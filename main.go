@@ -30,8 +30,8 @@ func main() {
 				log.Error("Error fetching content", log.Field("url", *urlPtr), log.Field("error", err))
 				return
 			}
-			log.Info("Fetched content", log.Field("url", *urlPtr), log.Field("content", content))
-			c.Start(*urlPtr) // Start crawling from this URL
+			log.Info("Fetched content", log.Field("url", *urlPtr), log.Field("content_length", len(content))) // Log the length of the content
+			c.Start(*urlPtr)                                                                                  // Start crawling from this URL
 		}),
 	)
 
