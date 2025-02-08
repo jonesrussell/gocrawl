@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"net/url"
 	"time"
 
 	"crypto/md5"
@@ -36,8 +37,19 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 		colly.Debugger(debugger),
 	)
 
+	// Parse the base URL to extract the domain
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, err // Handle URL parsing error
+	}
+	allowedDomain := parsedURL.Hostname() // Extract the domain from the base URL
+
 	// Set allowed domains to restrict crawling
-	collector.AllowedDomains = []string{baseURL} // Restrict to the base URL domain
+	collector.AllowedDomains = []string{
+		allowedDomain,
+		"http://" + allowedDomain,
+		"https://" + allowedDomain,
+	}
 
 	// Set rate limit
 	collector.Limit(&colly.LimitRule{
@@ -57,6 +69,9 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 		if err := e.Request.Visit(link); err != nil {
 			if err.Error() == "URL already visited" {
 				log.Info("URL already visited", log.Field("link", link))
+			} else if err.Error() == "Forbidden domain" {
+				// Log as info instead of error
+				log.Info("Forbidden domain", log.Field("link", link))
 			} else {
 				log.Error("Error visiting link", log.Field("link", link), log.Field("error", err))
 			}
@@ -73,6 +88,9 @@ func (c *Crawler) Start(url string) {
 
 		hash := md5.Sum([]byte(url))
 		docID := hex.EncodeToString(hash[:])
+
+		// Log the content being indexed
+		c.Logger.Info("Indexing document", c.Logger.Field("url", url), c.Logger.Field("content_length", len(content)))
 
 		err := c.Storage.IndexDocument("example_index", docID, map[string]interface{}{"url": url, "content": content})
 		if err != nil {
