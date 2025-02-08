@@ -5,16 +5,15 @@ import (
 	"flag"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/crawler" // Updated with the actual module path
-	"github.com/jonesrussell/gocrawl/internal/logger"  // Import the logger package
+	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 
-	// Import Colly debug package
 	"go.uber.org/fx"
 )
 
 func main() {
 	// Initialize the logger
-	log, err := logger.NewLogger()
+	log, err := logger.NewCustomLogger()
 	if err != nil {
 		panic(err) // Handle logger initialization error
 	}
