@@ -2,9 +2,12 @@ package main
 
 import (
 	"flag"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/crawler" // Updated with the actual module path
 	"github.com/jonesrussell/gocrawl/internal/logger"  // Import the logger package
+
+	// Import Colly debug package
 	"go.uber.org/fx"
 )
 
@@ -15,23 +18,20 @@ func main() {
 		panic(err) // Handle logger initialization error
 	}
 
-	// Define command-line flags for the URL and maxDepth
+	// Define command-line flags for the URL, maxDepth, and rateLimit
 	urlPtr := flag.String("url", "http://example.com", "The URL to crawl")
-	maxDepthPtr := flag.Int("maxDepth", 2, "The maximum depth to crawl") // New flag for maxDepth
-	flag.Parse()                                                         // Parse the command-line flags
+	maxDepthPtr := flag.Int("maxDepth", 2, "The maximum depth to crawl")                     // New flag for maxDepth
+	rateLimitPtr := flag.Duration("rateLimit", 2*time.Second, "Rate limit between requests") // New flag for rate limit
+	flag.Parse()                                                                             // Parse the command-line flags
 
 	app := fx.New(
 		fx.Provide(func() (*crawler.Crawler, error) {
-			return crawler.NewCrawler(*urlPtr, *maxDepthPtr) // Pass maxDepth from the flag
+			// Create a new Debugger
+			debugger := logger.NewCustomDebugger(log)
+			return crawler.NewCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, debugger) // Pass debugger to the crawler
 		}),
 		fx.Invoke(func(c *crawler.Crawler) {
-			content, err := c.Fetch(*urlPtr) // Fetch content from the URL
-			if err != nil {
-				log.Error("Error fetching content", log.Field("url", *urlPtr), log.Field("error", err))
-				return
-			}
-			log.Info("Fetched content", log.Field("url", *urlPtr), log.Field("content_length", len(content))) // Log the length of the content
-			c.Start(*urlPtr)                                                                                  // Start crawling from this URL
+			c.Start(*urlPtr) // Directly call Start to handle crawling and indexing
 		}),
 	)
 
