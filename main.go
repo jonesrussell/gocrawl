@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"time"
 
@@ -25,10 +26,25 @@ func main() {
 	flag.Parse()                                                                             // Parse the command-line flags
 
 	app := fx.New(
-		fx.Provide(func() (*crawler.Crawler, error) {
+		fx.Provide(func(lc fx.Lifecycle) (*crawler.Crawler, error) {
 			// Create a new Debugger
 			debugger := logger.NewCustomDebugger(log)
-			return crawler.NewCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, debugger) // Pass debugger to the crawler
+
+			// Create a new Crawler
+			crawlerInstance, err := crawler.NewCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, debugger)
+			if err != nil {
+				return nil, err
+			}
+
+			// Register a shutdown function to stop the crawler
+			lc.Append(fx.Hook{
+				OnStop: func(ctx context.Context) error {
+					crawlerInstance.Collector.Wait() // Wait for all requests to finish
+					return nil
+				},
+			})
+
+			return crawlerInstance, nil
 		}),
 		fx.Invoke(func(c *crawler.Crawler) {
 			c.Start(*urlPtr) // Directly call Start to handle crawling and indexing
