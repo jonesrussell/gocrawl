@@ -43,6 +43,11 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 		Delay:       rateLimit,
 	})
 
+	// Set OnRequest callback
+	collector.OnRequest(func(r *colly.Request) {
+		log.Printf("Requesting URL: %s\n", r.URL.String()) // Log the request URL
+	})
+
 	return &Crawler{BaseURL: baseURL, Storage: storage, MaxDepth: maxDepth, RateLimit: rateLimit, Collector: collector}, nil
 }
 

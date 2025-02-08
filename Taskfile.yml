@@ -1,0 +1,8 @@
+version: '3'
+
+tasks:
+  crawl:
+    desc: "Run the web crawler"
+    cmds:
+      - go run main.go -url https://www.elliotlaketoday.com/opp-beat
+
