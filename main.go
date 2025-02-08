@@ -1,42 +1,36 @@
 package main
 
 import (
-	"log"
+	"flag"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/gocolly/colly/v2"
 	"go.uber.org/fx"
+	"github.com/jonesrussell/gocrawl/internal/crawler" // Updated with the actual module path
+	"github.com/jonesrussell/gocrawl/internal/logger" // Import the logger package
 )
 
-type Crawler struct {
-	Collector *colly.Collector
-	ESClient  *elasticsearch.Client
-}
-
-func NewCrawler() *Crawler {
-	collector := colly.NewCollector()
-	esClient, err := elasticsearch.NewDefaultClient()
-	if err != nil {
-		log.Fatalf("Error creating Elasticsearch client: %s", err)
-	}
-	return &Crawler{Collector: collector, ESClient: esClient}
-}
-
-func (c *Crawler) Start(url string) {
-	c.Collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Attr("href")
-		log.Println("Found link:", link)
-		// Here you can add code to index the link in Elasticsearch
-	})
-
-	c.Collector.Visit(url)
-}
-
 func main() {
+	// Initialize the logger
+	log, err := logger.NewLogger()
+	if err != nil {
+		panic(err) // Handle logger initialization error
+	}
+
+	// Define a command-line flag for the URL
+	urlPtr := flag.String("url", "http://example.com", "The URL to crawl")
+	flag.Parse() // Parse the command-line flags
+
 	app := fx.New(
-		fx.Provide(NewCrawler),
-		fx.Invoke(func(c *Crawler) {
-			c.Start("http://example.com") // Start crawling from this URL
+		fx.Provide(func() (*crawler.Crawler, error) {
+			return crawler.NewCrawler(*urlPtr) // Pass the URL from the flag
+		}),
+		fx.Invoke(func(c *crawler.Crawler) {
+			content, err := c.Fetch(*urlPtr) // Fetch content from the URL
+			if err != nil {
+				log.Error("Error fetching content", logger.Field("url", *urlPtr), logger.Field("error", err))
+				return
+			}
+			log.Info("Fetched content", logger.Field("url", *urlPtr), logger.Field("content", content))
+			c.Start(*urlPtr) // Start crawling from this URL
 		}),
 	)
 
