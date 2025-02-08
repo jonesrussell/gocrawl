@@ -1,7 +1,6 @@
 package crawler
 
 import (
-	"log"
 	"time"
 
 	"crypto/md5"
@@ -20,10 +19,11 @@ type Crawler struct {
 	MaxDepth  int
 	RateLimit time.Duration
 	Collector *colly.Collector
+	Logger    *logger.CustomLogger
 }
 
 // NewCrawler initializes a new Crawler
-func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger) (*Crawler, error) {
+func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger, log *logger.CustomLogger) (*Crawler, error) {
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
 		return nil, err
@@ -36,6 +36,9 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 		colly.Debugger(debugger),
 	)
 
+	// Set allowed domains to restrict crawling
+	collector.AllowedDomains = []string{baseURL} // Restrict to the base URL domain
+
 	// Set rate limit
 	collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
@@ -45,10 +48,22 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 
 	// Set OnRequest callback
 	collector.OnRequest(func(r *colly.Request) {
-		log.Printf("Requesting URL: %s\n", r.URL.String()) // Log the request URL
+		log.Info("Requesting URL", log.Field("url", r.URL.String()), log.Field("request_id", r.ID))
 	})
 
-	return &Crawler{BaseURL: baseURL, Storage: storage, MaxDepth: maxDepth, RateLimit: rateLimit, Collector: collector}, nil
+	// Set OnHTML callback to find and visit links
+	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		if err := e.Request.Visit(link); err != nil {
+			if err.Error() == "URL already visited" {
+				log.Info("URL already visited", log.Field("link", link))
+			} else {
+				log.Error("Error visiting link", log.Field("link", link), log.Field("error", err))
+			}
+		}
+	})
+
+	return &Crawler{BaseURL: baseURL, Storage: storage, MaxDepth: maxDepth, RateLimit: rateLimit, Collector: collector, Logger: log}, nil
 }
 
 // Start method to begin crawling and indexing
@@ -61,13 +76,13 @@ func (c *Crawler) Start(url string) {
 
 		err := c.Storage.IndexDocument("example_index", docID, map[string]interface{}{"url": url, "content": content})
 		if err != nil {
-			log.Println("Error indexing document:", err)
+			c.Logger.Error("Error indexing document", c.Logger.Field("url", url), c.Logger.Field("error", err))
 		}
 	})
 
 	err := c.Collector.Visit(url)
 	if err != nil {
-		log.Println("Error visiting URL:", err)
+		c.Logger.Error("Error visiting URL", c.Logger.Field("url", url), c.Logger.Field("error", err))
 	}
 
 	c.Collector.Wait()

@@ -19,7 +19,8 @@ func main() {
 		panic("Error loading .env file") // Handle error if .env file is not found
 	}
 
-	appEnv := os.Getenv("APP_ENV") // Get the APP_ENV variable
+	appEnv := os.Getenv("APP_ENV")     // Get the APP_ENV variable
+	appDebug := os.Getenv("APP_DEBUG") // Get the APP_DEBUG variable
 
 	// Initialize the logger based on the environment
 	var log *logger.CustomLogger
@@ -39,13 +40,21 @@ func main() {
 	rateLimitPtr := flag.Duration("rateLimit", 2*time.Second, "Rate limit between requests") // New flag for rate limit
 	flag.Parse()                                                                             // Parse the command-line flags
 
+	// Print configuration if APP_DEBUG is true
+	if appDebug == "true" {
+		log.Info("Crawling Configuration",
+			log.Field("url", *urlPtr),
+			log.Field("maxDepth", *maxDepthPtr),
+			log.Field("rateLimit", rateLimitPtr.String()))
+	}
+
 	app := fx.New(
 		fx.Provide(func(lc fx.Lifecycle) (*crawler.Crawler, error) {
 			// Create a new Debugger
 			debugger := logger.NewCustomDebugger(log)
 
 			// Create a new Crawler
-			crawlerInstance, err := crawler.NewCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, debugger)
+			crawlerInstance, err := crawler.NewCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, debugger, log)
 			if err != nil {
 				return nil, err
 			}
