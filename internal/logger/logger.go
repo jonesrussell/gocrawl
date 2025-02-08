@@ -41,3 +41,12 @@ func NewCustomLogger() (*CustomLogger, error) {
 	}
 	return &CustomLogger{logger: logger}, nil
 }
+
+// NewDevelopmentLogger initializes a new CustomLogger for development
+func NewDevelopmentLogger() (*CustomLogger, error) {
+	logger, err := zap.NewDevelopment() // Use development logger
+	if err != nil {
+		return nil, err
+	}
+	return &CustomLogger{logger: logger}, nil
+}

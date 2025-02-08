@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"flag"
+	"os" // Import os for environment variable access
 	"time"
 
+	"github.com/joho/godotenv" // Import godotenv for loading .env files
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 
@@ -12,8 +14,21 @@ import (
 )
 
 func main() {
-	// Initialize the logger
-	log, err := logger.NewCustomLogger()
+	// Load environment variables from .env file
+	if err := godotenv.Load(); err != nil {
+		panic("Error loading .env file") // Handle error if .env file is not found
+	}
+
+	appEnv := os.Getenv("APP_ENV") // Get the APP_ENV variable
+
+	// Initialize the logger based on the environment
+	var log *logger.CustomLogger
+	var err error
+	if appEnv == "development" {
+		log, err = logger.NewDevelopmentLogger() // Use development logger
+	} else {
+		log, err = logger.NewCustomLogger() // Use production logger
+	}
 	if err != nil {
 		panic(err) // Handle logger initialization error
 	}

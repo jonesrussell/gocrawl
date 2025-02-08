@@ -5,6 +5,7 @@ go 1.23.4
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.17.0
 	github.com/gocolly/colly/v2 v2.1.0
+	github.com/joho/godotenv v1.5.1
 	go.uber.org/fx v1.23.0
 	go.uber.org/zap v1.27.0
 )
