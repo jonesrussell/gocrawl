@@ -1,18 +1,18 @@
 package crawler
 
 import (
-	"net/http"
 	"io/ioutil"
 	"log"
+	"net/http"
+
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
 // Crawler struct to hold configuration or state if needed
 type Crawler struct {
-	BaseURL  string
-	ESClient *elasticsearch.Client
-	Storage  *storage.Storage
+	BaseURL string
+	Storage *storage.Storage
 }
 
 // NewCrawler initializes a new Crawler
@@ -22,7 +22,7 @@ func NewCrawler(baseURL string) (*Crawler, error) {
 		return nil, err
 	}
 	storage := storage.NewStorage(esClient)
-	return &Crawler{BaseURL: baseURL, ESClient: esClient, Storage: storage}, nil
+	return &Crawler{BaseURL: baseURL, Storage: storage}, nil
 }
 
 // Fetch fetches the content from the given URL

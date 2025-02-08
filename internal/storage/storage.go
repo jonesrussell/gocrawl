@@ -1,9 +1,12 @@
 package storage
 
 import (
-	"context"
-	"github.com/elastic/go-elasticsearch/v8"
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"log"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // Storage struct to hold the Elasticsearch client
@@ -18,10 +21,30 @@ func NewStorage(esClient *elasticsearch.Client) *Storage {
 
 // IndexDocument indexes a document in Elasticsearch
 func (s *Storage) IndexDocument(index string, docID string, document interface{}) error {
-	// Here you would implement the logic to index the document
-	// For example, using the ES client to index the document
-	// This is a placeholder for the actual implementation
-	log.Printf("Indexing document ID %s in index %s", docID, index)
+	// Convert the document to JSON
+	data, err := json.Marshal(document)
+	if err != nil {
+		return err
+	}
+
+	// Create the request to index the document
+	req := bytes.NewReader(data)
+	res, err := s.ESClient.Index(
+		index,
+		req,
+		s.ESClient.Index.WithDocumentID(docID),
+		s.ESClient.Index.WithRefresh("true"),
+	)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("Error indexing document ID %s: %s", docID, res.String())
+	}
+
+	log.Printf("Indexed document ID %s in index %s", docID, index)
 	return nil
 }
 

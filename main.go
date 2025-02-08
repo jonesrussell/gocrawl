@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 
-	"go.uber.org/fx"
 	"github.com/jonesrussell/gocrawl/internal/crawler" // Updated with the actual module path
-	"github.com/jonesrussell/gocrawl/internal/logger" // Import the logger package
+	"github.com/jonesrussell/gocrawl/internal/logger"  // Import the logger package
+	"go.uber.org/fx"
 )
 
 func main() {
@@ -26,10 +26,10 @@ func main() {
 		fx.Invoke(func(c *crawler.Crawler) {
 			content, err := c.Fetch(*urlPtr) // Fetch content from the URL
 			if err != nil {
-				log.Error("Error fetching content", logger.Field("url", *urlPtr), logger.Field("error", err))
+				log.Error("Error fetching content", log.Field("url", *urlPtr), log.Field("error", err))
 				return
 			}
-			log.Info("Fetched content", logger.Field("url", *urlPtr), logger.Field("content", content))
+			log.Info("Fetched content", log.Field("url", *urlPtr), log.Field("content", content))
 			c.Start(*urlPtr) // Start crawling from this URL
 		}),
 	)
