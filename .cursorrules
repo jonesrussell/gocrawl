@@ -1,0 +1,4 @@
+- Provide a brief explanation of updates made to the code.
+- Use proper dependency injection for better testability.
+- Maintain code readability and structure.
+- Avoid global state where possible.
