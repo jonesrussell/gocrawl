@@ -1,7 +1,7 @@
 package crawler
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 
@@ -11,18 +11,19 @@ import (
 
 // Crawler struct to hold configuration or state if needed
 type Crawler struct {
-	BaseURL string
-	Storage *storage.Storage
+	BaseURL  string
+	Storage  *storage.Storage
+	MaxDepth int
 }
 
 // NewCrawler initializes a new Crawler
-func NewCrawler(baseURL string) (*Crawler, error) {
+func NewCrawler(baseURL string, maxDepth int) (*Crawler, error) {
 	esClient, err := elasticsearch.NewDefaultClient()
 	if err != nil {
 		return nil, err
 	}
 	storage := storage.NewStorage(esClient)
-	return &Crawler{BaseURL: baseURL, Storage: storage}, nil
+	return &Crawler{BaseURL: baseURL, Storage: storage, MaxDepth: maxDepth}, nil
 }
 
 // Fetch fetches the content from the given URL
@@ -34,7 +35,7 @@ func (c *Crawler) Fetch(url string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Println("Error reading response body:", err)
 		return "", err

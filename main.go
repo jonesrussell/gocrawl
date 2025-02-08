@@ -15,13 +15,14 @@ func main() {
 		panic(err) // Handle logger initialization error
 	}
 
-	// Define a command-line flag for the URL
+	// Define command-line flags for the URL and maxDepth
 	urlPtr := flag.String("url", "http://example.com", "The URL to crawl")
-	flag.Parse() // Parse the command-line flags
+	maxDepthPtr := flag.Int("maxDepth", 3, "The maximum depth to crawl") // New flag for maxDepth
+	flag.Parse()                                                         // Parse the command-line flags
 
 	app := fx.New(
 		fx.Provide(func() (*crawler.Crawler, error) {
-			return crawler.NewCrawler(*urlPtr) // Pass the URL from the flag
+			return crawler.NewCrawler(*urlPtr, *maxDepthPtr) // Pass maxDepth from the flag
 		}),
 		fx.Invoke(func(c *crawler.Crawler) {
 			content, err := c.Fetch(*urlPtr) // Fetch content from the URL
