@@ -17,7 +17,7 @@ func main() {
 
 	// Define command-line flags for the URL and maxDepth
 	urlPtr := flag.String("url", "http://example.com", "The URL to crawl")
-	maxDepthPtr := flag.Int("maxDepth", 3, "The maximum depth to crawl") // New flag for maxDepth
+	maxDepthPtr := flag.Int("maxDepth", 2, "The maximum depth to crawl") // New flag for maxDepth
 	flag.Parse()                                                         // Parse the command-line flags
 
 	app := fx.New(
