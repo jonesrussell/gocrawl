@@ -20,12 +20,19 @@ func NewStorage() (*Storage, error) {
 	// Load credentials from environment variables
 	esURL := os.Getenv("ELASTIC_URL")
 	esPassword := os.Getenv("ELASTIC_PASSWORD")
+	esAPIKey := os.Getenv("ELASTIC_API_KEY") // Load API key from environment variables
 
 	// Create the Elasticsearch client with authentication
 	cfg := elasticsearch.Config{
 		Addresses: []string{esURL},
-		Username:  "elastic", // Default username for Elasticsearch
-		Password:  esPassword,
+	}
+
+	// Check if API key is provided
+	if esAPIKey != "" {
+		cfg.APIKey = esAPIKey // Use API key for authentication
+	} else {
+		cfg.Username = "elastic"  // Default username for Elasticsearch
+		cfg.Password = esPassword // Use password for authentication
 	}
 
 	esClient, err := elasticsearch.NewClient(cfg)
@@ -58,7 +65,7 @@ func (s *Storage) IndexDocument(index string, docID string, document interface{}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return fmt.Errorf("Error indexing document ID %s: %s", docID, res.String())
+		return fmt.Errorf("error indexing document ID %s: %s", docID, res.String())
 	}
 
 	log.Printf("Indexed document ID %s in index %s", docID, index)
