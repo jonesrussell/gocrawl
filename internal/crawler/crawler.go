@@ -47,7 +47,12 @@ func NewCrawler(p CrawlerParams) (*Crawler, error) {
 
 	p.Logger.Info("Successfully connected to Elasticsearch")
 
-	collectorInstance, err := collector.New(p.BaseURL, p.MaxDepth, p.RateLimit, p.Debugger)
+	collectorInstance, err := collector.New(collector.CollectorParams{
+		BaseURL:   p.BaseURL,
+		MaxDepth:  p.MaxDepth,
+		RateLimit: p.RateLimit,
+		Debugger:  p.Debugger,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize collector: %w", err)
 	}

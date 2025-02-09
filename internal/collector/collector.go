@@ -8,11 +8,22 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 
 	"github.com/gocolly/colly/v2"
+	"go.uber.org/fx"
 )
 
+// CollectorParams holds the dependencies for creating a new collector
+type CollectorParams struct {
+	fx.In
+
+	BaseURL   string        `name:"baseURL"`
+	MaxDepth  int           `name:"maxDepth"`
+	RateLimit time.Duration `name:"rateLimit"`
+	Debugger  *logger.CustomDebugger
+}
+
 // New creates and returns a new colly collector
-func New(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger) (*colly.Collector, error) {
-	parsedURL, err := url.Parse(baseURL)
+func New(p CollectorParams) (*colly.Collector, error) {
+	parsedURL, err := url.Parse(p.BaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse baseURL: %w", err)
 	}
@@ -20,8 +31,8 @@ func New(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger
 
 	collector := colly.NewCollector(
 		colly.Async(true),
-		colly.MaxDepth(maxDepth),
-		colly.Debugger(debugger),
+		colly.MaxDepth(p.MaxDepth),
+		colly.Debugger(p.Debugger),
 		colly.AllowedDomains(
 			allowedDomain,
 			"http://"+allowedDomain,
@@ -32,7 +43,7 @@ func New(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger
 	collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: 2,
-		Delay:       rateLimit,
+		Delay:       p.RateLimit,
 	})
 
 	// Set a timeout for requests
