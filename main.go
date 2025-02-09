@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -48,6 +49,7 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 		config.Module,
 		logger.Module,
 		storage.Module,
+		collector.Module,
 		fx.Provide(
 			fx.Annotated{
 				Name:   "baseURL",
