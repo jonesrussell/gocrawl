@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/elastic/go-elasticsearch/v8"
 )
@@ -15,8 +16,24 @@ type Storage struct {
 }
 
 // NewStorage initializes a new Storage instance
-func NewStorage(esClient *elasticsearch.Client) *Storage {
-	return &Storage{ESClient: esClient}
+func NewStorage() (*Storage, error) {
+	// Load credentials from environment variables
+	esURL := os.Getenv("ELASTIC_URL")
+	esPassword := os.Getenv("ELASTIC_PASSWORD")
+
+	// Create the Elasticsearch client with authentication
+	cfg := elasticsearch.Config{
+		Addresses: []string{esURL},
+		Username:  "elastic", // Default username for Elasticsearch
+		Password:  esPassword,
+	}
+
+	esClient, err := elasticsearch.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Storage{ESClient: esClient}, nil
 }
 
 // IndexDocument indexes a document in Elasticsearch
