@@ -22,6 +22,7 @@ type Crawler struct {
 	RateLimit time.Duration
 	Collector *colly.Collector
 	Logger    *logger.CustomLogger
+	Done      chan bool
 }
 
 var lastErrorTime time.Time
@@ -54,6 +55,7 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 		RateLimit: rateLimit,
 		Collector: collector,
 		Logger:    log,
+		Done:      make(chan bool),
 	}, nil
 }
 
@@ -168,6 +170,9 @@ func (c *Crawler) Start(ctx context.Context, url string) {
 	}
 
 	c.Collector.Wait()
+
+	// Signal that crawling is done
+	c.Done <- true
 }
 
 func generateDocumentID(url string) string {

@@ -15,7 +15,7 @@ import (
 	"go.uber.org/fx/fxevent"
 )
 
-// Add a new struct that implements fx.Printer
+// logPrinter is a struct that implements fx.Printer
 type logPrinter struct{}
 
 func (lp *logPrinter) Printf(format string, args ...any) {
@@ -57,16 +57,29 @@ func main() {
 				return &logPrinter{} // Provide the custom fx.Printer
 			},
 			func(lc fx.Lifecycle) (*crawler.Crawler, error) {
-				return initializeCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, loggerInstance, cfg, lc)
+				return initializeCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, loggerInstance, cfg)
 			},
 		),
 		fx.WithLogger(func(l fx.Printer) fxevent.Logger {
 			return &fxevent.ZapLogger{Logger: loggerInstance.GetZapLogger()} // Use the underlying zap logger
 		}),
-		fx.Invoke(func(c *crawler.Crawler) {
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
-			defer cancel()
-			c.Start(ctx, *urlPtr) // Directly call Start to handle crawling and indexing
+		fx.Invoke(func(lc fx.Lifecycle, c *crawler.Crawler) {
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					go func() {
+						ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+						defer cancel()
+						c.Start(ctx, *urlPtr) // Pass the URL pointer as the second argument
+
+						<-c.Done // Wait for crawling to complete
+					}()
+					return nil
+				},
+				OnStop: func(ctx context.Context) error {
+					c.Collector.Wait() // Wait for all requests to finish
+					return nil
+				},
+			})
 		}),
 	)
 
@@ -89,7 +102,7 @@ func newLogger(cfg *config.Config) *logger.CustomLogger {
 	return loggerInstance
 }
 
-func initializeCrawler(url string, maxDepth int, rateLimit time.Duration, loggerInstance *logger.CustomLogger, cfg *config.Config, lc fx.Lifecycle) (*crawler.Crawler, error) {
+func initializeCrawler(url string, maxDepth int, rateLimit time.Duration, loggerInstance *logger.CustomLogger, cfg *config.Config) (*crawler.Crawler, error) {
 	// Create a new Debugger
 	debugger := logger.NewCustomDebugger(loggerInstance)
 
@@ -98,14 +111,6 @@ func initializeCrawler(url string, maxDepth int, rateLimit time.Duration, logger
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize crawler: %w", err)
 	}
-
-	// Register a shutdown function to stop the crawler
-	lc.Append(fx.Hook{
-		OnStop: func(ctx context.Context) error {
-			crawlerInstance.Collector.Wait() // Wait for all requests to finish
-			return nil
-		},
-	})
 
 	return crawlerInstance, nil
 }
