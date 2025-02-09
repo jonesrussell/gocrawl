@@ -36,8 +36,8 @@ func main() {
 
 	// Define command-line flags for the URL, maxDepth, and rateLimit
 	urlPtr := flag.String("url", "http://example.com", "The URL to crawl")
-	maxDepthPtr := flag.Int("maxDepth", 2, "The maximum depth to crawl")                     // New flag for maxDepth
-	rateLimitPtr := flag.Duration("rateLimit", 2*time.Second, "Rate limit between requests") // New flag for rate limit
+	maxDepthPtr := flag.Int("maxDepth", 2, "The maximum depth to crawl")
+	rateLimitPtr := flag.Duration("rateLimit", 5*time.Second, "Rate limit between requests") // Set a longer rate limit for testing
 	flag.Parse()                                                                             // Parse the command-line flags
 
 	// Print configuration if APP_DEBUG is true
