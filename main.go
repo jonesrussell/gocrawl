@@ -47,7 +47,9 @@ func main() {
 			return initializeCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, loggerInstance, cfg, lc)
 		}),
 		fx.Invoke(func(c *crawler.Crawler) {
-			c.Start(*urlPtr) // Directly call Start to handle crawling and indexing
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			c.Start(ctx, *urlPtr) // Directly call Start to handle crawling and indexing
 		}),
 	)
 
