@@ -23,6 +23,10 @@ type Crawler struct {
 	Logger    *logger.CustomLogger
 }
 
+var lastErrorTime time.Time
+
+const errorLogCooldown = 10 * time.Second // Cooldown period for logging the same error
+
 // NewCrawler initializes a new Crawler
 func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger, log *logger.CustomLogger) (*Crawler, error) {
 	esClient, err := elasticsearch.NewDefaultClient()
@@ -34,7 +38,7 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 	// Initialize Colly collector with rate limiting and debugger
 	collector := colly.NewCollector(
 		colly.Async(true),
-		colly.Debugger(debugger),
+		// colly.Debugger(debugger),
 	)
 
 	// Parse the base URL to extract the domain
@@ -60,7 +64,14 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 
 	// Set OnRequest callback
 	collector.OnRequest(func(r *colly.Request) {
+		startTime := time.Now() // Record the start time
 		log.Info("Requesting URL", log.Field("url", r.URL.String()), log.Field("request_id", r.ID))
+
+		// Log the time taken for the request
+		defer func() {
+			duration := time.Since(startTime)
+			log.Info("Request completed", log.Field("url", r.URL.String()), log.Field("duration", duration))
+		}()
 	})
 
 	// Set OnHTML callback to find and visit links
@@ -90,17 +101,31 @@ func (c *Crawler) Start(url string) {
 		docID := hex.EncodeToString(hash[:])
 
 		// Log the content being indexed
-		c.Logger.Info("Indexing document", c.Logger.Field("url", url), c.Logger.Field("content_length", len(content)))
+		c.Logger.Info("Indexing document", c.Logger.Field("url", url), c.Logger.Field("content_length", len(content)), c.Logger.Field("content_preview", content[:100]))
+
+		if len(content) == 0 {
+			c.Logger.Warn("Content is empty, skipping indexing", c.Logger.Field("url", url))
+			return
+		}
 
 		err := c.Storage.IndexDocument("example_index", docID, map[string]interface{}{"url": url, "content": content})
 		if err != nil {
-			c.Logger.Error("Error indexing document", c.Logger.Field("url", url), c.Logger.Field("error", err))
+			if time.Since(lastErrorTime) > errorLogCooldown {
+				c.Logger.Error("Error indexing document", c.Logger.Field("url", url), c.Logger.Field("error", err))
+				lastErrorTime = time.Now()
+			}
+		} else {
+			// Log success message for indexing
+			c.Logger.Info("Successfully indexed document", c.Logger.Field("url", url), c.Logger.Field("docID", docID))
 		}
 	})
 
 	err := c.Collector.Visit(url)
 	if err != nil {
 		c.Logger.Error("Error visiting URL", c.Logger.Field("url", url), c.Logger.Field("error", err))
+	} else {
+		// Log success message for visiting
+		c.Logger.Info("Successfully visited URL", c.Logger.Field("url", url))
 	}
 
 	c.Collector.Wait()
