@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -74,4 +75,22 @@ func (s *Storage) IndexDocument(index string, docID string, document interface{}
 	return nil
 }
 
-// Other storage-related methods can be added here
+// TestConnection checks the connection to the Elasticsearch cluster
+func (s *Storage) TestConnection() error {
+	ctx := context.Background()
+	info, err := s.ESClient.Info(
+		s.ESClient.Info.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("error getting Elasticsearch info: %w", err)
+	}
+	defer info.Body.Close()
+
+	var esInfo map[string]interface{}
+	if err := json.NewDecoder(info.Body).Decode(&esInfo); err != nil {
+		return fmt.Errorf("error decoding Elasticsearch info response: %w", err)
+	}
+
+	log.Printf("Elasticsearch info: %+v", esInfo)
+	return nil
+}

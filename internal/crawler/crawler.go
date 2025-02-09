@@ -35,6 +35,14 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 		return nil, err
 	}
 
+	// Test the connection to Elasticsearch
+	err = storage.TestConnection()
+	if err != nil {
+		log.Fatalf("Error testing connection: %s", err) // Exit the application on connection failure
+	}
+
+	log.Info("Successfully connected to Elasticsearch")
+
 	// Initialize collector
 	collector, err := initializeCollector(baseURL, maxDepth, rateLimit, debugger)
 	if err != nil {
