@@ -79,3 +79,8 @@ func NewDevelopmentLogger() (*CustomLogger, error) {
 func (z *CustomLogger) Sync() error {
 	return z.logger.Sync()
 }
+
+// GetZapLogger returns the underlying zap.Logger
+func (z *CustomLogger) GetZapLogger() *zap.Logger {
+	return z.logger
+}

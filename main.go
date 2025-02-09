@@ -12,7 +12,15 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
+
+// Add a new struct that implements fx.Printer
+type logPrinter struct{}
+
+func (lp *logPrinter) Printf(format string, args ...any) {
+	log.Printf(format, args...) // Use log.Printf for formatted logging
+}
 
 func main() {
 	// Define command-line flags
@@ -45,10 +53,16 @@ func main() {
 			func() *logger.CustomLogger {
 				return loggerInstance
 			},
+			func() fx.Printer {
+				return &logPrinter{} // Provide the custom fx.Printer
+			},
 			func(lc fx.Lifecycle) (*crawler.Crawler, error) {
 				return initializeCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, loggerInstance, cfg, lc)
 			},
 		),
+		fx.WithLogger(func(l fx.Printer) fxevent.Logger {
+			return &fxevent.ZapLogger{Logger: loggerInstance.GetZapLogger()} // Use the underlying zap logger
+		}),
 		fx.Invoke(func(c *crawler.Crawler) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
