@@ -139,8 +139,15 @@ func logVisitError(log *logger.CustomLogger, link string, err error) {
 	}
 }
 
+// Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context, url string) {
 	c.Collector.OnHTML("html", func(e *colly.HTMLElement) {
+		// Check if the context is done before proceeding
+		if ctx.Err() != nil {
+			c.Logger.Warn("Crawling stopped due to context cancellation")
+			return
+		}
+
 		content := e.Text
 		docID := generateDocumentID(url)
 
