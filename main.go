@@ -24,12 +24,7 @@ func main() {
 	rateLimitPtr := flag.Duration("rateLimit", 5*time.Second, "Rate limit between requests")
 	flag.Parse()
 
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		log.Fatalf("Error loading config: %s", err)
-	}
-
-	app := createApp(*urlPtr, *maxDepthPtr, *rateLimitPtr, cfg)
+	app := createApp(*urlPtr, *maxDepthPtr, *rateLimitPtr)
 
 	// Create a channel to listen for OS signals
 	sigs := make(chan os.Signal, 1)
@@ -48,18 +43,31 @@ func main() {
 	// No need to call app.Shutdown() as fx handles it automatically
 }
 
-func createApp(url string, maxDepth int, rateLimit time.Duration, cfg *config.Config) *fx.App {
+func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 	return fx.New(
 		config.Module,
 		logger.Module,
 		storage.Module,
 		fx.Provide(
-			func(lc fx.Lifecycle, loggerInstance *logger.CustomLogger) (*crawler.Crawler, error) {
-				return initializeCrawler(url, maxDepth, rateLimit, loggerInstance, cfg)
+			fx.Annotated{
+				Name:   "baseURL",
+				Target: func() string { return url },
 			},
+			fx.Annotated{
+				Name:   "maxDepth",
+				Target: func() int { return maxDepth },
+			},
+			fx.Annotated{
+				Name:   "rateLimit",
+				Target: func() time.Duration { return rateLimit },
+			},
+			func(l *logger.CustomLogger) *logger.CustomDebugger {
+				return logger.NewCustomDebugger(l)
+			},
+			crawler.NewCrawler,
 		),
-		fx.WithLogger(func(loggerInstance *logger.CustomLogger) fxevent.Logger {
-			return &fxevent.ZapLogger{Logger: loggerInstance.GetZapLogger()}
+		fx.WithLogger(func(l *logger.CustomLogger) fxevent.Logger {
+			return &fxevent.ZapLogger{Logger: l.GetZapLogger()}
 		}),
 		fx.Invoke(registerHooks),
 	)
@@ -91,22 +99,17 @@ func startCrawling(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdo
 		if err != nil {
 			log.Printf("Error during crawling: %s", err)
 		}
+		log.Println("Crawler.Start() completed, closing done channel")
 		close(done)
 	}()
 
+	log.Println("Waiting for done signal...")
 	<-done
 	log.Println("Crawling process finished")
 
-	// Wait for all requests to complete
-	c.Collector.Wait()
-
-	// Trigger shutdown
+	log.Println("Initiating shutdown...")
 	if err := shutdowner.Shutdown(); err != nil {
 		log.Printf("Error during shutdown: %v", err)
 	}
-}
-
-func initializeCrawler(url string, maxDepth int, rateLimit time.Duration, loggerInstance *logger.CustomLogger, cfg *config.Config) (*crawler.Crawler, error) {
-	debugger := logger.NewCustomDebugger(loggerInstance)
-	return crawler.NewCrawler(url, maxDepth, rateLimit, debugger, loggerInstance, cfg)
+	log.Println("Shutdown completed")
 }

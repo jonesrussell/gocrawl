@@ -12,6 +12,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+	"go.uber.org/fx"
 )
 
 // Crawler struct to hold configuration or state if needed
@@ -25,35 +26,47 @@ type Crawler struct {
 	IndexName string
 }
 
+// CrawlerParams holds the dependencies for creating a new Crawler
+type CrawlerParams struct {
+	fx.In
+
+	BaseURL   string        `name:"baseURL"`
+	MaxDepth  int           `name:"maxDepth"`
+	RateLimit time.Duration `name:"rateLimit"`
+	Debugger  *logger.CustomDebugger
+	Logger    *logger.CustomLogger
+	Config    *config.Config
+}
+
 // NewCrawler initializes a new Crawler
-func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger, log *logger.CustomLogger, cfg *config.Config) (*Crawler, error) {
-	storage, err := initializeStorage(cfg, log)
+func NewCrawler(p CrawlerParams) (*Crawler, error) {
+	storageInstance, err := initializeStorage(p.Config, p.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
 
-	log.Info("Successfully connected to Elasticsearch")
+	p.Logger.Info("Successfully connected to Elasticsearch")
 
-	collectorInstance, err := collector.New(baseURL, maxDepth, rateLimit, debugger)
+	collectorInstance, err := collector.New(p.BaseURL, p.MaxDepth, p.RateLimit, p.Debugger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize collector: %w", err)
 	}
 
-	collector.ConfigureLogging(collectorInstance, log)
+	collector.ConfigureLogging(collectorInstance, p.Logger)
 
 	return &Crawler{
-		BaseURL:   baseURL,
-		Storage:   storage,
-		MaxDepth:  maxDepth,
-		RateLimit: rateLimit,
+		BaseURL:   p.BaseURL,
+		Storage:   storageInstance,
+		MaxDepth:  p.MaxDepth,
+		RateLimit: p.RateLimit,
 		Collector: collectorInstance,
-		Logger:    log,
-		IndexName: cfg.IndexName,
+		Logger:    p.Logger,
+		IndexName: p.Config.IndexName,
 	}, nil
 }
 
 func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.Storage, error) {
-	storage, err := storage.NewStorage(cfg, log)
+	storageInstance, err := storage.NewStorage(cfg, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
@@ -61,18 +74,39 @@ func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.S
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err = storage.TestConnection(ctx)
+	err = storageInstance.TestConnection(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error testing connection: %w", err)
 	}
 
-	return storage, nil
+	return storageInstance, nil
 }
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context) error {
 	c.Logger.Info("Starting crawling process")
 
+	// Configure collectors with context
+	c.configureCollectors(ctx)
+
+	// Visit the URL
+	if err := c.Collector.Visit(c.BaseURL); err != nil {
+		return fmt.Errorf("error visiting URL: %w", err)
+	}
+
+	// Wait for all requests to complete since we're using async mode
+	c.Collector.Wait()
+
+	// Check if context was cancelled
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	return nil
+}
+
+// Helper method to configure collectors
+func (c *Crawler) configureCollectors(ctx context.Context) {
 	c.Collector.OnRequest(func(r *colly.Request) {
 		c.Logger.Debug("Requesting URL", c.Logger.Field("url", r.URL.String()))
 	})
@@ -102,13 +136,6 @@ func (c *Crawler) Start(ctx context.Context) error {
 		c.Logger.Debug("Indexing document", c.Logger.Field("url", e.Request.URL.String()), c.Logger.Field("docID", docID))
 		c.indexDocument(ctx, c.IndexName, e.Request.URL.String(), content, docID)
 	})
-
-	if err := c.Collector.Visit(c.BaseURL); err != nil {
-		return fmt.Errorf("error visiting URL: %w", err)
-	}
-
-	<-ctx.Done()
-	return nil
 }
 
 func generateDocumentID(url string) string {
