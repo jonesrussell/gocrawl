@@ -8,6 +8,7 @@ type LoggerInterface interface {
 	Debug(msg string, fields ...zap.Field)
 	Info(msg string, fields ...zap.Field)
 	Error(msg string, fields ...zap.Field)
+	Warn(msg string, fields ...zap.Field)
 	Field(key string, value interface{}) zap.Field
 	// Add other methods as needed
 }
@@ -26,6 +27,10 @@ func (z *CustomLogger) Info(msg string, fields ...zap.Field) {
 
 func (z *CustomLogger) Error(msg string, fields ...zap.Field) {
 	z.logger.Error(msg, fields...)
+}
+
+func (z *CustomLogger) Warn(msg string, fields ...zap.Field) {
+	z.logger.Warn(msg, fields...)
 }
 
 // Field creates a zap.Field for structured logging
