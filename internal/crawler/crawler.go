@@ -134,6 +134,9 @@ func logVisitError(log *logger.CustomLogger, link string, err error) {
 		log.Info("URL already visited", log.Field("link", link))
 	case "Forbidden domain", "Missing URL":
 		log.Info(err.Error(), log.Field("link", link))
+	case "Max depth limit reached":
+		// Log a simple message without stack trace
+		log.Warn("Max depth limit reached", log.Field("link", link))
 	default:
 		log.Error("Error visiting link", log.Field("link", link), log.Field("error", err))
 	}
