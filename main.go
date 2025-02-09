@@ -10,17 +10,11 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 )
-
-// logPrinter is a struct that implements fx.Printer
-type logPrinter struct{}
-
-func (lp *logPrinter) Printf(format string, args ...any) {
-	log.Printf(format, args...) // Use log.Printf for formatted logging
-}
 
 func main() {
 	// Define command-line flags
@@ -35,32 +29,16 @@ func main() {
 		log.Fatalf("Error loading config: %s", err)
 	}
 
-	// Initialize the logger based on the environment
-	loggerInstance := newLogger(cfg)
-
-	// Print configuration if APP_DEBUG is true
-	if cfg.AppDebug {
-		loggerInstance.Info("Crawling Configuration",
-			loggerInstance.Field("url", *urlPtr),
-			loggerInstance.Field("maxDepth", *maxDepthPtr),
-			loggerInstance.Field("rateLimit", rateLimitPtr.String()))
-	}
-
 	// Create and run the Fx application
 	app := fx.New(
+		logger.Module,
+		storage.Module,
 		fx.Provide(
-			// Provide the logger
-			func() *logger.CustomLogger {
-				return loggerInstance
-			},
-			func() fx.Printer {
-				return &logPrinter{} // Provide the custom fx.Printer
-			},
-			func(lc fx.Lifecycle) (*crawler.Crawler, error) {
+			func(lc fx.Lifecycle, loggerInstance *logger.CustomLogger) (*crawler.Crawler, error) {
 				return initializeCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, loggerInstance, cfg)
 			},
 		),
-		fx.WithLogger(func(l fx.Printer) fxevent.Logger {
+		fx.WithLogger(func(loggerInstance *logger.CustomLogger) fxevent.Logger {
 			return &fxevent.ZapLogger{Logger: loggerInstance.GetZapLogger()} // Use the underlying zap logger
 		}),
 		fx.Invoke(func(lc fx.Lifecycle, c *crawler.Crawler) {
@@ -84,22 +62,6 @@ func main() {
 	)
 
 	app.Run()
-}
-
-func newLogger(cfg *config.Config) *logger.CustomLogger {
-	if cfg.AppEnv == "development" {
-		loggerInstance, err := logger.NewDevelopmentLogger() // Use development logger
-		if err != nil {
-			log.Fatalf("Error initializing development logger: %s", err)
-		}
-		return loggerInstance
-	}
-
-	loggerInstance, err := logger.NewCustomLogger() // Use production logger
-	if err != nil {
-		log.Fatalf("Error initializing production logger: %s", err)
-	}
-	return loggerInstance
 }
 
 func initializeCrawler(url string, maxDepth int, rateLimit time.Duration, loggerInstance *logger.CustomLogger, cfg *config.Config) (*crawler.Crawler, error) {
