@@ -24,6 +24,8 @@ type Crawler struct {
 	Collector *colly.Collector
 	Logger    *logger.CustomLogger
 	IndexName string
+	done      chan struct{}
+	isRunning bool
 }
 
 // CrawlerParams holds the dependencies for creating a new Crawler
@@ -67,6 +69,8 @@ func NewCrawler(p CrawlerParams) (*Crawler, error) {
 		Collector: collectorInstance,
 		Logger:    p.Logger,
 		IndexName: p.Config.IndexName,
+		done:      make(chan struct{}),
+		isRunning: false,
 	}, nil
 }
 
@@ -89,21 +93,36 @@ func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.S
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context) error {
-	c.Logger.Info("Starting crawling process")
+	if c.isRunning {
+		return fmt.Errorf("crawler is already running")
+	}
+	c.isRunning = true
+	defer func() {
+		c.isRunning = false
+		close(c.done)
+	}()
 
-	// Configure collectors with context
+	c.Logger.Info("Starting crawling process")
 	c.configureCollectors(ctx)
 
-	// Visit the URL
-	if err := c.Collector.Visit(c.BaseURL); err != nil {
-		return fmt.Errorf("error visiting URL: %w", err)
-	}
+	errChan := make(chan error, 1)
+	go func() {
+		if err := c.Collector.Visit(c.BaseURL); err != nil {
+			errChan <- fmt.Errorf("error visiting URL: %w", err)
+			return
+		}
+		c.Collector.Wait()
+		errChan <- nil
+	}()
 
-	// Wait for all requests to complete since we're using async mode
-	c.Collector.Wait()
-
-	// Check if context was cancelled
-	if ctx.Err() != nil {
+	select {
+	case err := <-errChan:
+		if err != nil {
+			c.Logger.Error("Crawling error", c.Logger.Field("error", err))
+			return err
+		}
+	case <-ctx.Done():
+		c.Logger.Warn("Crawling stopped due to context cancellation", c.Logger.Field("error", ctx.Err()))
 		return ctx.Err()
 	}
 
@@ -118,6 +137,9 @@ func (c *Crawler) configureCollectors(ctx context.Context) {
 
 	c.Collector.OnResponse(func(r *colly.Response) {
 		c.Logger.Debug("Received response", c.Logger.Field("url", r.Request.URL.String()), c.Logger.Field("status", r.StatusCode))
+		if r.StatusCode != 200 {
+			c.Logger.Warn("Non-200 response received", c.Logger.Field("url", r.Request.URL.String()), c.Logger.Field("status", r.StatusCode))
+		}
 	})
 
 	c.Collector.OnError(func(r *colly.Response, err error) {
@@ -157,4 +179,20 @@ func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, do
 	} else {
 		c.Logger.Info("Successfully indexed document", c.Logger.Field("url", url), c.Logger.Field("docID", docID))
 	}
+}
+
+// Wait returns a channel that's closed when crawling is complete
+func (c *Crawler) Wait() <-chan struct{} {
+	return c.done
+}
+
+// Stop method to stop the crawling process
+func (c *Crawler) Stop() error {
+	if !c.isRunning {
+		return fmt.Errorf("crawler is not running")
+	}
+	c.Logger.Info("Stopping crawling process")
+	c.isRunning = false
+	close(c.done) // Signal that crawling is done
+	return nil
 }

@@ -31,17 +31,29 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
+	// Create a context that will be canceled when a signal is received
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Run the application in a goroutine
+	appDone := make(chan error, 1)
 	go func() {
-		if err := app.Start(context.Background()); err != nil {
-			log.Fatalf("Application error: %v", err)
-		}
+		appDone <- app.Start(ctx)
 	}()
 
-	// Wait for a signal
-	<-sigs
-	log.Println("Received shutdown signal, exiting...")
-	// No need to call app.Shutdown() as fx handles it automatically
+	// Wait for either app completion or signal
+	select {
+	case err := <-appDone:
+		if err != nil {
+			log.Fatalf("Application error: %v", err)
+		}
+	case sig := <-sigs:
+		log.Printf("Received signal %v, initiating shutdown...", sig)
+		cancel()
+		if err := app.Stop(context.Background()); err != nil {
+			log.Printf("Error during shutdown: %v", err)
+		}
+	}
 }
 
 func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
@@ -83,35 +95,36 @@ func registerHooks(lc fx.Lifecycle, c *crawler.Crawler, shutdowner fx.Shutdowner
 		},
 		OnStop: func(ctx context.Context) error {
 			log.Println("Shutdown process initiated...")
+			// Ensure the crawler is stopped gracefully
+			if err := c.Stop(); err != nil {
+				log.Printf("Error stopping crawler: %v", err)
+			}
 			return nil
 		},
 	})
 }
 
 func startCrawling(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdowner) {
-	done := make(chan struct{})
-
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Hour)
-	defer cancel()
-
-	log.Println("Starting the crawling process")
-
+	errChan := make(chan error, 1)
 	go func() {
-		err := c.Start(ctx)
-		if err != nil {
-			log.Printf("Error during crawling: %s", err)
-		}
-		log.Println("Crawler.Start() completed, closing done channel")
-		close(done)
+		errChan <- c.Start(ctx)
 	}()
 
-	log.Println("Waiting for done signal...")
-	<-done
-	log.Println("Crawling process finished")
-
-	log.Println("Initiating shutdown...")
-	if err := shutdowner.Shutdown(); err != nil {
-		log.Printf("Error during shutdown: %v", err)
+	select {
+	case err := <-errChan:
+		if err != nil && err != context.Canceled {
+			log.Printf("Error during crawling: %s", err)
+		}
+		log.Println("Crawling process finished")
+		// Signal shutdown after crawling is complete
+		if err := shutdowner.Shutdown(); err != nil {
+			log.Printf("Error during shutdown: %v", err)
+		}
+	case <-ctx.Done():
+		log.Println("Context canceled, shutting down...")
+		// Ensure shutdown is called if context is done
+		if err := shutdowner.Shutdown(); err != nil {
+			log.Printf("Error during shutdown: %v", err)
+		}
 	}
-	log.Println("Shutdown completed")
 }
