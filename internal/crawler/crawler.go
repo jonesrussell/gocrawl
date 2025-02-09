@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 
@@ -27,9 +28,9 @@ var lastErrorTime time.Time
 const errorLogCooldown = 10 * time.Second // Cooldown period for logging the same error
 
 // NewCrawler initializes a new Crawler
-func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger, log *logger.CustomLogger) (*Crawler, error) {
-	// Initialize storage
-	storage, err := initializeStorage()
+func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger, log *logger.CustomLogger, cfg *config.Config) (*Crawler, error) {
+	// Initialize storage with the config
+	storage, err := storage.NewStorage(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -51,10 +52,6 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 		Collector: collector,
 		Logger:    log,
 	}, nil
-}
-
-func initializeStorage() (*storage.Storage, error) {
-	return storage.NewStorage()
 }
 
 func initializeCollector(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger) (*colly.Collector, error) {

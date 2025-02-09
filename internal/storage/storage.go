@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/config" // Import the config package
 )
 
 // Storage struct to hold the Elasticsearch client
@@ -16,26 +16,25 @@ type Storage struct {
 }
 
 // NewStorage initializes a new Storage instance
-func NewStorage() (*Storage, error) {
-	// Load credentials from environment variables
-	esURL := os.Getenv("ELASTIC_URL")
-	esPassword := os.Getenv("ELASTIC_PASSWORD")
-	esAPIKey := os.Getenv("ELASTIC_API_KEY") // Load API key from environment variables
-
+func NewStorage(cfg *config.Config) (*Storage, error) {
 	// Create the Elasticsearch client with authentication
-	cfg := elasticsearch.Config{
+	esURL := cfg.ElasticURL
+	esPassword := cfg.ElasticPassword
+	esAPIKey := cfg.ElasticAPIKey
+
+	cfgElasticsearch := elasticsearch.Config{
 		Addresses: []string{esURL},
 	}
 
 	// Check if API key is provided
 	if esAPIKey != "" {
-		cfg.APIKey = esAPIKey // Use API key for authentication
+		cfgElasticsearch.APIKey = esAPIKey // Use API key for authentication
 	} else {
-		cfg.Username = "elastic"  // Default username for Elasticsearch
-		cfg.Password = esPassword // Use password for authentication
+		cfgElasticsearch.Username = "elastic"  // Default username for Elasticsearch
+		cfgElasticsearch.Password = esPassword // Use password for authentication
 	}
 
-	esClient, err := elasticsearch.NewClient(cfg)
+	esClient, err := elasticsearch.NewClient(cfgElasticsearch)
 	if err != nil {
 		return nil, err
 	}

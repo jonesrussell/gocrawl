@@ -50,8 +50,8 @@ func main() {
 			// Create a new Debugger
 			debugger := logger.NewCustomDebugger(log)
 
-			// Create a new Crawler
-			crawlerInstance, err := crawler.NewCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, debugger, log)
+			// Create a new Crawler with the config
+			crawlerInstance, err := crawler.NewCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, debugger, log, cfg)
 			if err != nil {
 				return nil, err
 			}
