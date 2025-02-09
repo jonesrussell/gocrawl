@@ -7,7 +7,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -29,11 +28,11 @@ const errorLogCooldown = 10 * time.Second // Cooldown period for logging the sam
 
 // NewCrawler initializes a new Crawler
 func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger, log *logger.CustomLogger) (*Crawler, error) {
-	esClient, err := elasticsearch.NewDefaultClient()
+	// Create storage instance, which now initializes the Elasticsearch client
+	storage, err := storage.NewStorage()
 	if err != nil {
 		return nil, err
 	}
-	storage := storage.NewStorage(esClient)
 
 	// Initialize Colly collector with rate limiting and debugger
 	collector := colly.NewCollector(
@@ -83,6 +82,9 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 			} else if err.Error() == "Forbidden domain" {
 				// Log as info instead of error
 				log.Info("Forbidden domain", log.Field("link", link))
+			} else if err.Error() == "Missing URL" {
+				// Log as info instead of error
+				log.Info("Missing URL", log.Field("link", link))
 			} else {
 				log.Error("Error visiting link", log.Field("link", link), log.Field("error", err))
 			}
