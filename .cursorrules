@@ -2,3 +2,28 @@
 - Use proper dependency injection for better testability.
 - Maintain code readability and structure.
 - Avoid global state where possible.
+- Use go 1.23.
+- Use the following dependencies:
+	github.com/elastic/go-elasticsearch/v8 v8.17.0
+	github.com/gocolly/colly/v2 v2.1.0
+	github.com/joho/godotenv v1.5.1
+	go.uber.org/fx v1.23.0
+	go.uber.org/zap v1.27.0
+
+- Uber Fx Module structure:
+	internal/
+		collector/
+			module.go
+			collector.go
+		config/
+			module.go
+			config.go
+		crawler/
+			module.go
+			crawler.go
+		logger/
+			module.go
+			logger.go
+		storage/
+			module.go
+			storage.go
