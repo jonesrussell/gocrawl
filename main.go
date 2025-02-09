@@ -50,6 +50,7 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 		logger.Module,
 		storage.Module,
 		collector.Module,
+		crawler.Module,
 		fx.Provide(
 			fx.Annotated{
 				Name:   "baseURL",
@@ -66,7 +67,6 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 			func(l *logger.CustomLogger) *logger.CustomDebugger {
 				return logger.NewCustomDebugger(l)
 			},
-			crawler.NewCrawler,
 		),
 		fx.WithLogger(func(l *logger.CustomLogger) fxevent.Logger {
 			return &fxevent.ZapLogger{Logger: l.GetZapLogger()}
