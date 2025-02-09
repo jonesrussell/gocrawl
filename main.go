@@ -47,14 +47,16 @@ func main() {
 					go func() {
 						ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
 						defer cancel()
-						c.Start(ctx, *urlPtr) // Pass the URL pointer as the second argument
+						c.Start(ctx, *urlPtr) // Start the crawler
 
 						<-c.Done // Wait for crawling to complete
 					}()
 					return nil
 				},
 				OnStop: func(ctx context.Context) error {
+					// Signal the crawler to stop and wait for it to finish
 					c.Collector.Wait() // Wait for all requests to finish
+					close(c.Done)      // Close the Done channel to signal completion
 					return nil
 				},
 			})
