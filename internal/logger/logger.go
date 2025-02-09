@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 
+	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -33,6 +34,13 @@ const (
 
 // Ensure CustomLogger implements LoggerInterface
 var _ LoggerInterface = (*CustomLogger)(nil)
+
+type LoggerParams struct {
+	fx.In
+
+	Level  LogLevel
+	AppEnv string `name:"appEnv"`
+}
 
 func (z *CustomLogger) Debug(msg string, fields ...zap.Field) {
 	z.logger.Debug(msg, fields...)
@@ -66,11 +74,11 @@ func (z *CustomLogger) Field(key string, value interface{}) zap.Field {
 }
 
 // NewCustomLogger initializes a new CustomLogger with a specified log level
-func NewCustomLogger(level LogLevel) (*CustomLogger, error) {
+func NewCustomLogger(p LoggerParams) (*CustomLogger, error) {
 	// Create a zap configuration
 	config := zap.Config{
-		Level:    zap.NewAtomicLevelAt(zapcore.Level(level)), // Set the log level
-		Encoding: "json",                                     // or "console" for human-readable output
+		Level:    zap.NewAtomicLevelAt(zapcore.Level(p.Level)),
+		Encoding: "json",
 		EncoderConfig: zapcore.EncoderConfig{
 			MessageKey:    "message",
 			LevelKey:      "level",
@@ -80,8 +88,8 @@ func NewCustomLogger(level LogLevel) (*CustomLogger, error) {
 			EncodeLevel:   zapcore.CapitalLevelEncoder,
 			EncodeTime:    zapcore.ISO8601TimeEncoder,
 		},
-		OutputPaths:      []string{"stdout"}, // Output to stdout
-		ErrorOutputPaths: []string{"stderr"}, // Output errors to stderr
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
 	}
 
 	// Create the logger
@@ -90,11 +98,11 @@ func NewCustomLogger(level LogLevel) (*CustomLogger, error) {
 		return nil, err
 	}
 
-	return &CustomLogger{logger: logger, Level: level}, nil
+	return &CustomLogger{logger: logger, Level: p.Level}, nil
 }
 
 // NewDevelopmentLogger initializes a new CustomLogger for development
-func NewDevelopmentLogger() (*CustomLogger, error) {
+func NewDevelopmentLogger(p LoggerParams) (*CustomLogger, error) {
 	encoderConfig := zap.NewDevelopmentEncoderConfig()
 	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
@@ -105,7 +113,7 @@ func NewDevelopmentLogger() (*CustomLogger, error) {
 	)
 
 	logger := zap.New(core)
-	return &CustomLogger{logger: logger}, nil
+	return &CustomLogger{logger: logger, Level: p.Level}, nil
 }
 
 // Sync flushes any buffered log entries

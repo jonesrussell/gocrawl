@@ -16,9 +16,7 @@ var Module = fx.Module("logger",
 
 // NewLogger initializes the appropriate logger based on the environment
 func NewLogger(cfg *config.Config) (*CustomLogger, error) {
-	env := cfg.AppEnv
-	logLevel := cfg.LogLevel // Read log level from config
-
+	logLevel := cfg.LogLevel
 	var level LogLevel
 	switch strings.ToUpper(logLevel) {
 	case "DEBUG":
@@ -30,15 +28,24 @@ func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 	case "ERROR":
 		level = ERROR
 	default:
-		level = INFO // Default to INFO if not set or invalid
+		level = INFO
 	}
 
-	if env == "development" {
-		return NewDevelopmentLogger()
+	params := LoggerParams{
+		Level:  level,
+		AppEnv: cfg.AppEnv,
 	}
-	return NewCustomLogger(level) // Pass the log level from config
+
+	if cfg.AppEnv == "development" {
+		return NewDevelopmentLogger(params)
+	}
+	return NewCustomLogger(params)
 }
 
 func InitializeLogger() (*CustomLogger, error) {
-	return NewCustomLogger(INFO)
+	params := LoggerParams{
+		Level:  INFO,
+		AppEnv: "production", // default to production environment
+	}
+	return NewCustomLogger(params)
 }
