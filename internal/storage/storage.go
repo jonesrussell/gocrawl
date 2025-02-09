@@ -3,9 +3,11 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config" // Import the config package
@@ -25,6 +27,9 @@ func NewStorage(cfg *config.Config) (*Storage, error) {
 
 	cfgElasticsearch := elasticsearch.Config{
 		Addresses: []string{esURL},
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
 	}
 
 	// Check if API key is provided
