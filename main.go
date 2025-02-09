@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"flag"
-	"os" // Import os for environment variable access
+	"log"
 	"time"
 
-	"github.com/joho/godotenv" // Import godotenv for loading .env files
+	"github.com/jonesrussell/gocrawl/internal/config" // Import the config package
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 
@@ -14,34 +14,31 @@ import (
 )
 
 func main() {
-	// Load environment variables from .env file
-	if err := godotenv.Load(); err != nil {
-		panic("Error loading .env file") // Handle error if .env file is not found
+	// Load configuration
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Error loading config: %s", err)
 	}
-
-	appEnv := os.Getenv("APP_ENV")     // Get the APP_ENV variable
-	appDebug := os.Getenv("APP_DEBUG") // Get the APP_DEBUG variable
 
 	// Initialize the logger based on the environment
 	var log *logger.CustomLogger
-	var err error
-	if appEnv == "development" {
+	if cfg.AppEnv == "development" {
 		log, err = logger.NewDevelopmentLogger() // Use development logger
 	} else {
 		log, err = logger.NewCustomLogger() // Use production logger
 	}
 	if err != nil {
-		panic(err) // Handle logger initialization error
+		log.Fatalf("Error initializing logger: %s", err)
 	}
 
 	// Define command-line flags for the URL, maxDepth, and rateLimit
 	urlPtr := flag.String("url", "http://example.com", "The URL to crawl")
 	maxDepthPtr := flag.Int("maxDepth", 2, "The maximum depth to crawl")
-	rateLimitPtr := flag.Duration("rateLimit", 5*time.Second, "Rate limit between requests") // Set a longer rate limit for testing
-	flag.Parse()                                                                             // Parse the command-line flags
+	rateLimitPtr := flag.Duration("rateLimit", 5*time.Second, "Rate limit between requests")
+	flag.Parse() // Parse the command-line flags
 
 	// Print configuration if APP_DEBUG is true
-	if appDebug == "true" {
+	if cfg.AppDebug {
 		log.Info("Crawling Configuration",
 			log.Field("url", *urlPtr),
 			log.Field("maxDepth", *maxDepthPtr),
