@@ -1,7 +1,10 @@
 package logger
 
 import (
+	"os"
+
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type LoggerInterface interface {
@@ -56,11 +59,23 @@ func NewCustomLogger() (*CustomLogger, error) {
 	return &CustomLogger{logger: logger}, nil
 }
 
-// NewDevelopmentLogger initializes a new CustomLogger for development
+// NewDevelopmentLogger initializes a new CustomLogger for development with color
 func NewDevelopmentLogger() (*CustomLogger, error) {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		return nil, err
-	}
+	// Create a new console encoder with color support
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
+	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder // Use colored level encoding
+
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderConfig),
+		zapcore.Lock(os.Stdout),
+		zap.DebugLevel, // Set the log level to Debug for development
+	)
+
+	logger := zap.New(core)
 	return &CustomLogger{logger: logger}, nil
+}
+
+// Sync flushes any buffered log entries
+func (z *CustomLogger) Sync() error {
+	return z.logger.Sync()
 }

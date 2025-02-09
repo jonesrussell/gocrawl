@@ -28,10 +28,7 @@ func main() {
 	}
 
 	// Initialize the logger based on the environment
-	loggerInstance, err := initializeLogger(cfg)
-	if err != nil {
-		log.Fatalf("Error initializing logger: %s", err)
-	}
+	loggerInstance := newLogger(cfg)
 
 	// Print configuration if APP_DEBUG is true
 	if cfg.AppDebug {
@@ -43,9 +40,15 @@ func main() {
 
 	// Create and run the Fx application
 	app := fx.New(
-		fx.Provide(func(lc fx.Lifecycle) (*crawler.Crawler, error) {
-			return initializeCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, loggerInstance, cfg, lc)
-		}),
+		fx.Provide(
+			// Provide the logger
+			func() *logger.CustomLogger {
+				return loggerInstance
+			},
+			func(lc fx.Lifecycle) (*crawler.Crawler, error) {
+				return initializeCrawler(*urlPtr, *maxDepthPtr, *rateLimitPtr, loggerInstance, cfg, lc)
+			},
+		),
 		fx.Invoke(func(c *crawler.Crawler) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
@@ -56,11 +59,20 @@ func main() {
 	app.Run()
 }
 
-func initializeLogger(cfg *config.Config) (*logger.CustomLogger, error) {
+func newLogger(cfg *config.Config) *logger.CustomLogger {
 	if cfg.AppEnv == "development" {
-		return logger.NewDevelopmentLogger() // Use development logger
+		loggerInstance, err := logger.NewDevelopmentLogger() // Use development logger
+		if err != nil {
+			log.Fatalf("Error initializing development logger: %s", err)
+		}
+		return loggerInstance
 	}
-	return logger.NewCustomLogger() // Use production logger
+
+	loggerInstance, err := logger.NewCustomLogger() // Use production logger
+	if err != nil {
+		log.Fatalf("Error initializing production logger: %s", err)
+	}
+	return loggerInstance
 }
 
 func initializeCrawler(url string, maxDepth int, rateLimit time.Duration, loggerInstance *logger.CustomLogger, cfg *config.Config, lc fx.Lifecycle) (*crawler.Crawler, error) {
