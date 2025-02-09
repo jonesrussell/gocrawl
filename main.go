@@ -31,16 +31,21 @@ func main() {
 
 	app := createApp(*urlPtr, *maxDepthPtr, *rateLimitPtr, cfg)
 
-	// Handle shutdown signals
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	// Create a channel to listen for OS signals
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
+	// Run the application in a goroutine
 	go func() {
-		<-stop
-		app.Stop(context.Background())
+		if err := app.Start(context.Background()); err != nil {
+			log.Fatalf("Application error: %v", err)
+		}
 	}()
 
-	app.Run()
+	// Wait for a signal
+	<-sigs
+	log.Println("Received shutdown signal, exiting...")
+	// No need to call app.Shutdown() as fx handles it automatically
 }
 
 func createApp(url string, maxDepth int, rateLimit time.Duration, cfg *config.Config) *fx.App {
@@ -90,9 +95,15 @@ func startCrawling(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdo
 	}()
 
 	<-done
-	shutdowner.Shutdown()
-
 	log.Println("Crawling process finished")
+
+	// Wait for all requests to complete
+	c.Collector.Wait()
+
+	// Trigger shutdown
+	if err := shutdowner.Shutdown(); err != nil {
+		log.Printf("Error during shutdown: %v", err)
+	}
 }
 
 func initializeCrawler(url string, maxDepth int, rateLimit time.Duration, loggerInstance *logger.CustomLogger, cfg *config.Config) (*crawler.Crawler, error) {

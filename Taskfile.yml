@@ -4,4 +4,4 @@ tasks:
   crawl:
     desc: "Run the web crawler"
     cmds:
-      - go run main.go -maxDepth 1 -rateLimit 2s -url https://www.elliotlaketoday.com/opp-beat
+      - go run main.go -maxDepth 2 -rateLimit 2s -url https://www.elliotlaketoday.com/opp-beat
