@@ -1,8 +1,6 @@
 package logger
 
 import (
-	"os"
-
 	"go.uber.org/zap"
 )
 
@@ -19,6 +17,9 @@ type LoggerInterface interface {
 type CustomLogger struct {
 	logger *zap.Logger
 }
+
+// Ensure CustomLogger implements LoggerInterface
+var _ LoggerInterface = (*CustomLogger)(nil)
 
 func (z *CustomLogger) Debug(msg string, fields ...zap.Field) {
 	z.logger.Debug(msg, fields...)
@@ -38,8 +39,7 @@ func (z *CustomLogger) Warn(msg string, fields ...zap.Field) {
 
 // Implement Fatalf method
 func (z *CustomLogger) Fatalf(msg string, args ...interface{}) {
-	z.logger.Fatal(msg, zap.Any("args", args)) // Log the fatal message
-	os.Exit(1)                                 // Exit the program with a non-zero status
+	z.logger.Fatal(msg, zap.Any("args", args)) // Log the fatal message, Zap will handle the exit
 }
 
 // Field creates a zap.Field for structured logging
@@ -58,7 +58,7 @@ func NewCustomLogger() (*CustomLogger, error) {
 
 // NewDevelopmentLogger initializes a new CustomLogger for development
 func NewDevelopmentLogger() (*CustomLogger, error) {
-	logger, err := zap.NewDevelopment() // Use development logger
+	logger, err := zap.NewDevelopment()
 	if err != nil {
 		return nil, err
 	}

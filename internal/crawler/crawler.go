@@ -1,14 +1,17 @@
 package crawler
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"net/url"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+
+	"github.com/jonesrussell/gocrawl/internal/config"
 
 	"github.com/gocolly/colly/v2"
 )
@@ -30,15 +33,9 @@ const errorLogCooldown = 10 * time.Second // Cooldown period for logging the sam
 // NewCrawler initializes a new Crawler
 func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger, log *logger.CustomLogger, cfg *config.Config) (*Crawler, error) {
 	// Initialize storage with the config
-	storage, err := storage.NewStorage(cfg)
+	storage, err := initializeStorage(cfg, log)
 	if err != nil {
-		return nil, err
-	}
-
-	// Test the connection to Elasticsearch
-	err = storage.TestConnection()
-	if err != nil {
-		log.Fatalf("Error testing connection: %s", err.Error()) // Pass the error message directly
+		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
 
 	log.Info("Successfully connected to Elasticsearch")
@@ -46,7 +43,7 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 	// Initialize collector
 	collector, err := initializeCollector(baseURL, maxDepth, rateLimit, debugger)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize collector: %w", err)
 	}
 
 	// Configure logging for the collector
@@ -62,10 +59,28 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 	}, nil
 }
 
+func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.Storage, error) {
+	storage, err := storage.NewStorage(cfg, log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	// Test the connection to Elasticsearch
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = storage.TestConnection(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error testing connection: %w", err)
+	}
+
+	return storage, nil
+}
+
 func initializeCollector(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger) (*colly.Collector, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse baseURL: %w", err)
 	}
 	allowedDomain := parsedURL.Hostname()
 
@@ -124,7 +139,7 @@ func logVisitError(log *logger.CustomLogger, link string, err error) {
 	}
 }
 
-func (c *Crawler) Start(url string) {
+func (c *Crawler) Start(ctx context.Context, url string) {
 	c.Collector.OnHTML("html", func(e *colly.HTMLElement) {
 		content := e.Text
 		docID := generateDocumentID(url)
@@ -134,7 +149,7 @@ func (c *Crawler) Start(url string) {
 			return
 		}
 
-		c.indexDocument(url, content, docID)
+		c.indexDocument(ctx, url, content, docID)
 	})
 
 	err := c.Collector.Visit(url)
@@ -152,10 +167,10 @@ func generateDocumentID(url string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (c *Crawler) indexDocument(url, content, docID string) {
+func (c *Crawler) indexDocument(ctx context.Context, url, content, docID string) {
 	c.Logger.Info("Indexing document", c.Logger.Field("url", url), c.Logger.Field("content_length", len(content)), c.Logger.Field("content_preview", content[:100]))
 
-	err := c.Storage.IndexDocument("example_index", docID, map[string]interface{}{"url": url, "content": content})
+	err := c.Storage.IndexDocument(ctx, "example_index", docID, map[string]interface{}{"url": url, "content": content})
 	if err != nil {
 		if time.Since(lastErrorTime) > errorLogCooldown {
 			c.Logger.Error("Error indexing document", c.Logger.Field("url", url), c.Logger.Field("error", err))

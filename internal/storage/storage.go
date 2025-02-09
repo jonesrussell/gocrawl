@@ -6,38 +6,40 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/config" // Import the config package
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // Storage struct to hold the Elasticsearch client
 type Storage struct {
 	ESClient *elasticsearch.Client
+	Logger   *logger.CustomLogger
 }
 
 // NewStorage initializes a new Storage instance
-func NewStorage(cfg *config.Config) (*Storage, error) {
-	// Create the Elasticsearch client with authentication
-	esURL := cfg.ElasticURL
-	esPassword := cfg.ElasticPassword
-	esAPIKey := cfg.ElasticAPIKey
+func NewStorage(cfg *config.Config, log *logger.CustomLogger) (*Storage, error) {
+	// Validate essential configuration parameters
+	if cfg.ElasticURL == "" {
+		return nil, fmt.Errorf("ELASTIC_URL is required")
+	}
 
+	// Create the Elasticsearch client with authentication
 	cfgElasticsearch := elasticsearch.Config{
-		Addresses: []string{esURL},
+		Addresses: []string{cfg.ElasticURL},
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
 
 	// Check if API key is provided
-	if esAPIKey != "" {
-		cfgElasticsearch.APIKey = esAPIKey // Use API key for authentication
+	if cfg.ElasticAPIKey != "" {
+		cfgElasticsearch.APIKey = cfg.ElasticAPIKey // Use API key for authentication
 	} else {
-		cfgElasticsearch.Username = "elastic"  // Default username for Elasticsearch
-		cfgElasticsearch.Password = esPassword // Use password for authentication
+		cfgElasticsearch.Username = "elastic"           // Default username for Elasticsearch
+		cfgElasticsearch.Password = cfg.ElasticPassword // Use password for authentication
 	}
 
 	esClient, err := elasticsearch.NewClient(cfgElasticsearch)
@@ -45,15 +47,15 @@ func NewStorage(cfg *config.Config) (*Storage, error) {
 		return nil, err
 	}
 
-	return &Storage{ESClient: esClient}, nil
+	return &Storage{ESClient: esClient, Logger: log}, nil
 }
 
 // IndexDocument indexes a document in Elasticsearch
-func (s *Storage) IndexDocument(index string, docID string, document interface{}) error {
+func (s *Storage) IndexDocument(ctx context.Context, index string, docID string, document interface{}) error {
 	// Convert the document to JSON
 	data, err := json.Marshal(document)
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshaling document: %w", err)
 	}
 
 	// Create the request to index the document
@@ -63,9 +65,10 @@ func (s *Storage) IndexDocument(index string, docID string, document interface{}
 		req,
 		s.ESClient.Index.WithDocumentID(docID),
 		s.ESClient.Index.WithRefresh("true"),
+		s.ESClient.Index.WithContext(ctx),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("error indexing document: %w", err)
 	}
 	defer res.Body.Close()
 
@@ -73,13 +76,16 @@ func (s *Storage) IndexDocument(index string, docID string, document interface{}
 		return fmt.Errorf("error indexing document ID %s: %s", docID, res.String())
 	}
 
-	log.Printf("Indexed document ID %s in index %s", docID, index)
+	s.Logger.Info("Indexed document",
+		s.Logger.Field("docID", docID),
+		s.Logger.Field("index", index),
+		s.Logger.Field("document", document),
+	)
 	return nil
 }
 
 // TestConnection checks the connection to the Elasticsearch cluster
-func (s *Storage) TestConnection() error {
-	ctx := context.Background()
+func (s *Storage) TestConnection(ctx context.Context) error {
 	info, err := s.ESClient.Info(
 		s.ESClient.Info.WithContext(ctx),
 	)
@@ -93,6 +99,6 @@ func (s *Storage) TestConnection() error {
 		return fmt.Errorf("error decoding Elasticsearch info response: %w", err)
 	}
 
-	log.Printf("Elasticsearch info: %+v", esInfo)
+	s.Logger.Info("Elasticsearch info", s.Logger.Field("info", esInfo))
 	return nil
 }
