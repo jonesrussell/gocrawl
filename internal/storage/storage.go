@@ -56,9 +56,6 @@ func (s *Storage) IndexDocument(index string, docID string, document interface{}
 		return err
 	}
 
-	// Log the document being indexed
-	log.Printf("Indexing document ID %s in index %s: %s", docID, index, string(data))
-
 	// Create the request to index the document
 	req := bytes.NewReader(data)
 	res, err := s.ESClient.Index(
