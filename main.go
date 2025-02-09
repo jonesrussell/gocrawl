@@ -86,10 +86,11 @@ func startCrawling(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdo
 		if err != nil {
 			log.Printf("Error during crawling: %s", err)
 		}
+		close(done)
 	}()
 
-	<-done                // Wait for the crawling to complete
-	shutdowner.Shutdown() // Trigger application stop when crawling is complete
+	<-done
+	shutdowner.Shutdown()
 
 	log.Println("Crawling process finished")
 }
