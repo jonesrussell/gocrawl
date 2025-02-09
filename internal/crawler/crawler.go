@@ -175,7 +175,10 @@ func generateDocumentID(url string) string {
 }
 
 func (c *Crawler) indexDocument(ctx context.Context, url, content, docID string) {
-	c.Logger.Info("Indexing document", c.Logger.Field("url", url), c.Logger.Field("content_length", len(content)), c.Logger.Field("content_preview", content[:100]))
+	// Log a concise summary instead of detailed content
+	c.Logger.Debug("Indexing document",
+		c.Logger.Field("url", url),
+		c.Logger.Field("docID", docID))
 
 	err := c.Storage.IndexDocument(ctx, "example_index", docID, map[string]interface{}{"url": url, "content": content})
 	if err != nil {

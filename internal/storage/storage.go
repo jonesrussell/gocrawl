@@ -76,11 +76,11 @@ func (s *Storage) IndexDocument(ctx context.Context, index string, docID string,
 		return fmt.Errorf("error indexing document ID %s: %s", docID, res.String())
 	}
 
+	// Log a concise summary instead of the full document
 	s.Logger.Info("Indexed document",
 		s.Logger.Field("docID", docID),
-		s.Logger.Field("index", index),
-		s.Logger.Field("document", document),
-	)
+		s.Logger.Field("index", index))
+
 	return nil
 }
 
