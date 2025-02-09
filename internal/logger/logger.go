@@ -2,6 +2,7 @@ package logger
 
 import (
 	"os"
+	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -14,12 +15,21 @@ type LoggerInterface interface {
 	Warn(msg string, fields ...zap.Field)
 	Fatalf(msg string, args ...interface{})
 	Field(key string, value interface{}) zap.Field
-	// Add other methods as needed
 }
 
 type CustomLogger struct {
 	logger *zap.Logger
+	Level  LogLevel
 }
+
+type LogLevel int
+
+const (
+	ERROR LogLevel = iota
+	INFO
+	WARN
+	DEBUG
+)
 
 // Ensure CustomLogger implements LoggerInterface
 var _ LoggerInterface = (*CustomLogger)(nil)
@@ -29,7 +39,12 @@ func (z *CustomLogger) Debug(msg string, fields ...zap.Field) {
 }
 
 func (z *CustomLogger) Info(msg string, fields ...zap.Field) {
-	z.logger.Info(msg, fields...)
+	if strings.Contains(msg, "provided") { // Filter out specific messages
+		return
+	}
+	if z.Level >= INFO {
+		z.logger.Info(msg, fields...)
+	}
 }
 
 func (z *CustomLogger) Error(msg string, fields ...zap.Field) {
@@ -42,7 +57,7 @@ func (z *CustomLogger) Warn(msg string, fields ...zap.Field) {
 
 // Implement Fatalf method
 func (z *CustomLogger) Fatalf(msg string, args ...interface{}) {
-	z.logger.Fatal(msg, zap.Any("args", args)) // Log the fatal message, Zap will handle the exit
+	z.logger.Fatal(msg, zap.Any("args", args))
 }
 
 // Field creates a zap.Field for structured logging
@@ -50,25 +65,43 @@ func (z *CustomLogger) Field(key string, value interface{}) zap.Field {
 	return zap.Any(key, value)
 }
 
-// NewCustomLogger initializes a new CustomLogger
-func NewCustomLogger() (*CustomLogger, error) {
-	logger, err := zap.NewProduction()
+// NewCustomLogger initializes a new CustomLogger with a specified log level
+func NewCustomLogger(level LogLevel) (*CustomLogger, error) {
+	// Create a zap configuration
+	config := zap.Config{
+		Level:    zap.NewAtomicLevelAt(zapcore.Level(level)), // Set the log level
+		Encoding: "json",                                     // or "console" for human-readable output
+		EncoderConfig: zapcore.EncoderConfig{
+			MessageKey:    "message",
+			LevelKey:      "level",
+			TimeKey:       "time",
+			CallerKey:     "caller",
+			StacktraceKey: "stacktrace",
+			EncodeLevel:   zapcore.CapitalLevelEncoder,
+			EncodeTime:    zapcore.ISO8601TimeEncoder,
+		},
+		OutputPaths:      []string{"stdout"}, // Output to stdout
+		ErrorOutputPaths: []string{"stderr"}, // Output errors to stderr
+	}
+
+	// Create the logger
+	logger, err := config.Build()
 	if err != nil {
 		return nil, err
 	}
-	return &CustomLogger{logger: logger}, nil
+
+	return &CustomLogger{logger: logger, Level: level}, nil
 }
 
-// NewDevelopmentLogger initializes a new CustomLogger for development with color
+// NewDevelopmentLogger initializes a new CustomLogger for development
 func NewDevelopmentLogger() (*CustomLogger, error) {
-	// Create a new console encoder with color support
 	encoderConfig := zap.NewDevelopmentEncoderConfig()
-	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder // Use colored level encoding
+	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(encoderConfig),
 		zapcore.Lock(os.Stdout),
-		zap.DebugLevel, // Set the log level to Debug for development
+		zap.DebugLevel,
 	)
 
 	logger := zap.New(core)

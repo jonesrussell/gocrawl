@@ -5,6 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -31,6 +35,7 @@ func main() {
 
 	// Create and run the Fx application
 	app := fx.New(
+		config.Module,
 		logger.Module,
 		storage.Module,
 		fx.Provide(
@@ -54,14 +59,32 @@ func main() {
 					return nil
 				},
 				OnStop: func(ctx context.Context) error {
-					// Signal the crawler to stop and wait for it to finish
-					c.Collector.Wait() // Wait for all requests to finish
-					close(c.Done)      // Close the Done channel to signal completion
+					log.Println("Shutdown process initiated...") // Log when shutdown starts
+					logGoroutineCount()                          // Log active goroutines before waiting
+					// Wait for the crawling to finish
+					select {
+					case <-c.Done: // Wait for the Done channel to be closed
+						log.Println("Crawling completed, shutting down...")
+					case <-ctx.Done(): // Handle context timeout
+						log.Println("Shutdown timeout, forcing exit...")
+					}
+					c.Collector.Wait()                             // Wait for all requests to finish
+					logGoroutineCount()                            // Log active goroutines after waiting
+					log.Println("Crawling completed successfully") // Log when crawling is done
 					return nil
 				},
 			})
 		}),
 	)
+
+	// Handle shutdown signals
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-stop
+		app.Stop(context.Background())
+	}()
 
 	app.Run()
 }
@@ -77,4 +100,9 @@ func initializeCrawler(url string, maxDepth int, rateLimit time.Duration, logger
 	}
 
 	return crawlerInstance, nil
+}
+
+func logGoroutineCount() {
+	numGoroutines := runtime.NumGoroutine()
+	log.Printf("Number of active goroutines: %d\n", numGoroutines)
 }

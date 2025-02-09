@@ -17,6 +17,7 @@ type Config struct {
 	ElasticPassword string
 	ElasticAPIKey   string
 	IndexName       string
+	LogLevel        string
 }
 
 // LoadConfig loads configuration from environment variables
@@ -40,6 +41,7 @@ func LoadConfig() (*Config, error) {
 		ElasticPassword: os.Getenv("ELASTIC_PASSWORD"),
 		ElasticAPIKey:   os.Getenv("ELASTIC_API_KEY"),
 		IndexName:       os.Getenv("INDEX_NAME"),
+		LogLevel:        os.Getenv("LOG_LEVEL"),
 	}
 
 	// Validate required configuration values
