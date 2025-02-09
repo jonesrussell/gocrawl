@@ -25,10 +25,6 @@ type Crawler struct {
 	IndexName string
 }
 
-var lastErrorTime time.Time
-
-const errorLogCooldown = 10 * time.Second
-
 // NewCrawler initializes a new Crawler
 func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger *logger.CustomDebugger, log *logger.CustomLogger, cfg *config.Config) (*Crawler, error) {
 	storage, err := initializeStorage(cfg, log)
@@ -125,10 +121,7 @@ func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, do
 
 	err := c.Storage.IndexDocument(ctx, indexName, docID, map[string]interface{}{"url": url, "content": content})
 	if err != nil {
-		if time.Since(lastErrorTime) > errorLogCooldown {
-			c.Logger.Error("Error indexing document", c.Logger.Field("url", url), c.Logger.Field("error", err))
-			lastErrorTime = time.Now()
-		}
+		c.Logger.Error("Error indexing document", c.Logger.Field("url", url), c.Logger.Field("error", err))
 	} else {
 		c.Logger.Info("Successfully indexed document", c.Logger.Field("url", url), c.Logger.Field("docID", docID))
 	}
