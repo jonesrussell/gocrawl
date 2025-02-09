@@ -8,12 +8,10 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-
-	"github.com/jonesrussell/gocrawl/internal/config"
-
-	"github.com/gocolly/colly/v2"
 )
 
 // Crawler struct to hold configuration or state if needed
@@ -117,7 +115,7 @@ func configureCollectorLogging(collector *colly.Collector, log *logger.CustomLog
 	})
 
 	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Attr("href")
+		link := e.Request.AbsoluteURL(e.Attr("href"))
 		if err := e.Request.Visit(link); err != nil {
 			logVisitError(log, link, err)
 		}
@@ -152,14 +150,14 @@ func (c *Crawler) Start(ctx context.Context, url string) {
 		}
 
 		content := e.Text
-		docID := generateDocumentID(url)
+		docID := generateDocumentID(e.Request.URL.String())
 
 		if len(content) == 0 {
-			c.Logger.Warn("Content is empty, skipping indexing", c.Logger.Field("url", url))
+			c.Logger.Warn("Content is empty, skipping indexing", c.Logger.Field("url", e.Request.URL.String()))
 			return
 		}
 
-		c.indexDocument(ctx, url, content, docID)
+		c.indexDocument(ctx, e.Request.URL.String(), content, docID)
 	})
 
 	err := c.Collector.Visit(url)
