@@ -23,6 +23,7 @@ type Crawler struct {
 	Collector *colly.Collector
 	Logger    *logger.CustomLogger
 	Done      chan bool
+	IndexName string
 }
 
 var lastErrorTime time.Time
@@ -56,6 +57,7 @@ func NewCrawler(baseURL string, maxDepth int, rateLimit time.Duration, debugger 
 		Collector: collector,
 		Logger:    log,
 		Done:      make(chan bool),
+		IndexName: cfg.IndexName,
 	}, nil
 }
 
@@ -159,7 +161,7 @@ func (c *Crawler) Start(ctx context.Context, url string) {
 			return
 		}
 
-		c.indexDocument(ctx, e.Request.URL.String(), content, docID)
+		c.indexDocument(ctx, c.IndexName, e.Request.URL.String(), content, docID)
 	})
 
 	err := c.Collector.Visit(url)
@@ -180,13 +182,13 @@ func generateDocumentID(url string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (c *Crawler) indexDocument(ctx context.Context, url, content, docID string) {
+func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, docID string) {
 	// Log a concise summary instead of detailed content
 	c.Logger.Debug("Indexing document",
 		c.Logger.Field("url", url),
 		c.Logger.Field("docID", docID))
 
-	err := c.Storage.IndexDocument(ctx, "example_index", docID, map[string]interface{}{"url": url, "content": content})
+	err := c.Storage.IndexDocument(ctx, indexName, docID, map[string]interface{}{"url": url, "content": content})
 	if err != nil {
 		if time.Since(lastErrorTime) > errorLogCooldown {
 			c.Logger.Error("Error indexing document", c.Logger.Field("url", url), c.Logger.Field("error", err))
