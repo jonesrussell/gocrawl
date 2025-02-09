@@ -64,7 +64,7 @@ func main() {
 			return &fxevent.ZapLogger{Logger: loggerInstance.GetZapLogger()} // Use the underlying zap logger
 		}),
 		fx.Invoke(func(c *crawler.Crawler) {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
 			defer cancel()
 			c.Start(ctx, *urlPtr) // Directly call Start to handle crawling and indexing
 		}),
