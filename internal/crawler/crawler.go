@@ -24,7 +24,6 @@ type Crawler struct {
 	Collector *colly.Collector
 	Logger    *logger.CustomLogger
 	IndexName string
-	done      chan struct{}
 }
 
 // CrawlerParams holds the dependencies for creating a new Crawler
@@ -68,7 +67,6 @@ func NewCrawler(p CrawlerParams) (*Crawler, error) {
 		Collector: collectorInstance,
 		Logger:    p.Logger,
 		IndexName: p.Config.IndexName,
-		done:      make(chan struct{}),
 	}, nil
 }
 
@@ -94,30 +92,17 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 	c.Logger.Info("Starting crawling process")
 	c.configureCollectors(ctx)
 
-	errChan := make(chan error, 1)
-	go func() {
-		if err := c.Collector.Visit(c.BaseURL); err != nil {
-			errChan <- fmt.Errorf("error visiting URL: %w", err)
-			return
-		}
-		errChan <- nil
-	}()
+	if err := c.Collector.Visit(c.BaseURL); err != nil {
+		c.Logger.Error("Error visiting URL", c.Logger.Field("error", err))
+		return err
+	}
 
-	select {
-	case err := <-errChan:
-		if err != nil {
-			c.Logger.Error("Crawling error", c.Logger.Field("error", err))
-			return err
-		}
-		c.Logger.Info("Crawling process finished, waiting for all requests to complete...")
-		c.Collector.Wait() // Wait for all requests to finish
-		c.Logger.Info("All requests completed, initiating shutdown...")
-		if err := shutdowner.Shutdown(); err != nil {
-			c.Logger.Error("Error during shutdown", c.Logger.Field("error", err))
-		}
-	case <-ctx.Done():
-		c.Logger.Warn("Crawling stopped due to context cancellation", c.Logger.Field("error", ctx.Err()))
-		// Do not stop the crawling process, just log the cancellation
+	// Wait for all requests to finish
+	c.Logger.Info("Crawling process finished, waiting for all requests to complete...")
+	c.Collector.Wait() // Wait for all requests to finish
+	c.Logger.Info("All requests completed, initiating shutdown...")
+	if err := shutdowner.Shutdown(); err != nil {
+		c.Logger.Error("Error during shutdown", c.Logger.Field("error", err))
 	}
 
 	return nil
