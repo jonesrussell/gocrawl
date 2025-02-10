@@ -10,13 +10,14 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type LoggerInterface interface {
-	Debug(msg string, fields ...zap.Field)
+// Interface holds the methods for the logger
+type Interface interface {
 	Info(msg string, fields ...zap.Field)
 	Error(msg string, fields ...zap.Field)
+	Debug(msg string, fields ...zap.Field)
 	Warn(msg string, fields ...zap.Field)
 	Fatalf(msg string, args ...interface{})
-	Errorf(format string, args ...interface{}) // Add Errorf method to interface
+	Errorf(format string, args ...interface{})
 	Field(key string, value interface{}) zap.Field
 }
 
@@ -34,10 +35,11 @@ const (
 	DEBUG
 )
 
-// Ensure CustomLogger implements LoggerInterface
-var _ LoggerInterface = (*CustomLogger)(nil)
+// Ensure CustomLogger implements Interface
+var _ Interface = (*CustomLogger)(nil)
 
-type LoggerParams struct {
+// Params holds the parameters for creating a logger
+type Params struct {
 	fx.In
 
 	Level  LogLevel
@@ -81,7 +83,7 @@ func (z *CustomLogger) Field(key string, value interface{}) zap.Field {
 }
 
 // NewCustomLogger initializes a new CustomLogger with a specified log level
-func NewCustomLogger(p LoggerParams) (*CustomLogger, error) {
+func NewCustomLogger(p Params) (*CustomLogger, error) {
 	// Create a zap configuration
 	config := zap.Config{
 		Level:    zap.NewAtomicLevelAt(zapcore.Level(p.Level)),
@@ -109,7 +111,7 @@ func NewCustomLogger(p LoggerParams) (*CustomLogger, error) {
 }
 
 // NewDevelopmentLogger initializes a new CustomLogger for development
-func NewDevelopmentLogger(p LoggerParams) (*CustomLogger, error) {
+func NewDevelopmentLogger(p Params) (*CustomLogger, error) {
 	encoderConfig := zap.NewDevelopmentEncoderConfig()
 	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 

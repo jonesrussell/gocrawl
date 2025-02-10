@@ -33,7 +33,7 @@ func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 		level = INFO
 	}
 
-	params := LoggerParams{
+	params := Params{
 		Level:  level,
 		AppEnv: cfg.AppEnv,
 	}
@@ -45,7 +45,7 @@ func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 }
 
 func InitializeLogger() (*CustomLogger, error) {
-	params := LoggerParams{
+	params := Params{
 		Level:  INFO,
 		AppEnv: "production", // default to production environment
 	}

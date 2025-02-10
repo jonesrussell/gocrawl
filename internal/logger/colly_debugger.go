@@ -6,11 +6,11 @@ import (
 
 // CustomDebugger is a custom debugger that uses ZapLogger
 type CustomDebugger struct {
-	logger LoggerInterface
+	logger Interface
 }
 
 // NewCustomDebugger creates a new CustomDebugger
-func NewCustomDebugger(logger LoggerInterface) *CustomDebugger {
+func NewCustomDebugger(logger Interface) *CustomDebugger {
 	return &CustomDebugger{logger: logger}
 }
 
