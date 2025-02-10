@@ -3,11 +3,20 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
+
+// CrawlerConfig holds crawler-specific configuration
+type CrawlerConfig struct {
+	BaseURL   string
+	MaxDepth  int
+	RateLimit time.Duration
+}
 
 // Config holds the application configuration
 type Config struct {
@@ -19,6 +28,8 @@ type Config struct {
 	ElasticAPIKey   string
 	IndexName       string
 	LogLevel        string
+	CrawlerConfig   CrawlerConfig
+	Transport       http.RoundTripper // Added for testing
 }
 
 // LoadConfig loads configuration from environment variables
@@ -47,6 +58,11 @@ func LoadConfig() (*Config, error) {
 		ElasticAPIKey:   os.Getenv("ELASTIC_API_KEY"),
 		IndexName:       os.Getenv("INDEX_NAME"),
 		LogLevel:        os.Getenv("LOG_LEVEL"),
+		CrawlerConfig: CrawlerConfig{
+			BaseURL:   os.Getenv("CRAWLER_BASE_URL"),
+			MaxDepth:  parseIntEnv("CRAWLER_MAX_DEPTH", 0),
+			RateLimit: parseDurationEnv("CRAWLER_RATE_LIMIT", 0),
+		},
 	}
 
 	// Validate required configuration values
@@ -64,4 +80,24 @@ func parseBoolEnv(key string, defaultValue bool) (bool, error) {
 		return defaultValue, nil
 	}
 	return strconv.ParseBool(value)
+}
+
+// parseIntEnv parses an integer environment variable with a default value
+func parseIntEnv(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	intValue, _ := strconv.Atoi(value)
+	return intValue
+}
+
+// parseDurationEnv parses a duration environment variable with a default value
+func parseDurationEnv(key string, defaultValue time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	duration, _ := time.ParseDuration(value)
+	return duration
 }

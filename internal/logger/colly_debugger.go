@@ -5,68 +5,74 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 )
 
-// CollyDebugger is a custom debugger for Colly
+// CollyDebugger implements colly.Debugger interface
 type CollyDebugger struct {
-	logger *CustomLogger
+	Logger Interface
 }
 
-// NewCollyDebugger creates a new CollyDebugger
-func NewCollyDebugger(logger *CustomLogger) *CollyDebugger {
-	return &CollyDebugger{logger: logger}
-}
-
-// Init initializes the debugger (no specific initialization needed here)
+// Init implements colly.Debugger
 func (d *CollyDebugger) Init() error {
-	// You can add any initialization logic if needed
 	return nil
+}
+
+// Event implements colly.Debugger
+func (d *CollyDebugger) Event(e *debug.Event) {
+	if d.Logger == nil {
+		return
+	}
+
+	d.Logger.Debug("Colly event",
+		"type", e.Type,
+		"requestID", e.RequestID,
+		"collectorID", e.CollectorID,
+	)
 }
 
 // OnRequest logs the request details
 func (d *CollyDebugger) OnRequest(e *colly.Request) {
-	d.logger.Debug(
+	d.Logger.Debug(
 		"Request",
-		e.URL,
-		e.Method,
-		e.Headers,
+		"url", e.URL.String(),
+		"method", e.Method,
+		"headers", e.Headers,
 	)
 }
 
 // OnResponse logs the response details
 func (d *CollyDebugger) OnResponse(e *colly.Response) {
-	d.logger.Info(
+	d.Logger.Info(
 		"Response",
-		e.Request.URL,
-		e.StatusCode,
-		e.Headers,
+		"url", e.Request.URL.String(),
+		"status", e.StatusCode,
+		"headers", e.Headers,
 	)
 }
 
 // OnError logs the error details
 func (d *CollyDebugger) OnError(e *colly.Response, err error) {
-	d.logger.Error(
+	if d.Logger == nil {
+		return
+	}
+
+	errMsg := "unknown error"
+	if err != nil {
+		errMsg = err.Error()
+	}
+
+	d.Logger.Error(
 		"Error",
-		e.Request.URL,
-		e.StatusCode,
-		err.Error(),
+		"url", e.Request.URL.String(),
+		"status", e.StatusCode,
+		"error", errMsg,
 	)
 }
 
 // OnEvent logs the event details
 func (d *CollyDebugger) OnEvent(e *debug.Event) {
-	d.logger.Info(
+	d.Logger.Info(
 		"Event",
-		e.Type,
-		e.RequestID,
-		e.CollectorID,
-	)
-}
-
-// Implement the Event method to satisfy the debug.Debugger interface
-func (d *CollyDebugger) Event(e *debug.Event) {
-	d.logger.Info(
-		"Event",
-		e.Type,
-		e.RequestID,
-		e.CollectorID,
+		"type", e.Type,
+		"requestID", e.RequestID,
+		"collectorID", e.CollectorID,
 	)
 }

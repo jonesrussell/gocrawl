@@ -32,31 +32,29 @@ var _ Interface = (*CustomLogger)(nil)
 type Params struct {
 	fx.In
 
+	Debug  bool
 	Level  zapcore.Level
 	AppEnv string `name:"appEnv"`
 }
 
 // NewCustomLogger initializes a new CustomLogger with a specified log level
 func NewCustomLogger(params Params) (*CustomLogger, error) {
-	config := zap.Config{
-		Level:    zap.NewAtomicLevelAt(params.Level),
-		Encoding: "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			MessageKey:    "message",
-			LevelKey:      "level",
-			TimeKey:       "time",
-			CallerKey:     "caller",
-			StacktraceKey: "stacktrace",
-			EncodeLevel:   zapcore.CapitalLevelEncoder,
-			EncodeTime:    zapcore.ISO8601TimeEncoder,
-		},
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
+	if params.AppEnv == "" {
+		params.AppEnv = "development"
+	}
+
+	var config zap.Config
+	if params.Debug || params.AppEnv == "development" {
+		config = zap.NewDevelopmentConfig()
+		config.Level = zap.NewAtomicLevelAt(params.Level)
+	} else {
+		config = zap.NewProductionConfig()
+		config.Level = zap.NewAtomicLevelAt(params.Level)
 	}
 
 	logger, err := config.Build()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to build logger: %w", err)
 	}
 
 	return &CustomLogger{Logger: logger, Level: params.Level}, nil
@@ -131,11 +129,12 @@ func convertToZapFields(fields []interface{}) []zap.Field {
 		if str, ok := fields[0].(string); ok {
 			return []zap.Field{zap.String("context", str)}
 		}
+		return []zap.Field{zap.Any("context", fields[0])}
 	}
 
 	// Handle key-value pairs
-	for i := 0; i < len(fields); i++ {
-		// If we have an odd number of remaining fields, add the last one as context
+	for i := 0; i < len(fields)-1; i += 2 {
+		// If we have an odd number of fields and this is the last one
 		if i == len(fields)-1 {
 			if str, ok := fields[i].(string); ok {
 				zapFields = append(zapFields, zap.String("context", str))
@@ -148,14 +147,24 @@ func convertToZapFields(fields []interface{}) []zap.Field {
 		// Process key-value pair
 		key, ok := fields[i].(string)
 		if !ok {
+			// If key is not a string, use it as a value with a generated key
 			zapFields = append(zapFields, zap.Any(fmt.Sprintf("value%d", i), fields[i]))
+			i-- // Adjust index since we're not consuming the next value
 			continue
 		}
 
-		// Move to next item for value
-		i++
-		value := fields[i]
-		zapFields = append(zapFields, zap.Any(key, value))
+		// Use the next item as value
+		zapFields = append(zapFields, zap.Any(key, fields[i+1]))
+	}
+
+	// Handle last item if we have an odd number of fields
+	if len(fields)%2 != 0 {
+		last := fields[len(fields)-1]
+		if str, ok := last.(string); ok {
+			zapFields = append(zapFields, zap.String("context", str))
+		} else {
+			zapFields = append(zapFields, zap.Any("context", last))
+		}
 	}
 
 	return zapFields

@@ -4,7 +4,12 @@ tasks:
   crawl:
     desc: "Run the web crawler"
     cmds:
-      - go run main.go -maxDepth 2 -rateLimit 2s -url https://www.elliotlaketoday.com/opp-beat
+      - go run main.go crawl -u https://www.elliotlaketoday.com/opp-beat -d 2 -r 2s
+
+  search:
+    desc: "Search crawled content"
+    cmds:
+      - go run main.go search -q "{{.CLI_ARGS}}" -i streetcode_index
 
   build:
     desc: "Build the web crawler executable"
@@ -22,3 +27,19 @@ tasks:
     desc: "Run the tests"
     cmds:
       - go test -v ./...
+
+  test:cover:
+    desc: "Run tests with coverage"
+    cmds:
+      - mkdir -p coverage
+      - go test -coverprofile=coverage/coverage.out ./...
+      - go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+      - go tool cover -func=coverage/coverage.out
+    generates:
+      - coverage/coverage.out
+      - coverage/coverage.html
+
+  help:
+    desc: "Show available commands"
+    cmds:
+      - go run main.go --help

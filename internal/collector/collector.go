@@ -3,7 +3,6 @@ package collector
 import (
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -31,78 +30,72 @@ type DebuggerInterface interface {
 	Event(e *debug.Event)
 }
 
-// Params holds the dependencies for creating a new collector
+// Params holds the parameters for creating a Collector
 type Params struct {
 	fx.In
 
-	BaseURL   string        `name:"baseURL"`
-	MaxDepth  int           `name:"maxDepth"`
-	RateLimit time.Duration `name:"rateLimit"`
-	Debugger  DebuggerInterface
+	BaseURL   string
+	MaxDepth  int
+	RateLimit time.Duration
+	Debugger  *logger.CollyDebugger
 }
 
-// Result holds the dependencies for the collector
+// Result holds the collector instance
 type Result struct {
 	fx.Out
 
 	Collector *colly.Collector
 }
 
-// New creates and returns a new colly collector
+// New creates a new collector instance
 func New(p Params) (Result, error) {
-	parsedURL, err := url.Parse(p.BaseURL)
-	if err != nil {
-		return Result{}, fmt.Errorf("failed to parse baseURL: %w", err)
+	// Validate URL
+	if p.BaseURL == "" {
+		return Result{}, fmt.Errorf("base URL cannot be empty")
 	}
-	allowedDomain := parsedURL.Hostname()
 
-	collector := colly.NewCollector(
-		colly.Async(true),
+	parsedURL, err := url.Parse(p.BaseURL)
+	if err != nil || (!strings.HasPrefix(parsedURL.Scheme, "http") && !strings.HasPrefix(parsedURL.Scheme, "https")) {
+		return Result{}, fmt.Errorf("invalid base URL: must be a valid HTTP/HTTPS URL")
+	}
+
+	c := colly.NewCollector(
 		colly.MaxDepth(p.MaxDepth),
-		colly.Debugger(p.Debugger),
-		colly.AllowedDomains(allowedDomain),
-		colly.URLFilters(
-			regexp.MustCompile(fmt.Sprintf("^https?://%s/.*", allowedDomain)),
-		),
-		colly.ParseHTTPErrorResponse(),
+		colly.Async(true),
 	)
 
-	// Add URL normalization
-	collector.OnRequest(func(r *colly.Request) {
-		r.URL.RawQuery = "" // Remove query parameters
-		if !strings.HasPrefix(r.URL.Scheme, "http") {
-			r.URL.Scheme = "https"
-		}
-	})
-
-	// Configure limits
-	err = collector.Limit(&colly.LimitRule{
+	err = c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: CollectorParallelism,
-		Delay:       p.RateLimit,
-		RandomDelay: p.RateLimit / RandomDelayFactor, // Add some randomization to be more polite
+		RandomDelay: p.RateLimit,
 	})
 	if err != nil {
-		return Result{}, fmt.Errorf("error setting collector limit: %w", err)
+		return Result{}, err
 	}
 
-	// Set a timeout for requests
-	collector.SetRequestTimeout(RequestTimeout)
+	if p.Debugger != nil {
+		c.SetDebugger(p.Debugger)
+	}
 
-	return Result{Collector: collector}, nil
+	return Result{Collector: c}, nil
 }
 
-// ConfigureLogging configures the logging for the collector
+// ConfigureLogging sets up logging for the collector
 func ConfigureLogging(c *colly.Collector, log logger.Interface) {
 	c.OnRequest(func(r *colly.Request) {
 		log.Debug("Requesting URL", r.URL.String())
 	})
 
 	c.OnResponse(func(r *colly.Response) {
-		log.Debug("Received response", r.Request.URL.String(), r.StatusCode)
+		log.Debug("Received response",
+			"url", r.Request.URL.String(),
+			"status", r.StatusCode,
+		)
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		log.Error("Error occurred", r.Request.URL.String(), err)
+		log.Error("Error occurred",
+			"url", r.Request.URL.String(),
+			"error", err.Error(),
+		)
 	})
 }

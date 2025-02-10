@@ -47,7 +47,7 @@ type Storage interface {
 // ElasticsearchStorage struct to hold the Elasticsearch client
 type ElasticsearchStorage struct {
 	ESClient *elasticsearch.Client
-	Logger   *logger.CustomLogger
+	Logger   logger.Interface
 }
 
 // Result holds the dependencies for the storage
@@ -67,37 +67,72 @@ var ErrInvalidHits = errors.New("invalid response format: hits not found")
 var ErrInvalidHitsArray = errors.New("invalid response format: hits array not found")
 
 // NewStorage initializes a new Storage instance
-func NewStorage(cfg *config.Config, log *logger.CustomLogger) (Result, error) {
+func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 	// Validate essential configuration parameters
 	if cfg.ElasticURL == "" {
 		return Result{}, errors.New("ELASTIC_URL is required")
 	}
 
-	// Create the Elasticsearch client with authentication
+	// Create the Elasticsearch client configuration
 	cfgElasticsearch := elasticsearch.Config{
 		Addresses: []string{cfg.ElasticURL},
-		Transport: &http.Transport{
+	}
+
+	if cfg.Transport != nil {
+		cfgElasticsearch.Transport = cfg.Transport
+	} else {
+		cfgElasticsearch.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				//nolint:gosec // This is a temporary solution to bypass the TLS certificate verification
 				InsecureSkipVerify: true,
 			},
-		},
+		}
 	}
 
-	// Check if API key is provided
+	// Configure authentication
 	if cfg.ElasticAPIKey != "" {
-		cfgElasticsearch.APIKey = cfg.ElasticAPIKey // Use API key for authentication
-	} else {
-		cfgElasticsearch.Username = "elastic"           // Default username for Elasticsearch
-		cfgElasticsearch.Password = cfg.ElasticPassword // Use password for authentication
+		cfgElasticsearch.APIKey = cfg.ElasticAPIKey
+	} else if cfg.ElasticPassword != "" {
+		cfgElasticsearch.Username = "elastic" // Default username
+		cfgElasticsearch.Password = cfg.ElasticPassword
 	}
 
+	// Create the client
 	esClient, err := elasticsearch.NewClient(cfgElasticsearch)
 	if err != nil {
-		return Result{}, err
+		return Result{}, fmt.Errorf("failed to create elasticsearch client: %w", err)
 	}
 
-	return Result{Storage: &ElasticsearchStorage{ESClient: esClient, Logger: log}}, nil
+	// Test the connection
+	res, err := esClient.Info()
+	if err != nil {
+		return Result{}, fmt.Errorf("failed to connect to elasticsearch: %w", err)
+	}
+	defer res.Body.Close()
+
+	log.Info("Successfully connected to Elasticsearch")
+
+	return Result{
+		Storage: &ElasticsearchStorage{
+			ESClient: esClient,
+			Logger:   log,
+		},
+	}, nil
+}
+
+// NewStorageWithClient creates a new Storage instance with a provided Elasticsearch client
+func NewStorageWithClient(cfg *config.Config, log logger.Interface, client *elasticsearch.Client) (Result, error) {
+	if cfg.ElasticURL == "" {
+		return Result{}, fmt.Errorf("elasticsearch URL is required")
+	}
+
+	es := &ElasticsearchStorage{
+		ESClient: client,
+		Logger:   log, // No need for pointer conversion since we're using Interface
+	}
+
+	return Result{
+		Storage: es,
+	}, nil
 }
 
 // IndexDocument indexes a document in Elasticsearch
@@ -199,6 +234,11 @@ func (s *ElasticsearchStorage) processHits(
 	hits []interface{},
 	resultChan chan<- map[string]interface{},
 ) {
+	// Check context before starting
+	if ctx.Err() != nil {
+		return
+	}
+
 	for _, hit := range hits {
 		hitMap, isMap := hit.(map[string]interface{})
 		if !isMap {
@@ -211,9 +251,9 @@ func (s *ElasticsearchStorage) processHits(
 		}
 
 		select {
-		case resultChan <- source:
 		case <-ctx.Done():
 			return
+		case resultChan <- source:
 		}
 	}
 }
@@ -241,6 +281,11 @@ func (s *ElasticsearchStorage) handleScrollResponse(
 	searchRes *esapi.Response,
 	resultChan chan<- map[string]interface{},
 ) (string, error) {
+	// Check context before starting
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+
 	var result map[string]interface{}
 	if err := json.NewDecoder(searchRes.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("error parsing scroll response: %w", err)
@@ -251,8 +296,10 @@ func (s *ElasticsearchStorage) handleScrollResponse(
 		return "", err
 	}
 
+	// Process hits synchronously
 	s.processHits(ctx, hits, resultChan)
 
+	// Check for scroll ID after processing hits
 	scrollID, isString := result["_scroll_id"].(string)
 	if !isString {
 		return "", errors.New("invalid scroll ID")
@@ -268,33 +315,42 @@ func (s *ElasticsearchStorage) ScrollSearch(
 	query map[string]interface{},
 	batchSize int,
 ) (<-chan map[string]interface{}, error) {
-	resultChan := make(chan map[string]interface{})
-
 	var buf bytes.Buffer
 	if encodeErr := json.NewEncoder(&buf).Encode(query); encodeErr != nil {
 		return nil, fmt.Errorf("error encoding query: %w", encodeErr)
 	}
 
+	// Initial search request
+	searchRes, err := s.ESClient.Search(
+		s.ESClient.Search.WithContext(ctx),
+		s.ESClient.Search.WithIndex(index),
+		s.ESClient.Search.WithBody(&buf),
+		s.ESClient.Search.WithScroll(time.Minute),
+		s.ESClient.Search.WithSize(batchSize),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initial scroll failed: %w", err)
+	}
+	defer searchRes.Body.Close()
+
+	// Check if the response indicates an error
+	if searchRes.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(searchRes.Body).Decode(&e); err != nil {
+			return nil, fmt.Errorf("error parsing error response: %w", err)
+		}
+		return nil, fmt.Errorf("elasticsearch error: %v", e["error"])
+	}
+
+	resultChan := make(chan map[string]interface{})
+
 	go func() {
 		defer close(resultChan)
-
-		searchRes, searchErr := s.ESClient.Search(
-			s.ESClient.Search.WithContext(ctx),
-			s.ESClient.Search.WithIndex(index),
-			s.ESClient.Search.WithBody(&buf),
-			s.ESClient.Search.WithScroll(time.Minute),
-			s.ESClient.Search.WithSize(batchSize),
-		)
-		if searchErr != nil {
-			s.Logger.Error("Initial scroll failed", searchErr)
-			return
-		}
 
 		for {
 			scrollID, scrollErr := s.handleScrollResponse(ctx, searchRes, resultChan)
 			if scrollErr != nil {
 				s.Logger.Error("Error processing scroll response", scrollErr)
-				searchRes.Body.Close()
 				return
 			}
 			searchRes.Body.Close()
