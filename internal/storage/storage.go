@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -23,7 +24,7 @@ type Storage struct {
 func NewStorage(cfg *config.Config, log *logger.CustomLogger) (*Storage, error) {
 	// Validate essential configuration parameters
 	if cfg.ElasticURL == "" {
-		return nil, fmt.Errorf("ELASTIC_URL is required")
+		return nil, errors.New("ELASTIC_URL is required")
 	}
 
 	// Create the Elasticsearch client with authentication
