@@ -3,6 +3,7 @@ package collector
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -57,21 +58,21 @@ func New(p Params) (Result, error) {
 		colly.Async(true),
 		colly.MaxDepth(p.MaxDepth),
 		colly.Debugger(p.Debugger),
-		colly.AllowedDomains(
-			allowedDomain,
-			"http://"+allowedDomain,
-			"https://"+allowedDomain,
+		colly.AllowedDomains(allowedDomain), // Simplified domain restriction
+		colly.URLFilters(
+			regexp.MustCompile(fmt.Sprintf("^https?://%s/.*", allowedDomain)),
 		),
 	)
 
-	// Declare limitErr outside the if statement to avoid shadowing
-	var limitErr error
-	if limitErr = collector.Limit(&colly.LimitRule{
+	// Configure limits
+	err = collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: CollectorParallelism,
 		Delay:       p.RateLimit,
-	}); limitErr != nil {
-		return Result{}, fmt.Errorf("error setting collector limit: %w", limitErr)
+		RandomDelay: p.RateLimit / 2, // Add some randomization to be more polite
+	})
+	if err != nil {
+		return Result{}, fmt.Errorf("error setting collector limit: %w", err)
 	}
 
 	// Set a timeout for requests

@@ -131,9 +131,21 @@ func (c *Crawler) configureCollectors(ctx context.Context) {
 		c.Logger.Error("Error occurred", r.Request.URL.String(), err)
 	})
 
+	c.Collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		c.Logger.Debug("Found link", "url", link)
+
+		err := e.Request.Visit(link)
+		if err != nil {
+			if err != colly.ErrAlreadyVisited {
+				c.Logger.Debug("Could not visit link", "url", link, "error", err.Error())
+			}
+		}
+	})
+
 	c.Collector.OnHTML("html", func(e *colly.HTMLElement) {
 		if ctx.Err() != nil {
-			c.Logger.Warn("Crawling stopped due to context cancellation", ctx.Err())
+			c.Logger.Warn("Crawling stopped due to context cancellation", "error", ctx.Err())
 			return
 		}
 
@@ -141,11 +153,11 @@ func (c *Crawler) configureCollectors(ctx context.Context) {
 		docID := generateDocumentID(e.Request.URL.String())
 
 		if len(content) == 0 {
-			c.Logger.Warn("Content is empty, skipping indexing", e.Request.URL.String())
+			c.Logger.Warn("Content is empty, skipping indexing", "url", e.Request.URL.String())
 			return
 		}
 
-		c.Logger.Debug("Indexing document", e.Request.URL.String(), docID)
+		c.Logger.Debug("Indexing document", "url", e.Request.URL.String(), "id", docID)
 		c.indexDocument(ctx, c.IndexName, e.Request.URL.String(), content, docID)
 	})
 }
