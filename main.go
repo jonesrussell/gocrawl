@@ -49,9 +49,7 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 				Name:   "rateLimit",
 				Target: func() time.Duration { return rateLimit },
 			},
-			func(l *logger.CustomLogger) *logger.CollyDebugger {
-				return logger.NewCollyDebugger(l)
-			},
+			logger.NewCollyDebugger,
 		),
 		fx.WithLogger(func(l *logger.CustomLogger) fxevent.Logger {
 			return &fxevent.ZapLogger{Logger: l.GetZapLogger()}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
+	"go.uber.org/zap/zapcore"
 )
 
 // Module provides the logger as an Fx module
@@ -19,18 +20,18 @@ var Module = fx.Module("logger",
 // NewLogger initializes the appropriate logger based on the environment
 func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 	logLevel := cfg.LogLevel
-	var level LogLevel
+	var level zapcore.Level
 	switch strings.ToUpper(logLevel) {
 	case "DEBUG":
-		level = DEBUG
+		level = zapcore.DebugLevel
 	case "INFO":
-		level = INFO
+		level = zapcore.InfoLevel
 	case "WARN":
-		level = WARN
+		level = zapcore.WarnLevel
 	case "ERROR":
-		level = ERROR
+		level = zapcore.ErrorLevel
 	default:
-		level = INFO
+		level = zapcore.InfoLevel
 	}
 
 	params := Params{
@@ -46,8 +47,8 @@ func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 
 func InitializeLogger() (*CustomLogger, error) {
 	params := Params{
-		Level:  INFO,
-		AppEnv: "production", // default to production environment
+		Level:  zapcore.InfoLevel,
+		AppEnv: "production",
 	}
 	return NewCustomLogger(params)
 }

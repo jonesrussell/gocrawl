@@ -23,17 +23,8 @@ type Interface interface {
 
 type CustomLogger struct {
 	logger *zap.Logger
-	Level  LogLevel
+	Level  zapcore.Level
 }
-
-type LogLevel int
-
-const (
-	ERROR LogLevel = iota
-	INFO
-	WARN
-	DEBUG
-)
 
 // Ensure CustomLogger implements Interface
 var _ Interface = (*CustomLogger)(nil)
@@ -42,7 +33,7 @@ var _ Interface = (*CustomLogger)(nil)
 type Params struct {
 	fx.In
 
-	Level  LogLevel
+	Level  zapcore.Level
 	AppEnv string `name:"appEnv"`
 }
 
@@ -54,7 +45,7 @@ func (z *CustomLogger) Info(msg string, fields ...zap.Field) {
 	if strings.Contains(msg, "provided") { // Filter out specific messages
 		return
 	}
-	if z.Level >= INFO {
+	if z.Level >= zapcore.InfoLevel {
 		z.logger.Info(msg, fields...)
 	}
 }
@@ -86,7 +77,7 @@ func (z *CustomLogger) Field(key string, value interface{}) zap.Field {
 func NewCustomLogger(p Params) (*CustomLogger, error) {
 	// Create a zap configuration
 	config := zap.Config{
-		Level:    zap.NewAtomicLevelAt(zapcore.Level(p.Level)),
+		Level:    zap.NewAtomicLevelAt(p.Level),
 		Encoding: "json",
 		EncoderConfig: zapcore.EncoderConfig{
 			MessageKey:    "message",

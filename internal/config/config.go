@@ -25,7 +25,11 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
-		fmt.Println("Warning: .env file not found, using environment variables")
+		// Fallback logging mechanism
+		if os.Getenv("APP_ENV") == "development" {
+			// Only print in development mode
+			os.Stderr.WriteString("Warning: .env file not found, using environment variables\n")
+		}
 	}
 
 	// Parse APP_DEBUG as a boolean

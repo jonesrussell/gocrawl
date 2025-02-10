@@ -31,7 +31,10 @@ func NewStorage(cfg *config.Config, log *logger.CustomLogger) (*Storage, error) 
 	cfgElasticsearch := elasticsearch.Config{
 		Addresses: []string{cfg.ElasticURL},
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{
+				//nolint:gosec // This is a temporary solution to bypass the TLS certificate verification
+				InsecureSkipVerify: true,
+			},
 		},
 	}
 

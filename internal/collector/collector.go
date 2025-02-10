@@ -46,11 +46,15 @@ func New(p Params) (*colly.Collector, error) {
 		),
 	)
 
-	collector.Limit(&colly.LimitRule{
+	// Declare limitErr outside the if statement to avoid shadowing
+	var limitErr error
+	if limitErr = collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: CollectorParallelism,
 		Delay:       p.RateLimit,
-	})
+	}); limitErr != nil {
+		return nil, fmt.Errorf("error setting collector limit: %w", limitErr)
+	}
 
 	// Set a timeout for requests
 	collector.SetRequestTimeout(RequestTimeout)
