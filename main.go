@@ -77,11 +77,11 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 	)
 }
 
-func registerHooks(lc fx.Lifecycle, c *crawler.Crawler) {
+func registerHooks(lc fx.Lifecycle, c *crawler.Crawler, shutdowner fx.Shutdowner) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			log.Println("Starting crawling process...")
-			go startCrawling(ctx, c)
+			go startCrawling(ctx, c, shutdowner)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
@@ -92,8 +92,8 @@ func registerHooks(lc fx.Lifecycle, c *crawler.Crawler) {
 	})
 }
 
-func startCrawling(ctx context.Context, c *crawler.Crawler) {
-	if err := c.Start(ctx, nil); err != nil {
+func startCrawling(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdowner) {
+	if err := c.Start(ctx, shutdowner); err != nil {
 		log.Printf("Error during crawling: %s", err)
 	}
 	log.Println("Crawling process finished")
