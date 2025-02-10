@@ -73,7 +73,7 @@ func TestNewCrawler(t *testing.T) {
 // TestCrawler_Start tests the Crawler's Start method
 func TestCrawler_Start(t *testing.T) {
 	// Create a test server
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.Write([]byte(`<html><body>Test content</body></html>`))
 	}))

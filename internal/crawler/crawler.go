@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -151,7 +152,9 @@ func (c *Crawler) configureCollectors(ctx context.Context) {
 
 		// Visit the link asynchronously
 		if err := e.Request.Visit(link); err != nil {
-			if err != colly.ErrAlreadyVisited && err != colly.ErrMissingURL && err != colly.ErrForbiddenDomain {
+			if !errors.Is(err, colly.ErrAlreadyVisited) &&
+				!errors.Is(err, colly.ErrMissingURL) &&
+				!errors.Is(err, colly.ErrForbiddenDomain) {
 				c.Logger.Debug("Could not visit link", "url", link, "error", err.Error())
 			}
 		}
