@@ -13,7 +13,9 @@ import (
 
 // TestNew tests the New function of the collector package
 func TestNew(t *testing.T) {
-	mockDebugger := logger.NewMockCollyDebugger() // Use the mock debugger
+	mockDebugger := &logger.CollyDebugger{
+		Logger: logger.NewMockCustomLogger(),
+	}
 
 	params := collector.Params{
 		BaseURL:   "http://example.com",
@@ -46,5 +48,55 @@ func TestConfigureLogging(t *testing.T) {
 	c.Visit("http://example.com")
 
 	// Check if the logger received the expected log messages
-	assert.Contains(t, testLogger.Messages, "Requesting URL")
+	messages := testLogger.GetMessages()
+	assert.Contains(t, messages, "Requesting URL")
+}
+
+func TestCollector(t *testing.T) {
+	testLogger := logger.NewMockCustomLogger()
+
+	tests := []struct {
+		name    string
+		baseURL string
+		wantErr bool
+	}{
+		{
+			name:    "valid URL",
+			baseURL: "https://example.com",
+			wantErr: false,
+		},
+		{
+			name:    "invalid URL",
+			baseURL: "not-a-url",
+			wantErr: true,
+		},
+		{
+			name:    "empty URL",
+			baseURL: "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := collector.Params{
+				BaseURL:   tt.baseURL,
+				MaxDepth:  2,
+				RateLimit: time.Second,
+				Debugger: &logger.CollyDebugger{
+					Logger: testLogger,
+				},
+			}
+
+			result, err := collector.New(params)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result.Collector)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result.Collector)
+			}
+		})
+	}
 }

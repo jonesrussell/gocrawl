@@ -50,11 +50,20 @@ func (d *CollyDebugger) OnResponse(e *colly.Response) {
 
 // OnError logs the error details
 func (d *CollyDebugger) OnError(e *colly.Response, err error) {
+	if d.Logger == nil {
+		return
+	}
+
+	errMsg := "unknown error"
+	if err != nil {
+		errMsg = err.Error()
+	}
+
 	d.Logger.Error(
 		"Error",
 		"url", e.Request.URL.String(),
 		"status", e.StatusCode,
-		"error", err.Error(),
+		"error", errMsg,
 	)
 }
 
