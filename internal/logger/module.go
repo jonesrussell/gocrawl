@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -9,29 +10,19 @@ import (
 )
 
 // Module provides the logger as an Fx module
-//
-//nolint:gochecknoglobals // This is a module
 var Module = fx.Module("logger",
-	fx.Provide(
-		NewLogger,
-	),
+	fx.Provide(NewLogger),
 )
 
 // NewLogger initializes the appropriate logger based on the environment
 func NewLogger(cfg *config.Config) (*CustomLogger, error) {
-	logLevel := cfg.LogLevel
-	var level zapcore.Level
-	switch strings.ToUpper(logLevel) {
-	case "DEBUG":
-		level = zapcore.DebugLevel
-	case "INFO":
-		level = zapcore.InfoLevel
-	case "WARN":
-		level = zapcore.WarnLevel
-	case "ERROR":
-		level = zapcore.ErrorLevel
-	default:
-		level = zapcore.InfoLevel
+	if cfg == nil {
+		return nil, errors.New("config cannot be nil")
+	}
+
+	level, err := parseLogLevel(cfg.LogLevel)
+	if err != nil {
+		return nil, err
 	}
 
 	params := Params{
@@ -45,10 +36,18 @@ func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 	return NewCustomLogger(params)
 }
 
-func InitializeLogger() (*CustomLogger, error) {
-	params := Params{
-		Level:  zapcore.InfoLevel,
-		AppEnv: "production",
+// parseLogLevel parses the log level from the configuration
+func parseLogLevel(logLevel string) (zapcore.Level, error) {
+	switch strings.ToUpper(logLevel) {
+	case "DEBUG":
+		return zapcore.DebugLevel, nil
+	case "INFO":
+		return zapcore.InfoLevel, nil
+	case "WARN":
+		return zapcore.WarnLevel, nil
+	case "ERROR":
+		return zapcore.ErrorLevel, nil
+	default:
+		return zapcore.InfoLevel, errors.New("invalid log level")
 	}
-	return NewCustomLogger(params)
 }

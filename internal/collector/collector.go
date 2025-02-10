@@ -3,11 +3,14 @@ package collector
 import (
 	"fmt"
 	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/debug"
 	"go.uber.org/fx"
 )
 
@@ -17,6 +20,16 @@ const (
 	CollectorParallelism = 2                // Maximum parallelism for collector
 )
 
+// DebuggerInterface is an interface for the debugger
+type DebuggerInterface interface {
+	Init() error
+	OnRequest(e *colly.Request)
+	OnResponse(e *colly.Response)
+	OnError(e *colly.Response, err error)
+	OnEvent(e *debug.Event)
+	Event(e *debug.Event)
+}
+
 // Params holds the dependencies for creating a new collector
 type Params struct {
 	fx.In
@@ -24,7 +37,7 @@ type Params struct {
 	BaseURL   string        `name:"baseURL"`
 	MaxDepth  int           `name:"maxDepth"`
 	RateLimit time.Duration `name:"rateLimit"`
-	Debugger  *logger.CollyDebugger
+	Debugger  DebuggerInterface
 }
 
 // Result holds the dependencies for the collector
@@ -46,21 +59,30 @@ func New(p Params) (Result, error) {
 		colly.Async(true),
 		colly.MaxDepth(p.MaxDepth),
 		colly.Debugger(p.Debugger),
-		colly.AllowedDomains(
-			allowedDomain,
-			"http://"+allowedDomain,
-			"https://"+allowedDomain,
+		colly.AllowedDomains(allowedDomain),
+		colly.URLFilters(
+			regexp.MustCompile(fmt.Sprintf("^https?://%s/.*", allowedDomain)),
 		),
+		colly.ParseHTTPErrorResponse(),
 	)
 
-	// Declare limitErr outside the if statement to avoid shadowing
-	var limitErr error
-	if limitErr = collector.Limit(&colly.LimitRule{
+	// Add URL normalization
+	collector.OnRequest(func(r *colly.Request) {
+		r.URL.RawQuery = "" // Remove query parameters
+		if !strings.HasPrefix(r.URL.Scheme, "http") {
+			r.URL.Scheme = "https"
+		}
+	})
+
+	// Configure limits
+	err = collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: CollectorParallelism,
 		Delay:       p.RateLimit,
-	}); limitErr != nil {
-		return Result{}, fmt.Errorf("error setting collector limit: %w", limitErr)
+		RandomDelay: p.RateLimit / 2, // Add some randomization to be more polite
+	})
+	if err != nil {
+		return Result{}, fmt.Errorf("error setting collector limit: %w", err)
 	}
 
 	// Set a timeout for requests
@@ -69,39 +91,17 @@ func New(p Params) (Result, error) {
 	return Result{Collector: collector}, nil
 }
 
-// ConfigureLogging sets up logging for the collector
-func ConfigureLogging(collector *colly.Collector, log *logger.CustomLogger) {
-	collector.OnRequest(func(r *colly.Request) {
-		startTime := time.Now()
-		logRequest(log, "Requesting URL", r, startTime)
-
-		defer func() {
-			duration := time.Since(startTime)
-			logRequest(log, "Request completed", r, duration)
-		}()
+// ConfigureLogging configures the logging for the collector
+func ConfigureLogging(c *colly.Collector, log logger.Interface) {
+	c.OnRequest(func(r *colly.Request) {
+		log.Debug("Requesting URL", r.URL.String())
 	})
 
-	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if err := e.Request.Visit(link); err != nil {
-			logVisitError(log, link, err)
-		}
+	c.OnResponse(func(r *colly.Response) {
+		log.Debug("Received response", r.Request.URL.String(), r.StatusCode)
 	})
-}
 
-func logRequest(log *logger.CustomLogger, message string, r *colly.Request, data interface{}) {
-	log.Info(message, log.Field("url", r.URL.String()), log.Field("request_id", r.ID), log.Field("data", data))
-}
-
-func logVisitError(log *logger.CustomLogger, link string, err error) {
-	switch err.Error() {
-	case "URL already visited":
-		log.Info("URL already visited", log.Field("link", link))
-	case "Forbidden domain", "Missing URL":
-		log.Info(err.Error(), log.Field("link", link))
-		// case "Max depth limit reached":
-		// 	log.Warn("Max depth limit reached", log.Field("link", link))
-		// default:
-		// 	log.Error("Error visiting link", log.Field("link", link), log.Field("error", err))
-	}
+	c.OnError(func(r *colly.Response, err error) {
+		log.Error("Error occurred", r.Request.URL.String(), err)
+	})
 }

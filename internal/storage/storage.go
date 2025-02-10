@@ -15,8 +15,14 @@ import (
 	"go.uber.org/fx"
 )
 
-// Storage struct to hold the Elasticsearch client
-type Storage struct {
+// Storage defines the methods that any storage implementation must have
+type Storage interface {
+	IndexDocument(ctx context.Context, index string, docID string, document interface{}) error
+	TestConnection(ctx context.Context) error
+}
+
+// ElasticsearchStorage struct to hold the Elasticsearch client
+type ElasticsearchStorage struct {
 	ESClient *elasticsearch.Client
 	Logger   *logger.CustomLogger
 }
@@ -25,8 +31,11 @@ type Storage struct {
 type Result struct {
 	fx.Out
 
-	Storage *Storage
+	Storage Storage // Use the interface type here
 }
+
+// Ensure ElasticsearchStorage implements the Storage interface
+var _ Storage = (*ElasticsearchStorage)(nil)
 
 // NewStorage initializes a new Storage instance
 func NewStorage(cfg *config.Config, log *logger.CustomLogger) (Result, error) {
@@ -59,11 +68,16 @@ func NewStorage(cfg *config.Config, log *logger.CustomLogger) (Result, error) {
 		return Result{}, err
 	}
 
-	return Result{Storage: &Storage{ESClient: esClient, Logger: log}}, nil
+	return Result{Storage: &ElasticsearchStorage{ESClient: esClient, Logger: log}}, nil
 }
 
 // IndexDocument indexes a document in Elasticsearch
-func (s *Storage) IndexDocument(ctx context.Context, index string, docID string, document interface{}) error {
+func (s *ElasticsearchStorage) IndexDocument(
+	ctx context.Context,
+	index string,
+	docID string,
+	document interface{},
+) error {
 	// Convert the document to JSON
 	data, err := json.Marshal(document)
 	if err != nil {
@@ -89,15 +103,13 @@ func (s *Storage) IndexDocument(ctx context.Context, index string, docID string,
 	}
 
 	// Log a concise summary instead of the full document
-	s.Logger.Info("Indexed document",
-		s.Logger.Field("docID", docID),
-		s.Logger.Field("index", index))
+	s.Logger.Info("Indexed document", docID, index, res.Status())
 
 	return nil
 }
 
 // TestConnection checks the connection to the Elasticsearch cluster
-func (s *Storage) TestConnection(ctx context.Context) error {
+func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
 	info, err := s.ESClient.Info(
 		s.ESClient.Info.WithContext(ctx),
 	)
@@ -111,6 +123,6 @@ func (s *Storage) TestConnection(ctx context.Context) error {
 		return fmt.Errorf("error decoding Elasticsearch info response: %w", decodeErr)
 	}
 
-	s.Logger.Info("Elasticsearch info", s.Logger.Field("info", esInfo))
+	s.Logger.Info("Elasticsearch info", esInfo)
 	return nil
 }

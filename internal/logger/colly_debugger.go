@@ -25,9 +25,9 @@ func (d *CollyDebugger) Init() error {
 func (d *CollyDebugger) OnRequest(e *colly.Request) {
 	d.logger.Debug(
 		"Request",
-		d.logger.Field("url", e.URL),
-		d.logger.Field("method", e.Method),
-		d.logger.Field("headers", e.Headers),
+		e.URL,
+		e.Method,
+		e.Headers,
 	)
 }
 
@@ -35,9 +35,9 @@ func (d *CollyDebugger) OnRequest(e *colly.Request) {
 func (d *CollyDebugger) OnResponse(e *colly.Response) {
 	d.logger.Info(
 		"Response",
-		d.logger.Field("url", e.Request.URL),
-		d.logger.Field("status", e.StatusCode),
-		d.logger.Field("headers", e.Headers),
+		e.Request.URL,
+		e.StatusCode,
+		e.Headers,
 	)
 }
 
@@ -45,9 +45,9 @@ func (d *CollyDebugger) OnResponse(e *colly.Response) {
 func (d *CollyDebugger) OnError(e *colly.Response, err error) {
 	d.logger.Error(
 		"Error",
-		d.logger.Field("url", e.Request.URL),
-		d.logger.Field("status", e.StatusCode),
-		d.logger.Field("error", err.Error()),
+		e.Request.URL,
+		e.StatusCode,
+		err.Error(),
 	)
 }
 
@@ -55,9 +55,9 @@ func (d *CollyDebugger) OnError(e *colly.Response, err error) {
 func (d *CollyDebugger) OnEvent(e *debug.Event) {
 	d.logger.Info(
 		"Event",
-		d.logger.Field("type", e.Type),
-		d.logger.Field("request_id", e.RequestID),
-		d.logger.Field("collector_id", e.CollectorID),
+		e.Type,
+		e.RequestID,
+		e.CollectorID,
 	)
 }
 
@@ -65,8 +65,8 @@ func (d *CollyDebugger) OnEvent(e *debug.Event) {
 func (d *CollyDebugger) Event(e *debug.Event) {
 	d.logger.Info(
 		"Event",
-		d.logger.Field("type", e.Type),
-		d.logger.Field("request_id", e.RequestID),
-		d.logger.Field("collector_id", e.CollectorID),
+		e.Type,
+		e.RequestID,
+		e.CollectorID,
 	)
 }

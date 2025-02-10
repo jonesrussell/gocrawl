@@ -3,7 +3,6 @@ package logger
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -12,17 +11,17 @@ import (
 
 // Interface holds the methods for the logger
 type Interface interface {
-	Info(msg string, fields ...zap.Field)
-	Error(msg string, fields ...zap.Field)
-	Debug(msg string, fields ...zap.Field)
-	Warn(msg string, fields ...zap.Field)
+	Info(msg string, fields ...interface{})
+	Error(msg string, fields ...interface{})
+	Debug(msg string, fields ...interface{})
+	Warn(msg string, fields ...interface{})
 	Fatalf(msg string, args ...interface{})
 	Errorf(format string, args ...interface{})
-	Field(key string, value interface{}) zap.Field
 }
 
+// CustomLogger wraps the zap.Logger
 type CustomLogger struct {
-	logger *zap.Logger
+	Logger *zap.Logger
 	Level  zapcore.Level
 }
 
@@ -37,47 +36,10 @@ type Params struct {
 	AppEnv string `name:"appEnv"`
 }
 
-func (z *CustomLogger) Debug(msg string, fields ...zap.Field) {
-	z.logger.Debug(msg, fields...)
-}
-
-func (z *CustomLogger) Info(msg string, fields ...zap.Field) {
-	if strings.Contains(msg, "provided") { // Filter out specific messages
-		return
-	}
-	if z.Level >= zapcore.InfoLevel {
-		z.logger.Info(msg, fields...)
-	}
-}
-
-func (z *CustomLogger) Error(msg string, fields ...zap.Field) {
-	z.logger.Error(msg, fields...)
-}
-
-func (z *CustomLogger) Warn(msg string, fields ...zap.Field) {
-	z.logger.Warn(msg, fields...)
-}
-
-// Implement Fatalf method
-func (z *CustomLogger) Fatalf(msg string, args ...interface{}) {
-	z.logger.Fatal(msg, zap.Any("args", args))
-}
-
-// Implement Errorf method
-func (z *CustomLogger) Errorf(format string, args ...interface{}) {
-	z.logger.Error(fmt.Sprintf(format, args...))
-}
-
-// Field creates a zap.Field for structured logging
-func (z *CustomLogger) Field(key string, value interface{}) zap.Field {
-	return zap.Any(key, value)
-}
-
 // NewCustomLogger initializes a new CustomLogger with a specified log level
-func NewCustomLogger(p Params) (*CustomLogger, error) {
-	// Create a zap configuration
+func NewCustomLogger(params Params) (*CustomLogger, error) {
 	config := zap.Config{
-		Level:    zap.NewAtomicLevelAt(p.Level),
+		Level:    zap.NewAtomicLevelAt(params.Level),
 		Encoding: "json",
 		EncoderConfig: zapcore.EncoderConfig{
 			MessageKey:    "message",
@@ -92,13 +54,42 @@ func NewCustomLogger(p Params) (*CustomLogger, error) {
 		ErrorOutputPaths: []string{"stderr"},
 	}
 
-	// Create the logger
 	logger, err := config.Build()
 	if err != nil {
 		return nil, err
 	}
 
-	return &CustomLogger{logger: logger, Level: p.Level}, nil
+	return &CustomLogger{Logger: logger, Level: params.Level}, nil
+}
+
+// Info logs an info message
+func (c *CustomLogger) Info(msg string, fields ...interface{}) {
+	c.Logger.Info(msg, convertToZapFields(fields)...)
+}
+
+// Error logs an error message
+func (c *CustomLogger) Error(msg string, fields ...interface{}) {
+	c.Logger.Error(msg, convertToZapFields(fields)...)
+}
+
+// Debug logs a debug message
+func (c *CustomLogger) Debug(msg string, fields ...interface{}) {
+	c.Logger.Debug(msg, convertToZapFields(fields)...)
+}
+
+// Warn logs a warning message
+func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
+	c.Logger.Warn(msg, convertToZapFields(fields)...)
+}
+
+// Fatalf logs a fatal message
+func (c *CustomLogger) Fatalf(msg string, args ...interface{}) {
+	c.Logger.Fatal(msg, zap.Any("args", args))
+}
+
+// Errorf logs a formatted error message
+func (c *CustomLogger) Errorf(format string, args ...interface{}) {
+	c.Logger.Error(fmt.Sprintf(format, args...))
 }
 
 // NewDevelopmentLogger initializes a new CustomLogger for development
@@ -113,15 +104,59 @@ func NewDevelopmentLogger(p Params) (*CustomLogger, error) {
 	)
 
 	logger := zap.New(core)
-	return &CustomLogger{logger: logger, Level: p.Level}, nil
+	return &CustomLogger{Logger: logger, Level: p.Level}, nil
 }
 
 // Sync flushes any buffered log entries
-func (z *CustomLogger) Sync() error {
-	return z.logger.Sync()
+func (c *CustomLogger) Sync() error {
+	return c.Logger.Sync()
 }
 
 // GetZapLogger returns the underlying zap.Logger
-func (z *CustomLogger) GetZapLogger() *zap.Logger {
-	return z.logger
+func (c *CustomLogger) GetZapLogger() *zap.Logger {
+	return c.Logger
+}
+
+// convertToZapFields converts variadic key-value pairs to zap.Fields
+func convertToZapFields(fields []interface{}) []zap.Field {
+	var zapFields []zap.Field
+
+	// If no fields provided, return empty slice
+	if len(fields) == 0 {
+		return zapFields
+	}
+
+	// If first argument is a string and no more arguments, treat it as additional message context
+	if len(fields) == 1 {
+		if str, ok := fields[0].(string); ok {
+			return []zap.Field{zap.String("context", str)}
+		}
+	}
+
+	// Handle key-value pairs
+	for i := 0; i < len(fields); i++ {
+		// If we have an odd number of remaining fields, add the last one as context
+		if i == len(fields)-1 {
+			if str, ok := fields[i].(string); ok {
+				zapFields = append(zapFields, zap.String("context", str))
+			} else {
+				zapFields = append(zapFields, zap.Any("context", fields[i]))
+			}
+			break
+		}
+
+		// Process key-value pair
+		key, ok := fields[i].(string)
+		if !ok {
+			zapFields = append(zapFields, zap.Any(fmt.Sprintf("value%d", i), fields[i]))
+			continue
+		}
+
+		// Move to next item for value
+		i++
+		value := fields[i]
+		zapFields = append(zapFields, zap.Any(key, value))
+	}
+
+	return zapFields
 }
