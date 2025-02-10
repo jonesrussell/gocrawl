@@ -303,33 +303,42 @@ func (s *ElasticsearchStorage) ScrollSearch(
 	query map[string]interface{},
 	batchSize int,
 ) (<-chan map[string]interface{}, error) {
-	resultChan := make(chan map[string]interface{})
-
 	var buf bytes.Buffer
 	if encodeErr := json.NewEncoder(&buf).Encode(query); encodeErr != nil {
 		return nil, fmt.Errorf("error encoding query: %w", encodeErr)
 	}
 
+	// Initial search request
+	searchRes, err := s.ESClient.Search(
+		s.ESClient.Search.WithContext(ctx),
+		s.ESClient.Search.WithIndex(index),
+		s.ESClient.Search.WithBody(&buf),
+		s.ESClient.Search.WithScroll(time.Minute),
+		s.ESClient.Search.WithSize(batchSize),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initial scroll failed: %w", err)
+	}
+	defer searchRes.Body.Close()
+
+	// Check if the response indicates an error
+	if searchRes.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(searchRes.Body).Decode(&e); err != nil {
+			return nil, fmt.Errorf("error parsing error response: %w", err)
+		}
+		return nil, fmt.Errorf("elasticsearch error: %v", e["error"])
+	}
+
+	resultChan := make(chan map[string]interface{})
+
 	go func() {
 		defer close(resultChan)
-
-		searchRes, searchErr := s.ESClient.Search(
-			s.ESClient.Search.WithContext(ctx),
-			s.ESClient.Search.WithIndex(index),
-			s.ESClient.Search.WithBody(&buf),
-			s.ESClient.Search.WithScroll(time.Minute),
-			s.ESClient.Search.WithSize(batchSize),
-		)
-		if searchErr != nil {
-			s.Logger.Error("Initial scroll failed", searchErr)
-			return
-		}
 
 		for {
 			scrollID, scrollErr := s.handleScrollResponse(ctx, searchRes, resultChan)
 			if scrollErr != nil {
 				s.Logger.Error("Error processing scroll response", scrollErr)
-				searchRes.Body.Close()
 				return
 			}
 			searchRes.Body.Close()

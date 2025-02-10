@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -193,12 +194,44 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 	})
 
 	t.Run("BulkIndex", func(t *testing.T) {
+		// Update transport response for bulk operation
+		transport.Response = `{
+			"took": 30,
+			"errors": false,
+			"items": [
+				{
+					"index": {
+						"_index": "test-index",
+						"_id": "1",
+						"_version": 1,
+						"result": "created",
+						"status": 201
+					}
+				},
+				{
+					"index": {
+						"_index": "test-index",
+						"_id": "2",
+						"_version": 1,
+						"result": "created",
+						"status": 201
+					}
+				}
+			]
+		}`
+
 		docs := []interface{}{
 			map[string]interface{}{"title": "Doc 1"},
 			map[string]interface{}{"title": "Doc 2"},
 		}
 		err := es.BulkIndex(ctx, "test-index", docs)
 		assert.NoError(t, err)
+
+		// Test error case
+		transport.Error = fmt.Errorf("bulk index error")
+		err = es.BulkIndex(ctx, "test-index", docs)
+		assert.Error(t, err)
+		transport.Error = nil
 	})
 
 	t.Run("UpdateDocument", func(t *testing.T) {
@@ -229,4 +262,149 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 			assert.NotNil(t, result)
 		}
 	})
+
+	t.Run("TestConnection", func(t *testing.T) {
+		transport.Response = `{
+			"name" : "node-1",
+			"cluster_name" : "elasticsearch",
+			"version" : {
+				"number" : "8.0.0"
+			}
+		}`
+		err := es.TestConnection(ctx)
+		assert.NoError(t, err)
+
+		// Test error case
+		transport.Error = fmt.Errorf("connection error")
+		err = es.TestConnection(ctx)
+		assert.Error(t, err)
+		transport.Error = nil
+	})
+
+	t.Run("CreateIndex", func(t *testing.T) {
+		transport.Response = `{
+			"acknowledged": true,
+			"shards_acknowledged": true,
+			"index": "test-index"
+		}`
+
+		mapping := map[string]interface{}{
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"title": map[string]interface{}{
+						"type": "text",
+					},
+				},
+			},
+		}
+		err := es.CreateIndex(ctx, "test-index", mapping)
+		assert.NoError(t, err)
+
+		// Test error case
+		transport.Error = fmt.Errorf("create index error")
+		err = es.CreateIndex(ctx, "test-index", mapping)
+		assert.Error(t, err)
+		transport.Error = nil
+	})
+
+	t.Run("DeleteIndex", func(t *testing.T) {
+		transport.Response = `{
+			"acknowledged": true
+		}`
+		err := es.DeleteIndex(ctx, "test-index")
+		assert.NoError(t, err)
+
+		// Test error case
+		transport.Error = fmt.Errorf("delete index error")
+		err = es.DeleteIndex(ctx, "test-index")
+		assert.Error(t, err)
+		transport.Error = nil
+	})
+
+	t.Run("ScrollSearch_Error", func(t *testing.T) {
+		// Set error response for initial search
+		transport.Response = `{
+			"error": {
+				"type": "search_phase_execution_exception",
+				"reason": "scroll error"
+			},
+			"status": 500
+		}`
+		transport.StatusCode = http.StatusInternalServerError
+
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"match_all": map[string]interface{}{},
+			},
+		}
+		resultChan, err := es.ScrollSearch(ctx, "test-index", query, 100)
+		assert.Error(t, err)
+		assert.Nil(t, resultChan)
+
+		// Reset transport for subsequent tests
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("ProcessHits_InvalidHit", func(t *testing.T) {
+		transport.Response = `{
+			"took": 1,
+			"hits": {
+				"hits": [
+					{"invalid": "hit"},
+					{"_source": "not_a_map"}
+				]
+			}
+		}`
+
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"match_all": map[string]interface{}{},
+			},
+		}
+		results, err := es.Search(ctx, "test-index", query)
+		assert.NoError(t, err)
+		assert.Empty(t, results)
+	})
+
+	t.Run("GetHitsFromResult_InvalidResponse", func(t *testing.T) {
+		transport.Response = `{
+			"took": 1,
+			"hits": "invalid"
+		}`
+
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"match_all": map[string]interface{}{},
+			},
+		}
+		results, err := es.Search(ctx, "test-index", query)
+		assert.Error(t, err)
+		assert.Nil(t, results)
+	})
+}
+
+func TestNewStorage_Errors(t *testing.T) {
+	log := logger.NewMockCustomLogger()
+
+	// Create a config with empty URL to trigger error
+	cfg := &config.Config{
+		ElasticURL: "", // This should trigger an error
+	}
+
+	// Create elasticsearch client with mock transport
+	transport := &mockTransport{
+		Response:   "{}",
+		StatusCode: http.StatusOK,
+	}
+
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+		Transport: transport,
+	})
+	require.NoError(t, err)
+
+	// Test storage creation with empty URL
+	result, err := NewStorageWithClient(cfg, log, esClient)
+	assert.Error(t, err)
+	assert.Equal(t, Result{}, result) // Should be an empty Result
 }
