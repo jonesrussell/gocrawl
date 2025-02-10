@@ -69,23 +69,18 @@ func New(p Params) (Result, error) {
 	return Result{Collector: collector}, nil
 }
 
-// ConfigureLogging sets up logging for the collector
-func ConfigureLogging(collector *colly.Collector, log *logger.CustomLogger) {
-	collector.OnRequest(func(r *colly.Request) {
-		startTime := time.Now()
-		logRequest(log, "Requesting URL", r, startTime)
-
-		defer func() {
-			duration := time.Since(startTime)
-			logRequest(log, "Request completed", r, duration)
-		}()
+// ConfigureLogging configures the logging for the collector
+func ConfigureLogging(c *colly.Collector, log logger.Interface) {
+	c.OnRequest(func(r *colly.Request) {
+		log.Debug("Requesting URL", r.URL.String())
 	})
 
-	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if err := e.Request.Visit(link); err != nil {
-			logVisitError(log, link, err)
-		}
+	c.OnResponse(func(r *colly.Response) {
+		log.Debug("Received response", r.Request.URL.String(), r.StatusCode)
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		log.Error("Error occurred", r.Request.URL.String(), err)
 	})
 }
 

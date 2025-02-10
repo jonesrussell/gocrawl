@@ -28,11 +28,11 @@ type Crawler struct {
 	MaxDepth  int
 	RateLimit time.Duration
 	Collector *colly.Collector
-	Logger    *logger.CustomLogger
+	Logger    logger.Interface
 	IndexName string
 }
 
-// Params holds the dependencies for creating a new Crawler
+// Params holds the parameters for creating a Crawler
 type Params struct {
 	fx.In
 
@@ -40,7 +40,7 @@ type Params struct {
 	MaxDepth  int           `name:"maxDepth"`
 	RateLimit time.Duration `name:"rateLimit"`
 	Debugger  *logger.CollyDebugger
-	Logger    *logger.CustomLogger
+	Logger    logger.Interface
 	Config    *config.Config
 	Storage   storage.Storage
 }
