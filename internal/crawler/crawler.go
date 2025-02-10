@@ -93,21 +93,31 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 	c.Logger.Info("Starting crawling process")
 	c.configureCollectors(ctx)
 
-	if err := c.Collector.Visit(c.BaseURL); err != nil {
-		c.Logger.Error("Error visiting start URL", "url", c.BaseURL, "error", err)
+	// Create error channel for async crawling
+	errChan := make(chan error, 1)
+	done := make(chan bool, 1)
+
+	go func() {
+		if err := c.Collector.Visit(c.BaseURL); err != nil {
+			errChan <- err
+			return
+		}
+		c.Collector.Wait()
+		done <- true
+	}()
+
+	// Wait for either completion or context cancellation
+	select {
+	case err := <-errChan:
 		return err
+	case <-done:
+		c.Logger.Info("Crawling completed successfully")
+	case <-ctx.Done():
+		c.Logger.Error("Context cancelled", "error", ctx.Err())
+		return ctx.Err()
 	}
 
-	c.Logger.Info("Crawling process finished, waiting for all requests to complete...")
-	c.Collector.Wait()
-	c.Logger.Info("All requests completed, initiating shutdown...")
-
-	if err := shutdowner.Shutdown(); err != nil {
-		c.Logger.Error("Error during shutdown", "error", err)
-		return err
-	}
-
-	return nil
+	return shutdowner.Shutdown()
 }
 
 // Helper method to configure collectors

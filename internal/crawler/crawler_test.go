@@ -2,6 +2,8 @@ package crawler_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -70,39 +72,55 @@ func TestNewCrawler(t *testing.T) {
 
 // TestCrawler_Start tests the Crawler's Start method
 func TestCrawler_Start(t *testing.T) {
+	// Create a test server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<html><body>Test content</body></html>`))
+	}))
+	defer ts.Close()
+
 	mockStorage := new(MockStorage)
-
-	// Use NewMockCustomLogger to create a mock logger
 	testLogger := logger.NewMockCustomLogger()
-
 	testConfig := &config.Config{IndexName: "test-index"}
 
+	// Create a new collector without domain restrictions
+	collector := colly.NewCollector(
+		colly.AllowURLRevisit(),
+		colly.MaxDepth(1),
+		colly.Async(true),
+		colly.AllowedDomains(), // Empty to allow all domains
+	)
+
 	c := &crawler.Crawler{
-		BaseURL:   "http://example.com",
+		BaseURL:   ts.URL,
 		Storage:   mockStorage,
 		MaxDepth:  1,
-		RateLimit: 1 * time.Second,
-		Collector: colly.NewCollector(),
+		RateLimit: 1 * time.Millisecond,
+		Collector: collector,
 		Logger:    testLogger,
 		IndexName: testConfig.IndexName,
 	}
 
-	mockStorage.On("IndexDocument", mock.Anything, testConfig.IndexName, mock.Anything, mock.Anything).Return(nil)
+	// Set up mock expectations
 	mockStorage.On("TestConnection", mock.Anything).Return(nil)
+	mockStorage.On("IndexDocument", mock.Anything, testConfig.IndexName, mock.Anything, mock.Anything).Return(nil).Maybe()
 
-	// Create a mock shutdowner
 	mockShutdowner := new(MockShutdowner)
 	mockShutdowner.On("Shutdown", mock.Anything).Return(nil)
 
 	app := fxtest.New(t)
 	defer app.RequireStart().RequireStop()
 
-	ctx := context.Background()
-	err := c.Start(ctx, mockShutdowner)
-	if err != nil {
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Run the crawler
+	if err := c.Start(ctx, mockShutdowner); err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
+	// Verify expectations
 	mockStorage.AssertExpectations(t)
 	mockShutdowner.AssertExpectations(t)
 }
