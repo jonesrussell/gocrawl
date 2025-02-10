@@ -85,9 +85,8 @@ func NewCrawler(p Params) (Result, error) {
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
-	// Test the connection before starting the crawl
 	if err := c.Storage.TestConnection(ctx); err != nil {
-		c.Logger.Error("Failed to connect to storage", err)
+		c.Logger.Error("Failed to connect to storage", "error", err)
 		return err
 	}
 
@@ -95,16 +94,17 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 	c.configureCollectors(ctx)
 
 	if err := c.Collector.Visit(c.BaseURL); err != nil {
-		c.Logger.Error("Error visiting URL", err)
+		c.Logger.Error("Error visiting start URL", "url", c.BaseURL, "error", err)
 		return err
 	}
 
-	// Wait for all requests to finish
 	c.Logger.Info("Crawling process finished, waiting for all requests to complete...")
-	c.Collector.Wait() // Wait for all requests to finish
+	c.Collector.Wait()
 	c.Logger.Info("All requests completed, initiating shutdown...")
+
 	if err := shutdowner.Shutdown(); err != nil {
-		c.Logger.Error("Error during shutdown", err)
+		c.Logger.Error("Error during shutdown", "error", err)
+		return err
 	}
 
 	return nil
@@ -132,12 +132,16 @@ func (c *Crawler) configureCollectors(ctx context.Context) {
 	})
 
 	c.Collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Attr("href")
+		link := e.Request.AbsoluteURL(e.Attr("href"))
+		if link == "" {
+			return // Skip empty or invalid URLs
+		}
+
 		c.Logger.Debug("Found link", "url", link)
 
-		err := e.Request.Visit(link)
-		if err != nil {
-			if err != colly.ErrAlreadyVisited {
+		// Visit the link asynchronously
+		if err := e.Request.Visit(link); err != nil {
+			if err != colly.ErrAlreadyVisited && err != colly.ErrMissingURL && err != colly.ErrForbiddenDomain {
 				c.Logger.Debug("Could not visit link", "url", link, "error", err.Error())
 			}
 		}

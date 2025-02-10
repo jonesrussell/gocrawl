@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -58,11 +59,20 @@ func New(p Params) (Result, error) {
 		colly.Async(true),
 		colly.MaxDepth(p.MaxDepth),
 		colly.Debugger(p.Debugger),
-		colly.AllowedDomains(allowedDomain), // Simplified domain restriction
+		colly.AllowedDomains(allowedDomain),
 		colly.URLFilters(
 			regexp.MustCompile(fmt.Sprintf("^https?://%s/.*", allowedDomain)),
 		),
+		colly.ParseHTTPErrorResponse(),
 	)
+
+	// Add URL normalization
+	collector.OnRequest(func(r *colly.Request) {
+		r.URL.RawQuery = "" // Remove query parameters
+		if !strings.HasPrefix(r.URL.Scheme, "http") {
+			r.URL.Scheme = "https"
+		}
+	})
 
 	// Configure limits
 	err = collector.Limit(&colly.LimitRule{
