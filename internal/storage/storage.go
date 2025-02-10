@@ -73,31 +73,45 @@ func NewStorage(cfg *config.Config, log *logger.CustomLogger) (Result, error) {
 		return Result{}, errors.New("ELASTIC_URL is required")
 	}
 
-	// Create the Elasticsearch client with authentication
+	// Create the Elasticsearch client configuration
 	cfgElasticsearch := elasticsearch.Config{
 		Addresses: []string{cfg.ElasticURL},
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				//nolint:gosec // This is a temporary solution to bypass the TLS certificate verification
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, // Only for development/testing
 			},
 		},
 	}
 
-	// Check if API key is provided
+	// Configure authentication
 	if cfg.ElasticAPIKey != "" {
-		cfgElasticsearch.APIKey = cfg.ElasticAPIKey // Use API key for authentication
-	} else {
-		cfgElasticsearch.Username = "elastic"           // Default username for Elasticsearch
-		cfgElasticsearch.Password = cfg.ElasticPassword // Use password for authentication
+		cfgElasticsearch.APIKey = cfg.ElasticAPIKey
+	} else if cfg.ElasticPassword != "" {
+		cfgElasticsearch.Username = "elastic" // Default username
+		cfgElasticsearch.Password = cfg.ElasticPassword
 	}
 
+	// Create the client
 	esClient, err := elasticsearch.NewClient(cfgElasticsearch)
 	if err != nil {
-		return Result{}, err
+		return Result{}, fmt.Errorf("failed to create elasticsearch client: %w", err)
 	}
 
-	return Result{Storage: &ElasticsearchStorage{ESClient: esClient, Logger: log}}, nil
+	// Test the connection
+	res, err := esClient.Info()
+	if err != nil {
+		return Result{}, fmt.Errorf("failed to connect to elasticsearch: %w", err)
+	}
+	defer res.Body.Close()
+
+	log.Info("Successfully connected to Elasticsearch")
+
+	return Result{
+		Storage: &ElasticsearchStorage{
+			ESClient: esClient,
+			Logger:   log,
+		},
+	}, nil
 }
 
 // IndexDocument indexes a document in Elasticsearch
