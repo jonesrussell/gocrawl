@@ -20,15 +20,27 @@ import (
 func testConfig() *config.Config {
 	return &config.Config{
 		ElasticURL: "http://localhost:9200",
-		Transport:  http.DefaultTransport,
 		LogLevel:   "info",
 	}
 }
 
 // setupStorageTest is a helper function for storage tests
 func setupStorageTest(t *testing.T) Storage {
+	// Create mock transport with successful connection response
+	mockTransport := &mockTransport{
+		Response: `{
+			"name": "test-node",
+			"cluster_name": "test-cluster",
+			"version": {
+				"number": "8.0.0"
+			}
+		}`,
+		StatusCode: http.StatusOK,
+	}
+
 	cfg := &config.Config{
 		ElasticURL: "http://localhost:9200",
+		Transport:  mockTransport, // Set the mock transport
 	}
 
 	log := logger.NewMockCustomLogger()
@@ -41,14 +53,28 @@ func setupStorageTest(t *testing.T) Storage {
 
 func TestNewStorage(t *testing.T) {
 	t.Run("successful creation", func(t *testing.T) {
+		// Create mock transport
+		mockTransport := &mockTransport{
+			Response: `{
+				"name": "test-node",
+				"cluster_name": "test-cluster",
+				"version": {
+					"number": "8.0.0"
+				}
+			}`,
+			StatusCode: http.StatusOK,
+		}
+
 		cfg := &config.Config{
 			ElasticURL: "http://localhost:9200",
+			Transport:  mockTransport,
 		}
 		log := logger.NewMockCustomLogger()
 
 		result, err := NewStorage(cfg, log)
 		require.NoError(t, err)
 		assert.NotNil(t, result)
+		assert.NotNil(t, result.Storage)
 	})
 
 	t.Run("missing URL", func(t *testing.T) {
@@ -58,6 +84,23 @@ func TestNewStorage(t *testing.T) {
 		_, err := NewStorage(cfg, log)
 		assert.Error(t, err)
 		assert.Equal(t, ErrMissingURL, err)
+	})
+
+	t.Run("connection error", func(t *testing.T) {
+		// Create mock transport that returns an error
+		mockTransport := &mockTransport{
+			Error: fmt.Errorf("connection error"),
+		}
+
+		cfg := &config.Config{
+			ElasticURL: "http://localhost:9200",
+			Transport:  mockTransport,
+		}
+		log := logger.NewMockCustomLogger()
+
+		_, err := NewStorage(cfg, log)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to connect to elasticsearch")
 	})
 }
 
@@ -103,33 +146,28 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		}
 	}`
 
-	transport := &mockTransport{
+	mockTransport := &mockTransport{
 		Response:   successResponse,
 		StatusCode: http.StatusOK,
 	}
 
-	cfg := &config.Config{
-		ElasticURL: "http://localhost:9200",
-		IndexName:  "test-index",
-	}
-
 	// Create elasticsearch client with mock transport
 	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport: transport,
-		Addresses: []string{cfg.ElasticURL},
+		Transport: mockTransport,
+		Addresses: []string{"http://localhost:9200"},
 	})
 	require.NoError(t, err)
 
 	// Create storage with mocked client
-	storage, err := NewStorageWithClient(cfg, log, esClient)
-	require.NoError(t, err)
-	require.NotNil(t, storage.Storage)
-
-	es := storage.Storage.(*ElasticsearchStorage)
+	storage := &ElasticsearchStorage{
+		ESClient: esClient,
+		Logger:   log,
+		opts:     DefaultOptions(),
+	}
 
 	t.Run("IndexDocument", func(t *testing.T) {
 		// Update transport response for index operation
-		transport.Response = `{
+		mockTransport.Response = `{
 			"_index": "test-index",
 			"_id": "test-id",
 			"_version": 1,
@@ -147,27 +185,27 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 			"title": "Test Document",
 			"body":  "Test Content",
 		}
-		err := es.IndexDocument(ctx, "test-index", "test-id", doc)
+		err := storage.IndexDocument(ctx, "test-index", "test-id", doc)
 		assert.NoError(t, err)
 	})
 
 	t.Run("Search", func(t *testing.T) {
 		// Update transport response for search operation
-		transport.Response = successResponse
+		mockTransport.Response = successResponse
 
 		query := map[string]interface{}{
 			"query": map[string]interface{}{
 				"match_all": map[string]interface{}{},
 			},
 		}
-		results, err := es.Search(ctx, "test-index", query)
+		results, err := storage.Search(ctx, "test-index", query)
 		assert.NoError(t, err)
 		assert.NotNil(t, results)
 	})
 
 	t.Run("BulkIndex", func(t *testing.T) {
 		// Update transport response for bulk operation
-		transport.Response = `{
+		mockTransport.Response = `{
 			"took": 30,
 			"errors": false,
 			"items": [
@@ -196,26 +234,26 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 			map[string]interface{}{"title": "Doc 1"},
 			map[string]interface{}{"title": "Doc 2"},
 		}
-		err := es.BulkIndex(ctx, "test-index", docs)
+		err := storage.BulkIndex(ctx, "test-index", docs)
 		assert.NoError(t, err)
 
 		// Test error case
-		transport.Error = fmt.Errorf("bulk index error")
-		err = es.BulkIndex(ctx, "test-index", docs)
+		mockTransport.Error = fmt.Errorf("bulk index error")
+		err = storage.BulkIndex(ctx, "test-index", docs)
 		assert.Error(t, err)
-		transport.Error = nil
+		mockTransport.Error = nil
 	})
 
 	t.Run("UpdateDocument", func(t *testing.T) {
 		update := map[string]interface{}{
 			"title": "Updated Title",
 		}
-		err := es.UpdateDocument(ctx, "test-index", "test-id", update)
+		err := storage.UpdateDocument(ctx, "test-index", "test-id", update)
 		assert.NoError(t, err)
 	})
 
 	t.Run("DeleteDocument", func(t *testing.T) {
-		err := es.DeleteDocument(ctx, "test-index", "test-id")
+		err := storage.DeleteDocument(ctx, "test-index", "test-id")
 		assert.NoError(t, err)
 	})
 
@@ -225,7 +263,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 				"match_all": map[string]interface{}{},
 			},
 		}
-		resultChan, err := es.ScrollSearch(ctx, "test-index", query, 100)
+		resultChan, err := storage.ScrollSearch(ctx, "test-index", query, 100)
 		assert.NoError(t, err)
 		assert.NotNil(t, resultChan)
 
@@ -236,25 +274,25 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 	})
 
 	t.Run("TestConnection", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"name" : "node-1",
 			"cluster_name" : "elasticsearch",
 			"version" : {
 				"number" : "8.0.0"
 			}
 		}`
-		err := es.TestConnection(ctx)
+		err := storage.TestConnection(ctx)
 		assert.NoError(t, err)
 
 		// Test error case
-		transport.Error = fmt.Errorf("connection error")
-		err = es.TestConnection(ctx)
+		mockTransport.Error = fmt.Errorf("connection error")
+		err = storage.TestConnection(ctx)
 		assert.Error(t, err)
-		transport.Error = nil
+		mockTransport.Error = nil
 	})
 
 	t.Run("CreateIndex", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"acknowledged": true,
 			"shards_acknowledged": true,
 			"index": "test-index"
@@ -269,57 +307,57 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 				},
 			},
 		}
-		err := es.CreateIndex(ctx, "test-index", mapping)
+		err := storage.CreateIndex(ctx, "test-index", mapping)
 		assert.NoError(t, err)
 
 		// Test error case
-		transport.Error = fmt.Errorf("create index error")
-		err = es.CreateIndex(ctx, "test-index", mapping)
+		mockTransport.Error = fmt.Errorf("create index error")
+		err = storage.CreateIndex(ctx, "test-index", mapping)
 		assert.Error(t, err)
-		transport.Error = nil
+		mockTransport.Error = nil
 	})
 
 	t.Run("DeleteIndex", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"acknowledged": true
 		}`
-		err := es.DeleteIndex(ctx, "test-index")
+		err := storage.DeleteIndex(ctx, "test-index")
 		assert.NoError(t, err)
 
 		// Test error case
-		transport.Error = fmt.Errorf("delete index error")
-		err = es.DeleteIndex(ctx, "test-index")
+		mockTransport.Error = fmt.Errorf("delete index error")
+		err = storage.DeleteIndex(ctx, "test-index")
 		assert.Error(t, err)
-		transport.Error = nil
+		mockTransport.Error = nil
 	})
 
 	t.Run("ScrollSearch_Error", func(t *testing.T) {
 		// Set error response for initial search
-		transport.Response = `{
+		mockTransport.Response = `{
 			"error": {
 				"type": "search_phase_execution_exception",
 				"reason": "scroll error"
 			},
 			"status": 500
 		}`
-		transport.StatusCode = http.StatusInternalServerError
+		mockTransport.StatusCode = http.StatusInternalServerError
 
 		query := map[string]interface{}{
 			"query": map[string]interface{}{
 				"match_all": map[string]interface{}{},
 			},
 		}
-		resultChan, err := es.ScrollSearch(ctx, "test-index", query, 100)
+		resultChan, err := storage.ScrollSearch(ctx, "test-index", query, 100)
 		assert.Error(t, err)
 		assert.Nil(t, resultChan)
 
 		// Reset transport for subsequent tests
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("ProcessHits_InvalidHit", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"took": 1,
 			"hits": {
 				"hits": [
@@ -334,13 +372,13 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 				"match_all": map[string]interface{}{},
 			},
 		}
-		results, err := es.Search(ctx, "test-index", query)
+		results, err := storage.Search(ctx, "test-index", query)
 		assert.NoError(t, err)
 		assert.Empty(t, results)
 	})
 
 	t.Run("GetHitsFromResult_InvalidResponse", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"took": 1,
 			"hits": "invalid"
 		}`
@@ -350,7 +388,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 				"match_all": map[string]interface{}{},
 			},
 		}
-		results, err := es.Search(ctx, "test-index", query)
+		results, err := storage.Search(ctx, "test-index", query)
 		assert.Error(t, err)
 		assert.Nil(t, results)
 	})
@@ -390,22 +428,22 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 	})
 
 	t.Run("HandleScrollResponse_InvalidResponse", func(t *testing.T) {
-		transport.Response = `invalid json`
+		mockTransport.Response = `invalid json`
 
 		resultChan := make(chan map[string]interface{})
-		searchRes, err := es.ESClient.Search(
-			es.ESClient.Search.WithContext(ctx),
-			es.ESClient.Search.WithIndex("test-index"),
+		searchRes, err := esClient.Search(
+			esClient.Search.WithContext(ctx),
+			esClient.Search.WithIndex("test-index"),
 		)
 		require.NoError(t, err)
 
-		scrollID, err := es.HandleScrollResponse(ctx, searchRes, resultChan)
+		scrollID, err := storage.HandleScrollResponse(ctx, searchRes, resultChan)
 		assert.Error(t, err)
 		assert.Empty(t, scrollID)
 	})
 
 	t.Run("HandleScrollResponse_MissingScrollID", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"hits": {
 				"hits": [
 					{
@@ -420,9 +458,9 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		// Use a buffered channel to prevent blocking
 		resultChan := make(chan map[string]interface{}, 1)
 
-		searchRes, err := es.ESClient.Search(
-			es.ESClient.Search.WithContext(ctx),
-			es.ESClient.Search.WithIndex("test-index"),
+		searchRes, err := esClient.Search(
+			esClient.Search.WithContext(ctx),
+			esClient.Search.WithIndex("test-index"),
 		)
 		require.NoError(t, err)
 		defer searchRes.Body.Close()
@@ -431,7 +469,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			scrollID, err := es.HandleScrollResponse(ctx, searchRes, resultChan)
+			scrollID, err := storage.HandleScrollResponse(ctx, searchRes, resultChan)
 			assert.Error(t, err)
 			assert.Empty(t, scrollID)
 			close(resultChan) // Close the channel after error
@@ -448,7 +486,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 
 	t.Run("ScrollSearch_NextScrollError", func(t *testing.T) {
 		// First response successful
-		transport.Response = `{
+		mockTransport.Response = `{
 			"hits": {
 				"hits": [
 					{
@@ -469,19 +507,19 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 
 		// Set up RequestFunc to return error on second request
 		var requestCount int
-		transport.RequestFunc = func(req *http.Request) (*http.Response, error) {
+		mockTransport.RequestFunc = func(req *http.Request) (*http.Response, error) {
 			requestCount++
 			if requestCount > 1 {
 				return nil, fmt.Errorf("scroll error")
 			}
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(transport.Response)),
+				Body:       io.NopCloser(strings.NewReader(mockTransport.Response)),
 				Header:     make(http.Header),
 			}, nil
 		}
 
-		resultChan, err := es.ScrollSearch(ctx, "test-index", query, 100)
+		resultChan, err := storage.ScrollSearch(ctx, "test-index", query, 100)
 		assert.NoError(t, err)
 		assert.NotNil(t, resultChan)
 
@@ -491,11 +529,11 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		}
 
 		// Reset RequestFunc
-		transport.RequestFunc = nil
+		mockTransport.RequestFunc = nil
 	})
 
 	t.Run("NewStorage_ConnectionError", func(t *testing.T) {
-		transport.Error = fmt.Errorf("connection error")
+		mockTransport.Error = fmt.Errorf("connection error")
 
 		result, err := NewStorage(&config.Config{
 			ElasticURL: "http://localhost:9200",
@@ -503,7 +541,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, Result{}, result)
 
-		transport.Error = nil
+		mockTransport.Error = nil
 	})
 
 	t.Run("UpdateDocument_InvalidJSON", func(t *testing.T) {
@@ -511,7 +549,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		update := map[string]interface{}{
 			"value": make(chan int), // Cannot be marshaled to JSON
 		}
-		err := es.UpdateDocument(ctx, "test-index", "test-id", update)
+		err := storage.UpdateDocument(ctx, "test-index", "test-id", update)
 		assert.Error(t, err)
 	})
 
@@ -520,7 +558,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 			"value": make(chan int), // Cannot be marshaled to JSON
 		}
 		docs := []interface{}{invalidDoc}
-		err := es.BulkIndex(ctx, "test-index", docs)
+		err := storage.BulkIndex(ctx, "test-index", docs)
 		assert.Error(t, err)
 	})
 
@@ -528,7 +566,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		doc := map[string]interface{}{
 			"value": make(chan int), // Cannot be marshaled to JSON
 		}
-		err := es.IndexDocument(ctx, "test-index", "test-id", doc)
+		err := storage.IndexDocument(ctx, "test-index", "test-id", doc)
 		assert.Error(t, err)
 	})
 
@@ -536,7 +574,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		query := map[string]interface{}{
 			"query": make(chan int), // Cannot be marshaled to JSON
 		}
-		results, err := es.Search(ctx, "test-index", query)
+		results, err := storage.Search(ctx, "test-index", query)
 		assert.Error(t, err)
 		assert.Nil(t, results)
 	})
@@ -545,39 +583,39 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		mapping := map[string]interface{}{
 			"settings": make(chan int), // Cannot be marshaled to JSON
 		}
-		err := es.CreateIndex(ctx, "test-index", mapping)
+		err := storage.CreateIndex(ctx, "test-index", mapping)
 		assert.Error(t, err)
 	})
 
 	t.Run("DeleteDocument_ErrorResponse", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"error": {
 				"type": "document_missing_exception",
 				"reason": "document not found"
 			},
 			"status": 404
 		}`
-		transport.StatusCode = http.StatusNotFound
+		mockTransport.StatusCode = http.StatusNotFound
 
-		err := es.DeleteDocument(ctx, "test-index", "nonexistent-id")
+		err := storage.DeleteDocument(ctx, "test-index", "nonexistent-id")
 		assert.Error(t, err)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("Search_ErrorResponse", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"error": {
 				"type": "index_not_found_exception",
 				"reason": "no such index"
 			},
 			"status": 404
 		}`
-		transport.StatusCode = http.StatusNotFound
+		mockTransport.StatusCode = http.StatusNotFound
 
-		results, err := es.Search(ctx, "nonexistent-index", map[string]interface{}{
+		results, err := storage.Search(ctx, "nonexistent-index", map[string]interface{}{
 			"query": map[string]interface{}{
 				"match_all": map[string]interface{}{},
 			},
@@ -586,8 +624,8 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		assert.Nil(t, results)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("ProcessHits_EmptyHits", func(t *testing.T) {
@@ -597,7 +635,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			es.ProcessHits(ctx, hits, resultChan)
+			storage.ProcessHits(ctx, hits, resultChan)
 			close(resultChan)
 		}()
 
@@ -625,8 +663,8 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 	})
 
 	t.Run("TestConnection_InvalidResponse", func(t *testing.T) {
-		transport.Response = `invalid json`
-		err := es.TestConnection(ctx)
+		mockTransport.Response = `invalid json`
+		err := storage.TestConnection(ctx)
 		assert.Error(t, err)
 	})
 
@@ -634,46 +672,46 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		invalidQuery := map[string]interface{}{
 			"invalid": make(chan int), // Cannot be marshaled to JSON
 		}
-		resultChan, err := es.ScrollSearch(ctx, "test-index", invalidQuery, 100)
+		resultChan, err := storage.ScrollSearch(ctx, "test-index", invalidQuery, 100)
 		assert.Error(t, err)
 		assert.Nil(t, resultChan)
 	})
 
 	t.Run("UpdateDocument_ErrorResponse", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"error": {
 				"type": "version_conflict_engine_exception",
 				"reason": "version conflict"
 			},
 			"status": 409
 		}`
-		transport.StatusCode = http.StatusConflict
+		mockTransport.StatusCode = http.StatusConflict
 
 		update := map[string]interface{}{
 			"title": "Updated Title",
 		}
-		err := es.UpdateDocument(ctx, "test-index", "test-id", update)
+		err := storage.UpdateDocument(ctx, "test-index", "test-id", update)
 		assert.Error(t, err)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("BulkIndex_EmptyDocuments", func(t *testing.T) {
-		err := es.BulkIndex(ctx, "test-index", []interface{}{})
+		err := storage.BulkIndex(ctx, "test-index", []interface{}{})
 		assert.NoError(t, err)
 	})
 
 	t.Run("CreateIndex_ErrorResponse", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"error": {
 				"type": "resource_already_exists_exception",
 				"reason": "index already exists"
 			},
 			"status": 400
 		}`
-		transport.StatusCode = http.StatusBadRequest
+		mockTransport.StatusCode = http.StatusBadRequest
 
 		mapping := map[string]interface{}{
 			"mappings": map[string]interface{}{
@@ -684,100 +722,100 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 				},
 			},
 		}
-		err := es.CreateIndex(ctx, "test-index", mapping)
+		err := storage.CreateIndex(ctx, "test-index", mapping)
 		assert.Error(t, err)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("DeleteIndex_NonexistentIndex", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"error": {
 				"type": "index_not_found_exception",
 				"reason": "no such index"
 			},
 			"status": 404
 		}`
-		transport.StatusCode = http.StatusNotFound
+		mockTransport.StatusCode = http.StatusNotFound
 
-		err := es.DeleteIndex(ctx, "nonexistent-index")
+		err := storage.DeleteIndex(ctx, "nonexistent-index")
 		assert.Error(t, err)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("Search_IsErrorResponse", func(t *testing.T) {
-		transport.Response = `{
+		mockTransport.Response = `{
 			"error": {
 				"type": "search_exception",
 				"reason": "search error"
 			},
 			"status": 500
 		}`
-		transport.StatusCode = http.StatusInternalServerError
+		mockTransport.StatusCode = http.StatusInternalServerError
 
 		query := map[string]interface{}{
 			"query": map[string]interface{}{
 				"match_all": map[string]interface{}{},
 			},
 		}
-		results, err := es.Search(ctx, "test-index", query)
+		results, err := storage.Search(ctx, "test-index", query)
 		assert.Error(t, err)
 		assert.Nil(t, results)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("DeleteDocument_InvalidResponse", func(t *testing.T) {
-		transport.Response = `invalid json`
-		transport.StatusCode = http.StatusInternalServerError
-		err := es.DeleteDocument(ctx, "test-index", "test-id")
+		mockTransport.Response = `invalid json`
+		mockTransport.StatusCode = http.StatusInternalServerError
+		err := storage.DeleteDocument(ctx, "test-index", "test-id")
 		assert.Error(t, err)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("UpdateDocument_InvalidResponse", func(t *testing.T) {
-		transport.Response = `invalid json`
-		transport.StatusCode = http.StatusInternalServerError
+		mockTransport.Response = `invalid json`
+		mockTransport.StatusCode = http.StatusInternalServerError
 		update := map[string]interface{}{
 			"title": "Updated Title",
 		}
-		err := es.UpdateDocument(ctx, "test-index", "test-id", update)
+		err := storage.UpdateDocument(ctx, "test-index", "test-id", update)
 		assert.Error(t, err)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("BulkIndex_InvalidResponse", func(t *testing.T) {
-		transport.Response = `invalid json`
-		transport.StatusCode = http.StatusInternalServerError
+		mockTransport.Response = `invalid json`
+		mockTransport.StatusCode = http.StatusInternalServerError
 
 		docs := []interface{}{
 			map[string]interface{}{"title": "Doc 1"},
 		}
-		err := es.BulkIndex(ctx, "test-index", docs)
+		err := storage.BulkIndex(ctx, "test-index", docs)
 		assert.Error(t, err)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("ScrollSearch_InvalidResponse", func(t *testing.T) {
-		transport.Response = `invalid json`
-		transport.StatusCode = http.StatusInternalServerError
-		transport.RequestFunc = func(req *http.Request) (*http.Response, error) {
+		mockTransport.Response = `invalid json`
+		mockTransport.StatusCode = http.StatusInternalServerError
+		mockTransport.RequestFunc = func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusInternalServerError,
 				Body:       io.NopCloser(strings.NewReader(`invalid json`)),
@@ -790,14 +828,14 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 				"match_all": map[string]interface{}{},
 			},
 		}
-		resultChan, err := es.ScrollSearch(ctx, "test-index", query, 100)
+		resultChan, err := storage.ScrollSearch(ctx, "test-index", query, 100)
 		assert.Error(t, err)
 		assert.Nil(t, resultChan)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
-		transport.RequestFunc = nil
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
+		mockTransport.RequestFunc = nil
 	})
 
 	t.Run("ProcessHits_InvalidSource", func(t *testing.T) {
@@ -811,7 +849,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 
 		go func() {
 			defer close(done)
-			es.ProcessHits(ctx, hits, resultChan)
+			storage.ProcessHits(ctx, hits, resultChan)
 			close(resultChan)
 		}()
 
@@ -830,11 +868,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 	})
 
 	t.Run("NewStorage_InvalidTransport", func(t *testing.T) {
-		invalidTransport := &mockTransport{
-			Response:   "invalid json",
-			StatusCode: http.StatusInternalServerError,
-			Error:      fmt.Errorf("transport error"),
-		}
+		invalidTransport := &http.Transport{}
 
 		result, err := NewStorage(&config.Config{
 			ElasticURL: "http://localhost:9200",
@@ -842,13 +876,11 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		}, log)
 		assert.Error(t, err)
 		assert.Equal(t, Result{}, result)
-
-		invalidTransport.Error = nil
 	})
 
 	t.Run("CreateIndex_InvalidResponse", func(t *testing.T) {
-		transport.Response = `invalid json`
-		transport.StatusCode = http.StatusInternalServerError
+		mockTransport.Response = `invalid json`
+		mockTransport.StatusCode = http.StatusInternalServerError
 
 		mapping := map[string]interface{}{
 			"mappings": map[string]interface{}{
@@ -859,23 +891,23 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 				},
 			},
 		}
-		err := es.CreateIndex(ctx, "test-index", mapping)
+		err := storage.CreateIndex(ctx, "test-index", mapping)
 		assert.Error(t, err)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 
 	t.Run("DeleteIndex_InvalidResponse", func(t *testing.T) {
-		transport.Response = `invalid json`
-		transport.StatusCode = http.StatusInternalServerError
+		mockTransport.Response = `invalid json`
+		mockTransport.StatusCode = http.StatusInternalServerError
 
-		err := es.DeleteIndex(ctx, "test-index")
+		err := storage.DeleteIndex(ctx, "test-index")
 		assert.Error(t, err)
 
 		// Reset transport
-		transport.StatusCode = http.StatusOK
-		transport.Response = successResponse
+		mockTransport.StatusCode = http.StatusOK
+		mockTransport.Response = successResponse
 	})
 }

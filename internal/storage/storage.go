@@ -62,6 +62,10 @@ const (
 
 // NewStorage initializes a new Storage instance
 func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
+	if cfg.ElasticURL == "" {
+		return Result{}, ErrMissingURL
+	}
+
 	opts := DefaultOptions()
 	opts.URL = cfg.ElasticURL
 	opts.Password = cfg.ElasticPassword
