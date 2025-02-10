@@ -39,7 +39,7 @@ type Params struct {
 	BaseURL   string        `name:"baseURL"`
 	MaxDepth  int           `name:"maxDepth"`
 	RateLimit time.Duration `name:"rateLimit"`
-	Debugger  *logger.CustomDebugger
+	Debugger  *logger.CollyDebugger
 	Logger    *logger.CustomLogger
 	Config    *config.Config
 }
@@ -53,7 +53,7 @@ func NewCrawler(p Params) (*Crawler, error) {
 
 	p.Logger.Info("Successfully connected to Elasticsearch")
 
-	collectorInstance, err := collector.New(collector.CollectorParams{
+	collectorInstance, err := collector.New(collector.Params{
 		BaseURL:   p.BaseURL,
 		MaxDepth:  p.MaxDepth,
 		RateLimit: p.RateLimit,

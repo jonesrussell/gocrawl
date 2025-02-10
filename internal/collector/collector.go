@@ -17,18 +17,18 @@ const (
 	CollectorParallelism = 2                // Maximum parallelism for collector
 )
 
-// CollectorParams holds the dependencies for creating a new collector
-type CollectorParams struct {
+// Params holds the dependencies for creating a new collector
+type Params struct {
 	fx.In
 
 	BaseURL   string        `name:"baseURL"`
 	MaxDepth  int           `name:"maxDepth"`
 	RateLimit time.Duration `name:"rateLimit"`
-	Debugger  *logger.CustomDebugger
+	Debugger  *logger.CollyDebugger
 }
 
 // New creates and returns a new colly collector
-func New(p CollectorParams) (*colly.Collector, error) {
+func New(p Params) (*colly.Collector, error) {
 	parsedURL, err := url.Parse(p.BaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse baseURL: %w", err)

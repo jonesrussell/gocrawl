@@ -1,42 +1,72 @@
 package logger
 
 import (
+	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 )
 
-// CustomDebugger is a custom debugger that uses ZapLogger
-type CustomDebugger struct {
-	logger Interface
+// CollyDebugger is a custom debugger for Colly
+type CollyDebugger struct {
+	logger *CustomLogger
 }
 
-// NewCustomDebugger creates a new CustomDebugger
-func NewCustomDebugger(logger Interface) *CustomDebugger {
-	return &CustomDebugger{logger: logger}
+// NewCollyDebugger creates a new CollyDebugger
+func NewCollyDebugger(logger *CustomLogger) *CollyDebugger {
+	return &CollyDebugger{logger: logger}
 }
 
 // Init initializes the debugger (no specific initialization needed here)
-func (d *CustomDebugger) Init() error {
+func (d *CollyDebugger) Init() error {
 	// You can add any initialization logic if needed
 	return nil
 }
 
 // OnRequest logs the request details
-func (d *CustomDebugger) OnRequest(e *debug.Event) {
-	d.logger.Debug("Request", d.logger.Field("request_id", e.RequestID), d.logger.Field("collector_id", e.CollectorID), d.logger.Field("type", e.Type))
+func (d *CollyDebugger) OnRequest(e *colly.Request) {
+	d.logger.Debug(
+		"Request",
+		d.logger.Field("url", e.URL),
+		d.logger.Field("method", e.Method),
+		d.logger.Field("headers", e.Headers),
+	)
 }
 
 // OnResponse logs the response details
-func (d *CustomDebugger) OnResponse(e *debug.Event) {
-	d.logger.Info("Response", d.logger.Field("request_id", e.RequestID), d.logger.Field("collector_id", e.CollectorID), d.logger.Field("type", e.Type))
+func (d *CollyDebugger) OnResponse(e *colly.Response) {
+	d.logger.Info(
+		"Response",
+		d.logger.Field("url", e.Request.URL),
+		d.logger.Field("status", e.StatusCode),
+		d.logger.Field("headers", e.Headers),
+	)
 }
 
-// OnError logs errors
-func (d *CustomDebugger) OnError(e *debug.Event, err error) {
-	d.logger.Error("Error", d.logger.Field("request_id", e.RequestID), d.logger.Field("collector_id", e.CollectorID), d.logger.Field("error", err.Error()))
+// OnError logs the error details
+func (d *CollyDebugger) OnError(e *colly.Response, err error) {
+	d.logger.Error(
+		"Error",
+		d.logger.Field("url", e.Request.URL),
+		d.logger.Field("status", e.StatusCode),
+		d.logger.Field("error", err.Error()),
+	)
 }
 
-// Event logs general events
-func (d *CustomDebugger) Event(e *debug.Event) {
-	// Log the event using your logger
-	d.logger.Info("Event", d.logger.Field("type", e.Type), d.logger.Field("request_id", e.RequestID), d.logger.Field("collector_id", e.CollectorID))
+// OnEvent logs the event details
+func (d *CollyDebugger) OnEvent(e *debug.Event) {
+	d.logger.Info(
+		"Event",
+		d.logger.Field("type", e.Type),
+		d.logger.Field("request_id", e.RequestID),
+		d.logger.Field("collector_id", e.CollectorID),
+	)
+}
+
+// Implement the Event method to satisfy the debug.Debugger interface
+func (d *CollyDebugger) Event(e *debug.Event) {
+	d.logger.Info(
+		"Event",
+		d.logger.Field("type", e.Type),
+		d.logger.Field("request_id", e.RequestID),
+		d.logger.Field("collector_id", e.CollectorID),
+	)
 }
