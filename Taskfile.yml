@@ -10,3 +10,14 @@ tasks:
     desc: "Build the web crawler executable"
     cmds:
       - go build -o crawler main.go
+
+  lint:
+    desc: "Lint the Go code"
+    cmds:
+      - go vet ./...
+      - golangci-lint run ./...
+
+  test:
+    desc: "Run the tests"
+    cmds:
+      - go test -v ./...
