@@ -151,11 +151,14 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 		c.Logger.Error("Failed to check index existence", "error", err)
 		return err
 	}
+
+	// Create index if it doesn't exist
 	if !exists {
-		c.Logger.Error("Index does not exist",
-			"index", c.IndexName,
-			"message", "Please create the index before running the crawler")
-		return fmt.Errorf("index %s does not exist", c.IndexName)
+		c.Logger.Info("Index does not exist, creating...", "index", c.IndexName)
+		if err := c.createArticleIndex(ctx); err != nil {
+			c.Logger.Error("Failed to create index", "error", err)
+			return err
+		}
 	}
 
 	c.Logger.Info("Starting crawl with valid index", "index", c.IndexName)
@@ -411,4 +414,49 @@ func (c *Crawler) processArticles(ctx context.Context) {
 			indexBatch()
 		}
 	}
+}
+
+// createArticleIndex creates the articles index with proper mappings
+func (c *Crawler) createArticleIndex(ctx context.Context) error {
+	mapping := map[string]interface{}{
+		"mappings": map[string]interface{}{
+			"properties": map[string]interface{}{
+				"id": map[string]interface{}{
+					"type": "keyword",
+				},
+				"title": map[string]interface{}{
+					"type":     "text",
+					"analyzer": "standard",
+					"fields": map[string]interface{}{
+						"keyword": map[string]interface{}{
+							"type": "keyword",
+						},
+					},
+				},
+				"body": map[string]interface{}{
+					"type":     "text",
+					"analyzer": "standard",
+				},
+				"author": map[string]interface{}{
+					"type": "keyword",
+				},
+				"published_date": map[string]interface{}{
+					"type": "date",
+				},
+				"source": map[string]interface{}{
+					"type": "keyword",
+				},
+				"tags": map[string]interface{}{
+					"type": "keyword",
+				},
+			},
+		},
+	}
+
+	if err := c.Storage.CreateIndex(ctx, c.IndexName, mapping); err != nil {
+		return fmt.Errorf("failed to create index: %w", err)
+	}
+
+	c.Logger.Info("Created index", "index", c.IndexName)
+	return nil
 }
