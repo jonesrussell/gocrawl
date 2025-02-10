@@ -92,7 +92,7 @@ func TestCrawler_Start(t *testing.T) {
 
 	// Create a mock shutdowner
 	mockShutdowner := new(MockShutdowner)
-	mockShutdowner.On("Shutdown").Return(nil)
+	mockShutdowner.On("Shutdown", mock.Anything).Return(nil)
 
 	app := fxtest.New(t)
 	defer app.RequireStart().RequireStop()

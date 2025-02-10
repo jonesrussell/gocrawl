@@ -85,6 +85,12 @@ func NewCrawler(p Params) (Result, error) {
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
+	// Test the connection before starting the crawl
+	if err := c.Storage.TestConnection(ctx); err != nil {
+		c.Logger.Error("Failed to connect to storage", err)
+		return err
+	}
+
 	c.Logger.Info("Starting crawling process")
 	c.configureCollectors(ctx)
 
