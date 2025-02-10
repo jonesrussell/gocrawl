@@ -37,9 +37,7 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 		collector.Module,
 		crawler.Module,
 		fx.Provide(
-			func() context.Context {
-				return context.Background()
-			},
+			context.Background,
 			fx.Annotated{
 				Name:   "baseURL",
 				Target: func() string { return url },
