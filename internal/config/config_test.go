@@ -53,7 +53,7 @@ func TestLoadConfig_MissingElasticURL(t *testing.T) {
 	// Assert that an error is returned and ElasticURL is required
 	require.Error(t, err)
 	assert.Nil(t, cfg)
-	assert.EqualError(t, err, "ELASTIC_URL is required")
+	require.EqualError(t, err, "ELASTIC_URL is required")
 }
 
 func TestLoadConfig_EnvFileNotFound(t *testing.T) {
@@ -67,6 +67,6 @@ func TestLoadConfig_EnvFileNotFound(t *testing.T) {
 
 	// Assert that an error is returned for the missing ELASTIC_URL
 	require.Error(t, err)
-	assert.EqualError(t, err, "ELASTIC_URL is required")
+	require.EqualError(t, err, "ELASTIC_URL is required")
 	assert.Nil(t, cfg) // Ensure that the config is nil
 }

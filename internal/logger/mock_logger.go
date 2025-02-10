@@ -34,7 +34,7 @@ func (m *MockLogger) Warn(msg string, _ ...interface{}) {
 }
 
 // Implement Fatalf method
-func (m *MockLogger) Fatalf(msg string, args ...interface{}) {
+func (m *MockLogger) Fatalf(msg string, _ ...interface{}) {
 	m.Messages = append(m.Messages, msg)
 }
 

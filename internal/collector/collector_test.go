@@ -8,6 +8,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestNew tests the New function of the collector package
@@ -22,8 +23,8 @@ func TestNew(t *testing.T) {
 	}
 
 	result, err := collector.New(params)
-	assert.NoError(t, err)
-	assert.NotNil(t, result.Collector)
+	require.NoError(t, err)
+	require.NotNil(t, result.Collector)
 
 	// Additional assertions can be made here based on the collector's configuration
 }

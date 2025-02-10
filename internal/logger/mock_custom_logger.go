@@ -17,19 +17,19 @@ func NewMockCustomLogger() *MockCustomLogger {
 }
 
 // Implement the methods of CustomLogger
-func (m *MockCustomLogger) Info(msg string, fields ...interface{}) {
+func (m *MockCustomLogger) Info(msg string, _ ...interface{}) {
 	m.Messages = append(m.Messages, msg)
 }
 
-func (m *MockCustomLogger) Error(msg string, fields ...interface{}) {
+func (m *MockCustomLogger) Error(msg string, _ ...interface{}) {
 	m.Messages = append(m.Messages, msg)
 }
 
-func (m *MockCustomLogger) Debug(msg string, fields ...interface{}) {
+func (m *MockCustomLogger) Debug(msg string, _ ...interface{}) {
 	m.Messages = append(m.Messages, msg)
 }
 
-func (m *MockCustomLogger) Warn(msg string, fields ...interface{}) {
+func (m *MockCustomLogger) Warn(msg string, _ ...interface{}) {
 	m.Messages = append(m.Messages, msg)
 }
 
