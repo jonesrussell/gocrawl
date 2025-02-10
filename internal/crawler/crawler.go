@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -53,35 +52,84 @@ type Result struct {
 	Crawler *Crawler
 }
 
-// NewCrawler initializes a new Crawler
+// NewCrawler creates a new Crawler instance
 func NewCrawler(p Params) (Result, error) {
-	// Use the provided storage instance
-	storageInstance := p.Storage
+	if p.Logger == nil {
+		return Result{}, errors.New("logger is required")
+	}
 
-	p.Logger.Info("Successfully connected to Elasticsearch")
+	// Create a new collector
+	c := colly.NewCollector(
+		colly.MaxDepth(p.MaxDepth),
+		colly.Async(true),
+	)
 
-	collectorResult, err := collector.New(collector.Params{
-		BaseURL:   p.BaseURL,
-		MaxDepth:  p.MaxDepth,
-		RateLimit: p.RateLimit,
-		Debugger:  p.Debugger,
+	// Set rate limiting
+	err := c.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		RandomDelay: p.RateLimit,
 	})
 	if err != nil {
-		return Result{}, fmt.Errorf("failed to initialize collector: %w", err)
+		return Result{}, fmt.Errorf("error setting rate limit: %w", err)
 	}
-	collectorInstance := collectorResult.Collector // Extract the Collector
 
-	collector.ConfigureLogging(collectorInstance, p.Logger)
-
-	return Result{Crawler: &Crawler{
+	crawler := &Crawler{
 		BaseURL:   p.BaseURL,
-		Storage:   storageInstance,
+		Storage:   p.Storage,
 		MaxDepth:  p.MaxDepth,
 		RateLimit: p.RateLimit,
-		Collector: collectorInstance,
+		Collector: c,
 		Logger:    p.Logger,
 		IndexName: p.Config.IndexName,
-	}}, nil
+	}
+
+	// Configure collector callbacks
+	c.OnRequest(func(r *colly.Request) {
+		crawler.Logger.Debug("Requesting URL", r.URL.String())
+	})
+
+	c.OnResponse(func(r *colly.Response) {
+		crawler.Logger.Debug("Received response", r.Request.URL.String(), r.StatusCode)
+		if r.StatusCode != HTTPStatusOK {
+			crawler.Logger.Warn(
+				"Non-200 response received",
+				r.Request.URL.String(),
+				r.StatusCode,
+			)
+		}
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		crawler.Logger.Error("Error occurred", r.Request.URL.String(), err)
+	})
+
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Request.AbsoluteURL(e.Attr("href"))
+		if link == "" {
+			return
+		}
+
+		crawler.Logger.Debug("Found link", "url", link)
+
+		if err := e.Request.Visit(link); err != nil {
+			if !errors.Is(err, colly.ErrAlreadyVisited) &&
+				!errors.Is(err, colly.ErrMissingURL) &&
+				!errors.Is(err, colly.ErrForbiddenDomain) {
+				crawler.Logger.Debug("Could not visit link", "url", link, "error", err.Error())
+			}
+		}
+	})
+
+	if p.Debugger != nil {
+		c.SetDebugger(p.Debugger)
+	}
+
+	p.Logger.Info("Crawler initialized",
+		"baseURL", p.BaseURL,
+		"maxDepth", p.MaxDepth,
+		"rateLimit", p.RateLimit)
+
+	return Result{Crawler: crawler}, nil
 }
 
 // Start method to begin crawling

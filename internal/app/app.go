@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -11,6 +13,11 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap/zapcore"
 )
+
+func init() {
+	// Load .env file if it exists
+	godotenv.Load()
+}
 
 // appShutdowner implements fx.Shutdowner
 type appShutdowner struct {
@@ -23,32 +30,47 @@ func (s *appShutdowner) Shutdown(opts ...fx.ShutdownOption) error {
 
 // StartCrawler initializes and starts the crawler
 func StartCrawler(ctx context.Context, cfg *config.Config) error {
-	log, err := logger.NewCustomLogger(logger.Params{
-		Debug: true,
-		Level: zapcore.DebugLevel,
-	})
+	// Load full config from environment
+	envConfig, err := config.LoadConfig()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	store, err := storage.NewStorage(cfg, log)
+	// Merge CLI config with environment config
+	envConfig.CrawlerConfig = cfg.CrawlerConfig
+
+	log, err := logger.NewCustomLogger(logger.Params{
+		Debug:  envConfig.AppDebug,
+		Level:  zapcore.DebugLevel,
+		AppEnv: envConfig.AppEnv,
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	store, err := storage.NewStorage(envConfig, log)
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
 	}
 
 	crawlerParams := crawler.Params{
-		BaseURL:   cfg.CrawlerConfig.BaseURL,
-		MaxDepth:  cfg.CrawlerConfig.MaxDepth,
-		RateLimit: cfg.CrawlerConfig.RateLimit,
-		Debugger:  &logger.CollyDebugger{},
+		BaseURL:   envConfig.CrawlerConfig.BaseURL,
+		MaxDepth:  envConfig.CrawlerConfig.MaxDepth,
+		RateLimit: envConfig.CrawlerConfig.RateLimit,
+		Debugger:  &logger.CollyDebugger{Logger: log},
 		Logger:    log,
-		Config:    cfg,
+		Config:    envConfig,
 		Storage:   store.Storage,
 	}
 
+	log.Info("Starting crawler",
+		"baseURL", crawlerParams.BaseURL,
+		"maxDepth", crawlerParams.MaxDepth,
+		"rateLimit", crawlerParams.RateLimit)
+
 	crawlerResult, err := crawler.NewCrawler(crawlerParams)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create crawler: %w", err)
 	}
 
 	var shutdowner *appShutdowner
@@ -58,7 +80,7 @@ func StartCrawler(ctx context.Context, cfg *config.Config) error {
 		fx.Invoke(func(c *crawler.Crawler) {
 			go func() {
 				<-ctx.Done()
-				time.Sleep(time.Second) // Give time for cleanup
+				time.Sleep(time.Second)
 			}()
 		}),
 	)
@@ -66,7 +88,7 @@ func StartCrawler(ctx context.Context, cfg *config.Config) error {
 	shutdowner = &appShutdowner{app: app}
 
 	if err := app.Start(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to start app: %w", err)
 	}
 
 	return crawlerResult.Crawler.Start(ctx, shutdowner)
@@ -74,6 +96,15 @@ func StartCrawler(ctx context.Context, cfg *config.Config) error {
 
 // Search performs a search query
 func Search(ctx context.Context, index string, query map[string]interface{}) ([]map[string]interface{}, error) {
+	// Load config from environment
+	envConfig, err := config.LoadConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Override index name from CLI
+	envConfig.IndexName = index
+
 	log, err := logger.NewCustomLogger(logger.Params{
 		Debug: true,
 		Level: zapcore.InfoLevel,
@@ -82,16 +113,7 @@ func Search(ctx context.Context, index string, query map[string]interface{}) ([]
 		return nil, err
 	}
 
-	cfg := &config.Config{
-		IndexName: index,
-		CrawlerConfig: config.CrawlerConfig{
-			BaseURL:   "",
-			MaxDepth:  0,
-			RateLimit: 0,
-		},
-	}
-
-	store, err := storage.NewStorage(cfg, log)
+	store, err := storage.NewStorage(envConfig, log)
 	if err != nil {
 		return nil, err
 	}

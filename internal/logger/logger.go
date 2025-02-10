@@ -39,25 +39,22 @@ type Params struct {
 
 // NewCustomLogger initializes a new CustomLogger with a specified log level
 func NewCustomLogger(params Params) (*CustomLogger, error) {
-	config := zap.Config{
-		Level:    zap.NewAtomicLevelAt(params.Level),
-		Encoding: "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			MessageKey:    "message",
-			LevelKey:      "level",
-			TimeKey:       "time",
-			CallerKey:     "caller",
-			StacktraceKey: "stacktrace",
-			EncodeLevel:   zapcore.CapitalLevelEncoder,
-			EncodeTime:    zapcore.ISO8601TimeEncoder,
-		},
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
+	if params.AppEnv == "" {
+		params.AppEnv = "development"
+	}
+
+	var config zap.Config
+	if params.Debug || params.AppEnv == "development" {
+		config = zap.NewDevelopmentConfig()
+		config.Level = zap.NewAtomicLevelAt(params.Level)
+	} else {
+		config = zap.NewProductionConfig()
+		config.Level = zap.NewAtomicLevelAt(params.Level)
 	}
 
 	logger, err := config.Build()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to build logger: %w", err)
 	}
 
 	return &CustomLogger{Logger: logger, Level: params.Level}, nil
