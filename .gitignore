@@ -1,3 +1,5 @@
 .env
 
 http_ca.crt
+
+bin/
