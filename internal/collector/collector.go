@@ -18,6 +18,7 @@ import (
 const (
 	RequestTimeout       = 30 * time.Second // Timeout for requests
 	CollectorParallelism = 2                // Maximum parallelism for collector
+	RandomDelayFactor    = 2                // RandomDelayFactor is used to add randomization to rate limiting
 )
 
 // DebuggerInterface is an interface for the debugger
@@ -79,7 +80,7 @@ func New(p Params) (Result, error) {
 		DomainGlob:  "*",
 		Parallelism: CollectorParallelism,
 		Delay:       p.RateLimit,
-		RandomDelay: p.RateLimit / 2, // Add some randomization to be more polite
+		RandomDelay: p.RateLimit / RandomDelayFactor, // Add some randomization to be more polite
 	})
 	if err != nil {
 		return Result{}, fmt.Errorf("error setting collector limit: %w", err)
