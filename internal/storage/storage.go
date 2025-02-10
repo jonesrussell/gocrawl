@@ -234,6 +234,11 @@ func (s *ElasticsearchStorage) processHits(
 	hits []interface{},
 	resultChan chan<- map[string]interface{},
 ) {
+	// Check context before starting
+	if ctx.Err() != nil {
+		return
+	}
+
 	for _, hit := range hits {
 		hitMap, isMap := hit.(map[string]interface{})
 		if !isMap {
@@ -246,9 +251,9 @@ func (s *ElasticsearchStorage) processHits(
 		}
 
 		select {
-		case resultChan <- source:
 		case <-ctx.Done():
 			return
+		case resultChan <- source:
 		}
 	}
 }
@@ -276,6 +281,11 @@ func (s *ElasticsearchStorage) handleScrollResponse(
 	searchRes *esapi.Response,
 	resultChan chan<- map[string]interface{},
 ) (string, error) {
+	// Check context before starting
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+
 	var result map[string]interface{}
 	if err := json.NewDecoder(searchRes.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("error parsing scroll response: %w", err)
@@ -286,8 +296,10 @@ func (s *ElasticsearchStorage) handleScrollResponse(
 		return "", err
 	}
 
+	// Process hits synchronously
 	s.processHits(ctx, hits, resultChan)
 
+	// Check for scroll ID after processing hits
 	scrollID, isString := result["_scroll_id"].(string)
 	if !isString {
 		return "", errors.New("invalid scroll ID")

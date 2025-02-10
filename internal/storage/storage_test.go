@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -381,6 +382,201 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		results, err := es.Search(ctx, "test-index", query)
 		assert.Error(t, err)
 		assert.Nil(t, results)
+	})
+
+	t.Run("ProcessHits_ContextCancelled", func(t *testing.T) {
+		// Create a cancelled context
+		cancelCtx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		hits := []interface{}{
+			map[string]interface{}{
+				"_source": map[string]interface{}{
+					"title": "Test Doc",
+				},
+			},
+		}
+
+		resultChan := make(chan map[string]interface{})
+		done := make(chan struct{})
+
+		go func() {
+			defer close(done)
+			es.processHits(cancelCtx, hits, resultChan)
+			close(resultChan)
+		}()
+
+		// Use a timeout to avoid hanging if the test fails
+		select {
+		case result, ok := <-resultChan:
+			if ok {
+				t.Errorf("Received unexpected result: %v", result)
+			}
+		case <-done:
+			// Success - channel was closed without sending results
+		case <-time.After(time.Second):
+			t.Error("Test timed out")
+		}
+	})
+
+	t.Run("HandleScrollResponse_InvalidResponse", func(t *testing.T) {
+		transport.Response = `invalid json`
+
+		resultChan := make(chan map[string]interface{})
+		searchRes, err := es.ESClient.Search(
+			es.ESClient.Search.WithContext(ctx),
+			es.ESClient.Search.WithIndex("test-index"),
+		)
+		require.NoError(t, err)
+
+		scrollID, err := es.handleScrollResponse(ctx, searchRes, resultChan)
+		assert.Error(t, err)
+		assert.Empty(t, scrollID)
+	})
+
+	t.Run("HandleScrollResponse_MissingScrollID", func(t *testing.T) {
+		transport.Response = `{
+			"hits": {
+				"hits": [
+					{
+						"_source": {
+							"title": "Test Doc"
+						}
+					}
+				]
+			}
+		}`
+
+		// Use a buffered channel to prevent blocking
+		resultChan := make(chan map[string]interface{}, 1)
+
+		searchRes, err := es.ESClient.Search(
+			es.ESClient.Search.WithContext(ctx),
+			es.ESClient.Search.WithIndex("test-index"),
+		)
+		require.NoError(t, err)
+		defer searchRes.Body.Close()
+
+		// Create a done channel to signal completion
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			scrollID, err := es.handleScrollResponse(ctx, searchRes, resultChan)
+			assert.Error(t, err)
+			assert.Empty(t, scrollID)
+			close(resultChan) // Close the channel after error
+		}()
+
+		// Wait for completion or timeout
+		select {
+		case <-done:
+			// Success - operation completed
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Test timed out")
+		}
+	})
+
+	t.Run("ScrollSearch_NextScrollError", func(t *testing.T) {
+		// First response successful
+		transport.Response = `{
+			"hits": {
+				"hits": [
+					{
+						"_source": {
+							"title": "Test Doc"
+						}
+					}
+				]
+			},
+			"_scroll_id": "test_scroll_id"
+		}`
+
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"match_all": map[string]interface{}{},
+			},
+		}
+
+		// Set up RequestFunc to return error on second request
+		var requestCount int
+		transport.RequestFunc = func(req *http.Request) (*http.Response, error) {
+			requestCount++
+			if requestCount > 1 {
+				return nil, fmt.Errorf("scroll error")
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(transport.Response)),
+				Header:     make(http.Header),
+			}, nil
+		}
+
+		resultChan, err := es.ScrollSearch(ctx, "test-index", query, 100)
+		assert.NoError(t, err)
+		assert.NotNil(t, resultChan)
+
+		// Read results until channel is closed due to error
+		for range resultChan {
+			// Should only get one result before error
+		}
+
+		// Reset RequestFunc
+		transport.RequestFunc = nil
+	})
+
+	t.Run("NewStorage_ConnectionError", func(t *testing.T) {
+		transport.Error = fmt.Errorf("connection error")
+
+		result, err := NewStorage(&config.Config{
+			ElasticURL: "http://localhost:9200",
+		}, log)
+		assert.Error(t, err)
+		assert.Equal(t, Result{}, result)
+
+		transport.Error = nil
+	})
+
+	t.Run("UpdateDocument_InvalidJSON", func(t *testing.T) {
+		// Create an update with an unserializable value
+		update := map[string]interface{}{
+			"value": make(chan int), // Cannot be marshaled to JSON
+		}
+		err := es.UpdateDocument(ctx, "test-index", "test-id", update)
+		assert.Error(t, err)
+	})
+
+	t.Run("BulkIndex_InvalidDocument", func(t *testing.T) {
+		invalidDoc := map[string]interface{}{
+			"value": make(chan int), // Cannot be marshaled to JSON
+		}
+		docs := []interface{}{invalidDoc}
+		err := es.BulkIndex(ctx, "test-index", docs)
+		assert.Error(t, err)
+	})
+
+	t.Run("IndexDocument_InvalidDocument", func(t *testing.T) {
+		doc := map[string]interface{}{
+			"value": make(chan int), // Cannot be marshaled to JSON
+		}
+		err := es.IndexDocument(ctx, "test-index", "test-id", doc)
+		assert.Error(t, err)
+	})
+
+	t.Run("Search_InvalidQuery", func(t *testing.T) {
+		query := map[string]interface{}{
+			"query": make(chan int), // Cannot be marshaled to JSON
+		}
+		results, err := es.Search(ctx, "test-index", query)
+		assert.Error(t, err)
+		assert.Nil(t, results)
+	})
+
+	t.Run("CreateIndex_InvalidMapping", func(t *testing.T) {
+		mapping := map[string]interface{}{
+			"settings": make(chan int), // Cannot be marshaled to JSON
+		}
+		err := es.CreateIndex(ctx, "test-index", mapping)
+		assert.Error(t, err)
 	})
 }
 
