@@ -8,6 +8,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/debug"
 	"go.uber.org/fx"
 )
 
@@ -17,6 +18,16 @@ const (
 	CollectorParallelism = 2                // Maximum parallelism for collector
 )
 
+// DebuggerInterface is an interface for the debugger
+type DebuggerInterface interface {
+	Init() error
+	OnRequest(e *colly.Request)
+	OnResponse(e *colly.Response)
+	OnError(e *colly.Response, err error)
+	OnEvent(e *debug.Event)
+	Event(e *debug.Event)
+}
+
 // Params holds the dependencies for creating a new collector
 type Params struct {
 	fx.In
@@ -24,7 +35,7 @@ type Params struct {
 	BaseURL   string        `name:"baseURL"`
 	MaxDepth  int           `name:"maxDepth"`
 	RateLimit time.Duration `name:"rateLimit"`
-	Debugger  *logger.CollyDebugger
+	Debugger  DebuggerInterface
 }
 
 // Result holds the dependencies for the collector
@@ -82,21 +93,4 @@ func ConfigureLogging(c *colly.Collector, log logger.Interface) {
 	c.OnError(func(r *colly.Response, err error) {
 		log.Error("Error occurred", r.Request.URL.String(), err)
 	})
-}
-
-func logRequest(log *logger.CustomLogger, message string, r *colly.Request, data interface{}) {
-	log.Info(message, r.URL.String(), r.ID, data)
-}
-
-func logVisitError(log *logger.CustomLogger, link string, err error) {
-	switch err.Error() {
-	case "URL already visited":
-		log.Info("URL already visited", link)
-	case "Forbidden domain", "Missing URL":
-		log.Info(err.Error(), link)
-		// case "Max depth limit reached":
-		// 	log.Warn("Max depth limit reached", log.Field("link", link))
-		// default:
-		// 	log.Error("Error visiting link", log.Field("link", link), log.Field("error", err))
-	}
 }
