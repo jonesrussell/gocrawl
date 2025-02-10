@@ -261,19 +261,24 @@ func (c *Crawler) processPage(e *colly.HTMLElement) {
 		article.Body = intro + "\n\n" + article.Body
 	}
 
-	// Add tags from multiple sources
-	// 1. JSON-LD section
-	if jsonLD.Section != "" {
-		article.Tags = append(article.Tags, jsonLD.Section)
+	// Parse published date - try meta tag first
+	if timeStr := e.ChildAttr("meta[property='article:published_time']", "content"); timeStr != "" {
+		c.Logger.Debug("Found meta published time", "value", timeStr)
+		if t, err := time.Parse(time.RFC3339, timeStr); err == nil {
+			article.PublishedDate = t
+		}
 	}
 
-	// 2. JSON-LD keywords
-	if len(jsonLD.Keywords) > 0 {
-		article.Tags = append(article.Tags, jsonLD.Keywords...)
+	// Add tags from multiple sources with debug logging
+	// 1. Article section from meta tag
+	if section := e.ChildAttr("meta[property='article:section']", "content"); section != "" {
+		c.Logger.Debug("Found meta section", "value", section)
+		article.Tags = append(article.Tags, section)
 	}
 
-	// 3. Meta keywords
+	// 2. Keywords from meta tag
 	if keywords := e.ChildAttr("meta[name='keywords']", "content"); keywords != "" {
+		c.Logger.Debug("Found meta keywords", "value", keywords)
 		for _, tag := range strings.Split(keywords, "|") {
 			if tag = strings.TrimSpace(tag); tag != "" {
 				article.Tags = append(article.Tags, tag)
@@ -281,12 +286,12 @@ func (c *Crawler) processPage(e *colly.HTMLElement) {
 		}
 	}
 
-	// 4. Breadcrumb navigation
-	e.ForEach("ol.nav-breadcrumb li a", func(_ int, el *colly.HTMLElement) {
-		if tag := strings.TrimSpace(el.Text); tag != "" && tag != "Home" {
-			article.Tags = append(article.Tags, tag)
-		}
-	})
+	// 3. Add section from URL path
+	if strings.Contains(article.Source, "/opp-beat/") {
+		article.Tags = append(article.Tags, "OPP Beat")
+	} else if strings.Contains(article.Source, "/police/") {
+		article.Tags = append(article.Tags, "Police")
+	}
 
 	// Remove duplicates from tags
 	seen := make(map[string]bool)
@@ -298,21 +303,6 @@ func (c *Crawler) processPage(e *colly.HTMLElement) {
 		}
 	}
 	article.Tags = uniqueTags
-
-	// Parse published date from time element
-	if timeStr := e.ChildAttr("time.timeago", "datetime"); timeStr != "" {
-		if t, err := time.Parse(time.RFC3339, timeStr); err == nil {
-			article.PublishedDate = t
-		} else {
-			c.Logger.Debug("Failed to parse datetime",
-				"datetime", timeStr,
-				"error", err)
-		}
-	} else if jsonLD.DatePublished != "" {
-		if t, err := time.Parse(time.RFC3339, jsonLD.DatePublished); err == nil {
-			article.PublishedDate = t
-		}
-	}
 
 	// Skip empty articles
 	if article.Title == "" && article.Body == "" {
