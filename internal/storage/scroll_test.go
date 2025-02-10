@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -40,14 +41,13 @@ func TestScrollSearch(t *testing.T) {
 		}
 	}`
 
-	// Second response indicating end of scroll
+	// Second response indicating end of scroll with error
 	endResponse := `{
-		"took": 1,
-		"_scroll_id": "test_scroll_id",
-		"hits": {
-			"total": {"value": 0, "relation": "eq"},
-			"hits": []
-		}
+		"error": {
+			"type": "search_phase_execution_exception",
+			"reason": "no search context found"
+		},
+		"status": 404
 	}`
 
 	var requestCount int
@@ -61,14 +61,17 @@ func TestScrollSearch(t *testing.T) {
 			header.Add("Content-Type", "application/json")
 
 			var responseBody string
+			statusCode := http.StatusOK
+
 			if requestCount == 1 {
 				responseBody = firstResponse
 			} else {
 				responseBody = endResponse
+				statusCode = http.StatusNotFound
 			}
 
 			return &http.Response{
-				StatusCode: http.StatusOK,
+				StatusCode: statusCode,
 				Body:       io.NopCloser(strings.NewReader(responseBody)),
 				Header:     header,
 			}, nil
@@ -105,6 +108,10 @@ func TestScrollSearch(t *testing.T) {
 	select {
 	case <-done:
 		assert.Len(t, results, 3, "Expected 3 documents from scroll")
+		for i, result := range results {
+			expectedValue := fmt.Sprintf("value%d", i+1)
+			assert.Equal(t, expectedValue, result["field1"], "Unexpected value for document %d", i+1)
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Test timed out waiting for scroll results")
 	}
