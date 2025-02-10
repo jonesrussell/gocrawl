@@ -21,6 +21,7 @@ var crawlCmd = &cobra.Command{
 			BaseURL:   baseURL,
 			MaxDepth:  maxDepth,
 			IndexName: indexName,
+			RateLimit: rateLimit,
 		}
 
 		return app.StartCrawler(ctx, cfg)

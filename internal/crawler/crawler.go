@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -62,17 +63,27 @@ func NewCrawler(p Params) (Result, error) {
 		return Result{}, errors.New("logger is required")
 	}
 
-	// Create a new collector
+	// Parse domain from BaseURL
+	parsedURL, err := url.Parse(p.BaseURL)
+	if err != nil {
+		return Result{}, fmt.Errorf("invalid base URL: %w", err)
+	}
+	domain := parsedURL.Host
+
+	// Create a new collector with proper configuration
 	c := colly.NewCollector(
 		colly.MaxDepth(p.MaxDepth),
 		colly.Async(true),
-		colly.AllowedDomains("www.elliotlaketoday.com"),
+		colly.AllowedDomains(domain),    // Use parsed domain
+		colly.MaxBodySize(10*1024*1024), // 10MB
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
 	)
 
 	// Set rate limiting
-	err := c.Limit(&colly.LimitRule{
+	err = c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: p.RateLimit,
+		Parallelism: 2, // Allow some parallel requests
 	})
 	if err != nil {
 		return Result{}, fmt.Errorf("error setting rate limit: %w", err)
@@ -96,22 +107,15 @@ func NewCrawler(p Params) (Result, error) {
 
 	// Configure collector callbacks
 	c.OnRequest(func(r *colly.Request) {
-		crawler.Logger.Debug("Requesting URL", r.URL.String())
+		crawler.Logger.Debug("Visiting", "url", r.URL.String())
 	})
 
 	c.OnResponse(func(r *colly.Response) {
-		crawler.Logger.Debug("Received response", r.Request.URL.String(), r.StatusCode)
-		if r.StatusCode != HTTPStatusOK {
-			crawler.Logger.Warn(
-				"Non-200 response received",
-				r.Request.URL.String(),
-				r.StatusCode,
-			)
-		}
+		crawler.Logger.Debug("Got response", "url", r.Request.URL.String(), "status", r.StatusCode)
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		crawler.Logger.Error("Error occurred", r.Request.URL.String(), err)
+		crawler.Logger.Error("Error scraping", "url", r.Request.URL.String(), "error", err)
 	})
 
 	c.OnHTML("div.details", func(e *colly.HTMLElement) {
@@ -143,7 +147,8 @@ func NewCrawler(p Params) (Result, error) {
 	p.Logger.Info("Crawler initialized",
 		"baseURL", p.BaseURL,
 		"maxDepth", p.MaxDepth,
-		"rateLimit", p.RateLimit)
+		"rateLimit", p.RateLimit,
+		"domain", domain)
 
 	return Result{Crawler: crawler}, nil
 }
@@ -171,18 +176,22 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 		close(processorDone)
 	}()
 
-	c.Logger.Info("Starting crawling process")
+	c.Logger.Info("Starting crawling process", "url", c.BaseURL)
 
 	// Create error channel for async crawling
 	errChan := make(chan error, 1)
 	crawlerDone := make(chan bool, 1)
 
 	go func() {
+		c.Logger.Debug("Starting Visit", "url", c.BaseURL)
 		if err := c.Collector.Visit(c.BaseURL); err != nil {
+			c.Logger.Error("Visit failed", "error", err)
 			errChan <- err
 			return
 		}
+		c.Logger.Debug("Waiting for collector to finish")
 		c.Collector.Wait()
+		c.Logger.Debug("Collector finished")
 		crawlerDone <- true
 	}()
 
@@ -190,6 +199,7 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 	var result error
 	select {
 	case err := <-errChan:
+		c.Logger.Error("Crawler error", "error", err)
 		result = err
 	case <-crawlerDone:
 		c.Logger.Info("Crawling completed successfully")
@@ -210,10 +220,13 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 
 // processPage handles article extraction
 func (c *Crawler) processPage(e *colly.HTMLElement) {
+	c.Logger.Debug("Processing page", "url", e.Request.URL.String())
 	article := c.articleSvc.ExtractArticle(e)
 	if article == nil {
+		c.Logger.Debug("No article extracted", "url", e.Request.URL.String())
 		return
 	}
+	c.Logger.Debug("Article extracted", "url", e.Request.URL.String(), "title", article.Title)
 	c.articleChan <- article
 }
 

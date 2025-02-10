@@ -25,6 +25,7 @@ type Config struct {
 	IndexName string
 	BaseURL   string
 	MaxDepth  int
+	RateLimit time.Duration
 
 	// Elasticsearch settings
 	ElasticURL      string
@@ -35,6 +36,11 @@ type Config struct {
 
 // LoadConfig loads configuration from environment variables
 func LoadConfig() (*Config, error) {
+	rateLimit, err := time.ParseDuration(getEnvDefault("CRAWLER_RATE_LIMIT", "1s"))
+	if err != nil {
+		rateLimit = time.Second // Default to 1 second if parsing fails
+	}
+
 	cfg := &Config{
 		AppEnv:        getEnvDefault("APP_ENV", "development"),
 		LogLevel:      getEnvDefault("LOG_LEVEL", "info"),
@@ -43,6 +49,7 @@ func LoadConfig() (*Config, error) {
 		IndexName:     getEnvDefault("INDEX_NAME", "articles"),
 		BaseURL:       os.Getenv("CRAWLER_BASE_URL"),
 		MaxDepth:      getIntEnvDefault("CRAWLER_MAX_DEPTH", 2),
+		RateLimit:     rateLimit,
 	}
 
 	// Validate required fields
