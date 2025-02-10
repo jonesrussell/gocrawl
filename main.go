@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -26,7 +25,7 @@ func main() {
 
 	// Run the application
 	if err := app.Start(context.Background()); err != nil {
-		log.Fatalf("Application start error: %v", err)
+		panic(err)
 	}
 }
 
@@ -61,23 +60,23 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 	)
 }
 
-func registerHooks(lc fx.Lifecycle, c *crawler.Crawler, shutdowner fx.Shutdowner) {
+func registerHooks(lc fx.Lifecycle, c *crawler.Crawler, shutdowner fx.Shutdowner, log *logger.CustomLogger) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			log.Println("Starting crawling process...")
-			startCrawling(ctx, c, shutdowner)
+			log.Info("Starting crawling process...")
+			startCrawling(ctx, c, shutdowner, log)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			log.Println("Shutdown process initiated...")
+			log.Info("Shutdown process initiated...")
 			return nil
 		},
 	})
 }
 
-func startCrawling(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdowner) {
+func startCrawling(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdowner, log *logger.CustomLogger) {
 	if err := c.Start(ctx, shutdowner); err != nil {
-		log.Printf("Error during crawling: %s", err)
+		log.Errorf("Error during crawling: %s", err)
 	}
-	log.Println("Crawling process finished")
+	log.Info("Crawling process finished")
 }

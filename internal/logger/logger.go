@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -15,6 +16,7 @@ type LoggerInterface interface {
 	Error(msg string, fields ...zap.Field)
 	Warn(msg string, fields ...zap.Field)
 	Fatalf(msg string, args ...interface{})
+	Errorf(format string, args ...interface{}) // Add Errorf method to interface
 	Field(key string, value interface{}) zap.Field
 }
 
@@ -66,6 +68,11 @@ func (z *CustomLogger) Warn(msg string, fields ...zap.Field) {
 // Implement Fatalf method
 func (z *CustomLogger) Fatalf(msg string, args ...interface{}) {
 	z.logger.Fatal(msg, zap.Any("args", args))
+}
+
+// Implement Errorf method
+func (z *CustomLogger) Errorf(format string, args ...interface{}) {
+	z.logger.Error(fmt.Sprintf(format, args...))
 }
 
 // Field creates a zap.Field for structured logging
