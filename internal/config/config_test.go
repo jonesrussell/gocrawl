@@ -12,14 +12,14 @@ import (
 func TestLoadConfig_Success(t *testing.T) {
 	// Set environment variables for testing
 	defer os.Clearenv() // Clear environment variables after the test
-	os.Setenv("APP_NAME", "TestApp")
-	os.Setenv("APP_ENV", "development")
-	os.Setenv("APP_DEBUG", "true")
-	os.Setenv("ELASTIC_URL", "http://localhost:9200")
-	os.Setenv("ELASTIC_PASSWORD", "password")
-	os.Setenv("ELASTIC_API_KEY", "api_key")
-	os.Setenv("INDEX_NAME", "test_index")
-	os.Setenv("LOG_LEVEL", "debug")
+	t.Setenv("APP_NAME", "TestApp")
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("APP_DEBUG", "true")
+	t.Setenv("ELASTIC_URL", "http://localhost:9200")
+	t.Setenv("ELASTIC_PASSWORD", "password")
+	t.Setenv("ELASTIC_API_KEY", "api_key")
+	t.Setenv("INDEX_NAME", "test_index")
+	t.Setenv("LOG_LEVEL", "debug")
 
 	// Load the configuration
 	cfg, err := config.LoadConfig()
@@ -39,13 +39,13 @@ func TestLoadConfig_Success(t *testing.T) {
 func TestLoadConfig_MissingElasticURL(t *testing.T) {
 	defer os.Clearenv() // Clear environment variables after the test
 	// Set environment variables for testing
-	os.Setenv("APP_NAME", "TestApp")
-	os.Setenv("APP_ENV", "development")
-	os.Setenv("APP_DEBUG", "true")
-	os.Setenv("ELASTIC_PASSWORD", "password")
-	os.Setenv("ELASTIC_API_KEY", "api_key")
-	os.Setenv("INDEX_NAME", "test_index")
-	os.Setenv("LOG_LEVEL", "debug")
+	t.Setenv("APP_NAME", "TestApp")
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("APP_DEBUG", "true")
+	t.Setenv("ELASTIC_PASSWORD", "password")
+	t.Setenv("ELASTIC_API_KEY", "api_key")
+	t.Setenv("INDEX_NAME", "test_index")
+	t.Setenv("LOG_LEVEL", "debug")
 
 	// Load the configuration
 	cfg, err := config.LoadConfig()
@@ -59,7 +59,7 @@ func TestLoadConfig_MissingElasticURL(t *testing.T) {
 func TestLoadConfig_EnvFileNotFound(t *testing.T) {
 	defer os.Clearenv() // Clear environment variables after the test
 	// Ensure that the .env file is not loaded
-	os.Setenv("APP_ENV", "development")
+	t.Setenv("APP_ENV", "development")
 	// Do not set ELASTIC_URL to simulate the missing environment variable
 
 	// Load the configuration
