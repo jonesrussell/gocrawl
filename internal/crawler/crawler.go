@@ -24,7 +24,7 @@ const (
 // Crawler struct to hold configuration or state if needed
 type Crawler struct {
 	BaseURL   string
-	Storage   *storage.Storage
+	Storage   storage.Storage
 	MaxDepth  int
 	RateLimit time.Duration
 	Collector *colly.Collector
@@ -42,6 +42,7 @@ type Params struct {
 	Debugger  *logger.CollyDebugger
 	Logger    *logger.CustomLogger
 	Config    *config.Config
+	Storage   storage.Storage
 }
 
 // Result holds the dependencies for the crawler
@@ -53,11 +54,8 @@ type Result struct {
 
 // NewCrawler initializes a new Crawler
 func NewCrawler(p Params) (Result, error) {
-	storageResult, err := initializeStorage(p.Config, p.Logger)
-	if err != nil {
-		return Result{}, fmt.Errorf("failed to initialize storage: %w", err)
-	}
-	storageInstance := storageResult.Storage // Extract the Storage
+	// Use the provided storage instance
+	storageInstance := p.Storage
 
 	p.Logger.Info("Successfully connected to Elasticsearch")
 
@@ -83,23 +81,6 @@ func NewCrawler(p Params) (Result, error) {
 		Logger:    p.Logger,
 		IndexName: p.Config.IndexName,
 	}}, nil
-}
-
-func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.Result, error) {
-	storageResult, err := storage.NewStorage(cfg, log)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutDuration)
-	defer cancel()
-
-	err = storageResult.Storage.TestConnection(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error testing connection: %w", err)
-	}
-
-	return &storageResult, nil
 }
 
 // Start method to begin crawling
