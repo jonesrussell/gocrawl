@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -260,31 +261,88 @@ func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, do
 	}
 }
 
-// Add method to process articles
+// processPage handles article extraction
 func (c *Crawler) processPage(e *colly.HTMLElement) {
+	// Common selectors for news articles
 	article := &models.Article{
 		ID:            uuid.New().String(),
-		Title:         e.ChildText("h1"),
-		Body:          e.ChildText("article"),
+		Title:         e.ChildText("h1.article-title, h1.headline, h1"),      // Common title selectors
+		Body:          e.ChildText("div.article-body, div.content, article"), // Common content selectors
 		Source:        e.Request.URL.String(),
-		PublishedDate: time.Now(),
+		PublishedDate: extractDate(e),
+		Author:        extractAuthor(e),
 		Tags:          extractTags(e),
 	}
 
-	// Try to extract author
-	author := e.ChildText("meta[name='author']")
-	if author != "" {
-		article.Author = author
+	// Skip if no content found
+	if article.Title == "" || article.Body == "" {
+		return
 	}
+
+	c.Logger.Debug("Found article",
+		"title", article.Title,
+		"url", article.Source)
 
 	c.articleChan <- article
 }
 
+// Helper functions for extraction
+func extractDate(e *colly.HTMLElement) time.Time {
+	// Common date selectors
+	dateStr := e.ChildAttr("meta[property='article:published_time']", "content")
+	if dateStr == "" {
+		dateStr = e.ChildText("time, .date, .published-date")
+	}
+
+	// Try parsing with different formats
+	for _, layout := range []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05Z",
+		"2006-01-02 15:04:05",
+		"January 2, 2006",
+	} {
+		if t, err := time.Parse(layout, dateStr); err == nil {
+			return t
+		}
+	}
+
+	return time.Now()
+}
+
+func extractAuthor(e *colly.HTMLElement) string {
+	// Common author selectors
+	author := e.ChildAttr("meta[name='author']", "content")
+	if author == "" {
+		author = e.ChildText(".author-name, .byline, .author")
+	}
+	return author
+}
+
 func extractTags(e *colly.HTMLElement) []string {
 	var tags []string
-	e.ForEach("meta[property='article:tag']", func(_ int, el *colly.HTMLElement) {
-		tags = append(tags, el.Attr("content"))
+
+	// Check meta tags
+	e.ForEach("meta[property='article:tag'], meta[name='keywords']", func(_ int, el *colly.HTMLElement) {
+		content := el.Attr("content")
+		if content != "" {
+			// Split if comma-separated
+			for _, tag := range strings.Split(content, ",") {
+				tag = strings.TrimSpace(tag)
+				if tag != "" {
+					tags = append(tags, tag)
+				}
+			}
+		}
 	})
+
+	// Check tag links
+	e.ForEach("a.tag, .tags a", func(_ int, el *colly.HTMLElement) {
+		tag := strings.TrimSpace(el.Text)
+		if tag != "" {
+			tags = append(tags, tag)
+		}
+	})
+
 	return tags
 }
 
