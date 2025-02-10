@@ -578,6 +578,167 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		err := es.CreateIndex(ctx, "test-index", mapping)
 		assert.Error(t, err)
 	})
+
+	t.Run("DeleteDocument_ErrorResponse", func(t *testing.T) {
+		transport.Response = `{
+			"error": {
+				"type": "document_missing_exception",
+				"reason": "document not found"
+			},
+			"status": 404
+		}`
+		transport.StatusCode = http.StatusNotFound
+
+		err := es.DeleteDocument(ctx, "test-index", "nonexistent-id")
+		assert.Error(t, err)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("Search_ErrorResponse", func(t *testing.T) {
+		transport.Response = `{
+			"error": {
+				"type": "index_not_found_exception",
+				"reason": "no such index"
+			},
+			"status": 404
+		}`
+		transport.StatusCode = http.StatusNotFound
+
+		results, err := es.Search(ctx, "nonexistent-index", map[string]interface{}{
+			"query": map[string]interface{}{
+				"match_all": map[string]interface{}{},
+			},
+		})
+		assert.Error(t, err)
+		assert.Nil(t, results)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("ProcessHits_EmptyHits", func(t *testing.T) {
+		hits := []interface{}{}
+		resultChan := make(chan map[string]interface{}, 1)
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			es.processHits(ctx, hits, resultChan)
+			close(resultChan)
+		}()
+
+		var results []map[string]interface{}
+		for result := range resultChan {
+			results = append(results, result)
+		}
+		assert.Empty(t, results)
+
+		select {
+		case <-done:
+			// Success
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Timeout waiting for processHits to complete")
+		}
+	})
+
+	t.Run("NewStorage_InvalidConfig", func(t *testing.T) {
+		invalidCfg := &config.Config{
+			ElasticURL: "://invalid-url",
+		}
+		result, err := NewStorage(invalidCfg, log)
+		assert.Error(t, err)
+		assert.Equal(t, Result{}, result)
+	})
+
+	t.Run("TestConnection_InvalidResponse", func(t *testing.T) {
+		transport.Response = `invalid json`
+		err := es.TestConnection(ctx)
+		assert.Error(t, err)
+	})
+
+	t.Run("ScrollSearch_InvalidQuery", func(t *testing.T) {
+		invalidQuery := map[string]interface{}{
+			"invalid": make(chan int), // Cannot be marshaled to JSON
+		}
+		resultChan, err := es.ScrollSearch(ctx, "test-index", invalidQuery, 100)
+		assert.Error(t, err)
+		assert.Nil(t, resultChan)
+	})
+
+	t.Run("UpdateDocument_ErrorResponse", func(t *testing.T) {
+		transport.Response = `{
+			"error": {
+				"type": "version_conflict_engine_exception",
+				"reason": "version conflict"
+			},
+			"status": 409
+		}`
+		transport.StatusCode = http.StatusConflict
+
+		update := map[string]interface{}{
+			"title": "Updated Title",
+		}
+		err := es.UpdateDocument(ctx, "test-index", "test-id", update)
+		assert.Error(t, err)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("BulkIndex_EmptyDocuments", func(t *testing.T) {
+		err := es.BulkIndex(ctx, "test-index", []interface{}{})
+		assert.NoError(t, err)
+	})
+
+	t.Run("CreateIndex_ErrorResponse", func(t *testing.T) {
+		transport.Response = `{
+			"error": {
+				"type": "resource_already_exists_exception",
+				"reason": "index already exists"
+			},
+			"status": 400
+		}`
+		transport.StatusCode = http.StatusBadRequest
+
+		mapping := map[string]interface{}{
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"title": map[string]interface{}{
+						"type": "text",
+					},
+				},
+			},
+		}
+		err := es.CreateIndex(ctx, "test-index", mapping)
+		assert.Error(t, err)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("DeleteIndex_NonexistentIndex", func(t *testing.T) {
+		transport.Response = `{
+			"error": {
+				"type": "index_not_found_exception",
+				"reason": "no such index"
+			},
+			"status": 404
+		}`
+		transport.StatusCode = http.StatusNotFound
+
+		err := es.DeleteIndex(ctx, "nonexistent-index")
+		assert.Error(t, err)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
 }
 
 func TestNewStorage_Errors(t *testing.T) {
