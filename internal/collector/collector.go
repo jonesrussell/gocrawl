@@ -11,6 +11,12 @@ import (
 	"go.uber.org/fx"
 )
 
+// Constants for configuration
+const (
+	RequestTimeout       = 30 * time.Second // Timeout for requests
+	CollectorParallelism = 2                // Maximum parallelism for collector
+)
+
 // CollectorParams holds the dependencies for creating a new collector
 type CollectorParams struct {
 	fx.In
@@ -42,12 +48,12 @@ func New(p CollectorParams) (*colly.Collector, error) {
 
 	collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: 2,
+		Parallelism: CollectorParallelism,
 		Delay:       p.RateLimit,
 	})
 
 	// Set a timeout for requests
-	collector.SetRequestTimeout(30 * time.Second)
+	collector.SetRequestTimeout(RequestTimeout)
 
 	return collector, nil
 }

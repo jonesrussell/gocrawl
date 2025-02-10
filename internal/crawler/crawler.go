@@ -2,7 +2,7 @@ package crawler
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -32,8 +32,8 @@ type Crawler struct {
 	IndexName string
 }
 
-// CrawlerParams holds the dependencies for creating a new Crawler
-type CrawlerParams struct {
+// Params holds the dependencies for creating a new Crawler
+type Params struct {
 	fx.In
 
 	BaseURL   string        `name:"baseURL"`
@@ -45,7 +45,7 @@ type CrawlerParams struct {
 }
 
 // NewCrawler initializes a new Crawler
-func NewCrawler(p CrawlerParams) (*Crawler, error) {
+func NewCrawler(p Params) (*Crawler, error) {
 	storageInstance, err := initializeStorage(p.Config, p.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
@@ -121,9 +121,17 @@ func (c *Crawler) configureCollectors(ctx context.Context) {
 	})
 
 	c.Collector.OnResponse(func(r *colly.Response) {
-		c.Logger.Debug("Received response", c.Logger.Field("url", r.Request.URL.String()), c.Logger.Field("status", r.StatusCode))
+		c.Logger.Debug(
+			"Received response",
+			c.Logger.Field("url", r.Request.URL.String()),
+			c.Logger.Field("status", r.StatusCode),
+		)
 		if r.StatusCode != HTTPStatusOK {
-			c.Logger.Warn("Non-200 response received", c.Logger.Field("url", r.Request.URL.String()), c.Logger.Field("status", r.StatusCode))
+			c.Logger.Warn(
+				"Non-200 response received",
+				c.Logger.Field("url", r.Request.URL.String()),
+				c.Logger.Field("status", r.StatusCode),
+			)
 		}
 	})
 
@@ -151,12 +159,16 @@ func (c *Crawler) configureCollectors(ctx context.Context) {
 }
 
 func generateDocumentID(url string) string {
-	hash := md5.Sum([]byte(url))
+	hash := sha256.Sum256([]byte(url))
 	return hex.EncodeToString(hash[:])
 }
 
 func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, docID string) {
-	c.Logger.Debug("Preparing to index document", c.Logger.Field("url", url), c.Logger.Field("docID", docID)) // Log before indexing
+	c.Logger.Debug(
+		"Preparing to index document",
+		c.Logger.Field("url", url),
+		c.Logger.Field("docID", docID),
+	) // Log before indexing
 
 	err := c.Storage.IndexDocument(ctx, indexName, docID, map[string]interface{}{"url": url, "content": content})
 	if err != nil {

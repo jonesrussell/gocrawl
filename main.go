@@ -67,10 +67,6 @@ func registerHooks(lc fx.Lifecycle, c *crawler.Crawler, shutdowner fx.Shutdowner
 			startCrawling(ctx, c, shutdowner, log)
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
-			log.Info("Shutdown process initiated...")
-			return nil
-		},
 	})
 }
 

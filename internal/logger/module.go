@@ -8,6 +8,8 @@ import (
 )
 
 // Module provides the logger as an Fx module
+//
+//nolint:gochecknoglobals // This is a module
 var Module = fx.Module("logger",
 	fx.Provide(
 		NewLogger,
