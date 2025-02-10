@@ -156,8 +156,15 @@ func (s *ElasticsearchStorage) ProcessHits(
 
 		select {
 		case <-ctx.Done():
+			s.Logger.Info("Context cancelled while processing hits")
 			return
-		case resultChan <- source:
+		default:
+			select {
+			case <-ctx.Done():
+				s.Logger.Info("Context cancelled while sending hit")
+				return
+			case resultChan <- source:
+			}
 		}
 	}
 }

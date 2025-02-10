@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/assert"
@@ -16,10 +17,12 @@ func TestScrollSearch(t *testing.T) {
 	storage := setupTestStorage(t)
 	ctx := context.Background()
 
-	// Create mock transport with proper response handling
-	responseBody := `{
+	// First response with scroll ID and hits
+	firstResponse := `{
+		"took": 1,
 		"_scroll_id": "test_scroll_id",
 		"hits": {
+			"total": {"value": 3, "relation": "eq"},
 			"hits": [
 				{
 					"_source": {"field1": "value1"},
@@ -36,13 +39,33 @@ func TestScrollSearch(t *testing.T) {
 			]
 		}
 	}`
+
+	// Second response indicating end of scroll
+	endResponse := `{
+		"took": 1,
+		"_scroll_id": "test_scroll_id",
+		"hits": {
+			"total": {"value": 0, "relation": "eq"},
+			"hits": []
+		}
+	}`
+
+	var requestCount int
 	mockTransport := &mockTransport{
-		Response:   responseBody,
+		Response:   firstResponse,
 		StatusCode: http.StatusOK,
 		RequestFunc: func(req *http.Request) (*http.Response, error) {
+			requestCount++
 			header := http.Header{}
 			header.Add("X-Elastic-Product", "Elasticsearch")
 			header.Add("Content-Type", "application/json")
+
+			var responseBody string
+			if requestCount == 1 {
+				responseBody = firstResponse
+			} else {
+				responseBody = endResponse
+			}
 
 			return &http.Response{
 				StatusCode: http.StatusOK,
@@ -52,7 +75,7 @@ func TestScrollSearch(t *testing.T) {
 		},
 	}
 
-	// Create new client with mock transport
+	// Update storage with mock transport
 	client, err := elasticsearch.NewClient(elasticsearch.Config{
 		Transport: mockTransport,
 		Addresses: []string{storage.opts.URL},
@@ -70,11 +93,21 @@ func TestScrollSearch(t *testing.T) {
 	require.NoError(t, err)
 
 	var results []map[string]interface{}
-	for doc := range resultChan {
-		results = append(results, doc)
-	}
+	done := make(chan struct{})
 
-	assert.Len(t, results, 3)
+	go func() {
+		defer close(done)
+		for doc := range resultChan {
+			results = append(results, doc)
+		}
+	}()
+
+	select {
+	case <-done:
+		assert.Len(t, results, 3, "Expected 3 documents from scroll")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Test timed out waiting for scroll results")
+	}
 }
 
 func TestScrollSearchWithCancel(t *testing.T) {
@@ -167,7 +200,46 @@ func TestHandleScrollResponse(t *testing.T) {
 	storage := setupTestStorage(t)
 	ctx := context.Background()
 
-	// Create test response
+	// Create test response with proper format
+	responseBody := `{
+		"took": 1,
+		"_scroll_id": "test_scroll_id",
+		"hits": {
+			"total": {"value": 1, "relation": "eq"},
+			"hits": [
+				{
+					"_source": {"field1": "value1"},
+					"_id": "1"
+				}
+			]
+		}
+	}`
+
+	mockTransport := &mockTransport{
+		Response:   responseBody,
+		StatusCode: http.StatusOK,
+		RequestFunc: func(req *http.Request) (*http.Response, error) {
+			header := http.Header{}
+			header.Add("X-Elastic-Product", "Elasticsearch")
+			header.Add("Content-Type", "application/json")
+
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(responseBody)),
+				Header:     header,
+			}, nil
+		},
+	}
+
+	// Create client with mock transport
+	client, err := elasticsearch.NewClient(elasticsearch.Config{
+		Transport: mockTransport,
+		Addresses: []string{storage.opts.URL},
+	})
+	require.NoError(t, err)
+	storage.ESClient = client
+
+	// Create response for testing
 	searchRes, err := storage.ESClient.Search(
 		storage.ESClient.Search.WithContext(ctx),
 		storage.ESClient.Search.WithIndex("test_index"),
@@ -176,6 +248,10 @@ func TestHandleScrollResponse(t *testing.T) {
 
 	resultChan := make(chan map[string]interface{}, 1)
 	scrollID, err := storage.HandleScrollResponse(ctx, searchRes, resultChan)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, scrollID)
+	require.NoError(t, err)
+	assert.Equal(t, "test_scroll_id", scrollID)
+
+	// Check that we got the expected result
+	result := <-resultChan
+	assert.Equal(t, "value1", result["field1"])
 }
