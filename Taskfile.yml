@@ -5,3 +5,8 @@ tasks:
     desc: "Run the web crawler"
     cmds:
       - go run main.go -maxDepth 2 -rateLimit 2s -url https://www.elliotlaketoday.com/opp-beat
+
+  build:
+    desc: "Build the web crawler executable"
+    cmds:
+      - go build -o crawler main.go
