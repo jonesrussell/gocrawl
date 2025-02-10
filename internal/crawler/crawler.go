@@ -44,28 +44,37 @@ type Params struct {
 	Config    *config.Config
 }
 
+// Result holds the dependencies for the crawler
+type Result struct {
+	fx.Out
+
+	Crawler *Crawler
+}
+
 // NewCrawler initializes a new Crawler
-func NewCrawler(p Params) (*Crawler, error) {
-	storageInstance, err := initializeStorage(p.Config, p.Logger)
+func NewCrawler(p Params) (Result, error) {
+	storageResult, err := initializeStorage(p.Config, p.Logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize storage: %w", err)
+		return Result{}, fmt.Errorf("failed to initialize storage: %w", err)
 	}
+	storageInstance := storageResult.Storage // Extract the Storage
 
 	p.Logger.Info("Successfully connected to Elasticsearch")
 
-	collectorInstance, err := collector.New(collector.Params{
+	collectorResult, err := collector.New(collector.Params{
 		BaseURL:   p.BaseURL,
 		MaxDepth:  p.MaxDepth,
 		RateLimit: p.RateLimit,
 		Debugger:  p.Debugger,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize collector: %w", err)
+		return Result{}, fmt.Errorf("failed to initialize collector: %w", err)
 	}
+	collectorInstance := collectorResult.Collector // Extract the Collector
 
 	collector.ConfigureLogging(collectorInstance, p.Logger)
 
-	return &Crawler{
+	return Result{Crawler: &Crawler{
 		BaseURL:   p.BaseURL,
 		Storage:   storageInstance,
 		MaxDepth:  p.MaxDepth,
@@ -73,11 +82,11 @@ func NewCrawler(p Params) (*Crawler, error) {
 		Collector: collectorInstance,
 		Logger:    p.Logger,
 		IndexName: p.Config.IndexName,
-	}, nil
+	}}, nil
 }
 
-func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.Storage, error) {
-	storageInstance, err := storage.NewStorage(cfg, log)
+func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.Result, error) {
+	storageResult, err := storage.NewStorage(cfg, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
@@ -85,12 +94,12 @@ func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.S
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutDuration)
 	defer cancel()
 
-	err = storageInstance.TestConnection(ctx)
+	err = storageResult.Storage.TestConnection(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error testing connection: %w", err)
 	}
 
-	return storageInstance, nil
+	return &storageResult, nil
 }
 
 // Start method to begin crawling

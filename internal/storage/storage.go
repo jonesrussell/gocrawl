@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"go.uber.org/fx"
 )
 
 // Storage struct to hold the Elasticsearch client
@@ -20,11 +21,18 @@ type Storage struct {
 	Logger   *logger.CustomLogger
 }
 
+// Result holds the dependencies for the storage
+type Result struct {
+	fx.Out
+
+	Storage *Storage
+}
+
 // NewStorage initializes a new Storage instance
-func NewStorage(cfg *config.Config, log *logger.CustomLogger) (*Storage, error) {
+func NewStorage(cfg *config.Config, log *logger.CustomLogger) (Result, error) {
 	// Validate essential configuration parameters
 	if cfg.ElasticURL == "" {
-		return nil, errors.New("ELASTIC_URL is required")
+		return Result{}, errors.New("ELASTIC_URL is required")
 	}
 
 	// Create the Elasticsearch client with authentication
@@ -48,10 +56,10 @@ func NewStorage(cfg *config.Config, log *logger.CustomLogger) (*Storage, error) 
 
 	esClient, err := elasticsearch.NewClient(cfgElasticsearch)
 	if err != nil {
-		return nil, err
+		return Result{}, err
 	}
 
-	return &Storage{ESClient: esClient, Logger: log}, nil
+	return Result{Storage: &Storage{ESClient: esClient, Logger: log}}, nil
 }
 
 // IndexDocument indexes a document in Elasticsearch

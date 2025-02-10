@@ -27,11 +27,18 @@ type Params struct {
 	Debugger  *logger.CollyDebugger
 }
 
+// Result holds the dependencies for the collector
+type Result struct {
+	fx.Out
+
+	Collector *colly.Collector
+}
+
 // New creates and returns a new colly collector
-func New(p Params) (*colly.Collector, error) {
+func New(p Params) (Result, error) {
 	parsedURL, err := url.Parse(p.BaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse baseURL: %w", err)
+		return Result{}, fmt.Errorf("failed to parse baseURL: %w", err)
 	}
 	allowedDomain := parsedURL.Hostname()
 
@@ -53,13 +60,13 @@ func New(p Params) (*colly.Collector, error) {
 		Parallelism: CollectorParallelism,
 		Delay:       p.RateLimit,
 	}); limitErr != nil {
-		return nil, fmt.Errorf("error setting collector limit: %w", limitErr)
+		return Result{}, fmt.Errorf("error setting collector limit: %w", limitErr)
 	}
 
 	// Set a timeout for requests
 	collector.SetRequestTimeout(RequestTimeout)
 
-	return collector, nil
+	return Result{Collector: collector}, nil
 }
 
 // ConfigureLogging sets up logging for the collector
