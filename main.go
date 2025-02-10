@@ -51,26 +51,20 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 			},
 			logger.NewCollyDebugger,
 		),
+		fx.Provide(
+			func(l *logger.CustomLogger) logger.Interface {
+				return l
+			},
+		),
 		fx.WithLogger(func(l *logger.CustomLogger) fxevent.Logger {
 			return &fxevent.ZapLogger{Logger: l.GetZapLogger()}
 		}),
-		fx.Invoke(registerHooks),
+		fx.Invoke(func(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdowner, log *logger.CustomLogger) {
+			if err := c.Start(ctx, shutdowner); err != nil {
+				log.Errorf("Error during crawling: %s", err)
+				return
+			}
+			log.Info("Crawling process finished")
+		}),
 	)
-}
-
-func registerHooks(lc fx.Lifecycle, c *crawler.Crawler, shutdowner fx.Shutdowner, log *logger.CustomLogger) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			log.Info("Starting crawling process...")
-			startCrawling(ctx, c, shutdowner, log)
-			return nil
-		},
-	})
-}
-
-func startCrawling(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdowner, log *logger.CustomLogger) {
-	if err := c.Start(ctx, shutdowner); err != nil {
-		log.Errorf("Error during crawling: %s", err)
-	}
-	log.Info("Crawling process finished")
 }

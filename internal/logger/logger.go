@@ -38,7 +38,6 @@ type Params struct {
 
 // NewCustomLogger initializes a new CustomLogger with a specified log level
 func NewCustomLogger(params Params) (*CustomLogger, error) {
-	// Create a zap configuration
 	config := zap.Config{
 		Level:    zap.NewAtomicLevelAt(params.Level),
 		Encoding: "json",
@@ -55,7 +54,6 @@ func NewCustomLogger(params Params) (*CustomLogger, error) {
 		ErrorOutputPaths: []string{"stderr"},
 	}
 
-	// Create the logger
 	logger, err := config.Build()
 	if err != nil {
 		return nil, err
@@ -84,12 +82,12 @@ func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
 	c.Logger.Warn(msg, convertToZapFields(fields)...)
 }
 
-// Implement Fatalf method
+// Fatalf logs a fatal message
 func (c *CustomLogger) Fatalf(msg string, args ...interface{}) {
 	c.Logger.Fatal(msg, zap.Any("args", args))
 }
 
-// Implement Errorf method
+// Errorf logs a formatted error message
 func (c *CustomLogger) Errorf(format string, args ...interface{}) {
 	c.Logger.Error(fmt.Sprintf(format, args...))
 }
@@ -123,7 +121,6 @@ func (c *CustomLogger) GetZapLogger() *zap.Logger {
 func convertToZapFields(fields []interface{}) []zap.Field {
 	var zapFields []zap.Field
 	if len(fields)%2 != 0 {
-		// Handle the case where fields are not in key-value pairs
 		zapFields = append(zapFields, zap.String("error", "fields must be in key-value pairs"))
 		return zapFields
 	}
