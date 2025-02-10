@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -46,7 +47,7 @@ func LoadConfig() (*Config, error) {
 
 	// Validate required configuration values
 	if config.ElasticURL == "" {
-		return nil, fmt.Errorf("ELASTIC_URL is required")
+		return nil, errors.New("ELASTIC_URL is required")
 	}
 
 	return config, nil
