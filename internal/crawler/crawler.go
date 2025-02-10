@@ -32,7 +32,7 @@ type Crawler struct {
 	Logger      logger.Interface
 	IndexName   string
 	articleChan chan *models.Article
-	articleSvc  *article.Service
+	articleSvc  article.Service
 	indexSvc    *storage.IndexService
 }
 
@@ -253,4 +253,17 @@ func (c *Crawler) processArticles(ctx context.Context) {
 			indexBatch()
 		}
 	}
+}
+
+// Add these methods to the Crawler struct
+func (c *Crawler) SetCollector(collector *colly.Collector) {
+	c.Collector = collector
+}
+
+func (c *Crawler) SetArticleService(svc article.Service) {
+	c.articleSvc = svc
+}
+
+func (c *Crawler) SetBaseURL(url string) {
+	c.BaseURL = url
 }

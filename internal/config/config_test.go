@@ -12,28 +12,28 @@ import (
 func TestLoadConfig_Success(t *testing.T) {
 	// Set environment variables for testing
 	defer os.Clearenv() // Clear environment variables after the test
-	t.Setenv("APP_NAME", "TestApp")
 	t.Setenv("APP_ENV", "development")
-	t.Setenv("APP_DEBUG", "true")
+	t.Setenv("LOG_LEVEL", "debug")
 	t.Setenv("ELASTIC_URL", "http://localhost:9200")
 	t.Setenv("ELASTIC_PASSWORD", "password")
 	t.Setenv("ELASTIC_API_KEY", "api_key")
 	t.Setenv("INDEX_NAME", "test_index")
-	t.Setenv("LOG_LEVEL", "debug")
+	t.Setenv("CRAWLER_BASE_URL", "https://example.com")
+	t.Setenv("CRAWLER_MAX_DEPTH", "3")
 
 	// Load the configuration
 	cfg, err := config.LoadConfig()
 	require.NoError(t, err)
 
 	// Assert the loaded values
-	assert.Equal(t, "TestApp", cfg.AppName)
 	assert.Equal(t, "development", cfg.AppEnv)
-	assert.True(t, cfg.AppDebug)
+	assert.Equal(t, "debug", cfg.LogLevel)
 	assert.Equal(t, "http://localhost:9200", cfg.ElasticURL)
 	assert.Equal(t, "password", cfg.ElasticPassword)
 	assert.Equal(t, "api_key", cfg.ElasticAPIKey)
 	assert.Equal(t, "test_index", cfg.IndexName)
-	assert.Equal(t, "debug", cfg.LogLevel)
+	assert.Equal(t, "https://example.com", cfg.BaseURL)
+	assert.Equal(t, 3, cfg.MaxDepth)
 }
 
 func TestLoadConfig_MissingElasticURL(t *testing.T) {

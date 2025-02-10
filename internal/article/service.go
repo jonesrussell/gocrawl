@@ -12,12 +12,19 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
-type Service struct {
+// Service defines the interface for article operations
+type Service interface {
+	ExtractArticle(e *colly.HTMLElement) *models.Article
+}
+
+// ArticleService implements the Service interface
+type ArticleService struct {
 	logger logger.Interface
 }
 
-func NewService(logger logger.Interface) *Service {
-	return &Service{logger: logger}
+// NewService creates a new ArticleService instance
+func NewService(logger logger.Interface) Service {
+	return &ArticleService{logger: logger}
 }
 
 type jsonLDArticle struct {
@@ -29,7 +36,7 @@ type jsonLDArticle struct {
 	Section       string   `json:"articleSection"`
 }
 
-func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
+func (s *ArticleService) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	var jsonLD jsonLDArticle
 
 	// Extract metadata from JSON-LD first
@@ -40,7 +47,7 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	})
 
 	// Clean up author (remove date)
-	author := s.cleanAuthor(e.ChildText(".details-byline"))
+	author := s.CleanAuthor(e.ChildText(".details-byline"))
 
 	// Create article with basic fields
 	article := &models.Article{
@@ -58,7 +65,7 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	}
 
 	// Parse published date
-	article.PublishedDate = s.parsePublishedDate(e, jsonLD)
+	article.PublishedDate = s.ParsePublishedDate(e, jsonLD)
 
 	// Skip empty articles
 	if article.Title == "" && article.Body == "" {
@@ -77,14 +84,14 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	return article
 }
 
-func (s *Service) cleanAuthor(author string) string {
+func (s *ArticleService) CleanAuthor(author string) string {
 	if idx := strings.Index(author, "    "); idx != -1 {
 		author = strings.TrimSpace(author[:idx])
 	}
 	return author
 }
 
-func (s *Service) extractTags(e *colly.HTMLElement, jsonLD jsonLDArticle) []string {
+func (s *ArticleService) extractTags(e *colly.HTMLElement, jsonLD jsonLDArticle) []string {
 	tags := make([]string, 0)
 
 	// 1. JSON-LD keywords
@@ -132,7 +139,7 @@ func (s *Service) extractTags(e *colly.HTMLElement, jsonLD jsonLDArticle) []stri
 	return uniqueTags
 }
 
-func (s *Service) parsePublishedDate(e *colly.HTMLElement, jsonLD jsonLDArticle) time.Time {
+func (s *ArticleService) ParsePublishedDate(e *colly.HTMLElement, jsonLD jsonLDArticle) time.Time {
 	var publishedDate time.Time
 
 	timeFormats := []string{

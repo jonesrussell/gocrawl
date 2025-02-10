@@ -2,10 +2,13 @@ package logger
 
 import (
 	"fmt"
+
+	"github.com/stretchr/testify/mock"
 )
 
 // MockLogger is a simple mock for the logger
 type MockLogger struct {
+	mock.Mock
 	Messages []string
 }
 
@@ -17,7 +20,8 @@ func NewMockLogger() *MockLogger {
 }
 
 // Implement the same methods as CustomLogger
-func (m *MockLogger) Info(msg string, _ ...interface{}) {
+func (m *MockLogger) Info(msg string, args ...interface{}) {
+	m.Called(msg, args)
 	m.Messages = append(m.Messages, msg)
 }
 
@@ -25,7 +29,8 @@ func (m *MockLogger) Error(msg string, _ ...interface{}) {
 	m.Messages = append(m.Messages, msg)
 }
 
-func (m *MockLogger) Debug(msg string, _ ...interface{}) {
+func (m *MockLogger) Debug(msg string, args ...interface{}) {
+	m.Called(msg, args)
 	m.Messages = append(m.Messages, msg)
 }
 

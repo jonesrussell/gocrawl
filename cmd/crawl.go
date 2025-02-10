@@ -16,14 +16,11 @@ var crawlCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		// Create config with all necessary values
+		// Create config with CLI values
 		cfg := &config.Config{
-			CrawlerConfig: config.CrawlerConfig{
-				BaseURL:   baseURL,
-				MaxDepth:  maxDepth,
-				RateLimit: rateLimit,
-			},
-			IndexName: indexName, // Make sure this is set
+			BaseURL:   baseURL,
+			MaxDepth:  maxDepth,
+			IndexName: indexName,
 		}
 
 		return app.StartCrawler(ctx, cfg)

@@ -76,3 +76,10 @@ func (d *CollyDebugger) OnEvent(e *debug.Event) {
 		"collectorID", e.CollectorID,
 	)
 }
+
+// NewCollyDebugger creates a new CollyDebugger instance
+func NewCollyDebugger(log Interface) *CollyDebugger {
+	return &CollyDebugger{
+		Logger: log,
+	}
+}
