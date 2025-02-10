@@ -28,8 +28,6 @@ func main() {
 	if err := app.Start(context.Background()); err != nil {
 		log.Fatalf("Application start error: %v", err)
 	}
-
-	log.Println("Application started successfully.")
 }
 
 func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
