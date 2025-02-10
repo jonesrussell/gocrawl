@@ -16,38 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockTransport struct {
-	Response    string
-	StatusCode  int
-	Error       error
-	RequestFunc func(*http.Request) (*http.Response, error)
-}
-
-func (t *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if t.Error != nil {
-		return nil, t.Error
-	}
-
-	if t.RequestFunc != nil {
-		return t.RequestFunc(req)
-	}
-
-	// Create default response with required headers
-	header := http.Header{}
-	header.Add("X-Elastic-Product", "Elasticsearch")
-	header.Add("Content-Type", "application/json")
-
-	return &http.Response{
-		StatusCode: t.StatusCode,
-		Body:       io.NopCloser(strings.NewReader(t.Response)),
-		Header:     header,
-	}, nil
-}
-
-func (t *mockTransport) Perform(req *http.Request) (*http.Response, error) {
-	return t.RoundTrip(req)
-}
-
 // testConfig returns a test configuration
 func testConfig() *config.Config {
 	return &config.Config{
@@ -57,89 +25,40 @@ func testConfig() *config.Config {
 	}
 }
 
-// setupTestStorage creates a new storage instance for testing
-func setupTestStorage(t *testing.T) *ElasticsearchStorage {
-	cfg := testConfig()
-	log, err := logger.NewLogger(cfg)
-	require.NoError(t, err, "Failed to create logger")
-
-	// Create mock transport with proper headers and response
-	responseBody := `{
-		"name": "test_node",
-		"cluster_name": "test_cluster",
-		"version": {
-			"number": "8.0.0"
-		}
-	}`
-	mockTransport := &mockTransport{
-		Response:   responseBody,
-		StatusCode: http.StatusOK,
-		RequestFunc: func(req *http.Request) (*http.Response, error) {
-			header := http.Header{}
-			header.Add("X-Elastic-Product", "Elasticsearch")
-			header.Add("Content-Type", "application/json")
-
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(responseBody)),
-				Header:     header,
-			}, nil
-		},
+// setupStorageTest is a helper function for storage tests
+func setupStorageTest(t *testing.T) Storage {
+	cfg := &config.Config{
+		ElasticURL: "http://localhost:9200",
 	}
-	cfg.Transport = mockTransport
 
-	// Create storage with options
-	opts := DefaultOptions()
-	opts.URL = cfg.ElasticURL
+	log := logger.NewMockCustomLogger()
 
-	// Create elasticsearch client
-	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport: mockTransport,
-		Addresses: []string{opts.URL},
-	})
+	storage, err := NewStorage(cfg, log)
 	require.NoError(t, err)
 
-	// Create storage instance directly
-	storage := &ElasticsearchStorage{
-		ESClient: esClient,
-		Logger:   log,
-		opts:     opts,
-	}
-
-	return storage
+	return storage.Storage
 }
 
 func TestNewStorage(t *testing.T) {
-	cfg := testConfig()
-	log, err := logger.NewLogger(cfg)
-	require.NoError(t, err, "Failed to create logger")
-
-	responseBody := `{
-		"name": "test_node",
-		"cluster_name": "test_cluster",
-		"version": {
-			"number": "8.0.0"
+	t.Run("successful creation", func(t *testing.T) {
+		cfg := &config.Config{
+			ElasticURL: "http://localhost:9200",
 		}
-	}`
+		log := logger.NewMockCustomLogger()
 
-	mockTransport := &mockTransport{
-		Response:   responseBody,
-		StatusCode: http.StatusOK,
-	}
+		result, err := NewStorage(cfg, log)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+	})
 
-	cfg = &config.Config{
-		ElasticURL: "http://localhost:9200",
-		Transport:  mockTransport,
-		LogLevel:   "info",
-	}
+	t.Run("missing URL", func(t *testing.T) {
+		cfg := &config.Config{}
+		log := logger.NewMockCustomLogger()
 
-	result, err := NewStorage(cfg, log)
-	require.NoError(t, err)
-	require.NotNil(t, result.Storage)
-
-	storage, ok := result.Storage.(*ElasticsearchStorage)
-	require.True(t, ok)
-	require.NotNil(t, storage.ESClient)
+		_, err := NewStorage(cfg, log)
+		assert.Error(t, err)
+		assert.Equal(t, ErrMissingURL, err)
+	})
 }
 
 func TestNewStorageWithClient(t *testing.T) {
@@ -437,7 +356,10 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 	})
 
 	t.Run("ProcessHits_ContextCancelled", func(t *testing.T) {
-		storage := setupTestStorage(t)
+		storage := setupStorageTest(t)
+		es, ok := storage.(*ElasticsearchStorage)
+		require.True(t, ok)
+
 		ctx, cancel := context.WithCancel(context.Background())
 
 		hits := []interface{}{
@@ -454,7 +376,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		cancel()
 
 		// Process hits with cancelled context
-		storage.ProcessHits(ctx, hits, resultChan)
+		es.ProcessHits(ctx, hits, resultChan)
 
 		// Try to receive from channel - should not get any results
 		select {
@@ -948,6 +870,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 	t.Run("DeleteIndex_InvalidResponse", func(t *testing.T) {
 		transport.Response = `invalid json`
 		transport.StatusCode = http.StatusInternalServerError
+
 		err := es.DeleteIndex(ctx, "test-index")
 		assert.Error(t, err)
 
@@ -955,29 +878,4 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		transport.StatusCode = http.StatusOK
 		transport.Response = successResponse
 	})
-}
-
-func TestNewStorage_Errors(t *testing.T) {
-	log := logger.NewMockCustomLogger()
-
-	// Create a config with empty URL to trigger error
-	cfg := &config.Config{
-		ElasticURL: "", // This should trigger an error
-	}
-
-	// Create elasticsearch client with mock transport
-	transport := &mockTransport{
-		Response:   "{}",
-		StatusCode: http.StatusOK,
-	}
-
-	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport: transport,
-	})
-	require.NoError(t, err)
-
-	// Test storage creation with empty URL
-	result, err := NewStorageWithClient(cfg, log, esClient)
-	assert.Error(t, err)
-	assert.Equal(t, Result{}, result) // Should be an empty Result
 }

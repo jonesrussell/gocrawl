@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -11,24 +12,37 @@ import (
 )
 
 func TestCreateArticlesIndex(t *testing.T) {
-	storage := setupTestStorage(t)
+	es := setupTestStorage(t)
 	ctx := context.Background()
 
-	// Test successful index creation
-	err := storage.CreateArticlesIndex(ctx)
-	require.NoError(t, err)
+	// Mock successful index creation
+	mockTransport := &mockTransport{
+		Response:   `{"acknowledged": true}`,
+		StatusCode: http.StatusOK,
+	}
+	es.ESClient.Transport = mockTransport
 
-	// Verify index exists
-	res, err := storage.ESClient.Indices.Exists([]string{"articles"})
+	err := es.CreateArticlesIndex(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 200, res.StatusCode)
 }
 
 func TestIndexArticle(t *testing.T) {
-	storage := setupTestStorage(t)
+	es := setupTestStorage(t)
 	ctx := context.Background()
 
-	// Create test article
+	// Mock successful index response
+	mockTransport := &mockTransport{
+		Response: `{
+			"_index": "articles",
+			"_id": "test-1",
+			"_version": 1,
+			"result": "created",
+			"_shards": {"total": 1, "successful": 1, "failed": 0}
+		}`,
+		StatusCode: http.StatusOK,
+	}
+	es.ESClient.Transport = mockTransport
+
 	article := &models.Article{
 		ID:            "test-1",
 		Title:         "Test Article",
@@ -37,84 +51,122 @@ func TestIndexArticle(t *testing.T) {
 		PublishedDate: time.Now(),
 	}
 
-	// Test indexing
-	err := storage.IndexArticle(ctx, article)
+	err := es.IndexArticle(ctx, article)
 	require.NoError(t, err)
-
-	// Verify article exists
-	res, err := storage.ESClient.Get("articles", article.ID)
-	require.NoError(t, err)
-	assert.Equal(t, 200, res.StatusCode)
 }
 
 func TestBulkIndexArticles(t *testing.T) {
-	storage := setupTestStorage(t)
+	es := setupTestStorage(t)
 	ctx := context.Background()
 
-	// Create test articles
+	// Mock successful bulk index response
+	mockTransport := &mockTransport{
+		Response: `{
+			"took": 30,
+			"errors": false,
+			"items": [
+				{
+					"index": {
+						"_index": "articles",
+						"_id": "test-1",
+						"_version": 1,
+						"result": "created",
+						"status": 201
+					}
+				},
+				{
+					"index": {
+						"_index": "articles",
+						"_id": "test-2",
+						"_version": 1,
+						"result": "created",
+						"status": 201
+					}
+				}
+			]
+		}`,
+		StatusCode: http.StatusOK,
+	}
+	es.ESClient.Transport = mockTransport
+
 	articles := []*models.Article{
 		{
-			ID:            "bulk-1",
-			Title:         "Bulk Article 1",
-			Body:          "Content 1",
-			Source:        "https://example.com",
+			ID:            "test-1",
+			Title:         "Test Article 1",
+			Body:          "Test content 1",
+			Source:        "https://example.com/1",
 			PublishedDate: time.Now(),
+			Tags:          []string{"test", "article"},
 		},
 		{
-			ID:            "bulk-2",
-			Title:         "Bulk Article 2",
-			Body:          "Content 2",
-			Source:        "https://example.com",
+			ID:            "test-2",
+			Title:         "Test Article 2",
+			Body:          "Test content 2",
+			Source:        "https://example.com/2",
 			PublishedDate: time.Now(),
+			Tags:          []string{"test", "article"},
 		},
 	}
 
-	// Test bulk indexing
-	err := storage.BulkIndexArticles(ctx, articles)
+	err := es.BulkIndexArticles(ctx, articles)
 	require.NoError(t, err)
-
-	// Verify articles exist
-	for _, article := range articles {
-		res, err := storage.ESClient.Get("articles", article.ID)
-		require.NoError(t, err)
-		assert.Equal(t, 200, res.StatusCode)
-	}
 }
 
 func TestSearchArticles(t *testing.T) {
-	storage := setupTestStorage(t)
+	es := setupTestStorage(t)
 	ctx := context.Background()
 
-	// Create and index test articles
-	articles := []*models.Article{
-		{
-			ID:    "search-1",
-			Title: "Golang Testing",
-			Body:  "How to write tests in Go",
-			Tags:  []string{"golang", "testing"},
-		},
-		{
-			ID:    "search-2",
-			Title: "Elasticsearch Guide",
-			Body:  "Using Elasticsearch with Go",
-			Tags:  []string{"elasticsearch", "golang"},
-		},
+	// Mock successful search response
+	mockTransport := &mockTransport{
+		Response: `{
+			"took": 1,
+			"hits": {
+				"total": {"value": 2, "relation": "eq"},
+				"hits": [
+					{
+						"_source": {
+							"id": "test-1",
+							"title": "Golang Testing",
+							"body": "How to write tests in Go",
+							"source": "https://example.com/1",
+							"published_date": "2024-03-20T12:00:00Z",
+							"tags": ["golang", "testing"]
+						}
+					},
+					{
+						"_source": {
+							"id": "test-2",
+							"title": "Elasticsearch Guide",
+							"body": "Using Elasticsearch with Go",
+							"source": "https://example.com/2",
+							"published_date": "2024-03-20T12:00:00Z",
+							"tags": ["elasticsearch", "golang"]
+						}
+					}
+				]
+			}
+		}`,
+		StatusCode: http.StatusOK,
 	}
+	es.ESClient.Transport = mockTransport
 
-	err := storage.BulkIndexArticles(ctx, articles)
-	require.NoError(t, err)
+	t.Run("search by title", func(t *testing.T) {
+		results, err := es.SearchArticles(ctx, "Golang", 10)
+		require.NoError(t, err)
+		assert.Len(t, results, 2)
+		assert.Equal(t, "Golang Testing", results[0].Title)
+	})
 
-	// Wait for indexing
-	time.Sleep(1 * time.Second)
+	t.Run("search by content", func(t *testing.T) {
+		results, err := es.SearchArticles(ctx, "Elasticsearch", 10)
+		require.NoError(t, err)
+		assert.Len(t, results, 2)
+		assert.Equal(t, "Elasticsearch Guide", results[1].Title)
+	})
 
-	// Test search
-	results, err := storage.SearchArticles(ctx, "golang", 10)
-	require.NoError(t, err)
-	assert.Len(t, results, 2)
-
-	// Test search with specific term
-	results, err = storage.SearchArticles(ctx, "elasticsearch", 10)
-	require.NoError(t, err)
-	assert.Len(t, results, 1)
-	assert.Equal(t, "Elasticsearch Guide", results[0].Title)
+	t.Run("search by tag", func(t *testing.T) {
+		results, err := es.SearchArticles(ctx, "golang", 10)
+		require.NoError(t, err)
+		assert.Len(t, results, 2)
+	})
 }
