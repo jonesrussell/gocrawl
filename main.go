@@ -37,6 +37,9 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 		collector.Module,
 		crawler.Module,
 		fx.Provide(
+			func() context.Context {
+				return context.Background()
+			},
 			fx.Annotated{
 				Name:   "baseURL",
 				Target: func() string { return url },
@@ -59,7 +62,7 @@ func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
 		fx.WithLogger(func(l *logger.CustomLogger) fxevent.Logger {
 			return &fxevent.ZapLogger{Logger: l.GetZapLogger()}
 		}),
-		fx.Invoke(func(ctx context.Context, c *crawler.Crawler, shutdowner fx.Shutdowner, log *logger.CustomLogger) {
+		fx.Invoke(func(c *crawler.Crawler, shutdowner fx.Shutdowner, log *logger.CustomLogger, ctx context.Context) {
 			if err := c.Start(ctx, shutdowner); err != nil {
 				log.Errorf("Error during crawling: %s", err)
 				return

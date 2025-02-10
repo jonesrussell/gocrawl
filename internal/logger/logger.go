@@ -120,17 +120,43 @@ func (c *CustomLogger) GetZapLogger() *zap.Logger {
 // convertToZapFields converts variadic key-value pairs to zap.Fields
 func convertToZapFields(fields []interface{}) []zap.Field {
 	var zapFields []zap.Field
-	if len(fields)%2 != 0 {
-		zapFields = append(zapFields, zap.String("error", "fields must be in key-value pairs"))
+
+	// If no fields provided, return empty slice
+	if len(fields) == 0 {
 		return zapFields
 	}
-	for i := 0; i < len(fields); i += 2 {
+
+	// If first argument is a string and no more arguments, treat it as additional message context
+	if len(fields) == 1 {
+		if str, ok := fields[0].(string); ok {
+			return []zap.Field{zap.String("context", str)}
+		}
+	}
+
+	// Handle key-value pairs
+	for i := 0; i < len(fields); i++ {
+		// If we have an odd number of remaining fields, add the last one as context
+		if i == len(fields)-1 {
+			if str, ok := fields[i].(string); ok {
+				zapFields = append(zapFields, zap.String("context", str))
+			} else {
+				zapFields = append(zapFields, zap.Any("context", fields[i]))
+			}
+			break
+		}
+
+		// Process key-value pair
 		key, ok := fields[i].(string)
 		if !ok {
-			zapFields = append(zapFields, zap.Any("error", "key must be a string"))
+			zapFields = append(zapFields, zap.Any(fmt.Sprintf("value%d", i), fields[i]))
 			continue
 		}
-		zapFields = append(zapFields, zap.Any(key, fields[i+1]))
+
+		// Move to next item for value
+		i++
+		value := fields[i]
+		zapFields = append(zapFields, zap.Any(key, value))
 	}
+
 	return zapFields
 }
