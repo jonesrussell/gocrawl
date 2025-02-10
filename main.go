@@ -4,9 +4,6 @@ import (
 	"context"
 	"flag"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -27,23 +24,12 @@ func main() {
 
 	app := createApp(*urlPtr, *maxDepthPtr, *rateLimitPtr)
 
-	// Create a channel to listen for OS signals
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
 	// Run the application
 	if err := app.Start(context.Background()); err != nil {
 		log.Fatalf("Application start error: %v", err)
 	}
 
-	// Wait for a signal to shutdown
-	<-sigs
-	log.Println("Received shutdown signal, stopping application...")
-
-	// Stop the application gracefully
-	if err := app.Stop(context.Background()); err != nil {
-		log.Printf("Error during shutdown: %v", err)
-	}
+	log.Println("Application started successfully.")
 }
 
 func createApp(url string, maxDepth int, rateLimit time.Duration) *fx.App {
@@ -81,12 +67,11 @@ func registerHooks(lc fx.Lifecycle, c *crawler.Crawler, shutdowner fx.Shutdowner
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			log.Println("Starting crawling process...")
-			go startCrawling(ctx, c, shutdowner)
+			startCrawling(ctx, c, shutdowner)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
 			log.Println("Shutdown process initiated...")
-			// No need to call c.Stop() since it has been removed
 			return nil
 		},
 	})
