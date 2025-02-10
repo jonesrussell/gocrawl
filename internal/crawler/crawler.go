@@ -25,7 +25,6 @@ type Crawler struct {
 	Logger    *logger.CustomLogger
 	IndexName string
 	done      chan struct{}
-	isRunning bool
 }
 
 // CrawlerParams holds the dependencies for creating a new Crawler
@@ -70,7 +69,6 @@ func NewCrawler(p CrawlerParams) (*Crawler, error) {
 		Logger:    p.Logger,
 		IndexName: p.Config.IndexName,
 		done:      make(chan struct{}),
-		isRunning: false,
 	}, nil
 }
 
@@ -92,16 +90,7 @@ func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.S
 }
 
 // Start method to begin crawling
-func (c *Crawler) Start(ctx context.Context) error {
-	if c.isRunning {
-		return fmt.Errorf("crawler is already running")
-	}
-	c.isRunning = true
-	defer func() {
-		c.isRunning = false
-		close(c.done)
-	}()
-
+func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 	c.Logger.Info("Starting crawling process")
 	c.configureCollectors(ctx)
 
@@ -111,7 +100,6 @@ func (c *Crawler) Start(ctx context.Context) error {
 			errChan <- fmt.Errorf("error visiting URL: %w", err)
 			return
 		}
-		c.Collector.Wait()
 		errChan <- nil
 	}()
 
@@ -121,9 +109,15 @@ func (c *Crawler) Start(ctx context.Context) error {
 			c.Logger.Error("Crawling error", c.Logger.Field("error", err))
 			return err
 		}
+		c.Logger.Info("Crawling process finished, waiting for all requests to complete...")
+		c.Collector.Wait() // Wait for all requests to finish
+		c.Logger.Info("All requests completed, initiating shutdown...")
+		if err := shutdowner.Shutdown(); err != nil {
+			c.Logger.Error("Error during shutdown", c.Logger.Field("error", err))
+		}
 	case <-ctx.Done():
 		c.Logger.Warn("Crawling stopped due to context cancellation", c.Logger.Field("error", ctx.Err()))
-		return ctx.Err()
+		// Do not stop the crawling process, just log the cancellation
 	}
 
 	return nil
@@ -179,20 +173,4 @@ func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, do
 	} else {
 		c.Logger.Info("Successfully indexed document", c.Logger.Field("url", url), c.Logger.Field("docID", docID))
 	}
-}
-
-// Wait returns a channel that's closed when crawling is complete
-func (c *Crawler) Wait() <-chan struct{} {
-	return c.done
-}
-
-// Stop method to stop the crawling process
-func (c *Crawler) Stop() error {
-	if !c.isRunning {
-		return fmt.Errorf("crawler is not running")
-	}
-	c.Logger.Info("Stopping crawling process")
-	c.isRunning = false
-	close(c.done) // Signal that crawling is done
-	return nil
 }
