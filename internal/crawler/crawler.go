@@ -15,6 +15,12 @@ import (
 	"go.uber.org/fx"
 )
 
+// Constants for configuration
+const (
+	TimeoutDuration = 5 * time.Second
+	HTTPStatusOK    = 200
+)
+
 // Crawler struct to hold configuration or state if needed
 type Crawler struct {
 	BaseURL   string
@@ -76,7 +82,7 @@ func initializeStorage(cfg *config.Config, log *logger.CustomLogger) (*storage.S
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutDuration)
 	defer cancel()
 
 	err = storageInstance.TestConnection(ctx)
@@ -116,7 +122,7 @@ func (c *Crawler) configureCollectors(ctx context.Context) {
 
 	c.Collector.OnResponse(func(r *colly.Response) {
 		c.Logger.Debug("Received response", c.Logger.Field("url", r.Request.URL.String()), c.Logger.Field("status", r.StatusCode))
-		if r.StatusCode != 200 {
+		if r.StatusCode != HTTPStatusOK {
 			c.Logger.Warn("Non-200 response received", c.Logger.Field("url", r.Request.URL.String()), c.Logger.Field("status", r.StatusCode))
 		}
 	})
