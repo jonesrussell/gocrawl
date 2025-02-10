@@ -32,6 +32,7 @@ var _ Interface = (*CustomLogger)(nil)
 type Params struct {
 	fx.In
 
+	Debug  bool
 	Level  zapcore.Level
 	AppEnv string `name:"appEnv"`
 }
