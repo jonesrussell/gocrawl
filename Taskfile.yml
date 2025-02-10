@@ -9,7 +9,7 @@ tasks:
   search:
     desc: "Search crawled content"
     cmds:
-      - go run main.go search -q "{{.CLI_ARGS}}" -i pages
+      - go run main.go search -q "{{.CLI_ARGS}}" -i streetcode_index
 
   build:
     desc: "Build the web crawler executable"
