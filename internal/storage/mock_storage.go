@@ -2,9 +2,13 @@ package storage
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stretchr/testify/mock"
 )
+
+// ErrMockTypeAssertion is returned when a type assertion fails in mock methods
+var ErrMockTypeAssertion = errors.New("mock type assertion failed")
 
 // MockStorage is a mock implementation of the Storage interface
 type MockStorage struct {
@@ -35,9 +39,17 @@ func (m *MockStorage) BulkIndex(ctx context.Context, index string, documents []i
 }
 
 // Search implements Storage
-func (m *MockStorage) Search(ctx context.Context, index string, query map[string]interface{}) ([]map[string]interface{}, error) {
+func (m *MockStorage) Search(
+	ctx context.Context,
+	index string,
+	query map[string]interface{},
+) ([]map[string]interface{}, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).([]map[string]interface{}), args.Error(1)
+	result, ok := args.Get(0).([]map[string]interface{})
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }
 
 // CreateIndex implements Storage
@@ -53,7 +65,12 @@ func (m *MockStorage) DeleteIndex(ctx context.Context, index string) error {
 }
 
 // UpdateDocument implements Storage
-func (m *MockStorage) UpdateDocument(ctx context.Context, index string, docID string, update map[string]interface{}) error {
+func (m *MockStorage) UpdateDocument(
+	ctx context.Context,
+	index string,
+	docID string,
+	update map[string]interface{},
+) error {
 	args := m.Called(ctx, index, docID, update)
 	return args.Error(0)
 }
@@ -65,7 +82,16 @@ func (m *MockStorage) DeleteDocument(ctx context.Context, index string, docID st
 }
 
 // ScrollSearch implements Storage
-func (m *MockStorage) ScrollSearch(ctx context.Context, index string, query map[string]interface{}, batchSize int) (<-chan map[string]interface{}, error) {
+func (m *MockStorage) ScrollSearch(
+	ctx context.Context,
+	index string,
+	query map[string]interface{},
+	batchSize int,
+) (<-chan map[string]interface{}, error) {
 	args := m.Called(ctx, index, query, batchSize)
-	return args.Get(0).(<-chan map[string]interface{}), args.Error(1)
+	result, ok := args.Get(0).(<-chan map[string]interface{})
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }
