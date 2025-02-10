@@ -3,3 +3,5 @@
 http_ca.crt
 
 bin/
+coverage/coverage.html
+coverage/coverage.out
