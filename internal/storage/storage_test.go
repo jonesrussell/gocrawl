@@ -739,6 +739,174 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		transport.StatusCode = http.StatusOK
 		transport.Response = successResponse
 	})
+
+	t.Run("Search_IsErrorResponse", func(t *testing.T) {
+		transport.Response = `{
+			"error": {
+				"type": "search_exception",
+				"reason": "search error"
+			},
+			"status": 500
+		}`
+		transport.StatusCode = http.StatusInternalServerError
+
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"match_all": map[string]interface{}{},
+			},
+		}
+		results, err := es.Search(ctx, "test-index", query)
+		assert.Error(t, err)
+		assert.Nil(t, results)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("DeleteDocument_InvalidResponse", func(t *testing.T) {
+		transport.Response = `invalid json`
+		transport.StatusCode = http.StatusInternalServerError
+		err := es.DeleteDocument(ctx, "test-index", "test-id")
+		assert.Error(t, err)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("UpdateDocument_InvalidResponse", func(t *testing.T) {
+		transport.Response = `invalid json`
+		transport.StatusCode = http.StatusInternalServerError
+		update := map[string]interface{}{
+			"title": "Updated Title",
+		}
+		err := es.UpdateDocument(ctx, "test-index", "test-id", update)
+		assert.Error(t, err)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("BulkIndex_InvalidResponse", func(t *testing.T) {
+		transport.Response = `invalid json`
+		transport.StatusCode = http.StatusInternalServerError
+
+		docs := []interface{}{
+			map[string]interface{}{"title": "Doc 1"},
+		}
+		err := es.BulkIndex(ctx, "test-index", docs)
+		assert.Error(t, err)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("ScrollSearch_InvalidResponse", func(t *testing.T) {
+		transport.Response = `invalid json`
+		transport.StatusCode = http.StatusInternalServerError
+		transport.RequestFunc = func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader(`invalid json`)),
+				Header:     make(http.Header),
+			}, nil
+		}
+
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"match_all": map[string]interface{}{},
+			},
+		}
+		resultChan, err := es.ScrollSearch(ctx, "test-index", query, 100)
+		assert.Error(t, err)
+		assert.Nil(t, resultChan)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+		transport.RequestFunc = nil
+	})
+
+	t.Run("ProcessHits_InvalidSource", func(t *testing.T) {
+		hits := []interface{}{
+			map[string]interface{}{
+				"_source": "invalid source", // Not a map
+			},
+		}
+		resultChan := make(chan map[string]interface{}, 1)
+		done := make(chan struct{})
+
+		go func() {
+			defer close(done)
+			es.processHits(ctx, hits, resultChan)
+			close(resultChan)
+		}()
+
+		var results []map[string]interface{}
+		for result := range resultChan {
+			results = append(results, result)
+		}
+		assert.Empty(t, results)
+
+		select {
+		case <-done:
+			// Success
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Timeout waiting for processHits to complete")
+		}
+	})
+
+	t.Run("NewStorage_InvalidTransport", func(t *testing.T) {
+		invalidTransport := &mockTransport{
+			Response:   "invalid json",
+			StatusCode: http.StatusInternalServerError,
+			Error:      fmt.Errorf("transport error"),
+		}
+
+		result, err := NewStorage(&config.Config{
+			ElasticURL: "http://localhost:9200",
+			Transport:  invalidTransport,
+		}, log)
+		assert.Error(t, err)
+		assert.Equal(t, Result{}, result)
+
+		invalidTransport.Error = nil
+	})
+
+	t.Run("CreateIndex_InvalidResponse", func(t *testing.T) {
+		transport.Response = `invalid json`
+		transport.StatusCode = http.StatusInternalServerError
+
+		mapping := map[string]interface{}{
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"title": map[string]interface{}{
+						"type": "text",
+					},
+				},
+			},
+		}
+		err := es.CreateIndex(ctx, "test-index", mapping)
+		assert.Error(t, err)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
+
+	t.Run("DeleteIndex_InvalidResponse", func(t *testing.T) {
+		transport.Response = `invalid json`
+		transport.StatusCode = http.StatusInternalServerError
+		err := es.DeleteIndex(ctx, "test-index")
+		assert.Error(t, err)
+
+		// Reset transport
+		transport.StatusCode = http.StatusOK
+		transport.Response = successResponse
+	})
 }
 
 func TestNewStorage_Errors(t *testing.T) {
