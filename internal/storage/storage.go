@@ -96,8 +96,8 @@ func (s *Storage) TestConnection(ctx context.Context) error {
 	defer info.Body.Close()
 
 	var esInfo map[string]interface{}
-	if err := json.NewDecoder(info.Body).Decode(&esInfo); err != nil {
-		return fmt.Errorf("error decoding Elasticsearch info response: %w", err)
+	if decodeErr := json.NewDecoder(info.Body).Decode(&esInfo); decodeErr != nil {
+		return fmt.Errorf("error decoding Elasticsearch info response: %w", decodeErr)
 	}
 
 	s.Logger.Info("Elasticsearch info", s.Logger.Field("info", esInfo))
