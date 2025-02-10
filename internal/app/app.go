@@ -38,6 +38,10 @@ func StartCrawler(ctx context.Context, cfg *config.Config) error {
 
 	// Merge CLI config with environment config
 	envConfig.CrawlerConfig = cfg.CrawlerConfig
+	// Also merge the index name from CLI if provided
+	if cfg.IndexName != "" {
+		envConfig.IndexName = cfg.IndexName
+	}
 
 	log, err := logger.NewCustomLogger(logger.Params{
 		Debug:  envConfig.AppDebug,

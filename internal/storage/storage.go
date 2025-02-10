@@ -36,6 +36,7 @@ type Storage interface {
 	DeleteDocument(ctx context.Context, index string, docID string) error
 	BulkIndexArticles(ctx context.Context, articles []*models.Article) error
 	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
+	IndexExists(ctx context.Context, indexName string) (bool, error)
 }
 
 // ElasticsearchStorage struct to hold the Elasticsearch client
@@ -375,4 +376,14 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 
 	s.Logger.Info("Deleted document", "index", index, "docID", docID)
 	return nil
+}
+
+// IndexExists checks if the specified index exists
+func (es *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
+	exists, err := es.ESClient.Indices.Exists([]string{indexName})
+	if err != nil {
+		return false, fmt.Errorf("failed to check index existence: %w", err)
+	}
+
+	return exists.StatusCode == http.StatusOK, nil
 }

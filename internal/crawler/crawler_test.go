@@ -42,6 +42,10 @@ func TestNewCrawler(t *testing.T) {
 	testLogger := logger.NewMockCustomLogger()
 	testConfig := &config.Config{IndexName: "test-index"}
 
+	// Set up mock expectations
+	mockStorage.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	mockStorage.On("TestConnection", mock.Anything).Return(nil)
+
 	params := crawler.Params{
 		BaseURL:   "http://example.com",
 		MaxDepth:  1,
@@ -79,9 +83,8 @@ func TestCrawler_Start(t *testing.T) {
 
 	// Set up mock expectations
 	mockStorage.On("TestConnection", mock.Anything).Return(nil)
-	mockStorage.On("IndexDocument", mock.Anything, testConfig.IndexName, mock.Anything, mock.Anything).Return(nil)
-	// Allow any number of calls to BulkIndexArticles
-	mockStorage.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockStorage.On("IndexExists", mock.Anything, testConfig.IndexName).Return(true, nil)
+	mockStorage.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil)
 
 	params := crawler.Params{
 		BaseURL:   ts.URL,
@@ -143,11 +146,10 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 		},
 	}
 
-	// Set up all necessary mock expectations
+	// Set up mock expectations
 	mockStorage.On("TestConnection", mock.Anything).Return(nil)
-	mockStorage.On("IndexDocument", mock.Anything, testConfig.IndexName, mock.Anything, mock.Anything).Return(nil)
-	// Allow any number of calls to BulkIndexArticles
-	mockStorage.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockStorage.On("IndexExists", mock.Anything, testConfig.IndexName).Return(true, nil)
+	mockStorage.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil)
 
 	params := crawler.Params{
 		BaseURL:   ts.URL,

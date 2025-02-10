@@ -139,16 +139,37 @@ func NewCrawler(p Params) (Result, error) {
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
+	// Check storage connection
 	if err := c.Storage.TestConnection(ctx); err != nil {
 		c.Logger.Error("Failed to connect to storage", "error", err)
 		return err
 	}
 
+	// Check if index exists
+	exists, err := c.Storage.IndexExists(ctx, c.IndexName)
+	if err != nil {
+		c.Logger.Error("Failed to check index existence", "error", err)
+		return err
+	}
+	if !exists {
+		c.Logger.Error("Index does not exist",
+			"index", c.IndexName,
+			"message", "Please create the index before running the crawler")
+		return fmt.Errorf("index %s does not exist", c.IndexName)
+	}
+
+	c.Logger.Info("Starting crawl with valid index", "index", c.IndexName)
+
 	c.articleChan = make(chan *models.Article, 100)
-	defer close(c.articleChan)
+
+	// Create a done channel for article processor
+	processorDone := make(chan struct{})
 
 	// Start article processor
-	go c.processArticles(ctx)
+	go func() {
+		c.processArticles(ctx)
+		close(processorDone)
+	}()
 
 	// Configure collector
 	c.Collector.OnHTML("article", c.processPage)
@@ -158,7 +179,7 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 
 	// Create error channel for async crawling
 	errChan := make(chan error, 1)
-	done := make(chan bool, 1)
+	crawlerDone := make(chan bool, 1)
 
 	go func() {
 		if err := c.Collector.Visit(c.BaseURL); err != nil {
@@ -166,20 +187,28 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 			return
 		}
 		c.Collector.Wait()
-		done <- true
+		crawlerDone <- true
 	}()
 
 	// Wait for either completion or context cancellation
+	var result error
 	select {
 	case err := <-errChan:
-		return err
-	case <-done:
+		result = err
+	case <-crawlerDone:
 		c.Logger.Info("Crawling completed successfully")
 	case <-ctx.Done():
 		c.Logger.Error("Context cancelled", "error", ctx.Err())
-		return ctx.Err()
+		result = ctx.Err()
 	}
 
+	// Close article channel and wait for processor to finish
+	close(c.articleChan)
+	<-processorDone
+
+	if result != nil {
+		return result
+	}
 	return shutdowner.Shutdown()
 }
 
@@ -346,31 +375,40 @@ func extractTags(e *colly.HTMLElement) []string {
 	return tags
 }
 
-// Add article processor
+// processArticles handles the bulk indexing of articles
 func (c *Crawler) processArticles(ctx context.Context) {
 	var articles []*models.Article
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
+	// Helper function to bulk index articles
+	indexBatch := func() {
+		if len(articles) > 0 {
+			if err := c.Storage.BulkIndexArticles(ctx, articles); err != nil {
+				c.Logger.Error("Failed to bulk index articles", "error", err)
+			} else {
+				c.Logger.Info("Successfully indexed articles", "count", len(articles))
+			}
+			articles = articles[:0] // Clear the slice while keeping capacity
+		}
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
+			indexBatch() // Final index attempt before exit
 			return
-		case article := <-c.articleChan:
+		case article, ok := <-c.articleChan:
+			if !ok {
+				indexBatch() // Final index attempt before exit
+				return
+			}
 			articles = append(articles, article)
 			if len(articles) >= 10 {
-				if err := c.Storage.BulkIndexArticles(ctx, articles); err != nil {
-					c.Logger.Error("Failed to bulk index articles", "error", err)
-				}
-				articles = articles[:0]
+				indexBatch()
 			}
 		case <-ticker.C:
-			if len(articles) > 0 {
-				if err := c.Storage.BulkIndexArticles(ctx, articles); err != nil {
-					c.Logger.Error("Failed to bulk index articles", "error", err)
-				}
-				articles = articles[:0]
-			}
+			indexBatch()
 		}
 	}
 }

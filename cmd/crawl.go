@@ -15,14 +15,18 @@ var crawlCmd = &cobra.Command{
 	Long:  `Crawl a website and store the content in Elasticsearch`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		return app.StartCrawler(ctx, &config.Config{
+
+		// Create config with all necessary values
+		cfg := &config.Config{
 			CrawlerConfig: config.CrawlerConfig{
 				BaseURL:   baseURL,
 				MaxDepth:  maxDepth,
 				RateLimit: rateLimit,
 			},
-			IndexName: indexName,
-		})
+			IndexName: indexName, // Make sure this is set
+		}
+
+		return app.StartCrawler(ctx, cfg)
 	},
 }
 

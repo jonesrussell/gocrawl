@@ -112,3 +112,9 @@ func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int
 	}
 	return articles, args.Error(1)
 }
+
+// IndexExists implements Storage
+func (m *MockStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
+	args := m.Called(ctx, indexName)
+	return args.Bool(0), args.Error(1)
+}
