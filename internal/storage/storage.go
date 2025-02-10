@@ -3,10 +3,10 @@ package storage
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -63,46 +63,40 @@ const (
 
 // NewStorage initializes a new Storage instance
 func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
-	if cfg.ElasticURL == "" {
-		return Result{}, ErrMissingURL
+	if cfg == nil {
+		return Result{}, fmt.Errorf("config is required")
 	}
 
-	opts := DefaultOptions()
-	opts.URL = cfg.ElasticURL
-	opts.Password = cfg.ElasticPassword
-	opts.APIKey = cfg.ElasticAPIKey
-
-	if cfg.Transport != nil {
-		opts.Transport = cfg.Transport
-	} else {
-		opts.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		}
+	if cfg.Elasticsearch.URL == "" {
+		return Result{}, fmt.Errorf("elasticsearch URL is required")
 	}
 
+	// Create Elasticsearch config
 	esConfig := elasticsearch.Config{
-		Addresses: []string{opts.URL},
-		Transport: opts.Transport,
+		Addresses: []string{cfg.Elasticsearch.URL},
+		Username:  "elastic",
+		Password:  cfg.Elasticsearch.Password,
+		APIKey:    cfg.Elasticsearch.APIKey,
+		Transport: cfg.Crawler.Transport,
+		// Add other configuration options as needed
+		RetryOnStatus: []int{502, 503, 504, 429},
+		RetryBackoff: func(i int) time.Duration {
+			return time.Duration(i) * 100 * time.Millisecond
+		},
+		MaxRetries: 5,
 	}
 
-	if opts.APIKey != "" {
-		esConfig.APIKey = opts.APIKey
-	} else if opts.Password != "" {
-		esConfig.Username = opts.Username
-		esConfig.Password = opts.Password
-	}
-
-	esClient, err := elasticsearch.NewClient(esConfig)
+	// Create Elasticsearch client
+	client, err := elasticsearch.NewClient(esConfig)
 	if err != nil {
-		return Result{}, fmt.Errorf("failed to create elasticsearch client: %w", err)
+		return Result{}, fmt.Errorf("error creating elasticsearch client: %w", err)
 	}
 
+	// Create storage instance
 	storage := &ElasticsearchStorage{
-		ESClient: esClient,
+		ESClient: client,
 		Logger:   log,
-		opts:     opts,
+		opts:     DefaultOptions(),
 	}
 
 	if err := storage.TestConnection(context.Background()); err != nil {
@@ -110,8 +104,8 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 	}
 
 	log.Info("Successfully connected to Elasticsearch",
-		"url", opts.URL,
-		"using_api_key", opts.APIKey != "",
+		"url", cfg.Elasticsearch.URL,
+		"using_api_key", cfg.Elasticsearch.APIKey != "",
 	)
 
 	return Result{
@@ -121,7 +115,7 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 
 // NewStorageWithClient creates a new Storage instance with a provided Elasticsearch client
 func NewStorageWithClient(cfg *config.Config, log logger.Interface, client *elasticsearch.Client) (Result, error) {
-	if cfg.ElasticURL == "" {
+	if cfg.Elasticsearch.URL == "" {
 		return Result{}, fmt.Errorf("elasticsearch URL is required")
 	}
 

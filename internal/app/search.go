@@ -7,7 +7,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 // SearchResult represents a search result
@@ -16,54 +16,40 @@ type SearchResult struct {
 	Content string
 }
 
-// SearchParams holds the parameters for search operations
-type SearchParams struct {
-	fx.In
-
-	Config  *config.Config
-	Storage storage.Storage
-	Logger  logger.Interface
-}
-
-// SearchContent searches for content in the specified index
-func SearchContent(ctx context.Context, query string, indexName string, size int) ([]SearchResult, error) {
-	// Initialize the fx app with dependencies
-	var searchResults []SearchResult
-	var searchErr error
-
-	app := fx.New(
-		fx.Provide(
-			config.LoadConfig,
-			logger.NewCustomLogger,
-			storage.NewStorage,
-		),
-		fx.Invoke(func(p SearchParams) {
-			// Search for articles
-			articles, err := p.Storage.SearchArticles(ctx, query, size)
-			if err != nil {
-				searchErr = fmt.Errorf("failed to search articles: %w", err)
-				return
-			}
-
-			// Convert articles to search results
-			results := make([]SearchResult, len(articles))
-			for i, article := range articles {
-				results[i] = SearchResult{
-					URL:     article.Source,
-					Content: article.Body,
-				}
-			}
-			searchResults = results
-		}),
-	)
-
-	if err := app.Start(ctx); err != nil {
-		return nil, fmt.Errorf("failed to start search: %w", err)
+// SearchContent performs a search query
+func SearchContent(ctx context.Context, query string, index string, size int) ([]SearchResult, error) {
+	log, err := logger.NewCustomLogger(logger.Params{
+		Debug:  true,
+		Level:  zap.InfoLevel,
+		AppEnv: "development",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
-	defer app.Stop(ctx)
 
-	if searchErr != nil {
-		return nil, searchErr
+	storageResult, err := storage.NewStorage(&config.Config{
+		Crawler: config.CrawlerConfig{
+			IndexName: index,
+		},
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: "http://localhost:9200", // Consider making this configurable
+		},
+	}, log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	results, err := storageResult.Storage.SearchArticles(ctx, query, size)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search articles: %w", err)
+	}
+
+	searchResults := make([]SearchResult, len(results))
+	for i, article := range results {
+		searchResults[i] = SearchResult{
+			URL:     article.Source,
+			Content: article.Body,
+		}
 	}
 
 	return searchResults, nil

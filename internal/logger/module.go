@@ -22,17 +22,17 @@ func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 		return nil, errors.New("config cannot be nil")
 	}
 
-	level, err := parseLogLevel(cfg.LogLevel)
+	level, err := parseLogLevel(cfg.App.LogLevel)
 	if err != nil {
 		return nil, err
 	}
 
 	params := Params{
 		Level:  level,
-		AppEnv: cfg.AppEnv,
+		AppEnv: cfg.App.Environment,
 	}
 
-	if cfg.AppEnv == "development" {
+	if cfg.App.Environment == "development" {
 		return NewDevelopmentLogger(params)
 	}
 	return NewCustomLogger(params)

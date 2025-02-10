@@ -1,51 +1,57 @@
 package storage
 
 import (
+	"context"
 	"net/http"
+	"os"
 	"testing"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/require"
 )
 
-// setupTestStorage creates a test storage instance with mocked transport
-// This is used by multiple test files in the package
-func setupTestStorage(t *testing.T) *ElasticsearchStorage {
-	// Create mock transport
-	mockTransport := &mockTransport{
-		Response: `{
-			"name": "test-node",
-			"cluster_name": "test-cluster",
-			"version": {
-				"number": "8.0.0"
-			}
-		}`,
-		StatusCode: http.StatusOK,
-	}
-
-	// Create a test config
-	cfg := &config.Config{
-		ElasticURL: "http://localhost:9200",
-	}
-
-	// Create elasticsearch client with mock transport
-	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport: mockTransport,
-		Addresses: []string{cfg.ElasticURL},
-	})
-	require.NoError(t, err)
+// CreateTestStorage creates a new storage instance for testing
+func CreateTestStorage(t *testing.T) Storage {
+	t.Helper()
 
 	// Create a test logger
 	log := logger.NewMockCustomLogger()
 
-	// Create storage instance with mocked client
-	storage := &ElasticsearchStorage{
-		ESClient: esClient,
-		Logger:   log,
-		opts:     DefaultOptions(),
+	// Create test config
+	cfg := &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL:      getTestElasticURL(),
+			Password: "test-password",
+			APIKey:   "test-api-key",
+		},
+		Crawler: config.CrawlerConfig{
+			Transport: http.DefaultTransport,
+		},
 	}
 
-	return storage
+	// Create storage instance
+	storage, err := NewStorage(cfg, log)
+	require.NoError(t, err, "Failed to create test storage: %v", err)
+	require.NotNil(t, storage.Storage, "Storage instance should not be nil")
+
+	return storage.Storage
+}
+
+// getTestElasticURL returns the Elasticsearch URL for testing
+func getTestElasticURL() string {
+	if url := os.Getenv("TEST_ELASTIC_URL"); url != "" {
+		return url
+	}
+	return "http://localhost:9200"
+}
+
+// CleanupTestIndex removes the test index after tests
+func CleanupTestIndex(ctx context.Context, t *testing.T, s Storage, indexName string) {
+	t.Helper()
+
+	err := s.DeleteIndex(ctx, indexName)
+	if err != nil {
+		t.Logf("Warning: Failed to cleanup test index %s: %v", indexName, err)
+	}
 }

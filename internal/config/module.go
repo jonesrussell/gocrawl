@@ -1,6 +1,8 @@
 package config
 
 import (
+	"net/http"
+
 	"go.uber.org/fx"
 )
 
@@ -9,6 +11,12 @@ import (
 //nolint:gochecknoglobals // This is a module
 var Module = fx.Module("config",
 	fx.Provide(
-		LoadConfig, // Ensure LoadConfig is provided
+		func() *Config {
+			cfg, err := NewConfig(http.DefaultTransport)
+			if err != nil {
+				panic(err) // Or handle error appropriately
+			}
+			return cfg
+		},
 	),
 )

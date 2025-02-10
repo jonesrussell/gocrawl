@@ -3,8 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strconv"
 
 	"github.com/jonesrussell/gocrawl/internal/app"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +18,23 @@ var searchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		results, err := app.SearchContent(ctx, args[0], indexName, querySize)
+
+		// Create config with CLI values
+		cfg := &config.Config{
+			Crawler: config.CrawlerConfig{
+				IndexName: cmd.Flag("index").Value.String(),
+				Transport: http.DefaultTransport,
+			},
+		}
+
+		// Parse size parameter
+		sizeStr := cmd.Flag("size").Value.String()
+		size, err := strconv.Atoi(sizeStr)
+		if err != nil {
+			return fmt.Errorf("invalid size value: %w", err)
+		}
+
+		results, err := app.SearchContent(ctx, args[0], cfg.Crawler.IndexName, size)
 		if err != nil {
 			return fmt.Errorf("search failed: %w", err)
 		}
@@ -30,6 +49,6 @@ var searchCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(searchCmd)
-	searchCmd.Flags().StringVarP(&indexName, "index", "i", "articles", "Index to search")
-	searchCmd.Flags().IntVarP(&querySize, "size", "s", 10, "Number of results to return")
+	searchCmd.Flags().StringP("index", "i", "articles", "Index to search")
+	searchCmd.Flags().IntP("size", "s", 10, "Number of results to return")
 }

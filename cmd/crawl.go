@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/app"
@@ -18,10 +21,29 @@ var crawlCmd = &cobra.Command{
 
 		// Create config with CLI values
 		cfg := &config.Config{
-			BaseURL:   baseURL,
-			MaxDepth:  maxDepth,
-			IndexName: indexName,
-			RateLimit: rateLimit,
+			Crawler: config.CrawlerConfig{
+				BaseURL:   cmd.Flag("url").Value.String(),
+				IndexName: cmd.Flag("index").Value.String(),
+				Transport: http.DefaultTransport,
+			},
+		}
+
+		// Parse rate limit
+		if rateStr := cmd.Flag("rate").Value.String(); rateStr != "" {
+			rate, err := time.ParseDuration(rateStr)
+			if err != nil {
+				return fmt.Errorf("invalid rate value: %w", err)
+			}
+			cfg.Crawler.RateLimit = rate
+		}
+
+		// Parse max depth
+		if depthStr := cmd.Flag("depth").Value.String(); depthStr != "" {
+			depth, err := strconv.Atoi(depthStr)
+			if err != nil {
+				return fmt.Errorf("invalid depth value: %w", err)
+			}
+			cfg.Crawler.MaxDepth = depth
 		}
 
 		return app.StartCrawler(ctx, cfg)
@@ -31,10 +53,10 @@ var crawlCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(crawlCmd)
 
-	crawlCmd.Flags().StringVarP(&baseURL, "url", "u", "", "Base URL to crawl (required)")
-	crawlCmd.Flags().IntVarP(&maxDepth, "depth", "d", 2, "Maximum crawl depth")
-	crawlCmd.Flags().DurationVarP(&rateLimit, "rate", "r", time.Second, "Rate limit between requests")
-	crawlCmd.Flags().StringVarP(&indexName, "index", "i", "articles", "Elasticsearch index name")
+	crawlCmd.Flags().StringP("url", "u", "", "Base URL to crawl (required)")
+	crawlCmd.Flags().IntP("depth", "d", 2, "Maximum crawl depth")
+	crawlCmd.Flags().DurationP("rate", "r", time.Second, "Rate limit between requests")
+	crawlCmd.Flags().StringP("index", "i", "articles", "Elasticsearch index name")
 
 	crawlCmd.MarkFlagRequired("url")
 }
