@@ -11,13 +11,12 @@ import (
 
 // Interface holds the methods for the logger
 type Interface interface {
-	Info(msg string, fields ...zap.Field)
-	Error(msg string, fields ...zap.Field)
-	Debug(msg string, fields ...zap.Field)
-	Warn(msg string, fields ...zap.Field)
+	Info(msg string, fields ...interface{})
+	Error(msg string, fields ...interface{})
+	Debug(msg string, fields ...interface{})
+	Warn(msg string, fields ...interface{})
 	Fatalf(msg string, args ...interface{})
 	Errorf(format string, args ...interface{})
-	Field(key string, value interface{}) zap.Field
 }
 
 // CustomLogger wraps the zap.Logger
@@ -66,38 +65,33 @@ func NewCustomLogger(params Params) (*CustomLogger, error) {
 }
 
 // Info logs an info message
-func (c *CustomLogger) Info(msg string, fields ...zap.Field) {
-	c.Logger.Info(msg, fields...)
+func (c *CustomLogger) Info(msg string, fields ...interface{}) {
+	c.Logger.Info(msg, convertToZapFields(fields)...)
 }
 
 // Error logs an error message
-func (c *CustomLogger) Error(msg string, fields ...zap.Field) {
-	c.Logger.Error(msg, fields...)
+func (c *CustomLogger) Error(msg string, fields ...interface{}) {
+	c.Logger.Error(msg, convertToZapFields(fields)...)
 }
 
 // Debug logs a debug message
-func (c *CustomLogger) Debug(msg string, fields ...zap.Field) {
-	c.Logger.Debug(msg, fields...)
+func (c *CustomLogger) Debug(msg string, fields ...interface{}) {
+	c.Logger.Debug(msg, convertToZapFields(fields)...)
 }
 
 // Warn logs a warning message
-func (c *CustomLogger) Warn(msg string, fields ...zap.Field) {
-	c.Logger.Warn(msg, fields...)
+func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
+	c.Logger.Warn(msg, convertToZapFields(fields)...)
 }
 
 // Implement Fatalf method
-func (z *CustomLogger) Fatalf(msg string, args ...interface{}) {
-	z.Logger.Fatal(msg, zap.Any("args", args))
+func (c *CustomLogger) Fatalf(msg string, args ...interface{}) {
+	c.Logger.Fatal(msg, zap.Any("args", args))
 }
 
 // Implement Errorf method
-func (z *CustomLogger) Errorf(format string, args ...interface{}) {
-	z.Logger.Error(fmt.Sprintf(format, args...))
-}
-
-// Field creates a zap.Field for structured logging
-func (z *CustomLogger) Field(key string, value interface{}) zap.Field {
-	return zap.Any(key, value)
+func (c *CustomLogger) Errorf(format string, args ...interface{}) {
+	c.Logger.Error(fmt.Sprintf(format, args...))
 }
 
 // NewDevelopmentLogger initializes a new CustomLogger for development
@@ -121,6 +115,25 @@ func (c *CustomLogger) Sync() error {
 }
 
 // GetZapLogger returns the underlying zap.Logger
-func (z *CustomLogger) GetZapLogger() *zap.Logger {
-	return z.Logger
+func (c *CustomLogger) GetZapLogger() *zap.Logger {
+	return c.Logger
+}
+
+// convertToZapFields converts variadic key-value pairs to zap.Fields
+func convertToZapFields(fields []interface{}) []zap.Field {
+	var zapFields []zap.Field
+	if len(fields)%2 != 0 {
+		// Handle the case where fields are not in key-value pairs
+		zapFields = append(zapFields, zap.String("error", "fields must be in key-value pairs"))
+		return zapFields
+	}
+	for i := 0; i < len(fields); i += 2 {
+		key, ok := fields[i].(string)
+		if !ok {
+			zapFields = append(zapFields, zap.Any("error", "key must be a string"))
+			continue
+		}
+		zapFields = append(zapFields, zap.Any(key, fields[i+1]))
+	}
+	return zapFields
 }

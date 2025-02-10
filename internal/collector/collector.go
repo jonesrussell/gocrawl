@@ -90,15 +90,15 @@ func ConfigureLogging(collector *colly.Collector, log *logger.CustomLogger) {
 }
 
 func logRequest(log *logger.CustomLogger, message string, r *colly.Request, data interface{}) {
-	log.Info(message, log.Field("url", r.URL.String()), log.Field("request_id", r.ID), log.Field("data", data))
+	log.Info(message, r.URL.String(), r.ID, data)
 }
 
 func logVisitError(log *logger.CustomLogger, link string, err error) {
 	switch err.Error() {
 	case "URL already visited":
-		log.Info("URL already visited", log.Field("link", link))
+		log.Info("URL already visited", link)
 	case "Forbidden domain", "Missing URL":
-		log.Info(err.Error(), log.Field("link", link))
+		log.Info(err.Error(), link)
 		// case "Max depth limit reached":
 		// 	log.Warn("Max depth limit reached", log.Field("link", link))
 		// default:

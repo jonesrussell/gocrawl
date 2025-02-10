@@ -89,7 +89,7 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 	c.configureCollectors(ctx)
 
 	if err := c.Collector.Visit(c.BaseURL); err != nil {
-		c.Logger.Error("Error visiting URL", c.Logger.Field("error", err))
+		c.Logger.Error("Error visiting URL", err)
 		return err
 	}
 
@@ -98,7 +98,7 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 	c.Collector.Wait() // Wait for all requests to finish
 	c.Logger.Info("All requests completed, initiating shutdown...")
 	if err := shutdowner.Shutdown(); err != nil {
-		c.Logger.Error("Error during shutdown", c.Logger.Field("error", err))
+		c.Logger.Error("Error during shutdown", err)
 	}
 
 	return nil
@@ -107,31 +107,27 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 // Helper method to configure collectors
 func (c *Crawler) configureCollectors(ctx context.Context) {
 	c.Collector.OnRequest(func(r *colly.Request) {
-		c.Logger.Debug("Requesting URL", c.Logger.Field("url", r.URL.String()))
+		c.Logger.Debug("Requesting URL", r.URL.String())
 	})
 
 	c.Collector.OnResponse(func(r *colly.Response) {
-		c.Logger.Debug(
-			"Received response",
-			c.Logger.Field("url", r.Request.URL.String()),
-			c.Logger.Field("status", r.StatusCode),
-		)
+		c.Logger.Debug("Received response", r.Request.URL.String(), r.StatusCode)
 		if r.StatusCode != HTTPStatusOK {
 			c.Logger.Warn(
 				"Non-200 response received",
-				c.Logger.Field("url", r.Request.URL.String()),
-				c.Logger.Field("status", r.StatusCode),
+				r.Request.URL.String(),
+				r.StatusCode,
 			)
 		}
 	})
 
 	c.Collector.OnError(func(r *colly.Response, err error) {
-		c.Logger.Error("Error occurred", c.Logger.Field("url", r.Request.URL.String()), c.Logger.Field("error", err))
+		c.Logger.Error("Error occurred", r.Request.URL.String(), err)
 	})
 
 	c.Collector.OnHTML("html", func(e *colly.HTMLElement) {
 		if ctx.Err() != nil {
-			c.Logger.Warn("Crawling stopped due to context cancellation", c.Logger.Field("error", ctx.Err()))
+			c.Logger.Warn("Crawling stopped due to context cancellation", ctx.Err())
 			return
 		}
 
@@ -139,11 +135,11 @@ func (c *Crawler) configureCollectors(ctx context.Context) {
 		docID := generateDocumentID(e.Request.URL.String())
 
 		if len(content) == 0 {
-			c.Logger.Warn("Content is empty, skipping indexing", c.Logger.Field("url", e.Request.URL.String()))
+			c.Logger.Warn("Content is empty, skipping indexing", e.Request.URL.String())
 			return
 		}
 
-		c.Logger.Debug("Indexing document", c.Logger.Field("url", e.Request.URL.String()), c.Logger.Field("docID", docID))
+		c.Logger.Debug("Indexing document", e.Request.URL.String(), docID)
 		c.indexDocument(ctx, c.IndexName, e.Request.URL.String(), content, docID)
 	})
 }
@@ -156,14 +152,14 @@ func generateDocumentID(url string) string {
 func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, docID string) {
 	c.Logger.Debug(
 		"Preparing to index document",
-		c.Logger.Field("url", url),
-		c.Logger.Field("docID", docID),
+		url,
+		docID,
 	) // Log before indexing
 
 	err := c.Storage.IndexDocument(ctx, indexName, docID, map[string]interface{}{"url": url, "content": content})
 	if err != nil {
-		c.Logger.Error("Error indexing document", c.Logger.Field("url", url), c.Logger.Field("error", err))
+		c.Logger.Error("Error indexing document", url, err)
 	} else {
-		c.Logger.Info("Successfully indexed document", c.Logger.Field("url", url), c.Logger.Field("docID", docID))
+		c.Logger.Info("Successfully indexed document", url, docID)
 	}
 }

@@ -103,9 +103,7 @@ func (s *ElasticsearchStorage) IndexDocument(
 	}
 
 	// Log a concise summary instead of the full document
-	s.Logger.Info("Indexed document",
-		s.Logger.Field("docID", docID),
-		s.Logger.Field("index", index))
+	s.Logger.Info("Indexed document", docID, index, res.Status())
 
 	return nil
 }
@@ -125,6 +123,6 @@ func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
 		return fmt.Errorf("error decoding Elasticsearch info response: %w", decodeErr)
 	}
 
-	s.Logger.Info("Elasticsearch info", s.Logger.Field("info", esInfo))
+	s.Logger.Info("Elasticsearch info", esInfo)
 	return nil
 }

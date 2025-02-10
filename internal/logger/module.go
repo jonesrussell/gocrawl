@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -19,6 +20,10 @@ var Module = fx.Module("logger",
 
 // NewLogger initializes the appropriate logger based on the environment
 func NewLogger(cfg *config.Config) (*CustomLogger, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("config cannot be nil")
+	}
+
 	logLevel := cfg.LogLevel
 	var level zapcore.Level
 	switch strings.ToUpper(logLevel) {
