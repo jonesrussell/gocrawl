@@ -2,58 +2,34 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/spf13/cobra"
 )
 
-var (
-	query     string
-	indexName string
-)
-
 var searchCmd = &cobra.Command{
-	Use:   "search",
-	Short: "Search crawled content",
-	Long:  `Search through the content stored in Elasticsearch`,
+	Use:   "search [query]",
+	Short: "Search indexed content",
+	Long:  `Search content that has been crawled and indexed in Elasticsearch`,
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-
-		// Convert query string to Elasticsearch query
-		queryMap := map[string]interface{}{
-			"query": map[string]interface{}{
-				"multi_match": map[string]interface{}{
-					"query":  query,
-					"fields": []string{"title", "content", "url"},
-				},
-			},
-		}
-
-		results, err := app.Search(ctx, indexName, queryMap)
+		results, err := app.SearchContent(ctx, args[0], indexName, querySize)
 		if err != nil {
-			return err
+			return fmt.Errorf("search failed: %w", err)
 		}
 
-		// Pretty print results
+		// Print results
 		for _, result := range results {
-			prettyJSON, err := json.MarshalIndent(result, "", "  ")
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(prettyJSON))
+			fmt.Printf("URL: %s\nContent: %s\n\n", result.URL, result.Content)
 		}
-
 		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(searchCmd)
-
-	searchCmd.Flags().StringVarP(&query, "query", "q", "", "Search query (required)")
-	searchCmd.Flags().StringVarP(&indexName, "index", "i", "pages", "Index name to search")
-
-	searchCmd.MarkFlagRequired("query")
+	searchCmd.Flags().StringVarP(&indexName, "index", "i", "articles", "Index to search")
+	searchCmd.Flags().IntVarP(&querySize, "size", "s", 10, "Number of results to return")
 }

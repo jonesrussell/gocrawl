@@ -9,12 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	baseURL   string
-	maxDepth  int
-	rateLimit time.Duration
-)
-
 var crawlCmd = &cobra.Command{
 	Use:   "crawl",
 	Short: "Start crawling a website",
@@ -27,6 +21,7 @@ var crawlCmd = &cobra.Command{
 				MaxDepth:  maxDepth,
 				RateLimit: rateLimit,
 			},
+			IndexName: indexName,
 		})
 	},
 }
@@ -37,6 +32,7 @@ func init() {
 	crawlCmd.Flags().StringVarP(&baseURL, "url", "u", "", "Base URL to crawl (required)")
 	crawlCmd.Flags().IntVarP(&maxDepth, "depth", "d", 2, "Maximum crawl depth")
 	crawlCmd.Flags().DurationVarP(&rateLimit, "rate", "r", time.Second, "Rate limit between requests")
+	crawlCmd.Flags().StringVarP(&indexName, "index", "i", "articles", "Elasticsearch index name")
 
 	crawlCmd.MarkFlagRequired("url")
 }

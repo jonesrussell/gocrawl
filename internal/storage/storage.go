@@ -11,6 +11,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"go.uber.org/fx"
 )
 
@@ -33,6 +34,8 @@ type Storage interface {
 		update map[string]interface{},
 	) error
 	DeleteDocument(ctx context.Context, index string, docID string) error
+	BulkIndexArticles(ctx context.Context, articles []*models.Article) error
+	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
 }
 
 // ElasticsearchStorage struct to hold the Elasticsearch client

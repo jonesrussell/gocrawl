@@ -80,3 +80,41 @@ func TestBulkIndexArticles(t *testing.T) {
 		assert.Equal(t, 200, res.StatusCode)
 	}
 }
+
+func TestSearchArticles(t *testing.T) {
+	storage := setupTestStorage(t)
+	ctx := context.Background()
+
+	// Create and index test articles
+	articles := []*models.Article{
+		{
+			ID:    "search-1",
+			Title: "Golang Testing",
+			Body:  "How to write tests in Go",
+			Tags:  []string{"golang", "testing"},
+		},
+		{
+			ID:    "search-2",
+			Title: "Elasticsearch Guide",
+			Body:  "Using Elasticsearch with Go",
+			Tags:  []string{"elasticsearch", "golang"},
+		},
+	}
+
+	err := storage.BulkIndexArticles(ctx, articles)
+	require.NoError(t, err)
+
+	// Wait for indexing
+	time.Sleep(1 * time.Second)
+
+	// Test search
+	results, err := storage.SearchArticles(ctx, "golang", 10)
+	require.NoError(t, err)
+	assert.Len(t, results, 2)
+
+	// Test search with specific term
+	results, err = storage.SearchArticles(ctx, "elasticsearch", 10)
+	require.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "Elasticsearch Guide", results[0].Title)
+}

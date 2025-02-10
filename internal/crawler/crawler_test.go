@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
@@ -27,33 +27,41 @@ func (m *MockShutdowner) Shutdown(opts ...fx.ShutdownOption) error {
 	return args.Error(0)
 }
 
+// MockCollector is a mock implementation of colly.Collector
+type MockCollector struct {
+	mock.Mock
+}
+
+func (m *MockCollector) Visit(url string) error {
+	args := m.Called(url)
+	return args.Error(0)
+}
+
 // TestNewCrawler tests the creation of a new Crawler instance
 func TestNewCrawler(t *testing.T) {
 	mockStorage := storage.NewMockStorage()
-
-	// Use NewMockCustomLogger to create a mock logger
 	testLogger := logger.NewMockCustomLogger()
-
 	testConfig := &config.Config{IndexName: "test-index"}
+
+	// Set up mock expectations
+	mockStorage.On("TestConnection", mock.Anything).Return(nil)
+	mockStorage.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil)
 
 	params := crawler.Params{
 		BaseURL:   "http://example.com",
 		MaxDepth:  1,
 		RateLimit: 1 * time.Second,
 		Debugger:  &logger.CollyDebugger{},
-		Logger:    testLogger, // Use the assigned logger variable
+		Logger:    testLogger,
 		Config:    testConfig,
 		Storage:   mockStorage,
 	}
 
 	result, err := crawler.NewCrawler(params)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, result.Crawler)
 
-	if result.Crawler == nil {
-		t.Fatalf("Expected crawler instance, got nil")
-	}
+	mockStorage.AssertExpectations(t)
 }
 
 // TestCrawler_Start tests the Crawler's Start method
@@ -67,29 +75,31 @@ func TestCrawler_Start(t *testing.T) {
 
 	mockStorage := storage.NewMockStorage()
 	testLogger := logger.NewMockCustomLogger()
-	testConfig := &config.Config{IndexName: "test-index"}
-
-	// Create a new collector without domain restrictions
-	collector := colly.NewCollector(
-		colly.AllowURLRevisit(),
-		colly.MaxDepth(1),
-		colly.Async(true),
-		colly.AllowedDomains(), // Empty to allow all domains
-	)
-
-	c := &crawler.Crawler{
-		BaseURL:   ts.URL,
-		Storage:   mockStorage,
-		MaxDepth:  1,
-		RateLimit: 1 * time.Millisecond,
-		Collector: collector,
-		Logger:    testLogger,
-		IndexName: testConfig.IndexName,
+	testConfig := &config.Config{
+		IndexName: "test-index",
+		CrawlerConfig: config.CrawlerConfig{
+			BaseURL:   ts.URL,
+			MaxDepth:  1,
+			RateLimit: time.Millisecond,
+		},
 	}
 
 	// Set up mock expectations
 	mockStorage.On("TestConnection", mock.Anything).Return(nil)
-	mockStorage.On("IndexDocument", mock.Anything, testConfig.IndexName, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockStorage.On("IndexDocument", mock.Anything, testConfig.IndexName, mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil)
+
+	params := crawler.Params{
+		BaseURL:   ts.URL,
+		MaxDepth:  1,
+		RateLimit: time.Millisecond,
+		Logger:    testLogger,
+		Config:    testConfig,
+		Storage:   mockStorage,
+	}
+
+	result, err := crawler.NewCrawler(params)
+	require.NoError(t, err)
 
 	mockShutdowner := new(MockShutdowner)
 	mockShutdowner.On("Shutdown", mock.Anything).Return(nil)
@@ -102,11 +112,52 @@ func TestCrawler_Start(t *testing.T) {
 	defer cancel()
 
 	// Run the crawler
-	if err := c.Start(ctx, mockShutdowner); err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
+	err = result.Crawler.Start(ctx, mockShutdowner)
+	require.NoError(t, err)
 
 	// Verify expectations
 	mockStorage.AssertExpectations(t)
 	mockShutdowner.AssertExpectations(t)
+}
+
+func TestCrawlerArticleProcessing(t *testing.T) {
+	mockStorage := storage.NewMockStorage()
+	testLogger := logger.NewMockCustomLogger()
+	testConfig := &config.Config{
+		IndexName: "test-index",
+		CrawlerConfig: config.CrawlerConfig{
+			BaseURL:   "https://example.com",
+			MaxDepth:  1,
+			RateLimit: time.Millisecond,
+		},
+	}
+
+	// Set up mock expectations
+	mockStorage.On("TestConnection", mock.Anything).Return(nil)
+	mockStorage.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil)
+
+	params := crawler.Params{
+		BaseURL:   "https://example.com",
+		MaxDepth:  1,
+		RateLimit: time.Millisecond,
+		Logger:    testLogger,
+		Config:    testConfig,
+		Storage:   mockStorage,
+	}
+
+	result, err := crawler.NewCrawler(params)
+	require.NoError(t, err)
+
+	mockShutdowner := new(MockShutdowner)
+	mockShutdowner.On("Shutdown", mock.Anything).Return(nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start crawler
+	err = result.Crawler.Start(ctx, mockShutdowner)
+	require.NoError(t, err)
+
+	// Verify storage calls
+	mockStorage.AssertExpectations(t)
 }

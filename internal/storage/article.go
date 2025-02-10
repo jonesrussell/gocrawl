@@ -116,3 +116,58 @@ func (es *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles 
 
 	return nil
 }
+
+// SearchArticles searches for articles based on a query
+func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
+	searchQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"multi_match": map[string]interface{}{
+				"query":  query,
+				"fields": []string{"title^2", "body", "tags"},
+			},
+		},
+		"size": size,
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(searchQuery); err != nil {
+		return nil, fmt.Errorf("error encoding search query: %w", err)
+	}
+
+	res, err := es.ESClient.Search(
+		es.ESClient.Search.WithContext(ctx),
+		es.ESClient.Search.WithIndex("articles"),
+		es.ESClient.Search.WithBody(&buf),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error executing search: %w", err)
+	}
+	defer res.Body.Close()
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+
+	hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
+	articles := make([]*models.Article, 0, len(hits))
+
+	for _, hit := range hits {
+		hitMap := hit.(map[string]interface{})
+		source := hitMap["_source"].(map[string]interface{})
+
+		var article models.Article
+		sourceData, err := json.Marshal(source)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling hit source: %w", err)
+		}
+
+		if err := json.Unmarshal(sourceData, &article); err != nil {
+			return nil, fmt.Errorf("error unmarshaling article: %w", err)
+		}
+
+		articles = append(articles, &article)
+	}
+
+	return articles, nil
+}

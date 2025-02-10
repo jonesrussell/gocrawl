@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 )
@@ -23,13 +25,14 @@ const (
 
 // Crawler struct to hold configuration or state if needed
 type Crawler struct {
-	BaseURL   string
-	Storage   storage.Storage
-	MaxDepth  int
-	RateLimit time.Duration
-	Collector *colly.Collector
-	Logger    logger.Interface
-	IndexName string
+	BaseURL     string
+	Storage     storage.Storage
+	MaxDepth    int
+	RateLimit   time.Duration
+	Collector   *colly.Collector
+	Logger      logger.Interface
+	IndexName   string
+	articleChan chan *models.Article
 }
 
 // Params holds the parameters for creating a Crawler
@@ -74,13 +77,14 @@ func NewCrawler(p Params) (Result, error) {
 	}
 
 	crawler := &Crawler{
-		BaseURL:   p.BaseURL,
-		Storage:   p.Storage,
-		MaxDepth:  p.MaxDepth,
-		RateLimit: p.RateLimit,
-		Collector: c,
-		Logger:    p.Logger,
-		IndexName: p.Config.IndexName,
+		BaseURL:     p.BaseURL,
+		Storage:     p.Storage,
+		MaxDepth:    p.MaxDepth,
+		RateLimit:   p.RateLimit,
+		Collector:   c,
+		Logger:      p.Logger,
+		IndexName:   p.Config.IndexName,
+		articleChan: make(chan *models.Article, 100),
 	}
 
 	// Configure collector callbacks
@@ -139,8 +143,17 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 		return err
 	}
 
-	c.Logger.Info("Starting crawling process")
+	c.articleChan = make(chan *models.Article, 100)
+	defer close(c.articleChan)
+
+	// Start article processor
+	go c.processArticles(ctx)
+
+	// Configure collector
+	c.Collector.OnHTML("article", c.processPage)
 	c.configureCollectors(ctx)
+
+	c.Logger.Info("Starting crawling process")
 
 	// Create error channel for async crawling
 	errChan := make(chan error, 1)
@@ -244,5 +257,62 @@ func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, do
 		c.Logger.Error("Error indexing document", url, err)
 	} else {
 		c.Logger.Info("Successfully indexed document", url, docID)
+	}
+}
+
+// Add method to process articles
+func (c *Crawler) processPage(e *colly.HTMLElement) {
+	article := &models.Article{
+		ID:            uuid.New().String(),
+		Title:         e.ChildText("h1"),
+		Body:          e.ChildText("article"),
+		Source:        e.Request.URL.String(),
+		PublishedDate: time.Now(),
+		Tags:          extractTags(e),
+	}
+
+	// Try to extract author
+	author := e.ChildText("meta[name='author']")
+	if author != "" {
+		article.Author = author
+	}
+
+	c.articleChan <- article
+}
+
+func extractTags(e *colly.HTMLElement) []string {
+	var tags []string
+	e.ForEach("meta[property='article:tag']", func(_ int, el *colly.HTMLElement) {
+		tags = append(tags, el.Attr("content"))
+	})
+	return tags
+}
+
+// Add article processor
+func (c *Crawler) processArticles(ctx context.Context) {
+	var articles []*models.Article
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case article := <-c.articleChan:
+			articles = append(articles, article)
+			if len(articles) >= 10 {
+				if err := c.Storage.BulkIndexArticles(ctx, articles); err != nil {
+					c.Logger.Error("Failed to bulk index articles", "error", err)
+				}
+				articles = articles[:0]
+			}
+		case <-ticker.C:
+			if len(articles) > 0 {
+				if err := c.Storage.BulkIndexArticles(ctx, articles); err != nil {
+					c.Logger.Error("Failed to bulk index articles", "error", err)
+				}
+				articles = articles[:0]
+			}
+		}
 	}
 }

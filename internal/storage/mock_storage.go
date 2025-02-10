@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -94,4 +95,20 @@ func (m *MockStorage) ScrollSearch(
 		return nil, ErrMockTypeAssertion
 	}
 	return result, args.Error(1)
+}
+
+// BulkIndexArticles implements Storage
+func (m *MockStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
+	args := m.Called(ctx, articles)
+	return args.Error(0)
+}
+
+// SearchArticles implements Storage
+func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
+	args := m.Called(ctx, query, size)
+	var articles []*models.Article
+	if args.Get(0) != nil {
+		articles = args.Get(0).([]*models.Article)
+	}
+	return articles, args.Error(1)
 }
