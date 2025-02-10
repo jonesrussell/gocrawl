@@ -32,20 +32,18 @@ func (t *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return t.RequestFunc(req)
 	}
 
-	// Add required Elasticsearch response headers
-	header := make(http.Header)
-	header.Add("X-Elastic-Product", "Elasticsearch") // This is crucial
+	// Create default response with required headers
+	header := http.Header{}
+	header.Add("X-Elastic-Product", "Elasticsearch")
 	header.Add("Content-Type", "application/json")
 
-	response := &http.Response{
+	return &http.Response{
 		StatusCode: t.StatusCode,
 		Body:       io.NopCloser(strings.NewReader(t.Response)),
 		Header:     header,
-	}
-	return response, nil
+	}, nil
 }
 
-// Add Perform method to implement elastictransport.Interface
 func (t *mockTransport) Perform(req *http.Request) (*http.Response, error) {
 	return t.RoundTrip(req)
 }
@@ -116,7 +114,6 @@ func TestNewStorage(t *testing.T) {
 	log, err := logger.NewLogger(cfg)
 	require.NoError(t, err, "Failed to create logger")
 
-	// Create mock transport with proper headers and response
 	responseBody := `{
 		"name": "test_node",
 		"cluster_name": "test_cluster",
@@ -125,36 +122,21 @@ func TestNewStorage(t *testing.T) {
 		}
 	}`
 
-	// Create a transport that always returns a valid response
 	mockTransport := &mockTransport{
 		Response:   responseBody,
 		StatusCode: http.StatusOK,
-		RequestFunc: func(req *http.Request) (*http.Response, error) {
-			header := http.Header{}
-			header.Add("X-Elastic-Product", "Elasticsearch")
-			header.Add("Content-Type", "application/json")
-
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(responseBody)),
-				Header:     header,
-			}, nil
-		},
 	}
 
-	// Create a new config with the mock transport
 	cfg = &config.Config{
 		ElasticURL: "http://localhost:9200",
 		Transport:  mockTransport,
 		LogLevel:   "info",
 	}
 
-	// Create storage with the config
 	result, err := NewStorage(cfg, log)
 	require.NoError(t, err)
 	require.NotNil(t, result.Storage)
 
-	// Verify the storage was created correctly
 	storage, ok := result.Storage.(*ElasticsearchStorage)
 	require.True(t, ok)
 	require.NotNil(t, storage.ESClient)

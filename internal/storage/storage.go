@@ -64,26 +64,19 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 	opts.Password = cfg.ElasticPassword
 	opts.APIKey = cfg.ElasticAPIKey
 
-	if transport, ok := cfg.Transport.(*http.Transport); ok {
-		opts.Transport = transport
-	}
-
-	if opts.URL == "" {
-		return Result{}, ErrMissingURL
-	}
-
-	esConfig := elasticsearch.Config{
-		Addresses: []string{opts.URL},
-	}
-
-	if opts.Transport != nil {
-		esConfig.Transport = opts.Transport
+	if cfg.Transport != nil {
+		opts.Transport = cfg.Transport
 	} else {
-		esConfig.Transport = &http.Transport{
+		opts.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},
 		}
+	}
+
+	esConfig := elasticsearch.Config{
+		Addresses: []string{opts.URL},
+		Transport: opts.Transport,
 	}
 
 	if opts.APIKey != "" {
