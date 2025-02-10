@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -28,6 +29,7 @@ type Config struct {
 	IndexName       string
 	LogLevel        string
 	CrawlerConfig   CrawlerConfig
+	Transport       http.RoundTripper // Added for testing
 }
 
 // LoadConfig loads configuration from environment variables

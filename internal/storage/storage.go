@@ -47,7 +47,7 @@ type Storage interface {
 // ElasticsearchStorage struct to hold the Elasticsearch client
 type ElasticsearchStorage struct {
 	ESClient *elasticsearch.Client
-	Logger   *logger.CustomLogger
+	Logger   logger.Interface
 }
 
 // Result holds the dependencies for the storage
@@ -67,7 +67,7 @@ var ErrInvalidHits = errors.New("invalid response format: hits not found")
 var ErrInvalidHitsArray = errors.New("invalid response format: hits array not found")
 
 // NewStorage initializes a new Storage instance
-func NewStorage(cfg *config.Config, log *logger.CustomLogger) (Result, error) {
+func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 	// Validate essential configuration parameters
 	if cfg.ElasticURL == "" {
 		return Result{}, errors.New("ELASTIC_URL is required")
@@ -76,11 +76,16 @@ func NewStorage(cfg *config.Config, log *logger.CustomLogger) (Result, error) {
 	// Create the Elasticsearch client configuration
 	cfgElasticsearch := elasticsearch.Config{
 		Addresses: []string{cfg.ElasticURL},
-		Transport: &http.Transport{
+	}
+
+	if cfg.Transport != nil {
+		cfgElasticsearch.Transport = cfg.Transport
+	} else {
+		cfgElasticsearch.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, // Only for development/testing
+				InsecureSkipVerify: true,
 			},
-		},
+		}
 	}
 
 	// Configure authentication
@@ -111,6 +116,22 @@ func NewStorage(cfg *config.Config, log *logger.CustomLogger) (Result, error) {
 			ESClient: esClient,
 			Logger:   log,
 		},
+	}, nil
+}
+
+// NewStorageWithClient creates a new Storage instance with a provided Elasticsearch client
+func NewStorageWithClient(cfg *config.Config, log logger.Interface, client *elasticsearch.Client) (Result, error) {
+	if cfg.ElasticURL == "" {
+		return Result{}, fmt.Errorf("elasticsearch URL is required")
+	}
+
+	es := &ElasticsearchStorage{
+		ESClient: client,
+		Logger:   log, // No need for pointer conversion since we're using Interface
+	}
+
+	return Result{
+		Storage: es,
 	}, nil
 }
 
