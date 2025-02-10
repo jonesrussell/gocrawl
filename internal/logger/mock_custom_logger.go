@@ -1,5 +1,9 @@
 package logger
 
+import (
+	"fmt"
+)
+
 // MockCustomLogger is a mock implementation of CustomLogger
 type MockCustomLogger struct {
 	Messages []string
@@ -29,10 +33,12 @@ func (m *MockCustomLogger) Warn(msg string, fields ...interface{}) {
 	m.Messages = append(m.Messages, msg)
 }
 
+// Implement Fatalf method
 func (m *MockCustomLogger) Fatalf(msg string, args ...interface{}) {
-	m.Messages = append(m.Messages, msg)
+	m.Messages = append(m.Messages, fmt.Sprintf(msg, args...)) // Format the message correctly
 }
 
+// Implement Errorf method
 func (m *MockCustomLogger) Errorf(format string, args ...interface{}) {
-	m.Messages = append(m.Messages, format)
+	m.Messages = append(m.Messages, fmt.Sprintf(format, args...)) // Format the message correctly
 }
