@@ -2,8 +2,7 @@ package crawler
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -66,6 +65,7 @@ func NewCrawler(p Params) (Result, error) {
 	c := colly.NewCollector(
 		colly.MaxDepth(p.MaxDepth),
 		colly.Async(true),
+		colly.AllowedDomains("www.elliotlaketoday.com"),
 	)
 
 	// Set rate limiting
@@ -108,19 +108,24 @@ func NewCrawler(p Params) (Result, error) {
 		crawler.Logger.Error("Error occurred", r.Request.URL.String(), err)
 	})
 
+	c.OnHTML("div.details", func(e *colly.HTMLElement) {
+		crawler.processPage(e)
+	})
+
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Request.AbsoluteURL(e.Attr("href"))
 		if link == "" {
 			return
 		}
 
-		crawler.Logger.Debug("Found link", "url", link)
-
-		if err := e.Request.Visit(link); err != nil {
-			if !errors.Is(err, colly.ErrAlreadyVisited) &&
-				!errors.Is(err, colly.ErrMissingURL) &&
-				!errors.Is(err, colly.ErrForbiddenDomain) {
-				crawler.Logger.Debug("Could not visit link", "url", link, "error", err.Error())
+		if strings.Contains(link, "/opp-beat") ||
+			strings.Contains(link, "/police") ||
+			strings.Contains(link, "/news") {
+			crawler.Logger.Debug("Found article link", "url", link)
+			if err := e.Request.Visit(link); err != nil {
+				if !errors.Is(err, colly.ErrAlreadyVisited) {
+					crawler.Logger.Debug("Could not visit article", "url", link, "error", err.Error())
+				}
 			}
 		}
 	})
@@ -174,10 +179,6 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 		close(processorDone)
 	}()
 
-	// Configure collector
-	c.Collector.OnHTML("article", c.processPage)
-	c.configureCollectors(ctx)
-
 	c.Logger.Info("Starting crawling process")
 
 	// Create error channel for async crawling
@@ -215,167 +216,121 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 	return shutdowner.Shutdown()
 }
 
-// Helper method to configure collectors
-func (c *Crawler) configureCollectors(ctx context.Context) {
-	c.Collector.OnRequest(func(r *colly.Request) {
-		c.Logger.Debug("Requesting URL", r.URL.String())
-	})
-
-	c.Collector.OnResponse(func(r *colly.Response) {
-		c.Logger.Debug("Received response", r.Request.URL.String(), r.StatusCode)
-		if r.StatusCode != HTTPStatusOK {
-			c.Logger.Warn(
-				"Non-200 response received",
-				r.Request.URL.String(),
-				r.StatusCode,
-			)
-		}
-	})
-
-	c.Collector.OnError(func(r *colly.Response, err error) {
-		c.Logger.Error("Error occurred", r.Request.URL.String(), err)
-	})
-
-	c.Collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if link == "" {
-			return // Skip empty or invalid URLs
-		}
-
-		c.Logger.Debug("Found link", "url", link)
-
-		// Visit the link asynchronously
-		if err := e.Request.Visit(link); err != nil {
-			if !errors.Is(err, colly.ErrAlreadyVisited) &&
-				!errors.Is(err, colly.ErrMissingURL) &&
-				!errors.Is(err, colly.ErrForbiddenDomain) {
-				c.Logger.Debug("Could not visit link", "url", link, "error", err.Error())
-			}
-		}
-	})
-
-	c.Collector.OnHTML("html", func(e *colly.HTMLElement) {
-		if ctx.Err() != nil {
-			c.Logger.Warn("Crawling stopped due to context cancellation", "error", ctx.Err())
-			return
-		}
-
-		content := e.Text
-		docID := generateDocumentID(e.Request.URL.String())
-
-		if len(content) == 0 {
-			c.Logger.Warn("Content is empty, skipping indexing", "url", e.Request.URL.String())
-			return
-		}
-
-		c.Logger.Debug("Indexing document", "url", e.Request.URL.String(), "id", docID)
-		c.indexDocument(ctx, c.IndexName, e.Request.URL.String(), content, docID)
-	})
-}
-
-func generateDocumentID(url string) string {
-	hash := sha256.Sum256([]byte(url))
-	return hex.EncodeToString(hash[:])
-}
-
-func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, docID string) {
-	c.Logger.Debug(
-		"Preparing to index document",
-		url,
-		docID,
-	) // Log before indexing
-
-	err := c.Storage.IndexDocument(ctx, indexName, docID, map[string]interface{}{"url": url, "content": content})
-	if err != nil {
-		c.Logger.Error("Error indexing document", url, err)
-	} else {
-		c.Logger.Info("Successfully indexed document", url, docID)
-	}
-}
-
 // processPage handles article extraction
 func (c *Crawler) processPage(e *colly.HTMLElement) {
-	// Common selectors for news articles
-	article := &models.Article{
-		ID:            uuid.New().String(),
-		Title:         e.ChildText("h1.article-title, h1.headline, h1"),      // Common title selectors
-		Body:          e.ChildText("div.article-body, div.content, article"), // Common content selectors
-		Source:        e.Request.URL.String(),
-		PublishedDate: extractDate(e),
-		Author:        extractAuthor(e),
-		Tags:          extractTags(e),
+	// Add debug logging at start
+	c.Logger.Debug("Starting article processing",
+		"url", e.Request.URL.String(),
+		"has_title", e.DOM.Find("h1.details-title").Length() > 0,
+		"has_body", e.DOM.Find("#details-body").Length() > 0)
+
+	// Extract metadata from JSON-LD first
+	var jsonLD struct {
+		DateCreated   string   `json:"dateCreated"`
+		DateModified  string   `json:"dateModified"`
+		DatePublished string   `json:"datePublished"`
+		Author        string   `json:"author"`
+		Keywords      []string `json:"keywords"`
+		Section       string   `json:"articleSection"`
 	}
 
-	// Skip if no content found
-	if article.Title == "" || article.Body == "" {
+	e.ForEach(`script[type="application/ld+json"]`, func(_ int, el *colly.HTMLElement) {
+		if err := json.Unmarshal([]byte(el.Text), &jsonLD); err != nil {
+			c.Logger.Debug("Failed to parse JSON-LD", "error", err)
+		}
+	})
+
+	// Clean up author (remove date)
+	author := e.ChildText(".details-byline")
+	if idx := strings.Index(author, "    "); idx != -1 {
+		author = strings.TrimSpace(author[:idx])
+	}
+
+	// Common selectors for news articles
+	article := &models.Article{
+		ID:     uuid.New().String(),
+		Title:  e.ChildText("h1.details-title"),
+		Body:   e.ChildText("#details-body"),
+		Source: e.Request.URL.String(),
+		Author: author,
+		Tags:   make([]string, 0),
+	}
+
+	// Get intro/description
+	if intro := e.ChildText(".details-intro"); intro != "" {
+		article.Body = intro + "\n\n" + article.Body
+	}
+
+	// Add tags from multiple sources
+	// 1. JSON-LD section
+	if jsonLD.Section != "" {
+		article.Tags = append(article.Tags, jsonLD.Section)
+	}
+
+	// 2. JSON-LD keywords
+	if len(jsonLD.Keywords) > 0 {
+		article.Tags = append(article.Tags, jsonLD.Keywords...)
+	}
+
+	// 3. Meta keywords
+	if keywords := e.ChildAttr("meta[name='keywords']", "content"); keywords != "" {
+		for _, tag := range strings.Split(keywords, "|") {
+			if tag = strings.TrimSpace(tag); tag != "" {
+				article.Tags = append(article.Tags, tag)
+			}
+		}
+	}
+
+	// 4. Breadcrumb navigation
+	e.ForEach("ol.nav-breadcrumb li a", func(_ int, el *colly.HTMLElement) {
+		if tag := strings.TrimSpace(el.Text); tag != "" && tag != "Home" {
+			article.Tags = append(article.Tags, tag)
+		}
+	})
+
+	// Remove duplicates from tags
+	seen := make(map[string]bool)
+	uniqueTags := make([]string, 0)
+	for _, tag := range article.Tags {
+		if !seen[tag] {
+			seen[tag] = true
+			uniqueTags = append(uniqueTags, tag)
+		}
+	}
+	article.Tags = uniqueTags
+
+	// Parse published date from time element
+	if timeStr := e.ChildAttr("time.timeago", "datetime"); timeStr != "" {
+		if t, err := time.Parse(time.RFC3339, timeStr); err == nil {
+			article.PublishedDate = t
+		} else {
+			c.Logger.Debug("Failed to parse datetime",
+				"datetime", timeStr,
+				"error", err)
+		}
+	} else if jsonLD.DatePublished != "" {
+		if t, err := time.Parse(time.RFC3339, jsonLD.DatePublished); err == nil {
+			article.PublishedDate = t
+		}
+	}
+
+	// Skip empty articles
+	if article.Title == "" && article.Body == "" {
+		c.Logger.Debug("Skipping empty article", "url", article.Source)
 		return
 	}
 
-	c.Logger.Debug("Found article",
+	// Log article details at debug level
+	c.Logger.Debug("Processing article",
+		"id", article.ID,
 		"title", article.Title,
-		"url", article.Source)
+		"url", article.Source,
+		"date", article.PublishedDate,
+		"author", article.Author,
+		"tags", article.Tags)
 
+	// Send article to channel for processing
 	c.articleChan <- article
-}
-
-// Helper functions for extraction
-func extractDate(e *colly.HTMLElement) time.Time {
-	// Common date selectors
-	dateStr := e.ChildAttr("meta[property='article:published_time']", "content")
-	if dateStr == "" {
-		dateStr = e.ChildText("time, .date, .published-date")
-	}
-
-	// Try parsing with different formats
-	for _, layout := range []string{
-		time.RFC3339,
-		"2006-01-02T15:04:05Z",
-		"2006-01-02 15:04:05",
-		"January 2, 2006",
-	} {
-		if t, err := time.Parse(layout, dateStr); err == nil {
-			return t
-		}
-	}
-
-	return time.Now()
-}
-
-func extractAuthor(e *colly.HTMLElement) string {
-	// Common author selectors
-	author := e.ChildAttr("meta[name='author']", "content")
-	if author == "" {
-		author = e.ChildText(".author-name, .byline, .author")
-	}
-	return author
-}
-
-func extractTags(e *colly.HTMLElement) []string {
-	var tags []string
-
-	// Check meta tags
-	e.ForEach("meta[property='article:tag'], meta[name='keywords']", func(_ int, el *colly.HTMLElement) {
-		content := el.Attr("content")
-		if content != "" {
-			// Split if comma-separated
-			for _, tag := range strings.Split(content, ",") {
-				tag = strings.TrimSpace(tag)
-				if tag != "" {
-					tags = append(tags, tag)
-				}
-			}
-		}
-	})
-
-	// Check tag links
-	e.ForEach("a.tag, .tags a", func(_ int, el *colly.HTMLElement) {
-		tag := strings.TrimSpace(el.Text)
-		if tag != "" {
-			tags = append(tags, tag)
-		}
-	})
-
-	return tags
 }
 
 // processArticles handles the bulk indexing of articles
