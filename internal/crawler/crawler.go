@@ -2,14 +2,13 @@ package crawler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/google/uuid"
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -33,6 +32,8 @@ type Crawler struct {
 	Logger      logger.Interface
 	IndexName   string
 	articleChan chan *models.Article
+	articleSvc  *article.Service
+	indexSvc    *storage.IndexService
 }
 
 // Params holds the parameters for creating a Crawler
@@ -77,6 +78,9 @@ func NewCrawler(p Params) (Result, error) {
 		return Result{}, fmt.Errorf("error setting rate limit: %w", err)
 	}
 
+	articleSvc := article.NewService(p.Logger)
+	indexSvc := storage.NewIndexService(p.Storage, p.Logger)
+
 	crawler := &Crawler{
 		BaseURL:     p.BaseURL,
 		Storage:     p.Storage,
@@ -86,6 +90,8 @@ func NewCrawler(p Params) (Result, error) {
 		Logger:      p.Logger,
 		IndexName:   p.Config.IndexName,
 		articleChan: make(chan *models.Article, 100),
+		articleSvc:  articleSvc,
+		indexSvc:    indexSvc,
 	}
 
 	// Configure collector callbacks
@@ -144,26 +150,12 @@ func NewCrawler(p Params) (Result, error) {
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
-	// Check storage connection
 	if err := c.Storage.TestConnection(ctx); err != nil {
-		c.Logger.Error("Failed to connect to storage", "error", err)
-		return err
+		return fmt.Errorf("storage connection failed: %w", err)
 	}
 
-	// Check if index exists
-	exists, err := c.Storage.IndexExists(ctx, c.IndexName)
-	if err != nil {
-		c.Logger.Error("Failed to check index existence", "error", err)
-		return err
-	}
-
-	// Create index if it doesn't exist
-	if !exists {
-		c.Logger.Info("Index does not exist, creating...", "index", c.IndexName)
-		if err := c.createArticleIndex(ctx); err != nil {
-			c.Logger.Error("Failed to create index", "error", err)
-			return err
-		}
+	if err := c.indexSvc.EnsureIndex(ctx, c.IndexName); err != nil {
+		return fmt.Errorf("index setup failed: %w", err)
 	}
 
 	c.Logger.Info("Starting crawl with valid index", "index", c.IndexName)
@@ -218,108 +210,10 @@ func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
 
 // processPage handles article extraction
 func (c *Crawler) processPage(e *colly.HTMLElement) {
-	// Add debug logging at start
-	c.Logger.Debug("Starting article processing",
-		"url", e.Request.URL.String(),
-		"has_title", e.DOM.Find("h1.details-title").Length() > 0,
-		"has_body", e.DOM.Find("#details-body").Length() > 0)
-
-	// Extract metadata from JSON-LD first
-	var jsonLD struct {
-		DateCreated   string   `json:"dateCreated"`
-		DateModified  string   `json:"dateModified"`
-		DatePublished string   `json:"datePublished"`
-		Author        string   `json:"author"`
-		Keywords      []string `json:"keywords"`
-		Section       string   `json:"articleSection"`
-	}
-
-	e.ForEach(`script[type="application/ld+json"]`, func(_ int, el *colly.HTMLElement) {
-		if err := json.Unmarshal([]byte(el.Text), &jsonLD); err != nil {
-			c.Logger.Debug("Failed to parse JSON-LD", "error", err)
-		}
-	})
-
-	// Clean up author (remove date)
-	author := e.ChildText(".details-byline")
-	if idx := strings.Index(author, "    "); idx != -1 {
-		author = strings.TrimSpace(author[:idx])
-	}
-
-	// Common selectors for news articles
-	article := &models.Article{
-		ID:     uuid.New().String(),
-		Title:  e.ChildText("h1.details-title"),
-		Body:   e.ChildText("#details-body"),
-		Source: e.Request.URL.String(),
-		Author: author,
-		Tags:   make([]string, 0),
-	}
-
-	// Get intro/description
-	if intro := e.ChildText(".details-intro"); intro != "" {
-		article.Body = intro + "\n\n" + article.Body
-	}
-
-	// Parse published date - try meta tag first
-	if timeStr := e.ChildAttr("meta[property='article:published_time']", "content"); timeStr != "" {
-		c.Logger.Debug("Found meta published time", "value", timeStr)
-		if t, err := time.Parse(time.RFC3339, timeStr); err == nil {
-			article.PublishedDate = t
-		}
-	}
-
-	// Add tags from multiple sources with debug logging
-	// 1. Article section from meta tag
-	if section := e.ChildAttr("meta[property='article:section']", "content"); section != "" {
-		c.Logger.Debug("Found meta section", "value", section)
-		article.Tags = append(article.Tags, section)
-	}
-
-	// 2. Keywords from meta tag
-	if keywords := e.ChildAttr("meta[name='keywords']", "content"); keywords != "" {
-		c.Logger.Debug("Found meta keywords", "value", keywords)
-		for _, tag := range strings.Split(keywords, "|") {
-			if tag = strings.TrimSpace(tag); tag != "" {
-				article.Tags = append(article.Tags, tag)
-			}
-		}
-	}
-
-	// 3. Add section from URL path
-	if strings.Contains(article.Source, "/opp-beat/") {
-		article.Tags = append(article.Tags, "OPP Beat")
-	} else if strings.Contains(article.Source, "/police/") {
-		article.Tags = append(article.Tags, "Police")
-	}
-
-	// Remove duplicates from tags
-	seen := make(map[string]bool)
-	uniqueTags := make([]string, 0)
-	for _, tag := range article.Tags {
-		if !seen[tag] {
-			seen[tag] = true
-			uniqueTags = append(uniqueTags, tag)
-		}
-	}
-	article.Tags = uniqueTags
-
-	// Skip empty articles
-	if article.Title == "" && article.Body == "" {
-		c.Logger.Debug("Skipping empty article", "url", article.Source)
+	article := c.articleSvc.ExtractArticle(e)
+	if article == nil {
 		return
 	}
-
-	// Log article details at debug level
-	c.Logger.Debug("Processing article",
-		"id", article.ID,
-		"title", article.Title,
-		"url", article.Source,
-		"date", article.PublishedDate,
-		"author", article.Author,
-		"tags", article.Tags)
-
-	// Send article to channel for processing
 	c.articleChan <- article
 }
 
@@ -359,49 +253,4 @@ func (c *Crawler) processArticles(ctx context.Context) {
 			indexBatch()
 		}
 	}
-}
-
-// createArticleIndex creates the articles index with proper mappings
-func (c *Crawler) createArticleIndex(ctx context.Context) error {
-	mapping := map[string]interface{}{
-		"mappings": map[string]interface{}{
-			"properties": map[string]interface{}{
-				"id": map[string]interface{}{
-					"type": "keyword",
-				},
-				"title": map[string]interface{}{
-					"type":     "text",
-					"analyzer": "standard",
-					"fields": map[string]interface{}{
-						"keyword": map[string]interface{}{
-							"type": "keyword",
-						},
-					},
-				},
-				"body": map[string]interface{}{
-					"type":     "text",
-					"analyzer": "standard",
-				},
-				"author": map[string]interface{}{
-					"type": "keyword",
-				},
-				"published_date": map[string]interface{}{
-					"type": "date",
-				},
-				"source": map[string]interface{}{
-					"type": "keyword",
-				},
-				"tags": map[string]interface{}{
-					"type": "keyword",
-				},
-			},
-		},
-	}
-
-	if err := c.Storage.CreateIndex(ctx, c.IndexName, mapping); err != nil {
-		return fmt.Errorf("failed to create index: %w", err)
-	}
-
-	c.Logger.Info("Created index", "index", c.IndexName)
-	return nil
 }
