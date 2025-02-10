@@ -1,6 +1,6 @@
 # Go Web Crawler
 
-A simple web crawler built in Go that fetches and processes web pages. This project demonstrates the use of the Colly library for web scraping and the Zap library for logging.
+A simple web crawler built in Go that fetches and processes web pages, storing results in Elasticsearch. This project demonstrates the use of Cobra for CLI, Colly for web scraping, Elasticsearch for storage, and Zap for logging.
 
 ## Table of Contents
 
@@ -14,9 +14,11 @@ A simple web crawler built in Go that fetches and processes web pages. This proj
 
 ## Features
 
-- Crawl web pages with configurable depth and rate limits.
-- Log crawling activities using structured logging.
-- Easily configurable through environment variables.
+- Command-line interface using Cobra
+- Crawl web pages with configurable depth and rate limits
+- Store crawled data in Elasticsearch
+- Log crawling activities using structured logging
+- Easily configurable through environment variables and flags
 
 ## Installation
 
@@ -29,7 +31,7 @@ A simple web crawler built in Go that fetches and processes web pages. This proj
 
 2. **Install dependencies:**
 
-   Make sure you have Go installed. Then, run:
+   Make sure you have Go and Elasticsearch installed. Then, run:
 
    ```bash
    go mod tidy
@@ -37,36 +39,63 @@ A simple web crawler built in Go that fetches and processes web pages. This proj
 
 3. **Create a `.env` file** (optional):
 
-   You can create a `.env` file in the root directory to set environment variables for configuration.
+   You can create a `.env` file in the root directory to set environment variables for configuration:
+
+   ```env
+   ELASTIC_URL=http://localhost:9200
+   ELASTIC_PASSWORD=your_password
+   ELASTIC_API_KEY=your_api_key
+   INDEX_NAME=crawled_pages
+   ```
 
 ## Usage
 
-To run the web crawler, use the following command:
+The crawler provides several commands through its CLI:
 
 ```bash
-task crawl
+# Show available commands
+gocrawl help
+
+# Start crawling
+gocrawl crawl https://example.com
+
+# Search crawled content
+gocrawl search "search term"
+
+# Get help for crawl command
+gocrawl crawl --help
 ```
 
-You can customize the parameters such as `maxDepth`, `rateLimit`, and `url` directly in the command.
+### Crawl Command Options
+
+```bash
+gocrawl crawl [url] [flags]
+
+Flags:
+  -d, --depth int          Maximum crawl depth (default 2)
+  -r, --rate-limit string  Rate limit between requests (default "1s")
+  -h, --help              Help for crawl command
+```
+
+### Search Command Options
+
+```bash
+gocrawl search [query] [flags]
+
+Flags:
+  -i, --index string       Elasticsearch index to search (default "crawled_pages")
+  -s, --size int          Number of results to return (default 10)
+  -h, --help              Help for search command
+```
 
 ## Tasks
 
 This project uses a `Taskfile.yml` for task automation. Here are the available tasks:
 
-- **crawl**: Run the web crawler with specified parameters.
-- **build**: Build the web crawler executable and place it in the `bin` directory.
-- **lint**: Lint the Go code using `go vet` and `golangci-lint`.
-- **test**: Run the tests for the application.
-
-### Example of Building the Application
-
-To build the application, run:
-
-```bash
-task build
-```
-
-This will create an executable named `gocrawl` in the `bin` directory.
+- **build**: Build the web crawler executable
+- **lint**: Lint the Go code
+- **test**: Run the tests
+- **docs**: Generate CLI documentation
 
 ## Testing
 
@@ -75,6 +104,8 @@ To run the tests, use:
 ```bash
 task test
 ```
+
+Make sure Elasticsearch is running locally or update the test configuration to point to your Elasticsearch instance.
 
 ## Contributing
 

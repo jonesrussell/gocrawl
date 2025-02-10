@@ -7,23 +7,50 @@
 	github.com/elastic/go-elasticsearch/v8 v8.17.0
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/joho/godotenv v1.5.1
+	github.com/spf13/cobra v1.8.0
 	go.uber.org/fx v1.23.0
 	go.uber.org/zap v1.27.0
 
 - Uber Fx Module structure:
+	cmd/
+			root.go
+			crawl.go
+			search.go
 	internal/
+		app/
+			app.go
 		collector/
 			module.go
 			collector.go
+			collector_test.go
 		config/
 			module.go
 			config.go
+			config_test.go
 		crawler/
 			module.go
 			crawler.go
+			crawler_test.go
 		logger/
 			module.go
 			logger.go
+			logger_test.go
+			colly_debugger.go
+			colly_debugger_test.go
+			mock_colly_debugger.go
+			mock_colly_debugger_test.go
+			mock_custom_logger.go
+			mock_logger.go
+			mock_logger_test.go
 		storage/
 			module.go
+			module_test.go
 			storage.go
+			storage_test.go
+			errors.go
+			errors_test.go
+			mock_storage.go
+			options.go
+			options_test.go
+			scroll.go
+			scroll_test.go
