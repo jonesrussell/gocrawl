@@ -2,10 +2,10 @@ package logger
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -22,34 +22,22 @@ func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 		return nil, errors.New("config cannot be nil")
 	}
 
-	level, err := parseLogLevel(cfg.App.LogLevel)
+	var logger *zap.Logger
+	var err error
+	if cfg.App.Environment == "development" {
+		// Development logger with color
+		config := zap.NewDevelopmentConfig()
+		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder // Add color to log levels
+		logger, err = config.Build()
+	} else {
+		// Production logger
+		config := zap.NewProductionConfig()
+		logger, err = config.Build()
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	params := Params{
-		Level:  level,
-		AppEnv: cfg.App.Environment,
-	}
-
-	if cfg.App.Environment == "development" {
-		return NewDevelopmentLogger(params)
-	}
-	return NewCustomLogger(params)
-}
-
-// parseLogLevel parses the log level from the configuration
-func parseLogLevel(logLevel string) (zapcore.Level, error) {
-	switch strings.ToUpper(logLevel) {
-	case "DEBUG":
-		return zapcore.DebugLevel, nil
-	case "INFO":
-		return zapcore.InfoLevel, nil
-	case "WARN":
-		return zapcore.WarnLevel, nil
-	case "ERROR":
-		return zapcore.ErrorLevel, nil
-	default:
-		return zapcore.InfoLevel, errors.New("invalid log level")
-	}
+	return &CustomLogger{logger}, nil
 }

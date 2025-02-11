@@ -42,13 +42,13 @@ func TestNewCustomLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, err := NewCustomLogger(tt.params)
+			logger, err := NewDevelopmentLogger(tt.params)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewCustomLogger() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewDevelopmentLogger() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if logger == nil {
-				t.Error("NewCustomLogger() returned nil logger")
+				t.Error("NewDevelopmentLogger() returned nil logger")
 				return
 			}
 

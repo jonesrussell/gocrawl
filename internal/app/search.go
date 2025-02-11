@@ -18,7 +18,7 @@ type SearchResult struct {
 
 // SearchContent performs a search query
 func SearchContent(ctx context.Context, query string, index string, size int) ([]SearchResult, error) {
-	log, err := logger.NewCustomLogger(logger.Params{
+	log, err := logger.NewDevelopmentLogger(logger.Params{
 		Debug:  true,
 		Level:  zap.InfoLevel,
 		AppEnv: "development",

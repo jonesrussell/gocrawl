@@ -21,8 +21,7 @@ type Interface interface {
 
 // CustomLogger wraps the zap.Logger
 type CustomLogger struct {
-	Logger *zap.Logger
-	Level  zapcore.Level
+	*zap.Logger
 }
 
 // Ensure CustomLogger implements Interface
@@ -35,29 +34,6 @@ type Params struct {
 	Debug  bool
 	Level  zapcore.Level
 	AppEnv string `name:"appEnv"`
-}
-
-// NewCustomLogger initializes a new CustomLogger with a specified log level
-func NewCustomLogger(params Params) (*CustomLogger, error) {
-	if params.AppEnv == "" {
-		params.AppEnv = "development"
-	}
-
-	var config zap.Config
-	if params.Debug || params.AppEnv == "development" {
-		config = zap.NewDevelopmentConfig()
-		config.Level = zap.NewAtomicLevelAt(params.Level)
-	} else {
-		config = zap.NewProductionConfig()
-		config.Level = zap.NewAtomicLevelAt(params.Level)
-	}
-
-	logger, err := config.Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build logger: %w", err)
-	}
-
-	return &CustomLogger{Logger: logger, Level: params.Level}, nil
 }
 
 // Info logs an info message
@@ -102,7 +78,7 @@ func NewDevelopmentLogger(p Params) (*CustomLogger, error) {
 	)
 
 	logger := zap.New(core)
-	return &CustomLogger{Logger: logger, Level: p.Level}, nil
+	return &CustomLogger{Logger: logger}, nil
 }
 
 // Sync flushes any buffered log entries

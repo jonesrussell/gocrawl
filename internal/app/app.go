@@ -8,7 +8,7 @@ import (
 
 // NewLogger creates a new logger instance
 func NewLogger(cfg *config.Config) (logger.Interface, error) {
-	return logger.NewCustomLogger(logger.Params{
+	return logger.NewDevelopmentLogger(logger.Params{
 		Debug:  cfg.App.Debug,
 		Level:  zap.InfoLevel,
 		AppEnv: cfg.App.Environment,
