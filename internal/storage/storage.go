@@ -71,13 +71,10 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 		return Result{}, fmt.Errorf("elasticsearch URL is required")
 	}
 
-	// Set up HTTP transport with TLS configuration
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: cfg.Crawler.SkipTLS, // Use the SkipTLS setting from config
-	}
-
 	transport := &http.Transport{
-		TLSClientConfig: tlsConfig,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
 	}
 
 	// Create Elasticsearch config
