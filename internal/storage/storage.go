@@ -77,7 +77,6 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 		Username:  "elastic",
 		Password:  cfg.Elasticsearch.Password,
 		APIKey:    cfg.Elasticsearch.APIKey,
-		Transport: cfg.Crawler.Transport,
 		// Add other configuration options as needed
 		RetryOnStatus: []int{502, 503, 504, 429},
 		RetryBackoff: func(i int) time.Duration {
@@ -99,11 +98,8 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 		opts:     DefaultOptions(),
 	}
 
-	if err := storage.TestConnection(context.Background()); err != nil {
-		return Result{}, fmt.Errorf("failed to connect to elasticsearch: %w", err)
-	}
-
-	log.Info("Successfully connected to Elasticsearch",
+	// Don't test connection immediately - let the application handle reconnection
+	log.Info("Storage initialized",
 		"url", cfg.Elasticsearch.URL,
 		"using_api_key", cfg.Elasticsearch.APIKey != "",
 	)
@@ -167,23 +163,29 @@ func (s *ElasticsearchStorage) IndexDocument(
 	return nil
 }
 
-// TestConnection checks the connection to the Elasticsearch cluster
+// TestConnection checks if we can connect to Elasticsearch
 func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
-	info, err := s.ESClient.Info(
-		s.ESClient.Info.WithContext(ctx),
-	)
-	if err != nil {
-		return fmt.Errorf("error getting Elasticsearch info: %w", err)
-	}
-	defer info.Body.Close()
+	// Add retry logic
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		info, err := s.ESClient.Info(
+			s.ESClient.Info.WithContext(ctx),
+		)
+		if err == nil {
+			defer info.Body.Close()
+			return nil
+		}
 
-	var esInfo map[string]interface{}
-	if decodeErr := json.NewDecoder(info.Body).Decode(&esInfo); decodeErr != nil {
-		return fmt.Errorf("error decoding Elasticsearch info response: %w", decodeErr)
+		s.Logger.Warn("Failed to connect to Elasticsearch, retrying...",
+			"attempt", i+1,
+			"error", err,
+		)
+
+		// Wait before retrying
+		time.Sleep(time.Second * time.Duration(i+1))
 	}
 
-	s.Logger.Info("Elasticsearch info", esInfo)
-	return nil
+	return fmt.Errorf("failed to connect to elasticsearch after %d attempts", maxRetries)
 }
 
 // BulkIndex performs bulk indexing of documents

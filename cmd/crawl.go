@@ -10,6 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var crawlCmd = &cobra.Command{
@@ -18,6 +19,12 @@ var crawlCmd = &cobra.Command{
 	Long:  `Crawl a website and store the content in Elasticsearch`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
+
+		// Set viper values
+		viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
+		viper.Set("CRAWLER_MAX_DEPTH", cmd.Flag("depth").Value.String())
+		viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())
+		viper.Set("INDEX_NAME", cmd.Flag("index").Value.String())
 
 		// Create config with CLI values
 		cfg := &config.Config{

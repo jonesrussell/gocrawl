@@ -8,6 +8,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Error definitions
+var (
+	ErrMissingElasticURL = errors.New("ELASTIC_URL is required")
+)
+
 // AppConfig holds application-level configuration
 type AppConfig struct {
 	Environment string
@@ -74,7 +79,7 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 	}
 
 	if cfg.Elasticsearch.URL == "" {
-		return nil, errors.New("ELASTIC_URL is required")
+		return nil, ErrMissingElasticURL
 	}
 
 	return cfg, nil
