@@ -25,9 +25,9 @@ type CrawlerConfig struct {
 	BaseURL   string
 	MaxDepth  int
 	RateLimit time.Duration
-	IndexName string // Added IndexName here since it's crawler-related
+	IndexName string
 	Transport http.RoundTripper
-	SkipTLS   bool // New field to control TLS verification
+	SkipTLS   bool
 }
 
 // ElasticsearchConfig holds Elasticsearch-specific configuration
@@ -91,6 +91,7 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 }
 
 // LoadConfig loads the configuration from environment variables or a config file
+// Keeping this function if needed for other purposes
 func LoadConfig() (*Config, error) {
 	return &Config{
 		Crawler: CrawlerConfig{
