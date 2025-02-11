@@ -20,7 +20,7 @@ func TestCreateArticlesIndex(t *testing.T) {
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Mock successful index creation
-	mockTransport := &mockTransport{
+	mockTransport := &MockTransport{
 		Response:   `{"acknowledged": true}`,
 		StatusCode: http.StatusOK,
 	}
@@ -53,7 +53,7 @@ func TestIndexArticle(t *testing.T) {
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Mock successful index response
-	mockTransport := &mockTransport{
+	mockTransport := &MockTransport{
 		Response: `{
 			"_index": "articles",
 			"_id": "test-1",

@@ -11,14 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupTestStorage creates a new storage instance for testing with minimal configuration
+// testConfig returns a test configuration
+func testConfig() *config.Config {
+	return &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: "http://localhost:9200",
+		},
+		App: config.AppConfig{
+			LogLevel: "info",
+		},
+	}
+}
+
+// setupTestStorage creates a new storage instance for testing
 func setupTestStorage(t *testing.T) Storage {
 	t.Helper()
 
 	// Create test logger
 	log := logger.NewMockCustomLogger()
 
-	// Create minimal test config
+	// Create test config
 	cfg := &config.Config{
 		Elasticsearch: config.ElasticsearchConfig{
 			URL: getTestElasticURL(),
@@ -65,7 +77,7 @@ func CreateTestStorage(t *testing.T) Storage {
 
 // getTestElasticURL returns the Elasticsearch URL for testing
 func getTestElasticURL() string {
-	if url := os.Getenv("TEST_ELASTIC_URL"); url != "" {
+	if url := os.Getenv("TEST_ELASTICSEARCH_URL"); url != "" {
 		return url
 	}
 	return "http://localhost:9200"

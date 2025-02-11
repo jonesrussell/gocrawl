@@ -4,10 +4,12 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
-// mockTransport implements http.RoundTripper for testing
-type mockTransport struct {
+// MockTransport implements http.RoundTripper for testing
+type MockTransport struct {
 	Response    string
 	StatusCode  int
 	Error       error
@@ -15,7 +17,7 @@ type mockTransport struct {
 }
 
 // RoundTrip implements http.RoundTripper
-func (t *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t.Error != nil {
 		return nil, t.Error
 	}
@@ -32,6 +34,15 @@ func (t *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // Perform implements the Transport interface
-func (t *mockTransport) Perform(req *http.Request) (*http.Response, error) {
+func (t *MockTransport) Perform(req *http.Request) (*http.Response, error) {
 	return t.RoundTrip(req)
+}
+
+// createESResponse creates an Elasticsearch API response from the mock data
+func (t *MockTransport) createESResponse() *esapi.Response {
+	return &esapi.Response{
+		StatusCode: t.StatusCode,
+		Body:       io.NopCloser(strings.NewReader(t.Response)),
+		Header:     make(http.Header),
+	}
 }

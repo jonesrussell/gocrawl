@@ -2,9 +2,7 @@ package storage
 
 import (
 	"context"
-	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +21,7 @@ func TestScrollSearch(t *testing.T) {
 	const batchSize = 100
 
 	// Mock successful scroll response
-	mockTransport := &mockTransport{
+	mockTransport := &MockTransport{
 		Response: `{
 			"_scroll_id": "test_scroll_id",
 			"took": 1,
@@ -81,7 +79,7 @@ func TestScrollSearch_Error(t *testing.T) {
 	const batchSize = 100
 
 	// Mock error response
-	mockTransport := &mockTransport{
+	mockTransport := &MockTransport{
 		Response:   `{"error": "test error"}`,
 		StatusCode: http.StatusInternalServerError,
 	}
@@ -138,7 +136,7 @@ func TestHandleScrollResponse(t *testing.T) {
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Mock scroll response
-	mockTransport := &mockTransport{
+	mockTransport := &MockTransport{
 		Response: `{
 			"_scroll_id": "test_scroll_id",
 			"hits": {
@@ -156,19 +154,16 @@ func TestHandleScrollResponse(t *testing.T) {
 	es.ESClient.Transport = mockTransport
 
 	// Create test response
-	resp := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader(mockTransport.Response)),
-		Header:     make(http.Header),
-	}
+	resp := mockTransport.createESResponse()
 
 	// Create result channel
 	resultChan := make(chan map[string]interface{}, 1)
 	defer close(resultChan)
 
 	// Test response handling
-	err := es.HandleScrollResponse(context.Background(), resp, resultChan)
+	scrollID, err := es.HandleScrollResponse(context.Background(), resp, resultChan)
 	require.NoError(t, err)
+	assert.Equal(t, "test_scroll_id", scrollID)
 
 	// Verify a result was sent to the channel
 	result := <-resultChan

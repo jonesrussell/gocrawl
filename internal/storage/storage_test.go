@@ -16,37 +16,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// testConfig returns a test configuration
-func testConfig() *config.Config {
-	return &config.Config{
-		ElasticURL: "http://localhost:9200",
-		LogLevel:   "info",
-	}
-}
-
 // setupStorageTest is a helper function for storage tests
 func setupStorageTest(t *testing.T) Storage {
-	// Create mock transport with successful connection response
-	mockTransport := &mockTransport{
-		Response: `{
-			"name": "test-node",
-			"cluster_name": "test-cluster",
-			"version": {
-				"number": "8.0.0"
-			}
-		}`,
-		StatusCode: http.StatusOK,
-	}
-
-	cfg := &config.Config{
-		ElasticURL: "http://localhost:9200",
-		Transport:  mockTransport, // Set the mock transport
-	}
-
+	// Create test logger
 	log := logger.NewMockCustomLogger()
 
+	// Create test config
+	cfg := &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: getTestElasticURL(),
+		},
+		Crawler: config.CrawlerConfig{
+			Transport: http.DefaultTransport,
+		},
+	}
+
+	// Create storage instance
 	storage, err := NewStorage(cfg, log)
-	require.NoError(t, err)
+	require.NoError(t, err, "Failed to create test storage")
+	require.NotNil(t, storage.Storage, "Storage instance should not be nil")
 
 	return storage.Storage
 }
@@ -145,7 +133,8 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		}
 	}`
 
-	mockTransport := &mockTransport{
+	// Define mockTransport here
+	mockTransport := &MockTransport{
 		Response:   successResponse,
 		StatusCode: http.StatusOK,
 	}
@@ -535,7 +524,9 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		mockTransport.Error = fmt.Errorf("connection error")
 
 		result, err := NewStorage(&config.Config{
-			ElasticURL: "http://localhost:9200",
+			Elasticsearch: config.ElasticsearchConfig{
+				URL: "http://localhost:9200",
+			},
 		}, log)
 		assert.Error(t, err)
 		assert.Equal(t, Result{}, result)
@@ -654,7 +645,9 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 
 	t.Run("NewStorage_InvalidConfig", func(t *testing.T) {
 		invalidCfg := &config.Config{
-			ElasticURL: "://invalid-url",
+			Elasticsearch: config.ElasticsearchConfig{
+				URL: "://invalid-url",
+			},
 		}
 		result, err := NewStorage(invalidCfg, log)
 		assert.Error(t, err)
@@ -870,8 +863,12 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		invalidTransport := &http.Transport{}
 
 		result, err := NewStorage(&config.Config{
-			ElasticURL: "http://localhost:9200",
-			Transport:  invalidTransport,
+			Elasticsearch: config.ElasticsearchConfig{
+				URL: "http://localhost:9200",
+			},
+			Crawler: config.CrawlerConfig{
+				Transport: invalidTransport,
+			},
 		}, log)
 		assert.Error(t, err)
 		assert.Equal(t, Result{}, result)
