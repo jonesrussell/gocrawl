@@ -57,6 +57,7 @@ var crawlCmd = &cobra.Command{
 			cfg.Crawler.MaxDepth = depth
 		}
 
+		// Start the crawler with the provided config
 		return app.StartCrawler(ctx, cfg)
 	},
 }
