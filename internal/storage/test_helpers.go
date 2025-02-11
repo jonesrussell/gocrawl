@@ -11,11 +11,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// CreateTestStorage creates a new storage instance for testing
+// setupTestStorage creates a new storage instance for testing with minimal configuration
+func setupTestStorage(t *testing.T) Storage {
+	t.Helper()
+
+	// Create test logger
+	log := logger.NewMockCustomLogger()
+
+	// Create minimal test config
+	cfg := &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: getTestElasticURL(),
+		},
+		Crawler: config.CrawlerConfig{
+			Transport: http.DefaultTransport,
+		},
+	}
+
+	// Create storage instance
+	storage, err := NewStorage(cfg, log)
+	require.NoError(t, err, "Failed to create test storage")
+	require.NotNil(t, storage.Storage, "Storage instance should not be nil")
+
+	return storage.Storage
+}
+
+// CreateTestStorage creates a new storage instance for testing with full configuration
 func CreateTestStorage(t *testing.T) Storage {
 	t.Helper()
 
-	// Create a test logger
+	// Create test logger
 	log := logger.NewMockCustomLogger()
 
 	// Create test config
@@ -32,7 +57,7 @@ func CreateTestStorage(t *testing.T) Storage {
 
 	// Create storage instance
 	storage, err := NewStorage(cfg, log)
-	require.NoError(t, err, "Failed to create test storage: %v", err)
+	require.NoError(t, err, "Failed to create test storage")
 	require.NotNil(t, storage.Storage, "Storage instance should not be nil")
 
 	return storage.Storage

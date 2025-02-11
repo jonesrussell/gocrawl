@@ -18,7 +18,12 @@ type MockStorage struct {
 
 // NewMockStorage creates a new instance of MockStorage
 func NewMockStorage() *MockStorage {
-	return &MockStorage{}
+	m := &MockStorage{}
+	// Set up default expectations
+	m.On("TestConnection", mock.Anything).Return(nil)
+	m.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	m.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil)
+	return m
 }
 
 // IndexDocument mocks the indexing of a document

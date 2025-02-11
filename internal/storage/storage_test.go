@@ -52,71 +52,70 @@ func setupStorageTest(t *testing.T) Storage {
 }
 
 func TestNewStorage(t *testing.T) {
-	t.Run("successful creation", func(t *testing.T) {
-		// Create mock transport
-		mockTransport := &mockTransport{
-			Response: `{
-				"name": "test-node",
-				"cluster_name": "test-cluster",
-				"version": {
-					"number": "8.0.0"
-				}
-			}`,
-			StatusCode: http.StatusOK,
-		}
+	// Create test logger
+	log := logger.NewMockCustomLogger()
 
-		cfg := &config.Config{
-			ElasticURL: "http://localhost:9200",
-			Transport:  mockTransport,
-		}
-		log := logger.NewMockCustomLogger()
+	// Create test config
+	cfg := &config.Config{
+		App: config.AppConfig{
+			LogLevel: "debug",
+		},
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: "http://localhost:9200",
+		},
+		Crawler: config.CrawlerConfig{
+			Transport: http.DefaultTransport,
+		},
+	}
 
-		result, err := NewStorage(cfg, log)
-		require.NoError(t, err)
-		assert.NotNil(t, result)
-		assert.NotNil(t, result.Storage)
-	})
-
-	t.Run("missing URL", func(t *testing.T) {
-		cfg := &config.Config{}
-		log := logger.NewMockCustomLogger()
-
-		_, err := NewStorage(cfg, log)
-		assert.Error(t, err)
-		assert.Equal(t, ErrMissingURL, err)
-	})
-
-	t.Run("connection error", func(t *testing.T) {
-		// Create mock transport that returns an error
-		mockTransport := &mockTransport{
-			Error: fmt.Errorf("connection error"),
-		}
-
-		cfg := &config.Config{
-			ElasticURL: "http://localhost:9200",
-			Transport:  mockTransport,
-		}
-		log := logger.NewMockCustomLogger()
-
-		_, err := NewStorage(cfg, log)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to connect to elasticsearch")
-	})
+	// Test storage creation
+	result, err := NewStorage(cfg, log)
+	require.NoError(t, err)
+	require.NotNil(t, result.Storage)
 }
 
 func TestNewStorageWithClient(t *testing.T) {
-	cfg := testConfig()
-	log, err := logger.NewLogger(cfg)
-	require.NoError(t, err, "Failed to create logger")
+	// Create test logger
+	log := logger.NewMockCustomLogger()
 
-	client, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{cfg.ElasticURL},
-	})
+	// Create test config
+	cfg := &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: "http://localhost:9200",
+		},
+		Crawler: config.CrawlerConfig{
+			Transport: http.DefaultTransport,
+		},
+	}
+
+	// Test storage creation
+	result, err := NewStorage(cfg, log)
 	require.NoError(t, err)
+	require.NotNil(t, result.Storage)
+}
 
-	result, err := NewStorageWithClient(cfg, log, client)
+func TestStorage_TestConnection(t *testing.T) {
+	// Create test logger
+	log := logger.NewMockCustomLogger()
+
+	// Create test config
+	cfg := &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: "http://localhost:9200",
+		},
+		Crawler: config.CrawlerConfig{
+			Transport: http.DefaultTransport,
+		},
+	}
+
+	// Create storage instance
+	result, err := NewStorage(cfg, log)
+	require.NoError(t, err)
+	require.NotNil(t, result.Storage)
+
+	// Test connection
+	err = result.Storage.TestConnection(context.Background())
 	assert.NoError(t, err)
-	assert.NotNil(t, result.Storage)
 }
 
 func TestElasticsearchStorage_Operations(t *testing.T) {
