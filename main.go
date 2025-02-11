@@ -9,16 +9,23 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/cmd"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/spf13/viper"
 )
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+	// Initialize viper to read configuration
+	viper.SetConfigName(".env") // Name of the env file (without extension)
+	viper.SetConfigType("env")  // The type of the file, here it is env
+	viper.AddConfigPath(".")    // Path to look for the env file in the current directory
+
+	// Read in the config file
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error reading config file: %v", err)
 	}
+	viper.AutomaticEnv() // Load environment variables
 
 	// Create the configuration
 	cfg, err := config.NewConfig(http.DefaultTransport)
@@ -26,10 +33,16 @@ func main() {
 		log.Fatalf("Error creating config: %v", err)
 	}
 
-	// Initialize your application with the config
+	// Initialize the logger
+	lgr, err := logger.NewLogger(cfg)
+	if err != nil {
+		log.Fatalf("Error initializing logger: %v", err)
+	}
+
+	// Initialize your application with the config and logger
 	go func() {
-		if err := cmd.Execute(cfg); err != nil {
-			log.Fatalf("Error executing command: %v", err)
+		if err := cmd.Execute(cfg, lgr); err != nil {
+			lgr.Fatal("Error executing command", err)
 		}
 	}()
 
@@ -38,13 +51,13 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigChan
 
-	log.Printf("Received signal: %v. Shutting down gracefully...", sig)
+	lgr.Info("Received signal: %v. Shutting down gracefully...", sig)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := cmd.Shutdown(ctx); err != nil {
-		log.Fatalf("Error during shutdown: %v", err)
+	if err := cmd.Shutdown(ctx, lgr); err != nil {
+		lgr.Fatal("Error during shutdown", err)
 	}
 
-	log.Println("Application shutdown successfully")
+	lgr.Info("Application shutdown successfully")
 }

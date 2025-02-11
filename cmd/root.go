@@ -20,13 +20,7 @@ var rootCmd = &cobra.Command{
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-func Execute(cfg *config.Config) error {
-	// Initialize the logger
-	lgr, err := logger.NewLogger(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to initialize logger: %w", err)
-	}
-
+func Execute(cfg *config.Config, lgr *logger.CustomLogger) error {
 	app := fx.New(
 		// Core modules
 		config.Module,
@@ -44,6 +38,9 @@ func Execute(cfg *config.Config) error {
 		return err
 	}
 
+	// Add subcommands to the root command
+	rootCmd.AddCommand(NewCrawlCmd(lgr)) // Add crawl command
+
 	if err := rootCmd.Execute(); err != nil {
 		lgr.Error("Error executing root command", err)
 		return err
@@ -58,7 +55,7 @@ func Execute(cfg *config.Config) error {
 }
 
 // Shutdown gracefully shuts down the application
-func Shutdown(ctx context.Context) error {
+func Shutdown(ctx context.Context, lgr *logger.CustomLogger) error {
 	app := fx.New(
 		// Core modules
 		config.Module,
@@ -72,6 +69,7 @@ func Shutdown(ctx context.Context) error {
 	)
 
 	if err := app.Stop(ctx); err != nil {
+		lgr.Error("Error during shutdown", err)
 		return fmt.Errorf("error during shutdown: %w", err)
 	}
 

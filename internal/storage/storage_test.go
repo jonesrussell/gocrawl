@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -16,8 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupStorageTest is a helper function for storage tests
-func setupStorageTest(t *testing.T) Storage {
+// setupTestStorage creates a new storage instance for testing
+func setupTestStorage(t *testing.T) Storage {
+	t.Helper()
+
 	// Create test logger
 	log := logger.NewMockCustomLogger()
 
@@ -37,6 +40,24 @@ func setupStorageTest(t *testing.T) Storage {
 	require.NotNil(t, storage.Storage, "Storage instance should not be nil")
 
 	return storage.Storage
+}
+
+// getTestElasticURL returns the Elasticsearch URL for testing
+func getTestElasticURL() string {
+	if url := os.Getenv("TEST_ELASTICSEARCH_URL"); url != "" {
+		return url
+	}
+	return "http://localhost:9200"
+}
+
+// CleanupTestIndex removes the test index after tests
+func CleanupTestIndex(ctx context.Context, t *testing.T, s Storage, indexName string) {
+	t.Helper()
+
+	err := s.DeleteIndex(ctx, indexName)
+	if err != nil {
+		t.Logf("Warning: Failed to cleanup test index %s: %v", indexName, err)
+	}
 }
 
 func TestNewStorage(t *testing.T) {
@@ -382,7 +403,7 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 	})
 
 	t.Run("ProcessHits_ContextCancelled", func(t *testing.T) {
-		storage := setupStorageTest(t)
+		storage := setupTestStorage(t)
 		es, ok := storage.(*ElasticsearchStorage)
 		require.True(t, ok)
 
