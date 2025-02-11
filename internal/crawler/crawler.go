@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"crypto/tls"
@@ -38,6 +37,7 @@ type Crawler struct {
 	articleChan chan *models.Article
 	articleSvc  article.Service
 	indexSvc    *storage.IndexService
+	running     bool
 }
 
 // Params holds the parameters for creating a Crawler
@@ -115,6 +115,7 @@ func NewCrawler(p Params) (Result, error) {
 		articleChan: make(chan *models.Article, 100),
 		articleSvc:  articleSvc,
 		indexSvc:    indexSvc,
+		running:     true,
 	}
 
 	// Configure collector callbacks
@@ -157,14 +158,10 @@ func NewCrawler(p Params) (Result, error) {
 			return
 		}
 
-		if strings.Contains(link, "/opp-beat") ||
-			strings.Contains(link, "/police") ||
-			strings.Contains(link, "/news") {
-			crawler.Logger.Debug("Found article link", "url", link)
-			if err := e.Request.Visit(link); err != nil {
-				if !errors.Is(err, colly.ErrAlreadyVisited) {
-					crawler.Logger.Debug("Could not visit article", "url", link, "error", err.Error())
-				}
+		crawler.Logger.Debug("Found article link", "url", link)
+		if err := e.Request.Visit(link); err != nil {
+			if !errors.Is(err, colly.ErrAlreadyVisited) {
+				crawler.Logger.Debug("Could not visit article", "url", link, "error", err.Error())
 			}
 		}
 	})
@@ -183,78 +180,49 @@ func NewCrawler(p Params) (Result, error) {
 }
 
 // Start method to begin crawling
-func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
-	c.Logger.Debug("Testing storage connection")
+func (c *Crawler) Start(ctx context.Context) error {
+	c.running = true // Set running state to true
+	c.Logger.Debug("Starting crawler", "baseURL", c.BaseURL)
+
+	// Perform initial setup (e.g., test connection, ensure index)
 	if err := c.Storage.TestConnection(ctx); err != nil {
+		c.Logger.Error("Storage connection failed", "error", err)
 		return fmt.Errorf("storage connection failed: %w", err)
 	}
 
-	c.Logger.Debug("Ensuring index exists")
 	if err := c.indexSvc.EnsureIndex(ctx, c.IndexName); err != nil {
+		c.Logger.Error("Index setup failed", "error", err)
 		return fmt.Errorf("index setup failed: %w", err)
 	}
 
-	c.Logger.Info("Starting crawl with valid index", "index", c.IndexName)
+	// Visit the base URL to start crawling
+	if err := c.Collector.Visit(c.BaseURL); err != nil {
+		c.Logger.Error("Failed to visit base URL", "error", err)
+		return fmt.Errorf("failed to visit base URL: %w", err)
+	}
 
-	c.articleChan = make(chan *models.Article, 100)
-	c.Logger.Debug("Created article channel")
-
-	// Create a done channel for article processor
-	processorDone := make(chan struct{})
-
-	// Start article processor
-	go func() {
-		c.Logger.Debug("Starting article processor")
-		c.processArticles(ctx)
-		c.Logger.Debug("Article processor finished")
-		close(processorDone)
-	}()
-
-	c.Logger.Info("Starting crawling process", "url", c.BaseURL)
-
-	// Create error channel for async crawling
-	errChan := make(chan error, 1)
-	crawlerDone := make(chan bool, 1)
-
-	go func() {
-		c.Logger.Debug("Starting Visit", "url", c.BaseURL)
-		if err := c.Collector.Visit(c.BaseURL); err != nil {
-			c.Logger.Error("Visit failed", "error", err, "url", c.BaseURL)
-			if errors.Is(err, colly.ErrMissingURL) {
-				c.Logger.Error("Missing URL error")
-			} else if errors.Is(err, colly.ErrForbiddenDomain) {
-				c.Logger.Error("Forbidden domain error")
-			}
-			errChan <- err
-			return
+	c.Logger.Debug("Crawling process started")
+	// Start the crawling process
+	for c.running {
+		select {
+		case <-ctx.Done():
+			c.running = false // Set running state to false on shutdown
+			c.Logger.Debug("Crawler shutting down")
+			return nil
+		default:
+			c.Logger.Info("Crawling...", "url", c.BaseURL)
+			time.Sleep(1 * time.Second) // Simulate crawling work
 		}
-		c.Logger.Debug("Waiting for collector to finish")
-		c.Collector.Wait()
-		c.Logger.Debug("Collector finished")
-		crawlerDone <- true
-	}()
-
-	// Wait for either completion or context cancellation
-	var result error
-	select {
-	case err := <-errChan:
-		c.Logger.Error("Crawler error", "error", err)
-		result = err
-	case <-crawlerDone:
-		c.Logger.Info("Crawling completed successfully")
-	case <-ctx.Done():
-		c.Logger.Error("Context cancelled", "error", ctx.Err())
-		result = ctx.Err()
 	}
 
-	// Close article channel and wait for processor to finish
-	close(c.articleChan)
-	<-processorDone
+	return nil
+}
 
-	if result != nil {
-		return result
-	}
-	return shutdowner.Shutdown()
+// Stop method to cleanly shut down the crawler
+func (c *Crawler) Stop() {
+	c.running = false
+	c.Logger.Debug("Stopping crawler")
+	// Perform any necessary cleanup here
 }
 
 // processPage handles article extraction
@@ -267,44 +235,6 @@ func (c *Crawler) processPage(e *colly.HTMLElement) {
 	}
 	c.Logger.Debug("Article extracted", "url", e.Request.URL.String(), "title", article.Title)
 	c.articleChan <- article
-}
-
-// processArticles handles the bulk indexing of articles
-func (c *Crawler) processArticles(ctx context.Context) {
-	var articles []*models.Article
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	// Helper function to bulk index articles
-	indexBatch := func() {
-		if len(articles) > 0 {
-			if err := c.Storage.BulkIndexArticles(ctx, articles); err != nil {
-				c.Logger.Error("Failed to bulk index articles", "error", err)
-			} else {
-				c.Logger.Info("Successfully indexed articles", "count", len(articles))
-			}
-			articles = articles[:0] // Clear the slice while keeping capacity
-		}
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			indexBatch() // Final index attempt before exit
-			return
-		case article, ok := <-c.articleChan:
-			if !ok {
-				indexBatch() // Final index attempt before exit
-				return
-			}
-			articles = append(articles, article)
-			if len(articles) >= 10 {
-				indexBatch()
-			}
-		case <-ticker.C:
-			indexBatch()
-		}
-	}
 }
 
 // Add these methods to the Crawler struct

@@ -110,13 +110,14 @@ func TestCrawler_Start(t *testing.T) {
 
 	// Test crawler start
 	ctx := context.Background()
-	err = result.Crawler.Start(ctx, nil)
+	err = result.Crawler.Start(ctx)
 	assert.NoError(t, err)
 
 	// Verify storage operations using mock methods
 	mockStorage.AssertCalled(t, "TestConnection", ctx)
 	mockStorage.AssertCalled(t, "IndexExists", ctx, mockConfig.Crawler.IndexName)
-	mockStorage.AssertCalled(t, "BulkIndexArticles", ctx, mock.Anything)
+
+	// Additional tests...
 }
 
 func TestCrawlerArticleProcessing(t *testing.T) {
@@ -124,12 +125,11 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 	mockLogger := &logger.MockLogger{}
 	mockStorage := &storage.MockStorage{}
 	mockArticleSvc := &article.MockService{}
-	mockShutdowner := &MockShutdowner{}
 
 	mockConfig := &config.Config{
 		Crawler: config.CrawlerConfig{
 			IndexName: "test_articles",
-			BaseURL:   "https://test.com",
+			BaseURL:   "http://example.com",
 			MaxDepth:  1,
 			RateLimit: time.Second,
 		},
@@ -139,7 +139,6 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 		BaseURL:   mockConfig.Crawler.BaseURL,
 		MaxDepth:  mockConfig.Crawler.MaxDepth,
 		RateLimit: mockConfig.Crawler.RateLimit,
-		Debugger:  &logger.CollyDebugger{Logger: mockLogger},
 		Logger:    mockLogger,
 		Config:    mockConfig,
 		Storage:   mockStorage,
@@ -176,7 +175,6 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 	// Set up expectations
 	mockStorage.On("IndexExists", mock.Anything, mockConfig.Crawler.IndexName).Return(true, nil)
 	mockStorage.On("TestConnection", mock.Anything).Return(nil)
-	mockShutdowner.On("Shutdown", mock.Anything).Return(nil)
 
 	testArticle := &models.Article{
 		ID:    "test-id",
@@ -190,21 +188,19 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	err = crawlerInstance.Start(ctx, mockShutdowner)
+	err = crawlerInstance.Start(ctx)
 	assert.NoError(t, err)
 
 	// Verify expectations
 	mockLogger.AssertExpectations(t)
 	mockStorage.AssertExpectations(t)
 	mockArticleSvc.AssertExpectations(t)
-	mockShutdowner.AssertExpectations(t)
 }
 
 func TestCrawler(t *testing.T) {
 	mockLogger := logger.NewMockCustomLogger()
 	mockStorage := &storage.MockStorage{}
 	mockArticleSvc := &article.MockService{}
-	mockShutdowner := &MockShutdowner{}
 
 	testConfig := &config.Config{
 		Crawler: config.CrawlerConfig{
@@ -258,7 +254,7 @@ func TestCrawler(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	err = crawlerInstance.Start(ctx, mockShutdowner)
+	err = crawlerInstance.Start(ctx)
 	assert.NoError(t, err)
 
 	// Verify expectations

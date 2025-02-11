@@ -34,8 +34,10 @@ func newFxApp(cfg *config.Config) *fx.App {
 				}
 				result, err := crawler.NewCrawler(params)
 				if err != nil {
+					log.Error("Failed to create crawler", "error", err)
 					return nil, err
 				}
+				log.Debug("Crawler created successfully", "baseURL", params.BaseURL)
 				return result.Crawler, nil
 			},
 		),
@@ -46,7 +48,6 @@ func newFxApp(cfg *config.Config) *fx.App {
 func runCrawler(
 	lc fx.Lifecycle,
 	c *crawler.Crawler,
-	shutdowner fx.Shutdowner,
 	log logger.Interface,
 	cfg *config.Config,
 ) {
@@ -57,8 +58,9 @@ func runCrawler(
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
+			log.Debug("Crawler is starting...")
 			go func() {
-				if err := c.Start(ctx, shutdowner); err != nil {
+				if err := c.Start(ctx); err != nil {
 					log.Error("Crawler failed", "error", err)
 				}
 			}()
@@ -66,6 +68,8 @@ func runCrawler(
 		},
 		OnStop: func(ctx context.Context) error {
 			log.Info("Stopping crawler...")
+			c.Stop()
+			log.Debug("Crawler stopped successfully")
 			return nil
 		},
 	})
