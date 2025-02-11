@@ -49,3 +49,33 @@ func (m *MockLogger) Errorf(format string, args ...interface{}) {
 }
 
 // Add any other methods that CustomLogger has
+
+// MockCustomLogger is a mock implementation of the logger.Interface
+type MockCustomLogger struct {
+	mock.Mock
+}
+
+func (m *MockCustomLogger) Fatal(args ...interface{}) {
+	m.Called(args)
+}
+
+func (m *MockCustomLogger) Error(msg string, fields ...interface{}) {
+	m.Called(msg, fields)
+}
+
+// Implement Debug method
+func (m *MockCustomLogger) Debug(msg string, fields ...interface{}) {
+	m.Called(msg, fields)
+}
+
+// Implement Errorf method
+func (m *MockCustomLogger) Errorf(format string, args ...interface{}) {
+	m.Called(fmt.Sprintf(format, args...))
+}
+
+// Implement other methods as needed...
+
+// NewMockCustomLogger creates a new instance of MockCustomLogger
+func NewMockCustomLogger() *MockCustomLogger {
+	return &MockCustomLogger{}
+}

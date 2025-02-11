@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -927,4 +929,58 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 		mockTransport.StatusCode = http.StatusOK
 		mockTransport.Response = successResponse
 	})
+}
+
+// MockElasticsearchClient is a mock of the Elasticsearch client
+type MockElasticsearchClient struct {
+	mock.Mock
+}
+
+func (m *MockElasticsearchClient) Search(ctx context.Context, index string, query interface{}) (*esapi.Response, error) {
+	args := m.Called(ctx, index, query)
+	return args.Get(0).(*esapi.Response), args.Error(1)
+}
+
+func (m *MockElasticsearchClient) Index(ctx context.Context, index string, body interface{}) (*esapi.Response, error) {
+	args := m.Called(ctx, index, body)
+	return args.Get(0).(*esapi.Response), args.Error(1)
+}
+
+func (m *MockElasticsearchClient) TestConnection(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+// Add other methods as needed
+
+func TestNewStorageWithMock(t *testing.T) {
+	// Create a mock Elasticsearch client
+	mockClient := new(MockElasticsearchClient)
+
+	// Set up expectations on the mock client
+	mockClient.On("Search", mock.Anything, "test-index", mock.Anything).Return(&esapi.Response{}, nil)
+	mockClient.On("Index", mock.Anything, "test-index", mock.Anything).Return(&esapi.Response{}, nil)
+	mockClient.On("TestConnection", mock.Anything).Return(nil)
+
+	// Create test logger using the new mock logger
+	log := logger.NewMockCustomLogger()
+
+	// Create test config
+	cfg := &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: "http://localhost:9200", // This can be ignored if using mock
+		},
+		Crawler: config.CrawlerConfig{
+			Transport: http.DefaultTransport,
+		},
+	}
+
+	// Create storage instance with mock client
+	storage := &ElasticsearchStorage{
+		ESClient: mockClient,
+		Logger:   log,
+		opts:     DefaultOptions(),
+	}
+
+	// Run your tests against the storage instance
 }
