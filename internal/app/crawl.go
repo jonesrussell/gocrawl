@@ -65,7 +65,8 @@ func runCrawler(
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			return shutdowner.Shutdown()
+			log.Info("Stopping crawler...")
+			return nil
 		},
 	})
 }

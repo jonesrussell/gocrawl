@@ -21,7 +21,7 @@ var rootCmd = &cobra.Command{
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-func Execute() {
+func Execute(cfg *config.Config) {
 	app := fx.New(
 		// Core modules
 		config.Module,

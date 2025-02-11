@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -32,6 +33,9 @@ var crawlCmd = &cobra.Command{
 				BaseURL:   cmd.Flag("url").Value.String(),
 				IndexName: cmd.Flag("index").Value.String(),
 				Transport: http.DefaultTransport,
+			},
+			Elasticsearch: config.ElasticsearchConfig{
+				URL: os.Getenv("ELASTIC_URL"),
 			},
 		}
 
