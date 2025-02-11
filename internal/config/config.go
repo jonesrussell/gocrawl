@@ -27,11 +27,13 @@ type CrawlerConfig struct {
 	RateLimit time.Duration
 	IndexName string // Added IndexName here since it's crawler-related
 	Transport http.RoundTripper
+	SkipTLS   bool // New field to control TLS verification
 }
 
 // ElasticsearchConfig holds Elasticsearch-specific configuration
 type ElasticsearchConfig struct {
 	URL      string
+	Username string
 	Password string
 	APIKey   string
 }
@@ -54,9 +56,10 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 		return nil, err
 	}
 
-	rateLimit := viper.GetDuration("CRAWLER_RATE_LIMIT")
-	if rateLimit == 0 {
-		rateLimit = time.Second
+	rateLimitStr := viper.GetString("CRAWLER_RATE_LIMIT")
+	rateLimit, err := time.ParseDuration(rateLimitStr)
+	if err != nil {
+		rateLimit = time.Second // Default value if parsing fails
 	}
 
 	cfg := &Config{
@@ -71,6 +74,7 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 			RateLimit: rateLimit,
 			IndexName: viper.GetString("INDEX_NAME"),
 			Transport: transport,
+			SkipTLS:   viper.GetBool("CRAWLER_SKIP_TLS"),
 		},
 		Elasticsearch: ElasticsearchConfig{
 			URL:      viper.GetString("ELASTIC_URL"),
@@ -84,4 +88,17 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// LoadConfig loads the configuration from environment variables or a config file
+func LoadConfig() (*Config, error) {
+	return &Config{
+		Crawler: CrawlerConfig{
+			IndexName: viper.GetString("CRAWLER_INDEX_NAME"),
+			BaseURL:   viper.GetString("CRAWLER_BASE_URL"),
+			MaxDepth:  viper.GetInt("CRAWLER_MAX_DEPTH"),
+			RateLimit: viper.GetDuration("CRAWLER_RATE_LIMIT"),
+			SkipTLS:   viper.GetBool("SKIP_TLS"),
+		},
+	}, nil
 }

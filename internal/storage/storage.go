@@ -3,10 +3,10 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -71,18 +71,22 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 		return Result{}, fmt.Errorf("elasticsearch URL is required")
 	}
 
+	// Set up HTTP transport with TLS configuration
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: cfg.Crawler.SkipTLS, // Use the SkipTLS setting from config
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
 	// Create Elasticsearch config
 	esConfig := elasticsearch.Config{
 		Addresses: []string{cfg.Elasticsearch.URL},
-		Username:  "elastic",
+		Transport: transport,
+		Username:  cfg.Elasticsearch.Username,
 		Password:  cfg.Elasticsearch.Password,
 		APIKey:    cfg.Elasticsearch.APIKey,
-		// Add other configuration options as needed
-		RetryOnStatus: []int{502, 503, 504, 429},
-		RetryBackoff: func(i int) time.Duration {
-			return time.Duration(i) * 100 * time.Millisecond
-		},
-		MaxRetries: 5,
 	}
 
 	// Create Elasticsearch client
@@ -95,11 +99,14 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 	storage := &ElasticsearchStorage{
 		ESClient: client,
 		Logger:   log,
-		opts:     DefaultOptions(),
 	}
 
-	// Don't test connection immediately - let the application handle reconnection
-	log.Info("Storage initialized",
+	// Test connection to Elasticsearch
+	if err := storage.TestConnection(context.Background()); err != nil {
+		return Result{}, fmt.Errorf("failed to connect to elasticsearch: %w", err)
+	}
+
+	log.Info("Successfully connected to Elasticsearch",
 		"url", cfg.Elasticsearch.URL,
 		"using_api_key", cfg.Elasticsearch.APIKey != "",
 	)
@@ -163,29 +170,23 @@ func (s *ElasticsearchStorage) IndexDocument(
 	return nil
 }
 
-// TestConnection checks if we can connect to Elasticsearch
+// TestConnection checks the connection to the Elasticsearch cluster
 func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
-	// Add retry logic
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		info, err := s.ESClient.Info(
-			s.ESClient.Info.WithContext(ctx),
-		)
-		if err == nil {
-			defer info.Body.Close()
-			return nil
-		}
+	info, err := s.ESClient.Info(
+		s.ESClient.Info.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("error getting Elasticsearch info: %w", err)
+	}
+	defer info.Body.Close()
 
-		s.Logger.Warn("Failed to connect to Elasticsearch, retrying...",
-			"attempt", i+1,
-			"error", err,
-		)
-
-		// Wait before retrying
-		time.Sleep(time.Second * time.Duration(i+1))
+	var esInfo map[string]interface{}
+	if decodeErr := json.NewDecoder(info.Body).Decode(&esInfo); decodeErr != nil {
+		return fmt.Errorf("error decoding Elasticsearch info response: %w", decodeErr)
 	}
 
-	return fmt.Errorf("failed to connect to elasticsearch after %d attempts", maxRetries)
+	s.Logger.Info("Elasticsearch info", esInfo)
+	return nil
 }
 
 // BulkIndex performs bulk indexing of documents

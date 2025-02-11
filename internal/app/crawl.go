@@ -51,7 +51,7 @@ func runCrawler(
 	log logger.Interface,
 	cfg *config.Config,
 ) {
-	log.Info("Starting crawler",
+	log.Info("runCrawler",
 		"baseURL", cfg.Crawler.BaseURL,
 		"maxDepth", cfg.Crawler.MaxDepth,
 		"rateLimit", cfg.Crawler.RateLimit)
@@ -59,11 +59,9 @@ func runCrawler(
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			log.Debug("Crawler is starting...")
-			go func() {
-				if err := c.Start(ctx); err != nil {
-					log.Error("Crawler failed", "error", err)
-				}
-			}()
+			if err := c.Start(ctx); err != nil {
+				log.Error("Crawler failed", "error", err)
+			}
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {

@@ -95,10 +95,12 @@ func NewCrawler(p Params) (Result, error) {
 	}
 
 	// Add transport configuration
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: p.Config.Crawler.SkipTLS,
+	}
+
 	c.WithTransport(&http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
+		TLSClientConfig: tlsConfig,
 	})
 
 	articleSvc := article.NewService(p.Logger)
@@ -196,24 +198,13 @@ func (c *Crawler) Start(ctx context.Context) error {
 	}
 
 	// Visit the base URL to start crawling
+	c.Logger.Debug("Visiting base URL", "url", c.BaseURL)
 	if err := c.Collector.Visit(c.BaseURL); err != nil {
 		c.Logger.Error("Failed to visit base URL", "error", err)
 		return fmt.Errorf("failed to visit base URL: %w", err)
 	}
 
 	c.Logger.Debug("Crawling process started")
-	// Start the crawling process
-	for c.running {
-		select {
-		case <-ctx.Done():
-			c.running = false // Set running state to false on shutdown
-			c.Logger.Debug("Crawler shutting down")
-			return nil
-		default:
-			c.Logger.Info("Crawling...", "url", c.BaseURL)
-			time.Sleep(1 * time.Second) // Simulate crawling work
-		}
-	}
 
 	return nil
 }

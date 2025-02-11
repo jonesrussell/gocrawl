@@ -6,3 +6,4 @@ CRAWLER_BASE_URL: https://www.elliotlaketoday.com/opp-beat
 CRAWLER_MAX_DEPTH: 2
 CRAWLER_RATE_LIMIT: 2s
 INDEX_NAME: articles
+SKIP_TLS: true
