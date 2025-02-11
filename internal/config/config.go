@@ -72,9 +72,9 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 			BaseURL:   viper.GetString("CRAWLER_BASE_URL"),
 			MaxDepth:  viper.GetInt("CRAWLER_MAX_DEPTH"),
 			RateLimit: rateLimit,
-			IndexName: viper.GetString("INDEX_NAME"),
+			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
 			Transport: transport,
-			SkipTLS:   viper.GetBool("CRAWLER_SKIP_TLS"),
+			SkipTLS:   viper.GetBool("CRAWLER_ELASTIC_SKIP_TLS"),
 		},
 		Elasticsearch: ElasticsearchConfig{
 			URL:      viper.GetString("ELASTIC_URL"),
@@ -94,11 +94,11 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 func LoadConfig() (*Config, error) {
 	return &Config{
 		Crawler: CrawlerConfig{
-			IndexName: viper.GetString("CRAWLER_INDEX_NAME"),
+			IndexName: viper.GetString("CRAWLER_ELASTIC_INDEX_NAME"),
 			BaseURL:   viper.GetString("CRAWLER_BASE_URL"),
 			MaxDepth:  viper.GetInt("CRAWLER_MAX_DEPTH"),
 			RateLimit: viper.GetDuration("CRAWLER_RATE_LIMIT"),
-			SkipTLS:   viper.GetBool("SKIP_TLS"),
+			SkipTLS:   viper.GetBool("ELASTIC_SKIP_TLS"),
 		},
 	}, nil
 }

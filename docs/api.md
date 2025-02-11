@@ -48,7 +48,7 @@ Required environment variables:
 | `ELASTIC_URL` | Elasticsearch server URL | Yes |
 | `ELASTIC_PASSWORD` | Elasticsearch password | Yes |
 | `ELASTIC_API_KEY` | Elasticsearch API key | No |
-| `INDEX_NAME` | Name of the Elasticsearch index | Yes |
+| `ELASTIC_INDEX_NAME` | Name of the Elasticsearch index | Yes |
 | `APP_ENV` | Application environment (development/production) | No |
 | `APP_NAME` | Application name | No |
 | `APP_DEBUG` | Enable debug mode | No |

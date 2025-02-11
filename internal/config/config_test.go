@@ -23,7 +23,7 @@ func TestNewConfig(t *testing.T) {
 		"CRAWLER_BASE_URL":   "http://test.com",
 		"CRAWLER_MAX_DEPTH":  "3",
 		"CRAWLER_RATE_LIMIT": "2s",
-		"INDEX_NAME":         "test-index",
+		"ELASTIC_INDEX_NAME": "test-index",
 	}
 
 	// Set environment variables
@@ -95,7 +95,7 @@ func TestLoadConfig_Success(t *testing.T) {
 	t.Setenv("ELASTIC_URL", "http://localhost:9200")
 	t.Setenv("ELASTIC_PASSWORD", "password")
 	t.Setenv("ELASTIC_API_KEY", "api_key")
-	t.Setenv("INDEX_NAME", "test_index")
+	t.Setenv("ELASTIC_INDEX_NAME", "test_index")
 	t.Setenv("CRAWLER_BASE_URL", "https://example.com")
 	t.Setenv("CRAWLER_MAX_DEPTH", "3")
 
@@ -122,7 +122,7 @@ func TestLoadConfig_MissingElasticURL(t *testing.T) {
 	t.Setenv("APP_DEBUG", "true")
 	t.Setenv("ELASTIC_PASSWORD", "password")
 	t.Setenv("ELASTIC_API_KEY", "api_key")
-	t.Setenv("INDEX_NAME", "test_index")
+	t.Setenv("ELASTIC_INDEX_NAME", "test_index")
 	t.Setenv("LOG_LEVEL", "debug")
 
 	// Load the configuration

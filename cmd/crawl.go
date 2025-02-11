@@ -25,7 +25,7 @@ var crawlCmd = &cobra.Command{
 		viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
 		viper.Set("CRAWLER_MAX_DEPTH", cmd.Flag("depth").Value.String())
 		viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())
-		viper.Set("INDEX_NAME", cmd.Flag("index").Value.String())
+		viper.Set("ELASTIC_INDEX_NAME", cmd.Flag("index").Value.String())
 
 		// Create config with CLI values
 		cfg := &config.Config{

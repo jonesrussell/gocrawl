@@ -1,9 +1,15 @@
 APP_ENV: development
 LOG_LEVEL: debug
 APP_DEBUG: true
+
 ELASTIC_URL: http://localhost:9200
+ELASTIC_USERNAME: elastic
+ELASTIC_PASSWORD: t9rqA*BKxmayJ_Dmbsxk
+ELASTIC_API_KEY: NFg0czhKUUJPbEhlZjA0a216YV86RXVqNTZqY1ZTeUc4Z3owa1V3eWlSZw==
+ELASTIC_INDEX_NAME: articles
+ELASTIC_SKIP_TLS: true
+
+
 CRAWLER_BASE_URL: https://www.elliotlaketoday.com/opp-beat
 CRAWLER_MAX_DEPTH: 2
 CRAWLER_RATE_LIMIT: 2s
-INDEX_NAME: articles
-SKIP_TLS: true

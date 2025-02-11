@@ -34,7 +34,7 @@ var Module = fx.Module("config",
 					BaseURL:   viper.GetString("CRAWLER_BASE_URL"),
 					MaxDepth:  viper.GetInt("CRAWLER_MAX_DEPTH"),
 					RateLimit: viper.GetDuration("CRAWLER_RATE_LIMIT"),
-					IndexName: viper.GetString("INDEX_NAME"),
+					IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
 				},
 				Elasticsearch: ElasticsearchConfig{
 					URL:      viper.GetString("ELASTIC_URL"),

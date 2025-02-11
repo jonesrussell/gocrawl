@@ -30,7 +30,7 @@ LOG_LEVEL=debug
 # Elasticsearch
 ELASTIC_URL=http://elasticsearch:9200
 ELASTIC_PASSWORD=your_password
-INDEX_NAME=articles
+ELASTIC_INDEX_NAME=articles
 ```
 
 ### 3. Development Container
