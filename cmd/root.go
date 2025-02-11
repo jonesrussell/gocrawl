@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -21,7 +20,13 @@ var rootCmd = &cobra.Command{
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-func Execute(cfg *config.Config) {
+func Execute(cfg *config.Config) error {
+	// Initialize the logger
+	lgr, err := logger.NewLogger(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+
 	app := fx.New(
 		// Core modules
 		config.Module,
@@ -35,17 +40,40 @@ func Execute(cfg *config.Config) {
 	)
 
 	if err := app.Start(context.Background()); err != nil {
-		fmt.Printf("Error starting application: %v\n", err)
-		os.Exit(1)
+		lgr.Error("Error starting application", err)
+		return err
 	}
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		lgr.Error("Error executing root command", err)
+		return err
 	}
 
 	if err := app.Stop(context.Background()); err != nil {
-		fmt.Printf("Error stopping application: %v\n", err)
-		os.Exit(1)
+		lgr.Error("Error stopping application", err)
+		return err
 	}
+
+	return nil
+}
+
+// Shutdown gracefully shuts down the application
+func Shutdown(ctx context.Context) error {
+	app := fx.New(
+		// Core modules
+		config.Module,
+		logger.Module,
+		storage.Module,
+		collector.Module,
+		crawler.Module,
+
+		// Application module
+		app.Module,
+	)
+
+	if err := app.Stop(ctx); err != nil {
+		return fmt.Errorf("error during shutdown: %w", err)
+	}
+
+	return nil
 }

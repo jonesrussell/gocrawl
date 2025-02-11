@@ -15,7 +15,7 @@ type Interface interface {
 	Error(msg string, fields ...interface{})
 	Debug(msg string, fields ...interface{})
 	Warn(msg string, fields ...interface{})
-	Fatalf(msg string, args ...interface{})
+	Fatal(msg string, fields ...interface{})
 	Errorf(format string, args ...interface{})
 }
 
@@ -56,9 +56,9 @@ func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
 	c.Logger.Warn(msg, convertToZapFields(fields)...)
 }
 
-// Fatalf logs a fatal message
-func (c *CustomLogger) Fatalf(msg string, args ...interface{}) {
-	c.Logger.Fatal(msg, zap.Any("args", args))
+// Fatal logs a fatal message
+func (c *CustomLogger) Fatal(msg string, fields ...interface{}) {
+	c.Logger.Fatal(msg, convertToZapFields(fields)...)
 }
 
 // Errorf logs a formatted error message
@@ -100,26 +100,8 @@ func convertToZapFields(fields []interface{}) []zap.Field {
 		return zapFields
 	}
 
-	// If first argument is a string and no more arguments, treat it as additional message context
-	if len(fields) == 1 {
-		if str, ok := fields[0].(string); ok {
-			return []zap.Field{zap.String("context", str)}
-		}
-		return []zap.Field{zap.Any("context", fields[0])}
-	}
-
 	// Handle key-value pairs
 	for i := 0; i < len(fields)-1; i += 2 {
-		// If we have an odd number of fields and this is the last one
-		if i == len(fields)-1 {
-			if str, ok := fields[i].(string); ok {
-				zapFields = append(zapFields, zap.String("context", str))
-			} else {
-				zapFields = append(zapFields, zap.Any("context", fields[i]))
-			}
-			break
-		}
-
 		// Process key-value pair
 		key, ok := fields[i].(string)
 		if !ok {

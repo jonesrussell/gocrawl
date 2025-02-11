@@ -24,15 +24,22 @@ func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 
 	var logger *zap.Logger
 	var err error
-	if cfg.App.Environment == "development" {
+	switch cfg.App.Environment {
+	case "development":
 		// Development logger with color
 		config := zap.NewDevelopmentConfig()
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder // Add color to log levels
 		logger, err = config.Build()
-	} else {
+	case "staging":
+		// Staging logger
+		config := zap.NewDevelopmentConfig()
+		logger, err = config.Build()
+	case "production":
 		// Production logger
 		config := zap.NewProductionConfig()
 		logger, err = config.Build()
+	default:
+		return nil, errors.New("unknown environment")
 	}
 
 	if err != nil {

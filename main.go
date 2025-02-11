@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/cmd"
@@ -22,5 +27,24 @@ func main() {
 	}
 
 	// Initialize your application with the config
-	cmd.Execute(cfg)
+	go func() {
+		if err := cmd.Execute(cfg); err != nil {
+			log.Fatalf("Error executing command: %v", err)
+		}
+	}()
+
+	// Graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-sigChan
+
+	log.Printf("Received signal: %v. Shutting down gracefully...", sig)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := cmd.Shutdown(ctx); err != nil {
+		log.Fatalf("Error during shutdown: %v", err)
+	}
+
+	log.Println("Application shutdown successfully")
 }

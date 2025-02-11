@@ -10,16 +10,24 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+// Modify crawlCmd to accept a logger instance
 var crawlCmd = &cobra.Command{
 	Use:   "crawl",
 	Short: "Start crawling a website",
 	Long:  `Crawl a website and store the content in Elasticsearch`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
+
+		// Initialize the logger
+		lgr, err := logger.NewLogger(&config.Config{App: config.AppConfig{Environment: os.Getenv("APP_ENV")}})
+		if err != nil {
+			return fmt.Errorf("failed to initialize logger: %w", err)
+		}
 
 		// Set viper values
 		viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
@@ -58,7 +66,12 @@ var crawlCmd = &cobra.Command{
 		}
 
 		// Start the crawler with the provided config
-		return app.StartCrawler(ctx, cfg)
+		if err := app.StartCrawler(ctx, cfg); err != nil {
+			lgr.Error("Error starting crawler", err)
+			return err
+		}
+
+		return nil
 	},
 }
 
