@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -59,7 +60,12 @@ func (es *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create index: %w", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(res.Body)
 
 	if res.IsError() {
 		var e map[string]interface{}
@@ -103,7 +109,7 @@ func (es *ElasticsearchStorage) IndexArticle(ctx context.Context, article *model
 }
 
 // BulkIndexArticles indexes multiple articles in bulk
-func (es *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
+func (es *ElasticsearchStorage) BulkIndexArticles(articles []*models.Article) error {
 	var buf bytes.Buffer
 
 	for _, article := range articles {

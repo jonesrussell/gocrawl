@@ -14,16 +14,19 @@ import (
 	"go.uber.org/fx"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "gocrawl",
-	Short: "A web crawler that stores content in Elasticsearch",
-}
+var (
+	rootCmd = &cobra.Command{
+		Use:   "gocrawl",
+		Short: "A web crawler that stores content in Elasticsearch",
+	}
+	appInstance *fx.App
+)
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
 	var lgr *logger.CustomLogger // Declare a variable to hold the logger
 
-	app := fx.New(
+	appInstance = fx.New(
 		// Core modules
 		config.Module,
 		logger.Module,
@@ -37,18 +40,20 @@ func Execute() error {
 		fx.Populate(&lgr), // Populate the logger from the Fx context
 	)
 
-	if err := app.Start(context.Background()); err != nil {
+	if err := appInstance.Start(context.Background()); err != nil {
 		return fmt.Errorf("error starting application: %w", err)
 	}
 
 	// Add subcommands to the root command
-	rootCmd.AddCommand(NewCrawlCmd(lgr)) // Pass logger from app
+	rootCmd.AddCommand(NewCrawlCmd(lgr)) // Pass logger from appInstance
+
+	rootCmd.AddCommand(NewSearchCmd(lgr))
 
 	if err := rootCmd.Execute(); err != nil {
 		return fmt.Errorf("error executing root command: %w", err)
 	}
 
-	if err := app.Stop(context.Background()); err != nil {
+	if err := appInstance.Stop(context.Background()); err != nil {
 		return fmt.Errorf("error stopping application: %w", err)
 	}
 
@@ -57,19 +62,7 @@ func Execute() error {
 
 // Shutdown gracefully shuts down the application
 func Shutdown(ctx context.Context) error {
-	app := fx.New(
-		// Core modules
-		config.Module,
-		logger.Module,
-		storage.Module,
-		collector.Module,
-		crawler.Module,
-
-		// Application module
-		app.Module,
-	)
-
-	if err := app.Stop(ctx); err != nil {
+	if err := appInstance.Stop(ctx); err != nil {
 		return fmt.Errorf("error during shutdown: %w", err)
 	}
 

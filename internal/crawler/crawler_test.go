@@ -17,18 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/fx"
 )
-
-// MockShutdowner is a mock implementation of the fx.Shutdowner interface
-type MockShutdowner struct {
-	mock.Mock
-}
-
-func (m *MockShutdowner) Shutdown(opts ...fx.ShutdownOption) error {
-	args := m.Called(opts)
-	return args.Error(0)
-}
 
 // MockCollector is a mock implementation of colly.Collector
 type MockCollector struct {

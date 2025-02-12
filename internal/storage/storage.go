@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"go.uber.org/fx"
@@ -46,6 +45,11 @@ type ElasticsearchStorage struct {
 	opts     Options
 }
 
+func (s *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 // Result holds the dependencies for the storage
 type Result struct {
 	fx.Out
@@ -60,22 +64,6 @@ var _ Storage = (*ElasticsearchStorage)(nil)
 const (
 	defaultRefreshValue = "true"
 )
-
-// NewStorageWithClient creates a new Storage instance with a provided Elasticsearch client
-func NewStorageWithClient(cfg *config.Config, log logger.Interface, client *elasticsearch.Client) (Result, error) {
-	if cfg.Elasticsearch.URL == "" {
-		return Result{}, fmt.Errorf("elasticsearch URL is required")
-	}
-
-	es := &ElasticsearchStorage{
-		ESClient: client,
-		Logger:   log,
-	}
-
-	return Result{
-		Storage: es,
-	}, nil
-}
 
 // IndexDocument indexes a document in Elasticsearch
 func (s *ElasticsearchStorage) IndexDocument(

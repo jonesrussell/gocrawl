@@ -74,7 +74,10 @@ func NewCrawlCmd(lgr *logger.CustomLogger) *cobra.Command {
 	crawlCmd.Flags().DurationP("rate", "r", time.Second, "Rate limit between requests")
 	crawlCmd.Flags().StringP("index", "i", "articles", "Elasticsearch index name")
 
-	crawlCmd.MarkFlagRequired("url")
+	err := crawlCmd.MarkFlagRequired("url")
+	if err != nil {
+		return nil
+	}
 
 	return crawlCmd
 }

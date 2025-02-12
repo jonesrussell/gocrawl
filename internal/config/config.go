@@ -101,7 +101,12 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 func logConfig(cfg *Config) {
 	// Create a logger instance (you can customize this as needed)
 	logger, _ := zap.NewDevelopment()
-	defer logger.Sync() // flushes buffer, if any
+	defer func(logger *zap.Logger) {
+		err := logger.Sync()
+		if err != nil {
+			
+		}
+	}(logger) // flushes buffer, if any
 	logger.Debug("Loaded configuration",
 		zap.String("Environment", cfg.App.Environment),
 		zap.String("LogLevel", cfg.App.LogLevel),
@@ -114,18 +119,4 @@ func logConfig(cfg *Config) {
 		zap.Duration("CrawlerRateLimit", cfg.Crawler.RateLimit),
 		zap.String("ElasticsearchPassword", cfg.Elasticsearch.Password), // Be cautious with sensitive data
 	)
-}
-
-// LoadConfig loads the configuration from environment variables or a config file
-// Keeping this function if needed for other purposes
-func LoadConfig() (*Config, error) {
-	return &Config{
-		Crawler: CrawlerConfig{
-			IndexName: viper.GetString("CRAWLER_ELASTIC_INDEX_NAME"),
-			BaseURL:   viper.GetString("CRAWLER_BASE_URL"),
-			MaxDepth:  viper.GetInt("CRAWLER_MAX_DEPTH"),
-			RateLimit: viper.GetDuration("CRAWLER_RATE_LIMIT"),
-			SkipTLS:   viper.GetBool("ELASTIC_SKIP_TLS"),
-		},
-	}, nil
 }

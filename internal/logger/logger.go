@@ -67,7 +67,7 @@ func (c *CustomLogger) Errorf(format string, args ...interface{}) {
 }
 
 // NewDevelopmentLogger initializes a new CustomLogger for development
-func NewDevelopmentLogger(p Params) (*CustomLogger, error) {
+func NewDevelopmentLogger() (*CustomLogger, error) {
 	encoderConfig := zap.NewDevelopmentEncoderConfig()
 	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
