@@ -78,6 +78,7 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 		},
 		Elasticsearch: ElasticsearchConfig{
 			URL:      viper.GetString("ELASTIC_URL"),
+			Username: viper.GetString("ELASTIC_USERNAME"),
 			Password: viper.GetString("ELASTIC_PASSWORD"),
 			APIKey:   viper.GetString("ELASTIC_API_KEY"),
 		},

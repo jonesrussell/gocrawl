@@ -5,9 +5,36 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// setupTestStorage creates a new storage instance for testing
+func setupTestStorage(t *testing.T) Storage {
+	t.Helper()
+
+	// Create a mock logger
+	log := logger.NewMockCustomLogger()
+
+	// Create test config
+	cfg := &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: "http://localhost:9200", // or use a test URL
+		},
+		Crawler: config.CrawlerConfig{
+			Transport: http.DefaultTransport,
+		},
+	}
+
+	// Create storage instance
+	storage, err := NewStorage(cfg, log)
+	require.NoError(t, err, "Failed to create test storage")
+	require.NotNil(t, storage.Storage, "Storage instance should not be nil")
+
+	return storage.Storage
+}
 
 func TestScrollSearch(t *testing.T) {
 	ctx := context.Background()

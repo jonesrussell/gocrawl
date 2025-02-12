@@ -38,6 +38,7 @@ type Params struct {
 	MaxDepth  int
 	RateLimit time.Duration
 	Debugger  *logger.CollyDebugger
+	Logger    logger.Interface
 }
 
 // Result holds the collector instance
@@ -75,6 +76,9 @@ func New(p Params) (Result, error) {
 	if p.Debugger != nil {
 		c.SetDebugger(p.Debugger)
 	}
+
+	// Configure logging for the collector
+	ConfigureLogging(c, p.Logger)
 
 	return Result{Collector: c}, nil
 }
