@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -68,7 +69,7 @@ func NewStorageWithClient(cfg *config.Config, log logger.Interface, client *elas
 
 	es := &ElasticsearchStorage{
 		ESClient: client,
-		Logger:   log, // No need for pointer conversion since we're using Interface
+		Logger:   log,
 	}
 
 	return Result{
@@ -83,6 +84,9 @@ func (s *ElasticsearchStorage) IndexDocument(
 	docID string,
 	document interface{},
 ) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	data, err := json.Marshal(document)
 	if err != nil {
 		return fmt.Errorf("error marshaling document: %w", err)
@@ -116,6 +120,9 @@ func (s *ElasticsearchStorage) IndexDocument(
 
 // TestConnection checks the connection to the Elasticsearch cluster
 func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	info, err := s.ESClient.Info(
 		s.ESClient.Info.WithContext(ctx),
 	)
@@ -135,6 +142,9 @@ func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
 
 // BulkIndex performs bulk indexing of documents
 func (s *ElasticsearchStorage) BulkIndex(ctx context.Context, index string, documents []interface{}) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second) // Add timeout
+	defer cancel()
+
 	var buf bytes.Buffer
 
 	for _, doc := range documents {
@@ -176,6 +186,9 @@ func (s *ElasticsearchStorage) Search(
 	index string,
 	query map[string]interface{},
 ) ([]map[string]interface{}, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(query); err != nil {
 		return nil, fmt.Errorf("error encoding query: %w", err)
@@ -219,6 +232,9 @@ func (s *ElasticsearchStorage) Search(
 
 // CreateIndex creates a new index with optional mapping
 func (s *ElasticsearchStorage) CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(mapping); err != nil {
 		return fmt.Errorf("error encoding mapping: %w", err)
@@ -244,6 +260,9 @@ func (s *ElasticsearchStorage) CreateIndex(ctx context.Context, index string, ma
 
 // DeleteIndex deletes an index
 func (s *ElasticsearchStorage) DeleteIndex(ctx context.Context, index string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	// Convert single index string to slice of strings
 	indices := []string{index}
 
@@ -271,6 +290,9 @@ func (s *ElasticsearchStorage) UpdateDocument(
 	docID string,
 	update map[string]interface{},
 ) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	body := map[string]interface{}{
 		"doc":           update,
 		"doc_as_upsert": true,
@@ -296,11 +318,15 @@ func (s *ElasticsearchStorage) UpdateDocument(
 		return fmt.Errorf("update failed: %s", res.String())
 	}
 
+	s.Logger.Info("Updated document", "index", index, "docID", docID)
 	return nil
 }
 
 // DeleteDocument deletes a document
 func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string, docID string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	res, err := s.ESClient.Delete(
 		index,
 		docID,
@@ -321,10 +347,14 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 
 // IndexExists checks if the specified index exists
 func (es *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
-	exists, err := es.ESClient.Indices.Exists([]string{indexName})
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second) // Add timeout
+	defer cancel()
+
+	res, err := es.ESClient.Indices.Exists([]string{indexName}, es.ESClient.Indices.Exists.WithContext(ctx))
 	if err != nil {
 		return false, fmt.Errorf("failed to check index existence: %w", err)
 	}
+	defer res.Body.Close()
 
-	return exists.StatusCode == http.StatusOK, nil
+	return res.StatusCode == http.StatusOK, nil
 }

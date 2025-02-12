@@ -15,6 +15,10 @@ var Module = fx.Module("app",
 		func() func(ctx context.Context, cfg *config.Config) error {
 			return StartCrawler
 		},
+		// Provide context.Context
+		func() context.Context {
+			return context.Background() // Provide a background context
+		},
 	),
 	// Invoke any initialization functions if needed
 	fx.Invoke(

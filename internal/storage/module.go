@@ -65,7 +65,7 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 
 	log.Info("Successfully connected to Elasticsearch",
 		"url", cfg.Elasticsearch.URL,
-		"using_api_key", cfg.Elasticsearch.APIKey != "",
+		"using_api_key", cfg.Elasticsearch.APIKey, // != "",
 	)
 
 	return Result{

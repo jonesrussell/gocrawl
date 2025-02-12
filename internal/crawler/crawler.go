@@ -122,30 +122,15 @@ func NewCrawler(p Params) (Result, error) {
 
 	// Configure collector callbacks
 	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-		r.Headers.Set("Accept-Language", "en-US,en;q=0.5")
-		crawler.Logger.Debug("Visiting", "url", r.URL.String(), "headers", r.Headers)
+		p.Logger.Debug("Requesting URL", r.URL.String())
 	})
 
 	c.OnResponse(func(r *colly.Response) {
-		crawler.Logger.Debug("Got response",
-			"url", r.Request.URL.String(),
-			"status", r.StatusCode,
-			"headers", r.Headers,
-			"body_length", len(r.Body))
-
-		// Log first 500 chars of response to see what we're getting
-		if len(r.Body) > 0 {
-			preview := string(r.Body)
-			if len(preview) > 500 {
-				preview = preview[:500]
-			}
-			crawler.Logger.Debug("Response preview", "body", preview)
-		}
+		p.Logger.Debug("Received response", "url", r.Request.URL.String(), "status", r.StatusCode)
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		crawler.Logger.Error("Error scraping", "url", r.Request.URL.String(), "error", err)
+		p.Logger.Error("Error scraping", "url", r.Request.URL.String(), "error", err)
 	})
 
 	c.OnHTML("div.details", func(e *colly.HTMLElement) {
@@ -157,12 +142,9 @@ func NewCrawler(p Params) (Result, error) {
 		if link == "" {
 			return
 		}
-
-		crawler.Logger.Debug("Found article link", "url", link)
+		p.Logger.Debug("Found link", "url", link)
 		if err := e.Request.Visit(link); err != nil {
-			if !errors.Is(err, colly.ErrAlreadyVisited) {
-				crawler.Logger.Debug("Could not visit article", "url", link, "error", err.Error())
-			}
+			p.Logger.Debug("Could not visit link", "url", link, "error", err)
 		}
 	})
 
@@ -182,7 +164,7 @@ func NewCrawler(p Params) (Result, error) {
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context) error {
 	c.running = true // Set running state to true
-	c.Logger.Debug("Starting crawler", "baseURL", c.BaseURL)
+	c.Logger.Debug("Starting crawl at base URL", "url", c.BaseURL)
 
 	// Perform initial setup (e.g., test connection, ensure index)
 	if err := c.Storage.TestConnection(ctx); err != nil {

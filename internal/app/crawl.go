@@ -44,31 +44,3 @@ func newFxApp(cfg *config.Config) *fx.App {
 		fx.Invoke(runCrawler),
 	)
 }
-
-func runCrawler(
-	lc fx.Lifecycle,
-	c *crawler.Crawler,
-	log logger.Interface,
-	cfg *config.Config,
-) {
-	log.Info("runCrawler",
-		"baseURL", cfg.Crawler.BaseURL,
-		"maxDepth", cfg.Crawler.MaxDepth,
-		"rateLimit", cfg.Crawler.RateLimit)
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			log.Debug("Crawler is starting...")
-			if err := c.Start(ctx); err != nil {
-				log.Error("Crawler failed", "error", err)
-			}
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			log.Info("Stopping crawler...")
-			c.Stop()
-			log.Debug("Crawler stopped successfully")
-			return nil
-		},
-	})
-}

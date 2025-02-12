@@ -5,3 +5,7 @@ http_ca.crt
 bin/
 coverage/coverage.html
 coverage/coverage.out
+.idea/.gitignore
+.idea/gocrawl.iml
+.idea/modules.xml
+.idea/vcs.xml

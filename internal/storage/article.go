@@ -44,7 +44,7 @@ func (es *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 	// Convert mappings to JSON
 	data, err := json.Marshal(mappings)
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshaling mappings: %w", err)
 	}
 
 	// Create the index
@@ -53,8 +53,25 @@ func (es *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 		Body:  bytes.NewReader(data),
 	}
 
-	_, err = req.Do(ctx, es.ESClient)
-	return err
+	es.Logger.Debug("Attempting to create index", "index", "articles", "mappings", mappings)
+
+	res, err := req.Do(ctx, es.ESClient)
+	if err != nil {
+		return fmt.Errorf("failed to create index: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return fmt.Errorf("error parsing error response: %w", err)
+		}
+		es.Logger.Error("Failed to create index", "error", e["error"])
+		return fmt.Errorf("elasticsearch error: %v", e["error"])
+	}
+
+	es.Logger.Info("Index created successfully", "index", "articles")
+	return nil
 }
 
 // IndexArticle indexes a single article
@@ -63,6 +80,8 @@ func (es *ElasticsearchStorage) IndexArticle(ctx context.Context, article *model
 	if err != nil {
 		return fmt.Errorf("error marshaling article: %w", err)
 	}
+
+	es.Logger.Debug("Indexing article", "articleID", article.ID)
 
 	res, err := es.ESClient.Index(
 		"articles",
@@ -79,6 +98,7 @@ func (es *ElasticsearchStorage) IndexArticle(ctx context.Context, article *model
 		return fmt.Errorf("error indexing article: %s", res.String())
 	}
 
+	es.Logger.Info("Article indexed successfully", "articleID", article.ID)
 	return nil
 }
 
@@ -104,6 +124,8 @@ func (es *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles 
 		}
 	}
 
+	es.Logger.Debug("Bulk indexing articles", "count", len(articles))
+
 	res, err := es.ESClient.Bulk(bytes.NewReader(buf.Bytes()))
 	if err != nil {
 		return fmt.Errorf("error bulk indexing: %w", err)
@@ -114,11 +136,14 @@ func (es *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles 
 		return fmt.Errorf("error bulk indexing: %s", res.String())
 	}
 
+	es.Logger.Info("Bulk indexing completed successfully", "count", len(articles))
 	return nil
 }
 
 // SearchArticles searches for articles based on a query
 func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
+	es.Logger.Debug("Searching articles", "query", query, "size", size)
+
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
 			"multi_match": map[string]interface{}{
@@ -169,5 +194,6 @@ func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string
 		articles = append(articles, &article)
 	}
 
+	es.Logger.Info("Search completed", "query", query, "results", len(articles))
 	return articles, nil
 }
