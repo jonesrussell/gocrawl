@@ -108,44 +108,6 @@ func (es *ElasticsearchStorage) IndexArticle(ctx context.Context, article *model
 	return nil
 }
 
-// BulkIndexArticles indexes multiple articles in bulk
-func (es *ElasticsearchStorage) BulkIndexArticles(articles []*models.Article) error {
-	var buf bytes.Buffer
-
-	for _, article := range articles {
-		// Add metadata action
-		meta := map[string]interface{}{
-			"index": map[string]interface{}{
-				"_index": "articles",
-				"_id":    article.ID,
-			},
-		}
-		if err := json.NewEncoder(&buf).Encode(meta); err != nil {
-			return fmt.Errorf("error encoding meta: %w", err)
-		}
-
-		// Add document
-		if err := json.NewEncoder(&buf).Encode(article); err != nil {
-			return fmt.Errorf("error encoding article: %w", err)
-		}
-	}
-
-	es.Logger.Debug("Bulk indexing articles", "count", len(articles))
-
-	res, err := es.ESClient.Bulk(bytes.NewReader(buf.Bytes()))
-	if err != nil {
-		return fmt.Errorf("error bulk indexing: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return fmt.Errorf("error bulk indexing: %s", res.String())
-	}
-
-	es.Logger.Info("Bulk indexing completed successfully", "count", len(articles))
-	return nil
-}
-
 // SearchArticles searches for articles based on a query
 func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
 	es.Logger.Debug("Searching articles", "query", query, "size", size)

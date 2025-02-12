@@ -104,7 +104,7 @@ func logConfig(cfg *Config) {
 	defer func(logger *zap.Logger) {
 		err := logger.Sync()
 		if err != nil {
-			
+
 		}
 	}(logger) // flushes buffer, if any
 	logger.Debug("Loaded configuration",

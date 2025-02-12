@@ -7,7 +7,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"go.uber.org/zap"
 )
 
 // SearchResult represents a search result
@@ -18,11 +17,7 @@ type SearchResult struct {
 
 // SearchContent performs a search query
 func SearchContent(ctx context.Context, query string, index string, size int) ([]SearchResult, error) {
-	log, err := logger.NewDevelopmentLogger(logger.Params{
-		Debug:  true,
-		Level:  zap.InfoLevel,
-		AppEnv: "development",
-	})
+	log, err := logger.NewDevelopmentLogger()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}

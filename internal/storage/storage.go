@@ -45,11 +45,6 @@ type ElasticsearchStorage struct {
 	opts     Options
 }
 
-func (s *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
-	//TODO implement me
-	panic("implement me")
-}
-
 // Result holds the dependencies for the storage
 type Result struct {
 	fx.Out
@@ -345,4 +340,44 @@ func (es *ElasticsearchStorage) IndexExists(ctx context.Context, indexName strin
 	defer res.Body.Close()
 
 	return res.StatusCode == http.StatusOK, nil
+}
+
+// BulkIndexArticles indexes multiple articles in bulk
+func (s *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
+	var buf bytes.Buffer
+
+	for _, article := range articles {
+		// Add metadata action
+		meta := map[string]interface{}{
+			"index": map[string]interface{}{
+				"_index": "articles",
+				"_id":    article.ID,
+			},
+		}
+		if err := json.NewEncoder(&buf).Encode(meta); err != nil {
+			return fmt.Errorf("error encoding meta: %w", err)
+		}
+
+		// Add document
+		if err := json.NewEncoder(&buf).Encode(article); err != nil {
+			return fmt.Errorf("error encoding article: %w", err)
+		}
+	}
+
+	s.Logger.Debug("Bulk indexing articles", "count", len(articles))
+
+	res, err := s.ESClient.Bulk(bytes.NewReader(buf.Bytes()),
+		s.ESClient.Bulk.WithContext(ctx), // Ensure context is passed
+		s.ESClient.Bulk.WithRefresh("true"))
+	if err != nil {
+		return fmt.Errorf("bulk indexing failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("bulk indexing failed: %s", res.String())
+	}
+
+	s.Logger.Info("Bulk indexed documents", "count", len(articles))
+	return nil
 }
