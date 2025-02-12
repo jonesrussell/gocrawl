@@ -45,7 +45,7 @@ A simple web crawler built in Go that fetches and processes web pages, storing r
    ELASTIC_URL=http://localhost:9200
    ELASTIC_PASSWORD=your_password
    ELASTIC_API_KEY=your_api_key
-   INDEX_NAME=crawled_pages
+   ELASTIC_INDEX_NAME=crawled_pages
    ```
 
 ## Usage

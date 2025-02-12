@@ -2,58 +2,57 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
 
 	"github.com/jonesrussell/gocrawl/internal/app"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 )
 
-var (
-	query     string
-	indexName string
-)
+func NewSearchCmd(lgr *logger.CustomLogger) *cobra.Command {
+	var searchCmd = &cobra.Command{
+		Use:   "search [query]",
+		Short: "Search indexed content",
+		Long:  `Search content that has been crawled and indexed in Elasticsearch`,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
 
-var searchCmd = &cobra.Command{
-	Use:   "search",
-	Short: "Search crawled content",
-	Long:  `Search through the content stored in Elasticsearch`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
-
-		// Convert query string to Elasticsearch query
-		queryMap := map[string]interface{}{
-			"query": map[string]interface{}{
-				"multi_match": map[string]interface{}{
-					"query":  query,
-					"fields": []string{"title", "content", "url"},
+			// Create config with CLI values
+			cfg := &config.Config{
+				Crawler: config.CrawlerConfig{
+					IndexName: cmd.Flag("index").Value.String(),
+					Transport: http.DefaultTransport,
 				},
-			},
-		}
-
-		results, err := app.Search(ctx, indexName, queryMap)
-		if err != nil {
-			return err
-		}
-
-		// Pretty print results
-		for _, result := range results {
-			prettyJSON, err := json.MarshalIndent(result, "", "  ")
-			if err != nil {
-				return err
 			}
-			fmt.Println(string(prettyJSON))
-		}
 
-		return nil
-	},
-}
+			// Parse size parameter
+			sizeStr := cmd.Flag("size").Value.String()
+			size, err := strconv.Atoi(sizeStr)
+			if err != nil {
+				lgr.Error("Invalid size value", err)
+				return fmt.Errorf("invalid size value: %w", err)
+			}
 
-func init() {
-	rootCmd.AddCommand(searchCmd)
+			results, err := app.SearchContent(ctx, args[0], cfg.Crawler.IndexName, size)
+			if err != nil {
+				lgr.Error("Search failed", err)
+				return fmt.Errorf("search failed: %w", err)
+			}
 
-	searchCmd.Flags().StringVarP(&query, "query", "q", "", "Search query (required)")
-	searchCmd.Flags().StringVarP(&indexName, "index", "i", "pages", "Index name to search")
+			// Print results
+			for _, result := range results {
+				fmt.Printf("URL: %s\nContent: %s\n\n", result.URL, result.Content)
+			}
+			return nil
+		},
+	}
 
-	searchCmd.MarkFlagRequired("query")
+	searchCmd.Flags().StringP("index", "i", "articles", "Index to search")
+	searchCmd.Flags().IntP("size", "s", 10, "Number of results to return")
+
+	return searchCmd
 }

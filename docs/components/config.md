@@ -32,7 +32,7 @@ func LoadConfig() (*Config, error) {
         ElasticURL:      os.Getenv("ELASTIC_URL"),
         ElasticPassword: os.Getenv("ELASTIC_PASSWORD"),
         ElasticAPIKey:   os.Getenv("ELASTIC_API_KEY"),
-        IndexName:       os.Getenv("INDEX_NAME"),
+        IndexName:       os.Getenv("ELASTIC_INDEX_NAME"),
         LogLevel:        getEnvOrDefault("LOG_LEVEL", "info"),
     }
     

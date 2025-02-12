@@ -2,41 +2,82 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-var (
-	baseURL   string
-	maxDepth  int
-	rateLimit time.Duration
-)
+func NewCrawlCmd(lgr *logger.CustomLogger) *cobra.Command {
+	var crawlCmd = &cobra.Command{
+		Use:   "crawl",
+		Short: "Start crawling a website",
+		Long:  `Crawl a website and store the content in Elasticsearch`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
 
-var crawlCmd = &cobra.Command{
-	Use:   "crawl",
-	Short: "Start crawling a website",
-	Long:  `Crawl a website and store the content in Elasticsearch`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
-		return app.StartCrawler(ctx, &config.Config{
-			CrawlerConfig: config.CrawlerConfig{
-				BaseURL:   baseURL,
-				MaxDepth:  maxDepth,
-				RateLimit: rateLimit,
-			},
-		})
-	},
-}
+			// Set viper values
+			viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
+			viper.Set("CRAWLER_MAX_DEPTH", cmd.Flag("depth").Value.String())
+			viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())
+			viper.Set("ELASTIC_INDEX_NAME", cmd.Flag("index").Value.String())
 
-func init() {
-	rootCmd.AddCommand(crawlCmd)
+			// Create config with CLI values
+			cfg := &config.Config{
+				Crawler: config.CrawlerConfig{
+					BaseURL:   cmd.Flag("url").Value.String(),
+					IndexName: cmd.Flag("index").Value.String(),
+					Transport: http.DefaultTransport,
+				},
+				Elasticsearch: config.ElasticsearchConfig{
+					URL: os.Getenv("ELASTIC_URL"),
+				},
+			}
 
-	crawlCmd.Flags().StringVarP(&baseURL, "url", "u", "", "Base URL to crawl (required)")
-	crawlCmd.Flags().IntVarP(&maxDepth, "depth", "d", 2, "Maximum crawl depth")
-	crawlCmd.Flags().DurationVarP(&rateLimit, "rate", "r", time.Second, "Rate limit between requests")
+			// Parse rate limit
+			if rateStr := cmd.Flag("rate").Value.String(); rateStr != "" {
+				rate, err := time.ParseDuration(rateStr)
+				if err != nil {
+					return fmt.Errorf("invalid rate value: %w", err)
+				}
+				cfg.Crawler.RateLimit = rate
+			}
 
-	crawlCmd.MarkFlagRequired("url")
+			// Parse max depth
+			if depthStr := cmd.Flag("depth").Value.String(); depthStr != "" {
+				depth, err := strconv.Atoi(depthStr)
+				if err != nil {
+					return fmt.Errorf("invalid depth value: %w", err)
+				}
+				cfg.Crawler.MaxDepth = depth
+			}
+
+			// Start the crawler with the provided config
+			if err := app.StartCrawler(ctx, cfg); err != nil {
+				lgr.Error("Error starting crawler", err)
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	crawlCmd.Flags().StringP("url", "u", "", "Base URL to crawl (required)")
+	crawlCmd.Flags().IntP("depth", "d", 2, "Maximum crawl depth")
+	crawlCmd.Flags().DurationP("rate", "r", time.Second, "Rate limit between requests")
+	crawlCmd.Flags().StringP("index", "i", "articles", "Elasticsearch index name")
+
+	err := crawlCmd.MarkFlagRequired("url")
+	if err != nil {
+		return nil
+	}
+
+	return crawlCmd
 }

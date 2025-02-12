@@ -16,3 +16,9 @@ func TestMockLogger(t *testing.T) {
 		logger.Errorf("test error %s", "arg")
 	})
 }
+
+func TestSomeFunction(t *testing.T) {
+	t.Run("test case", func(_ *testing.T) {
+		// ...
+	})
+}

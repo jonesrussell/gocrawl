@@ -1,14 +1,20 @@
 package config
 
 import (
+	"net/http"
+
 	"go.uber.org/fx"
 )
 
-// Module provides the configuration as an Fx module
-//
-//nolint:gochecknoglobals // This is a module
+// NewHTTPTransport creates a new HTTP transport
+func NewHTTPTransport() http.RoundTripper {
+	return http.DefaultTransport
+}
+
+// Module provides the configuration as a dependency
 var Module = fx.Module("config",
 	fx.Provide(
-		LoadConfig, // Ensure LoadConfig is provided
+		NewHTTPTransport, // Ensure this is provided
+		NewConfig,
 	),
 )

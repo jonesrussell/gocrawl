@@ -15,9 +15,8 @@ import (
 
 // Constants for configuration
 const (
-	RequestTimeout       = 30 * time.Second // Timeout for requests
-	CollectorParallelism = 2                // Maximum parallelism for collector
-	RandomDelayFactor    = 2                // RandomDelayFactor is used to add randomization to rate limiting
+	Parallelism       = 2 // Maximum parallelism for collector
+	RandomDelayFactor = 2 // RandomDelayFactor is used to add randomization to rate limiting
 )
 
 // DebuggerInterface is an interface for the debugger
@@ -38,6 +37,7 @@ type Params struct {
 	MaxDepth  int
 	RateLimit time.Duration
 	Debugger  *logger.CollyDebugger
+	Logger    logger.Interface
 }
 
 // Result holds the collector instance
@@ -75,6 +75,9 @@ func New(p Params) (Result, error) {
 	if p.Debugger != nil {
 		c.SetDebugger(p.Debugger)
 	}
+
+	// Configure logging for the collector
+	ConfigureLogging(c, p.Logger)
 
 	return Result{Collector: c}, nil
 }

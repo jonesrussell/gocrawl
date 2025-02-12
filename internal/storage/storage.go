@@ -3,19 +3,19 @@ package storage
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"go.uber.org/fx"
 )
 
-// Storage defines the methods that any storage implementation must have
-type Storage interface {
+// Interface defines the methods that any storage implementation must have
+type Interface interface {
 	IndexDocument(ctx context.Context, index string, docID string, document interface{}) error
 	TestConnection(ctx context.Context) error
 	BulkIndex(ctx context.Context, index string, documents []interface{}) error
@@ -33,6 +33,9 @@ type Storage interface {
 		update map[string]interface{},
 	) error
 	DeleteDocument(ctx context.Context, index string, docID string) error
+	BulkIndexArticles(ctx context.Context, articles []*models.Article) error
+	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
+	IndexExists(ctx context.Context, indexName string) (bool, error)
 }
 
 // ElasticsearchStorage struct to hold the Elasticsearch client
@@ -46,86 +49,16 @@ type ElasticsearchStorage struct {
 type Result struct {
 	fx.Out
 
-	Storage Storage // Use the interface type here
+	Storage Interface // Use the interface type here
 }
 
 // Ensure ElasticsearchStorage implements the Storage interface
-var _ Storage = (*ElasticsearchStorage)(nil)
+var _ Interface = (*ElasticsearchStorage)(nil)
 
 // Constants for common values
 const (
 	defaultRefreshValue = "true"
 )
-
-// NewStorage initializes a new Storage instance
-func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
-	opts := DefaultOptions()
-	opts.URL = cfg.ElasticURL
-	opts.Password = cfg.ElasticPassword
-	opts.APIKey = cfg.ElasticAPIKey
-
-	if cfg.Transport != nil {
-		opts.Transport = cfg.Transport
-	} else {
-		opts.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		}
-	}
-
-	esConfig := elasticsearch.Config{
-		Addresses: []string{opts.URL},
-		Transport: opts.Transport,
-	}
-
-	if opts.APIKey != "" {
-		esConfig.APIKey = opts.APIKey
-	} else if opts.Password != "" {
-		esConfig.Username = opts.Username
-		esConfig.Password = opts.Password
-	}
-
-	esClient, err := elasticsearch.NewClient(esConfig)
-	if err != nil {
-		return Result{}, fmt.Errorf("failed to create elasticsearch client: %w", err)
-	}
-
-	storage := &ElasticsearchStorage{
-		ESClient: esClient,
-		Logger:   log,
-		opts:     opts,
-	}
-
-	if err := storage.TestConnection(context.Background()); err != nil {
-		return Result{}, fmt.Errorf("failed to connect to elasticsearch: %w", err)
-	}
-
-	log.Info("Successfully connected to Elasticsearch",
-		"url", opts.URL,
-		"using_api_key", opts.APIKey != "",
-	)
-
-	return Result{
-		Storage: storage,
-	}, nil
-}
-
-// NewStorageWithClient creates a new Storage instance with a provided Elasticsearch client
-func NewStorageWithClient(cfg *config.Config, log logger.Interface, client *elasticsearch.Client) (Result, error) {
-	if cfg.ElasticURL == "" {
-		return Result{}, fmt.Errorf("elasticsearch URL is required")
-	}
-
-	es := &ElasticsearchStorage{
-		ESClient: client,
-		Logger:   log, // No need for pointer conversion since we're using Interface
-	}
-
-	return Result{
-		Storage: es,
-	}, nil
-}
 
 // IndexDocument indexes a document in Elasticsearch
 func (s *ElasticsearchStorage) IndexDocument(
@@ -134,6 +67,9 @@ func (s *ElasticsearchStorage) IndexDocument(
 	docID string,
 	document interface{},
 ) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	data, err := json.Marshal(document)
 	if err != nil {
 		return fmt.Errorf("error marshaling document: %w", err)
@@ -167,6 +103,9 @@ func (s *ElasticsearchStorage) IndexDocument(
 
 // TestConnection checks the connection to the Elasticsearch cluster
 func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	info, err := s.ESClient.Info(
 		s.ESClient.Info.WithContext(ctx),
 	)
@@ -186,6 +125,9 @@ func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
 
 // BulkIndex performs bulk indexing of documents
 func (s *ElasticsearchStorage) BulkIndex(ctx context.Context, index string, documents []interface{}) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second) // Add timeout
+	defer cancel()
+
 	var buf bytes.Buffer
 
 	for _, doc := range documents {
@@ -227,6 +169,9 @@ func (s *ElasticsearchStorage) Search(
 	index string,
 	query map[string]interface{},
 ) ([]map[string]interface{}, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(query); err != nil {
 		return nil, fmt.Errorf("error encoding query: %w", err)
@@ -270,6 +215,9 @@ func (s *ElasticsearchStorage) Search(
 
 // CreateIndex creates a new index with optional mapping
 func (s *ElasticsearchStorage) CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(mapping); err != nil {
 		return fmt.Errorf("error encoding mapping: %w", err)
@@ -295,6 +243,9 @@ func (s *ElasticsearchStorage) CreateIndex(ctx context.Context, index string, ma
 
 // DeleteIndex deletes an index
 func (s *ElasticsearchStorage) DeleteIndex(ctx context.Context, index string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	// Convert single index string to slice of strings
 	indices := []string{index}
 
@@ -322,6 +273,9 @@ func (s *ElasticsearchStorage) UpdateDocument(
 	docID string,
 	update map[string]interface{},
 ) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	body := map[string]interface{}{
 		"doc":           update,
 		"doc_as_upsert": true,
@@ -347,11 +301,15 @@ func (s *ElasticsearchStorage) UpdateDocument(
 		return fmt.Errorf("update failed: %s", res.String())
 	}
 
+	s.Logger.Info("Updated document", "index", index, "docID", docID)
 	return nil
 }
 
 // DeleteDocument deletes a document
 func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string, docID string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	defer cancel()
+
 	res, err := s.ESClient.Delete(
 		index,
 		docID,
@@ -367,5 +325,59 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 	}
 
 	s.Logger.Info("Deleted document", "index", index, "docID", docID)
+	return nil
+}
+
+// IndexExists checks if the specified index exists
+func (s *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second) // Add timeout
+	defer cancel()
+
+	res, err := s.ESClient.Indices.Exists([]string{indexName}, s.ESClient.Indices.Exists.WithContext(ctx))
+	if err != nil {
+		return false, fmt.Errorf("failed to check index existence: %w", err)
+	}
+	defer res.Body.Close()
+
+	return res.StatusCode == http.StatusOK, nil
+}
+
+// BulkIndexArticles indexes multiple articles in bulk
+func (s *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
+	var buf bytes.Buffer
+
+	for _, article := range articles {
+		// Add metadata action
+		meta := map[string]interface{}{
+			"index": map[string]interface{}{
+				"_index": "articles",
+				"_id":    article.ID,
+			},
+		}
+		if err := json.NewEncoder(&buf).Encode(meta); err != nil {
+			return fmt.Errorf("error encoding meta: %w", err)
+		}
+
+		// Add document
+		if err := json.NewEncoder(&buf).Encode(article); err != nil {
+			return fmt.Errorf("error encoding article: %w", err)
+		}
+	}
+
+	s.Logger.Debug("Bulk indexing articles", "count", len(articles))
+
+	res, err := s.ESClient.Bulk(bytes.NewReader(buf.Bytes()),
+		s.ESClient.Bulk.WithContext(ctx), // Ensure context is passed
+		s.ESClient.Bulk.WithRefresh("true"))
+	if err != nil {
+		return fmt.Errorf("bulk indexing failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("bulk indexing failed: %s", res.String())
+	}
+
+	s.Logger.Info("Bulk indexed documents", "count", len(articles))
 	return nil
 }
