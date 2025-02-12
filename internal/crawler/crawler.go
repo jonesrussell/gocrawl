@@ -124,8 +124,6 @@ func NewCrawler(p Params) (Result, error) {
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 		r.Headers.Set("Accept-Language", "en-US,en;q=0.5")
-		r.Headers.Set("Cache-Control", "no-cache")
-		r.Headers.Set("Pragma", "no-cache")
 		crawler.Logger.Debug("Visiting", "url", r.URL.String(), "headers", r.Headers)
 	})
 
