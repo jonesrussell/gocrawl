@@ -20,7 +20,9 @@ var rootCmd = &cobra.Command{
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-func Execute(cfg *config.Config, lgr *logger.CustomLogger) error {
+func Execute() error {
+	var lgr *logger.CustomLogger // Declare a variable to hold the logger
+
 	app := fx.New(
 		// Core modules
 		config.Module,
@@ -31,31 +33,30 @@ func Execute(cfg *config.Config, lgr *logger.CustomLogger) error {
 
 		// Application module
 		app.Module,
+
+		fx.Populate(&lgr), // Populate the logger from the Fx context
 	)
 
 	if err := app.Start(context.Background()); err != nil {
-		lgr.Error("Error starting application", err)
-		return err
+		return fmt.Errorf("error starting application: %w", err)
 	}
 
 	// Add subcommands to the root command
-	rootCmd.AddCommand(NewCrawlCmd(lgr)) // Add crawl command
+	rootCmd.AddCommand(NewCrawlCmd(lgr)) // Pass logger from app
 
 	if err := rootCmd.Execute(); err != nil {
-		lgr.Error("Error executing root command", err)
-		return err
+		return fmt.Errorf("error executing root command: %w", err)
 	}
 
 	if err := app.Stop(context.Background()); err != nil {
-		lgr.Error("Error stopping application", err)
-		return err
+		return fmt.Errorf("error stopping application: %w", err)
 	}
 
 	return nil
 }
 
 // Shutdown gracefully shuts down the application
-func Shutdown(ctx context.Context, lgr *logger.CustomLogger) error {
+func Shutdown(ctx context.Context) error {
 	app := fx.New(
 		// Core modules
 		config.Module,
@@ -69,7 +70,6 @@ func Shutdown(ctx context.Context, lgr *logger.CustomLogger) error {
 	)
 
 	if err := app.Stop(ctx); err != nil {
-		lgr.Error("Error during shutdown", err)
 		return fmt.Errorf("error during shutdown: %w", err)
 	}
 

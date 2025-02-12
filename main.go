@@ -41,7 +41,7 @@ func main() {
 
 	// Initialize your application with the config and logger
 	go func() {
-		if err := cmd.Execute(cfg, lgr); err != nil {
+		if err := cmd.Execute(); err != nil {
 			lgr.Fatal("Error executing command", err)
 		}
 	}()
@@ -55,7 +55,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := cmd.Shutdown(ctx, lgr); err != nil {
+	if err := cmd.Shutdown(ctx); err != nil {
 		lgr.Fatal("Error during shutdown", err)
 	}
 
