@@ -62,29 +62,6 @@ func CleanupTestIndex(ctx context.Context, t *testing.T, s Storage, indexName st
 	}
 }
 
-func TestNewStorage(t *testing.T) {
-	// Create test logger
-	log := logger.NewMockCustomLogger()
-
-	// Create test config
-	cfg := &config.Config{
-		App: config.AppConfig{
-			LogLevel: "debug",
-		},
-		Elasticsearch: config.ElasticsearchConfig{
-			URL: "http://localhost:9200",
-		},
-		Crawler: config.CrawlerConfig{
-			Transport: http.DefaultTransport,
-		},
-	}
-
-	// Test storage creation
-	result, err := NewStorage(cfg, log)
-	require.NoError(t, err)
-	require.NotNil(t, result.Storage)
-}
-
 func TestNewStorageWithClient(t *testing.T) {
 	// Create test logger
 	log := logger.NewMockCustomLogger()
@@ -965,22 +942,15 @@ func TestNewStorageWithMock(t *testing.T) {
 	// Create test logger using the new mock logger
 	log := logger.NewMockCustomLogger()
 
-	// Create test config
-	cfg := &config.Config{
+	// Create storage instance
+	storage, err := NewStorage(&config.Config{
 		Elasticsearch: config.ElasticsearchConfig{
-			URL: "http://localhost:9200", // This can be ignored if using mock
+			URL: "http://localhost:9200",
 		},
 		Crawler: config.CrawlerConfig{
 			Transport: http.DefaultTransport,
 		},
-	}
-
-	// Create storage instance with mock client
-	storage := &ElasticsearchStorage{
-		ESClient: mockClient,
-		Logger:   log,
-		opts:     DefaultOptions(),
-	}
-
-	// Run your tests against the storage instance
+	}, log)
+	require.NoError(t, err)
+	require.NotNil(t, storage.Storage)
 }
