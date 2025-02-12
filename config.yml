@@ -2,7 +2,7 @@ APP_ENV: development
 LOG_LEVEL: debug
 APP_DEBUG: true
 
-ELASTIC_URL: http://localhost:9200
+ELASTIC_URL: https://localhost:9200
 ELASTIC_USERNAME: elastic
 ELASTIC_PASSWORD: t9rqA*BKxmayJ_Dmbsxk
 ELASTIC_API_KEY: NFg0czhKUUJPbEhlZjA0a216YV86RXVqNTZqY1ZTeUc4Z3owa1V3eWlSZw==
