@@ -110,6 +110,9 @@ func TestElasticsearchStorage_Operations(t *testing.T) {
 	ctx := context.Background()
 	log := logger.NewMockCustomLogger()
 
+	// Set up expectations for the logger
+	log.On("Info", mock.Anything, mock.Anything).Return()
+
 	// Mock successful response with proper Elasticsearch format
 	successResponse := `{
 		"took": 1,
