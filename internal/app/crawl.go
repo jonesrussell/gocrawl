@@ -22,7 +22,7 @@ func newFxApp(cfg *config.Config) *fx.App {
 			func() *config.Config { return cfg },
 			NewLogger,
 			storage.NewStorage,
-			func(cfg *config.Config, log logger.Interface, store storage.Storage) (*crawler.Crawler, error) {
+			func(cfg *config.Config, log logger.Interface, store storage.Interface) (*crawler.Crawler, error) {
 				params := crawler.Params{
 					BaseURL:   cfg.Crawler.BaseURL,
 					MaxDepth:  cfg.Crawler.MaxDepth,

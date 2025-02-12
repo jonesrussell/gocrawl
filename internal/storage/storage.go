@@ -14,8 +14,8 @@ import (
 	"go.uber.org/fx"
 )
 
-// Storage defines the methods that any storage implementation must have
-type Storage interface {
+// Interface defines the methods that any storage implementation must have
+type Interface interface {
 	IndexDocument(ctx context.Context, index string, docID string, document interface{}) error
 	TestConnection(ctx context.Context) error
 	BulkIndex(ctx context.Context, index string, documents []interface{}) error
@@ -49,11 +49,11 @@ type ElasticsearchStorage struct {
 type Result struct {
 	fx.Out
 
-	Storage Storage // Use the interface type here
+	Storage Interface // Use the interface type here
 }
 
 // Ensure ElasticsearchStorage implements the Storage interface
-var _ Storage = (*ElasticsearchStorage)(nil)
+var _ Interface = (*ElasticsearchStorage)(nil)
 
 // Constants for common values
 const (
@@ -329,11 +329,11 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 }
 
 // IndexExists checks if the specified index exists
-func (es *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
+func (s *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second) // Add timeout
 	defer cancel()
 
-	res, err := es.ESClient.Indices.Exists([]string{indexName}, es.ESClient.Indices.Exists.WithContext(ctx))
+	res, err := s.ESClient.Indices.Exists([]string{indexName}, s.ESClient.Indices.Exists.WithContext(ctx))
 	if err != nil {
 		return false, fmt.Errorf("failed to check index existence: %w", err)
 	}

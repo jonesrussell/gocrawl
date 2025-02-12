@@ -1,22 +1,71 @@
-package storage
+package storage_test
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// MockTransport is a mock implementation of http.RoundTripper
+type MockTransport struct {
+	Response   string
+	StatusCode int
+}
+
+// Perform implements elastictransport.Interface.
+func (m *MockTransport) Perform(*http.Request) (*http.Response, error) {
+	panic("unimplemented")
+}
+
+// RoundTrip implements the http.RoundTripper interface
+func (m *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		Body:       io.NopCloser(strings.NewReader(m.Response)),
+		StatusCode: m.StatusCode,
+	}, nil
+}
+
+// setupTestStorage creates a new storage instance for testing
+func setupTestStorage(t *testing.T) storage.Interface {
+	t.Helper()
+
+	// Create a mock logger
+	log := logger.NewMockCustomLogger()
+
+	// Create test config
+	cfg := &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: "http://localhost:9200", // or use a test URL
+		},
+		Crawler: config.CrawlerConfig{
+			Transport: http.DefaultTransport,
+		},
+	}
+
+	// Create storageInstance instance
+	storageInstance, err := storage.NewStorage(cfg, log)
+	require.NoError(t, err, "Failed to create test storage")
+	require.NotNil(t, storageInstance, "Storage instance should not be nil")
+
+	return storageInstance
+}
+
 func TestCreateArticlesIndex(t *testing.T) {
 	ctx := context.Background()
-	storage := setupTestStorage(t)
+	storageInstance := setupTestStorage(t)
 
 	// Type assertion to get the concrete type
-	es, ok := storage.(*ElasticsearchStorage)
+	es, ok := storageInstance.(*storage.ElasticsearchStorage)
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Mock successful index creation
@@ -46,10 +95,10 @@ func TestCreateArticlesIndex(t *testing.T) {
 
 func TestIndexArticle(t *testing.T) {
 	ctx := context.Background()
-	storage := setupTestStorage(t)
+	storageInstance := setupTestStorage(t)
 
 	// Type assertion to get the concrete type
-	es, ok := storage.(*ElasticsearchStorage)
+	es, ok := storageInstance.(*storage.ElasticsearchStorage)
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Mock successful index response
@@ -79,10 +128,10 @@ func TestIndexArticle(t *testing.T) {
 
 func TestBulkIndexArticles(t *testing.T) {
 	ctx := context.Background()
-	storage := setupTestStorage(t)
+	storageInstance := setupTestStorage(t)
 
 	// Type assertion to get the concrete type
-	es, ok := storage.(*ElasticsearchStorage)
+	es, ok := storageInstance.(*storage.ElasticsearchStorage)
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Test successful bulk indexing
@@ -107,10 +156,10 @@ func TestBulkIndexArticles(t *testing.T) {
 
 func TestSearchArticles(t *testing.T) {
 	ctx := context.Background()
-	storage := setupTestStorage(t)
+	storageInstance := setupTestStorage(t)
 
 	// Type assertion to get the concrete type
-	es, ok := storage.(*ElasticsearchStorage)
+	es, ok := storageInstance.(*storage.ElasticsearchStorage)
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Test successful search
@@ -121,10 +170,10 @@ func TestSearchArticles(t *testing.T) {
 
 func TestBulkIndexArticles_EmptyList(t *testing.T) {
 	ctx := context.Background()
-	storage := setupTestStorage(t)
+	storageInstance := setupTestStorage(t)
 
 	// Type assertion to get the concrete type
-	es, ok := storage.(*ElasticsearchStorage)
+	es, ok := storageInstance.(*storage.ElasticsearchStorage)
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Test with empty list
@@ -134,10 +183,10 @@ func TestBulkIndexArticles_EmptyList(t *testing.T) {
 
 func TestSearchArticles_NoResults(t *testing.T) {
 	ctx := context.Background()
-	storage := setupTestStorage(t)
+	storageInstance := setupTestStorage(t)
 
 	// Type assertion to get the concrete type
-	es, ok := storage.(*ElasticsearchStorage)
+	es, ok := storageInstance.(*storage.ElasticsearchStorage)
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Test with no results

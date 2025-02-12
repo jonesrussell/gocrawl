@@ -22,7 +22,7 @@ func SearchContent(ctx context.Context, query string, index string, size int) ([
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	storageResult, err := storage.NewStorage(&config.Config{
+	storageInstance, err := storage.NewStorage(&config.Config{
 		Crawler: config.CrawlerConfig{
 			IndexName: index,
 		},
@@ -34,7 +34,7 @@ func SearchContent(ctx context.Context, query string, index string, size int) ([
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
 
-	results, err := storageResult.Storage.SearchArticles(ctx, query, size)
+	results, err := storageInstance.SearchArticles(ctx, query, size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search articles: %w", err)
 	}
@@ -45,6 +45,7 @@ func SearchContent(ctx context.Context, query string, index string, size int) ([
 			URL:     article.Source,
 			Content: article.Body,
 		}
+		log.Info("URL: %s, Content: %s", article.Source, article.Body)
 	}
 
 	return searchResults, nil

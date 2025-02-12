@@ -142,12 +142,29 @@ func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string
 		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
-	hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
-	articles := make([]*models.Article, 0, len(hits))
+	// Check if "hits" exists and is of the expected type
+	hits, ok := result["hits"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("error parsing hits: expected map[string]interface{}")
+	}
 
-	for _, hit := range hits {
-		hitMap := hit.(map[string]interface{})
-		source := hitMap["_source"].(map[string]interface{})
+	hitItems, ok := hits["hits"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("error parsing hit items: expected []interface{}")
+	}
+
+	articles := make([]*models.Article, 0, len(hitItems))
+
+	for _, hit := range hitItems {
+		hitMap, ok := hit.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("error parsing hit: expected map[string]interface{}")
+		}
+
+		source, ok := hitMap["_source"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("error parsing source: expected map[string]interface{}")
+		}
 
 		var article models.Article
 		sourceData, err := json.Marshal(source)

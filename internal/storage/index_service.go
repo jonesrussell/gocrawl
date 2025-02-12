@@ -8,11 +8,11 @@ import (
 )
 
 type IndexService struct {
-	storage Storage
+	storage Interface
 	logger  logger.Interface
 }
 
-func NewIndexService(storage Storage, logger logger.Interface) *IndexService {
+func NewIndexService(storage Interface, logger logger.Interface) *IndexService {
 	return &IndexService{
 		storage: storage,
 		logger:  logger,

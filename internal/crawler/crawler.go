@@ -21,14 +21,16 @@ import (
 
 // Constants for configuration
 const (
-	TimeoutDuration = 5 * time.Second
-	HTTPStatusOK    = 200
+	TimeoutDuration  = 5 * time.Second
+	HTTPStatusOK     = 200
+	DefaultBatchSize = 100
+	DefaultMaxDepth  = 2
 )
 
 // Crawler struct to hold configuration or state if needed
 type Crawler struct {
 	BaseURL     string
-	Storage     storage.Storage
+	Storage     storage.Interface
 	MaxDepth    int
 	RateLimit   time.Duration
 	Collector   *colly.Collector
@@ -50,7 +52,7 @@ type Params struct {
 	Debugger  *logger.CollyDebugger
 	Logger    logger.Interface
 	Config    *config.Config
-	Storage   storage.Storage
+	Storage   storage.Interface
 }
 
 // Result holds the dependencies for the crawler
@@ -114,7 +116,7 @@ func NewCrawler(p Params) (Result, error) {
 		Collector:   c,
 		Logger:      p.Logger,
 		IndexName:   p.Config.Crawler.IndexName,
-		articleChan: make(chan *models.Article, 100),
+		articleChan: make(chan *models.Article, DefaultBatchSize),
 		articleSvc:  articleSvc,
 		indexSvc:    indexSvc,
 		running:     true,

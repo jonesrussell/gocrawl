@@ -12,7 +12,7 @@ import (
 )
 
 // setupTestStorage creates a new storage instance for testing
-func setupTestStorage(t *testing.T) Storage {
+func setupTestStorage(t *testing.T) Interface {
 	t.Helper()
 
 	// Create a mock logger
@@ -29,19 +29,19 @@ func setupTestStorage(t *testing.T) Storage {
 	}
 
 	// Create storage instance
-	storage, err := NewStorage(cfg, log)
+	storageInstance, err := NewStorage(cfg, log)
 	require.NoError(t, err, "Failed to create test storage")
-	require.NotNil(t, storage.Storage, "Storage instance should not be nil")
+	require.NotNil(t, storageInstance, "Storage instance should not be nil")
 
-	return storage.Storage
+	return storageInstance
 }
 
 func TestScrollSearch(t *testing.T) {
 	ctx := context.Background()
-	storage := setupTestStorage(t)
+	storageInstance := setupTestStorage(t)
 
 	// Type assertion to get the concrete type
-	es, ok := storage.(*ElasticsearchStorage)
+	es, ok := storageInstance.(*ElasticsearchStorage)
 	require.True(t, ok, "Storage should be of type *ElasticsearchStorage")
 
 	// Use default batch size for tests

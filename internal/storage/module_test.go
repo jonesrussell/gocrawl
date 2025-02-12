@@ -44,9 +44,9 @@ func TestNewStorage(t *testing.T) {
 	log := logger.NewMockCustomLogger()
 
 	// Create storage instance
-	storage, err := NewStorage(testConfig, log)
+	storageInstance, err := NewStorage(testConfig, log)
 	require.NoError(t, err, "Failed to create test storage")
-	require.NotNil(t, storage.Storage, "Storage instance should not be nil")
+	require.NotNil(t, storageInstance, "Storage instance should not be nil")
 }
 
 // Add other tests as needed...

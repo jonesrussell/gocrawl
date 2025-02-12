@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestArticleService(t *testing.T) {
@@ -103,7 +104,7 @@ func TestExtractArticle(t *testing.T) {
 
 		// Create HTMLElement using goquery
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		testURL, _ := url.Parse("https://www.elliotlaketoday.com/opp-beat/test-article")
 		e := &colly.HTMLElement{
@@ -202,7 +203,7 @@ func TestParsePublishedDate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			doc, err := goquery.NewDocumentFromReader(strings.NewReader(tt.html))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			e := &colly.HTMLElement{
 				DOM: doc.Selection,

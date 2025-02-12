@@ -22,18 +22,18 @@ var Module = fx.Module("storage",
 )
 
 // NewStorage initializes a new Storage instance
-func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
+func NewStorage(cfg *config.Config, log logger.Interface) (Interface, error) {
 	if cfg == nil {
-		return Result{}, fmt.Errorf("config is required")
+		return nil, fmt.Errorf("config is required")
 	}
 
 	if cfg.Elasticsearch.URL == "" {
-		return Result{}, fmt.Errorf("elasticsearch URL is required")
+		return nil, fmt.Errorf("elasticsearch URL is required")
 	}
 
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: false,
 		},
 	}
 
@@ -49,18 +49,18 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 	// Create Elasticsearch client
 	client, err := elasticsearch.NewClient(esConfig)
 	if err != nil {
-		return Result{}, fmt.Errorf("error creating elasticsearch client: %w", err)
+		return nil, fmt.Errorf("error creating elasticsearch client: %w", err)
 	}
 
 	// Create storage instance
-	storage := &ElasticsearchStorage{
+	storageInstance := &ElasticsearchStorage{
 		ESClient: client,
 		Logger:   log,
 	}
 
 	// Test connection to Elasticsearch
-	if err := storage.TestConnection(context.Background()); err != nil {
-		return Result{}, fmt.Errorf("failed to connect to elasticsearch: %w", err)
+	if err := storageInstance.TestConnection(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to connect to elasticsearch: %w", err)
 	}
 
 	log.Info("Successfully connected to Elasticsearch",
@@ -68,7 +68,5 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Result, error) {
 		"using_api_key", cfg.Elasticsearch.APIKey, // != "",
 	)
 
-	return Result{
-		Storage: storage,
-	}, nil
+	return storageInstance, nil
 }

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/mock"
@@ -114,8 +115,11 @@ func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int
 	var articles []*models.Article
 	if args.Get(0) != nil {
 		articles = args.Get(0).([]*models.Article)
+		if err := args.Error(1); err != nil {
+			return nil, fmt.Errorf("error getting articles: %w", err)
+		}
 	}
-	return articles, args.Error(1)
+	return articles, nil
 }
 
 // IndexExists implements Storage
