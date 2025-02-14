@@ -35,7 +35,7 @@ type Crawler struct {
 	articleChan chan *models.Article
 	articleSvc  article.Service
 	indexSvc    *storage.IndexService
-	config      *config.Config // Store config reference
+	Config      *config.Config // Rename to Config for clarity
 }
 
 // Params holds the parameters for creating a Crawler
@@ -104,7 +104,7 @@ func NewCrawler(p Params) (Result, error) {
 		articleChan: make(chan *models.Article, DefaultBatchSize),
 		articleSvc:  article.NewService(p.Logger),
 		indexSvc:    storage.NewIndexService(p.Storage, p.Logger),
-		config:      p.Config,
+		Config:      p.Config,
 	}
 
 	// Configure collector callbacks
@@ -122,20 +122,20 @@ func NewCrawler(p Params) (Result, error) {
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context) error {
 	// Log full crawler configuration when debug is enabled
-	if c.config.App.Debug {
+	if c.Config.App.Debug {
 		c.Logger.Debug("Starting crawler with configuration",
-			"baseURL", c.config.Crawler.BaseURL,
-			"maxDepth", c.config.Crawler.MaxDepth,
-			"rateLimit", c.config.Crawler.RateLimit,
-			"indexName", c.config.Crawler.IndexName,
-			"skipTLS", c.config.Crawler.SkipTLS,
-			"environment", c.config.App.Environment,
-			"logLevel", c.config.App.LogLevel,
-			"elasticURL", c.config.Elasticsearch.URL,
+			"baseURL", c.Config.Crawler.BaseURL,
+			"maxDepth", c.Config.Crawler.MaxDepth,
+			"rateLimit", c.Config.Crawler.RateLimit,
+			"indexName", c.Config.Crawler.IndexName,
+			"skipTLS", c.Config.Crawler.SkipTLS,
+			"environment", c.Config.App.Environment,
+			"logLevel", c.Config.App.LogLevel,
+			"elasticURL", c.Config.Elasticsearch.URL,
 		)
 	}
 
-	c.Logger.Debug("Starting crawl at base URL", "url", c.config.Crawler.BaseURL)
+	c.Logger.Debug("Starting crawl at base URL", "url", c.Config.Crawler.BaseURL)
 
 	// Perform initial setup (e.g., test connection, ensure index)
 	if err := c.Storage.TestConnection(ctx); err != nil {
@@ -155,7 +155,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	go func() {
 		defer close(done)
 		// Visit the base URL to start crawling
-		if err := c.Collector.Visit(c.config.Crawler.BaseURL); err != nil {
+		if err := c.Collector.Visit(c.Config.Crawler.BaseURL); err != nil {
 			c.Logger.Error("Failed to visit base URL", "error", err)
 			return
 		}
@@ -233,4 +233,17 @@ func configureCollectorCallbacks(c *colly.Collector, crawler *Crawler) {
 	if crawler.Debugger != nil {
 		c.SetDebugger(crawler.Debugger)
 	}
+}
+
+// Getter methods for configuration
+func (c *Crawler) GetBaseURL() string {
+	return c.Config.Crawler.BaseURL
+}
+
+func (c *Crawler) GetMaxDepth() int {
+	return c.Config.Crawler.MaxDepth
+}
+
+func (c *Crawler) GetRateLimit() time.Duration {
+	return c.Config.Crawler.RateLimit
 }

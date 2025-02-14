@@ -47,12 +47,10 @@ func TestNewCrawler(t *testing.T) {
 
 	// Create crawler params
 	params := crawler.Params{
-		BaseURL:   testConfig.Crawler.BaseURL,
-		MaxDepth:  testConfig.Crawler.MaxDepth,
-		RateLimit: testConfig.Crawler.RateLimit,
-		Logger:    log,
-		Config:    testConfig,
-		Storage:   mockStorage,
+		Logger:   log,
+		Config:   testConfig,
+		Storage:  mockStorage,
+		Debugger: nil, // Set this if you have a debugger
 	}
 
 	// Test crawler creation
@@ -60,9 +58,9 @@ func TestNewCrawler(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result.Crawler)
 
-	// Verify crawler configuration
-	assert.Equal(t, testConfig.Crawler.BaseURL, result.Crawler.BaseURL)
-	assert.Equal(t, testConfig.Crawler.MaxDepth, result.Crawler.MaxDepth)
+	// Verify crawler configuration using getter methods
+	assert.Equal(t, testConfig.Crawler.BaseURL, result.Crawler.Config.Crawler.BaseURL)
+	assert.Equal(t, testConfig.Crawler.MaxDepth, result.Crawler.Config.Crawler.MaxDepth)
 	assert.Equal(t, mockStorage, result.Crawler.Storage)
 }
 
@@ -84,12 +82,10 @@ func TestCrawler_Start(t *testing.T) {
 
 	// Create crawler params
 	params := crawler.Params{
-		BaseURL:   mockConfig.Crawler.BaseURL,
-		MaxDepth:  mockConfig.Crawler.MaxDepth,
-		RateLimit: mockConfig.Crawler.RateLimit,
-		Logger:    log,
-		Config:    mockConfig,
-		Storage:   mockStorage,
+		Logger:   log,
+		Config:   mockConfig,
+		Storage:  mockStorage,
+		Debugger: nil, // Set this if you have a debugger
 	}
 
 	// Create crawler
@@ -125,12 +121,10 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 	}
 
 	params := crawler.Params{
-		BaseURL:   mockConfig.Crawler.BaseURL,
-		MaxDepth:  mockConfig.Crawler.MaxDepth,
-		RateLimit: mockConfig.Crawler.RateLimit,
-		Logger:    mockLogger,
-		Config:    mockConfig,
-		Storage:   mockStorage,
+		Logger:   mockLogger,
+		Config:   mockConfig,
+		Storage:  mockStorage,
+		Debugger: nil, // Set this if you have a debugger
 	}
 
 	result, err := crawler.NewCrawler(params)
@@ -155,8 +149,8 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	// Update BaseURL to test server
-	crawlerInstance.BaseURL = ts.URL
+	// Update BaseURL to test server through Config
+	crawlerInstance.Config.Crawler.BaseURL = ts.URL
 
 	// Set up mock article service
 	crawlerInstance.SetArticleService(mockArticleSvc)
@@ -201,12 +195,10 @@ func TestCrawler(t *testing.T) {
 	}
 
 	params := crawler.Params{
-		BaseURL:   testConfig.Crawler.BaseURL,
-		MaxDepth:  testConfig.Crawler.MaxDepth,
-		RateLimit: testConfig.Crawler.RateLimit,
-		Logger:    mockLogger,
-		Config:    testConfig,
-		Storage:   mockStorage,
+		Logger:   mockLogger,
+		Config:   testConfig,
+		Storage:  mockStorage,
+		Debugger: nil, // Set this if you have a debugger
 	}
 
 	result, err := crawler.NewCrawler(params)
@@ -221,8 +213,8 @@ func TestCrawler(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	// Update crawler with test server URL
-	crawlerInstance.BaseURL = ts.URL
+	// Update crawler with test server URL through Config
+	crawlerInstance.Config.Crawler.BaseURL = ts.URL
 
 	// Set up mock article service
 	crawlerInstance.SetArticleService(mockArticleSvc)
