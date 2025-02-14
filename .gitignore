@@ -9,3 +9,5 @@ coverage/coverage.out
 .idea/gocrawl.iml
 .idea/modules.xml
 .idea/vcs.xml
+
+config.yml
