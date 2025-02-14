@@ -8,11 +8,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/fx"
 )
 
 func NewCrawlCmd(lgr *logger.CustomLogger) *cobra.Command {
@@ -59,8 +60,18 @@ func NewCrawlCmd(lgr *logger.CustomLogger) *cobra.Command {
 				cfg.Crawler.MaxDepth = depth
 			}
 
-			// Start the crawler with the provided config and context
-			if err := app.StartCrawler(ctx, cfg); err != nil {
+			// Get the crawler instance from the fx container
+			var c *crawler.Crawler
+			if err := fx.New(
+				fx.Populate(&c),
+				fx.Supply(cfg),
+			).Start(ctx); err != nil {
+				lgr.Error("Error getting crawler instance", err)
+				return err
+			}
+
+			// Start the crawler
+			if err := c.Start(ctx); err != nil {
 				lgr.Error("Error starting crawler", err)
 				return err
 			}

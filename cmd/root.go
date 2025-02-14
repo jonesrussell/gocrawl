@@ -24,7 +24,7 @@ var (
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
-	var lgr *logger.CustomLogger // Declare a variable to hold the logger
+	var lgr *logger.CustomLogger
 
 	appInstance = fx.New(
 		// Core modules
@@ -37,10 +37,34 @@ func Execute() error {
 		// Application module
 		app.Module,
 
-		fx.Populate(&lgr), // Populate the logger from the Fx context
+		fx.Populate(&lgr),
+
+		// Provide base context
 		fx.Provide(func() context.Context {
-			return context.Background() // Provide a new context
+			return context.Background()
 		}),
+
+		// Provide crawler constructor
+		fx.Provide(
+			func(cfg *config.Config, log logger.Interface, store storage.Interface) (*crawler.Crawler, error) {
+				params := crawler.Params{
+					BaseURL:   cfg.Crawler.BaseURL,
+					MaxDepth:  cfg.Crawler.MaxDepth,
+					RateLimit: cfg.Crawler.RateLimit,
+					Debugger:  &logger.CollyDebugger{Logger: log},
+					Logger:    log,
+					Config:    cfg,
+					Storage:   store,
+				}
+				result, err := crawler.NewCrawler(params)
+				if err != nil {
+					log.Error("Failed to create crawler", "error", err)
+					return nil, err
+				}
+				log.Debug("Crawler created successfully", "baseURL", params.BaseURL)
+				return result.Crawler, nil
+			},
+		),
 	)
 
 	// Create a context for the application and add the logger to it
