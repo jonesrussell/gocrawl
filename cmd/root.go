@@ -52,7 +52,8 @@ func Execute() error {
 		}),
 	)
 
-	ctx := context.Background()
+	// Create context with app instance
+	ctx := context.WithValue(context.Background(), "fx.app", appInstance)
 
 	if err := appInstance.Start(ctx); err != nil {
 		return fmt.Errorf("error starting application: %w", err)

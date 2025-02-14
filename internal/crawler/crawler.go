@@ -4,11 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"time"
-
-	"crypto/tls"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
@@ -25,6 +22,7 @@ const (
 	HTTPStatusOK     = 200
 	DefaultBatchSize = 100
 	DefaultMaxDepth  = 2
+	DefaultRateLimit = time.Second
 )
 
 // Crawler struct to hold configuration or state if needed
@@ -35,6 +33,7 @@ type Crawler struct {
 	RateLimit   time.Duration
 	Collector   *colly.Collector
 	Logger      logger.Interface
+	Debugger    *logger.CollyDebugger
 	IndexName   string
 	articleChan chan *models.Article
 	articleSvc  article.Service
@@ -82,8 +81,6 @@ func NewCrawler(p Params) (Result, error) {
 		colly.AllowedDomains(domain),
 		colly.MaxBodySize(10*1024*1024),
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
-		colly.IgnoreRobotsTxt(),
-		colly.AllowURLRevisit(),
 	)
 
 	// Set rate limiting
@@ -96,18 +93,6 @@ func NewCrawler(p Params) (Result, error) {
 		return Result{}, fmt.Errorf("error setting rate limit: %w", err)
 	}
 
-	// Add transport configuration
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: p.Config.Crawler.SkipTLS,
-	}
-
-	c.WithTransport(&http.Transport{
-		TLSClientConfig: tlsConfig,
-	})
-
-	articleSvc := article.NewService(p.Logger)
-	indexSvc := storage.NewIndexService(p.Storage, p.Logger)
-
 	crawler := &Crawler{
 		BaseURL:     p.BaseURL,
 		Storage:     p.Storage,
@@ -115,44 +100,15 @@ func NewCrawler(p Params) (Result, error) {
 		RateLimit:   p.RateLimit,
 		Collector:   c,
 		Logger:      p.Logger,
+		Debugger:    p.Debugger,
 		IndexName:   p.Config.Crawler.IndexName,
 		articleChan: make(chan *models.Article, DefaultBatchSize),
-		articleSvc:  articleSvc,
-		indexSvc:    indexSvc,
-		running:     true,
+		articleSvc:  article.NewService(p.Logger),
+		indexSvc:    storage.NewIndexService(p.Storage, p.Logger),
 	}
 
 	// Configure collector callbacks
-	c.OnRequest(func(r *colly.Request) {
-		p.Logger.Debug("Requesting URL", r.URL.String())
-	})
-
-	c.OnResponse(func(r *colly.Response) {
-		p.Logger.Debug("Received response", "url", r.Request.URL.String(), "status", r.StatusCode)
-	})
-
-	c.OnError(func(r *colly.Response, err error) {
-		p.Logger.Error("Error scraping", "url", r.Request.URL.String(), "error", err)
-	})
-
-	c.OnHTML("div.details", func(e *colly.HTMLElement) {
-		crawler.processPage(e)
-	})
-
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if link == "" {
-			return
-		}
-		p.Logger.Debug("Found link", "url", link)
-		if err := e.Request.Visit(link); err != nil {
-			p.Logger.Debug("Could not visit link", "url", link, "error", err)
-		}
-	})
-
-	if p.Debugger != nil {
-		c.SetDebugger(p.Debugger)
-	}
+	configureCollectorCallbacks(c, crawler)
 
 	p.Logger.Info("Crawler initialized",
 		"baseURL", p.BaseURL,
@@ -190,6 +146,15 @@ func (c *Crawler) Start(ctx context.Context) error {
 	c.Collector.Wait()
 	c.Logger.Info("Crawler finished - no more links to visit")
 
+	// Signal fx to stop since crawling is complete
+	if app, ok := ctx.Value("fx.app").(*fx.App); ok {
+		c.Logger.Debug("Signaling application to shutdown")
+		if err := app.Stop(ctx); err != nil {
+			c.Logger.Error("Error during shutdown", "error", err)
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -223,4 +188,37 @@ func (c *Crawler) SetArticleService(svc article.Service) {
 
 func (c *Crawler) SetBaseURL(url string) {
 	c.BaseURL = url
+}
+
+func configureCollectorCallbacks(c *colly.Collector, crawler *Crawler) {
+	c.OnRequest(func(r *colly.Request) {
+		crawler.Logger.Debug("Requesting URL", r.URL.String())
+	})
+
+	c.OnResponse(func(r *colly.Response) {
+		crawler.Logger.Debug("Received response", "url", r.Request.URL.String(), "status", r.StatusCode)
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		crawler.Logger.Error("Error scraping", "url", r.Request.URL.String(), "error", err)
+	})
+
+	c.OnHTML("div.details", func(e *colly.HTMLElement) {
+		crawler.processPage(e)
+	})
+
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Request.AbsoluteURL(e.Attr("href"))
+		if link == "" {
+			return
+		}
+		crawler.Logger.Debug("Found link", "url", link)
+		if err := e.Request.Visit(link); err != nil {
+			crawler.Logger.Debug("Could not visit link", "url", link, "error", err)
+		}
+	})
+
+	if crawler.Debugger != nil {
+		c.SetDebugger(crawler.Debugger)
+	}
 }

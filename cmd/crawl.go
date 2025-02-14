@@ -23,7 +23,7 @@ func NewCrawlCmd(lgr *logger.CustomLogger, crawler *crawler.Crawler) *cobra.Comm
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 
-			// Set viper values
+			// Set viper values before config is created
 			viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
 			viper.Set("CRAWLER_MAX_DEPTH", cmd.Flag("depth").Value.String())
 			viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())

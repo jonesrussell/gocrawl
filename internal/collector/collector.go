@@ -59,25 +59,34 @@ func New(p Params) (Result, error) {
 		return Result{}, fmt.Errorf("invalid base URL: must be a valid HTTP/HTTPS URL")
 	}
 
+	// Create collector with base configuration
 	c := colly.NewCollector(
-		colly.MaxDepth(p.MaxDepth),
 		colly.Async(true),
+		colly.MaxDepth(p.MaxDepth),
 	)
 
+	// Set rate limiting
 	err = c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: p.RateLimit,
+		Parallelism: Parallelism,
 	})
 	if err != nil {
-		return Result{}, err
+		return Result{}, fmt.Errorf("failed to set rate limit: %w", err)
 	}
 
 	if p.Debugger != nil {
 		c.SetDebugger(p.Debugger)
 	}
 
-	// Configure logging for the collector
+	// Configure logging
 	ConfigureLogging(c, p.Logger)
+
+	p.Logger.Debug("Collector created",
+		"baseURL", p.BaseURL,
+		"maxDepth", p.MaxDepth,
+		"rateLimit", p.RateLimit,
+	)
 
 	return Result{Collector: c}, nil
 }

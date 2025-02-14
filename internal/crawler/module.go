@@ -15,10 +15,16 @@ func provideBaseURL(cfg *config.Config) string {
 }
 
 func provideMaxDepth(cfg *config.Config) int {
+	if cfg.Crawler.MaxDepth <= 0 {
+		return DefaultMaxDepth
+	}
 	return cfg.Crawler.MaxDepth
 }
 
 func provideRateLimit(cfg *config.Config) time.Duration {
+	if cfg.Crawler.RateLimit <= 0 {
+		return DefaultRateLimit
+	}
 	return cfg.Crawler.RateLimit
 }
 
@@ -48,16 +54,10 @@ var Module = fx.Module("crawler",
 )
 
 // registerHooks sets up the lifecycle hooks for the crawler
-func registerHooks(lc fx.Lifecycle, crawler *Crawler, shutdowner fx.Shutdowner) {
+func registerHooks(lc fx.Lifecycle, crawler *Crawler) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			err := crawler.Start(ctx)
-			if err != nil {
-				return err
-			}
-
-			// After crawler is done, signal shutdown
-			return shutdowner.Shutdown()
+			return crawler.Start(ctx)
 		},
 		OnStop: func(ctx context.Context) error {
 			crawler.Stop()
