@@ -14,18 +14,25 @@ import (
 	"go.uber.org/fx"
 )
 
+// CrawlerDeps holds the dependencies needed for the crawler
+type CrawlerDeps struct {
+	fx.In
+
+	Crawler *crawler.Crawler
+	Logger  *logger.CustomLogger
+}
+
 var (
 	rootCmd = &cobra.Command{
 		Use:   "gocrawl",
 		Short: "A web crawler that stores content in Elasticsearch",
 	}
 	appInstance *fx.App
+	deps        CrawlerDeps
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
-	var lgr *logger.CustomLogger
-
 	appInstance = fx.New(
 		// Core modules
 		config.Module,
@@ -37,46 +44,23 @@ func Execute() error {
 		// Application module
 		app.Module,
 
-		fx.Populate(&lgr),
+		fx.Populate(&deps),
 
-		// Provide base context
 		fx.Provide(func() context.Context {
 			return context.Background()
 		}),
-
-		// Provide crawler constructor
-		fx.Provide(
-			func(cfg *config.Config, log logger.Interface, store storage.Interface) (*crawler.Crawler, error) {
-				params := crawler.Params{
-					BaseURL:   cfg.Crawler.BaseURL,
-					MaxDepth:  cfg.Crawler.MaxDepth,
-					RateLimit: cfg.Crawler.RateLimit,
-					Debugger:  &logger.CollyDebugger{Logger: log},
-					Logger:    log,
-					Config:    cfg,
-					Storage:   store,
-				}
-				result, err := crawler.NewCrawler(params)
-				if err != nil {
-					log.Error("Failed to create crawler", "error", err)
-					return nil, err
-				}
-				log.Debug("Crawler created successfully", "baseURL", params.BaseURL)
-				return result.Crawler, nil
-			},
-		),
 	)
 
 	// Create a context for the application and add the logger to it
-	ctx := logger.WithContext(context.Background(), lgr.GetZapLogger()) // Use GetZapLogger() to get the zap.Logger
+	ctx := context.Background()
 
 	if err := appInstance.Start(ctx); err != nil {
 		return fmt.Errorf("error starting application: %w", err)
 	}
 
 	// Add subcommands to the root command
-	rootCmd.AddCommand(NewCrawlCmd(lgr)) // Pass logger from appInstance
-	rootCmd.AddCommand(NewSearchCmd(lgr))
+	rootCmd.AddCommand(NewCrawlCmd(deps.Logger, deps.Crawler))
+	rootCmd.AddCommand(NewSearchCmd(deps.Logger))
 
 	if err := rootCmd.Execute(); err != nil {
 		return fmt.Errorf("error executing root command: %w", err)

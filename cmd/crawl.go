@@ -13,10 +13,9 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 )
 
-func NewCrawlCmd(lgr *logger.CustomLogger) *cobra.Command {
+func NewCrawlCmd(lgr *logger.CustomLogger, crawler *crawler.Crawler) *cobra.Command {
 	var crawlCmd = &cobra.Command{
 		Use:   "crawl",
 		Short: "Start crawling a website",
@@ -42,7 +41,7 @@ func NewCrawlCmd(lgr *logger.CustomLogger) *cobra.Command {
 				},
 			}
 
-			// Parse rate limit
+			// Parse rate limit and max depth
 			if rateStr := cmd.Flag("rate").Value.String(); rateStr != "" {
 				rate, err := time.ParseDuration(rateStr)
 				if err != nil {
@@ -51,7 +50,6 @@ func NewCrawlCmd(lgr *logger.CustomLogger) *cobra.Command {
 				cfg.Crawler.RateLimit = rate
 			}
 
-			// Parse max depth
 			if depthStr := cmd.Flag("depth").Value.String(); depthStr != "" {
 				depth, err := strconv.Atoi(depthStr)
 				if err != nil {
@@ -60,18 +58,8 @@ func NewCrawlCmd(lgr *logger.CustomLogger) *cobra.Command {
 				cfg.Crawler.MaxDepth = depth
 			}
 
-			// Get the crawler instance from the fx container
-			var c *crawler.Crawler
-			if err := fx.New(
-				fx.Populate(&c),
-				fx.Supply(cfg),
-			).Start(ctx); err != nil {
-				lgr.Error("Error getting crawler instance", err)
-				return err
-			}
-
 			// Start the crawler
-			if err := c.Start(ctx); err != nil {
+			if err := crawler.Start(ctx); err != nil {
 				lgr.Error("Error starting crawler", err)
 				return err
 			}
