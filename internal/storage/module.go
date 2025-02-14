@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
 
@@ -15,13 +16,11 @@ type ElasticsearchClient struct {
 	Client *elasticsearch.Client
 }
 
-// Module provides the storage as an Fx module
-//
-//nolint:gochecknoglobals // This is a module
-var Module = fx.Options(
+// Module provides the storage module and its dependencies
+var Module = fx.Module("storage",
 	fx.Provide(
-		ProvideElasticsearchClient,
-		NewStorage,
+		ProvideElasticsearchClient, // Function to provide an Elasticsearch client
+		NewStorage,                 // Function to create a new storage instance
 	),
 )
 
@@ -30,6 +29,9 @@ func NewStorage(esClient *elasticsearch.Client) (Interface, error) {
 	if esClient == nil {
 		return nil, errors.New("elasticsearch client is nil")
 	}
+
+	// Log the Elasticsearch client information for debugging
+	fmt.Printf("Elasticsearch client initialized: %+v\n", esClient)
 
 	// Attempt to ping Elasticsearch to check connectivity
 	res, err := esClient.Info()
@@ -66,7 +68,10 @@ func ProvideElasticsearchClient() (*elasticsearch.Client, error) {
 		Addresses: []string{
 			"https://localhost:9200", // Ensure this matches your Elasticsearch URL
 		},
-		Transport: transport, // Use the custom transport
+		Transport: transport,                           // Use the custom transport
+		Username:  viper.GetString("ELASTIC_USERNAME"), // Get username from config
+		Password:  viper.GetString("ELASTIC_PASSWORD"), // Get password from config
+		APIKey:    viper.GetString("ELASTIC_API_KEY"),  // Get API key from config
 	}
 
 	client, err := elasticsearch.NewClient(cfg)

@@ -59,7 +59,7 @@ func NewCrawlCmd(lgr *logger.CustomLogger) *cobra.Command {
 				cfg.Crawler.MaxDepth = depth
 			}
 
-			// Start the crawler with the provided config
+			// Start the crawler with the provided config and context
 			if err := app.StartCrawler(ctx, cfg); err != nil {
 				lgr.Error("Error starting crawler", err)
 				return err

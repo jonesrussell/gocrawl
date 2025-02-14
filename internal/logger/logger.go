@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -126,4 +127,21 @@ func convertToZapFields(fields []interface{}) []zap.Field {
 	}
 
 	return zapFields
+}
+
+type contextKey struct{}
+
+// WithContext adds a logger to the context
+func WithContext(ctx context.Context, logger *zap.Logger) context.Context {
+	return context.WithValue(ctx, contextKey{}, logger)
+}
+
+// FromContext retrieves the logger from the context
+func FromContext(ctx context.Context) *zap.Logger {
+	logger, ok := ctx.Value(contextKey{}).(*zap.Logger)
+	if !ok {
+		// Return a default logger or handle the error as needed
+		return zap.NewNop() // No-op logger
+	}
+	return logger
 }

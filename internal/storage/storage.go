@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -101,25 +102,23 @@ func (s *ElasticsearchStorage) IndexDocument(
 	return nil
 }
 
-// TestConnection checks the connection to the Elasticsearch cluster
+// TestConnection checks if the Elasticsearch client is working
 func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
-	defer cancel()
+	if s.ESClient == nil {
+		return errors.New("elasticsearch client is nil")
+	}
 
-	info, err := s.ESClient.Info(
-		s.ESClient.Info.WithContext(ctx),
-	)
+	// Perform a simple request to test the connection
+	res, err := s.ESClient.Info()
 	if err != nil {
-		return fmt.Errorf("error getting Elasticsearch info: %w", err)
+		return fmt.Errorf("failed to connect to Elasticsearch: %w", err)
 	}
-	defer info.Body.Close()
+	defer res.Body.Close()
 
-	var esInfo map[string]interface{}
-	if decodeErr := json.NewDecoder(info.Body).Decode(&esInfo); decodeErr != nil {
-		return fmt.Errorf("error decoding Elasticsearch info response: %w", decodeErr)
+	if res.IsError() {
+		return fmt.Errorf("error response from Elasticsearch: %s", res.String())
 	}
 
-	s.Logger.Info("Elasticsearch info", esInfo)
 	return nil
 }
 

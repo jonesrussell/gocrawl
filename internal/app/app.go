@@ -6,9 +6,9 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+	"go.uber.org/zap"
 )
 
 // NewLogger creates a new logger instance
@@ -20,14 +20,22 @@ func NewLogger(cfg *config.Config) (logger.Interface, error) {
 	return log, nil
 }
 
-func runCrawler(ctx context.Context, crawler *crawler.Crawler) error {
-	// Start the crawler
-	if err := crawler.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start crawler: %w", err)
-	}
+// runCrawler is the function that will be invoked to start the crawling process.
+func runCrawler(ctx context.Context, storage storage.Interface) error {
+	log := logger.FromContext(ctx) // Get the logger from context
+	log.Debug("Starting the crawler...")
 
-	// Wait for the crawler to finish (if necessary)
-	// You might want to implement a wait group or similar mechanism here
+	// Your crawling logic here
+	fmt.Println("Starting the crawler...")
+
+	// Example of using the context
+	select {
+	case <-ctx.Done():
+		log.Error("Crawler stopped due to context cancellation", zap.Error(ctx.Err()))
+		return ctx.Err()
+	default:
+		// Continue with the crawling process
+	}
 
 	return nil
 }

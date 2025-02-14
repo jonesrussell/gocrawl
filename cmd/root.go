@@ -38,22 +38,27 @@ func Execute() error {
 		app.Module,
 
 		fx.Populate(&lgr), // Populate the logger from the Fx context
+		fx.Provide(func() context.Context {
+			return context.Background() // Provide a new context
+		}),
 	)
 
-	if err := appInstance.Start(context.Background()); err != nil {
+	// Create a context for the application and add the logger to it
+	ctx := logger.WithContext(context.Background(), lgr.GetZapLogger()) // Use GetZapLogger() to get the zap.Logger
+
+	if err := appInstance.Start(ctx); err != nil {
 		return fmt.Errorf("error starting application: %w", err)
 	}
 
 	// Add subcommands to the root command
 	rootCmd.AddCommand(NewCrawlCmd(lgr)) // Pass logger from appInstance
-
 	rootCmd.AddCommand(NewSearchCmd(lgr))
 
 	if err := rootCmd.Execute(); err != nil {
 		return fmt.Errorf("error executing root command: %w", err)
 	}
 
-	if err := appInstance.Stop(context.Background()); err != nil {
+	if err := appInstance.Stop(ctx); err != nil {
 		return fmt.Errorf("error stopping application: %w", err)
 	}
 

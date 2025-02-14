@@ -9,11 +9,11 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Module provides the logger as an Fx module
-//
-//nolint:gochecknoglobals // This is a module definition
+// Module provides the logger module and its dependencies
 var Module = fx.Module("logger",
-	fx.Provide(NewLogger),
+	fx.Provide(
+		NewDevelopmentLogger, // Function to create a new logger instance
+	),
 )
 
 // NewLogger initializes the appropriate logger based on the environment

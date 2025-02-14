@@ -11,10 +11,10 @@ func NewHTTPTransport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-// Module provides the configuration as a dependency
+// Module provides the configuration module and its dependencies
 var Module = fx.Module("config",
 	fx.Provide(
 		NewHTTPTransport, // Ensure this is provided
-		NewConfig,
+		NewConfig,        // Function to create a new config instance
 	),
 )

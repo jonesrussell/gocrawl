@@ -3,7 +3,8 @@ package app
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 )
 
@@ -11,17 +12,16 @@ import (
 var Module = fx.Module("app",
 	fx.Provide(
 		NewLogger,
-		// Provide the StartCrawler function
-		func() func(ctx context.Context, cfg *config.Config) error {
-			return StartCrawler
-		},
-		// Provide context.Context
-		func() context.Context {
-			return context.Background() // Provide a background context
+		// Provide a function that returns runCrawler
+		func() func(ctx context.Context, storage storage.Interface) error {
+			return runCrawler // Ensure runCrawler is provided correctly
 		},
 	),
-	// Invoke any initialization functions if needed
 	fx.Invoke(
-		runCrawler,
+		func(ctx context.Context, storage storage.Interface) error {
+			log := logger.FromContext(ctx)
+			log.Debug("Invoking runCrawler with provided context and storage")
+			return runCrawler(ctx, storage)
+		},
 	),
 )

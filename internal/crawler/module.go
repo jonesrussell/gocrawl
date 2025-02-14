@@ -25,9 +25,7 @@ func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {
 	return logger.NewCollyDebugger(log)
 }
 
-// Module provides the crawler as an Fx module
-//
-//nolint:gochecknoglobals // This is a module
+// Module provides the crawler module and its dependencies
 var Module = fx.Module("crawler",
 	fx.Provide(
 		fx.Annotated{
