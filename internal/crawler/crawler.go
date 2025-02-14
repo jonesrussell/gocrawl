@@ -178,7 +178,6 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 // Stop method to cleanly shut down the crawler
 func (c *Crawler) Stop() {
-	c.Logger.Debug("Stopping crawler")
 	// Perform any necessary cleanup here
 }
 
