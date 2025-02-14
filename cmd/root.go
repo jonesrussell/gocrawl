@@ -46,12 +46,12 @@ func Execute() error {
 
 		fx.Populate(&deps),
 
+		// Provide base context
 		fx.Provide(func() context.Context {
 			return context.Background()
 		}),
 	)
 
-	// Create a context for the application and add the logger to it
 	ctx := context.Background()
 
 	if err := appInstance.Start(ctx); err != nil {
@@ -62,12 +62,9 @@ func Execute() error {
 	rootCmd.AddCommand(NewCrawlCmd(deps.Logger, deps.Crawler))
 	rootCmd.AddCommand(NewSearchCmd(deps.Logger))
 
+	// Execute the command
 	if err := rootCmd.Execute(); err != nil {
 		return fmt.Errorf("error executing root command: %w", err)
-	}
-
-	if err := appInstance.Stop(ctx); err != nil {
-		return fmt.Errorf("error stopping application: %w", err)
 	}
 
 	return nil

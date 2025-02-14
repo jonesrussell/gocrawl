@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -43,4 +44,24 @@ var Module = fx.Module("crawler",
 		provideCollyDebugger,
 		NewCrawler,
 	),
+	fx.Invoke(registerHooks),
 )
+
+// registerHooks sets up the lifecycle hooks for the crawler
+func registerHooks(lc fx.Lifecycle, crawler *Crawler, shutdowner fx.Shutdowner) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			err := crawler.Start(ctx)
+			if err != nil {
+				return err
+			}
+
+			// After crawler is done, signal shutdown
+			return shutdowner.Shutdown()
+		},
+		OnStop: func(ctx context.Context) error {
+			crawler.Stop()
+			return nil
+		},
+	})
+}

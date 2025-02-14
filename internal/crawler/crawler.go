@@ -165,7 +165,7 @@ func NewCrawler(p Params) (Result, error) {
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context) error {
-	c.running = true // Set running state to true
+	c.running = true
 	c.Logger.Debug("Starting crawl at base URL", "url", c.BaseURL)
 
 	// Perform initial setup (e.g., test connection, ensure index)
@@ -186,7 +186,9 @@ func (c *Crawler) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to visit base URL: %w", err)
 	}
 
-	c.Logger.Debug("Crawling process started")
+	// Wait for collector to finish all requests
+	c.Collector.Wait()
+	c.Logger.Info("Crawler finished - no more links to visit")
 
 	return nil
 }
