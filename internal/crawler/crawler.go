@@ -38,7 +38,6 @@ type Crawler struct {
 	articleChan chan *models.Article
 	articleSvc  article.Service
 	indexSvc    *storage.IndexService
-	running     bool
 }
 
 // Params holds the parameters for creating a Crawler
@@ -123,12 +122,6 @@ func NewCrawler(p Params) (Result, error) {
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context) error {
-	if c.running {
-		c.Logger.Warn("Crawler is already running")
-		return nil
-	}
-
-	c.running = true
 	c.Logger.Debug("Starting crawl at base URL", "url", c.BaseURL)
 
 	// Perform initial setup (e.g., test connection, ensure index)
@@ -142,24 +135,29 @@ func (c *Crawler) Start(ctx context.Context) error {
 		return fmt.Errorf("index setup failed: %w", err)
 	}
 
-	// Visit the base URL to start crawling
-	c.Logger.Debug("Visiting base URL", "url", c.BaseURL)
-	if err := c.Collector.Visit(c.BaseURL); err != nil {
-		c.Logger.Error("Failed to visit base URL", "error", err)
-		return fmt.Errorf("failed to visit base URL: %w", err)
-	}
+	// Create a channel to track completion
+	done := make(chan struct{})
 
-	// Wait for collector to finish all requests
-	c.Collector.Wait()
-	c.Logger.Info("Crawler finished - no more links to visit")
-
-	// Signal fx to stop since crawling is complete
-	if app, ok := ctx.Value("fx.app").(*fx.App); ok {
-		c.Logger.Debug("Signaling application to shutdown")
-		if err := app.Stop(ctx); err != nil {
-			c.Logger.Error("Error during shutdown", "error", err)
-			return err
+	// Start crawling in a goroutine
+	go func() {
+		defer close(done)
+		// Visit the base URL to start crawling
+		if err := c.Collector.Visit(c.BaseURL); err != nil {
+			c.Logger.Error("Failed to visit base URL", "error", err)
+			return
 		}
+		// Wait for collector to finish all requests
+		c.Collector.Wait()
+		c.Logger.Info("Crawler finished - no more links to visit")
+	}()
+
+	// Wait for either completion or context cancellation
+	select {
+	case <-ctx.Done():
+		c.Logger.Info("Crawler stopping due to context cancellation")
+		return ctx.Err()
+	case <-done:
+		c.Logger.Info("Crawler completed successfully")
 	}
 
 	return nil
@@ -167,7 +165,6 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 // Stop method to cleanly shut down the crawler
 func (c *Crawler) Stop() {
-	c.running = false
 	c.Logger.Debug("Stopping crawler")
 	// Perform any necessary cleanup here
 }

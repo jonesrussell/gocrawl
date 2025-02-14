@@ -3,6 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -52,8 +55,7 @@ func Execute() error {
 		}),
 	)
 
-	// Create context with app instance
-	ctx := context.WithValue(context.Background(), "fx.app", appInstance)
+	ctx := context.Background()
 
 	if err := appInstance.Start(ctx); err != nil {
 		return fmt.Errorf("error starting application: %w", err)
@@ -63,9 +65,26 @@ func Execute() error {
 	rootCmd.AddCommand(NewCrawlCmd(deps.Logger, deps.Crawler))
 	rootCmd.AddCommand(NewSearchCmd(deps.Logger))
 
-	// Execute the command
+	// Execute the command and wait for completion
 	if err := rootCmd.Execute(); err != nil {
 		return fmt.Errorf("error executing root command: %w", err)
+	}
+
+	// Wait for signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Block until signal is received or app is done
+	select {
+	case sig := <-sigChan:
+		deps.Logger.Info("Received signal", "signal", sig)
+	case <-ctx.Done():
+		deps.Logger.Info("Context done")
+	}
+
+	// Shutdown the application
+	if err := appInstance.Stop(ctx); err != nil {
+		return fmt.Errorf("error stopping application: %w", err)
 	}
 
 	return nil

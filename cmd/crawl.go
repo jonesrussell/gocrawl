@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -21,7 +22,31 @@ func NewCrawlCmd(lgr *logger.CustomLogger, crawler *crawler.Crawler) *cobra.Comm
 			viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())
 			viper.Set("ELASTIC_INDEX_NAME", cmd.Flag("index").Value.String())
 
-			// Let fx lifecycle handle the crawler start/stop
+			// Create a context that can be cancelled
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
+
+			// Create a channel to wait for crawler completion
+			done := make(chan error, 1)
+
+			// Start crawler in goroutine
+			go func() {
+				done <- crawler.Start(ctx)
+			}()
+
+			// Wait for either completion or interrupt
+			select {
+			case err := <-done:
+				if err != nil {
+					lgr.Error("Crawler failed", err)
+					return err
+				}
+				lgr.Info("Crawler completed successfully")
+			case <-ctx.Done():
+				lgr.Info("Crawler interrupted")
+				return ctx.Err()
+			}
+
 			return nil
 		},
 	}
