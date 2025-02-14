@@ -129,3 +129,12 @@ func FromContext(ctx context.Context) *zap.Logger {
 	}
 	return logger
 }
+
+// NewProductionLogger initializes a new CustomLogger for production
+func NewProductionLogger() (*CustomLogger, error) {
+	logger, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
+	return &CustomLogger{Logger: logger}, nil
+}

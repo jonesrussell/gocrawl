@@ -43,14 +43,11 @@ func InitializeLogger() (logger.Interface, error) {
 		env = "development" // Set a default environment
 	}
 
-	cfg := &config.Config{
-		App: config.AppConfig{
-			Environment: env,
-			Debug:       viper.GetBool("APP_DEBUG"),
-			LogLevel:    viper.GetString("LOG_LEVEL"),
-		},
+	if env == "development" {
+		return logger.NewDevelopmentLogger() // Use colored logger in development
+	} else {
+		return logger.NewProductionLogger() // Use a different logger for production
 	}
-	return logger.NewLogger(cfg)
 }
 
 func Execute() error {
