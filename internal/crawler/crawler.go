@@ -27,10 +27,7 @@ const (
 
 // Crawler struct to hold configuration or state if needed
 type Crawler struct {
-	BaseURL     string
 	Storage     storage.Interface
-	MaxDepth    int
-	RateLimit   time.Duration
 	Collector   *colly.Collector
 	Logger      logger.Interface
 	Debugger    *logger.CollyDebugger
@@ -38,6 +35,7 @@ type Crawler struct {
 	articleChan chan *models.Article
 	articleSvc  article.Service
 	indexSvc    *storage.IndexService
+	config      *config.Config // Store config reference
 }
 
 // Params holds the parameters for creating a Crawler
@@ -95,10 +93,7 @@ func NewCrawler(p Params) (Result, error) {
 	}
 
 	crawler := &Crawler{
-		BaseURL:     p.Config.Crawler.BaseURL,
 		Storage:     p.Storage,
-		MaxDepth:    maxDepth,
-		RateLimit:   p.Config.Crawler.RateLimit,
 		Collector:   c,
 		Logger:      p.Logger,
 		Debugger:    p.Debugger,
@@ -106,6 +101,7 @@ func NewCrawler(p Params) (Result, error) {
 		articleChan: make(chan *models.Article, DefaultBatchSize),
 		articleSvc:  article.NewService(p.Logger),
 		indexSvc:    storage.NewIndexService(p.Storage, p.Logger),
+		config:      p.Config,
 	}
 
 	// Configure collector callbacks
@@ -122,7 +118,7 @@ func NewCrawler(p Params) (Result, error) {
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context) error {
-	c.Logger.Debug("Starting crawl at base URL", "url", c.BaseURL)
+	c.Logger.Debug("Starting crawl at base URL", "url", c.config.Crawler.BaseURL)
 
 	// Perform initial setup (e.g., test connection, ensure index)
 	if err := c.Storage.TestConnection(ctx); err != nil {
@@ -142,7 +138,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	go func() {
 		defer close(done)
 		// Visit the base URL to start crawling
-		if err := c.Collector.Visit(c.BaseURL); err != nil {
+		if err := c.Collector.Visit(c.config.Crawler.BaseURL); err != nil {
 			c.Logger.Error("Failed to visit base URL", "error", err)
 			return
 		}
@@ -188,10 +184,6 @@ func (c *Crawler) SetCollector(collector *colly.Collector) {
 
 func (c *Crawler) SetArticleService(svc article.Service) {
 	c.articleSvc = svc
-}
-
-func (c *Crawler) SetBaseURL(url string) {
-	c.BaseURL = url
 }
 
 func configureCollectorCallbacks(c *colly.Collector, crawler *Crawler) {
