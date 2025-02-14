@@ -14,6 +14,11 @@ import (
 	"go.uber.org/fx"
 )
 
+// Constants for default values
+const (
+	DefaultMaxDepth = 2 // Default maximum crawl depth
+)
+
 // NewCrawlCmd creates a new crawl command
 func NewCrawlCmd(log logger.Interface, cfg *config.Config, storageInstance storage.Interface) *cobra.Command {
 	var crawlCmd = &cobra.Command{
@@ -61,7 +66,7 @@ func NewCrawlCmd(log logger.Interface, cfg *config.Config, storageInstance stora
 	}
 
 	crawlCmd.Flags().StringP("url", "u", "", "Base URL to crawl (required)")
-	crawlCmd.Flags().IntP("depth", "d", 2, "Maximum crawl depth")
+	crawlCmd.Flags().IntP("depth", "d", DefaultMaxDepth, "Maximum crawl depth")
 	crawlCmd.Flags().DurationP("rate", "r", time.Second, "Rate limit between requests")
 	crawlCmd.Flags().StringP("index", "i", "articles", "Elasticsearch index name")
 
