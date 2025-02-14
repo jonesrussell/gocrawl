@@ -45,13 +45,10 @@ type Crawler struct {
 type Params struct {
 	fx.In
 
-	BaseURL   string        `name:"baseURL"`
-	MaxDepth  int           `name:"maxDepth"`
-	RateLimit time.Duration `name:"rateLimit"`
-	Debugger  *logger.CollyDebugger
-	Logger    logger.Interface
-	Config    *config.Config
-	Storage   storage.Interface
+	Config   *config.Config
+	Debugger *logger.CollyDebugger
+	Logger   logger.Interface
+	Storage  storage.Interface
 }
 
 // Result holds the dependencies for the crawler
@@ -68,15 +65,20 @@ func NewCrawler(p Params) (Result, error) {
 	}
 
 	// Parse domain from BaseURL
-	parsedURL, err := url.Parse(p.BaseURL)
+	parsedURL, err := url.Parse(p.Config.Crawler.BaseURL)
 	if err != nil {
 		return Result{}, fmt.Errorf("invalid base URL: %w", err)
 	}
 	domain := parsedURL.Host
 
+	maxDepth := p.Config.Crawler.MaxDepth
+	if maxDepth <= 0 {
+		maxDepth = DefaultMaxDepth
+	}
+
 	// Create a new collector with proper configuration
 	c := colly.NewCollector(
-		colly.MaxDepth(p.MaxDepth),
+		colly.MaxDepth(maxDepth),
 		colly.Async(true),
 		colly.AllowedDomains(domain),
 		colly.MaxBodySize(10*1024*1024),
@@ -86,7 +88,7 @@ func NewCrawler(p Params) (Result, error) {
 	// Set rate limiting
 	err = c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		RandomDelay: p.RateLimit,
+		RandomDelay: p.Config.Crawler.RateLimit,
 		Parallelism: 2,
 	})
 	if err != nil {
@@ -94,10 +96,10 @@ func NewCrawler(p Params) (Result, error) {
 	}
 
 	crawler := &Crawler{
-		BaseURL:     p.BaseURL,
+		BaseURL:     p.Config.Crawler.BaseURL,
 		Storage:     p.Storage,
-		MaxDepth:    p.MaxDepth,
-		RateLimit:   p.RateLimit,
+		MaxDepth:    maxDepth,
+		RateLimit:   p.Config.Crawler.RateLimit,
 		Collector:   c,
 		Logger:      p.Logger,
 		Debugger:    p.Debugger,
@@ -111,9 +113,9 @@ func NewCrawler(p Params) (Result, error) {
 	configureCollectorCallbacks(c, crawler)
 
 	p.Logger.Info("Crawler initialized",
-		"baseURL", p.BaseURL,
-		"maxDepth", p.MaxDepth,
-		"rateLimit", p.RateLimit,
+		"baseURL", p.Config.Crawler.BaseURL,
+		"maxDepth", maxDepth,
+		"rateLimit", p.Config.Crawler.RateLimit,
 		"domain", domain)
 
 	return Result{Crawler: crawler}, nil
