@@ -12,13 +12,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewSearchCmd(lgr *logger.CustomLogger) *cobra.Command {
+func NewSearchCmd(log logger.Interface) *cobra.Command {
 	var searchCmd = &cobra.Command{
 		Use:   "search",
 		Short: "Search content in Elasticsearch",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Skip execution during flag parsing phase
-			if lgr == nil {
+			if log == nil {
 				return nil
 			}
 			ctx := context.Background()
@@ -35,13 +35,13 @@ func NewSearchCmd(lgr *logger.CustomLogger) *cobra.Command {
 			sizeStr := cmd.Flag("size").Value.String()
 			size, err := strconv.Atoi(sizeStr)
 			if err != nil {
-				lgr.Error("Invalid size value", err)
+				log.Error("Invalid size value", err)
 				return fmt.Errorf("invalid size value: %w", err)
 			}
 
 			results, err := app.SearchContent(ctx, args[0], cfg.Crawler.IndexName, size)
 			if err != nil {
-				lgr.Error("Search failed", err)
+				log.Error("Search failed", err)
 				return fmt.Errorf("search failed: %w", err)
 			}
 

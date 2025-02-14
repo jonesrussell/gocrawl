@@ -12,7 +12,11 @@ import (
 // Module provides the logger module and its dependencies
 var Module = fx.Module("logger",
 	fx.Provide(
-		NewDevelopmentLogger, // Function to create a new logger instance
+		NewDevelopmentLogger, // Provide the development logger
+		func() Interface { // Provide the logger.Interface
+			logger, _ := NewDevelopmentLogger()
+			return logger
+		},
 	),
 )
 
@@ -47,4 +51,15 @@ func NewLogger(cfg *config.Config) (*CustomLogger, error) {
 	}
 
 	return &CustomLogger{logger}, nil
+}
+
+// NewDevelopmentLogger initializes a new CustomLogger for development
+func NewDevelopmentLogger() (*CustomLogger, error) {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		return nil, err
+	}
+	// Log when the logger is created
+	logger.Info("Logger initialized successfully")
+	return &CustomLogger{Logger: logger}, nil
 }

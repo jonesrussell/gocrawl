@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -62,6 +61,9 @@ func NewCrawler(p Params) (Result, error) {
 		return Result{}, errors.New("logger is required")
 	}
 
+	// Log the logger being used
+	p.Logger.Info("Creating new Crawler instance")
+
 	// Parse domain from BaseURL
 	parsedURL, err := url.Parse(p.Config.Crawler.BaseURL)
 	if err != nil {
@@ -114,7 +116,6 @@ func NewCrawler(p Params) (Result, error) {
 		"rateLimit", p.Config.Crawler.RateLimit,
 		"domain", domain)
 
-	os.Exit(0)
 	return Result{Crawler: crawler}, nil
 }
 

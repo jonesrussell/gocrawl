@@ -1,13 +1,13 @@
 package main
 
 import (
-	"log"
-
-	"github.com/jonesrussell/gocrawl/cmd"
+	"github.com/jonesrussell/gocrawl/cmd" // Import the cmd package
 )
 
 func main() {
+	// Call the Execute function from the cmd package
 	if err := cmd.Execute(); err != nil {
-		log.Fatal("Error executing command: ", err)
+		// Handle any errors that occur during command execution
+		panic(err)
 	}
 }

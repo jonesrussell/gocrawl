@@ -1,22 +1,26 @@
 package cmd
 
 import (
-	"context"
+	"fmt"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/collector"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/fx"
 )
 
-func NewCrawlCmd(lgr *logger.CustomLogger, crawler *crawler.Crawler) *cobra.Command {
+// Update NewCrawlCmd to accept dependencies
+func NewCrawlCmd(log logger.Interface, cfg *config.Config, storageInstance storage.Interface) *cobra.Command {
 	var crawlCmd = &cobra.Command{
 		Use:   "crawl",
 		Short: "Start crawling a website",
 		Long:  `Crawl a website and store the content in Elasticsearch`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// Set viper values before command runs
 			viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
 			if depth, err := cmd.Flags().GetInt("depth"); err == nil {
 				viper.Set("CRAWLER_MAX_DEPTH", depth)
@@ -26,26 +30,32 @@ func NewCrawlCmd(lgr *logger.CustomLogger, crawler *crawler.Crawler) *cobra.Comm
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx, cancel := context.WithCancel(cmd.Context())
-			defer cancel()
-
-			done := make(chan error, 1)
-			go func() {
-				done <- crawler.Start(ctx)
-			}()
-
-			select {
-			case err := <-done:
-				if err != nil {
-					lgr.Error("Crawler failed", err)
-					return err
-				}
-				lgr.Info("Crawler completed successfully")
-			case <-ctx.Done():
-				lgr.Info("Crawler interrupted")
-				return ctx.Err()
+			// Initialize fx container
+			var deps struct {
+				fx.In
+				Logger logger.Interface
 			}
 
+			app := fx.New(
+				config.Module,
+				logger.Module,
+				storage.Module,
+				collector.Module,
+				crawler.Module,
+				fx.Populate(&deps),
+			)
+
+			// Debug log before starting the application
+			log.Debug("Starting application...")
+
+			if err := app.Start(cmd.Context()); err != nil {
+				log.Error("Error starting application", "error", err)
+				return fmt.Errorf("error starting application: %w", err)
+			}
+			defer app.Stop(cmd.Context())
+
+			// Debug log after successful start
+			log.Debug("Application started successfully")
 			return nil
 		},
 	}

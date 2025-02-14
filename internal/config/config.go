@@ -120,3 +120,8 @@ func logConfig(cfg *Config) {
 		zap.String("ElasticsearchPassword", cfg.Elasticsearch.Password), // Be cautious with sensitive data
 	)
 }
+
+// NewHTTPTransport creates a new HTTP transport
+func NewHTTPTransport() http.RoundTripper {
+	return http.DefaultTransport
+}

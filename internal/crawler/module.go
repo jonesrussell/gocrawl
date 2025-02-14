@@ -21,13 +21,16 @@ var Module = fx.Module("crawler",
 )
 
 // registerHooks sets up the lifecycle hooks for the crawler
-func registerHooks(lc fx.Lifecycle, crawler *Crawler) {
+func registerHooks(lc fx.Lifecycle, log logger.Interface, c *Crawler) {
+	log.Debug("Registering hooks for crawler")
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			return crawler.Start(ctx)
+			log.Debug("Starting crawler...")
+			return c.Start(ctx)
 		},
 		OnStop: func(ctx context.Context) error {
-			crawler.Stop()
+			log.Debug("Stopping crawler...")
+			c.Stop()
 			return nil
 		},
 	})

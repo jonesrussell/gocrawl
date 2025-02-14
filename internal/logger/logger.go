@@ -3,7 +3,6 @@ package logger
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -65,21 +64,6 @@ func (c *CustomLogger) Fatal(msg string, fields ...interface{}) {
 // Errorf logs a formatted error message
 func (c *CustomLogger) Errorf(format string, args ...interface{}) {
 	c.Logger.Error(fmt.Sprintf(format, args...))
-}
-
-// NewDevelopmentLogger initializes a new CustomLogger for development
-func NewDevelopmentLogger() (*CustomLogger, error) {
-	encoderConfig := zap.NewDevelopmentEncoderConfig()
-	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(encoderConfig),
-		zapcore.Lock(os.Stdout),
-		zap.DebugLevel,
-	)
-
-	logger := zap.New(core)
-	return &CustomLogger{Logger: logger}, nil
 }
 
 // Sync flushes any buffered log entries
