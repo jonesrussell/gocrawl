@@ -14,6 +14,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
 
@@ -34,8 +35,27 @@ var (
 	deps        CrawlerDeps
 )
 
+func init() {
+	cobra.OnInitialize(initConfig)
+}
+
+func initConfig() {
+	// Initialize viper
+	viper.SetConfigName(".env")
+	viper.SetConfigType("env")
+	viper.AddConfigPath(".")
+	viper.AutomaticEnv()
+
+	// Read in the config file
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Printf("Error reading config file: %v\n", err)
+		os.Exit(1)
+	}
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
+	// Create the fx app
 	appInstance = fx.New(
 		// Core modules
 		config.Module,
@@ -61,11 +81,11 @@ func Execute() error {
 		return fmt.Errorf("error starting application: %w", err)
 	}
 
-	// Add subcommands to the root command
+	// Add commands with proper dependencies
 	rootCmd.AddCommand(NewCrawlCmd(deps.Logger, deps.Crawler))
 	rootCmd.AddCommand(NewSearchCmd(deps.Logger))
 
-	// Execute the command and wait for completion
+	// Execute the command
 	if err := rootCmd.Execute(); err != nil {
 		return fmt.Errorf("error executing root command: %w", err)
 	}

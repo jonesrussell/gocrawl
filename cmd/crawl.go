@@ -15,26 +15,25 @@ func NewCrawlCmd(lgr *logger.CustomLogger, crawler *crawler.Crawler) *cobra.Comm
 		Use:   "crawl",
 		Short: "Start crawling a website",
 		Long:  `Crawl a website and store the content in Elasticsearch`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// Set viper values before config is created
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			// Set viper values before command runs
 			viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
-			viper.Set("CRAWLER_MAX_DEPTH", cmd.Flag("depth").Value.String())
+			if depth, err := cmd.Flags().GetInt("depth"); err == nil {
+				viper.Set("CRAWLER_MAX_DEPTH", depth)
+			}
 			viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())
 			viper.Set("ELASTIC_INDEX_NAME", cmd.Flag("index").Value.String())
-
-			// Create a context that can be cancelled
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			// Create a channel to wait for crawler completion
 			done := make(chan error, 1)
-
-			// Start crawler in goroutine
 			go func() {
 				done <- crawler.Start(ctx)
 			}()
 
-			// Wait for either completion or interrupt
 			select {
 			case err := <-done:
 				if err != nil {

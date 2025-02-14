@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -113,11 +114,26 @@ func NewCrawler(p Params) (Result, error) {
 		"rateLimit", p.Config.Crawler.RateLimit,
 		"domain", domain)
 
+	os.Exit(0)
 	return Result{Crawler: crawler}, nil
 }
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context) error {
+	// Log full crawler configuration when debug is enabled
+	if c.config.App.Debug {
+		c.Logger.Debug("Starting crawler with configuration",
+			"baseURL", c.config.Crawler.BaseURL,
+			"maxDepth", c.config.Crawler.MaxDepth,
+			"rateLimit", c.config.Crawler.RateLimit,
+			"indexName", c.config.Crawler.IndexName,
+			"skipTLS", c.config.Crawler.SkipTLS,
+			"environment", c.config.App.Environment,
+			"logLevel", c.config.App.LogLevel,
+			"elasticURL", c.config.Elasticsearch.URL,
+		)
+	}
+
 	c.Logger.Debug("Starting crawl at base URL", "url", c.config.Crawler.BaseURL)
 
 	// Perform initial setup (e.g., test connection, ensure index)

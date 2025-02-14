@@ -14,11 +14,13 @@ import (
 
 func NewSearchCmd(lgr *logger.CustomLogger) *cobra.Command {
 	var searchCmd = &cobra.Command{
-		Use:   "search [query]",
-		Short: "Search indexed content",
-		Long:  `Search content that has been crawled and indexed in Elasticsearch`,
-		Args:  cobra.ExactArgs(1),
+		Use:   "search",
+		Short: "Search content in Elasticsearch",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Skip execution during flag parsing phase
+			if lgr == nil {
+				return nil
+			}
 			ctx := context.Background()
 
 			// Create config with CLI values
