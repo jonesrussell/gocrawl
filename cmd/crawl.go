@@ -14,13 +14,13 @@ import (
 	"go.uber.org/fx"
 )
 
-// Update NewCrawlCmd to accept dependencies
+// NewCrawlCmd creates a new crawl command
 func NewCrawlCmd(log logger.Interface, cfg *config.Config, storageInstance storage.Interface) *cobra.Command {
 	var crawlCmd = &cobra.Command{
 		Use:   "crawl",
 		Short: "Start crawling a website",
 		Long:  `Crawl a website and store the content in Elasticsearch`,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
 			if depth, err := cmd.Flags().GetInt("depth"); err == nil {
 				viper.Set("CRAWLER_MAX_DEPTH", depth)
@@ -29,7 +29,7 @@ func NewCrawlCmd(log logger.Interface, cfg *config.Config, storageInstance stora
 			viper.Set("ELASTIC_INDEX_NAME", cmd.Flag("index").Value.String())
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Initialize fx container
 			var deps struct {
 				fx.In
@@ -67,7 +67,7 @@ func NewCrawlCmd(log logger.Interface, cfg *config.Config, storageInstance stora
 
 	err := crawlCmd.MarkFlagRequired("url")
 	if err != nil {
-		return nil
+		log.Error("Error marking URL flag as required", "error", err)
 	}
 
 	return crawlCmd
