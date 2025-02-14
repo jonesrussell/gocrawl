@@ -1,14 +1,8 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
-	"net/http"
-	"os"
-	"strconv"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
@@ -21,49 +15,13 @@ func NewCrawlCmd(lgr *logger.CustomLogger, crawler *crawler.Crawler) *cobra.Comm
 		Short: "Start crawling a website",
 		Long:  `Crawl a website and store the content in Elasticsearch`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
-
 			// Set viper values before config is created
 			viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
 			viper.Set("CRAWLER_MAX_DEPTH", cmd.Flag("depth").Value.String())
 			viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())
 			viper.Set("ELASTIC_INDEX_NAME", cmd.Flag("index").Value.String())
 
-			// Create config with CLI values
-			cfg := &config.Config{
-				Crawler: config.CrawlerConfig{
-					BaseURL:   cmd.Flag("url").Value.String(),
-					IndexName: cmd.Flag("index").Value.String(),
-					Transport: http.DefaultTransport,
-				},
-				Elasticsearch: config.ElasticsearchConfig{
-					URL: os.Getenv("ELASTIC_URL"),
-				},
-			}
-
-			// Parse rate limit and max depth
-			if rateStr := cmd.Flag("rate").Value.String(); rateStr != "" {
-				rate, err := time.ParseDuration(rateStr)
-				if err != nil {
-					return fmt.Errorf("invalid rate value: %w", err)
-				}
-				cfg.Crawler.RateLimit = rate
-			}
-
-			if depthStr := cmd.Flag("depth").Value.String(); depthStr != "" {
-				depth, err := strconv.Atoi(depthStr)
-				if err != nil {
-					return fmt.Errorf("invalid depth value: %w", err)
-				}
-				cfg.Crawler.MaxDepth = depth
-			}
-
-			// Start the crawler
-			if err := crawler.Start(ctx); err != nil {
-				lgr.Error("Error starting crawler", err)
-				return err
-			}
-
+			// Let fx lifecycle handle the crawler start/stop
 			return nil
 		},
 	}

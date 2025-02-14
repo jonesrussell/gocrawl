@@ -121,6 +121,11 @@ func NewCrawler(p Params) (Result, error) {
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context) error {
+	if c.running {
+		c.Logger.Warn("Crawler is already running")
+		return nil
+	}
+
 	c.running = true
 	c.Logger.Debug("Starting crawl at base URL", "url", c.BaseURL)
 
