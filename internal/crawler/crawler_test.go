@@ -14,7 +14,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -59,9 +58,9 @@ func TestNewCrawler(t *testing.T) {
 	require.NotNil(t, result.Crawler)
 
 	// Verify crawler configuration using getter methods
-	assert.Equal(t, testConfig.Crawler.BaseURL, result.Crawler.Config.Crawler.BaseURL)
-	assert.Equal(t, testConfig.Crawler.MaxDepth, result.Crawler.Config.Crawler.MaxDepth)
-	assert.Equal(t, mockStorage, result.Crawler.Storage)
+	require.Equal(t, testConfig.Crawler.BaseURL, result.Crawler.Config.Crawler.BaseURL)
+	require.Equal(t, testConfig.Crawler.MaxDepth, result.Crawler.Config.Crawler.MaxDepth)
+	require.Equal(t, mockStorage, result.Crawler.Storage)
 }
 
 // TestCrawler_Start tests the Crawler's Start method
@@ -96,7 +95,7 @@ func TestCrawler_Start(t *testing.T) {
 	// Test crawler start
 	ctx := context.Background()
 	err = result.Crawler.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify storage operations using mock methods
 	mockStorage.AssertCalled(t, "TestConnection", ctx)
@@ -172,7 +171,7 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 	defer cancel()
 
 	err = crawlerInstance.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify expectations
 	mockLogger.AssertExpectations(t)
@@ -236,7 +235,7 @@ func TestCrawler(t *testing.T) {
 	defer cancel()
 
 	err = crawlerInstance.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify expectations
 	mockArticleSvc.AssertExpectations(t)
