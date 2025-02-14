@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/jonesrussell/gocrawl/cmd" // Import the cmd package
+	"github.com/jonesrussell/gocrawl/cmd"
 )
 
 func main() {
