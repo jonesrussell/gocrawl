@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 )
@@ -22,14 +22,14 @@ func SearchContent(ctx context.Context, query string, index string, size int) ([
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	storageInstance, err := storage.NewStorage(&config.Config{
-		Crawler: config.CrawlerConfig{
-			IndexName: index,
-		},
-		Elasticsearch: config.ElasticsearchConfig{
-			URL: "http://localhost:9200", // Consider making this configurable
-		},
-	}, log)
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{"http://localhost:9200"}, // Consider making this configurable
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
+	}
+
+	storageInstance, err := storage.NewStorage(esClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}

@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
 // NewLogger creates a new logger instance
@@ -28,4 +30,18 @@ func runCrawler(ctx context.Context, crawler *crawler.Crawler) error {
 	// You might want to implement a wait group or similar mechanism here
 
 	return nil
+}
+
+type App struct {
+	Storage storage.Interface
+}
+
+func NewApp(esClient *elasticsearch.Client) (*App, error) {
+	storage, err := storage.NewStorage(esClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage: %w", err)
+	}
+	return &App{
+		Storage: storage,
+	}, nil
 }

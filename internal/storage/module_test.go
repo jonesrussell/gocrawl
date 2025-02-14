@@ -7,7 +7,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
@@ -38,15 +37,3 @@ func TestModule(t *testing.T) {
 		assert.NoError(t, app.Err())
 	})
 }
-
-func TestNewStorage(t *testing.T) {
-	// Create a mock logger
-	log := logger.NewMockCustomLogger()
-
-	// Create storage instance
-	storageInstance, err := NewStorage(testConfig, log)
-	require.NoError(t, err, "Failed to create test storage")
-	require.NotNil(t, storageInstance, "Storage instance should not be nil")
-}
-
-// Add other tests as needed...

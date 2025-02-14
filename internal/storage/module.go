@@ -3,59 +3,48 @@ package storage
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
+
+type ElasticsearchClient struct {
+	Client *elasticsearch.Client
+}
 
 // Module provides the storage as an Fx module
 //
 //nolint:gochecknoglobals // This is a module
-var Module = fx.Module("storage",
+var Module = fx.Options(
 	fx.Provide(
+		ProvideElasticsearchClient,
 		NewStorage,
 	),
 )
 
 // NewStorage initializes a new Storage instance
-func NewStorage(cfg *config.Config, log logger.Interface) (Interface, error) {
-	if cfg == nil {
-		return nil, fmt.Errorf("config is required")
+func NewStorage(esClient *elasticsearch.Client) (Interface, error) {
+	if esClient == nil {
+		return nil, errors.New("elasticsearch client is nil")
 	}
 
-	if cfg.Elasticsearch.URL == "" {
-		return nil, fmt.Errorf("elasticsearch URL is required")
-	}
-
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: false,
-		},
-	}
-
-	// Create Elasticsearch config
-	esConfig := elasticsearch.Config{
-		Addresses: []string{cfg.Elasticsearch.URL},
-		Transport: transport,
-		Username:  cfg.Elasticsearch.Username,
-		Password:  cfg.Elasticsearch.Password,
-		APIKey:    cfg.Elasticsearch.APIKey,
-	}
-
-	// Create Elasticsearch client
-	client, err := elasticsearch.NewClient(esConfig)
+	// Attempt to ping Elasticsearch to check connectivity
+	res, err := esClient.Info()
 	if err != nil {
-		return nil, fmt.Errorf("error creating elasticsearch client: %w", err)
+		return nil, fmt.Errorf("failed to connect to Elasticsearch: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("error response from Elasticsearch: %s", res.String())
 	}
 
 	// Create storage instance
 	storageInstance := &ElasticsearchStorage{
-		ESClient: client,
-		Logger:   log,
+		ESClient: esClient,
 	}
 
 	// Test connection to Elasticsearch
@@ -63,10 +52,30 @@ func NewStorage(cfg *config.Config, log logger.Interface) (Interface, error) {
 		return nil, fmt.Errorf("failed to connect to elasticsearch: %w", err)
 	}
 
-	log.Info("Successfully connected to Elasticsearch",
-		"url", cfg.Elasticsearch.URL,
-		"using_api_key", cfg.Elasticsearch.APIKey, // != "",
-	)
-
 	return storageInstance, nil
+}
+
+// Provide the Elasticsearch client as a dependency
+func ProvideElasticsearchClient() (*elasticsearch.Client, error) {
+	// Create a custom HTTP transport that skips TLS verification
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	cfg := elasticsearch.Config{
+		Addresses: []string{
+			"https://localhost:9200", // Ensure this matches your Elasticsearch URL
+		},
+		Transport: transport, // Use the custom transport
+	}
+
+	client, err := elasticsearch.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Log the configuration for debugging
+	fmt.Printf("Connecting to Elasticsearch at %s\n", cfg.Addresses[0])
+
+	return client, nil
 }

@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/assert"
@@ -39,21 +38,16 @@ func (m *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 func setupTestStorage(t *testing.T) storage.Interface {
 	t.Helper()
 
-	// Create a mock logger
-	log := logger.NewMockCustomLogger()
-
-	// Create test config
-	cfg := &config.Config{
-		Elasticsearch: config.ElasticsearchConfig{
-			URL: "http://localhost:9200", // or use a test URL
-		},
-		Crawler: config.CrawlerConfig{
-			Transport: http.DefaultTransport,
-		},
+	// Create Elasticsearch client for testing
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{"http://localhost:9200"}, // Ensure this matches your Elasticsearch URL
+	})
+	if err != nil {
+		t.Fatalf("failed to create Elasticsearch client: %v", err)
 	}
 
 	// Create storageInstance instance
-	storageInstance, err := storage.NewStorage(cfg, log)
+	storageInstance, err := storage.NewStorage(esClient)
 	require.NoError(t, err, "Failed to create test storage")
 	require.NotNil(t, storageInstance, "Storage instance should not be nil")
 
