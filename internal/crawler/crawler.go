@@ -25,6 +25,12 @@ const (
 	DefaultRateLimit = time.Second
 )
 
+// Constants for default values
+const (
+	DefaultMaxBodySize = 10 * 1024 * 1024 // 10 MB
+	DefaultParallelism = 2                // Default parallelism
+)
+
 // Crawler struct to hold configuration or state if needed
 type Crawler struct {
 	Storage     storage.Interface
@@ -81,7 +87,7 @@ func NewCrawler(p Params) (Result, error) {
 		colly.MaxDepth(maxDepth),
 		colly.Async(true),
 		colly.AllowedDomains(domain),
-		colly.MaxBodySize(10*1024*1024),
+		colly.MaxBodySize(DefaultMaxBodySize),
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
 	)
 
@@ -89,7 +95,7 @@ func NewCrawler(p Params) (Result, error) {
 	err = c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: p.Config.Crawler.RateLimit,
-		Parallelism: 2,
+		Parallelism: DefaultParallelism,
 	})
 	if err != nil {
 		return Result{}, fmt.Errorf("error setting rate limit: %w", err)
