@@ -2,8 +2,10 @@ package storage
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -55,11 +57,19 @@ func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface
 
 // ProvideElasticsearchClient initializes the Elasticsearch client
 func ProvideElasticsearchClient(cfg *config.Config, log logger.Interface) (*elasticsearch.Client, error) {
+	// Create a custom HTTP transport
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: cfg.Elasticsearch.SkipTLS, // Use the SkipTLS setting from the config
+		},
+	}
+
 	client, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{cfg.Elasticsearch.URL},
 		Username:  cfg.Elasticsearch.Username,
 		Password:  cfg.Elasticsearch.Password,
 		APIKey:    cfg.Elasticsearch.APIKey,
+		Transport: transport, // Use the custom transport
 	})
 	if err != nil {
 		log.Error("Failed to create Elasticsearch client", "error", err)

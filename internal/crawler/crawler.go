@@ -68,7 +68,6 @@ func (c *Crawler) Start(ctx context.Context) error {
 			"maxDepth", c.Config.Crawler.MaxDepth,
 			"rateLimit", c.Config.Crawler.RateLimit,
 			"indexName", c.Config.Crawler.IndexName,
-			"skipTLS", c.Config.Crawler.SkipTLS,
 			"environment", c.Config.App.Environment,
 			"logLevel", c.Config.App.LogLevel,
 			"elasticURL", c.Config.Elasticsearch.URL,

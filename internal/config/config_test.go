@@ -47,7 +47,6 @@ func TestNewConfig(t *testing.T) {
 		assert.Equal(t, 3, cfg.Crawler.MaxDepth)
 		assert.Equal(t, 2*time.Second, cfg.Crawler.RateLimit)
 		assert.Equal(t, "test-index", cfg.Crawler.IndexName)
-		assert.NotNil(t, cfg.Crawler.Transport)
 
 		// Verify elasticsearch config
 		assert.Equal(t, "http://test-elastic:9200", cfg.Elasticsearch.URL)

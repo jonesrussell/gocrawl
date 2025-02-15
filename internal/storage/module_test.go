@@ -1,7 +1,6 @@
 package storage_test
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -17,9 +16,7 @@ var testConfig = &config.Config{
 	Elasticsearch: config.ElasticsearchConfig{
 		URL: "http://localhost:9200", // or use a test URL
 	},
-	Crawler: config.CrawlerConfig{
-		Transport: http.DefaultTransport,
-	},
+	Crawler: config.CrawlerConfig{},
 }
 
 func TestModule(t *testing.T) {

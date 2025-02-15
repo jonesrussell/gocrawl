@@ -27,8 +27,6 @@ type CrawlerConfig struct {
 	MaxDepth  int
 	RateLimit time.Duration
 	IndexName string
-	Transport http.RoundTripper
-	SkipTLS   bool
 }
 
 // ElasticsearchConfig holds Elasticsearch-specific configuration
@@ -38,6 +36,7 @@ type ElasticsearchConfig struct {
 	Password  string
 	APIKey    string
 	IndexName string
+	SkipTLS   bool
 }
 
 // Config holds all configuration settings
@@ -64,9 +63,6 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 		rateLimit = time.Second // Default value if parsing fails
 	}
 
-	// Determine if the application is in development or production
-	isDevelopment := viper.GetString("APP_ENV") == "development"
-
 	cfg := &Config{
 		App: AppConfig{
 			Environment: viper.GetString("APP_ENV"),
@@ -78,8 +74,6 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 			MaxDepth:  viper.GetInt("CRAWLER_MAX_DEPTH"),
 			RateLimit: rateLimit,
 			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
-			Transport: transport,
-			SkipTLS:   isDevelopment, // Allow insecure connections only in development
 		},
 		Elasticsearch: ElasticsearchConfig{
 			URL:       viper.GetString("ELASTIC_URL"),
@@ -87,6 +81,7 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 			Password:  viper.GetString("ELASTIC_PASSWORD"),
 			APIKey:    viper.GetString("ELASTIC_API_KEY"),
 			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
+			SkipTLS:   viper.GetBool("ELASTIC_SKIP_TLS"),
 		},
 	}
 
@@ -122,7 +117,7 @@ func logConfig(cfg *Config) {
 		zap.String("CrawlerBaseURL", cfg.Crawler.BaseURL),
 		zap.Int("CrawlerMaxDepth", cfg.Crawler.MaxDepth),
 		zap.Duration("CrawlerRateLimit", cfg.Crawler.RateLimit),
-		zap.String("ElasticsearchPassword", cfg.Elasticsearch.Password), // Be cautious with sensitive data
+		zap.Bool("ElasticsearchSkipTLS", cfg.Elasticsearch.SkipTLS),
 	)
 }
 
