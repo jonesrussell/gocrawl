@@ -36,6 +36,15 @@ type JSONLDArticle struct {
 	Section       string   `json:"articleSection"`
 }
 
+const (
+	DetailsBylineSelector = ".details-byline"
+	DetailsTitleSelector  = "h1.details-title"
+	DetailsBodySelector   = "#details-body"
+	DetailsIntroSelector  = ".details-intro"
+	MetaPublishedTime     = "meta[property='article:published_time']"
+	TimeAgoSelector       = "time.timeago"
+)
+
 func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	var jsonLD JSONLDArticle
 
@@ -47,20 +56,20 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	})
 
 	// Clean up author (remove date)
-	author := s.CleanAuthor(e.ChildText(".details-byline"))
+	author := s.CleanAuthor(e.ChildText(DetailsBylineSelector))
 
 	// Create article with basic fields
 	article := &models.Article{
 		ID:     uuid.New().String(),
-		Title:  e.ChildText("h1.details-title"),
-		Body:   e.ChildText("#details-body"),
+		Title:  e.ChildText(DetailsTitleSelector),
+		Body:   e.ChildText(DetailsBodySelector),
 		Source: e.Request.URL.String(),
 		Author: author,
 		Tags:   s.extractTags(e, jsonLD),
 	}
 
 	// Get intro/description
-	if intro := e.ChildText(".details-intro"); intro != "" {
+	if intro := e.ChildText(DetailsIntroSelector); intro != "" {
 		article.Body = intro + "\n\n" + article.Body
 	}
 
@@ -128,6 +137,10 @@ func (s *Service) extractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []stri
 	}
 
 	// Remove duplicates from tags
+	return removeDuplicates(tags)
+}
+
+func removeDuplicates(tags []string) []string {
 	seen := make(map[string]bool)
 	uniqueTags := make([]string, 0)
 	for _, tag := range tags {
@@ -140,8 +153,20 @@ func (s *Service) extractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []stri
 }
 
 func (s *Service) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time {
-	var publishedDate time.Time
+	datesToTry := []string{
+		jsonLD.DatePublished,
+		jsonLD.DateModified,
+		jsonLD.DateCreated,
+		e.ChildAttr(MetaPublishedTime, "content"),
+		e.ChildAttr(TimeAgoSelector, "datetime"),
+		e.ChildText(TimeAgoSelector),
+	}
 
+	return parseDate(datesToTry, s.Logger)
+}
+
+func parseDate(dates []string, logger logger.Interface) time.Time {
+	var publishedDate time.Time
 	timeFormats := []string{
 		time.RFC3339,
 		"2006-01-02T15:04:05Z",
@@ -149,31 +174,22 @@ func (s *Service) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle)
 		"2006-01-02 15:04:05",
 	}
 
-	datesToTry := []string{
-		jsonLD.DatePublished,
-		jsonLD.DateModified,
-		jsonLD.DateCreated,
-		e.ChildAttr("meta[property='article:published_time']", "content"),
-		e.ChildAttr("time.timeago", "datetime"),
-		e.ChildText("time.timeago"),
-	}
-
-	for _, dateStr := range datesToTry {
+	for _, dateStr := range dates {
 		if dateStr == "" {
 			continue
 		}
-		s.Logger.Debug("Trying to parse date", "value", dateStr)
+		logger.Debug("Trying to parse date", "value", dateStr)
 		for _, format := range timeFormats {
 			t, err := time.Parse(format, dateStr)
 			if err == nil {
 				publishedDate = t
-				s.Logger.Debug("Successfully parsed date",
+				logger.Debug("Successfully parsed date",
 					"source", dateStr,
 					"format", format,
 					"result", t)
 				break
 			}
-			s.Logger.Debug("Failed to parse date",
+			logger.Debug("Failed to parse date",
 				"source", dateStr,
 				"format", format,
 				"error", err)
@@ -181,6 +197,10 @@ func (s *Service) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle)
 		if !publishedDate.IsZero() {
 			break
 		}
+	}
+
+	if publishedDate.IsZero() {
+		logger.Debug("No valid published date found", "dates", dates)
 	}
 
 	return publishedDate
