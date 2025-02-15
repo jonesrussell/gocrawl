@@ -14,6 +14,22 @@ var (
 	ErrMissingElasticURL = errors.New("ELASTIC_URL is required")
 )
 
+// Configuration keys
+const (
+	AppEnvKey           = "APP_ENV"
+	LogLevelKey         = "LOG_LEVEL"
+	AppDebugKey         = "APP_DEBUG"
+	CrawlerBaseURLKey   = "CRAWLER_BASE_URL"
+	CrawlerMaxDepthKey  = "CRAWLER_MAX_DEPTH"
+	CrawlerRateLimitKey = "CRAWLER_RATE_LIMIT"
+	ElasticURLKey       = "ELASTIC_URL"
+	ElasticUsernameKey  = "ELASTIC_USERNAME"
+	ElasticPasswordKey  = "ELASTIC_PASSWORD"
+	ElasticAPIKeyKey    = "ELASTIC_API_KEY"
+	ElasticIndexNameKey = "ELASTIC_INDEX_NAME"
+	ElasticSkipTLSKey   = "ELASTIC_SKIP_TLS"
+)
+
 // AppConfig holds application-level configuration
 type AppConfig struct {
 	Environment string
@@ -53,40 +69,47 @@ func NewConfig() (*Config, error) {
 	viper.AddConfigPath(".")
 	viper.AutomaticEnv()
 
+	// Attempt to read the config file
 	if err := viper.ReadInConfig(); err != nil {
-		return nil, err
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// Config file not found; ignore error if desired
+			// You can log this if needed
+		} else {
+			// Config file was found but another error was produced
+			return nil, err
+		}
 	}
 
-	rateLimitStr := viper.GetString("CRAWLER_RATE_LIMIT")
-	rateLimit, err := time.ParseDuration(rateLimitStr)
+	// Proceed to read the configuration values
+	rateLimit, err := parseRateLimit(viper.GetString(CrawlerRateLimitKey))
 	if err != nil {
-		rateLimit = time.Second // Default value if parsing fails
+		return nil, err
 	}
 
 	cfg := &Config{
 		App: AppConfig{
-			Environment: viper.GetString("APP_ENV"),
-			LogLevel:    viper.GetString("LOG_LEVEL"),
-			Debug:       viper.GetBool("APP_DEBUG"),
+			Environment: viper.GetString(AppEnvKey),
+			LogLevel:    viper.GetString(LogLevelKey),
+			Debug:       viper.GetBool(AppDebugKey),
 		},
 		Crawler: CrawlerConfig{
-			BaseURL:   viper.GetString("CRAWLER_BASE_URL"),
-			MaxDepth:  viper.GetInt("CRAWLER_MAX_DEPTH"),
+			BaseURL:   viper.GetString(CrawlerBaseURLKey),
+			MaxDepth:  viper.GetInt(CrawlerMaxDepthKey),
 			RateLimit: rateLimit,
-			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
+			IndexName: viper.GetString(ElasticIndexNameKey),
 		},
 		Elasticsearch: ElasticsearchConfig{
-			URL:       viper.GetString("ELASTIC_URL"),
-			Username:  viper.GetString("ELASTIC_USERNAME"),
-			Password:  viper.GetString("ELASTIC_PASSWORD"),
-			APIKey:    viper.GetString("ELASTIC_API_KEY"),
-			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
-			SkipTLS:   viper.GetBool("ELASTIC_SKIP_TLS"),
+			URL:       viper.GetString(ElasticURLKey),
+			Username:  viper.GetString(ElasticUsernameKey),
+			Password:  viper.GetString(ElasticPasswordKey),
+			APIKey:    viper.GetString(ElasticAPIKeyKey),
+			IndexName: viper.GetString(ElasticIndexNameKey),
+			SkipTLS:   viper.GetBool(ElasticSkipTLSKey),
 		},
 	}
 
-	if cfg.Elasticsearch.URL == "" {
-		return nil, ErrMissingElasticURL
+	if err := ValidateConfig(cfg); err != nil {
+		return nil, err
 	}
 
 	// Log the full configuration if debug is enabled
@@ -95,6 +118,23 @@ func NewConfig() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// parseRateLimit parses the rate limit duration from a string
+func parseRateLimit(rateLimitStr string) (time.Duration, error) {
+	rateLimit, err := time.ParseDuration(rateLimitStr)
+	if err != nil {
+		return time.Second, nil // Default value if parsing fails
+	}
+	return rateLimit, nil
+}
+
+// ValidateConfig validates the configuration values
+func ValidateConfig(cfg *Config) error {
+	if cfg.Elasticsearch.URL == "" {
+		return ErrMissingElasticURL
+	}
+	return nil
 }
 
 // logConfig logs the configuration values
@@ -124,4 +164,13 @@ func logConfig(cfg *Config) {
 // NewHTTPTransport creates a new HTTP transport
 func NewHTTPTransport() http.RoundTripper {
 	return http.DefaultTransport
+}
+
+// Add this function to parse rate limits
+func ParseRateLimit(rate string) (time.Duration, error) {
+	duration, err := time.ParseDuration(rate)
+	if err != nil {
+		return time.Second, nil // Return default value on error
+	}
+	return duration, nil
 }
