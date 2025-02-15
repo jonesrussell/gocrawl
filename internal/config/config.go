@@ -4,100 +4,153 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
+
+// Error definitions
+var (
+	ErrMissingElasticURL = errors.New("ELASTIC_URL is required")
+)
+
+// Configuration keys
+const (
+	AppEnvKey           = "APP_ENV"
+	LogLevelKey         = "LOG_LEVEL"
+	AppDebugKey         = "APP_DEBUG"
+	CrawlerBaseURLKey   = "CRAWLER_BASE_URL"
+	CrawlerMaxDepthKey  = "CRAWLER_MAX_DEPTH"
+	CrawlerRateLimitKey = "CRAWLER_RATE_LIMIT"
+	ElasticURLKey       = "ELASTIC_URL"
+	ElasticUsernameKey  = "ELASTIC_USERNAME"
+	ElasticPasswordKey  = "ELASTIC_PASSWORD"
+	ElasticIndexNameKey = "ELASTIC_INDEX_NAME"
+	ElasticSkipTLSKey   = "ELASTIC_SKIP_TLS"
+	//nolint:gosec // This is a false positive
+	ElasticAPIKeyKey = "ELASTIC_API_KEY"
+)
+
+// AppConfig holds application-level configuration
+type AppConfig struct {
+	Environment string
+	LogLevel    string
+	Debug       bool
+}
 
 // CrawlerConfig holds crawler-specific configuration
 type CrawlerConfig struct {
 	BaseURL   string
 	MaxDepth  int
 	RateLimit time.Duration
+	IndexName string
 }
 
-// Config holds the application configuration
+// ElasticsearchConfig holds Elasticsearch-specific configuration
+type ElasticsearchConfig struct {
+	URL       string
+	Username  string
+	Password  string
+	APIKey    string
+	IndexName string
+	SkipTLS   bool
+}
+
+// Config holds all configuration settings
 type Config struct {
-	AppName         string
-	AppEnv          string
-	AppDebug        bool
-	ElasticURL      string
-	ElasticPassword string
-	ElasticAPIKey   string
-	IndexName       string
-	LogLevel        string
-	CrawlerConfig   CrawlerConfig
-	Transport       http.RoundTripper // Added for testing
+	App           AppConfig
+	Crawler       CrawlerConfig
+	Elasticsearch ElasticsearchConfig
 }
 
-// LoadConfig loads configuration from environment variables
-func LoadConfig() (*Config, error) {
-	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		// Fallback logging mechanism
-		if os.Getenv("APP_ENV") == "development" {
-			// Only print in development mode
-			os.Stderr.WriteString("Warning: .env file not found, using environment variables\n")
+// NewConfig creates a new Config instance with values from Viper
+func NewConfig() (*Config, error) {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.AutomaticEnv()
+
+	// Attempt to read the config file
+	if err := viper.ReadInConfig(); err != nil {
+		var configErr *viper.ConfigFileNotFoundError
+		if errors.As(err, &configErr) {
+			//nolint:forbidigo // No logger here
+			fmt.Println("Config file not found; ignoring error")
+		} else {
+			// Config file was found but another error was produced
+			return nil, err
 		}
 	}
 
-	// Parse APP_DEBUG as a boolean
-	appDebug, err := parseBoolEnv("APP_DEBUG", false)
+	// Proceed to read the configuration values
+	rateLimit, err := parseRateLimit(viper.GetString(CrawlerRateLimitKey))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing APP_DEBUG: %w", err)
+		return nil, err
 	}
 
-	config := &Config{
-		AppName:         os.Getenv("APP_NAME"),
-		AppEnv:          os.Getenv("APP_ENV"),
-		AppDebug:        appDebug,
-		ElasticURL:      os.Getenv("ELASTIC_URL"),
-		ElasticPassword: os.Getenv("ELASTIC_PASSWORD"),
-		ElasticAPIKey:   os.Getenv("ELASTIC_API_KEY"),
-		IndexName:       os.Getenv("INDEX_NAME"),
-		LogLevel:        os.Getenv("LOG_LEVEL"),
-		CrawlerConfig: CrawlerConfig{
-			BaseURL:   os.Getenv("CRAWLER_BASE_URL"),
-			MaxDepth:  parseIntEnv("CRAWLER_MAX_DEPTH", 0),
-			RateLimit: parseDurationEnv("CRAWLER_RATE_LIMIT", 0),
+	cfg := &Config{
+		App: AppConfig{
+			Environment: viper.GetString(AppEnvKey),
+			LogLevel:    viper.GetString(LogLevelKey),
+			Debug:       viper.GetBool(AppDebugKey),
+		},
+		Crawler: CrawlerConfig{
+			BaseURL:   viper.GetString(CrawlerBaseURLKey),
+			MaxDepth:  viper.GetInt(CrawlerMaxDepthKey),
+			RateLimit: rateLimit,
+			IndexName: viper.GetString(ElasticIndexNameKey),
+		},
+		Elasticsearch: ElasticsearchConfig{
+			URL:       viper.GetString(ElasticURLKey),
+			Username:  viper.GetString(ElasticUsernameKey),
+			Password:  viper.GetString(ElasticPasswordKey),
+			APIKey:    viper.GetString(ElasticAPIKeyKey),
+			IndexName: viper.GetString(ElasticIndexNameKey),
+			SkipTLS:   viper.GetBool(ElasticSkipTLSKey),
 		},
 	}
 
-	// Validate required configuration values
-	if config.ElasticURL == "" {
-		return nil, errors.New("ELASTIC_URL is required")
+	if validateErr := ValidateConfig(cfg); validateErr != nil {
+		return nil, validateErr
 	}
 
-	return config, nil
+	return cfg, nil
 }
 
-// parseBoolEnv parses a boolean environment variable with a default value
-func parseBoolEnv(key string, defaultValue bool) (bool, error) {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue, nil
+// parseRateLimit parses the rate limit duration from a string
+func parseRateLimit(rateLimitStr string) (time.Duration, error) {
+	if rateLimitStr == "" {
+		return time.Second, errors.New("rate limit cannot be empty")
 	}
-	return strconv.ParseBool(value)
+	rateLimit, err := time.ParseDuration(rateLimitStr)
+	if err != nil {
+		return time.Second, errors.New("error parsing duration")
+	}
+	return rateLimit, nil
 }
 
-// parseIntEnv parses an integer environment variable with a default value
-func parseIntEnv(key string, defaultValue int) int {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
+// ValidateConfig validates the configuration values
+func ValidateConfig(cfg *Config) error {
+	if cfg.Elasticsearch.URL == "" {
+		return ErrMissingElasticURL
 	}
-	intValue, _ := strconv.Atoi(value)
-	return intValue
+	return nil
 }
 
-// parseDurationEnv parses a duration environment variable with a default value
-func parseDurationEnv(key string, defaultValue time.Duration) time.Duration {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
+// NewHTTPTransport creates a new HTTP transport
+func NewHTTPTransport() http.RoundTripper {
+	return http.DefaultTransport
+}
+
+// ParseRateLimit parses a rate limit string and returns a time.Duration.
+// If the input is invalid, it returns a default value of 1 second and an error.
+func ParseRateLimit(rateLimit string) (time.Duration, error) {
+	if rateLimit == "" {
+		return time.Second, nil // Return default value
 	}
-	duration, _ := time.ParseDuration(value)
-	return duration
+	duration, err := time.ParseDuration(rateLimit)
+	if err != nil {
+		return time.Second, errors.New("error parsing duration") // Return an error message
+	}
+	return duration, nil
 }

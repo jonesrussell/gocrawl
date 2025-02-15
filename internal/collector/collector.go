@@ -1,7 +1,7 @@
 package collector
 
 import (
-	"fmt"
+	"errors"
 	"net/url"
 	"strings"
 	"time"
@@ -15,9 +15,8 @@ import (
 
 // Constants for configuration
 const (
-	RequestTimeout       = 30 * time.Second // Timeout for requests
-	CollectorParallelism = 2                // Maximum parallelism for collector
-	RandomDelayFactor    = 2                // RandomDelayFactor is used to add randomization to rate limiting
+	Parallelism       = 2 // Maximum parallelism for collector
+	RandomDelayFactor = 2 // RandomDelayFactor is used to add randomization to rate limiting
 )
 
 // DebuggerInterface is an interface for the debugger
@@ -38,6 +37,7 @@ type Params struct {
 	MaxDepth  int
 	RateLimit time.Duration
 	Debugger  *logger.CollyDebugger
+	Logger    logger.Interface
 }
 
 // Result holds the collector instance
@@ -51,30 +51,42 @@ type Result struct {
 func New(p Params) (Result, error) {
 	// Validate URL
 	if p.BaseURL == "" {
-		return Result{}, fmt.Errorf("base URL cannot be empty")
+		return Result{}, errors.New("base URL cannot be empty")
 	}
 
 	parsedURL, err := url.Parse(p.BaseURL)
 	if err != nil || (!strings.HasPrefix(parsedURL.Scheme, "http") && !strings.HasPrefix(parsedURL.Scheme, "https")) {
-		return Result{}, fmt.Errorf("invalid base URL: must be a valid HTTP/HTTPS URL")
+		return Result{}, errors.New("invalid base URL: must be a valid HTTP/HTTPS URL")
 	}
 
+	// Create collector with base configuration
 	c := colly.NewCollector(
-		colly.MaxDepth(p.MaxDepth),
 		colly.Async(true),
+		colly.MaxDepth(p.MaxDepth),
 	)
 
+	// Set rate limiting
 	err = c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: p.RateLimit,
+		Parallelism: Parallelism,
 	})
 	if err != nil {
-		return Result{}, err
+		return Result{}, errors.New("failed to set rate limit")
 	}
 
 	if p.Debugger != nil {
 		c.SetDebugger(p.Debugger)
 	}
+
+	// Configure logging
+	ConfigureLogging(c, p.Logger)
+
+	p.Logger.Debug("Collector created",
+		"baseURL", p.BaseURL,
+		"maxDepth", p.MaxDepth,
+		"rateLimit", p.RateLimit,
+	)
 
 	return Result{Collector: c}, nil
 }

@@ -12,6 +12,8 @@ type Storage interface {
     
     // TestConnection verifies the connection to the storage backend
     TestConnection(ctx context.Context) error
+
+    // Additional methods can be added here as needed
 }
 ```
 
@@ -39,6 +41,7 @@ The application accepts the following command-line flags:
 | `-url` | The URL to crawl | `http://example.com` |
 | `-maxDepth` | Maximum crawl depth | `2` |
 | `-rateLimit` | Rate limit between requests | `5s` |
+| `-index` | Elasticsearch index name | `articles` |
 
 ### Environment Variables
 Required environment variables:
@@ -48,7 +51,7 @@ Required environment variables:
 | `ELASTIC_URL` | Elasticsearch server URL | Yes |
 | `ELASTIC_PASSWORD` | Elasticsearch password | Yes |
 | `ELASTIC_API_KEY` | Elasticsearch API key | No |
-| `INDEX_NAME` | Name of the Elasticsearch index | Yes |
+| `ELASTIC_INDEX_NAME` | Name of the Elasticsearch index | Yes |
 | `APP_ENV` | Application environment (development/production) | No |
 | `APP_NAME` | Application name | No |
 | `APP_DEBUG` | Enable debug mode | No |
@@ -63,7 +66,7 @@ Required environment variables:
 ./bin/gocrawl -url="https://example.com"
 
 # Advanced usage with all flags
-./bin/gocrawl -url="https://example.com" -maxDepth=3 -rateLimit=2s
+./bin/gocrawl -url="https://example.com" -maxDepth=3 -rateLimit=2s -index="articles"
 ```
 
 ### Storage Example

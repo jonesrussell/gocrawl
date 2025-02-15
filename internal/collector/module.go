@@ -4,11 +4,9 @@ import (
 	"go.uber.org/fx"
 )
 
-// Module provides the collector as an Fx module
-//
-//nolint:gochecknoglobals // This is a module
+// Module provides the collector module and its dependencies
 var Module = fx.Module("collector",
 	fx.Provide(
-		New,
+		New, // Function to create a new collector instance
 	),
 )

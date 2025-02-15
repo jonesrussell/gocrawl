@@ -1,72 +1,65 @@
 package config_test
 
 import (
-	"os"
 	"testing"
+	"time"
+
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestLoadConfig_Success(t *testing.T) {
-	// Set environment variables for testing
-	defer os.Clearenv() // Clear environment variables after the test
-	t.Setenv("APP_NAME", "TestApp")
-	t.Setenv("APP_ENV", "development")
-	t.Setenv("APP_DEBUG", "true")
-	t.Setenv("ELASTIC_URL", "http://localhost:9200")
-	t.Setenv("ELASTIC_PASSWORD", "password")
-	t.Setenv("ELASTIC_API_KEY", "api_key")
-	t.Setenv("INDEX_NAME", "test_index")
-	t.Setenv("LOG_LEVEL", "debug")
+func TestNewConfig(t *testing.T) {
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("config")     // Name of the file without extension
+	viper.AddConfigPath("./testdata") // Path to the testdata directory
 
-	// Load the configuration
-	cfg, err := config.LoadConfig()
+	err := viper.ReadInConfig()
 	require.NoError(t, err)
 
-	// Assert the loaded values
-	assert.Equal(t, "TestApp", cfg.AppName)
-	assert.Equal(t, "development", cfg.AppEnv)
-	assert.True(t, cfg.AppDebug)
-	assert.Equal(t, "http://localhost:9200", cfg.ElasticURL)
-	assert.Equal(t, "password", cfg.ElasticPassword)
-	assert.Equal(t, "api_key", cfg.ElasticAPIKey)
-	assert.Equal(t, "test_index", cfg.IndexName)
-	assert.Equal(t, "debug", cfg.LogLevel)
+	cfg, err := config.NewConfig()
+
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	require.Equal(t, "test", cfg.App.Environment)
+	require.Equal(t, "debug", cfg.App.LogLevel)
+	require.True(t, cfg.App.Debug)
+	require.Equal(t, "http://test.example.com", cfg.Crawler.BaseURL)
+	require.Equal(t, 5, cfg.Crawler.MaxDepth)
+	require.Equal(t, 2*time.Second, cfg.Crawler.RateLimit)
+	require.Equal(t, "http://localhost:9200", cfg.Elasticsearch.URL)
+	require.Equal(t, "test_user", cfg.Elasticsearch.Username)
+	require.Equal(t, "test_pass", cfg.Elasticsearch.Password)
+	require.Equal(t, "test_apikey", cfg.Elasticsearch.APIKey)
+	require.Equal(t, "test_index", cfg.Elasticsearch.IndexName)
+	require.False(t, cfg.Elasticsearch.SkipTLS)
 }
 
-func TestLoadConfig_MissingElasticURL(t *testing.T) {
-	defer os.Clearenv() // Clear environment variables after the test
-	// Set environment variables for testing
-	t.Setenv("APP_NAME", "TestApp")
-	t.Setenv("APP_ENV", "development")
-	t.Setenv("APP_DEBUG", "true")
-	t.Setenv("ELASTIC_PASSWORD", "password")
-	t.Setenv("ELASTIC_API_KEY", "api_key")
-	t.Setenv("INDEX_NAME", "test_index")
-	t.Setenv("LOG_LEVEL", "debug")
+func TestParseRateLimit(t *testing.T) {
+	rateLimit, err := config.ParseRateLimit("1s")
+	require.NoError(t, err)
+	require.Equal(t, time.Second, rateLimit)
 
-	// Load the configuration
-	cfg, err := config.LoadConfig()
-
-	// Assert that an error is returned and ElasticURL is required
-	require.Error(t, err)
-	assert.Nil(t, cfg)
-	require.EqualError(t, err, "ELASTIC_URL is required")
+	// Test invalid duration
+	rateLimit, err = config.ParseRateLimit("invalid")
+	require.Error(t, err)                    // Expect an error
+	require.Equal(t, time.Second, rateLimit) // Should return default value
 }
 
-func TestLoadConfig_EnvFileNotFound(t *testing.T) {
-	defer os.Clearenv() // Clear environment variables after the test
-	// Ensure that the .env file is not loaded
-	t.Setenv("APP_ENV", "development")
-	// Do not set ELASTIC_URL to simulate the missing environment variable
+func TestValidateConfig(t *testing.T) {
+	cfg := &config.Config{
+		Elasticsearch: config.ElasticsearchConfig{
+			URL: "http://localhost:9200",
+		},
+	}
 
-	// Load the configuration
-	cfg, err := config.LoadConfig()
+	err := config.ValidateConfig(cfg)
+	require.NoError(t, err)
 
-	// Assert that an error is returned for the missing ELASTIC_URL
+	// Test missing Elasticsearch URL
+	cfg.Elasticsearch.URL = ""
+	err = config.ValidateConfig(cfg)
 	require.Error(t, err)
-	require.EqualError(t, err, "ELASTIC_URL is required")
-	assert.Nil(t, cfg) // Ensure that the config is nil
+	require.Equal(t, config.ErrMissingElasticURL, err)
 }

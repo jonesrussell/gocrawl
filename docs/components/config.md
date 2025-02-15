@@ -32,7 +32,7 @@ func LoadConfig() (*Config, error) {
         ElasticURL:      os.Getenv("ELASTIC_URL"),
         ElasticPassword: os.Getenv("ELASTIC_PASSWORD"),
         ElasticAPIKey:   os.Getenv("ELASTIC_API_KEY"),
-        IndexName:       os.Getenv("INDEX_NAME"),
+        IndexName:       os.Getenv("ELASTIC_INDEX_NAME"),
         LogLevel:        getEnvOrDefault("LOG_LEVEL", "info"),
     }
     
@@ -70,11 +70,11 @@ func (c *Config) Validate() error {
 ## Best Practices
 
 1. **Security**
-   - Never log sensitive values
-   - Use secure environment variables
-   - Validate all inputs
+   - Never log sensitive values.
+   - Use secure environment variables.
+   - Validate all inputs.
 
 2. **Defaults**
-   - Provide sensible defaults
-   - Document all options
-   - Use clear naming conventions
+   - Provide sensible defaults.
+   - Document all options.
+   - Use clear naming conventions.

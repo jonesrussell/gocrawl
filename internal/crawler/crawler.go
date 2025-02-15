@@ -2,105 +2,112 @@ package crawler
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
-	"go.uber.org/fx"
+	"github.com/jonesrussell/gocrawl/internal/article"
 )
 
 // Constants for configuration
 const (
-	TimeoutDuration = 5 * time.Second
-	HTTPStatusOK    = 200
+	TimeoutDuration  = 5 * time.Second
+	HTTPStatusOK     = 200
+	DefaultRateLimit = time.Second
 )
 
-// Crawler struct to hold configuration or state if needed
-type Crawler struct {
-	BaseURL   string
-	Storage   storage.Storage
-	MaxDepth  int
-	RateLimit time.Duration
-	Collector *colly.Collector
-	Logger    logger.Interface
-	IndexName string
-}
+// Start method to begin crawling
+func (c *Crawler) Start(ctx context.Context) error {
+	c.Logger.Debug("Starting crawl at base URL", "url", c.Config.Crawler.BaseURL)
 
-// Params holds the parameters for creating a Crawler
-type Params struct {
-	fx.In
-
-	BaseURL   string        `name:"baseURL"`
-	MaxDepth  int           `name:"maxDepth"`
-	RateLimit time.Duration `name:"rateLimit"`
-	Debugger  *logger.CollyDebugger
-	Logger    logger.Interface
-	Config    *config.Config
-	Storage   storage.Storage
-}
-
-// Result holds the dependencies for the crawler
-type Result struct {
-	fx.Out
-
-	Crawler *Crawler
-}
-
-// NewCrawler creates a new Crawler instance
-func NewCrawler(p Params) (Result, error) {
-	if p.Logger == nil {
-		return Result{}, errors.New("logger is required")
+	// Perform initial setup (e.g., test connection, ensure index)
+	if err := c.Storage.TestConnection(ctx); err != nil {
+		c.Logger.Error("Storage connection failed", "error", err)
+		return fmt.Errorf("storage connection failed: %w", err)
 	}
 
-	// Create a new collector
-	c := colly.NewCollector(
-		colly.MaxDepth(p.MaxDepth),
-		colly.Async(true),
-	)
-
-	// Set rate limiting
-	err := c.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		RandomDelay: p.RateLimit,
-	})
-	if err != nil {
-		return Result{}, fmt.Errorf("error setting rate limit: %w", err)
+	if err := c.IndexSvc.EnsureIndex(ctx, c.IndexName); err != nil {
+		c.Logger.Error("Index setup failed", "error", err)
+		return fmt.Errorf("index setup failed: %w", err)
 	}
 
-	crawler := &Crawler{
-		BaseURL:   p.BaseURL,
-		Storage:   p.Storage,
-		MaxDepth:  p.MaxDepth,
-		RateLimit: p.RateLimit,
-		Collector: c,
-		Logger:    p.Logger,
-		IndexName: p.Config.IndexName,
+	// Create a channel to track completion
+	done := make(chan struct{})
+
+	// Start crawling in a goroutine
+	go func() {
+		defer close(done)
+		// Visit the base URL to start crawling
+		if err := c.Collector.Visit(c.Config.Crawler.BaseURL); err != nil {
+			c.Logger.Error("Failed to visit base URL", "error", err)
+			return
+		}
+		// Wait for collector to finish all requests
+		c.Collector.Wait()
+		c.Logger.Info("Crawler finished - no more links to visit")
+	}()
+
+	// Wait for either completion or context cancellation
+	select {
+	case <-ctx.Done():
+		c.Logger.Info("Crawler stopping due to context cancellation")
+		return ctx.Err()
+	case <-done:
+		c.Logger.Info("Crawler completed successfully")
 	}
 
-	// Configure collector callbacks
+	return nil
+}
+
+// Stop method to cleanly shut down the crawler
+func (c *Crawler) Stop() {
+	// Perform any necessary cleanup here
+}
+
+// ProcessPage handles article extraction
+func (c *Crawler) ProcessPage(e *colly.HTMLElement) {
+	c.Logger.Debug("Processing page", "url", e.Request.URL.String())
+	article := c.ArticleService.ExtractArticle(e)
+	if article == nil {
+		c.Logger.Debug("No article extracted", "url", e.Request.URL.String())
+		return
+	}
+	c.Logger.Debug("Article extracted", "url", e.Request.URL.String(), "title", article.Title)
+
+	// Index the article after extraction
+	if err := c.Storage.IndexDocument(context.Background(), "articles", article.ID, article); err != nil {
+		c.Logger.Error("Failed to index article", "articleID", article.ID, "error", err)
+		return
+	}
+
+	c.articleChan <- article
+}
+
+// Add these methods to the Crawler struct
+func (c *Crawler) SetCollector(collector *colly.Collector) {
+	c.Collector = collector
+}
+
+func (c *Crawler) SetService(svc article.Interface) {
+	c.ArticleService = svc
+}
+
+func configureCollectorCallbacks(c *colly.Collector, crawler *Crawler) {
 	c.OnRequest(func(r *colly.Request) {
 		crawler.Logger.Debug("Requesting URL", r.URL.String())
 	})
 
 	c.OnResponse(func(r *colly.Response) {
-		crawler.Logger.Debug("Received response", r.Request.URL.String(), r.StatusCode)
-		if r.StatusCode != HTTPStatusOK {
-			crawler.Logger.Warn(
-				"Non-200 response received",
-				r.Request.URL.String(),
-				r.StatusCode,
-			)
-		}
+		crawler.Logger.Debug("Received response", "url", r.Request.URL.String(), "status", r.StatusCode)
 	})
 
 	c.OnError(func(r *colly.Response, err error) {
-		crawler.Logger.Error("Error occurred", r.Request.URL.String(), err)
+		crawler.Logger.Error("Error scraping", "url", r.Request.URL.String(), "error", err)
+	})
+
+	c.OnHTML("div.details", func(e *colly.HTMLElement) {
+		crawler.Logger.Debug("Found details", "url", e.Request.URL.String())
+		crawler.ProcessPage(e)
 	})
 
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -108,141 +115,26 @@ func NewCrawler(p Params) (Result, error) {
 		if link == "" {
 			return
 		}
-
 		crawler.Logger.Debug("Found link", "url", link)
-
 		if err := e.Request.Visit(link); err != nil {
-			if !errors.Is(err, colly.ErrAlreadyVisited) &&
-				!errors.Is(err, colly.ErrMissingURL) &&
-				!errors.Is(err, colly.ErrForbiddenDomain) {
-				crawler.Logger.Debug("Could not visit link", "url", link, "error", err.Error())
-			}
+			crawler.Logger.Debug("Could not visit link", "url", link, "error", err)
 		}
 	})
 
-	if p.Debugger != nil {
-		c.SetDebugger(p.Debugger)
+	if crawler.Debugger != nil {
+		c.SetDebugger(crawler.Debugger)
 	}
-
-	p.Logger.Info("Crawler initialized",
-		"baseURL", p.BaseURL,
-		"maxDepth", p.MaxDepth,
-		"rateLimit", p.RateLimit)
-
-	return Result{Crawler: crawler}, nil
 }
 
-// Start method to begin crawling
-func (c *Crawler) Start(ctx context.Context, shutdowner fx.Shutdowner) error {
-	if err := c.Storage.TestConnection(ctx); err != nil {
-		c.Logger.Error("Failed to connect to storage", "error", err)
-		return err
-	}
-
-	c.Logger.Info("Starting crawling process")
-	c.configureCollectors(ctx)
-
-	// Create error channel for async crawling
-	errChan := make(chan error, 1)
-	done := make(chan bool, 1)
-
-	go func() {
-		if err := c.Collector.Visit(c.BaseURL); err != nil {
-			errChan <- err
-			return
-		}
-		c.Collector.Wait()
-		done <- true
-	}()
-
-	// Wait for either completion or context cancellation
-	select {
-	case err := <-errChan:
-		return err
-	case <-done:
-		c.Logger.Info("Crawling completed successfully")
-	case <-ctx.Done():
-		c.Logger.Error("Context cancelled", "error", ctx.Err())
-		return ctx.Err()
-	}
-
-	return shutdowner.Shutdown()
+// Getter methods for configuration
+func (c *Crawler) GetBaseURL() string {
+	return c.Config.Crawler.BaseURL
 }
 
-// Helper method to configure collectors
-func (c *Crawler) configureCollectors(ctx context.Context) {
-	c.Collector.OnRequest(func(r *colly.Request) {
-		c.Logger.Debug("Requesting URL", r.URL.String())
-	})
-
-	c.Collector.OnResponse(func(r *colly.Response) {
-		c.Logger.Debug("Received response", r.Request.URL.String(), r.StatusCode)
-		if r.StatusCode != HTTPStatusOK {
-			c.Logger.Warn(
-				"Non-200 response received",
-				r.Request.URL.String(),
-				r.StatusCode,
-			)
-		}
-	})
-
-	c.Collector.OnError(func(r *colly.Response, err error) {
-		c.Logger.Error("Error occurred", r.Request.URL.String(), err)
-	})
-
-	c.Collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if link == "" {
-			return // Skip empty or invalid URLs
-		}
-
-		c.Logger.Debug("Found link", "url", link)
-
-		// Visit the link asynchronously
-		if err := e.Request.Visit(link); err != nil {
-			if !errors.Is(err, colly.ErrAlreadyVisited) &&
-				!errors.Is(err, colly.ErrMissingURL) &&
-				!errors.Is(err, colly.ErrForbiddenDomain) {
-				c.Logger.Debug("Could not visit link", "url", link, "error", err.Error())
-			}
-		}
-	})
-
-	c.Collector.OnHTML("html", func(e *colly.HTMLElement) {
-		if ctx.Err() != nil {
-			c.Logger.Warn("Crawling stopped due to context cancellation", "error", ctx.Err())
-			return
-		}
-
-		content := e.Text
-		docID := generateDocumentID(e.Request.URL.String())
-
-		if len(content) == 0 {
-			c.Logger.Warn("Content is empty, skipping indexing", "url", e.Request.URL.String())
-			return
-		}
-
-		c.Logger.Debug("Indexing document", "url", e.Request.URL.String(), "id", docID)
-		c.indexDocument(ctx, c.IndexName, e.Request.URL.String(), content, docID)
-	})
+func (c *Crawler) GetMaxDepth() int {
+	return c.Config.Crawler.MaxDepth
 }
 
-func generateDocumentID(url string) string {
-	hash := sha256.Sum256([]byte(url))
-	return hex.EncodeToString(hash[:])
-}
-
-func (c *Crawler) indexDocument(ctx context.Context, indexName, url, content, docID string) {
-	c.Logger.Debug(
-		"Preparing to index document",
-		url,
-		docID,
-	) // Log before indexing
-
-	err := c.Storage.IndexDocument(ctx, indexName, docID, map[string]interface{}{"url": url, "content": content})
-	if err != nil {
-		c.Logger.Error("Error indexing document", url, err)
-	} else {
-		c.Logger.Info("Successfully indexed document", url, docID)
-	}
+func (c *Crawler) GetRateLimit() time.Duration {
+	return c.Config.Crawler.RateLimit
 }

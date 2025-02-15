@@ -2,54 +2,83 @@ package logger
 
 import (
 	"errors"
-	"strings"
+	"fmt"
+	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-// Module provides the logger as an Fx module
-//
-//nolint:gochecknoglobals // This is a module definition
+// Module provides the logger module and its dependencies
 var Module = fx.Module("logger",
-	fx.Provide(NewLogger),
+	fx.Provide(
+		NewDevelopmentLogger, // Provide the development logger
+		func(cfg *config.Config) Interface { // Provide the logger.Interface
+			var logger *CustomLogger
+			var err error
+			switch cfg.App.Environment {
+			case "development":
+				logger, err = NewDevelopmentLogger()
+			case "production":
+				logger, err = NewProductionLogger(cfg)
+			default:
+				err = errors.New("unknown environment")
+			}
+			if err != nil {
+				panic(err)
+			}
+			return logger
+		},
+	),
 )
 
-// NewLogger initializes the appropriate logger based on the environment
-func NewLogger(cfg *config.Config) (*CustomLogger, error) {
+// NewDevelopmentLogger initializes a new CustomLogger for development with colored output
+func NewDevelopmentLogger() (*CustomLogger, error) {
+	config := zap.NewDevelopmentConfig()
+	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder // Add color to log levels
+
+	// Ensure the output is set to os.Stdout
+	config.OutputPaths = []string{"stdout"} // This should work in most environments
+	// Alternatively, you can use:
+	// config.OutputPaths = []string{os.Stdout.Name()} // This is more explicit
+
+	logger, err := config.Build()
+	if err != nil {
+		return nil, err
+	}
+	// Log when the logger is created
+	logger.Info("Development logger initialized successfully")
+	return &CustomLogger{Logger: logger}, nil
+}
+
+// NewProductionLogger initializes a new CustomLogger for production
+func NewProductionLogger(cfg *config.Config) (*CustomLogger, error) {
 	if cfg == nil {
 		return nil, errors.New("config cannot be nil")
 	}
 
-	level, err := parseLogLevel(cfg.LogLevel)
+	logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
 
-	params := Params{
-		Level:  level,
-		AppEnv: cfg.AppEnv,
-	}
+	fileCore := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		zapcore.AddSync(logFile),
+		zapcore.InfoLevel,
+	)
+	consoleCore := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.AddSync(os.Stdout),
+		zapcore.DebugLevel,
+	)
+	core := zapcore.NewTee(fileCore, consoleCore)
+	logger := zap.New(core)
 
-	if cfg.AppEnv == "development" {
-		return NewDevelopmentLogger(params)
-	}
-	return NewCustomLogger(params)
-}
+	// Test logging to ensure it's working
+	logger.Info("Production logger initialized successfully")
 
-// parseLogLevel parses the log level from the configuration
-func parseLogLevel(logLevel string) (zapcore.Level, error) {
-	switch strings.ToUpper(logLevel) {
-	case "DEBUG":
-		return zapcore.DebugLevel, nil
-	case "INFO":
-		return zapcore.InfoLevel, nil
-	case "WARN":
-		return zapcore.WarnLevel, nil
-	case "ERROR":
-		return zapcore.ErrorLevel, nil
-	default:
-		return zapcore.InfoLevel, errors.New("invalid log level")
-	}
+	return &CustomLogger{Logger: logger, logFile: logFile}, nil
 }

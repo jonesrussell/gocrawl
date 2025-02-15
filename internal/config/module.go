@@ -4,11 +4,10 @@ import (
 	"go.uber.org/fx"
 )
 
-// Module provides the configuration as an Fx module
-//
-//nolint:gochecknoglobals // This is a module
+// Module provides the config module and its dependencies
 var Module = fx.Module("config",
 	fx.Provide(
-		LoadConfig, // Ensure LoadConfig is provided
+		NewConfig,        // Function to create a new config instance
+		NewHTTPTransport, // Ensure this is provided
 	),
 )

@@ -30,18 +30,18 @@ LOG_LEVEL=debug
 # Elasticsearch
 ELASTIC_URL=http://elasticsearch:9200
 ELASTIC_PASSWORD=your_password
-INDEX_NAME=articles
+ELASTIC_INDEX_NAME=articles
 ```
 
 ### 3. Development Container
 
 The project includes a development container configuration:
 
-1. Open VS Code
-2. Install the "Remote - Containers" extension
-3. Open the project folder
-4. Click "Reopen in Container" when prompted
-5. Wait for the container to build and initialize
+1. Open VS Code.
+2. Install the "Remote - Containers" extension.
+3. Open the project folder.
+4. Click "Reopen in Container" when prompted.
+5. Wait for the container to build and initialize.
 
 ## Development Workflow
 
@@ -99,10 +99,10 @@ go test -v ./internal/crawler
 
 ### Writing Tests
 
-- Place tests in `*_test.go` files
-- Use table-driven tests where appropriate
-- Utilize mock implementations for external dependencies
-- Aim for >80% test coverage
+- Place tests in `*_test.go` files.
+- Use table-driven tests where appropriate.
+- Utilize mock implementations for external dependencies.
+- Aim for >80% test coverage.
 
 Example test:
 
@@ -181,10 +181,10 @@ continue
 
 ## Contributing
 
-1. Create a new branch for your feature/fix
-2. Write tests for new functionality
-3. Ensure all tests pass and linters are happy
-4. Submit a pull request
+1. Create a new branch for your feature/fix.
+2. Write tests for new functionality.
+3. Ensure all tests pass and linters are happy.
+4. Submit a pull request.
 
 ### Commit Messages
 
@@ -221,6 +221,6 @@ docker-compose build --no-cache
 
 ### Logs
 
-- Development logs are written to stdout
-- Production logs are in JSON format
-- Use appropriate log levels for debugging
+- Development logs are written to stdout.
+- Production logs are in JSON format.
+- Use appropriate log levels for debugging.

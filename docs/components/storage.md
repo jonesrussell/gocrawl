@@ -6,7 +6,10 @@ The Storage component handles data persistence using Elasticsearch as the backen
 
 ```go
 type Storage interface {
+    // IndexDocument stores a document in the specified index
     IndexDocument(ctx context.Context, index string, docID string, document interface{}) error
+    
+    // TestConnection verifies the connection to the storage backend
     TestConnection(ctx context.Context) error
 }
 ```
@@ -39,7 +42,15 @@ func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index, docID s
         s.ESClient.Index.WithDocumentID(docID),
         s.ESClient.Index.WithContext(ctx),
     )
-    // Error handling...
+    if err != nil {
+        return fmt.Errorf("error indexing document: %w", err)
+    }
+    defer res.Body.Close()
+
+    if res.IsError() {
+        return fmt.Errorf("error indexing document: %s", res.String())
+    }
+
     return nil
 }
 ```
@@ -56,19 +67,22 @@ func NewStorage(config *config.Config) (*ElasticsearchStorage, error) {
     }
     
     client, err := elasticsearch.NewClient(cfg)
-    // Error handling...
-    return &ElasticsearchStorage{client}, nil
+    if err != nil {
+        return nil, fmt.Errorf("error creating Elasticsearch client: %w", err)
+    }
+    
+    return &ElasticsearchStorage{ESClient: client}, nil
 }
 ```
 
 ## Best Practices
 
 1. **Error Handling**
-   - Implement retries for transient failures
-   - Use context for timeouts
-   - Log detailed error information
+   - Implement retries for transient failures.
+   - Use context for timeouts.
+   - Log detailed error information.
 
 2. **Performance**
-   - Use bulk operations where possible
-   - Implement connection pooling
-   - Monitor resource usage
+   - Use bulk operations where possible.
+   - Implement connection pooling.
+   - Monitor resource usage.

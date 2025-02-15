@@ -10,12 +10,15 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
+// Define a constant for the default scroll duration
+const defaultScrollDuration = 5 * time.Minute
+
 // getScrollDuration converts ScrollDuration string to time.Duration
 func (s *ElasticsearchStorage) getScrollDuration() time.Duration {
 	duration, err := time.ParseDuration(s.opts.ScrollDuration)
 	if err != nil {
-		// Default to 5 minutes if parsing fails
-		return 5 * time.Minute
+		// Default to the constant if parsing fails
+		return defaultScrollDuration
 	}
 	return duration
 }
@@ -64,8 +67,8 @@ func (s *ElasticsearchStorage) initializeScroll(
 	if searchRes.IsError() {
 		defer searchRes.Body.Close()
 		var e map[string]interface{}
-		if err := json.NewDecoder(searchRes.Body).Decode(&e); err != nil {
-			return nil, fmt.Errorf("error parsing error response: %w", err)
+		if decodeErr := json.NewDecoder(searchRes.Body).Decode(&e); decodeErr != nil {
+			return nil, fmt.Errorf("error parsing error response: %w", decodeErr)
 		}
 		return nil, fmt.Errorf("elasticsearch error: %v", e["error"])
 	}
@@ -73,6 +76,7 @@ func (s *ElasticsearchStorage) initializeScroll(
 	return searchRes, nil
 }
 
+// handleScrollRequests processes the scroll requests
 func (s *ElasticsearchStorage) handleScrollRequests(
 	ctx context.Context,
 	searchRes *esapi.Response,
@@ -82,43 +86,85 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 	defer searchRes.Body.Close()
 
 	for {
-		scrollID, err := s.HandleScrollResponse(ctx, searchRes, resultChan)
+		scrollID, err := s.HandleScrollResponse(searchRes, resultChan)
 		if err != nil {
 			s.Logger.Error("Error processing scroll response", "error", err)
 			return
 		}
 
-		select {
-		case <-ctx.Done():
+		if fetchErr := s.fetchNextScrollBatch(scrollID, resultChan); fetchErr != nil {
+			s.Logger.Error("Failed to get next scroll batch", "error", fetchErr)
+			return
+		}
+
+		// Check for context cancellation
+		if ctx.Err() != nil {
 			s.Logger.Info("Context cancelled, stopping scroll")
 			return
-		default:
-			searchRes, err = s.ESClient.Scroll(
-				s.ESClient.Scroll.WithContext(ctx),
-				s.ESClient.Scroll.WithScrollID(scrollID),
-				s.ESClient.Scroll.WithScroll(s.getScrollDuration()),
-			)
-			if err != nil {
-				s.Logger.Error("Failed to get next scroll batch", "error", err)
-				return
-			}
+		}
+	}
+}
 
-			// Check if we've reached the end of the scroll
-			if searchRes.IsError() {
-				var e map[string]interface{}
-				if err := json.NewDecoder(searchRes.Body).Decode(&e); err != nil {
-					s.Logger.Error("Error parsing scroll error response", "error", err)
-					return
-				}
-				if e["error"].(map[string]interface{})["type"] == "search_phase_execution_exception" {
-					s.Logger.Info("Reached end of scroll results")
-					return
-				}
-				s.Logger.Error("Unexpected scroll error", "error", e["error"])
-				return
+// fetchNextScrollBatch fetches the next batch of results from Elasticsearch
+func (s *ElasticsearchStorage) fetchNextScrollBatch(
+	scrollID string,
+	resultChan chan<- map[string]interface{},
+) error {
+	searchRes, err := s.ESClient.Scroll(
+		s.ESClient.Scroll.WithScrollID(scrollID),
+		s.ESClient.Scroll.WithScroll(s.getScrollDuration()),
+	)
+	if err != nil {
+		return err
+	}
+
+	if searchRes.IsError() {
+		return s.handleScrollError(searchRes)
+	}
+
+	// Process the hits from the response
+	return s.processScrollHits(searchRes, resultChan)
+}
+
+// handleScrollError handles errors from the scroll response
+func (s *ElasticsearchStorage) handleScrollError(searchRes *esapi.Response) error {
+	var e map[string]interface{}
+	if decodeErr := json.NewDecoder(searchRes.Body).Decode(&e); decodeErr != nil {
+		return decodeErr
+	}
+
+	// Check for specific error type
+	if errMap, ok := e["error"].(map[string]interface{}); ok {
+		if errType, errTypeOk := errMap["type"]; errTypeOk {
+			if errType == "search_phase_execution_exception" {
+				s.Logger.Info("Reached end of scroll results")
+				return nil
 			}
 		}
 	}
+
+	s.Logger.Error("Unexpected scroll error", "error", e["error"])
+	return fmt.Errorf("unexpected scroll error: %v", e["error"])
+}
+
+// processScrollHits processes the hits from the scroll response
+func (s *ElasticsearchStorage) processScrollHits(
+	searchRes *esapi.Response,
+	resultChan chan<- map[string]interface{},
+) error {
+	var result map[string]interface{}
+	if err := json.NewDecoder(searchRes.Body).Decode(&result); err != nil {
+		return fmt.Errorf("error parsing scroll response: %w", err)
+	}
+
+	hits, err := s.getHitsFromResult(result)
+	if err != nil {
+		return err
+	}
+
+	s.ProcessHits(hits, resultChan)
+
+	return nil
 }
 
 func (s *ElasticsearchStorage) getHitsFromResult(
@@ -139,7 +185,6 @@ func (s *ElasticsearchStorage) getHitsFromResult(
 
 // ProcessHits extracts documents from hits array and sends them to resultChan
 func (s *ElasticsearchStorage) ProcessHits(
-	ctx context.Context,
 	hits []interface{},
 	resultChan chan<- map[string]interface{},
 ) {
@@ -154,24 +199,13 @@ func (s *ElasticsearchStorage) ProcessHits(
 			continue
 		}
 
-		select {
-		case <-ctx.Done():
-			s.Logger.Info("Context cancelled while processing hits")
-			return
-		default:
-			select {
-			case <-ctx.Done():
-				s.Logger.Info("Context cancelled while sending hit")
-				return
-			case resultChan <- source:
-			}
-		}
+		// Send the source directly to the channel
+		resultChan <- source
 	}
 }
 
 // HandleScrollResponse processes a single scroll response
 func (s *ElasticsearchStorage) HandleScrollResponse(
-	ctx context.Context,
 	res *esapi.Response,
 	resultChan chan<- map[string]interface{},
 ) (string, error) {
@@ -185,7 +219,7 @@ func (s *ElasticsearchStorage) HandleScrollResponse(
 		return "", err
 	}
 
-	s.ProcessHits(ctx, hits, resultChan)
+	s.ProcessHits(hits, resultChan)
 
 	scrollID, ok := result["_scroll_id"].(string)
 	if !ok {

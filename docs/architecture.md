@@ -77,29 +77,29 @@ internal/
 
 ## Data Flow
 
-1. The crawler receives a starting URL and configuration
-2. The collector fetches pages according to configuration
-3. Page content is processed and validated
-4. Valid content is sent to storage
-5. All operations are logged with appropriate context
+1. The crawler receives a starting URL and configuration.
+2. The collector fetches pages according to configuration.
+3. Page content is processed and validated.
+4. Valid content is sent to storage.
+5. All operations are logged with appropriate context.
 
 ## Error Handling
 
-- Structured error types for different failure scenarios
-- Graceful degradation on temporary failures
-- Automatic retries with exponential backoff
-- Comprehensive error logging and monitoring
+- Structured error types for different failure scenarios.
+- Graceful degradation on temporary failures.
+- Automatic retries with exponential backoff.
+- Comprehensive error logging and monitoring.
 
 ## Configuration Management
 
-- Environment-based configuration
-- Command-line flags for runtime options
-- Validation of required configuration
-- Secure handling of sensitive data
+- Environment-based configuration.
+- Command-line flags for runtime options.
+- Validation of required configuration.
+- Secure handling of sensitive data.
 
 ## Testing Strategy
 
-- Unit tests for individual components
-- Integration tests for component interactions
-- Mock implementations for external dependencies
-- Comprehensive test coverage requirements
+- Unit tests for individual components.
+- Integration tests for component interactions.
+- Mock implementations for external dependencies.
+- Comprehensive test coverage requirements.
