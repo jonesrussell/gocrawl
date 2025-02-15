@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -26,46 +27,10 @@ func NewCrawlCmd(log logger.Interface) *cobra.Command {
 		Short: "Start crawling a website",
 		Long:  `Crawl a website and store the content in Elasticsearch`,
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
-			if depth, err := cmd.Flags().GetInt("depth"); err == nil {
-				viper.Set("CRAWLER_MAX_DEPTH", depth)
-			}
-			viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())
-			viper.Set("ELASTIC_INDEX_NAME", cmd.Flag("index").Value.String())
-			return nil
+			return setupCrawlCmd(cmd)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Initialize fx container
-			var deps struct {
-				fx.In
-				Logger logger.Interface
-			}
-
-			fxApp := fx.New(
-				config.Module,
-				logger.Module,
-				storage.Module,
-				collector.Module,
-				crawler.Module,
-				fx.Populate(&deps),
-			)
-
-			// Debug log before starting the application
-			log.Debug("Starting application...")
-
-			if err := fxApp.Start(cmd.Context()); err != nil {
-				log.Error("Error starting application", "error", err)
-				return fmt.Errorf("error starting application: %w", err)
-			}
-			defer func() {
-				if err := fxApp.Stop(cmd.Context()); err != nil {
-					log.Error("Error stopping application", "error", err)
-				}
-			}()
-
-			// Debug log after successful start
-			log.Debug("Application started successfully")
-			return nil
+			return executeCrawlCmd(cmd, log)
 		},
 	}
 
@@ -80,4 +45,57 @@ func NewCrawlCmd(log logger.Interface) *cobra.Command {
 	}
 
 	return crawlCmd
+}
+
+// setupCrawlCmd handles the setup for the crawl command
+func setupCrawlCmd(cmd *cobra.Command) error {
+	viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
+	if depth, err := cmd.Flags().GetInt("depth"); err == nil {
+		viper.Set("CRAWLER_MAX_DEPTH", depth)
+	}
+	viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())
+	viper.Set("ELASTIC_INDEX_NAME", cmd.Flag("index").Value.String())
+	return nil
+}
+
+// executeCrawlCmd handles the execution of the crawl command
+func executeCrawlCmd(cmd *cobra.Command, log logger.Interface) error {
+	// Initialize fx container
+	fxApp := fx.New(
+		config.Module,
+		logger.Module,
+		storage.Module,
+		collector.Module,
+		crawler.Module,
+		fx.Invoke(func(lc fx.Lifecycle, deps struct {
+			fx.In
+			Logger  logger.Interface
+			Crawler *crawler.Crawler
+		}) {
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					log.Debug("Starting application...")
+					return deps.Crawler.Start(ctx)
+				},
+				OnStop: func(ctx context.Context) error {
+					log.Debug("Stopping application...")
+					deps.Crawler.Stop()
+					return nil
+				},
+			})
+		}),
+	)
+
+	// Start the application
+	if err := fxApp.Start(cmd.Context()); err != nil {
+		log.Error("Error starting application", "error", err)
+		return fmt.Errorf("error starting application: %w", err)
+	}
+	defer func() {
+		if err := fxApp.Stop(cmd.Context()); err != nil {
+			log.Error("Error stopping application", "error", err)
+		}
+	}()
+
+	return nil
 }
