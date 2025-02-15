@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -58,30 +56,9 @@ func Execute() error {
 	}
 	log.Debug("Logger initialized successfully")
 
-	// Initialize configuration
-	transport := config.NewHTTPTransport()  // Create the transport
-	cfg, err := config.NewConfig(transport) // Pass the transport to NewConfig
-	if err != nil {
-		log.Error(fmt.Sprintf("Failed to initialize config: %v", err))
-		os.Exit(1)
-	}
-
-	// Initialize storage
-	esClient, err := storage.ProvideElasticsearchClient()
-	if err != nil {
-		log.Error(fmt.Sprintf("Failed to initialize Elasticsearch client: %v", err))
-		os.Exit(1)
-	}
-
-	storageInstance, err := storage.NewStorage(esClient)
-	if err != nil {
-		log.Error(fmt.Sprintf("Failed to initialize storage: %v", err))
-		os.Exit(1)
-	}
-
 	// Add commands
-	rootCmd.AddCommand(NewCrawlCmd(log, cfg, storageInstance)) // Pass logger, config, and storage to crawl command
-	rootCmd.AddCommand(NewSearchCmd(log))                      // Pass logger to search command
+	rootCmd.AddCommand(NewCrawlCmd(log))  // Pass logger, config, and storage to crawl command
+	rootCmd.AddCommand(NewSearchCmd(log)) // Pass logger to search command
 	log.Debug("Commands added to root command")
 
 	return rootCmd.Execute()
