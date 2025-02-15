@@ -6,6 +6,11 @@ tasks:
     cmds:
       - go run main.go crawl -u https://www.elliotlaketoday.com/opp-beat -d 2 -r 2s -i articles
 
+  crawl:multi:
+    desc: "Run the web crawler for multiple sources defined in sources.yml"
+    cmds:
+      - go run main.go crawl --source sources.yml
+
   search:
     desc: "Search crawled content"
     cmds:
