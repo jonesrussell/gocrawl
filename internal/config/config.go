@@ -2,7 +2,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -25,9 +24,10 @@ const (
 	ElasticURLKey       = "ELASTIC_URL"
 	ElasticUsernameKey  = "ELASTIC_USERNAME"
 	ElasticPasswordKey  = "ELASTIC_PASSWORD"
-	ElasticAPIKeyKey    = "ELASTIC_API_KEY"
 	ElasticIndexNameKey = "ELASTIC_INDEX_NAME"
 	ElasticSkipTLSKey   = "ELASTIC_SKIP_TLS"
+	//nolint:gosec // This is a false positive
+	ElasticAPIKeyKey = "ELASTIC_API_KEY"
 )
 
 // AppConfig holds application-level configuration
@@ -118,11 +118,11 @@ func NewConfig() (*Config, error) {
 // parseRateLimit parses the rate limit duration from a string
 func parseRateLimit(rateLimitStr string) (time.Duration, error) {
 	if rateLimitStr == "" {
-		return time.Second, fmt.Errorf("rate limit cannot be empty")
+		return time.Second, errors.New("rate limit cannot be empty")
 	}
 	rateLimit, err := time.ParseDuration(rateLimitStr)
 	if err != nil {
-		return time.Second, fmt.Errorf("error parsing duration")
+		return time.Second, errors.New("error parsing duration")
 	}
 	return rateLimit, nil
 }
@@ -144,7 +144,7 @@ func NewHTTPTransport() http.RoundTripper {
 func ParseRateLimit(rate string) (time.Duration, error) {
 	duration, err := time.ParseDuration(rate)
 	if err != nil {
-		return time.Second, fmt.Errorf("error parsing duration")
+		return time.Second, errors.New("error parsing duration")
 	}
 	return duration, nil
 }
