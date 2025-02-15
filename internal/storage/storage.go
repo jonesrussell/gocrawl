@@ -70,7 +70,7 @@ func (s *ElasticsearchStorage) IndexDocument(
 	document interface{},
 ) error {
 	if s.ESClient == nil {
-		return fmt.Errorf("elasticsearch client is not initialized")
+		return errors.New("elasticsearch client is not initialized")
 	}
 
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)

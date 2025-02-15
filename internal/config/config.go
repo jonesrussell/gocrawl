@@ -47,7 +47,7 @@ type Config struct {
 }
 
 // NewConfig creates a new Config instance with values from Viper
-func NewConfig(transport http.RoundTripper) (*Config, error) {
+func NewConfig() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")

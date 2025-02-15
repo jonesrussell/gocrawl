@@ -25,7 +25,7 @@ func NewSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			return setupSearchCmd(cmd, cfg)
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeSearchCmd(cmd, log)
 		},
 	}
@@ -59,12 +59,18 @@ func executeSearchCmd(cmd *cobra.Command, log logger.Interface) error {
 	app := newSearchFxApp(query)
 
 	if err := app.Start(cmd.Context()); err != nil {
-		log.Error("Error starting application", "error", err)
-		return fmt.Errorf("error starting application: %w", err)
+		startErr := app.Start(cmd.Context())
+		if startErr != nil {
+			log.Error("Error starting application", "error", startErr)
+			return fmt.Errorf("error starting application: %w", startErr)
+		}
 	}
 	defer func() {
 		if err := app.Stop(cmd.Context()); err != nil {
-			log.Error("Error stopping application", "error", err)
+			stopErr := app.Stop(cmd.Context())
+			if stopErr != nil {
+				log.Error("Error stopping application", "error", stopErr)
+			}
 		}
 	}()
 
@@ -89,7 +95,7 @@ func newSearchFxApp(query string) *fx.App {
 func setupSearchLifecycleHooks(lc fx.Lifecycle, deps struct {
 	fx.In
 	Logger    logger.Interface
-	SearchSvc *search.SearchService
+	SearchSvc *search.Service
 	Query     string
 }) {
 	lc.Append(fx.Hook{
@@ -105,7 +111,7 @@ func setupSearchLifecycleHooks(lc fx.Lifecycle, deps struct {
 }
 
 // runSearchApp executes the main logic of the search application
-func runSearchApp(ctx context.Context, log logger.Interface, searchSvc *search.SearchService, query string) error {
+func runSearchApp(ctx context.Context, log logger.Interface, searchSvc *search.Service, query string) error {
 	results, err := searchSvc.SearchContent(ctx, query, "articles", DefaultSearchSize)
 	if err != nil {
 		log.Error("Search failed", err)

@@ -31,7 +31,7 @@ func initConfig() {
 
 	if err := viper.ReadInConfig(); err != nil {
 		//nolint:forbidigo // This is a CLI error
-		fmt.Printf("Error reading config file: %v\n", err)
+		fmt.Println("Failed to load configuration:", err)
 		os.Exit(1)
 	}
 }
@@ -51,9 +51,9 @@ func InitializeLogger(cfg *config.Config) (logger.Interface, error) {
 
 func Execute() error {
 	// Initialize config
-	cfg, err := config.NewConfig(config.NewHTTPTransport())
+	cfg, err := config.NewConfig()
 	if err != nil {
-		fmt.Printf("Failed to load configuration: %v\n", err)
+		fmt.Println("Failed to load configuration:", err)
 		os.Exit(1)
 	}
 

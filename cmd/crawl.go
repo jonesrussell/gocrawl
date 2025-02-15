@@ -103,7 +103,7 @@ func setupLifecycleHooks(lc fx.Lifecycle, deps struct {
 			deps.Logger.Debug("Starting application...")
 			return deps.Crawler.Start(ctx)
 		},
-		OnStop: func(ctx context.Context) error {
+		OnStop: func(_ context.Context) error {
 			deps.Logger.Debug("Stopping application...")
 			deps.Crawler.Stop()
 			return nil

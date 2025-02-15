@@ -1,7 +1,6 @@
 package config_test
 
 import (
-	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -33,7 +32,7 @@ func TestNewConfig(t *testing.T) {
 
 	// Test successful config creation
 	t.Run("successful config creation", func(t *testing.T) {
-		cfg, err := config.NewConfig(http.DefaultTransport)
+		cfg, err := config.NewConfig()
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
@@ -57,7 +56,7 @@ func TestNewConfig(t *testing.T) {
 	// Test missing required fields
 	t.Run("missing elastic url", func(t *testing.T) {
 		os.Unsetenv("ELASTIC_URL")
-		cfg, err := config.NewConfig(http.DefaultTransport)
+		cfg, err := config.NewConfig()
 		require.ErrorIs(t, err, config.ErrMissingElasticURL)
 		require.Nil(t, cfg)
 	})
@@ -71,7 +70,7 @@ func TestNewConfig(t *testing.T) {
 		// Set only required ELASTIC_URL
 		t.Setenv("ELASTIC_URL", "http://localhost:9200")
 
-		cfg, err := config.NewConfig(http.DefaultTransport)
+		cfg, err := config.NewConfig()
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 
@@ -98,7 +97,7 @@ func TestLoadConfig_Success(t *testing.T) {
 	t.Setenv("CRAWLER_MAX_DEPTH", "3")
 
 	// Load the configuration
-	cfg, err := config.NewConfig(http.DefaultTransport)
+	cfg, err := config.NewConfig()
 	require.NoError(t, err)
 
 	// Assert the loaded values
@@ -124,7 +123,7 @@ func TestLoadConfig_MissingElasticURL(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "debug")
 
 	// Load the configuration
-	cfg, err := config.NewConfig(http.DefaultTransport)
+	cfg, err := config.NewConfig()
 
 	// Assert that an error is returned and ElasticURL is required
 	require.Error(t, err)
@@ -139,7 +138,7 @@ func TestLoadConfig_EnvFileNotFound(t *testing.T) {
 	// Do not set ELASTIC_URL to simulate the missing environment variable
 
 	// Load the configuration
-	cfg, err := config.NewConfig(http.DefaultTransport)
+	cfg, err := config.NewConfig()
 
 	// Assert that an error is returned for the missing ELASTIC_URL
 	require.Error(t, err)

@@ -9,28 +9,28 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
-// SearchResult represents a search result
-type SearchResult struct {
+// Result represents a search result
+type Result struct {
 	URL     string
 	Content string
 }
 
-// SearchService represents the search service
-type SearchService struct {
+// Service represents the search service
+type Service struct {
 	ESClient *elasticsearch.Client
 	Logger   logger.Interface
 }
 
 // NewSearchService creates a new instance of the search service
-func NewSearchService(esClient *elasticsearch.Client, log logger.Interface) *SearchService {
-	return &SearchService{
+func NewSearchService(esClient *elasticsearch.Client, log logger.Interface) *Service {
+	return &Service{
 		ESClient: esClient,
 		Logger:   log,
 	}
 }
 
 // SearchContent performs a search query
-func (s *SearchService) SearchContent(ctx context.Context, query string, index string, size int) ([]SearchResult, error) {
+func (s *Service) SearchContent(ctx context.Context, query string, _ string, size int) ([]Result, error) {
 	storageInstance, err := storage.NewStorage(s.ESClient, s.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
@@ -41,9 +41,9 @@ func (s *SearchService) SearchContent(ctx context.Context, query string, index s
 		return nil, fmt.Errorf("failed to search articles: %w", err)
 	}
 
-	searchResults := make([]SearchResult, len(results))
+	searchResults := make([]Result, len(results))
 	for i, article := range results {
-		searchResults[i] = SearchResult{
+		searchResults[i] = Result{
 			URL:     article.Source,
 			Content: article.Body,
 		}

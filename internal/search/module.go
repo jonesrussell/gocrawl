@@ -14,7 +14,7 @@ var Module = fx.Module("search",
 )
 
 // ProvideSearchService initializes the search service
-func ProvideSearchService(esClient *elasticsearch.Client, log logger.Interface) (*SearchService, error) {
+func ProvideSearchService(esClient *elasticsearch.Client, log logger.Interface) (*Service, error) {
 	// Initialize and return the search service
 	return NewSearchService(esClient, log), nil
 }
