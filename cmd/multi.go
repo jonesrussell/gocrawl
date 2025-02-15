@@ -49,6 +49,7 @@ func setupMultiCrawlCmd(_ *cobra.Command, cfg *config.Config, log logger.Interfa
 		// Use the Config methods to set the configuration values
 		cfg.Crawler.SetBaseURL(sources[0].URL)     // Set the BaseURL using the Config method
 		cfg.Crawler.SetIndexName(sources[0].Index) // Set the IndexName using the Config method
+
 		// Log updated config directly from the Config struct
 		log.Debug(
 			"Updated config",
