@@ -3,16 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/multisource"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-	"gopkg.in/yaml.v3"
 )
 
 // NewMultiCrawlCmd creates a new command for crawling multiple sources
@@ -56,30 +53,6 @@ func setupMultiCrawlCmd(_ *cobra.Command, cfg *config.Config, log logger.Interfa
 	return nil
 }
 
-// loadSourcesFromYAML reads the sources from a YAML file
-func loadSourcesFromYAML(filePath string) ([]Source, error) {
-	var sources struct {
-		Sources []Source `yaml:"sources"` // Wrap in a struct to match the YAML structure
-	}
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := yaml.Unmarshal(data, &sources); err != nil {
-		return nil, err
-	}
-
-	return sources.Sources, nil // Return the slice of sources
-}
-
-// Source struct to represent the structure of your sources.yml
-type Source struct {
-	Name  string `yaml:"name"`
-	URL   string `yaml:"url"`
-	Index string `yaml:"index"`
-}
-
 // executeMultiCrawlCmd handles the execution of the multi-crawl command
 func executeMultiCrawlCmd(cmd *cobra.Command, log logger.Interface) error {
 	// Initialize fx container
@@ -107,7 +80,6 @@ func newMultiCrawlFxApp(log logger.Interface) *fx.App {
 		config.Module,
 		logger.Module,
 		crawler.Module,
-		storage.Module,
 		multisource.Module,
 		fx.Invoke(setupMultiLifecycleHooks),
 	)
@@ -124,11 +96,10 @@ func setupMultiLifecycleHooks(lc fx.Lifecycle, deps struct {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			deps.Logger.Debug("Starting multi-crawl application...")
-			return deps.Crawler.Start(ctx)
+			return deps.MultiSource.Start(ctx)
 		},
 		OnStop: func(ctx context.Context) error {
 			deps.Logger.Debug("Stopping multi-crawl application...")
-			deps.Crawler.Stop()
 			deps.MultiSource.Stop()
 			return nil
 		},

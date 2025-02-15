@@ -1,9 +1,12 @@
 package multisource
 
 import (
-	"fmt"
+	"context"
 	"os"
 
+	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/pkg/errors"
 	"go.uber.org/fx"
 	"gopkg.in/yaml.v3"
 )
@@ -18,25 +21,56 @@ type SourceConfig struct {
 // MultiSource manages multiple sources for crawling
 type MultiSource struct {
 	Sources []SourceConfig
+	Crawler *crawler.Crawler
+	Logger  logger.Interface
 }
 
 // NewMultiSource creates a new MultiSource instance
-func NewMultiSource() (*MultiSource, error) {
-	var ms MultiSource
-	data, err := os.ReadFile("sources.yml")
+func NewMultiSource(logger logger.Interface, crawler *crawler.Crawler) (*MultiSource, error) {
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		configPath = "sources.yml"
+	}
+	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read sources.yml: %w", err)
+		return nil, errors.Wrap(err, "failed to read sources.yml")
 	}
+
+	var ms MultiSource
 	if err := yaml.Unmarshal(data, &ms); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal sources.yml: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal sources.yml")
 	}
+
+	ms.Crawler = crawler
+	ms.Logger = logger
 	return &ms, nil
+}
+
+// Start begins the crawling process for all sources
+func (ms *MultiSource) Start(ctx context.Context) error {
+	for _, source := range ms.Sources {
+		ms.Logger.Info("Starting crawl", "source", source.Name)
+
+		// Use the setter methods to set the BaseURL and IndexName for the Crawler
+		ms.Crawler.Config.Crawler.SetBaseURL(source.URL)
+		ms.Crawler.Config.Crawler.SetIndexName(source.Index)
+
+		// Start the Crawler
+		if err := ms.Crawler.Start(ctx); err != nil {
+			return errors.Wrapf(err, "error crawling source %s", source.Name)
+		}
+		ms.Logger.Info("Finished crawl", "source", source.Name)
+	}
+	return nil
 }
 
 // Stop halts the crawling process
 func (ms *MultiSource) Stop() {
-	// Logic to stop crawling if necessary
+	ms.Crawler.Stop()
 }
 
 // Module provides the fx module for MultiSource
-var Module = fx.Provide(NewMultiSource)
+var Module = fx.Module(
+	"multisource",
+	fx.Provide(NewMultiSource),
+)

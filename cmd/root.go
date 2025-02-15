@@ -6,10 +6,12 @@ import (
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/multisource"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/fx"
 )
 
 var (
@@ -83,14 +85,24 @@ func initializeDependencies() (*cobra.Command, error) {
 		return nil, err
 	}
 
-	// Initialize multisource
-	multiSource, err := multisource.NewMultiSource() // Initialize MultiSource
-	if err != nil {
-		return nil, err
-	}
+	// Initialize fx app with all necessary modules
+	app := fx.New(
+		fx.Provide(
+			func() *config.Config {
+				return cfg
+			},
+			func() logger.Interface {
+				return log
+			},
+		),
+		config.Module,
+		logger.Module,
+		crawler.Module,
+		multisource.Module,
+	)
 
-	// Create the multi crawl command with the new MultiSource argument
-	multiCmd := NewMultiCrawlCmd(log, cfg, multiSource)
+	// Create the multi crawl command
+	multiCmd := NewMultiCrawlCmd(log, cfg, nil) // MultiSource will be resolved by Fx
 
-	return multiCmd, nil
+	return multiCmd, app.Start(context.Background())
 }
