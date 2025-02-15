@@ -7,13 +7,22 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
+// Helper function to create a mock logger
+func newMockLogger() *logger.MockLogger {
+	mockLogger := &logger.MockLogger{}
+	mockLogger.On("Debug", mock.Anything, mock.Anything).Return() // Set up expectation for Debug call
+	return mockLogger
+}
+
 // TestNew tests the New function of the collector package
 func TestNew(t *testing.T) {
+	mockLogger := newMockLogger() // Use the helper function
 	mockDebugger := &logger.CollyDebugger{
-		Logger: logger.NewMockCustomLogger(),
+		Logger: mockLogger, // Use the same mock logger
 	}
 
 	params := collector.Params{
@@ -21,7 +30,11 @@ func TestNew(t *testing.T) {
 		MaxDepth:  2,
 		RateLimit: 1 * time.Second,
 		Debugger:  mockDebugger,
+		Logger:    mockLogger, // Use the same mock logger
 	}
+
+	// Set expectation for the "Collector created" log message
+	mockLogger.On("Debug", "Collector created", mock.Anything).Return()
 
 	result, err := collector.New(params)
 	require.NoError(t, err)
@@ -33,14 +46,17 @@ func TestNew(t *testing.T) {
 // TestConfigureLogging tests the ConfigureLogging function
 func TestConfigureLogging(t *testing.T) {
 	c := colly.NewCollector()
-	testLogger := logger.NewMockCustomLogger()
+	testLogger := newMockLogger() // Use the helper function
 
 	// Call the ConfigureLogging function
 	collector.ConfigureLogging(c, testLogger)
 
+	// Set expectation for the "Requesting URL" log message
+	testLogger.On("Debug", "Requesting URL", mock.Anything).Return()
+
 	// Simulate a request to test logging
 	c.OnRequest(func(r *colly.Request) {
-		testLogger.Info("Requesting URL", r.URL.String())
+		testLogger.Debug("Requesting URL", r.URL.String())
 	})
 
 	// Trigger a request to see if logging works
@@ -52,7 +68,7 @@ func TestConfigureLogging(t *testing.T) {
 }
 
 func TestCollector(t *testing.T) {
-	testLogger := logger.NewMockCustomLogger()
+	testLogger := newMockLogger() // Use the helper function
 
 	tests := []struct {
 		name    string
@@ -85,6 +101,7 @@ func TestCollector(t *testing.T) {
 				Debugger: &logger.CollyDebugger{
 					Logger: testLogger,
 				},
+				Logger: testLogger, // Ensure logger is initialized
 			}
 
 			result, err := collector.New(params)

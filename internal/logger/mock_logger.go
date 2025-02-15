@@ -65,7 +65,10 @@ func (m *MockLogger) Sync() error {
 	return nil
 }
 
-// Add any other methods that CustomLogger has
+// GetMessages returns the logged messages
+func (m *MockLogger) GetMessages() []string {
+	return m.Messages
+}
 
 // MockCustomLogger is a mock implementation of the logger.Interface
 type MockCustomLogger struct {
