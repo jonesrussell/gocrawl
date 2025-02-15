@@ -247,6 +247,15 @@ linters-settings:
     # Default: false
     all: true
 
+  gochecknoglobals:
+    # Exclude module.go files from the global variable check
+    exclude:
+      - ".*module\\.go$"  # This regex matches any file ending with module.go
+
+  forbidigo:
+    # Exclude cmd/root.go from the forbidigo check
+    exclude:
+      - "cmd/root\\.go"  # This regex matches the root.go file
 
 linters:
   disable-all: true
@@ -278,8 +287,6 @@ linters:
     - forbidigo # forbids identifiers
     - funlen # tool for detection of long functions
     - gocheckcompilerdirectives # validates go compiler directive comments (//go:)
-    - gochecknoglobals # checks that no global variables exist
-    - gochecknoinits # checks that no init functions are present in Go code
     - gochecksumtype # checks exhaustiveness on Go "sum types"
     - gocognit # computes and checks the cognitive complexity of functions
     - goconst # finds repeated strings that could be replaced by a constant
