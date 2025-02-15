@@ -7,7 +7,6 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,7 +48,7 @@ func TestConfigureLogging(t *testing.T) {
 
 	// Check if the logger received the expected log messages
 	messages := testLogger.GetMessages()
-	assert.Contains(t, messages, "Requesting URL")
+	require.Contains(t, messages, "Requesting URL")
 }
 
 func TestCollector(t *testing.T) {
@@ -91,11 +90,11 @@ func TestCollector(t *testing.T) {
 			result, err := collector.New(params)
 
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Nil(t, result.Collector)
+				require.Error(t, err)
+				require.Nil(t, result.Collector)
 			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, result.Collector)
+				require.NoError(t, err)
+				require.NotNil(t, result.Collector)
 			}
 		})
 	}
