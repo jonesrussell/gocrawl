@@ -15,14 +15,23 @@ type SearchResult struct {
 	Content string
 }
 
-// SearchContent performs a search query
-func SearchContent(ctx context.Context, esClient *elasticsearch.Client, query string, _ string, size int) ([]SearchResult, error) {
-	log, err := logger.NewDevelopmentLogger()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
+// SearchService represents the search service
+type SearchService struct {
+	ESClient *elasticsearch.Client
+	Logger   logger.Interface
+}
 
-	storageInstance, err := storage.NewStorage(esClient, log)
+// NewSearchService creates a new instance of the search service
+func NewSearchService(esClient *elasticsearch.Client, log logger.Interface) *SearchService {
+	return &SearchService{
+		ESClient: esClient,
+		Logger:   log,
+	}
+}
+
+// SearchContent performs a search query
+func (s *SearchService) SearchContent(ctx context.Context, query string, index string, size int) ([]SearchResult, error) {
+	storageInstance, err := storage.NewStorage(s.ESClient, s.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
@@ -38,7 +47,7 @@ func SearchContent(ctx context.Context, esClient *elasticsearch.Client, query st
 			URL:     article.Source,
 			Content: article.Body,
 		}
-		log.Info("URL: %s, Content: %s", article.Source, article.Body)
+		s.Logger.Info("URL: %s, Content: %s", article.Source, article.Body)
 	}
 
 	return searchResults, nil

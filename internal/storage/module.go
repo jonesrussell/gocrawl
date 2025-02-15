@@ -2,10 +2,8 @@ package storage
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -16,8 +14,8 @@ import (
 // Module provides the storage module and its dependencies
 var Module = fx.Module("storage",
 	fx.Provide(
-		ProvideElasticsearchClient, // Function to provide an Elasticsearch client
-		NewStorage,                 // Use NewStorage to initialize the storage correctly
+		ProvideElasticsearchClient,
+		NewStorage, // Assuming you have a NewStorage function
 	),
 )
 
@@ -55,32 +53,18 @@ func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface
 	return storageInstance, nil
 }
 
-// Provide the Elasticsearch client as a dependency
+// ProvideElasticsearchClient initializes the Elasticsearch client
 func ProvideElasticsearchClient(cfg *config.Config, log logger.Interface) (*elasticsearch.Client, error) {
-	// Create a custom HTTP transport
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: cfg.Crawler.SkipTLS, // Use the SkipTLS setting from the config
-		},
-	}
-
-	cfgElasticsearch := elasticsearch.Config{
-		Addresses: []string{
-			cfg.Elasticsearch.URL, // Use the URL from the config
-		},
-		Transport: transport,                  // Use the custom transport
-		Username:  cfg.Elasticsearch.Username, // Get username from config
-		Password:  cfg.Elasticsearch.Password, // Get password from config
-		APIKey:    cfg.Elasticsearch.APIKey,   // Get API key from config
-	}
-
-	client, err := elasticsearch.NewClient(cfgElasticsearch)
+	client, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{cfg.Elasticsearch.URL},
+		Username:  cfg.Elasticsearch.Username,
+		Password:  cfg.Elasticsearch.Password,
+		APIKey:    cfg.Elasticsearch.APIKey,
+	})
 	if err != nil {
+		log.Error("Failed to create Elasticsearch client", "error", err)
 		return nil, err
 	}
-
-	// Log the configuration for debugging
-	log.Info("Connecting to Elasticsearch", "address", cfgElasticsearch.Addresses[0])
-
+	log.Info("Elasticsearch client initialized successfully")
 	return client, nil
 }
