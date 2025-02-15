@@ -60,9 +60,15 @@ func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface
 
 // Provide the Elasticsearch client as a dependency
 func ProvideElasticsearchClient(log logger.Interface) (*elasticsearch.Client, error) {
-	// Create a custom HTTP transport that skips TLS verification
+	// Determine if the application is in development or production
+	isDevelopment := viper.GetString("APP_ENV") == "development"
+
+	// Create a custom HTTP transport
 	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{
+			//nolint:gosec // Allow insecure skip verify only in development
+			InsecureSkipVerify: isDevelopment,
+		},
 	}
 
 	cfg := elasticsearch.Config{
