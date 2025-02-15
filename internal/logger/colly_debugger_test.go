@@ -1,4 +1,4 @@
-package logger
+package logger_test
 
 import (
 	"net/http"
@@ -7,22 +7,23 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 func TestCollyDebugger(t *testing.T) {
-	mockLogger := NewMockCustomLogger()
-	debugger := &CollyDebugger{
+	mockLogger := logger.NewMockCustomLogger()
+	debugger := &logger.CollyDebugger{
 		Logger: mockLogger,
 	}
 
-	t.Run("Init", func(t *testing.T) {
+	t.Run("Init", func(_ *testing.T) {
 		if err := debugger.Init(); err != nil {
 			t.Errorf("Init() error = %v", err)
 		}
 	})
 
-	t.Run("Event with nil logger", func(t *testing.T) {
-		nilDebugger := &CollyDebugger{Logger: nil}
+	t.Run("Event with nil logger", func(_ *testing.T) {
+		nilDebugger := &logger.CollyDebugger{Logger: nil}
 		event := &debug.Event{
 			Type:        "test",
 			RequestID:   1,
@@ -31,7 +32,7 @@ func TestCollyDebugger(t *testing.T) {
 		nilDebugger.Event(event) // Should not panic
 	})
 
-	t.Run("Event with logger", func(t *testing.T) {
+	t.Run("Event with logger", func(_ *testing.T) {
 		event := &debug.Event{
 			Type:        "test",
 			RequestID:   1,
@@ -40,7 +41,7 @@ func TestCollyDebugger(t *testing.T) {
 		debugger.Event(event)
 	})
 
-	t.Run("OnRequest", func(t *testing.T) {
+	t.Run("OnRequest", func(_ *testing.T) {
 		testURL, _ := url.Parse("http://example.com")
 		req := &colly.Request{
 			URL:     testURL,
@@ -50,7 +51,7 @@ func TestCollyDebugger(t *testing.T) {
 		debugger.OnRequest(req)
 	})
 
-	t.Run("OnResponse", func(t *testing.T) {
+	t.Run("OnResponse", func(_ *testing.T) {
 		testURL, _ := url.Parse("http://example.com")
 		req := &colly.Request{URL: testURL}
 		resp := &colly.Response{
@@ -61,7 +62,7 @@ func TestCollyDebugger(t *testing.T) {
 		debugger.OnResponse(resp)
 	})
 
-	t.Run("OnError", func(t *testing.T) {
+	t.Run("OnError", func(_ *testing.T) {
 		testURL, _ := url.Parse("http://example.com")
 		req := &colly.Request{URL: testURL}
 		resp := &colly.Response{
@@ -72,7 +73,7 @@ func TestCollyDebugger(t *testing.T) {
 		debugger.OnError(resp, nil)
 	})
 
-	t.Run("OnEvent", func(t *testing.T) {
+	t.Run("OnEvent", func(_ *testing.T) {
 		event := &debug.Event{
 			Type:        "test",
 			RequestID:   1,

@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -15,14 +16,15 @@ type Interface interface {
 	Error(msg string, fields ...interface{})
 	Debug(msg string, fields ...interface{})
 	Warn(msg string, fields ...interface{})
-	Fatalf(msg string, args ...interface{})
+	Fatal(msg string, fields ...interface{})
 	Errorf(format string, args ...interface{})
+	Sync() error
 }
 
 // CustomLogger wraps the zap.Logger
 type CustomLogger struct {
-	Logger *zap.Logger
-	Level  zapcore.Level
+	*zap.Logger
+	logFile *os.File
 }
 
 // Ensure CustomLogger implements Interface
@@ -35,29 +37,6 @@ type Params struct {
 	Debug  bool
 	Level  zapcore.Level
 	AppEnv string `name:"appEnv"`
-}
-
-// NewCustomLogger initializes a new CustomLogger with a specified log level
-func NewCustomLogger(params Params) (*CustomLogger, error) {
-	if params.AppEnv == "" {
-		params.AppEnv = "development"
-	}
-
-	var config zap.Config
-	if params.Debug || params.AppEnv == "development" {
-		config = zap.NewDevelopmentConfig()
-		config.Level = zap.NewAtomicLevelAt(params.Level)
-	} else {
-		config = zap.NewProductionConfig()
-		config.Level = zap.NewAtomicLevelAt(params.Level)
-	}
-
-	logger, err := config.Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build logger: %w", err)
-	}
-
-	return &CustomLogger{Logger: logger, Level: params.Level}, nil
 }
 
 // Info logs an info message
@@ -80,9 +59,9 @@ func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
 	c.Logger.Warn(msg, convertToZapFields(fields)...)
 }
 
-// Fatalf logs a fatal message
-func (c *CustomLogger) Fatalf(msg string, args ...interface{}) {
-	c.Logger.Fatal(msg, zap.Any("args", args))
+// Fatal logs a fatal message
+func (c *CustomLogger) Fatal(msg string, fields ...interface{}) {
+	c.Logger.Fatal(msg, convertToZapFields(fields)...)
 }
 
 // Errorf logs a formatted error message
@@ -90,24 +69,17 @@ func (c *CustomLogger) Errorf(format string, args ...interface{}) {
 	c.Logger.Error(fmt.Sprintf(format, args...))
 }
 
-// NewDevelopmentLogger initializes a new CustomLogger for development
-func NewDevelopmentLogger(p Params) (*CustomLogger, error) {
-	encoderConfig := zap.NewDevelopmentEncoderConfig()
-	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(encoderConfig),
-		zapcore.Lock(os.Stdout),
-		zap.DebugLevel,
-	)
-
-	logger := zap.New(core)
-	return &CustomLogger{Logger: logger, Level: p.Level}, nil
-}
-
 // Sync flushes any buffered log entries
 func (c *CustomLogger) Sync() error {
-	return c.Logger.Sync()
+	if err := c.Logger.Sync(); err != nil {
+		return err
+	}
+	if c.logFile != nil {
+		if err := c.logFile.Close(); err != nil {
+			return fmt.Errorf("failed to close log file: %w", err)
+		}
+	}
+	return nil
 }
 
 // GetZapLogger returns the underlying zap.Logger
@@ -124,26 +96,8 @@ func convertToZapFields(fields []interface{}) []zap.Field {
 		return zapFields
 	}
 
-	// If first argument is a string and no more arguments, treat it as additional message context
-	if len(fields) == 1 {
-		if str, ok := fields[0].(string); ok {
-			return []zap.Field{zap.String("context", str)}
-		}
-		return []zap.Field{zap.Any("context", fields[0])}
-	}
-
 	// Handle key-value pairs
 	for i := 0; i < len(fields)-1; i += 2 {
-		// If we have an odd number of fields and this is the last one
-		if i == len(fields)-1 {
-			if str, ok := fields[i].(string); ok {
-				zapFields = append(zapFields, zap.String("context", str))
-			} else {
-				zapFields = append(zapFields, zap.Any("context", fields[i]))
-			}
-			break
-		}
-
 		// Process key-value pair
 		key, ok := fields[i].(string)
 		if !ok {
@@ -168,4 +122,21 @@ func convertToZapFields(fields []interface{}) []zap.Field {
 	}
 
 	return zapFields
+}
+
+type contextKey struct{}
+
+// WithContext adds a logger to the context
+func WithContext(ctx context.Context, logger *zap.Logger) context.Context {
+	return context.WithValue(ctx, contextKey{}, logger)
+}
+
+// FromContext retrieves the logger from the context
+func FromContext(ctx context.Context) *zap.Logger {
+	logger, ok := ctx.Value(contextKey{}).(*zap.Logger)
+	if !ok {
+		// Return a default logger or handle the error as needed
+		return zap.NewNop() // No-op logger
+	}
+	return logger
 }

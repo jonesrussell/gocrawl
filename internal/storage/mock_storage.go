@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -17,7 +18,12 @@ type MockStorage struct {
 
 // NewMockStorage creates a new instance of MockStorage
 func NewMockStorage() *MockStorage {
-	return &MockStorage{}
+	m := &MockStorage{}
+	// Set up default expectations
+	m.On("TestConnection", mock.Anything).Return(nil)
+	m.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	m.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil)
+	return m
 }
 
 // IndexDocument mocks the indexing of a document
@@ -94,4 +100,33 @@ func (m *MockStorage) ScrollSearch(
 		return nil, ErrMockTypeAssertion
 	}
 	return result, args.Error(1)
+}
+
+// BulkIndexArticles implements Storage
+func (m *MockStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
+	args := m.Called(ctx, articles)
+	return args.Error(0)
+}
+
+// SearchArticles implements Storage
+func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
+	args := m.Called(ctx, query, size)
+	var articles []*models.Article
+
+	// Check if the first argument is not nil before type assertion
+	if args.Get(0) != nil {
+		var ok bool
+		articles, ok = args.Get(0).([]*models.Article)
+		if !ok {
+			return nil, ErrMockTypeAssertion // Return error if type assertion fails
+		}
+	}
+
+	return articles, args.Error(1)
+}
+
+// IndexExists implements Storage
+func (m *MockStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
+	args := m.Called(ctx, indexName)
+	return args.Bool(0), args.Error(1)
 }

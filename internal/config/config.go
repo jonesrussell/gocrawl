@@ -2,102 +2,126 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
+
+// Error definitions
+var (
+	ErrMissingElasticURL = errors.New("ELASTIC_URL is required")
+)
+
+// AppConfig holds application-level configuration
+type AppConfig struct {
+	Environment string
+	LogLevel    string
+	Debug       bool
+}
 
 // CrawlerConfig holds crawler-specific configuration
 type CrawlerConfig struct {
 	BaseURL   string
 	MaxDepth  int
 	RateLimit time.Duration
+	IndexName string
 }
 
-// Config holds the application configuration
+// ElasticsearchConfig holds Elasticsearch-specific configuration
+type ElasticsearchConfig struct {
+	URL       string
+	Username  string
+	Password  string
+	APIKey    string
+	IndexName string
+	SkipTLS   bool
+}
+
+// Config holds all configuration settings
 type Config struct {
-	AppName         string
-	AppEnv          string
-	AppDebug        bool
-	ElasticURL      string
-	ElasticPassword string
-	ElasticAPIKey   string
-	IndexName       string
-	LogLevel        string
-	CrawlerConfig   CrawlerConfig
-	Transport       http.RoundTripper // Added for testing
+	App           AppConfig
+	Crawler       CrawlerConfig
+	Elasticsearch ElasticsearchConfig
 }
 
-// LoadConfig loads configuration from environment variables
-func LoadConfig() (*Config, error) {
-	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		// Fallback logging mechanism
-		if os.Getenv("APP_ENV") == "development" {
-			// Only print in development mode
-			os.Stderr.WriteString("Warning: .env file not found, using environment variables\n")
-		}
+// NewConfig creates a new Config instance with values from Viper
+func NewConfig() (*Config, error) {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, err
 	}
 
-	// Parse APP_DEBUG as a boolean
-	appDebug, err := parseBoolEnv("APP_DEBUG", false)
+	rateLimitStr := viper.GetString("CRAWLER_RATE_LIMIT")
+	rateLimit, err := time.ParseDuration(rateLimitStr)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing APP_DEBUG: %w", err)
+		rateLimit = time.Second // Default value if parsing fails
 	}
 
-	config := &Config{
-		AppName:         os.Getenv("APP_NAME"),
-		AppEnv:          os.Getenv("APP_ENV"),
-		AppDebug:        appDebug,
-		ElasticURL:      os.Getenv("ELASTIC_URL"),
-		ElasticPassword: os.Getenv("ELASTIC_PASSWORD"),
-		ElasticAPIKey:   os.Getenv("ELASTIC_API_KEY"),
-		IndexName:       os.Getenv("INDEX_NAME"),
-		LogLevel:        os.Getenv("LOG_LEVEL"),
-		CrawlerConfig: CrawlerConfig{
-			BaseURL:   os.Getenv("CRAWLER_BASE_URL"),
-			MaxDepth:  parseIntEnv("CRAWLER_MAX_DEPTH", 0),
-			RateLimit: parseDurationEnv("CRAWLER_RATE_LIMIT", 0),
+	cfg := &Config{
+		App: AppConfig{
+			Environment: viper.GetString("APP_ENV"),
+			LogLevel:    viper.GetString("LOG_LEVEL"),
+			Debug:       viper.GetBool("APP_DEBUG"),
+		},
+		Crawler: CrawlerConfig{
+			BaseURL:   viper.GetString("CRAWLER_BASE_URL"),
+			MaxDepth:  viper.GetInt("CRAWLER_MAX_DEPTH"),
+			RateLimit: rateLimit,
+			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
+		},
+		Elasticsearch: ElasticsearchConfig{
+			URL:       viper.GetString("ELASTIC_URL"),
+			Username:  viper.GetString("ELASTIC_USERNAME"),
+			Password:  viper.GetString("ELASTIC_PASSWORD"),
+			APIKey:    viper.GetString("ELASTIC_API_KEY"),
+			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
+			SkipTLS:   viper.GetBool("ELASTIC_SKIP_TLS"),
 		},
 	}
 
-	// Validate required configuration values
-	if config.ElasticURL == "" {
-		return nil, errors.New("ELASTIC_URL is required")
+	if cfg.Elasticsearch.URL == "" {
+		return nil, ErrMissingElasticURL
 	}
 
-	return config, nil
+	// Log the full configuration if debug is enabled
+	if cfg.App.Debug {
+		logConfig(cfg)
+	}
+
+	return cfg, nil
 }
 
-// parseBoolEnv parses a boolean environment variable with a default value
-func parseBoolEnv(key string, defaultValue bool) (bool, error) {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue, nil
-	}
-	return strconv.ParseBool(value)
+// logConfig logs the configuration values
+func logConfig(cfg *Config) {
+	// Create a logger instance (you can customize this as needed)
+	logger, _ := zap.NewDevelopment()
+	defer func(logger *zap.Logger) {
+		err := logger.Sync()
+		if err != nil {
+			logger.Error("Failed to sync logger", zap.Error(err))
+		}
+	}(logger) // flushes buffer, if any
+	logger.Debug("Loaded configuration",
+		zap.String("Environment", cfg.App.Environment),
+		zap.String("LogLevel", cfg.App.LogLevel),
+		zap.Bool("Debug", cfg.App.Debug),
+		zap.String("ElasticsearchURL", cfg.Elasticsearch.URL),
+		zap.String("ElasticsearchUsername", cfg.Elasticsearch.Username),
+		zap.String("ElasticsearchAPIKey", cfg.Elasticsearch.APIKey),
+		zap.String("CrawlerBaseURL", cfg.Crawler.BaseURL),
+		zap.Int("CrawlerMaxDepth", cfg.Crawler.MaxDepth),
+		zap.Duration("CrawlerRateLimit", cfg.Crawler.RateLimit),
+		zap.Bool("ElasticsearchSkipTLS", cfg.Elasticsearch.SkipTLS),
+	)
 }
 
-// parseIntEnv parses an integer environment variable with a default value
-func parseIntEnv(key string, defaultValue int) int {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	intValue, _ := strconv.Atoi(value)
-	return intValue
-}
-
-// parseDurationEnv parses a duration environment variable with a default value
-func parseDurationEnv(key string, defaultValue time.Duration) time.Duration {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	duration, _ := time.ParseDuration(value)
-	return duration
+// NewHTTPTransport creates a new HTTP transport
+func NewHTTPTransport() http.RoundTripper {
+	return http.DefaultTransport
 }
