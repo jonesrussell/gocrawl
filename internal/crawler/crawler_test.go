@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -27,13 +26,6 @@ type MockCollector struct {
 func (m *MockCollector) Visit(url string) error {
 	args := m.Called(url)
 	return args.Error(0)
-}
-
-// Mock Elasticsearch client for testing
-func newMockElasticsearchClient() *elasticsearch.Client {
-	// Create and return a mock or test instance of the Elasticsearch client
-	// This is a placeholder; implement your mock logic here
-	return &elasticsearch.Client{}
 }
 
 // TestNewCrawler tests the creation of a new Crawler instance

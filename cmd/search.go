@@ -99,7 +99,7 @@ func setupSearchLifecycleHooks(lc fx.Lifecycle, deps struct {
 			deps.Logger.Debug("Starting application...")
 			return runSearchApp(ctx, deps.Logger, deps.SearchSvc, deps.Query)
 		},
-		OnStop: func(ctx context.Context) error {
+		OnStop: func(_ context.Context) error {
 			deps.Logger.Debug("Stopping application...")
 			return nil
 		},

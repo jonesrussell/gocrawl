@@ -53,6 +53,7 @@ func Execute() error {
 	// Initialize config
 	cfg, err := config.NewConfig()
 	if err != nil {
+		//nolint:forbidigo // This is a CLI error
 		fmt.Println("Failed to load configuration:", err)
 		os.Exit(1)
 	}
@@ -60,7 +61,8 @@ func Execute() error {
 	// Initialize logger
 	log, err := InitializeLogger(cfg)
 	if err != nil {
-		log.Error(fmt.Sprintf("Failed to initialize logger: %v", err))
+		//nolint:forbidigo // This is a CLI error
+		fmt.Println("Failed to initialize logger:", err)
 		os.Exit(1)
 	}
 	log.Debug("Logger initialized successfully")
