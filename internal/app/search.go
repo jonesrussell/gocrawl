@@ -16,7 +16,7 @@ type SearchResult struct {
 }
 
 // SearchContent performs a search query
-func SearchContent(ctx context.Context, query string, index string, size int) ([]SearchResult, error) {
+func SearchContent(ctx context.Context, query string, _ string, size int) ([]SearchResult, error) {
 	log, err := logger.NewDevelopmentLogger()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
