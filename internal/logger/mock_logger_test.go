@@ -9,7 +9,7 @@ import (
 func TestMockLogger(t *testing.T) {
 	logger := logger.NewMockCustomLogger()
 
-	t.Run("logging methods", func(t *testing.T) {
+	t.Run("logging methods", func(_ *testing.T) {
 		logger.Info("test info")
 		logger.Error("test error")
 		logger.Debug("test debug")
