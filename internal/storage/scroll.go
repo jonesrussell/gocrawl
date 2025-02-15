@@ -86,7 +86,7 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 	defer searchRes.Body.Close()
 
 	for {
-		scrollID, err := s.HandleScrollResponse(ctx, searchRes, resultChan)
+		scrollID, err := s.HandleScrollResponse(searchRes, resultChan)
 		if err != nil {
 			s.Logger.Error("Error processing scroll response", "error", err)
 			return
@@ -135,7 +135,7 @@ func (s *ElasticsearchStorage) handleScrollError(searchRes *esapi.Response) erro
 
 	// Check for specific error type
 	if errMap, ok := e["error"].(map[string]interface{}); ok {
-		if errType, ok := errMap["type"]; ok {
+		if errType, errTypeOk := errMap["type"]; errTypeOk {
 			if errType == "search_phase_execution_exception" {
 				s.Logger.Info("Reached end of scroll results")
 				return nil
@@ -206,7 +206,6 @@ func (s *ElasticsearchStorage) ProcessHits(
 
 // HandleScrollResponse processes a single scroll response
 func (s *ElasticsearchStorage) HandleScrollResponse(
-	ctx context.Context,
 	res *esapi.Response,
 	resultChan chan<- map[string]interface{},
 ) (string, error) {
