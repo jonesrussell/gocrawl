@@ -13,6 +13,11 @@ type MockService struct {
 	mock.Mock
 }
 
+// NewMockService creates a new mock service
+func NewMockService() *MockService {
+	return &MockService{}
+}
+
 // ExtractArticle implements Service.ExtractArticle
 func (m *MockService) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	args := m.Called(e)

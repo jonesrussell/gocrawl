@@ -7,20 +7,34 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
-type IndexService struct {
-	storage Interface
-	logger  logger.Interface
+// Interface defines the methods for the IndexService
+type IndexServiceInterface interface {
+	EnsureIndex(ctx context.Context, indexName string) error
+	IndexExists(ctx context.Context, indexName string) (bool, error)
+	CreateIndex(ctx context.Context, indexName string, mapping map[string]interface{}) error
 }
 
-func NewIndexService(storage Interface, logger logger.Interface) *IndexService {
+// IndexService implements the IndexService interface
+type IndexService struct {
+	logger logger.Interface
+}
+
+// NewIndexService creates a new IndexService instance
+func NewIndexService(logger logger.Interface) IndexServiceInterface {
 	return &IndexService{
-		storage: storage,
-		logger:  logger,
+		logger: logger,
 	}
 }
 
+func (s *IndexService) CreateIndex(ctx context.Context, indexName string, mapping map[string]interface{}) error {
+	// Implementation for creating an index
+	// This should call the actual storage mechanism to create the index
+	return nil // Replace with actual implementation
+}
+
+// EnsureIndex checks if an index exists and creates it if it does not
 func (s *IndexService) EnsureIndex(ctx context.Context, indexName string) error {
-	exists, checkErr := s.storage.IndexExists(ctx, indexName)
+	exists, checkErr := s.IndexExists(ctx, indexName)
 	if checkErr != nil {
 		return fmt.Errorf("failed to check index: %w", checkErr)
 	}
@@ -34,6 +48,7 @@ func (s *IndexService) EnsureIndex(ctx context.Context, indexName string) error 
 	return nil
 }
 
+// createArticleIndex creates a new index with the specified mapping
 func (s *IndexService) createArticleIndex(ctx context.Context, indexName string) error {
 	mapping := map[string]interface{}{
 		"mappings": map[string]interface{}{
@@ -60,5 +75,11 @@ func (s *IndexService) createArticleIndex(ctx context.Context, indexName string)
 		},
 	}
 
-	return s.storage.CreateIndex(ctx, indexName, mapping)
+	return s.CreateIndex(ctx, indexName, mapping)
+}
+
+// Implement the IndexExists method
+func (s *IndexService) IndexExists(ctx context.Context, indexName string) (bool, error) {
+	// Implementation for checking if an index exists
+	return false, nil // Replace with actual implementation
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
@@ -53,21 +52,8 @@ type Crawler struct {
 	IndexName      string
 	articleChan    chan *models.Article
 	ArticleService article.Interface
-	indexSvc       *storage.IndexService
-	Config         config.CrawlerConfig
-}
-
-// Config holds the crawler configuration
-type Config struct {
-	Crawler CrawlerConfig
-}
-
-// CrawlerConfig holds the crawler-specific configuration
-type CrawlerConfig struct {
-	BaseURL   string
-	MaxDepth  int
-	RateLimit time.Duration
-	IndexName string
+	IndexSvc       storage.IndexServiceInterface
+	Config         *config.Config
 }
 
 const (
@@ -93,7 +79,7 @@ func NewCrawler(p Params) (Result, error) {
 		"rateLimit", p.Config.Crawler.RateLimit,
 	)
 
-	collector, err := createCollector(CrawlerConfig(p.Config.Crawler))
+	collector, err := createCollector(p.Config.Crawler)
 	if err != nil {
 		return Result{}, err
 	}
@@ -106,8 +92,8 @@ func NewCrawler(p Params) (Result, error) {
 		IndexName:      p.Config.Crawler.IndexName,
 		articleChan:    make(chan *models.Article, DefaultBatchSize),
 		ArticleService: article.NewService(p.Logger),
-		indexSvc:       storage.NewIndexService(p.Storage, p.Logger),
-		Config:         p.Config.Crawler,
+		IndexSvc:       storage.NewIndexService(p.Logger),
+		Config:         p.Config,
 	}
 
 	// Configure collector callbacks
@@ -116,7 +102,7 @@ func NewCrawler(p Params) (Result, error) {
 	return Result{Crawler: crawler}, nil
 }
 
-func createCollector(config CrawlerConfig) (*colly.Collector, error) {
+func createCollector(config config.CrawlerConfig) (*colly.Collector, error) {
 	// Parse domain from BaseURL
 	parsedURL, err := url.Parse(config.BaseURL)
 	if err != nil {

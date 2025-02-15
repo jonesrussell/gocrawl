@@ -39,9 +39,9 @@ func TestNewCrawler(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result.Crawler)
-	assert.Equal(t, "http://example.com", result.Crawler.Config.BaseURL)
-	assert.Equal(t, 3, result.Crawler.Config.MaxDepth)
-	assert.Equal(t, time.Second, result.Crawler.Config.RateLimit)
+	assert.Equal(t, "http://example.com", result.Crawler.Config.Crawler.BaseURL)
+	assert.Equal(t, 3, result.Crawler.Config.Crawler.MaxDepth)
+	assert.Equal(t, time.Second, result.Crawler.Config.Crawler.RateLimit)
 }
 
 func TestNewCrawler_MissingLogger(t *testing.T) {
