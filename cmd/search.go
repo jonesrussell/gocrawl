@@ -56,21 +56,17 @@ func executeSearchCmd(cmd *cobra.Command, log logger.Interface) error {
 		return fmt.Errorf("error retrieving query: %w", err)
 	}
 
+	// Initialize fx container
 	app := newSearchFxApp(query)
 
-	if err := app.Start(cmd.Context()); err != nil {
-		startErr := app.Start(cmd.Context())
-		if startErr != nil {
-			log.Error("Error starting application", "error", startErr)
-			return fmt.Errorf("error starting application: %w", startErr)
-		}
+	// Start the application
+	if startErr := app.Start(cmd.Context()); startErr != nil {
+		log.Error("Error starting application", "error", startErr)
+		return fmt.Errorf("error starting application: %w", startErr)
 	}
 	defer func() {
-		if err := app.Stop(cmd.Context()); err != nil {
-			stopErr := app.Stop(cmd.Context())
-			if stopErr != nil {
-				log.Error("Error stopping application", "error", stopErr)
-			}
+		if stopErr := app.Stop(cmd.Context()); stopErr != nil {
+			log.Error("Error stopping application", "error", stopErr)
 		}
 	}()
 
