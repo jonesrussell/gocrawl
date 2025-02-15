@@ -17,24 +17,24 @@ import (
 
 // Constants for timeout durations
 const (
-	DefaultIndexTimeout          = 10 * time.Second
 	DefaultBulkIndexTimeout      = 30 * time.Second
+	DefaultIndexTimeout          = 10 * time.Second
 	DefaultTestConnectionTimeout = 5 * time.Second
 )
 
 // Interface defines the methods that any storage implementation must have
 type Interface interface {
-	IndexDocument(ctx context.Context, index string, docID string, document interface{}) error
-	TestConnection(ctx context.Context) error
 	BulkIndex(ctx context.Context, index string, documents []interface{}) error
-	Search(ctx context.Context, index string, query map[string]interface{}) ([]map[string]interface{}, error)
-	CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error
-	DeleteIndex(ctx context.Context, index string) error
-	UpdateDocument(ctx context.Context, index string, docID string, update map[string]interface{}) error
-	DeleteDocument(ctx context.Context, index string, docID string) error
 	BulkIndexArticles(ctx context.Context, articles []*models.Article) error
-	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
+	CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error
+	DeleteDocument(ctx context.Context, index string, docID string) error
+	DeleteIndex(ctx context.Context, index string) error
+	IndexDocument(ctx context.Context, index string, docID string, document interface{}) error
 	IndexExists(ctx context.Context, indexName string) (bool, error)
+	Search(ctx context.Context, index string, query map[string]interface{}) ([]map[string]interface{}, error)
+	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
+	TestConnection(ctx context.Context) error
+	UpdateDocument(ctx context.Context, index string, docID string, update map[string]interface{}) error
 }
 
 // ElasticsearchStorage struct to hold the Elasticsearch client
