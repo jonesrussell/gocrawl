@@ -1,6 +1,7 @@
 package logger_test
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestCollyDebugger(t *testing.T) {
@@ -38,7 +40,13 @@ func TestCollyDebugger(t *testing.T) {
 			RequestID:   1,
 			CollectorID: 1,
 		}
+		// Set expectation for the Debug method
+		mockLogger.On("Debug", "Colly event", mock.Anything).Return()
+
 		debugger.Event(event)
+
+		// Assert that the expectations were met
+		mockLogger.AssertExpectations(t)
 	})
 
 	t.Run("OnRequest", func(_ *testing.T) {
@@ -48,7 +56,13 @@ func TestCollyDebugger(t *testing.T) {
 			Method:  "GET",
 			Headers: &http.Header{},
 		}
+		// Set expectation for the Debug method in OnRequest
+		mockLogger.On("Debug", "Request", mock.Anything).Return()
+
 		debugger.OnRequest(req)
+
+		// Assert that the expectations were met
+		mockLogger.AssertExpectations(t)
 	})
 
 	t.Run("OnResponse", func(_ *testing.T) {
@@ -59,7 +73,13 @@ func TestCollyDebugger(t *testing.T) {
 			StatusCode: 200,
 			Headers:    &http.Header{},
 		}
+		// Set expectation for the Info method in OnResponse
+		mockLogger.On("Info", "Response", mock.Anything).Return()
+
 		debugger.OnResponse(resp)
+
+		// Assert that the expectations were met
+		mockLogger.AssertExpectations(t)
 	})
 
 	t.Run("OnError", func(_ *testing.T) {
@@ -70,7 +90,13 @@ func TestCollyDebugger(t *testing.T) {
 			StatusCode: 404,
 			Headers:    &http.Header{},
 		}
-		debugger.OnError(resp, nil)
+		// Set expectation for the Error method in OnError
+		mockLogger.On("Error", "Error", mock.Anything).Return()
+
+		debugger.OnError(resp, errors.New("unknown error"))
+
+		// Assert that the expectations were met
+		mockLogger.AssertExpectations(t)
 	})
 
 	t.Run("OnEvent", func(_ *testing.T) {
@@ -79,6 +105,12 @@ func TestCollyDebugger(t *testing.T) {
 			RequestID:   1,
 			CollectorID: 1,
 		}
+		// Set expectation for the Info method in OnEvent
+		mockLogger.On("Info", "Event", mock.Anything).Return()
+
 		debugger.OnEvent(event)
+
+		// Assert that the expectations were met
+		mockLogger.AssertExpectations(t)
 	})
 }
