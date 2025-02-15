@@ -115,12 +115,15 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 					return
 				}
 				// Check for specific error type
-				if errType, ok := e["error"].(map[string]interface{})["type"]; ok && errType == "search_phase_execution_exception" {
-					s.Logger.Info("Reached end of scroll results")
+				if errType, ok := e["error"].(map[string]interface{})["type"]; ok {
+					if errType == "search_phase_execution_exception" {
+						s.Logger.Info("Reached end of scroll results")
+						return
+					}
+				} else {
+					s.Logger.Error("Unexpected scroll error", "error", e["error"])
 					return
 				}
-				s.Logger.Error("Unexpected scroll error", "error", e["error"])
-				return
 			}
 		}
 	}
