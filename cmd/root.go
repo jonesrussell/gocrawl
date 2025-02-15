@@ -70,7 +70,7 @@ func Execute() error {
 	// Add commands
 	rootCmd.AddCommand(NewCrawlCmd(log, cfg))  // Pass logger and config to crawl command
 	rootCmd.AddCommand(NewSearchCmd(log, cfg)) // Pass logger and config to search command
-	rootCmd.AddCommand(NewMultiCrawlCmd(log))  // Add the multi crawl command
+	rootCmd.AddCommand(NewMultiCrawlCmd(log, cfg))  // Pass logger and config to multi crawl command
 	log.Debug("Commands added to root command")
 
 	return rootCmd.Execute()
