@@ -1,14 +1,15 @@
-package storage
+package storage_test
 
 import (
 	"net/http"
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultOptions(t *testing.T) {
-	opts := DefaultOptions()
+	opts := storage.DefaultOptions()
 
 	assert.Equal(t, "5m", opts.ScrollDuration)
 	assert.Empty(t, opts.Username)
@@ -20,7 +21,7 @@ func TestDefaultOptions(t *testing.T) {
 
 func TestOptionsCustomValues(t *testing.T) {
 	customTransport := &http.Transport{}
-	opts := Options{
+	opts := storage.Options{
 		URL:            "http://localhost:9200",
 		Username:       "custom_user",
 		Password:       "custom_pass",
@@ -38,7 +39,7 @@ func TestOptionsCustomValues(t *testing.T) {
 }
 
 func TestOptionsEmptyValues(t *testing.T) {
-	opts := Options{}
+	opts := storage.Options{}
 
 	assert.Empty(t, opts.URL)
 	assert.Empty(t, opts.Username)

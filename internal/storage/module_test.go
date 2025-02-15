@@ -1,4 +1,4 @@
-package storage
+package storage_test
 
 import (
 	"net/http"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -24,7 +25,7 @@ var testConfig = &config.Config{
 func TestModule(t *testing.T) {
 	t.Run("module provides storage", func(t *testing.T) {
 		app := fxtest.New(t,
-			Module,
+			storage.Module,
 			fx.Provide(
 				func() *config.Config {
 					return testConfig
