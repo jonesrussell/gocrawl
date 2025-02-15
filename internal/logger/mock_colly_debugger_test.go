@@ -15,12 +15,12 @@ import (
 func TestMockCollyDebugger(t *testing.T) {
 	debugger := logger.NewMockCollyDebugger()
 
-	t.Run("Init", func(t *testing.T) {
+	t.Run("Init", func(_ *testing.T) {
 		err := debugger.Init()
 		assert.NoError(t, err)
 	})
 
-	t.Run("OnRequest", func(t *testing.T) {
+	t.Run("OnRequest", func(_ *testing.T) {
 		testURL, _ := url.Parse("http://example.com")
 		req := &colly.Request{
 			URL:     testURL,
@@ -30,7 +30,7 @@ func TestMockCollyDebugger(t *testing.T) {
 		debugger.OnRequest(req)
 	})
 
-	t.Run("OnResponse", func(t *testing.T) {
+	t.Run("OnResponse", func(_ *testing.T) {
 		testURL, _ := url.Parse("http://example.com")
 		req := &colly.Request{URL: testURL}
 		resp := &colly.Response{
@@ -41,7 +41,7 @@ func TestMockCollyDebugger(t *testing.T) {
 		debugger.OnResponse(resp)
 	})
 
-	t.Run("OnError", func(t *testing.T) {
+	t.Run("OnError", func(_ *testing.T) {
 		testURL, _ := url.Parse("http://example.com")
 		req := &colly.Request{URL: testURL}
 		resp := &colly.Response{
@@ -52,7 +52,7 @@ func TestMockCollyDebugger(t *testing.T) {
 		debugger.OnError(resp, errors.New("test error"))
 	})
 
-	t.Run("OnEvent", func(t *testing.T) {
+	t.Run("OnEvent", func(_ *testing.T) {
 		event := &debug.Event{
 			Type:        "test",
 			RequestID:   1,
@@ -61,7 +61,7 @@ func TestMockCollyDebugger(t *testing.T) {
 		debugger.OnEvent(event)
 	})
 
-	t.Run("Event", func(t *testing.T) {
+	t.Run("Event", func(_ *testing.T) {
 		event := &debug.Event{
 			Type:        "test",
 			RequestID:   1,
