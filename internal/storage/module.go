@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
 
@@ -59,35 +59,32 @@ func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface
 }
 
 // Provide the Elasticsearch client as a dependency
-func ProvideElasticsearchClient(log logger.Interface) (*elasticsearch.Client, error) {
-	// Determine if the application is in development or production
-	isDevelopment := viper.GetString("APP_ENV") == "development"
-
+func ProvideElasticsearchClient(log logger.Interface, cfg *config.Config) (*elasticsearch.Client, error) {
 	// Create a custom HTTP transport
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			//nolint:gosec // Allow insecure skip verify only in development
-			InsecureSkipVerify: isDevelopment,
+			InsecureSkipVerify: cfg.Crawler.SkipTLS, // Use the SkipTLS setting from the config
 		},
 	}
 
-	cfg := elasticsearch.Config{
+	cfgElasticsearch := elasticsearch.Config{
 		Addresses: []string{
-			"https://localhost:9200", // Ensure this matches your Elasticsearch URL
+			cfg.Elasticsearch.URL, // Use the URL from the config
 		},
-		Transport: transport,                           // Use the custom transport
-		Username:  viper.GetString("ELASTIC_USERNAME"), // Get username from config
-		Password:  viper.GetString("ELASTIC_PASSWORD"), // Get password from config
-		APIKey:    viper.GetString("ELASTIC_API_KEY"),  // Get API key from config
+		Transport: transport,                  // Use the custom transport
+		Username:  cfg.Elasticsearch.Username, // Get username from config
+		Password:  cfg.Elasticsearch.Password, // Get password from config
+		APIKey:    cfg.Elasticsearch.APIKey,   // Get API key from config
 	}
 
-	client, err := elasticsearch.NewClient(cfg)
+	client, err := elasticsearch.NewClient(cfgElasticsearch)
 	if err != nil {
 		return nil, err
 	}
 
 	// Log the configuration for debugging
-	log.Info("Connecting to Elasticsearch", "address", cfg.Addresses[0])
+	log.Info("Connecting to Elasticsearch", "address", cfgElasticsearch.Addresses[0])
 
 	return client, nil
 }
