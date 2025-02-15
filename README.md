@@ -7,6 +7,7 @@ A simple web crawler built in Go that fetches and processes web pages, storing r
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Configuration](#configuration)
 - [Tasks](#tasks)
 - [Testing](#testing)
 - [Contributing](#contributing)
@@ -37,15 +38,25 @@ A simple web crawler built in Go that fetches and processes web pages, storing r
    go mod tidy
    ```
 
-3. **Create a `.env` file** (optional):
+3. **Create a `config.yml` file** (optional):
 
-   You can create a `.env` file in the root directory to set environment variables for configuration:
+   You can create a `config.yml` file in the root directory to set environment variables for configuration:
 
-   ```env
-   ELASTIC_URL=http://localhost:9200
-   ELASTIC_PASSWORD=your_password
-   ELASTIC_API_KEY=your_api_key
-   ELASTIC_INDEX_NAME=crawled_pages
+   ```yaml
+   APP_ENV: development
+   LOG_LEVEL: debug
+   APP_DEBUG: true
+
+   ELASTIC_URL: https://localhost:9200
+   ELASTIC_USERNAME: elastic
+   ELASTIC_PASSWORD: your_password
+   ELASTIC_API_KEY: your_api_key
+   ELASTIC_INDEX_NAME: articles
+   ELASTIC_SKIP_TLS: true
+
+   CRAWLER_BASE_URL: https://www.elliotlaketoday.com/opp-beat
+   CRAWLER_MAX_DEPTH: 2
+   CRAWLER_RATE_LIMIT: 2s
    ```
 
 ## Usage

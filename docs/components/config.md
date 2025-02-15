@@ -70,11 +70,11 @@ func (c *Config) Validate() error {
 ## Best Practices
 
 1. **Security**
-   - Never log sensitive values
-   - Use secure environment variables
-   - Validate all inputs
+   - Never log sensitive values.
+   - Use secure environment variables.
+   - Validate all inputs.
 
 2. **Defaults**
-   - Provide sensible defaults
-   - Document all options
-   - Use clear naming conventions
+   - Provide sensible defaults.
+   - Document all options.
+   - Use clear naming conventions.

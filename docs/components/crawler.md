@@ -164,21 +164,16 @@ func TestCrawler_Start(t *testing.T) {
 ## Best Practices
 
 1. **Resource Management**
-   - Implement proper cleanup in Stop()
-   - Use context for cancellation
-   - Close all connections properly
+   - Implement proper cleanup in Stop().
+   - Use context for cancellation.
+   - Close all connections properly.
 
 2. **Error Handling**
-   - Use structured errors
-   - Implement retry mechanisms
-   - Log errors with context
+   - Use structured errors.
+   - Implement retry mechanisms.
+   - Log errors with context.
 
 3. **Configuration**
-   - Validate all configuration parameters
-   - Use reasonable defaults
-   - Document all options
-
-4. **Testing**
-   - Use dependency injection for testability
-   - Create mock implementations
-   - Test error scenarios
+   - Validate all configuration parameters.
+   - Use reasonable defaults.
+   - Document all options.

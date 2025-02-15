@@ -71,16 +71,16 @@ func (c *Collector) enableRobotsTxt() {
 ## Best Practices
 
 1. **Rate Limiting**
-   - Implement respectful crawling
-   - Follow robots.txt rules
-   - Use appropriate delays
+   - Implement respectful crawling.
+   - Follow robots.txt rules.
+   - Use appropriate delays.
 
 2. **Error Handling**
-   - Handle network errors
-   - Implement retries
-   - Log failures appropriately
+   - Handle network errors.
+   - Implement retries.
+   - Log failures appropriately.
 
 3. **Resource Management**
-   - Limit concurrent requests
-   - Manage memory usage
-   - Clean up resources
+   - Limit concurrent requests.
+   - Manage memory usage.
+   - Clean up resources.
