@@ -1,8 +1,4 @@
 sources:
-  - name: "Elliot Lake Today"
-    url: "https://www.elliotlaketoday.com/opp-beat"
-    index: "elliot_lake_articles"
-  
   - name: "Espanola News"
     url: "https://www.myespanolanow.com/news/"
     index: "espanola_articles"

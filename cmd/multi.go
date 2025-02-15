@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/multisource"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"gopkg.in/yaml.v3"
 )
@@ -21,7 +22,7 @@ func NewMultiCrawlCmd(log logger.Interface, config *config.Config) *cobra.Comman
 		Use:   "multi",
 		Short: "Crawl multiple sources defined in sources.yml",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return setupMultiCrawlCmd(cmd, config)
+			return setupMultiCrawlCmd(cmd, config, log)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeMultiCrawlCmd(cmd, log)
@@ -32,16 +33,31 @@ func NewMultiCrawlCmd(log logger.Interface, config *config.Config) *cobra.Comman
 }
 
 // setupMultiCrawlCmd handles the setup for the multi-crawl command
-func setupMultiCrawlCmd(_ *cobra.Command, config *config.Config) error {
+func setupMultiCrawlCmd(_ *cobra.Command, cfg *config.Config, log logger.Interface) error {
 	// Load the sources from sources.yml
 	sources, err := loadSourcesFromYAML("sources.yml")
 	if err != nil {
 		return fmt.Errorf("failed to load sources: %w", err)
 	}
 
+	// Debugging: Print loaded sources
+	for _, source := range sources {
+		log.Debug("Loaded source", "name", source.Name, "url", source.URL, "index", source.Index)
+	}
+
 	// Update the Config with the first source's BaseURL
 	if len(sources) > 0 {
-		config.Crawler.BaseURL = sources[0].BaseURL // Update the Config with the first source's URL
+		// Use Viper to set the configuration values
+		viper.Set(config.CrawlerBaseURLKey, sources[0].URL)     // Set the BaseURL using Viper
+		viper.Set(config.ElasticIndexNameKey, sources[0].Index) // Set the IndexName using Viper
+		// Log updated config directly from Viper
+		log.Debug(
+			"Updated config",
+			"baseURL",
+			viper.GetString(config.CrawlerBaseURLKey),
+			"indexName",
+			viper.GetString(config.ElasticIndexNameKey),
+		) // Log updated config
 	}
 
 	return nil
@@ -49,7 +65,9 @@ func setupMultiCrawlCmd(_ *cobra.Command, config *config.Config) error {
 
 // loadSourcesFromYAML reads the sources from a YAML file
 func loadSourcesFromYAML(filePath string) ([]Source, error) {
-	var sources []Source
+	var sources struct {
+		Sources []Source `yaml:"sources"` // Wrap in a struct to match the YAML structure
+	}
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
@@ -59,12 +77,14 @@ func loadSourcesFromYAML(filePath string) ([]Source, error) {
 		return nil, err
 	}
 
-	return sources, nil
+	return sources.Sources, nil // Return the slice of sources
 }
 
 // Source struct to represent the structure of your sources.yml
 type Source struct {
-	BaseURL string `yaml:"base_url"` // Adjust the field name based on your YAML structure
+	Name  string `yaml:"name"`
+	URL   string `yaml:"url"`
+	Index string `yaml:"index"`
 }
 
 // executeMultiCrawlCmd handles the execution of the multi-crawl command
