@@ -10,12 +10,15 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
+// Define a constant for the default scroll duration
+const defaultScrollDuration = 5 * time.Minute
+
 // getScrollDuration converts ScrollDuration string to time.Duration
 func (s *ElasticsearchStorage) getScrollDuration() time.Duration {
 	duration, err := time.ParseDuration(s.opts.ScrollDuration)
 	if err != nil {
-		// Default to 5 minutes if parsing fails
-		return 5 * time.Minute
+		// Default to the constant if parsing fails
+		return defaultScrollDuration
 	}
 	return duration
 }
