@@ -92,13 +92,13 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 			return
 		}
 
-		if err := s.fetchNextScrollBatch(ctx, scrollID, resultChan); err != nil {
-			s.Logger.Error("Failed to get next scroll batch", "error", err)
+		if fetchErr := s.fetchNextScrollBatch(ctx, scrollID, resultChan); fetchErr != nil {
+			s.Logger.Error("Failed to get next scroll batch", "error", fetchErr)
 			return
 		}
 
-		select {
-		case <-ctx.Done():
+		// Check for context cancellation
+		if ctx.Err() != nil {
 			s.Logger.Info("Context cancelled, stopping scroll")
 			return
 		}
@@ -201,18 +201,8 @@ func (s *ElasticsearchStorage) ProcessHits(
 			continue
 		}
 
-		select {
-		case <-ctx.Done():
-			s.Logger.Info("Context cancelled while processing hits")
-			return
-		default:
-			select {
-			case <-ctx.Done():
-				s.Logger.Info("Context cancelled while sending hit")
-				return
-			case resultChan <- source:
-			}
-		}
+		// Send the source directly to the channel
+		resultChan <- source
 	}
 }
 
