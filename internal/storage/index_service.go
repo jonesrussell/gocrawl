@@ -20,14 +20,14 @@ func NewIndexService(storage Interface, logger logger.Interface) *IndexService {
 }
 
 func (s *IndexService) EnsureIndex(ctx context.Context, indexName string) error {
-	exists, err := s.storage.IndexExists(ctx, indexName)
-	if err != nil {
-		return fmt.Errorf("failed to check index: %w", err)
+	exists, checkErr := s.storage.IndexExists(ctx, indexName)
+	if checkErr != nil {
+		return fmt.Errorf("failed to check index: %w", checkErr)
 	}
 
 	if !exists {
-		if err := s.createArticleIndex(ctx, indexName); err != nil {
-			return fmt.Errorf("failed to create index: %w", err)
+		if createErr := s.createArticleIndex(ctx, indexName); createErr != nil {
+			return fmt.Errorf("failed to create index: %w", createErr)
 		}
 	}
 
