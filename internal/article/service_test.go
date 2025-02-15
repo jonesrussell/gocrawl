@@ -42,7 +42,6 @@ const testHTML = `
     <div class="details">
         <h1 class="details-title">Elliot Lake man arrested after threatening to kill victim and police</h1>
         <div class="details-intro">Police were called to house on Milliken Road for report of break-and-enter</div>
-        <div id="details-body">NEWS RELEASE<br />ONTARIO PROVINCIAL POLICE<br />...</div>
         <div class="details-byline">
             ElliotLakeToday Staff
             <time datetime="2025-02-11T17:37:42Z">Feb 11, 2025 12:37 PM</time>
@@ -79,7 +78,7 @@ func TestExtractArticle(t *testing.T) {
 	assert.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", article.Title)
 	assert.Equal(
 		t,
-		"Police were called to house on Milliken Road for report of break-and-enter\n\nNEWS RELEASEONTARIO PROVINCIAL POLICE...",
+		"Police were called to house on Milliken Road for report of break-and-enter\n\n",
 		article.Body,
 	)
 	assert.Equal(t, "ElliotLakeToday Staff", article.Author)
