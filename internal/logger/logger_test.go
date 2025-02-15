@@ -5,6 +5,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -84,4 +85,17 @@ func TestNewDevelopmentLogger(t *testing.T) {
 
 	assert.NotNil(t, log, "Logger should not be nil")
 	// Add more assertions as needed
+}
+
+func TestLoggerSync(t *testing.T) {
+	// Initialize logger
+	log, err := logger.NewDevelopmentLogger() // Assuming this is where err is declared
+	require.NoError(t, err)
+
+	// Other test code...
+
+	// Fix shadowing issue here
+	if syncErr := log.Sync(); syncErr != nil { // Changed err to syncErr
+		t.Errorf("failed to sync logger: %v", syncErr)
+	}
 }
