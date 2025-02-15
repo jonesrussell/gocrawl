@@ -60,8 +60,8 @@ func TestNewConfig(t *testing.T) {
 	t.Run("missing elastic url", func(t *testing.T) {
 		os.Unsetenv("ELASTIC_URL")
 		cfg, err := config.NewConfig(http.DefaultTransport)
-		assert.ErrorIs(t, err, config.ErrMissingElasticURL)
-		assert.Nil(t, cfg)
+		require.ErrorIs(t, err, config.ErrMissingElasticURL)
+		require.Nil(t, cfg)
 	})
 
 	// Test default values
