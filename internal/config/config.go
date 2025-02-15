@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -71,9 +72,10 @@ func NewConfig() (*Config, error) {
 
 	// Attempt to read the config file
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			// Config file not found; ignore error if desired
-			// You can log this if needed
+		var configErr *viper.ConfigFileNotFoundError
+		if errors.As(err, &configErr) {
+			//nolint:forbidigo // No logger here
+			fmt.Println("Config file not found; ignoring error")
 		} else {
 			// Config file was found but another error was produced
 			return nil, err
@@ -108,8 +110,8 @@ func NewConfig() (*Config, error) {
 		},
 	}
 
-	if err := ValidateConfig(cfg); err != nil {
-		return nil, err
+	if validateErr := ValidateConfig(cfg); validateErr != nil {
+		return nil, validateErr
 	}
 
 	return cfg, nil
