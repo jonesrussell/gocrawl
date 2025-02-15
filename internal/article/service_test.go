@@ -24,7 +24,7 @@ func TestNewService(t *testing.T) {
 func TestParsePublishedDate(t *testing.T) {
 	mockLogger := &logger.MockLogger{}
 	mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
-	svc := article.NewService(mockLogger).(*article.ArticleService) // Type assertion to access internal methods
+	svc := article.NewService(mockLogger).(*article.Service) // Type assertion to access internal methods
 
 	tests := []struct {
 		name     string

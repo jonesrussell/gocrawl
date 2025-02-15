@@ -33,15 +33,15 @@ const (
 
 // Crawler struct to hold configuration or state if needed
 type Crawler struct {
-	Storage     storage.Interface
-	Collector   *colly.Collector
-	Logger      logger.Interface
-	Debugger    *logger.CollyDebugger
-	IndexName   string
-	articleChan chan *models.Article
-	articleSvc  article.Service
-	indexSvc    *storage.IndexService
-	Config      *config.Config // Rename to Config for clarity
+	Storage        storage.Interface
+	Collector      *colly.Collector
+	Logger         logger.Interface
+	Debugger       *logger.CollyDebugger
+	IndexName      string
+	articleChan    chan *models.Article
+	ArticleService article.Interface
+	indexSvc       *storage.IndexService
+	Config         *config.Config // Rename to Config for clarity
 }
 
 // Params holds the parameters for creating a Crawler
@@ -105,15 +105,15 @@ func NewCrawler(p Params) (Result, error) {
 	}
 
 	crawler := &Crawler{
-		Storage:     p.Storage,
-		Collector:   c,
-		Logger:      p.Logger,
-		Debugger:    p.Debugger,
-		IndexName:   p.Config.Crawler.IndexName,
-		articleChan: make(chan *models.Article, DefaultBatchSize),
-		articleSvc:  article.NewService(p.Logger),
-		indexSvc:    storage.NewIndexService(p.Storage, p.Logger),
-		Config:      p.Config,
+		Storage:        p.Storage,
+		Collector:      c,
+		Logger:         p.Logger,
+		Debugger:       p.Debugger,
+		IndexName:      p.Config.Crawler.IndexName,
+		articleChan:    make(chan *models.Article, DefaultBatchSize),
+		ArticleService: article.NewService(p.Logger),
+		indexSvc:       storage.NewIndexService(p.Storage, p.Logger),
+		Config:         p.Config,
 	}
 
 	// Configure collector callbacks
@@ -193,7 +193,7 @@ func (c *Crawler) Stop() {
 // processPage handles article extraction
 func (c *Crawler) processPage(e *colly.HTMLElement) {
 	c.Logger.Debug("Processing page", "url", e.Request.URL.String())
-	article := c.articleSvc.ExtractArticle(e)
+	article := c.ArticleService.ExtractArticle(e)
 	if article == nil {
 		c.Logger.Debug("No article extracted", "url", e.Request.URL.String())
 		return
@@ -207,8 +207,8 @@ func (c *Crawler) SetCollector(collector *colly.Collector) {
 	c.Collector = collector
 }
 
-func (c *Crawler) SetArticleService(svc article.Service) {
-	c.articleSvc = svc
+func (c *Crawler) SetService(svc article.Interface) {
+	c.ArticleService = svc
 }
 
 func configureCollectorCallbacks(c *colly.Collector, crawler *Crawler) {

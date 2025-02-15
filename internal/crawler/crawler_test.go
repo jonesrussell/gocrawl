@@ -152,7 +152,7 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 	crawlerInstance.Config.Crawler.BaseURL = ts.URL
 
 	// Set up mock article service
-	crawlerInstance.SetArticleService(mockArticleSvc)
+	crawlerInstance.SetService(mockArticleSvc)
 
 	// Set up expectations
 	mockStorage.On("IndexExists", mock.Anything, mockConfig.Crawler.IndexName).Return(true, nil)
@@ -216,7 +216,7 @@ func TestCrawler(t *testing.T) {
 	crawlerInstance.Config.Crawler.BaseURL = ts.URL
 
 	// Set up mock article service
-	crawlerInstance.SetArticleService(mockArticleSvc)
+	crawlerInstance.SetService(mockArticleSvc)
 
 	// Set up expectations
 	mockStorage.On("IndexExists", mock.Anything, testConfig.Crawler.IndexName).Return(true, nil)

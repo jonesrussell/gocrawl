@@ -13,18 +13,18 @@ import (
 )
 
 // Service defines the interface for article operations
-type Service interface {
+type Interface interface {
 	ExtractArticle(e *colly.HTMLElement) *models.Article
 }
 
-// ArticleService implements the Service interface
-type ArticleService struct {
+// Service implements the Service interface
+type Service struct {
 	Logger logger.Interface
 }
 
-// NewService creates a new ArticleService instance
-func NewService(logger logger.Interface) Service {
-	return &ArticleService{Logger: logger}
+// NewService creates a new Service instance
+func NewService(logger logger.Interface) Interface {
+	return &Service{Logger: logger}
 }
 
 type JSONLDArticle struct {
@@ -36,7 +36,7 @@ type JSONLDArticle struct {
 	Section       string   `json:"articleSection"`
 }
 
-func (s *ArticleService) ExtractArticle(e *colly.HTMLElement) *models.Article {
+func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	var jsonLD JSONLDArticle
 
 	// Extract metadata from JSON-LD first
@@ -84,14 +84,14 @@ func (s *ArticleService) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	return article
 }
 
-func (s *ArticleService) CleanAuthor(author string) string {
+func (s *Service) CleanAuthor(author string) string {
 	if idx := strings.Index(author, "    "); idx != -1 {
 		author = strings.TrimSpace(author[:idx])
 	}
 	return author
 }
 
-func (s *ArticleService) extractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string {
+func (s *Service) extractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string {
 	tags := make([]string, 0)
 
 	// 1. JSON-LD keywords
@@ -139,7 +139,7 @@ func (s *ArticleService) extractTags(e *colly.HTMLElement, jsonLD JSONLDArticle)
 	return uniqueTags
 }
 
-func (s *ArticleService) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time {
+func (s *Service) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time {
 	var publishedDate time.Time
 
 	timeFormats := []string{
