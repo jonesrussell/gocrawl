@@ -11,7 +11,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/multisource"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"gopkg.in/yaml.v3"
 )
@@ -47,16 +46,16 @@ func setupMultiCrawlCmd(_ *cobra.Command, cfg *config.Config, log logger.Interfa
 
 	// Update the Config with the first source's BaseURL
 	if len(sources) > 0 {
-		// Use Viper to set the configuration values
-		viper.Set(config.CrawlerBaseURLKey, sources[0].URL)     // Set the BaseURL using Viper
-		viper.Set(config.ElasticIndexNameKey, sources[0].Index) // Set the IndexName using Viper
-		// Log updated config directly from Viper
+		// Use the Config methods to set the configuration values
+		cfg.Crawler.SetBaseURL(sources[0].URL)     // Set the BaseURL using the Config method
+		cfg.Crawler.SetIndexName(sources[0].Index) // Set the IndexName using the Config method
+		// Log updated config directly from the Config struct
 		log.Debug(
 			"Updated config",
 			"baseURL",
-			viper.GetString(config.CrawlerBaseURLKey),
+			cfg.Crawler.BaseURL,
 			"indexName",
-			viper.GetString(config.ElasticIndexNameKey),
+			cfg.Crawler.IndexName,
 		) // Log updated config
 	}
 

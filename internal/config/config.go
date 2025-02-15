@@ -48,6 +48,18 @@ type CrawlerConfig struct {
 	SourceFile string
 }
 
+// SetBaseURL sets the BaseURL in the CrawlerConfig
+func (c *CrawlerConfig) SetBaseURL(url string) {
+	c.BaseURL = url
+	viper.Set(CrawlerBaseURLKey, url) // Also set it in Viper
+}
+
+// SetIndexName sets the IndexName in the CrawlerConfig
+func (c *CrawlerConfig) SetIndexName(index string) {
+	c.IndexName = index
+	viper.Set(ElasticIndexNameKey, index) // Also set it in Viper
+}
+
 // ElasticsearchConfig holds Elasticsearch-specific configuration
 type ElasticsearchConfig struct {
 	URL       string
