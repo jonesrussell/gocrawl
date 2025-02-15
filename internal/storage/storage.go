@@ -102,7 +102,7 @@ func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
 	}
 
 	// Perform a simple request to test the connection
-	res, err := s.ESClient.Info()
+	res, err := s.ESClient.Info(s.ESClient.Info.WithContext(ctx))
 	if err != nil {
 		return fmt.Errorf("failed to connect to Elasticsearch: %w", err)
 	}
