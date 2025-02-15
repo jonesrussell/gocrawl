@@ -48,6 +48,8 @@ func setupMultiCrawlCmd(_ *cobra.Command, cfg *config.Config, log logger.Interfa
 			cfg.Crawler.BaseURL,
 			"indexName",
 			cfg.Crawler.IndexName,
+			"maxDepth",
+			cfg.Crawler.MaxDepth,
 		) // Log updated config
 	}
 
