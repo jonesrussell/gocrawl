@@ -15,6 +15,9 @@ import (
 // Service defines the interface for article operations
 type Interface interface {
 	ExtractArticle(e *colly.HTMLElement) *models.Article
+	ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string
+	CleanAuthor(author string) string
+	ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time
 }
 
 // Service implements the Service interface
@@ -65,7 +68,7 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 		Body:   e.ChildText(DetailsBodySelector),
 		Source: e.Request.URL.String(),
 		Author: author,
-		Tags:   s.extractTags(e, jsonLD),
+		Tags:   s.ExtractTags(e, jsonLD),
 	}
 
 	// Get intro/description
@@ -93,6 +96,7 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	return article
 }
 
+// CleanAuthor cleans up the author string
 func (s *Service) CleanAuthor(author string) string {
 	if idx := strings.Index(author, "    "); idx != -1 {
 		author = strings.TrimSpace(author[:idx])
@@ -100,7 +104,7 @@ func (s *Service) CleanAuthor(author string) string {
 	return author
 }
 
-func (s *Service) extractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string {
+func (s *Service) ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string {
 	tags := make([]string, 0)
 
 	// 1. JSON-LD keywords
@@ -204,4 +208,17 @@ func parseDate(dates []string, logger logger.Interface) time.Time {
 	}
 
 	return publishedDate
+}
+
+// RemoveDuplicates removes duplicate tags from a slice
+func RemoveDuplicates(tags []string) []string {
+	seen := make(map[string]bool)
+	uniqueTags := make([]string, 0)
+	for _, tag := range tags {
+		if !seen[tag] {
+			seen[tag] = true
+			uniqueTags = append(uniqueTags, tag)
+		}
+	}
+	return uniqueTags
 }
