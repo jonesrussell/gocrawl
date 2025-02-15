@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
@@ -25,13 +26,13 @@ var Module = fx.Module("storage",
 )
 
 // NewStorage initializes a new Storage instance
-func NewStorage(esClient *elasticsearch.Client) (Interface, error) {
+func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface, error) {
 	if esClient == nil {
 		return nil, errors.New("elasticsearch client is nil")
 	}
 
 	// Log the Elasticsearch client information for debugging
-	fmt.Printf("Elasticsearch client initialized: %+v\n", esClient)
+	log.Info("Elasticsearch client initialized", "client", esClient)
 
 	// Attempt to ping Elasticsearch to check connectivity
 	res, err := esClient.Info()
@@ -50,15 +51,15 @@ func NewStorage(esClient *elasticsearch.Client) (Interface, error) {
 	}
 
 	// Test connection to Elasticsearch
-	if err := storageInstance.TestConnection(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed to connect to elasticsearch: %w", err)
+	if testErr := storageInstance.TestConnection(context.Background()); testErr != nil {
+		return nil, fmt.Errorf("failed to connect to elasticsearch: %w", testErr)
 	}
 
 	return storageInstance, nil
 }
 
 // Provide the Elasticsearch client as a dependency
-func ProvideElasticsearchClient() (*elasticsearch.Client, error) {
+func ProvideElasticsearchClient(log logger.Interface) (*elasticsearch.Client, error) {
 	// Create a custom HTTP transport that skips TLS verification
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -80,7 +81,7 @@ func ProvideElasticsearchClient() (*elasticsearch.Client, error) {
 	}
 
 	// Log the configuration for debugging
-	fmt.Printf("Connecting to Elasticsearch at %s\n", cfg.Addresses[0])
+	log.Info("Connecting to Elasticsearch", "address", cfg.Addresses[0])
 
 	return client, nil
 }

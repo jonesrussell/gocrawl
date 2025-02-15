@@ -29,7 +29,7 @@ func SearchContent(ctx context.Context, query string, _ string, size int) ([]Sea
 		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
 	}
 
-	storageInstance, err := storage.NewStorage(esClient)
+	storageInstance, err := storage.NewStorage(esClient, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}

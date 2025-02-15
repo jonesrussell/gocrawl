@@ -54,11 +54,6 @@ type Result struct {
 // Ensure ElasticsearchStorage implements the Storage interface
 var _ Interface = (*ElasticsearchStorage)(nil)
 
-// Constants for common values
-const (
-	defaultRefreshValue = "true"
-)
-
 // IndexDocument indexes a document in Elasticsearch
 func (s *ElasticsearchStorage) IndexDocument(
 	ctx context.Context,

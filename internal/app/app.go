@@ -31,8 +31,8 @@ type App struct {
 	Storage storage.Interface
 }
 
-func NewApp(esClient *elasticsearch.Client) (*App, error) {
-	storage, err := storage.NewStorage(esClient)
+func NewApp(esClient *elasticsearch.Client, log logger.Interface) (*App, error) {
+	storage, err := storage.NewStorage(esClient, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
