@@ -20,7 +20,7 @@ const (
 )
 
 // NewCrawlCmd creates a new crawl command
-func NewCrawlCmd(log logger.Interface, cfg *config.Config, storageInstance storage.Interface) *cobra.Command {
+func NewCrawlCmd(log logger.Interface, _ *config.Config, storageInstance storage.Interface) *cobra.Command {
 	var crawlCmd = &cobra.Command{
 		Use:   "crawl",
 		Short: "Start crawling a website",
