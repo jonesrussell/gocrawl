@@ -1,7 +1,7 @@
 package collector
 
 import (
-	"fmt"
+	"errors"
 	"net/url"
 	"strings"
 	"time"
@@ -51,12 +51,12 @@ type Result struct {
 func New(p Params) (Result, error) {
 	// Validate URL
 	if p.BaseURL == "" {
-		return Result{}, fmt.Errorf("base URL cannot be empty")
+		return Result{}, errors.New("base URL cannot be empty")
 	}
 
 	parsedURL, err := url.Parse(p.BaseURL)
 	if err != nil || (!strings.HasPrefix(parsedURL.Scheme, "http") && !strings.HasPrefix(parsedURL.Scheme, "https")) {
-		return Result{}, fmt.Errorf("invalid base URL: must be a valid HTTP/HTTPS URL")
+		return Result{}, errors.New("invalid base URL: must be a valid HTTP/HTTPS URL")
 	}
 
 	// Create collector with base configuration
@@ -72,7 +72,7 @@ func New(p Params) (Result, error) {
 		Parallelism: Parallelism,
 	})
 	if err != nil {
-		return Result{}, fmt.Errorf("failed to set rate limit: %w", err)
+		return Result{}, errors.New("failed to set rate limit")
 	}
 
 	if p.Debugger != nil {
