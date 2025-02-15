@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 // Error definitions
@@ -113,11 +112,6 @@ func NewConfig() (*Config, error) {
 		return nil, err
 	}
 
-	// Log the full configuration if debug is enabled
-	if cfg.App.Debug {
-		logConfig(cfg)
-	}
-
 	return cfg, nil
 }
 
@@ -141,30 +135,6 @@ func ValidateConfig(cfg *Config) error {
 	return nil
 }
 
-// logConfig logs the configuration values
-func logConfig(cfg *Config) {
-	// Create a logger instance (you can customize this as needed)
-	logger, _ := zap.NewDevelopment()
-	defer func(logger *zap.Logger) {
-		err := logger.Sync()
-		if err != nil {
-			logger.Error("Failed to sync logger", zap.Error(err))
-		}
-	}(logger) // flushes buffer, if any
-	logger.Debug("Loaded configuration",
-		zap.String("Environment", cfg.App.Environment),
-		zap.String("LogLevel", cfg.App.LogLevel),
-		zap.Bool("Debug", cfg.App.Debug),
-		zap.String("ElasticsearchURL", cfg.Elasticsearch.URL),
-		zap.String("ElasticsearchUsername", cfg.Elasticsearch.Username),
-		zap.String("ElasticsearchAPIKey", cfg.Elasticsearch.APIKey),
-		zap.String("CrawlerBaseURL", cfg.Crawler.BaseURL),
-		zap.Int("CrawlerMaxDepth", cfg.Crawler.MaxDepth),
-		zap.Duration("CrawlerRateLimit", cfg.Crawler.RateLimit),
-		zap.Bool("ElasticsearchSkipTLS", cfg.Elasticsearch.SkipTLS),
-	)
-}
-
 // NewHTTPTransport creates a new HTTP transport
 func NewHTTPTransport() http.RoundTripper {
 	return http.DefaultTransport
@@ -174,7 +144,7 @@ func NewHTTPTransport() http.RoundTripper {
 func ParseRateLimit(rate string) (time.Duration, error) {
 	duration, err := time.ParseDuration(rate)
 	if err != nil {
-		return time.Second, nil // Return default value on error
+		return time.Second, fmt.Errorf("error parsing duration")
 	}
 	return duration, nil
 }

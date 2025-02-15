@@ -21,13 +21,19 @@ func NewMockService() *MockService {
 // ExtractArticle implements Service.ExtractArticle
 func (m *MockService) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	args := m.Called(e)
-	return args.Get(0).(*models.Article)
+	if article, ok := args.Get(0).(*models.Article); ok {
+		return article
+	}
+	return nil // Handle the case where the article is not available
 }
 
 // ExtractTags mocks the ExtractTags method
 func (m *MockService) ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string {
 	args := m.Called(e, jsonLD)
-	return args.Get(0).([]string)
+	if tags, ok := args.Get(0).([]string); ok {
+		return tags
+	}
+	return nil // Handle the case where tags are not available
 }
 
 // CleanAuthor mocks the CleanAuthor method
@@ -39,5 +45,8 @@ func (m *MockService) CleanAuthor(author string) string {
 // ParsePublishedDate mocks the ParsePublishedDate method
 func (m *MockService) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time {
 	args := m.Called(e, jsonLD)
-	return args.Get(0).(time.Time)
+	if date, ok := args.Get(0).(time.Time); ok {
+		return date
+	}
+	return time.Time{} // Return zero time if not available
 }
