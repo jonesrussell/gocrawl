@@ -4,12 +4,12 @@ tasks:
   crawl:
     desc: "Run the web crawler"
     cmds:
-      - go run main.go crawl -u https://www.elliotlaketoday.com/opp-beat -d 1 -r 2s -i articles
+      - go run main.go crawl -u https://www.elliotlaketoday.com/opp-beat -d 2 -r 2s -i articles
 
   search:
     desc: "Search crawled content"
     cmds:
-      - go run main.go search -q "{{.CLI_ARGS}}" -i streetcode_index
+      - go run main.go search -q "{{.CLI_ARGS}}" -i articles
 
   build:
     desc: "Build the web crawler executable"
