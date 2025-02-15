@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 )
@@ -30,7 +31,7 @@ ELASTIC_SKIP_TLS: true
 
 	cfg, err := config.NewConfig()
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, cfg)
 	assert.Equal(t, "development", cfg.App.Environment)
 	assert.Equal(t, "debug", cfg.App.LogLevel)

@@ -26,7 +26,7 @@ func NewIndexService(logger logger.Interface) IndexServiceInterface {
 	}
 }
 
-func (s *IndexService) CreateIndex(ctx context.Context, indexName string, mapping map[string]interface{}) error {
+func (s *IndexService) CreateIndex(_ context.Context, indexName string, mapping map[string]interface{}) error {
 	// Implementation for creating an index
 	// This should call the actual storage mechanism to create the index
 	return nil // Replace with actual implementation

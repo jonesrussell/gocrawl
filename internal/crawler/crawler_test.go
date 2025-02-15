@@ -13,7 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
-func TestCrawler_Stop(t *testing.T) {
+func TestCrawler_Stop(_ *testing.T) {
 	mockLogger := logger.NewMockLogger()
 	c := &crawler.Crawler{
 		Logger: mockLogger,

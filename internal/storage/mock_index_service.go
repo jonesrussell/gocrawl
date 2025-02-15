@@ -34,8 +34,3 @@ func (m *MockIndexService) CreateIndex(ctx context.Context, indexName string, ma
 	args := m.Called(ctx, indexName, mapping)
 	return args.Error(0)
 }
-
-func (m *MockIndexService) createArticleIndex(ctx context.Context, indexName string) error {
-	args := m.Called(ctx, indexName)
-	return args.Error(0)
-}

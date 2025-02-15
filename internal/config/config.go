@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -122,9 +123,12 @@ func NewConfig() (*Config, error) {
 
 // parseRateLimit parses the rate limit duration from a string
 func parseRateLimit(rateLimitStr string) (time.Duration, error) {
+	if rateLimitStr == "" {
+		return time.Second, fmt.Errorf("rate limit cannot be empty")
+	}
 	rateLimit, err := time.ParseDuration(rateLimitStr)
 	if err != nil {
-		return time.Second, nil // Default value if parsing fails
+		return time.Second, fmt.Errorf("error parsing duration")
 	}
 	return rateLimit, nil
 }
