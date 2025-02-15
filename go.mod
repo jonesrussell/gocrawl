@@ -3,7 +3,7 @@ module github.com/jonesrussell/gocrawl
 go 1.23.4
 
 require (
-	github.com/PuerkitoBio/goquery v1.10.1
+	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/google/uuid v1.6.0

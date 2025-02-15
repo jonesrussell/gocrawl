@@ -101,10 +101,8 @@ func executeCrawlCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Confi
 		}
 	}()
 
-	// Use cfg here if needed, for example, to log the configuration
+	// Use cfg and esClient as needed, for example, to log the configuration
 	log.Debug(fmt.Sprintf("Crawling with configuration: %+v", cfg.Crawler))
-
-	// Use esClient as needed, for example, to log the configuration
 	log.Debug(fmt.Sprintf("Crawling with Elasticsearch client: %+v", esClient))
 
 	return nil

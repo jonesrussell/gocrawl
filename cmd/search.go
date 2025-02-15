@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/search"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -81,7 +81,7 @@ func executeSearchCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Conf
 
 // runApp executes the main logic of the application
 func runApp(ctx context.Context, log logger.Interface, cfg *config.Config, query string, esClient *elasticsearch.Client) error {
-	results, err := app.SearchContent(ctx, esClient, query, cfg.Elasticsearch.IndexName, DefaultSearchSize)
+	results, err := search.SearchContent(ctx, esClient, query, cfg.Elasticsearch.IndexName, DefaultSearchSize)
 	if err != nil {
 		log.Error("Search failed", err)
 		return fmt.Errorf("search failed: %w", err)
