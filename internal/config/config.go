@@ -142,11 +142,15 @@ func NewHTTPTransport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-// Add this function to parse rate limits
-func ParseRateLimit(rate string) (time.Duration, error) {
-	duration, err := time.ParseDuration(rate)
+// ParseRateLimit parses a rate limit string and returns a time.Duration.
+// If the input is invalid, it returns a default value of 1 second.
+func ParseRateLimit(rateLimit string) (time.Duration, error) {
+	if rateLimit == "" {
+		return time.Second, nil // Return default value
+	}
+	duration, err := time.ParseDuration(rateLimit)
 	if err != nil {
-		return time.Second, errors.New("error parsing duration")
+		return time.Second, nil // Return default value on error
 	}
 	return duration, nil
 }

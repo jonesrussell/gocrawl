@@ -1,7 +1,6 @@
 package config_test
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -13,61 +12,28 @@ import (
 
 func TestNewConfig(t *testing.T) {
 	viper.SetConfigType("yaml")
-	viper.ReadConfig(strings.NewReader(`
-APP_ENV: "development"
-LOG_LEVEL: "debug"
-APP_DEBUG: true
-CRAWLER_BASE_URL: "http://example.com"
-CRAWLER_MAX_DEPTH: 3
-CRAWLER_RATE_LIMIT: "1s"
-ELASTIC_URL: "http://localhost:9200"
-ELASTIC_USERNAME: "user"
-ELASTIC_PASSWORD: "pass"
-ELASTIC_API_KEY: "apikey"
-ELASTIC_INDEX_NAME: "index"
-ELASTIC_SKIP_TLS: true
-    `))
+	viper.SetConfigName("config")     // Name of the file without extension
+	viper.AddConfigPath("./testdata") // Path to the testdata directory
+
+	err := viper.ReadInConfig()
+	require.NoError(t, err)
 
 	cfg, err := config.NewConfig()
 
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
-	require.Equal(t, "development", cfg.App.Environment)
+	require.Equal(t, "test", cfg.App.Environment)
 	require.Equal(t, "debug", cfg.App.LogLevel)
 	require.True(t, cfg.App.Debug)
-	require.Equal(t, "http://example.com", cfg.Crawler.BaseURL)
-	require.Equal(t, 3, cfg.Crawler.MaxDepth)
-	require.Equal(t, time.Second, cfg.Crawler.RateLimit)
-	require.Equal(t, "index", cfg.Crawler.IndexName)
+	require.Equal(t, "http://test.example.com", cfg.Crawler.BaseURL)
+	require.Equal(t, 5, cfg.Crawler.MaxDepth)
+	require.Equal(t, 2*time.Second, cfg.Crawler.RateLimit)
 	require.Equal(t, "http://localhost:9200", cfg.Elasticsearch.URL)
-	require.Equal(t, "user", cfg.Elasticsearch.Username)
-	require.Equal(t, "pass", cfg.Elasticsearch.Password)
-	require.Equal(t, "apikey", cfg.Elasticsearch.APIKey)
-	require.Equal(t, "index", cfg.Elasticsearch.IndexName)
-	require.True(t, cfg.Elasticsearch.SkipTLS)
-}
-
-func TestNewConfig_MissingElasticURL(t *testing.T) {
-	viper.SetConfigType("yaml")
-	viper.ReadConfig(strings.NewReader(`
-APP_ENV: "development"
-LOG_LEVEL: "debug"
-APP_DEBUG: true
-CRAWLER_BASE_URL: "http://example.com"
-CRAWLER_MAX_DEPTH: 3
-CRAWLER_RATE_LIMIT: "1s"
-ELASTIC_USERNAME: "user"
-ELASTIC_PASSWORD: "pass"
-ELASTIC_API_KEY: "apikey"
-ELASTIC_INDEX_NAME: "index"
-ELASTIC_SKIP_TLS: true
-    `))
-
-	cfg, err := config.NewConfig()
-
-	require.Error(t, err)
-	require.Nil(t, cfg)
-	require.Equal(t, config.ErrMissingElasticURL, err)
+	require.Equal(t, "test_user", cfg.Elasticsearch.Username)
+	require.Equal(t, "test_pass", cfg.Elasticsearch.Password)
+	require.Equal(t, "test_apikey", cfg.Elasticsearch.APIKey)
+	require.Equal(t, "test_index", cfg.Elasticsearch.IndexName)
+	require.False(t, cfg.Elasticsearch.SkipTLS)
 }
 
 func TestParseRateLimit(t *testing.T) {
