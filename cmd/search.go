@@ -12,6 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Constants for default values
+const (
+	DefaultSearchSize = 10 // Default number of results to return
+)
+
 func NewSearchCmd(log logger.Interface) *cobra.Command {
 	var searchCmd = &cobra.Command{
 		Use:   "search",
@@ -45,16 +50,16 @@ func NewSearchCmd(log logger.Interface) *cobra.Command {
 				return fmt.Errorf("search failed: %w", err)
 			}
 
-			// Print results
+			// Print results using logger instead of fmt.Printf
 			for _, result := range results {
-				fmt.Printf("URL: %s\nContent: %s\n\n", result.URL, result.Content)
+				log.Info(fmt.Sprintf("URL: %s\nContent: %s\n\n", result.URL, result.Content)) // Use logger
 			}
 			return nil
 		},
 	}
 
 	searchCmd.Flags().StringP("index", "i", "articles", "Index to search")
-	searchCmd.Flags().IntP("size", "s", 10, "Number of results to return")
+	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return") // Use the constant here
 
 	return searchCmd
 }
