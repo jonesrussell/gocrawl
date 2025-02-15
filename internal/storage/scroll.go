@@ -92,7 +92,7 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 			return
 		}
 
-		if fetchErr := s.fetchNextScrollBatch(ctx, scrollID, resultChan); fetchErr != nil {
+		if fetchErr := s.fetchNextScrollBatch(scrollID, resultChan); fetchErr != nil {
 			s.Logger.Error("Failed to get next scroll batch", "error", fetchErr)
 			return
 		}
@@ -107,12 +107,10 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 
 // fetchNextScrollBatch fetches the next batch of results from Elasticsearch
 func (s *ElasticsearchStorage) fetchNextScrollBatch(
-	ctx context.Context,
 	scrollID string,
 	resultChan chan<- map[string]interface{},
 ) error {
 	searchRes, err := s.ESClient.Scroll(
-		s.ESClient.Scroll.WithContext(ctx),
 		s.ESClient.Scroll.WithScrollID(scrollID),
 		s.ESClient.Scroll.WithScroll(s.getScrollDuration()),
 	)
@@ -125,7 +123,7 @@ func (s *ElasticsearchStorage) fetchNextScrollBatch(
 	}
 
 	// Process the hits from the response
-	return s.processScrollHits(ctx, searchRes, resultChan)
+	return s.processScrollHits(searchRes, resultChan)
 }
 
 // handleScrollError handles errors from the scroll response
@@ -136,10 +134,12 @@ func (s *ElasticsearchStorage) handleScrollError(searchRes *esapi.Response) erro
 	}
 
 	// Check for specific error type
-	if errType, ok := e["error"].(map[string]interface{})["type"]; ok {
-		if errType == "search_phase_execution_exception" {
-			s.Logger.Info("Reached end of scroll results")
-			return nil
+	if errMap, ok := e["error"].(map[string]interface{}); ok {
+		if errType, ok := errMap["type"]; ok {
+			if errType == "search_phase_execution_exception" {
+				s.Logger.Info("Reached end of scroll results")
+				return nil
+			}
 		}
 	}
 
@@ -149,7 +149,6 @@ func (s *ElasticsearchStorage) handleScrollError(searchRes *esapi.Response) erro
 
 // processScrollHits processes the hits from the scroll response
 func (s *ElasticsearchStorage) processScrollHits(
-	ctx context.Context,
 	searchRes *esapi.Response,
 	resultChan chan<- map[string]interface{},
 ) error {
@@ -163,7 +162,7 @@ func (s *ElasticsearchStorage) processScrollHits(
 		return err
 	}
 
-	s.ProcessHits(ctx, hits, resultChan)
+	s.ProcessHits(hits, resultChan)
 
 	return nil
 }
@@ -186,7 +185,6 @@ func (s *ElasticsearchStorage) getHitsFromResult(
 
 // ProcessHits extracts documents from hits array and sends them to resultChan
 func (s *ElasticsearchStorage) ProcessHits(
-	ctx context.Context,
 	hits []interface{},
 	resultChan chan<- map[string]interface{},
 ) {
@@ -222,7 +220,7 @@ func (s *ElasticsearchStorage) HandleScrollResponse(
 		return "", err
 	}
 
-	s.ProcessHits(ctx, hits, resultChan)
+	s.ProcessHits(hits, resultChan)
 
 	scrollID, ok := result["_scroll_id"].(string)
 	if !ok {
