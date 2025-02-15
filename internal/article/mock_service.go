@@ -16,19 +16,13 @@ type MockService struct {
 // ExtractArticle implements Service.ExtractArticle
 func (m *MockService) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	args := m.Called(e)
-	if article, ok := args.Get(0).(*models.Article); ok {
-		return article
-	}
-	return nil
+	return args.Get(0).(*models.Article)
 }
 
 // ExtractTags mocks the ExtractTags method
 func (m *MockService) ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string {
 	args := m.Called(e, jsonLD)
-	if tags, ok := args.Get(0).([]string); ok {
-		return tags
-	}
-	return nil
+	return args.Get(0).([]string)
 }
 
 // CleanAuthor mocks the CleanAuthor method
@@ -40,8 +34,5 @@ func (m *MockService) CleanAuthor(author string) string {
 // ParsePublishedDate mocks the ParsePublishedDate method
 func (m *MockService) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time {
 	args := m.Called(e, jsonLD)
-	if date, ok := args.Get(0).(time.Time); ok {
-		return date
-	}
-	return time.Time{}
+	return args.Get(0).(time.Time)
 }

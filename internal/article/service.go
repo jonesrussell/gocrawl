@@ -45,11 +45,13 @@ const (
 	DetailsBodySelector   = "#details-body"
 	DetailsIntroSelector  = ".details-intro"
 	MetaPublishedTime     = "meta[property='article:published_time']"
-	TimeAgoSelector       = "time.timeago"
+	TimeAgoSelector       = "time"
 )
 
 func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	var jsonLD JSONLDArticle
+
+	s.Logger.Debug("Extracting article", "url", e.Request.URL.String())
 
 	// Extract metadata from JSON-LD first
 	e.ForEach(`script[type="application/ld+json"]`, func(_ int, el *colly.HTMLElement) {
