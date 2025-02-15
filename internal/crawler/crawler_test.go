@@ -31,7 +31,7 @@ func (m *MockCollector) Visit(url string) error {
 // TestNewCrawler tests the creation of a new Crawler instance
 func TestNewCrawler(t *testing.T) {
 	// Create test dependencies
-	log := logger.NewMockCustomLogger()
+	log := logger.NewMockLogger()
 	mockStorage := storage.NewMockStorage()
 
 	// Create test config
@@ -66,7 +66,7 @@ func TestNewCrawler(t *testing.T) {
 // TestCrawler_Start tests the Crawler's Start method
 func TestCrawler_Start(t *testing.T) {
 	// Create mock dependencies
-	log := logger.NewMockCustomLogger()
+	log := logger.NewMockLogger()
 	mockStorage := storage.NewMockStorage()
 
 	// Create mock config
@@ -180,7 +180,7 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 }
 
 func TestCrawler(t *testing.T) {
-	mockLogger := logger.NewMockCustomLogger()
+	mockLogger := logger.NewMockLogger()
 	mockStorage := &storage.MockStorage{}
 	mockArticleSvc := &article.MockService{}
 

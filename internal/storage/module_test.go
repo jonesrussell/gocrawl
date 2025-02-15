@@ -28,7 +28,7 @@ func TestModule(t *testing.T) {
 					return testConfig
 				},
 				func() logger.Interface {
-					return logger.NewMockCustomLogger()
+					return logger.NewMockLogger()
 				},
 			),
 		)

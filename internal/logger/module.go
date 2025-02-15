@@ -38,6 +38,12 @@ var Module = fx.Module("logger",
 func NewDevelopmentLogger() (*CustomLogger, error) {
 	config := zap.NewDevelopmentConfig()
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder // Add color to log levels
+
+	// Ensure the output is set to os.Stdout
+	config.OutputPaths = []string{"stdout"} // This should work in most environments
+	// Alternatively, you can use:
+	// config.OutputPaths = []string{os.Stdout.Name()} // This is more explicit
+
 	logger, err := config.Build()
 	if err != nil {
 		return nil, err

@@ -13,7 +13,7 @@ import (
 )
 
 func TestCollyDebugger(t *testing.T) {
-	mockLogger := logger.NewMockCustomLogger()
+	mockLogger := logger.NewMockLogger()
 	debugger := &logger.CollyDebugger{
 		Logger: mockLogger,
 	}
