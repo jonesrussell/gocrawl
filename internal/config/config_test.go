@@ -38,13 +38,12 @@ func TestNewConfig(t *testing.T) {
 
 func TestParseRateLimit(t *testing.T) {
 	rateLimit, err := config.ParseRateLimit("1s")
-
 	require.NoError(t, err)
 	require.Equal(t, time.Second, rateLimit)
 
 	// Test invalid duration
 	rateLimit, err = config.ParseRateLimit("invalid")
-	require.NoError(t, err)
+	require.Error(t, err)                    // Expect an error
 	require.Equal(t, time.Second, rateLimit) // Should return default value
 }
 
