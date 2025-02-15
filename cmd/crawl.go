@@ -41,7 +41,7 @@ func NewCrawlCmd(log logger.Interface) *cobra.Command {
 				Logger logger.Interface
 			}
 
-			app := fx.New(
+			fxApp := fx.New(
 				config.Module,
 				logger.Module,
 				storage.Module,
@@ -53,12 +53,12 @@ func NewCrawlCmd(log logger.Interface) *cobra.Command {
 			// Debug log before starting the application
 			log.Debug("Starting application...")
 
-			if err := app.Start(cmd.Context()); err != nil {
+			if err := fxApp.Start(cmd.Context()); err != nil {
 				log.Error("Error starting application", "error", err)
 				return fmt.Errorf("error starting application: %w", err)
 			}
 			defer func() {
-				if err := app.Stop(cmd.Context()); err != nil {
+				if err := fxApp.Stop(cmd.Context()); err != nil {
 					log.Error("Error stopping application", "error", err)
 				}
 			}()

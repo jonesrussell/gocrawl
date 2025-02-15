@@ -3,13 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"strconv"
 
 	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
+	"go.uber.org/fx"
 )
 
 // Constants for default values
@@ -22,44 +22,54 @@ func NewSearchCmd(log logger.Interface) *cobra.Command {
 		Use:   "search",
 		Short: "Search content in Elasticsearch",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Skip execution during flag parsing phase
-			if log == nil {
-				return nil
+			// Retrieve the query from the -q flag
+			query, err := cmd.Flags().GetString("query")
+			if err != nil || query == "" {
+				return fmt.Errorf("missing query argument")
 			}
+
+			// Initialize fx container
+			var deps struct {
+				fx.In
+				Logger  logger.Interface
+				Storage storage.Interface
+			}
+
+			fxApp := fx.New(
+				config.Module,
+				logger.Module,
+				storage.Module,
+				fx.Populate(&deps),
+			)
+
+			// Start the application
+			if err := fxApp.Start(cmd.Context()); err != nil {
+				log.Error("Error starting application", "error", err)
+				return fmt.Errorf("error starting application: %w", err)
+			}
+			defer fxApp.Stop(cmd.Context())
+
 			ctx := context.Background()
 
-			// Create config with CLI values
-			cfg := &config.Config{
-				Crawler: config.CrawlerConfig{
-					IndexName: cmd.Flag("index").Value.String(),
-					Transport: http.DefaultTransport,
-				},
-			}
-
-			// Parse size parameter
-			sizeStr := cmd.Flag("size").Value.String()
-			size, err := strconv.Atoi(sizeStr)
-			if err != nil {
-				log.Error("Invalid size value", err)
-				return fmt.Errorf("invalid size value: %w", err)
-			}
-
-			results, err := app.SearchContent(ctx, args[0], cfg.Crawler.IndexName, size)
+			// Use the injected storage instance to call SearchContent
+			results, err := app.SearchContent(ctx, query, "articles", DefaultSearchSize) // Adjust parameters as needed
 			if err != nil {
 				log.Error("Search failed", err)
 				return fmt.Errorf("search failed: %w", err)
 			}
 
-			// Print results using logger instead of fmt.Printf
+			// Print results using logger
 			for _, result := range results {
-				log.Info(fmt.Sprintf("URL: %s\nContent: %s\n\n", result.URL, result.Content)) // Use logger
+				log.Info(fmt.Sprintf("URL: %s\nContent: %s\n\n", result.URL, result.Content))
 			}
+
 			return nil
 		},
 	}
 
 	searchCmd.Flags().StringP("index", "i", "articles", "Index to search")
-	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return") // Use the constant here
+	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return")
+	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
 
 	return searchCmd
 }

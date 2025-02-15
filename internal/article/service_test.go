@@ -24,27 +24,27 @@ func TestNewService(t *testing.T) {
 func TestParsePublishedDate(t *testing.T) {
 	mockLogger := &logger.MockLogger{}
 	mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
-	svc := article.NewService(mockLogger).(*article.Service) // Type assertion to access internal methods
+	svc := article.NewService(mockLogger).(*article.Service)
 
 	tests := []struct {
 		name     string
 		html     string
-		expected string
+		expected time.Time
 	}{
 		{
 			name:     "JSON-LD date",
 			html:     `<script type="application/ld+json">{"datePublished": "2025-01-30T23:00:00Z"}</script>`,
-			expected: "2025-01-30T23:00:00Z",
+			expected: time.Date(2025, 1, 30, 23, 0, 0, 0, time.UTC),
 		},
 		{
 			name:     "timeago date",
 			html:     `<time class="timeago" datetime="2025-02-09T16:01:52.203Z">about 23 hours ago</time>`,
-			expected: "2025-02-09T16:01:52.203Z",
+			expected: time.Date(2025, 2, 9, 16, 1, 52, 203000000, time.UTC),
 		},
 		{
 			name:     "meta tag date",
 			html:     `<meta property="article:published_time" content="2025-02-10T12:00:00Z"/>`,
-			expected: "2025-02-10T12:00:00Z",
+			expected: time.Date(2025, 2, 10, 12, 0, 0, 0, time.UTC),
 		},
 	}
 
@@ -57,9 +57,8 @@ func TestParsePublishedDate(t *testing.T) {
 				DOM: doc.Selection,
 			}
 
-			expectedTime, _ := time.Parse(time.RFC3339, tt.expected)
-			result := svc.ParsePublishedDate(e, article.JSONLDArticle{}) // Update to use JSONLDArticle
-			assert.Equal(t, expectedTime, result)
+			result := svc.ParsePublishedDate(e, article.JSONLDArticle{})
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
