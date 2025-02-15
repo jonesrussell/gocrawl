@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -23,8 +24,8 @@ func init() {
 }
 
 func initConfig() {
-	viper.SetConfigName(".env")
-	viper.SetConfigType("env")
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	viper.AutomaticEnv()
 
@@ -36,8 +37,8 @@ func initConfig() {
 }
 
 // InitializeLogger initializes the logger
-func InitializeLogger() (logger.Interface, error) {
-	env := viper.GetString("APP_ENV")
+func InitializeLogger(cfg *config.Config) (logger.Interface, error) {
+	env := cfg.App.Environment
 	if env == "" {
 		env = "development" // Set a default environment
 	}
@@ -49,8 +50,15 @@ func InitializeLogger() (logger.Interface, error) {
 }
 
 func Execute() error {
+	// Initialize config
+	cfg, err := config.NewConfig(config.NewHTTPTransport())
+	if err != nil {
+		fmt.Printf("Failed to load configuration: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Initialize logger
-	log, err := InitializeLogger()
+	log, err := InitializeLogger(cfg)
 	if err != nil {
 		log.Error(fmt.Sprintf("Failed to initialize logger: %v", err))
 		os.Exit(1)
@@ -58,8 +66,8 @@ func Execute() error {
 	log.Debug("Logger initialized successfully")
 
 	// Add commands
-	rootCmd.AddCommand(NewCrawlCmd(log))  // Pass logger, config, and storage to crawl command
-	rootCmd.AddCommand(NewSearchCmd(log)) // Pass logger to search command
+	rootCmd.AddCommand(NewCrawlCmd(log, cfg))  // Pass logger and config to crawl command
+	rootCmd.AddCommand(NewSearchCmd(log, cfg)) // Pass logger and config to search command
 	log.Debug("Commands added to root command")
 
 	return rootCmd.Execute()

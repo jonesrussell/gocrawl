@@ -2,9 +2,11 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -33,10 +35,12 @@ type CrawlerConfig struct {
 
 // ElasticsearchConfig holds Elasticsearch-specific configuration
 type ElasticsearchConfig struct {
-	URL      string
-	Username string
-	Password string
-	APIKey   string
+	URL       string
+	Username  string
+	Password  string
+	APIKey    string
+	Client    *elasticsearch.Client
+	IndexName string
 }
 
 // Config holds all configuration settings
@@ -66,6 +70,17 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 	// Determine if the application is in development or production
 	isDevelopment := viper.GetString("APP_ENV") == "development"
 
+	// Create the Elasticsearch client
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{viper.GetString("ELASTIC_URL")},
+		Username:  viper.GetString("ELASTIC_USERNAME"),
+		Password:  viper.GetString("ELASTIC_PASSWORD"),
+		APIKey:    viper.GetString("ELASTIC_API_KEY"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
+	}
+
 	cfg := &Config{
 		App: AppConfig{
 			Environment: viper.GetString("APP_ENV"),
@@ -81,10 +96,12 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 			SkipTLS:   isDevelopment, // Allow insecure connections only in development
 		},
 		Elasticsearch: ElasticsearchConfig{
-			URL:      viper.GetString("ELASTIC_URL"),
-			Username: viper.GetString("ELASTIC_USERNAME"),
-			Password: viper.GetString("ELASTIC_PASSWORD"),
-			APIKey:   viper.GetString("ELASTIC_API_KEY"),
+			URL:       viper.GetString("ELASTIC_URL"),
+			Username:  viper.GetString("ELASTIC_USERNAME"),
+			Password:  viper.GetString("ELASTIC_PASSWORD"),
+			APIKey:    viper.GetString("ELASTIC_API_KEY"),
+			Client:    esClient,
+			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
 		},
 	}
 

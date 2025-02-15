@@ -11,7 +11,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
 
@@ -21,16 +20,16 @@ const (
 )
 
 // NewCrawlCmd creates a new crawl command
-func NewCrawlCmd(log logger.Interface) *cobra.Command {
+func NewCrawlCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 	var crawlCmd = &cobra.Command{
 		Use:   "crawl",
 		Short: "Start crawling a website",
 		Long:  `Crawl a website and store the content in Elasticsearch`,
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return setupCrawlCmd(cmd)
+			return setupCrawlCmd(cmd, cfg)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return executeCrawlCmd(cmd, log)
+			return executeCrawlCmd(cmd, log, cfg)
 		},
 	}
 
@@ -48,18 +47,22 @@ func NewCrawlCmd(log logger.Interface) *cobra.Command {
 }
 
 // setupCrawlCmd handles the setup for the crawl command
-func setupCrawlCmd(cmd *cobra.Command) error {
-	viper.Set("CRAWLER_BASE_URL", cmd.Flag("url").Value.String())
+func setupCrawlCmd(cmd *cobra.Command, cfg *config.Config) error {
+	// Set the configuration values directly from cfg
+	cfg.Crawler.BaseURL = cmd.Flag("url").Value.String()
 	if depth, err := cmd.Flags().GetInt("depth"); err == nil {
-		viper.Set("CRAWLER_MAX_DEPTH", depth)
+		cfg.Crawler.MaxDepth = depth
 	}
-	viper.Set("CRAWLER_RATE_LIMIT", cmd.Flag("rate").Value.String())
-	viper.Set("ELASTIC_INDEX_NAME", cmd.Flag("index").Value.String())
+	rateLimit, err := cmd.Flags().GetDuration("rate")
+	if err == nil {
+		cfg.Crawler.RateLimit = rateLimit
+	}
+	cfg.Crawler.IndexName = cmd.Flag("index").Value.String()
 	return nil
 }
 
 // executeCrawlCmd handles the execution of the crawl command
-func executeCrawlCmd(cmd *cobra.Command, log logger.Interface) error {
+func executeCrawlCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Config) error {
 	// Initialize fx container
 	fxApp := fx.New(
 		config.Module,
@@ -96,6 +99,9 @@ func executeCrawlCmd(cmd *cobra.Command, log logger.Interface) error {
 			log.Error("Error stopping application", "error", err)
 		}
 	}()
+
+	// Use cfg here if needed, for example, to log the configuration
+	log.Debug(fmt.Sprintf("Crawling with configuration: %+v", cfg.Crawler))
 
 	return nil
 }
