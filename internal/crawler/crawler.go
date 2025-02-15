@@ -199,6 +199,13 @@ func (c *Crawler) processPage(e *colly.HTMLElement) {
 		return
 	}
 	c.Logger.Debug("Article extracted", "url", e.Request.URL.String(), "title", article.Title)
+
+	// Index the article after extraction
+	if err := c.Storage.IndexDocument(context.Background(), "articles", article.ID, article); err != nil {
+		c.Logger.Error("Failed to index article", "articleID", article.ID, "error", err)
+		return
+	}
+
 	c.articleChan <- article
 }
 
@@ -225,6 +232,7 @@ func configureCollectorCallbacks(c *colly.Collector, crawler *Crawler) {
 	})
 
 	c.OnHTML("div.details", func(e *colly.HTMLElement) {
+		crawler.Logger.Debug("Found details", "url", e.Request.URL.String())
 		crawler.processPage(e)
 	})
 
