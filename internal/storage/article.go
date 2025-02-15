@@ -70,8 +70,8 @@ func (es *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 
 	if res.IsError() {
 		var e map[string]interface{}
-		if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
-			return fmt.Errorf("error parsing error response: %w", err)
+		if decodeErr := json.NewDecoder(res.Body).Decode(&e); decodeErr != nil {
+			return fmt.Errorf("error parsing error response: %w", decodeErr)
 		}
 		es.Logger.Error("Failed to create index", "error", e["error"])
 		return fmt.Errorf("elasticsearch error: %v", e["error"])
@@ -139,8 +139,8 @@ func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string
 	defer res.Body.Close()
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error parsing response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("error parsing response: %w", decodeErr)
 	}
 
 	// Check if "hits" exists and is of the expected type
