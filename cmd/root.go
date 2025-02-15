@@ -29,6 +29,7 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
+		//nolint:forbidigo // This is a CLI error
 		fmt.Printf("Error reading config file: %v\n", err)
 		os.Exit(1)
 	}
