@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -25,23 +27,104 @@ var Module = fx.Module("crawler",
 	),
 )
 
+// Params holds the dependencies required to create a new Crawler instance
+type Params struct {
+	fx.In
+
+	Logger   logger.Interface
+	Storage  storage.Interface
+	Debugger *logger.CollyDebugger
+	Config   *config.Config
+}
+
+// Result holds the result of creating a new Crawler instance
+type Result struct {
+	fx.Out
+
+	Crawler *Crawler
+}
+
+// Crawler represents a web crawler
+type Crawler struct {
+	Storage        storage.Interface
+	Collector      *colly.Collector
+	Logger         logger.Interface
+	Debugger       *logger.CollyDebugger
+	IndexName      string
+	articleChan    chan *models.Article
+	ArticleService article.Interface
+	indexSvc       *storage.IndexService
+	Config         config.CrawlerConfig
+}
+
+// Config holds the crawler configuration
+type Config struct {
+	Crawler CrawlerConfig
+}
+
+// CrawlerConfig holds the crawler-specific configuration
+type CrawlerConfig struct {
+	BaseURL   string
+	MaxDepth  int
+	RateLimit time.Duration
+	IndexName string
+}
+
+const (
+	DefaultMaxDepth    = 3
+	DefaultMaxBodySize = 10 * 1024 * 1024 // 10 MB
+	DefaultParallelism = 2
+	DefaultBatchSize   = 100
+)
+
 // NewCrawler creates a new Crawler instance
 func NewCrawler(p Params) (Result, error) {
 	if p.Logger == nil {
 		return Result{}, errors.New("logger is required")
 	}
 
-	// Log the logger being used
-	p.Logger.Info("Creating new Crawler instance")
+	if p.Config == nil {
+		return Result{}, errors.New("config is required")
+	}
 
-	// Parse domain from BaseURL
-	parsedURL, err := url.Parse(p.Config.Crawler.BaseURL)
+	p.Logger.Info("Crawler initialized",
+		"baseURL", p.Config.Crawler.BaseURL,
+		"maxDepth", p.Config.Crawler.MaxDepth,
+		"rateLimit", p.Config.Crawler.RateLimit,
+	)
+
+	collector, err := createCollector(CrawlerConfig(p.Config.Crawler))
 	if err != nil {
-		return Result{}, fmt.Errorf("invalid base URL: %w", err)
+		return Result{}, err
+	}
+
+	crawler := &Crawler{
+		Storage:        p.Storage,
+		Collector:      collector,
+		Logger:         p.Logger,
+		Debugger:       p.Debugger,
+		IndexName:      p.Config.Crawler.IndexName,
+		articleChan:    make(chan *models.Article, DefaultBatchSize),
+		ArticleService: article.NewService(p.Logger),
+		indexSvc:       storage.NewIndexService(p.Storage, p.Logger),
+		Config:         p.Config.Crawler,
+	}
+
+	// Configure collector callbacks
+	configureCollectorCallbacks(collector, crawler)
+
+	return Result{Crawler: crawler}, nil
+}
+
+func createCollector(config CrawlerConfig) (*colly.Collector, error) {
+	// Parse domain from BaseURL
+	parsedURL, err := url.Parse(config.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL: %w", err)
 	}
 	domain := parsedURL.Host
 
-	maxDepth := p.Config.Crawler.MaxDepth
+	maxDepth := config.MaxDepth
 	if maxDepth <= 0 {
 		maxDepth = DefaultMaxDepth
 	}
@@ -61,33 +144,12 @@ func NewCrawler(p Params) (Result, error) {
 	// Set rate limiting
 	err = c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		RandomDelay: p.Config.Crawler.RateLimit,
+		RandomDelay: config.RateLimit,
 		Parallelism: DefaultParallelism,
 	})
 	if err != nil {
-		return Result{}, fmt.Errorf("error setting rate limit: %w", err)
+		return nil, fmt.Errorf("error setting rate limit: %w", err)
 	}
 
-	crawler := &Crawler{
-		Storage:        p.Storage,
-		Collector:      c,
-		Logger:         p.Logger,
-		Debugger:       p.Debugger,
-		IndexName:      p.Config.Crawler.IndexName,
-		articleChan:    make(chan *models.Article, DefaultBatchSize),
-		ArticleService: article.NewService(p.Logger),
-		indexSvc:       storage.NewIndexService(p.Storage, p.Logger),
-		Config:         p.Config,
-	}
-
-	// Configure collector callbacks
-	configureCollectorCallbacks(c, crawler)
-
-	p.Logger.Info("Crawler initialized",
-		"baseURL", p.Config.Crawler.BaseURL,
-		"maxDepth", maxDepth,
-		"rateLimit", p.Config.Crawler.RateLimit,
-		"domain", domain)
-
-	return Result{Crawler: crawler}, nil
+	return c, nil
 }
