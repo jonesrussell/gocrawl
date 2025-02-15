@@ -62,9 +62,9 @@ func (es *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 		return fmt.Errorf("failed to create index: %w", err)
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			es.Logger.Error("Failed to close response body", "error", err)
+		closeErr := Body.Close()
+		if closeErr != nil {
+			es.Logger.Error("Failed to close response body", "error", closeErr)
 		}
 	}(res.Body)
 
@@ -157,24 +157,24 @@ func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string
 	articles := make([]*models.Article, 0, len(hitItems))
 
 	for _, hit := range hitItems {
-		hitMap, ok := hit.(map[string]interface{})
-		if !ok {
+		hitMap, hitOk := hit.(map[string]interface{})
+		if !hitOk {
 			return nil, errors.New("error parsing hit: expected map[string]interface{}")
 		}
 
-		source, ok := hitMap["_source"].(map[string]interface{})
-		if !ok {
+		source, sourceOk := hitMap["_source"].(map[string]interface{})
+		if !sourceOk {
 			return nil, errors.New("error parsing source: expected map[string]interface{}")
 		}
 
 		var article models.Article
-		sourceData, err := json.Marshal(source)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling hit source: %w", err)
+		sourceData, marshalErr := json.Marshal(source)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("error marshaling hit source: %w", marshalErr)
 		}
 
-		if err := json.Unmarshal(sourceData, &article); err != nil {
-			return nil, fmt.Errorf("error unmarshaling article: %w", err)
+		if unmarshalErr := json.Unmarshal(sourceData, &article); unmarshalErr != nil {
+			return nil, fmt.Errorf("error unmarshaling article: %w", unmarshalErr)
 		}
 
 		articles = append(articles, &article)

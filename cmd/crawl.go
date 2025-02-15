@@ -57,7 +57,11 @@ func NewCrawlCmd(log logger.Interface) *cobra.Command {
 				log.Error("Error starting application", "error", err)
 				return fmt.Errorf("error starting application: %w", err)
 			}
-			defer app.Stop(cmd.Context())
+			defer func() {
+				if err := app.Stop(cmd.Context()); err != nil {
+					log.Error("Error stopping application", "error", err)
+				}
+			}()
 
 			// Debug log after successful start
 			log.Debug("Application started successfully")
