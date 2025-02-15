@@ -28,7 +28,7 @@ func registerHooks(lc fx.Lifecycle, log logger.Interface, c *Crawler) {
 			log.Debug("Starting crawler...")
 			return c.Start(ctx)
 		},
-		OnStop: func(ctx context.Context) error {
+		OnStop: func(_ context.Context) error {
 			log.Debug("Stopping crawler...")
 			c.Stop()
 			return nil
