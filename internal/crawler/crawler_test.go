@@ -143,7 +143,7 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 	`
 
 	// Create test server
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, html)
 	}))
 	defer ts.Close()
@@ -207,7 +207,7 @@ func TestCrawler(t *testing.T) {
 	crawlerInstance := result.Crawler
 
 	// Set up test server
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, `<html><body><article>Test content</article></body></html>`)
 	}))
 	defer ts.Close()

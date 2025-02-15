@@ -136,6 +136,17 @@ linters-settings:
         # Whether to skip (*x).method() calls where x is a pointer receiver.
         # Default: true
         skipRecvDeref: false
+    # Custom rule to enforce that New functions are only in module.go files
+    newFuncInModule:
+      # This is a pseudo-rule; you will need to implement the logic in gocritic
+      # or use a similar approach to enforce this rule.
+      # The actual implementation of this rule would require a custom linter.
+      # For now, this is a placeholder to indicate where you would add such logic.
+      allow:
+        - "module.go"
+      deny:
+        - "New"
+        - "New.*"
 
   govet:
     # Enable all analyzers.
