@@ -29,7 +29,7 @@ func NewCrawlCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 			return setupCrawlCmd(cmd, cfg)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return executeCrawlCmd(cmd, log, cfg)
+			return executeCrawlCmd(cmd, log)
 		},
 	}
 
@@ -62,46 +62,51 @@ func setupCrawlCmd(cmd *cobra.Command, cfg *config.Config) error {
 }
 
 // executeCrawlCmd handles the execution of the crawl command
-func executeCrawlCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Config) error {
+func executeCrawlCmd(cmd *cobra.Command, log logger.Interface) error {
 	// Initialize fx container
-	fxApp := fx.New(
+	app := newCrawlFxApp()
+
+	// Start the application
+	if err := app.Start(cmd.Context()); err != nil {
+		log.Error("Error starting application", "error", err)
+		return fmt.Errorf("error starting application: %w", err)
+	}
+	defer func() {
+		if err := app.Stop(cmd.Context()); err != nil {
+			log.Error("Error stopping application", "error", err)
+		}
+	}()
+
+	return nil
+}
+
+// newFxApp initializes the Fx application with dependencies
+func newCrawlFxApp() *fx.App {
+	return fx.New(
 		config.Module,
 		logger.Module,
 		storage.Module,
 		collector.Module,
 		crawler.Module,
-		fx.Invoke(func(lc fx.Lifecycle, deps struct {
-			fx.In
-			Logger  logger.Interface
-			Crawler *crawler.Crawler
-		}) {
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					log.Debug("Starting application...")
-					return deps.Crawler.Start(ctx)
-				},
-				OnStop: func(ctx context.Context) error {
-					log.Debug("Stopping application...")
-					deps.Crawler.Stop()
-					return nil
-				},
-			})
-		}),
+		fx.Invoke(setupLifecycleHooks),
 	)
+}
 
-	// Start the application
-	if err := fxApp.Start(cmd.Context()); err != nil {
-		log.Error("Error starting application", "error", err)
-		return fmt.Errorf("error starting application: %w", err)
-	}
-	defer func() {
-		if err := fxApp.Stop(cmd.Context()); err != nil {
-			log.Error("Error stopping application", "error", err)
-		}
-	}()
-
-	// Use cfg as needed, for example, to log the configuration
-	log.Debug(fmt.Sprintf("Crawling with configuration: %+v", cfg.Crawler))
-
-	return nil
+// setupLifecycleHooks sets up the lifecycle hooks for the Fx application
+func setupLifecycleHooks(lc fx.Lifecycle, deps struct {
+	fx.In
+	Logger  logger.Interface
+	Crawler *crawler.Crawler
+}) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			deps.Logger.Debug("Starting application...")
+			return deps.Crawler.Start(ctx)
+		},
+		OnStop: func(ctx context.Context) error {
+			deps.Logger.Debug("Stopping application...")
+			deps.Crawler.Stop()
+			return nil
+		},
+	})
 }

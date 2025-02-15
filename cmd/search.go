@@ -23,12 +23,10 @@ func NewSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 		Use:   "search",
 		Short: "Search content in Elasticsearch",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			// Set the ELASTIC_INDEX_NAME from the command flag
-			cfg.Elasticsearch.IndexName = cmd.Flag("index").Value.String()
-			return nil
+			return setupSearchCmd(cmd, cfg)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return executeSearchCmd(cmd, log, cfg)
+			return executeSearchCmd(cmd, log)
 		},
 	}
 
@@ -36,51 +34,79 @@ func NewSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return")
 	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
 
+	err := searchCmd.MarkFlagRequired("query")
+	if err != nil {
+		log.Error("Error marking query flag as required", "error", err)
+	}
+
 	return searchCmd
 }
 
+// setupSearchCmd handles the setup for the search command
+func setupSearchCmd(cmd *cobra.Command, cfg *config.Config) error {
+	cfg.Elasticsearch.IndexName = cmd.Flag("index").Value.String()
+	return nil
+}
+
 // executeSearchCmd handles the search command execution
-func executeSearchCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Config) error {
+func executeSearchCmd(cmd *cobra.Command, log logger.Interface) error {
 	query, err := cmd.Flags().GetString("query")
-	if err != nil || query == "" {
-		return fmt.Errorf("missing query argument")
+	if err != nil {
+		log.Error("Error retrieving query", "error", err)
+		return fmt.Errorf("error retrieving query: %w", err)
 	}
 
-	// Initialize fx container
-	fxApp := fx.New(
-		config.Module,
-		logger.Module,
-		storage.Module,
-		search.Module,
-		fx.Invoke(func(lc fx.Lifecycle, deps struct {
-			fx.In
-			Logger    logger.Interface
-			SearchSvc *search.SearchService
-		}) {
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					return runApp(ctx, deps.Logger, cfg, query, deps.SearchSvc)
-				},
-				OnStop: func(ctx context.Context) error {
-					return nil
-				},
-			})
-		}),
-	)
+	app := newSearchFxApp(query)
 
-	// Start the application
-	if err := fxApp.Start(cmd.Context()); err != nil {
+	if err := app.Start(cmd.Context()); err != nil {
 		log.Error("Error starting application", "error", err)
 		return fmt.Errorf("error starting application: %w", err)
 	}
-	defer fxApp.Stop(cmd.Context())
+	defer func() {
+		if err := app.Stop(cmd.Context()); err != nil {
+			log.Error("Error stopping application", "error", err)
+		}
+	}()
 
 	return nil
 }
 
-// runApp executes the main logic of the application
-func runApp(ctx context.Context, log logger.Interface, cfg *config.Config, query string, searchSvc *search.SearchService) error {
-	results, err := searchSvc.SearchContent(ctx, query, cfg.Elasticsearch.IndexName, DefaultSearchSize)
+// newFxApp initializes the Fx application with dependencies
+func newSearchFxApp(query string) *fx.App {
+	return fx.New(
+		config.Module,
+		logger.Module,
+		storage.Module,
+		search.Module,
+		fx.Invoke(setupSearchLifecycleHooks),
+		fx.Provide(func() string {
+			return query
+		}),
+	)
+}
+
+// setupSearchLifecycleHooks sets up the lifecycle hooks for the Fx application
+func setupSearchLifecycleHooks(lc fx.Lifecycle, deps struct {
+	fx.In
+	Logger    logger.Interface
+	SearchSvc *search.SearchService
+	Query     string
+}) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			deps.Logger.Debug("Starting application...")
+			return runSearchApp(ctx, deps.Logger, deps.SearchSvc, deps.Query)
+		},
+		OnStop: func(ctx context.Context) error {
+			deps.Logger.Debug("Stopping application...")
+			return nil
+		},
+	})
+}
+
+// runSearchApp executes the main logic of the search application
+func runSearchApp(ctx context.Context, log logger.Interface, searchSvc *search.SearchService, query string) error {
+	results, err := searchSvc.SearchContent(ctx, query, "articles", DefaultSearchSize)
 	if err != nil {
 		log.Error("Search failed", err)
 		return fmt.Errorf("search failed: %w", err)
