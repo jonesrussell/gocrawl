@@ -9,10 +9,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/multisource"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
 
@@ -60,13 +58,6 @@ func setupCrawlCmd(cmd *cobra.Command, cfg *config.Config) error {
 		cfg.Crawler.RateLimit = rateLimit
 	}
 	cfg.Crawler.IndexName = cmd.Flag("index").Value.String()
-
-	// Retrieve the source file from viper
-	sourceFile := viper.GetString("CRAWLER_SOURCE_FILE")
-	if sourceFile != "" {
-		cfg.Crawler.SourceFile = sourceFile
-	}
-
 	return nil
 }
 
@@ -97,7 +88,6 @@ func newCrawlFxApp() *fx.App {
 		storage.Module,
 		collector.Module,
 		crawler.Module,
-		multisource.Module,
 		fx.Invoke(setupLifecycleHooks),
 	)
 }
@@ -105,18 +95,17 @@ func newCrawlFxApp() *fx.App {
 // setupLifecycleHooks sets up the lifecycle hooks for the Fx application
 func setupLifecycleHooks(lc fx.Lifecycle, deps struct {
 	fx.In
-	Logger      logger.Interface
-	Crawler     *crawler.Crawler
-	MultiSource *multisource.MultiSource
+	Logger  logger.Interface
+	Crawler *crawler.Crawler
 }) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			deps.Logger.Debug("Starting application...")
-			return deps.MultiSource.Start(ctx)
+			return deps.Crawler.Start(ctx)
 		},
 		OnStop: func(_ context.Context) error {
 			deps.Logger.Debug("Stopping application...")
-			deps.MultiSource.Stop()
+			deps.Crawler.Stop()
 			return nil
 		},
 	})
