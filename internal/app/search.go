@@ -16,17 +16,10 @@ type SearchResult struct {
 }
 
 // SearchContent performs a search query
-func SearchContent(ctx context.Context, query string, _ string, size int) ([]SearchResult, error) {
+func SearchContent(ctx context.Context, esClient *elasticsearch.Client, query string, _ string, size int) ([]SearchResult, error) {
 	log, err := logger.NewDevelopmentLogger()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
-
-	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{"http://localhost:9200"}, // Consider making this configurable
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
 	}
 
 	storageInstance, err := storage.NewStorage(esClient, log)

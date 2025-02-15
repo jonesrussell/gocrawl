@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -62,7 +63,7 @@ type Result struct {
 }
 
 // NewCrawler creates a new Crawler instance
-func NewCrawler(p Params) (Result, error) {
+func NewCrawler(p Params, esClient *elasticsearch.Client) (Result, error) {
 	if p.Logger == nil {
 		return Result{}, errors.New("logger is required")
 	}

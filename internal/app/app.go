@@ -10,6 +10,17 @@ import (
 	"go.uber.org/zap"
 )
 
+// NewElasticsearchClient creates a new Elasticsearch client
+func NewElasticsearchClient() (*elasticsearch.Client, error) {
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{"http://localhost:9200"}, // Consider making this configurable
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
+	}
+	return esClient, nil
+}
+
 // runCrawler is the function that will be invoked to start the crawling process.
 func runCrawler(ctx context.Context) error {
 	log := logger.FromContext(ctx) // Get the logger from context

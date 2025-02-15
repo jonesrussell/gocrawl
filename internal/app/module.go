@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
@@ -11,13 +12,13 @@ import (
 var Module = fx.Module("app",
 	fx.Provide(
 		logger.NewLogger,
-		// Provide a function that returns runCrawler
+		NewElasticsearchClient, // Provide the Elasticsearch client
 		func() func(ctx context.Context) error {
 			return runCrawler // Ensure runCrawler is provided correctly
 		},
 	),
 	fx.Invoke(
-		func(ctx context.Context) error {
+		func(ctx context.Context, esClient *elasticsearch.Client) error {
 			log := logger.FromContext(ctx)
 			log.Debug("Invoking runCrawler with provided context")
 			return runCrawler(ctx)
