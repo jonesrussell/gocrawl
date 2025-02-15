@@ -1,0 +1,8 @@
+{
+  "go.lintTool": "golangci-lint",
+  "go.lintFlags": [
+    "-c",
+    ".golangci.yml",
+    "--issues-exit-code=0"
+],
+}
