@@ -68,9 +68,9 @@ func TestNewCustomLogger(t *testing.T) {
 			}
 
 			// Test Sync
-			if err := logger.Sync(); err != nil {
+			if syncErr := logger.Sync(); syncErr != nil {
 				// Ignore sync errors as they're expected when writing to console
-				t.Log("Sync() error (expected):", err)
+				t.Log("Sync() error (expected):", syncErr)
 			}
 		})
 	}
@@ -95,7 +95,7 @@ func TestLoggerSync(t *testing.T) {
 	// Other test code...
 
 	// Fix shadowing issue here
-	if syncErr := log.Sync(); syncErr != nil { // Changed err to syncErr
+	if syncErr := log.Sync(); syncErr != nil {
 		t.Errorf("failed to sync logger: %v", syncErr)
 	}
 }
