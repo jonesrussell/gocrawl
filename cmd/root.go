@@ -48,7 +48,7 @@ func InitializeLogger(cfg *config.Config) (logger.Interface, error) {
 	if env == "development" {
 		return logger.NewDevelopmentLogger() // Use colored logger in development
 	}
-	return logger.NewProductionLogger() // Use a different logger for production
+	return logger.NewProductionLogger(cfg) // Use a different logger for production
 }
 
 func Execute() error {

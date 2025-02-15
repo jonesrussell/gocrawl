@@ -11,7 +11,6 @@ import (
 // Module provides the application module and its dependencies
 var Module = fx.Module("app",
 	fx.Provide(
-		logger.NewLogger,
 		NewElasticsearchClient, // Provide the Elasticsearch client
 		func() func(ctx context.Context) error {
 			return runCrawler // Ensure runCrawler is provided correctly
