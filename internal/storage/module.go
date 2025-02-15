@@ -60,6 +60,7 @@ func ProvideElasticsearchClient(cfg *config.Config, log logger.Interface) (*elas
 	// Create a custom HTTP transport
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
+			//nolint:gosec // We are using the SkipTLS setting from the config
 			InsecureSkipVerify: cfg.Elasticsearch.SkipTLS, // Use the SkipTLS setting from the config
 		},
 	}
