@@ -12,25 +12,15 @@ import (
 )
 
 var (
-	sourceFile string // Variable to hold the source file flag
-
 	rootCmd = &cobra.Command{
 		Use:   "gocrawl",
 		Short: "A web crawler that stores content in Elasticsearch",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if sourceFile != "" {
-				viper.Set("CRAWLER_SOURCE_FILE", sourceFile) // Set the source file in viper
-			}
-		},
 	}
 )
 
 // Initialize the command
 func init() {
 	cobra.OnInitialize(initConfig)
-
-	// Add the source file flag
-	rootCmd.PersistentFlags().StringVar(&sourceFile, "source", "", "Path to the source configuration file")
 }
 
 func initConfig() {
