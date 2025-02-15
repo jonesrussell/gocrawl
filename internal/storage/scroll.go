@@ -120,10 +120,9 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 						s.Logger.Info("Reached end of scroll results")
 						return
 					}
-				} else {
-					s.Logger.Error("Unexpected scroll error", "error", e["error"])
-					return
 				}
+				s.Logger.Error("Unexpected scroll error", "error", e["error"])
+				return
 			}
 		}
 	}
