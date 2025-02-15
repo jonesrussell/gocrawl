@@ -11,7 +11,7 @@ import (
 )
 
 // runCrawler is the function that will be invoked to start the crawling process.
-func runCrawler(ctx context.Context, storage storage.Interface) error {
+func runCrawler(ctx context.Context) error {
 	log := logger.FromContext(ctx) // Get the logger from context
 	log.Debug("Starting the crawler...")
 
