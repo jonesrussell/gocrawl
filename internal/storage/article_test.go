@@ -21,17 +21,17 @@ type MockTransport struct {
 	StatusCode int
 }
 
-// Perform implements elastictransport.Interface.
-func (m *MockTransport) Perform(*http.Request) (*http.Response, error) {
-	panic("unimplemented")
-}
-
 // RoundTrip implements the http.RoundTripper interface
 func (m *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return &http.Response{
 		Body:       io.NopCloser(strings.NewReader(m.Response)),
 		StatusCode: m.StatusCode,
 	}, nil
+}
+
+// Perform implements elastictransport.Interface
+func (m *MockTransport) Perform(req *http.Request) (*http.Response, error) {
+	return m.RoundTrip(req)
 }
 
 // setupTestStorage creates a new storage instance for testing

@@ -27,19 +27,10 @@ type Interface interface {
 	IndexDocument(ctx context.Context, index string, docID string, document interface{}) error
 	TestConnection(ctx context.Context) error
 	BulkIndex(ctx context.Context, index string, documents []interface{}) error
-	Search(
-		ctx context.Context,
-		index string,
-		query map[string]interface{},
-	) ([]map[string]interface{}, error)
+	Search(ctx context.Context, index string, query map[string]interface{}) ([]map[string]interface{}, error)
 	CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error
 	DeleteIndex(ctx context.Context, index string) error
-	UpdateDocument(
-		ctx context.Context,
-		index string,
-		docID string,
-		update map[string]interface{},
-	) error
+	UpdateDocument(ctx context.Context, index string, docID string, update map[string]interface{}) error
 	DeleteDocument(ctx context.Context, index string, docID string) error
 	BulkIndexArticles(ctx context.Context, articles []*models.Article) error
 	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
@@ -88,7 +79,7 @@ func (s *ElasticsearchStorage) IndexDocument(
 		index,
 		req,
 		s.ESClient.Index.WithDocumentID(docID),
-		s.ESClient.Index.WithRefresh(defaultRefreshValue),
+		s.ESClient.Index.WithRefresh("true"),
 		s.ESClient.Index.WithContext(ctx),
 	)
 	if err != nil {
