@@ -15,6 +15,13 @@ import (
 	"go.uber.org/fx"
 )
 
+// Constants for timeout durations
+const (
+	DefaultIndexTimeout          = 10 * time.Second
+	DefaultBulkIndexTimeout      = 30 * time.Second
+	DefaultTestConnectionTimeout = 5 * time.Second
+)
+
 // Interface defines the methods that any storage implementation must have
 type Interface interface {
 	IndexDocument(ctx context.Context, index string, docID string, document interface{}) error
@@ -68,7 +75,7 @@ func (s *ElasticsearchStorage) IndexDocument(
 	docID string,
 	document interface{},
 ) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	ctx, cancel := context.WithTimeout(ctx, DefaultIndexTimeout) // Use constant
 	defer cancel()
 
 	data, err := json.Marshal(document)
@@ -124,7 +131,7 @@ func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
 
 // BulkIndex performs bulk indexing of documents
 func (s *ElasticsearchStorage) BulkIndex(ctx context.Context, index string, documents []interface{}) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second) // Add timeout
+	ctx, cancel := context.WithTimeout(ctx, DefaultBulkIndexTimeout) // Use constant
 	defer cancel()
 
 	var buf bytes.Buffer
@@ -168,7 +175,7 @@ func (s *ElasticsearchStorage) Search(
 	index string,
 	query map[string]interface{},
 ) ([]map[string]interface{}, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	ctx, cancel := context.WithTimeout(ctx, DefaultIndexTimeout) // Use constant
 	defer cancel()
 
 	var buf bytes.Buffer
@@ -214,7 +221,7 @@ func (s *ElasticsearchStorage) Search(
 
 // CreateIndex creates a new index with optional mapping
 func (s *ElasticsearchStorage) CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	ctx, cancel := context.WithTimeout(ctx, DefaultIndexTimeout) // Use constant
 	defer cancel()
 
 	var buf bytes.Buffer
@@ -242,7 +249,7 @@ func (s *ElasticsearchStorage) CreateIndex(ctx context.Context, index string, ma
 
 // DeleteIndex deletes an index
 func (s *ElasticsearchStorage) DeleteIndex(ctx context.Context, index string) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	ctx, cancel := context.WithTimeout(ctx, DefaultIndexTimeout) // Use constant
 	defer cancel()
 
 	// Convert single index string to slice of strings
@@ -272,7 +279,7 @@ func (s *ElasticsearchStorage) UpdateDocument(
 	docID string,
 	update map[string]interface{},
 ) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	ctx, cancel := context.WithTimeout(ctx, DefaultIndexTimeout) // Use constant
 	defer cancel()
 
 	body := map[string]interface{}{
@@ -306,7 +313,7 @@ func (s *ElasticsearchStorage) UpdateDocument(
 
 // DeleteDocument deletes a document
 func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string, docID string) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second) // Add timeout
+	ctx, cancel := context.WithTimeout(ctx, DefaultIndexTimeout) // Use constant
 	defer cancel()
 
 	res, err := s.ESClient.Delete(
@@ -329,7 +336,7 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 
 // IndexExists checks if the specified index exists
 func (s *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second) // Add timeout
+	ctx, cancel := context.WithTimeout(ctx, DefaultTestConnectionTimeout) // Use constant
 	defer cancel()
 
 	res, err := s.ESClient.Indices.Exists([]string{indexName}, s.ESClient.Indices.Exists.WithContext(ctx))
