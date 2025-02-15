@@ -13,7 +13,7 @@ import (
 )
 
 // CreateArticlesIndex creates the articles index with appropriate mappings
-func (es *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
+func (s *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 	// Define the mappings for the articles index
 	mappings := map[string]interface{}{
 		"mappings": map[string]interface{}{
@@ -55,16 +55,16 @@ func (es *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 		Body:  bytes.NewReader(data),
 	}
 
-	es.Logger.Debug("Attempting to create index", "index", "articles", "mappings", mappings)
+	s.Logger.Debug("Attempting to create index", "index", "articles", "mappings", mappings)
 
-	res, err := req.Do(ctx, es.ESClient)
+	res, err := req.Do(ctx, s.ESClient)
 	if err != nil {
 		return fmt.Errorf("failed to create index: %w", err)
 	}
 	defer func(Body io.ReadCloser) {
 		closeErr := Body.Close()
 		if closeErr != nil {
-			es.Logger.Error("Failed to close response body", "error", closeErr)
+			s.Logger.Error("Failed to close response body", "error", closeErr)
 		}
 	}(res.Body)
 
@@ -73,28 +73,28 @@ func (es *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 		if decodeErr := json.NewDecoder(res.Body).Decode(&e); decodeErr != nil {
 			return fmt.Errorf("error parsing error response: %w", decodeErr)
 		}
-		es.Logger.Error("Failed to create index", "error", e["error"])
+		s.Logger.Error("Failed to create index", "error", e["error"])
 		return fmt.Errorf("elasticsearch error: %v", e["error"])
 	}
 
-	es.Logger.Info("Index created successfully", "index", "articles")
+	s.Logger.Info("Index created successfully", "index", "articles")
 	return nil
 }
 
 // IndexArticle indexes a single article
-func (es *ElasticsearchStorage) IndexArticle(ctx context.Context, article *models.Article) error {
+func (s *ElasticsearchStorage) IndexArticle(ctx context.Context, article *models.Article) error {
 	data, err := json.Marshal(article)
 	if err != nil {
 		return fmt.Errorf("error marshaling article: %w", err)
 	}
 
-	es.Logger.Debug("Indexing article", "articleID", article.ID)
+	s.Logger.Debug("Indexing article", "articleID", article.ID)
 
-	res, err := es.ESClient.Index(
+	res, err := s.ESClient.Index(
 		"articles",
 		bytes.NewReader(data),
-		es.ESClient.Index.WithContext(ctx),
-		es.ESClient.Index.WithDocumentID(article.ID),
+		s.ESClient.Index.WithContext(ctx),
+		s.ESClient.Index.WithDocumentID(article.ID),
 	)
 	if err != nil {
 		return fmt.Errorf("error indexing article: %w", err)
@@ -105,13 +105,13 @@ func (es *ElasticsearchStorage) IndexArticle(ctx context.Context, article *model
 		return fmt.Errorf("error indexing article: %s", res.String())
 	}
 
-	es.Logger.Info("Article indexed successfully", "articleID", article.ID)
+	s.Logger.Info("Article indexed successfully", "articleID", article.ID)
 	return nil
 }
 
 // SearchArticles searches for articles based on a query
-func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
-	es.Logger.Debug("Searching articles", "query", query, "size", size)
+func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
+	s.Logger.Debug("Searching articles", "query", query, "size", size)
 
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
@@ -128,10 +128,10 @@ func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string
 		return nil, fmt.Errorf("error encoding search query: %w", err)
 	}
 
-	res, err := es.ESClient.Search(
-		es.ESClient.Search.WithContext(ctx),
-		es.ESClient.Search.WithIndex("articles"),
-		es.ESClient.Search.WithBody(&buf),
+	res, err := s.ESClient.Search(
+		s.ESClient.Search.WithContext(ctx),
+		s.ESClient.Search.WithIndex("articles"),
+		s.ESClient.Search.WithBody(&buf),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error executing search: %w", err)
@@ -180,6 +180,6 @@ func (es *ElasticsearchStorage) SearchArticles(ctx context.Context, query string
 		articles = append(articles, &article)
 	}
 
-	es.Logger.Info("Search completed", "query", query, "results", len(articles))
+	s.Logger.Info("Search completed", "query", query, "results", len(articles))
 	return articles, nil
 }

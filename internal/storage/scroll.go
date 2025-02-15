@@ -92,40 +92,80 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 			return
 		}
 
+		if err := s.fetchNextScrollBatch(ctx, scrollID, resultChan); err != nil {
+			s.Logger.Error("Failed to get next scroll batch", "error", err)
+			return
+		}
+
 		select {
 		case <-ctx.Done():
 			s.Logger.Info("Context cancelled, stopping scroll")
 			return
-		default:
-			searchRes, err = s.ESClient.Scroll(
-				s.ESClient.Scroll.WithContext(ctx),
-				s.ESClient.Scroll.WithScrollID(scrollID),
-				s.ESClient.Scroll.WithScroll(s.getScrollDuration()),
-			)
-			if err != nil {
-				s.Logger.Error("Failed to get next scroll batch", "error", err)
-				return
-			}
-
-			// Check if we've reached the end of the scroll
-			if searchRes.IsError() {
-				var e map[string]interface{}
-				if decodeErr := json.NewDecoder(searchRes.Body).Decode(&e); decodeErr != nil {
-					s.Logger.Error("Error parsing scroll error response", "error", decodeErr)
-					return
-				}
-				// Check for specific error type
-				if errType, ok := e["error"].(map[string]interface{})["type"]; ok {
-					if errType == "search_phase_execution_exception" {
-						s.Logger.Info("Reached end of scroll results")
-						return
-					}
-				}
-				s.Logger.Error("Unexpected scroll error", "error", e["error"])
-				return
-			}
 		}
 	}
+}
+
+// fetchNextScrollBatch fetches the next batch of results from Elasticsearch
+func (s *ElasticsearchStorage) fetchNextScrollBatch(
+	ctx context.Context,
+	scrollID string,
+	resultChan chan<- map[string]interface{},
+) error {
+	searchRes, err := s.ESClient.Scroll(
+		s.ESClient.Scroll.WithContext(ctx),
+		s.ESClient.Scroll.WithScrollID(scrollID),
+		s.ESClient.Scroll.WithScroll(s.getScrollDuration()),
+	)
+	if err != nil {
+		return err
+	}
+
+	if searchRes.IsError() {
+		return s.handleScrollError(searchRes)
+	}
+
+	// Process the hits from the response
+	return s.processScrollHits(ctx, searchRes, resultChan)
+}
+
+// handleScrollError handles errors from the scroll response
+func (s *ElasticsearchStorage) handleScrollError(searchRes *esapi.Response) error {
+	var e map[string]interface{}
+	if decodeErr := json.NewDecoder(searchRes.Body).Decode(&e); decodeErr != nil {
+		return decodeErr
+	}
+
+	// Check for specific error type
+	if errType, ok := e["error"].(map[string]interface{})["type"]; ok {
+		if errType == "search_phase_execution_exception" {
+			s.Logger.Info("Reached end of scroll results")
+			return nil
+		}
+	}
+
+	s.Logger.Error("Unexpected scroll error", "error", e["error"])
+	return fmt.Errorf("unexpected scroll error: %v", e["error"])
+}
+
+// processScrollHits processes the hits from the scroll response
+func (s *ElasticsearchStorage) processScrollHits(
+	ctx context.Context,
+	searchRes *esapi.Response,
+	resultChan chan<- map[string]interface{},
+) error {
+	var result map[string]interface{}
+	if err := json.NewDecoder(searchRes.Body).Decode(&result); err != nil {
+		return fmt.Errorf("error parsing scroll response: %w", err)
+	}
+
+	hits, err := s.getHitsFromResult(result)
+	if err != nil {
+		return err
+	}
+
+	s.ProcessHits(ctx, hits, resultChan)
+
+	return nil
 }
 
 func (s *ElasticsearchStorage) getHitsFromResult(
