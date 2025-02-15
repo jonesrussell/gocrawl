@@ -77,7 +77,11 @@ func TestExtractArticle(t *testing.T) {
 	assert.NotNil(t, article)
 	assert.Equal(t, "/mock-url", article.Source)
 	assert.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", article.Title)
-	assert.Equal(t, "Police were called to house on Milliken Road for report of break-and-enter\n\nNEWS RELEASEONTARIO PROVINCIAL POLICE...", article.Body)
+	assert.Equal(
+		t,
+		"Police were called to house on Milliken Road for report of break-and-enter\n\nNEWS RELEASEONTARIO PROVINCIAL POLICE...",
+		article.Body,
+	)
 	assert.Equal(t, "ElliotLakeToday Staff", article.Author)
 
 	// Assert that the expectations were met
