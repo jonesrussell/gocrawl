@@ -9,9 +9,9 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/multisource"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 )
 
 var (
@@ -74,7 +74,7 @@ func Shutdown(_ context.Context) error {
 // initializeDependencies initializes all dependencies for the CLI
 func initializeDependencies() (*cobra.Command, error) {
 	// Initialize configuration
-	cfg, err := config.NewConfig() // Example config initialization
+	cfg, err := config.NewConfig() // This should be the only place you call NewConfig
 	if err != nil {
 		return nil, err
 	}
@@ -85,24 +85,41 @@ func initializeDependencies() (*cobra.Command, error) {
 		return nil, err
 	}
 
-	// Initialize fx app with all necessary modules
-	app := fx.New(
-		fx.Provide(
-			func() *config.Config {
-				return cfg
-			},
-			func() logger.Interface {
-				return log
-			},
-		),
-		config.Module,
-		logger.Module,
-		crawler.Module,
-		multisource.Module,
-	)
+	// Initialize Elasticsearch client using the provided function
+	elasticClient, err := storage.ProvideElasticsearchClient(cfg, log) // Use the function from storage module
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize storage
+	storageInstance, err := storage.NewStorage(elasticClient, log) // Ensure the storage is initialized
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize the debugger
+	debuggerInstance := logger.NewCollyDebugger(log) // Pass the logger to the debugger
+
+	// Initialize the crawler
+	crawlerParams := crawler.Params{
+		Logger:   log,
+		Storage:  storageInstance,
+		Debugger: debuggerInstance,
+		Config:   cfg,
+	}
+	crawlerInstance, err := crawler.NewCrawler(crawlerParams) // Ensure the crawler is initialized
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize multisource
+	multiSource, err := multisource.NewMultiSource(log, crawlerInstance.Crawler) // Pass logger and crawler
+	if err != nil {
+		return nil, err
+	}
 
 	// Create the multi crawl command
-	multiCmd := NewMultiCrawlCmd(log, cfg, nil) // MultiSource will be resolved by Fx
+	multiCmd := NewMultiCrawlCmd(log, cfg, multiSource) // Pass multiSource to the command
 
-	return multiCmd, app.Start(context.Background())
+	return multiCmd, nil
 }

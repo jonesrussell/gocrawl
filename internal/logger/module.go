@@ -14,7 +14,6 @@ import (
 // Module provides the logger module and its dependencies
 var Module = fx.Module("logger",
 	fx.Provide(
-		NewDevelopmentLogger, // Provide the development logger
 		func(cfg *config.Config) Interface { // Provide the logger.Interface
 			var logger *CustomLogger
 			var err error

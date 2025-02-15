@@ -17,7 +17,7 @@ import (
 var Module = fx.Module("storage",
 	fx.Provide(
 		ProvideElasticsearchClient,
-		NewStorage, // Assuming you have a NewStorage function
+		NewStorage, // Ensure this is provided
 	),
 )
 

@@ -8,6 +8,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/multisource"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -79,6 +80,7 @@ func newMultiCrawlFxApp(log logger.Interface) *fx.App {
 	return fx.New(
 		config.Module,
 		logger.Module,
+		storage.Module,
 		crawler.Module,
 		multisource.Module,
 		fx.Invoke(setupMultiLifecycleHooks),
