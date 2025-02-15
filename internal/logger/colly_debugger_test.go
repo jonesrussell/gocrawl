@@ -1,4 +1,4 @@
-package logger
+package logger_test
 
 import (
 	"net/http"
@@ -7,11 +7,12 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 func TestCollyDebugger(t *testing.T) {
-	mockLogger := NewMockCustomLogger()
-	debugger := &CollyDebugger{
+	mockLogger := logger.NewMockCustomLogger()
+	debugger := &logger.CollyDebugger{
 		Logger: mockLogger,
 	}
 
@@ -22,7 +23,7 @@ func TestCollyDebugger(t *testing.T) {
 	})
 
 	t.Run("Event with nil logger", func(t *testing.T) {
-		nilDebugger := &CollyDebugger{Logger: nil}
+		nilDebugger := &logger.CollyDebugger{Logger: nil}
 		event := &debug.Event{
 			Type:        "test",
 			RequestID:   1,
