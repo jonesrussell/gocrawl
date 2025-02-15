@@ -11,7 +11,7 @@ import (
 // Module provides the application module and its dependencies
 var Module = fx.Module("app",
 	fx.Provide(
-		NewLogger,
+		logger.NewLogger,
 		// Provide a function that returns runCrawler
 		func() func(ctx context.Context, storage storage.Interface) error {
 			return runCrawler // Ensure runCrawler is provided correctly
