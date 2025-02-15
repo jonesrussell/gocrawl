@@ -13,15 +13,11 @@ import (
 	"go.uber.org/fx"
 )
 
-type ElasticsearchClient struct {
-	Client *elasticsearch.Client
-}
-
 // Module provides the storage module and its dependencies
 var Module = fx.Module("storage",
 	fx.Provide(
 		ProvideElasticsearchClient, // Function to provide an Elasticsearch client
-		NewStorage,                 // Function to create a new storage instance
+		NewStorage,                 // Use NewStorage to initialize the storage correctly
 	),
 )
 
@@ -48,6 +44,7 @@ func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface
 	// Create storage instance
 	storageInstance := &ElasticsearchStorage{
 		ESClient: esClient,
+		Logger:   log,
 	}
 
 	// Test connection to Elasticsearch

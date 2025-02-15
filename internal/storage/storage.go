@@ -69,6 +69,10 @@ func (s *ElasticsearchStorage) IndexDocument(
 	docID string,
 	document interface{},
 ) error {
+	if s.ESClient == nil {
+		return fmt.Errorf("elasticsearch client is not initialized")
+	}
+
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
 	defer cancel()
 
@@ -82,19 +86,19 @@ func (s *ElasticsearchStorage) IndexDocument(
 		index,
 		req,
 		s.ESClient.Index.WithDocumentID(docID),
-		s.ESClient.Index.WithRefresh("true"),
 		s.ESClient.Index.WithContext(ctx),
 	)
 	if err != nil {
+		s.Logger.Error("Failed to index document", "error", err)
 		return fmt.Errorf("error indexing document: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return fmt.Errorf("error indexing document ID %s: %s", docID, res.String())
+		return fmt.Errorf("error indexing document: %s", res.String())
 	}
 
-	s.Logger.Info("Indexed document", "document_id", docID, "index", index, "status", res.Status())
+	s.Logger.Info("Document indexed successfully", "index", index, "docID", docID)
 	return nil
 }
 

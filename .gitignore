@@ -11,3 +11,4 @@ coverage/coverage.out
 .idea/vcs.xml
 
 config.yml
+app.log

@@ -3,6 +3,7 @@ package logger
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -17,11 +18,13 @@ type Interface interface {
 	Warn(msg string, fields ...interface{})
 	Fatal(msg string, fields ...interface{})
 	Errorf(format string, args ...interface{})
+	Sync() error
 }
 
 // CustomLogger wraps the zap.Logger
 type CustomLogger struct {
 	*zap.Logger
+	logFile *os.File
 }
 
 // Ensure CustomLogger implements Interface
@@ -68,7 +71,15 @@ func (c *CustomLogger) Errorf(format string, args ...interface{}) {
 
 // Sync flushes any buffered log entries
 func (c *CustomLogger) Sync() error {
-	return c.Logger.Sync()
+	if err := c.Logger.Sync(); err != nil {
+		return err
+	}
+	if c.logFile != nil {
+		if err := c.logFile.Close(); err != nil {
+			return fmt.Errorf("failed to close log file: %w", err)
+		}
+	}
+	return nil
 }
 
 // GetZapLogger returns the underlying zap.Logger
