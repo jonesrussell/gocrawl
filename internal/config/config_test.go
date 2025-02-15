@@ -28,8 +28,7 @@ func TestNewConfig(t *testing.T) {
 
 	// Set environment variables
 	for k, v := range testEnv {
-		os.Setenv(k, v)
-		defer os.Unsetenv(k)
+		t.Setenv(k, v)
 	}
 
 	// Test successful config creation
@@ -71,7 +70,7 @@ func TestNewConfig(t *testing.T) {
 			os.Unsetenv(k)
 		}
 		// Set only required ELASTIC_URL
-		os.Setenv("ELASTIC_URL", "http://localhost:9200")
+		t.Setenv("ELASTIC_URL", "http://localhost:9200")
 
 		cfg, err := config.NewConfig(http.DefaultTransport)
 		require.NoError(t, err)
