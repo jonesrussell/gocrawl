@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -32,20 +31,20 @@ ELASTIC_SKIP_TLS: true
 	cfg, err := config.NewConfig()
 
 	require.NoError(t, err)
-	assert.NotNil(t, cfg)
-	assert.Equal(t, "development", cfg.App.Environment)
-	assert.Equal(t, "debug", cfg.App.LogLevel)
-	assert.True(t, cfg.App.Debug)
-	assert.Equal(t, "http://example.com", cfg.Crawler.BaseURL)
-	assert.Equal(t, 3, cfg.Crawler.MaxDepth)
-	assert.Equal(t, time.Second, cfg.Crawler.RateLimit)
-	assert.Equal(t, "index", cfg.Crawler.IndexName)
-	assert.Equal(t, "http://localhost:9200", cfg.Elasticsearch.URL)
-	assert.Equal(t, "user", cfg.Elasticsearch.Username)
-	assert.Equal(t, "pass", cfg.Elasticsearch.Password)
-	assert.Equal(t, "apikey", cfg.Elasticsearch.APIKey)
-	assert.Equal(t, "index", cfg.Elasticsearch.IndexName)
-	assert.True(t, cfg.Elasticsearch.SkipTLS)
+	require.NotNil(t, cfg)
+	require.Equal(t, "development", cfg.App.Environment)
+	require.Equal(t, "debug", cfg.App.LogLevel)
+	require.True(t, cfg.App.Debug)
+	require.Equal(t, "http://example.com", cfg.Crawler.BaseURL)
+	require.Equal(t, 3, cfg.Crawler.MaxDepth)
+	require.Equal(t, time.Second, cfg.Crawler.RateLimit)
+	require.Equal(t, "index", cfg.Crawler.IndexName)
+	require.Equal(t, "http://localhost:9200", cfg.Elasticsearch.URL)
+	require.Equal(t, "user", cfg.Elasticsearch.Username)
+	require.Equal(t, "pass", cfg.Elasticsearch.Password)
+	require.Equal(t, "apikey", cfg.Elasticsearch.APIKey)
+	require.Equal(t, "index", cfg.Elasticsearch.IndexName)
+	require.True(t, cfg.Elasticsearch.SkipTLS)
 }
 
 func TestNewConfig_MissingElasticURL(t *testing.T) {
@@ -66,21 +65,21 @@ ELASTIC_SKIP_TLS: true
 
 	cfg, err := config.NewConfig()
 
-	assert.Error(t, err)
-	assert.Nil(t, cfg)
-	assert.Equal(t, config.ErrMissingElasticURL, err)
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	require.Equal(t, config.ErrMissingElasticURL, err)
 }
 
 func TestParseRateLimit(t *testing.T) {
 	rateLimit, err := config.ParseRateLimit("1s")
 
-	assert.NoError(t, err)
-	assert.Equal(t, time.Second, rateLimit)
+	require.NoError(t, err)
+	require.Equal(t, time.Second, rateLimit)
 
 	// Test invalid duration
 	rateLimit, err = config.ParseRateLimit("invalid")
-	assert.NoError(t, err)
-	assert.Equal(t, time.Second, rateLimit) // Should return default value
+	require.NoError(t, err)
+	require.Equal(t, time.Second, rateLimit) // Should return default value
 }
 
 func TestValidateConfig(t *testing.T) {
@@ -91,11 +90,11 @@ func TestValidateConfig(t *testing.T) {
 	}
 
 	err := config.ValidateConfig(cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test missing Elasticsearch URL
 	cfg.Elasticsearch.URL = ""
 	err = config.ValidateConfig(cfg)
-	assert.Error(t, err)
-	assert.Equal(t, config.ErrMissingElasticURL, err)
+	require.Error(t, err)
+	require.Equal(t, config.ErrMissingElasticURL, err)
 }

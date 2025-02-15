@@ -26,7 +26,7 @@ func NewIndexService(logger logger.Interface) IndexServiceInterface {
 	}
 }
 
-func (s *IndexService) CreateIndex(_ context.Context, indexName string, mapping map[string]interface{}) error {
+func (s *IndexService) CreateIndex(_ context.Context, _ string, _ map[string]interface{}) error {
 	// Implementation for creating an index
 	// This should call the actual storage mechanism to create the index
 	return nil // Replace with actual implementation
@@ -79,7 +79,7 @@ func (s *IndexService) createArticleIndex(ctx context.Context, indexName string)
 }
 
 // Implement the IndexExists method
-func (s *IndexService) IndexExists(ctx context.Context, indexName string) (bool, error) {
+func (s *IndexService) IndexExists(_ context.Context, _ string) (bool, error) {
 	// Implementation for checking if an index exists
 	return false, nil // Replace with actual implementation
 }

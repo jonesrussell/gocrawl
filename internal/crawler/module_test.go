@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -37,11 +37,11 @@ func TestNewCrawler(t *testing.T) {
 
 	result, err := crawler.NewCrawler(params)
 
-	assert.NoError(t, err)
-	assert.NotNil(t, result.Crawler)
-	assert.Equal(t, "http://example.com", result.Crawler.Config.Crawler.BaseURL)
-	assert.Equal(t, 3, result.Crawler.Config.Crawler.MaxDepth)
-	assert.Equal(t, time.Second, result.Crawler.Config.Crawler.RateLimit)
+	require.NoError(t, err)
+	require.NotNil(t, result.Crawler)
+	require.Equal(t, "http://example.com", result.Crawler.Config.Crawler.BaseURL)
+	require.Equal(t, 3, result.Crawler.Config.Crawler.MaxDepth)
+	require.Equal(t, time.Second, result.Crawler.Config.Crawler.RateLimit)
 }
 
 func TestNewCrawler_MissingLogger(t *testing.T) {
@@ -59,7 +59,7 @@ func TestNewCrawler_MissingLogger(t *testing.T) {
 
 	result, err := crawler.NewCrawler(params)
 
-	assert.Error(t, err)
-	assert.Equal(t, "logger is required", err.Error())
-	assert.Empty(t, result)
+	require.Error(t, err)
+	require.Equal(t, "logger is required", err.Error())
+	require.Empty(t, result)
 }
