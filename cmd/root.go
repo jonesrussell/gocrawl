@@ -7,6 +7,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/multisource"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -49,29 +50,15 @@ func InitializeLogger(cfg *config.Config) (logger.Interface, error) {
 	return logger.NewProductionLogger(cfg) // Use a different logger for production
 }
 
+// Execute is the entry point for the CLI
 func Execute() error {
-	// Initialize config
-	cfg, err := config.NewConfig()
+	// Initialize dependencies
+	rootCmd, err := initializeDependencies()
 	if err != nil {
 		//nolint:forbidigo // This is a CLI error
-		fmt.Println("Failed to load configuration:", err)
+		fmt.Println("Failed to initialize dependencies:", err)
 		os.Exit(1)
 	}
-
-	// Initialize logger
-	log, err := InitializeLogger(cfg)
-	if err != nil {
-		//nolint:forbidigo // This is a CLI error
-		fmt.Println("Failed to initialize logger:", err)
-		os.Exit(1)
-	}
-	log.Debug("Logger initialized successfully")
-
-	// Add commands
-	rootCmd.AddCommand(NewCrawlCmd(log, cfg))  // Pass logger and config to crawl command
-	rootCmd.AddCommand(NewSearchCmd(log, cfg)) // Pass logger and config to search command
-	rootCmd.AddCommand(NewMultiCrawlCmd(log, cfg))  // Pass logger and config to multi crawl command
-	log.Debug("Commands added to root command")
 
 	return rootCmd.Execute()
 }
@@ -80,4 +67,30 @@ func Execute() error {
 func Shutdown(_ context.Context) error {
 	// Implement shutdown logic if necessary
 	return nil
+}
+
+// initializeDependencies initializes all dependencies for the CLI
+func initializeDependencies() (*cobra.Command, error) {
+	// Initialize configuration
+	cfg, err := config.NewConfig() // Example config initialization
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize logger
+	log, err := InitializeLogger(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize multisource
+	multiSource, err := multisource.NewMultiSource() // Initialize MultiSource
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the multi crawl command with the new MultiSource argument
+	multiCmd := NewMultiCrawlCmd(log, cfg, multiSource)
+
+	return multiCmd, nil
 }

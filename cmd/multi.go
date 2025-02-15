@@ -16,12 +16,12 @@ import (
 )
 
 // NewMultiCrawlCmd creates a new command for crawling multiple sources
-func NewMultiCrawlCmd(log logger.Interface, config *config.Config) *cobra.Command {
+func NewMultiCrawlCmd(log logger.Interface, config *config.Config, multiSource *multisource.MultiSource) *cobra.Command {
 	var multiCrawlCmd = &cobra.Command{
 		Use:   "multi",
 		Short: "Crawl multiple sources defined in sources.yml",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return setupMultiCrawlCmd(cmd, config, log)
+			return setupMultiCrawlCmd(cmd, config, log, multiSource)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeMultiCrawlCmd(cmd, log)
@@ -32,23 +32,16 @@ func NewMultiCrawlCmd(log logger.Interface, config *config.Config) *cobra.Comman
 }
 
 // setupMultiCrawlCmd handles the setup for the multi-crawl command
-func setupMultiCrawlCmd(_ *cobra.Command, cfg *config.Config, log logger.Interface) error {
-	// Load the sources from sources.yml
-	sources, err := loadSourcesFromYAML("sources.yml")
-	if err != nil {
-		return fmt.Errorf("failed to load sources: %w", err)
-	}
-
+func setupMultiCrawlCmd(_ *cobra.Command, cfg *config.Config, log logger.Interface, multiSource *multisource.MultiSource) error {
 	// Debugging: Print loaded sources
-	for _, source := range sources {
+	for _, source := range multiSource.Sources {
 		log.Debug("Loaded source", "name", source.Name, "url", source.URL, "index", source.Index)
 	}
 
 	// Update the Config with the first source's BaseURL
-	if len(sources) > 0 {
-		// Use the Config methods to set the configuration values
-		cfg.Crawler.SetBaseURL(sources[0].URL)     // Set the BaseURL using the Config method
-		cfg.Crawler.SetIndexName(sources[0].Index) // Set the IndexName using the Config method
+	if len(multiSource.Sources) > 0 {
+		cfg.Crawler.SetBaseURL(multiSource.Sources[0].URL)     // Set the BaseURL using the Config method
+		cfg.Crawler.SetIndexName(multiSource.Sources[0].Index) // Set the IndexName using the Config method
 
 		// Log updated config directly from the Config struct
 		log.Debug(
