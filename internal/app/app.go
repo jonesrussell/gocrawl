@@ -15,9 +15,6 @@ func runCrawler(ctx context.Context, storage storage.Interface) error {
 	log := logger.FromContext(ctx) // Get the logger from context
 	log.Debug("Starting the crawler...")
 
-	// Your crawling logic here
-	fmt.Println("Starting the crawler...")
-
 	// Example of using the context
 	select {
 	case <-ctx.Done():
