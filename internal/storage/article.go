@@ -63,7 +63,7 @@ func (es *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-
+			es.Logger.Error("Failed to close response body", "error", err)
 		}
 	}(res.Body)
 
