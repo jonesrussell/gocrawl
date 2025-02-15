@@ -73,6 +73,7 @@ func (s *ElasticsearchStorage) initializeScroll(
 	return searchRes, nil
 }
 
+// handleScrollRequests processes the scroll requests
 func (s *ElasticsearchStorage) handleScrollRequests(
 	ctx context.Context,
 	searchRes *esapi.Response,
@@ -110,7 +111,8 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 					s.Logger.Error("Error parsing scroll error response", "error", err)
 					return
 				}
-				if e["error"].(map[string]interface{})["type"] == "search_phase_execution_exception" {
+				// Check for specific error type
+				if errType, ok := e["error"].(map[string]interface{})["type"]; ok && errType == "search_phase_execution_exception" {
 					s.Logger.Info("Reached end of scroll results")
 					return
 				}

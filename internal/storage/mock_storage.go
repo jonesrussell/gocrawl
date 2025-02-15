@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/mock"
@@ -113,13 +112,17 @@ func (m *MockStorage) BulkIndexArticles(ctx context.Context, articles []*models.
 func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
 	args := m.Called(ctx, query, size)
 	var articles []*models.Article
+
+	// Check if the first argument is not nil before type assertion
 	if args.Get(0) != nil {
-		articles = args.Get(0).([]*models.Article)
-		if err := args.Error(1); err != nil {
-			return nil, fmt.Errorf("error getting articles: %w", err)
+		var ok bool
+		articles, ok = args.Get(0).([]*models.Article)
+		if !ok {
+			return nil, ErrMockTypeAssertion // Return error if type assertion fails
 		}
 	}
-	return articles, nil
+
+	return articles, args.Error(1)
 }
 
 // IndexExists implements Storage
