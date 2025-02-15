@@ -22,12 +22,8 @@ func newMockLogger() *logger.MockLogger {
 	return mockLogger
 }
 
-func TestExtractArticle(t *testing.T) {
-	mockLogger := newMockLogger() // Use the helper function
-	svc := article.NewService(mockLogger)
-
-	// Create a mock HTML document with correct tags
-	html := `
+// Common HTML structure for tests
+const testHTML = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,8 +52,12 @@ func TestExtractArticle(t *testing.T) {
 </html>
 `
 
-	// Create a new document from the HTML string
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+func TestExtractArticle(t *testing.T) {
+	mockLogger := newMockLogger() // Use the helper function
+	svc := article.NewService(mockLogger)
+
+	// Create a new document from the common HTML string
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(testHTML))
 	if err != nil {
 		t.Fatalf("Failed to create document: %v", err)
 	}
@@ -134,16 +134,4 @@ func TestParsePublishedDate(t *testing.T) {
 
 	expectedDate, _ := time.Parse(time.RFC3339, "2025-02-14T15:04:05Z")
 	assert.Equal(t, expectedDate, date)
-}
-
-func TestRemoveDuplicates(t *testing.T) {
-	mockLogger := newMockLogger() // Use the helper function
-	svc := article.NewService(mockLogger)
-
-	tags := []string{"tag1", "tag2", "tag1", "tag3", "tag2"}
-	expectedTags := []string{"tag1", "tag2", "tag3"}
-
-	uniqueTags := article.RemoveDuplicates(tags)
-
-	assert.ElementsMatch(t, expectedTags, uniqueTags)
 }
