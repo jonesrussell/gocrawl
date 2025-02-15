@@ -52,9 +52,6 @@ func TestNewCrawler(t *testing.T) {
 		},
 	}
 
-	// Create a mock Elasticsearch client
-	esClient := newMockElasticsearchClient()
-
 	// Create crawler params
 	params := crawler.Params{
 		Logger:   log,
@@ -64,7 +61,7 @@ func TestNewCrawler(t *testing.T) {
 	}
 
 	// Test crawler creation
-	result, err := crawler.NewCrawler(params, esClient)
+	result, err := crawler.NewCrawler(params)
 	require.NoError(t, err)
 	require.NotNil(t, result.Crawler)
 
@@ -90,9 +87,6 @@ func TestCrawler_Start(t *testing.T) {
 		},
 	}
 
-	// Create a mock Elasticsearch client
-	esClient := newMockElasticsearchClient()
-
 	// Create crawler params
 	params := crawler.Params{
 		Logger:   log,
@@ -102,7 +96,7 @@ func TestCrawler_Start(t *testing.T) {
 	}
 
 	// Create crawler
-	result, err := crawler.NewCrawler(params, esClient)
+	result, err := crawler.NewCrawler(params)
 	require.NoError(t, err)
 	require.NotNil(t, result.Crawler)
 
@@ -133,9 +127,6 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 		},
 	}
 
-	// Create a mock Elasticsearch client
-	esClient := newMockElasticsearchClient()
-
 	params := crawler.Params{
 		Logger:   mockLogger,
 		Config:   mockConfig,
@@ -143,7 +134,7 @@ func TestCrawlerArticleProcessing(t *testing.T) {
 		Debugger: nil, // Set this if you have a debugger
 	}
 
-	result, err := crawler.NewCrawler(params, esClient)
+	result, err := crawler.NewCrawler(params)
 	require.NoError(t, err)
 
 	crawlerInstance := result.Crawler
@@ -210,9 +201,6 @@ func TestCrawler(t *testing.T) {
 		},
 	}
 
-	// Create a mock Elasticsearch client
-	esClient := newMockElasticsearchClient()
-
 	params := crawler.Params{
 		Logger:   mockLogger,
 		Config:   testConfig,
@@ -220,7 +208,7 @@ func TestCrawler(t *testing.T) {
 		Debugger: nil, // Set this if you have a debugger
 	}
 
-	result, err := crawler.NewCrawler(params, esClient)
+	result, err := crawler.NewCrawler(params)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 

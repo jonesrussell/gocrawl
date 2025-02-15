@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -27,7 +26,7 @@ var Module = fx.Module("crawler",
 )
 
 // NewCrawler creates a new Crawler instance
-func NewCrawler(p Params, esClient *elasticsearch.Client) (Result, error) {
+func NewCrawler(p Params) (Result, error) {
 	if p.Logger == nil {
 		return Result{}, errors.New("logger is required")
 	}
