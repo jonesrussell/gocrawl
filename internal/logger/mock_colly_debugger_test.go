@@ -1,4 +1,4 @@
-package logger
+package logger_test
 
 import (
 	"errors"
@@ -8,11 +8,12 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMockCollyDebugger(t *testing.T) {
-	debugger := NewMockCollyDebugger()
+	debugger := logger.NewMockCollyDebugger()
 
 	t.Run("Init", func(t *testing.T) {
 		err := debugger.Init()
