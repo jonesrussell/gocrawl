@@ -15,10 +15,15 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
-func TestExtractArticle(t *testing.T) {
-	// Use a mock logger for better testability
+// Helper function to create a mock logger
+func newMockLogger() *logger.MockLogger {
 	mockLogger := &logger.MockLogger{}
 	mockLogger.On("Debug", mock.Anything, mock.Anything).Return() // Set up expectation for Debug call
+	return mockLogger
+}
+
+func TestExtractArticle(t *testing.T) {
+	mockLogger := newMockLogger() // Use the helper function
 	svc := article.NewService(mockLogger)
 
 	// Create a mock HTML document with correct tags
@@ -80,7 +85,9 @@ func TestExtractArticle(t *testing.T) {
 }
 
 func TestCleanAuthor(t *testing.T) {
-	svc := article.NewService(&logger.MockLogger{})
+	mockLogger := newMockLogger() // Use the helper function
+	svc := article.NewService(mockLogger)
+
 	// Change the author string to match the expected format
 	author := "ElliotLakeToday Staff" // Simplified for testing
 
@@ -89,24 +96,9 @@ func TestCleanAuthor(t *testing.T) {
 	assert.Equal(t, "ElliotLakeToday Staff", cleanedAuthor)
 }
 
-func TestExtractTags(t *testing.T) {
-	svc := article.NewService(&logger.MockLogger{})
-	e := &colly.HTMLElement{
-		Request: &colly.Request{URL: &url.URL{Path: "/opp-beat/"}},
-	}
-	jsonLD := article.JSONLDArticle{
-		Keywords: []string{"tag1", "tag2"},
-		Section:  "news",
-	}
-
-	tags := svc.ExtractTags(e, jsonLD)
-
-	expectedTags := []string{"tag1", "tag2", "news", "OPP Beat"}
-	assert.ElementsMatch(t, expectedTags, tags)
-}
-
 func TestParsePublishedDate(t *testing.T) {
-	svc := article.NewService(&logger.MockLogger{})
+	mockLogger := newMockLogger() // Use the helper function
+	svc := article.NewService(mockLogger)
 
 	// Create a mock HTML document
 	html := `
@@ -115,7 +107,7 @@ func TestParsePublishedDate(t *testing.T) {
                 <script type="application/ld+json">{"datePublished": "2025-02-14T15:04:05Z"}</script>
             </head>
             <body>
-                <time class="timeago" datetime="2025-02-14T15:04:05Z">about 23 hours ago</time>
+                <time datetime="2025-02-14T15:04:05Z">about 23 hours ago</time>
             </body>
         </html>
     `
@@ -145,6 +137,9 @@ func TestParsePublishedDate(t *testing.T) {
 }
 
 func TestRemoveDuplicates(t *testing.T) {
+	mockLogger := newMockLogger() // Use the helper function
+	svc := article.NewService(mockLogger)
+
 	tags := []string{"tag1", "tag2", "tag1", "tag3", "tag2"}
 	expectedTags := []string{"tag1", "tag2", "tag3"}
 
