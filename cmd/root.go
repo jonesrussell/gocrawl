@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	// Import the Elasticsearch package
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
@@ -65,9 +67,21 @@ func Execute() error {
 	}
 	log.Debug("Logger initialized successfully")
 
+	// Initialize Elasticsearch client
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{cfg.Elasticsearch.URL},
+		Username:  cfg.Elasticsearch.Username,
+		Password:  cfg.Elasticsearch.Password,
+		APIKey:    cfg.Elasticsearch.APIKey,
+	})
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to create Elasticsearch client: %v", err))
+		os.Exit(1)
+	}
+
 	// Add commands
-	rootCmd.AddCommand(NewCrawlCmd(log, cfg))  // Pass logger and config to crawl command
-	rootCmd.AddCommand(NewSearchCmd(log, cfg)) // Pass logger and config to search command
+	rootCmd.AddCommand(NewCrawlCmd(log, cfg, esClient))  // Pass logger, config, and esClient to crawl command
+	rootCmd.AddCommand(NewSearchCmd(log, cfg, esClient)) // Pass logger, config, and esClient to search command
 	log.Debug("Commands added to root command")
 
 	return rootCmd.Execute()

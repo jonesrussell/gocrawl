@@ -56,11 +56,10 @@ func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface
 }
 
 // Provide the Elasticsearch client as a dependency
-func ProvideElasticsearchClient(log logger.Interface, cfg *config.Config) (*elasticsearch.Client, error) {
+func ProvideElasticsearchClient(cfg *config.Config, log logger.Interface) (*elasticsearch.Client, error) {
 	// Create a custom HTTP transport
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			//nolint:gosec // Allow insecure skip verify only in development
 			InsecureSkipVerify: cfg.Crawler.SkipTLS, // Use the SkipTLS setting from the config
 		},
 	}

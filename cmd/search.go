@@ -19,7 +19,7 @@ const (
 )
 
 // NewSearchCmd creates a new search command
-func NewSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
+func NewSearchCmd(log logger.Interface, cfg *config.Config, esClient *elasticsearch.Client) *cobra.Command {
 	var searchCmd = &cobra.Command{
 		Use:   "search",
 		Short: "Search content in Elasticsearch",
@@ -29,7 +29,7 @@ func NewSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return executeSearchCmd(cmd, log, cfg)
+			return executeSearchCmd(cmd, log, cfg, esClient)
 		},
 	}
 
@@ -41,7 +41,7 @@ func NewSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 }
 
 // executeSearchCmd handles the search command execution
-func executeSearchCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Config) error {
+func executeSearchCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Config, esClient *elasticsearch.Client) error {
 	query, err := cmd.Flags().GetString("query")
 	if err != nil || query == "" {
 		return fmt.Errorf("missing query argument")
@@ -60,7 +60,7 @@ func executeSearchCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Conf
 		}) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
-					return runApp(ctx, deps.Logger, cfg, query)
+					return runApp(ctx, deps.Logger, cfg, query, esClient)
 				},
 				OnStop: func(ctx context.Context) error {
 					return nil
@@ -80,8 +80,8 @@ func executeSearchCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Conf
 }
 
 // runApp executes the main logic of the application
-func runApp(ctx context.Context, log logger.Interface, cfg *config.Config, query string) error {
-	results, err := app.SearchContent(ctx, cfg.Elasticsearch.Client, query, cfg.Elasticsearch.IndexName, DefaultSearchSize)
+func runApp(ctx context.Context, log logger.Interface, cfg *config.Config, query string, esClient *elasticsearch.Client) error {
+	results, err := app.SearchContent(ctx, esClient, query, cfg.Elasticsearch.IndexName, DefaultSearchSize)
 	if err != nil {
 		log.Error("Search failed", err)
 		return fmt.Errorf("search failed: %w", err)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -20,7 +21,7 @@ const (
 )
 
 // NewCrawlCmd creates a new crawl command
-func NewCrawlCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
+func NewCrawlCmd(log logger.Interface, cfg *config.Config, esClient *elasticsearch.Client) *cobra.Command {
 	var crawlCmd = &cobra.Command{
 		Use:   "crawl",
 		Short: "Start crawling a website",
@@ -29,7 +30,7 @@ func NewCrawlCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 			return setupCrawlCmd(cmd, cfg)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return executeCrawlCmd(cmd, log, cfg)
+			return executeCrawlCmd(cmd, log, cfg, esClient)
 		},
 	}
 
@@ -62,7 +63,7 @@ func setupCrawlCmd(cmd *cobra.Command, cfg *config.Config) error {
 }
 
 // executeCrawlCmd handles the execution of the crawl command
-func executeCrawlCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Config) error {
+func executeCrawlCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Config, esClient *elasticsearch.Client) error {
 	// Initialize fx container
 	fxApp := fx.New(
 		config.Module,
@@ -102,6 +103,9 @@ func executeCrawlCmd(cmd *cobra.Command, log logger.Interface, cfg *config.Confi
 
 	// Use cfg here if needed, for example, to log the configuration
 	log.Debug(fmt.Sprintf("Crawling with configuration: %+v", cfg.Crawler))
+
+	// Use esClient as needed, for example, to log the configuration
+	log.Debug(fmt.Sprintf("Crawling with Elasticsearch client: %+v", esClient))
 
 	return nil
 }

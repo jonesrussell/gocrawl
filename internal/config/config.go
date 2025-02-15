@@ -2,11 +2,9 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -39,7 +37,6 @@ type ElasticsearchConfig struct {
 	Username  string
 	Password  string
 	APIKey    string
-	Client    *elasticsearch.Client
 	IndexName string
 }
 
@@ -70,17 +67,6 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 	// Determine if the application is in development or production
 	isDevelopment := viper.GetString("APP_ENV") == "development"
 
-	// Create the Elasticsearch client
-	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{viper.GetString("ELASTIC_URL")},
-		Username:  viper.GetString("ELASTIC_USERNAME"),
-		Password:  viper.GetString("ELASTIC_PASSWORD"),
-		APIKey:    viper.GetString("ELASTIC_API_KEY"),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
-	}
-
 	cfg := &Config{
 		App: AppConfig{
 			Environment: viper.GetString("APP_ENV"),
@@ -100,7 +86,6 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 			Username:  viper.GetString("ELASTIC_USERNAME"),
 			Password:  viper.GetString("ELASTIC_PASSWORD"),
 			APIKey:    viper.GetString("ELASTIC_API_KEY"),
-			Client:    esClient,
 			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
 		},
 	}
