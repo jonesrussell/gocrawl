@@ -67,8 +67,8 @@ func (s *ElasticsearchStorage) initializeScroll(
 	if searchRes.IsError() {
 		defer searchRes.Body.Close()
 		var e map[string]interface{}
-		if err := json.NewDecoder(searchRes.Body).Decode(&e); err != nil {
-			return nil, fmt.Errorf("error parsing error response: %w", err)
+		if decodeErr := json.NewDecoder(searchRes.Body).Decode(&e); decodeErr != nil {
+			return nil, fmt.Errorf("error parsing error response: %w", decodeErr)
 		}
 		return nil, fmt.Errorf("elasticsearch error: %v", e["error"])
 	}
@@ -110,8 +110,8 @@ func (s *ElasticsearchStorage) handleScrollRequests(
 			// Check if we've reached the end of the scroll
 			if searchRes.IsError() {
 				var e map[string]interface{}
-				if err := json.NewDecoder(searchRes.Body).Decode(&e); err != nil {
-					s.Logger.Error("Error parsing scroll error response", "error", err)
+				if decodeErr := json.NewDecoder(searchRes.Body).Decode(&e); decodeErr != nil {
+					s.Logger.Error("Error parsing scroll error response", "error", decodeErr)
 					return
 				}
 				// Check for specific error type
