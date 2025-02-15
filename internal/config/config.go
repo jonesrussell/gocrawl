@@ -16,17 +16,18 @@ var (
 
 // Configuration keys
 const (
-	AppEnvKey           = "APP_ENV"
-	LogLevelKey         = "LOG_LEVEL"
-	AppDebugKey         = "APP_DEBUG"
-	CrawlerBaseURLKey   = "CRAWLER_BASE_URL"
-	CrawlerMaxDepthKey  = "CRAWLER_MAX_DEPTH"
-	CrawlerRateLimitKey = "CRAWLER_RATE_LIMIT"
-	ElasticURLKey       = "ELASTIC_URL"
-	ElasticUsernameKey  = "ELASTIC_USERNAME"
-	ElasticPasswordKey  = "ELASTIC_PASSWORD"
-	ElasticIndexNameKey = "ELASTIC_INDEX_NAME"
-	ElasticSkipTLSKey   = "ELASTIC_SKIP_TLS"
+	AppEnvKey            = "APP_ENV"
+	LogLevelKey          = "LOG_LEVEL"
+	AppDebugKey          = "APP_DEBUG"
+	CrawlerBaseURLKey    = "CRAWLER_BASE_URL"
+	CrawlerMaxDepthKey   = "CRAWLER_MAX_DEPTH"
+	CrawlerRateLimitKey  = "CRAWLER_RATE_LIMIT"
+	CrawlerSourceFileKey = "CRAWLER_SOURCE_FILE"
+	ElasticURLKey        = "ELASTIC_URL"
+	ElasticUsernameKey   = "ELASTIC_USERNAME"
+	ElasticPasswordKey   = "ELASTIC_PASSWORD"
+	ElasticIndexNameKey  = "ELASTIC_INDEX_NAME"
+	ElasticSkipTLSKey    = "ELASTIC_SKIP_TLS"
 	//nolint:gosec // This is a false positive
 	ElasticAPIKeyKey = "ELASTIC_API_KEY"
 )
@@ -40,10 +41,11 @@ type AppConfig struct {
 
 // CrawlerConfig holds crawler-specific configuration
 type CrawlerConfig struct {
-	BaseURL   string
-	MaxDepth  int
-	RateLimit time.Duration
-	IndexName string
+	BaseURL    string
+	MaxDepth   int
+	RateLimit  time.Duration
+	IndexName  string
+	SourceFile string
 }
 
 // ElasticsearchConfig holds Elasticsearch-specific configuration
@@ -95,10 +97,11 @@ func NewConfig() (*Config, error) {
 			Debug:       viper.GetBool(AppDebugKey),
 		},
 		Crawler: CrawlerConfig{
-			BaseURL:   viper.GetString(CrawlerBaseURLKey),
-			MaxDepth:  viper.GetInt(CrawlerMaxDepthKey),
-			RateLimit: rateLimit,
-			IndexName: viper.GetString(ElasticIndexNameKey),
+			BaseURL:    viper.GetString(CrawlerBaseURLKey),
+			MaxDepth:   viper.GetInt(CrawlerMaxDepthKey),
+			RateLimit:  rateLimit,
+			IndexName:  viper.GetString(ElasticIndexNameKey),
+			SourceFile: viper.GetString(CrawlerSourceFileKey),
 		},
 		Elasticsearch: ElasticsearchConfig{
 			URL:       viper.GetString(ElasticURLKey),
