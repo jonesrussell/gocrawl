@@ -63,6 +63,9 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 		rateLimit = time.Second // Default value if parsing fails
 	}
 
+	// Determine if the application is in development or production
+	isDevelopment := viper.GetString("APP_ENV") == "development"
+
 	cfg := &Config{
 		App: AppConfig{
 			Environment: viper.GetString("APP_ENV"),
@@ -75,7 +78,7 @@ func NewConfig(transport http.RoundTripper) (*Config, error) {
 			RateLimit: rateLimit,
 			IndexName: viper.GetString("ELASTIC_INDEX_NAME"),
 			Transport: transport,
-			SkipTLS:   viper.GetBool("CRAWLER_ELASTIC_SKIP_TLS"),
+			SkipTLS:   isDevelopment, // Allow insecure connections only in development
 		},
 		Elasticsearch: ElasticsearchConfig{
 			URL:      viper.GetString("ELASTIC_URL"),
