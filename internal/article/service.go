@@ -27,7 +27,7 @@ func NewService(logger logger.Interface) Service {
 	return &ArticleService{Logger: logger}
 }
 
-type JsonLDArticle struct {
+type JSONLDArticle struct {
 	DateCreated   string   `json:"dateCreated"`
 	DateModified  string   `json:"dateModified"`
 	DatePublished string   `json:"datePublished"`
@@ -37,7 +37,7 @@ type JsonLDArticle struct {
 }
 
 func (s *ArticleService) ExtractArticle(e *colly.HTMLElement) *models.Article {
-	var jsonLD JsonLDArticle
+	var jsonLD JSONLDArticle
 
 	// Extract metadata from JSON-LD first
 	e.ForEach(`script[type="application/ld+json"]`, func(_ int, el *colly.HTMLElement) {
@@ -91,7 +91,7 @@ func (s *ArticleService) CleanAuthor(author string) string {
 	return author
 }
 
-func (s *ArticleService) extractTags(e *colly.HTMLElement, jsonLD JsonLDArticle) []string {
+func (s *ArticleService) extractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string {
 	tags := make([]string, 0)
 
 	// 1. JSON-LD keywords
@@ -139,7 +139,7 @@ func (s *ArticleService) extractTags(e *colly.HTMLElement, jsonLD JsonLDArticle)
 	return uniqueTags
 }
 
-func (s *ArticleService) ParsePublishedDate(e *colly.HTMLElement, jsonLD JsonLDArticle) time.Time {
+func (s *ArticleService) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time {
 	var publishedDate time.Time
 
 	timeFormats := []string{

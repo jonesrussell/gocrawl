@@ -45,9 +45,8 @@ func InitializeLogger() (logger.Interface, error) {
 
 	if env == "development" {
 		return logger.NewDevelopmentLogger() // Use colored logger in development
-	} else {
-		return logger.NewProductionLogger() // Use a different logger for production
 	}
+	return logger.NewProductionLogger() // Use a different logger for production
 }
 
 func Execute() error {
@@ -89,7 +88,7 @@ func Execute() error {
 }
 
 // Shutdown gracefully shuts down the application
-func Shutdown(ctx context.Context) error {
+func Shutdown(_ context.Context) error {
 	// Implement shutdown logic if necessary
 	return nil
 }
