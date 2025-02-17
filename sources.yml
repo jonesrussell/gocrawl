@@ -1,8 +1,0 @@
-sources:
-  - name: "Espanola News"
-    url: "https://www.myespanolanow.com/news/"
-    index: "espanola_articles"
-
-  - name: "Mid North Monitor"
-    url: "https://www.midnorthmonitor.com/category/news/local-news/"
-    index: "mid_north_articles"
