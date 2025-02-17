@@ -15,15 +15,10 @@ import (
 // MockConfig is a mock implementation of the config.Config interface
 type MockConfig struct {
 	App     config.AppConfig
-	Crawler struct {
-		BaseURL   string
-		IndexName string
-		MaxDepth  int
-	}
+	Crawler config.CrawlerConfig
 }
 
 func NewMockConfig() *config.Config {
-	// Create and return a mock config that matches the expected structure
 	return &config.Config{
 		App: config.AppConfig{
 			Environment: "development",
@@ -38,20 +33,17 @@ func NewMockConfig() *config.Config {
 
 func TestCommandsRegistered(t *testing.T) {
 	// Set the config path to the directory where your config file is located
-	viper.SetConfigName("config") // Name of the config file (without extension)
-	viper.SetConfigType("yaml")   // Set the type of the config file
-	viper.AddConfigPath("../..")  // Adjust the path to where the config file is located
-	viper.AutomaticEnv()          // Automatically read environment variables
+	viper.SetConfigName("sources") // Name of the config file (without extension)
+	viper.SetConfigType("yaml")    // Set the type of the config file
+	viper.AddConfigPath("..")      // Adjust the path to where the config file is located
+	viper.AutomaticEnv()           // Automatically read environment variables
 
 	if err := viper.ReadInConfig(); err != nil {
 		t.Fatalf("Failed to load configuration: %v", err)
 	}
 
 	// Initialize the logger and config for testing
-	log, err := logger.NewDevelopmentLogger() // or use a mock logger
-	if err != nil {
-		t.Fatalf("Failed to initialize logger: %v", err)
-	}
+	log := logger.NewMockLogger() // or use a mock logger
 
 	cfg := NewMockConfig() // Use the mock config
 
@@ -97,15 +89,15 @@ func TestCommandsRegistered(t *testing.T) {
 	rootCmd.AddCommand(multiCrawlCmd)
 
 	// Check if commands are registered
-	crawlCommand, _, err := rootCmd.Find("crawl") // Correctly use Find with a single string
+	crawlCommand, _, err := rootCmd.Find([]string{"crawl"}) // Use a slice of strings
 	assert.NoError(t, err)
 	assert.NotNil(t, crawlCommand, "Crawl command should be registered")
 
-	searchCommand, _, err := rootCmd.Find("search") // Correctly use Find with a single string
+	searchCommand, _, err := rootCmd.Find([]string{"search"}) // Use a slice of strings
 	assert.NoError(t, err)
 	assert.NotNil(t, searchCommand, "Search command should be registered")
 
-	multiCommand, _, err := rootCmd.Find("multi") // Correctly use Find with a single string
+	multiCommand, _, err := rootCmd.Find([]string{"multi"}) // Use a slice of strings
 	assert.NoError(t, err)
 	assert.NotNil(t, multiCommand, "Multi command should be registered")
 }
