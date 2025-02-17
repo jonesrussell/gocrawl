@@ -13,8 +13,9 @@ import (
 	"go.uber.org/fx"
 )
 
-// NewMultiCrawlCmd creates a new command for crawling multiple sources
 func NewMultiCrawlCmd(log logger.Interface, cfg *config.Config, multiSource *multisource.MultiSource) *cobra.Command {
+	var sourceName string
+
 	var multiCrawlCmd = &cobra.Command{
 		Use:   "multi",
 		Short: "Crawl multiple sources defined in sources.yml",
@@ -22,48 +23,51 @@ func NewMultiCrawlCmd(log logger.Interface, cfg *config.Config, multiSource *mul
 			return setupMultiCrawlCmd(cmd, cfg, log, multiSource)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return executeMultiCrawlCmd(cmd, log)
+			return executeMultiCrawlCmd(cmd, log, multiSource, sourceName)
 		},
 	}
+
+	multiCrawlCmd.Flags().StringVar(&sourceName, "source", "", "Specify the source to crawl")
 
 	return multiCrawlCmd
 }
 
-// setupMultiCrawlCmd handles the setup for the multi-crawl command
 func setupMultiCrawlCmd(
 	_ *cobra.Command,
 	cfg *config.Config,
 	log logger.Interface,
 	multiSource *multisource.MultiSource,
 ) error {
-	// Debugging: Print loaded sources
 	for _, source := range multiSource.Sources {
 		log.Debug("Loaded source", "name", source.Name, "url", source.URL, "index", source.Index)
 	}
 
-	// Update the Config with the first source's BaseURL
 	if len(multiSource.Sources) > 0 {
-		cfg.Crawler.SetBaseURL(multiSource.Sources[0].URL)     // Set the BaseURL using the Config method
-		cfg.Crawler.SetIndexName(multiSource.Sources[0].Index) // Set the IndexName using the Config method
+		cfg.Crawler.SetBaseURL(multiSource.Sources[0].URL)
+		cfg.Crawler.SetIndexName(multiSource.Sources[0].Index)
 
-		// Log updated config directly from the Config struct
 		log.Debug(
 			"Updated config",
 			"baseURL", cfg.Crawler.BaseURL,
 			"indexName", cfg.Crawler.IndexName,
 			"maxDepth", cfg.Crawler.MaxDepth,
-		) // Log updated config
+		)
 	}
 
 	return nil
 }
 
-// executeMultiCrawlCmd handles the execution of the multi-crawl command
-func executeMultiCrawlCmd(cmd *cobra.Command, log logger.Interface) error {
-	// Initialize fx container with the config path
-	app := newMultiCrawlFxApp(log) // Pass the config path
+func executeMultiCrawlCmd(cmd *cobra.Command, log logger.Interface, multiSource *multisource.MultiSource, sourceName string) error {
+	app := newMultiCrawlFxApp(log)
 
-	// Start the application
+	if sourceName != "" {
+		var err error
+		multiSource.Sources, err = filterSources(multiSource.Sources, sourceName)
+		if err != nil {
+			return err
+		}
+	}
+
 	if err := app.Start(cmd.Context()); err != nil {
 		log.Error("Error starting application", "error", err)
 		return fmt.Errorf("error starting application: %w", err)
@@ -77,9 +81,21 @@ func executeMultiCrawlCmd(cmd *cobra.Command, log logger.Interface) error {
 	return nil
 }
 
-// newMultiCrawlFxApp initializes the Fx application with dependencies for multi-crawl
+func filterSources(sources []multisource.SourceConfig, sourceName string) ([]multisource.SourceConfig, error) {
+	var filteredSources []multisource.SourceConfig
+	for _, source := range sources {
+		if source.Name == sourceName {
+			filteredSources = append(filteredSources, source)
+		}
+	}
+	if len(filteredSources) == 0 {
+		return nil, fmt.Errorf("no source found with name: %s", sourceName)
+	}
+	return filteredSources, nil
+}
+
 func newMultiCrawlFxApp(log logger.Interface) *fx.App {
-	log.Debug("Initializing multi-crawl application...") // Log initialization
+	log.Debug("Initializing multi-crawl application...")
 
 	return fx.New(
 		config.Module,
@@ -91,7 +107,6 @@ func newMultiCrawlFxApp(log logger.Interface) *fx.App {
 	)
 }
 
-// setupMultiLifecycleHooks sets up the lifecycle hooks for the Fx application
 func setupMultiLifecycleHooks(lc fx.Lifecycle, deps struct {
 	fx.In
 	Logger      logger.Interface
