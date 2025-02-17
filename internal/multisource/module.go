@@ -37,7 +37,7 @@ func NewMultiSource(logger logger.Interface, crawler *crawler.Crawler) (*MultiSo
 	}
 
 	var ms MultiSource
-	if err := yaml.Unmarshal(data, &ms); err != nil {
+	if unmarshalErr := yaml.Unmarshal(data, &ms); unmarshalErr != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal sources.yml")
 	}
 

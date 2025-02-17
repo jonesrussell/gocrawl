@@ -26,6 +26,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 }
 
+// Initialize configuration
 func initConfig() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -55,14 +56,14 @@ func InitializeLogger(cfg *config.Config) (logger.Interface, error) {
 // Execute is the entry point for the CLI
 func Execute() error {
 	// Initialize dependencies
-	rootCmd, err := initializeDependencies()
+	cmdInstance, err := initializeDependencies()
 	if err != nil {
 		//nolint:forbidigo // This is a CLI error
 		fmt.Println("Failed to initialize dependencies:", err)
 		os.Exit(1)
 	}
 
-	return rootCmd.Execute()
+	return cmdInstance.Execute()
 }
 
 // Shutdown gracefully shuts down the application
@@ -120,6 +121,11 @@ func initializeDependencies() (*cobra.Command, error) {
 
 	// Create the multi crawl command
 	multiCmd := NewMultiCrawlCmd(log, cfg, multiSource) // Pass multiSource to the command
+	rootCmd.AddCommand(multiCmd)                        // Register the multi crawl command
 
-	return multiCmd, nil
+	// Register the crawl and search commands
+	rootCmd.AddCommand(NewCrawlCmd(log, cfg))  // Pass logger and config to crawl command
+	rootCmd.AddCommand(NewSearchCmd(log, cfg)) // Pass logger and config to search command
+
+	return rootCmd, nil
 }

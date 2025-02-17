@@ -14,12 +14,12 @@ import (
 )
 
 // NewMultiCrawlCmd creates a new command for crawling multiple sources
-func NewMultiCrawlCmd(log logger.Interface, config *config.Config, multiSource *multisource.MultiSource) *cobra.Command {
+func NewMultiCrawlCmd(log logger.Interface, cfg *config.Config, multiSource *multisource.MultiSource) *cobra.Command {
 	var multiCrawlCmd = &cobra.Command{
 		Use:   "multi",
 		Short: "Crawl multiple sources defined in sources.yml",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return setupMultiCrawlCmd(cmd, config, log, multiSource)
+			return setupMultiCrawlCmd(cmd, cfg, log, multiSource)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeMultiCrawlCmd(cmd, log)
@@ -30,7 +30,12 @@ func NewMultiCrawlCmd(log logger.Interface, config *config.Config, multiSource *
 }
 
 // setupMultiCrawlCmd handles the setup for the multi-crawl command
-func setupMultiCrawlCmd(_ *cobra.Command, cfg *config.Config, log logger.Interface, multiSource *multisource.MultiSource) error {
+func setupMultiCrawlCmd(
+	_ *cobra.Command,
+	cfg *config.Config,
+	log logger.Interface,
+	multiSource *multisource.MultiSource,
+) error {
 	// Debugging: Print loaded sources
 	for _, source := range multiSource.Sources {
 		log.Debug("Loaded source", "name", source.Name, "url", source.URL, "index", source.Index)
@@ -44,12 +49,9 @@ func setupMultiCrawlCmd(_ *cobra.Command, cfg *config.Config, log logger.Interfa
 		// Log updated config directly from the Config struct
 		log.Debug(
 			"Updated config",
-			"baseURL",
-			cfg.Crawler.BaseURL,
-			"indexName",
-			cfg.Crawler.IndexName,
-			"maxDepth",
-			cfg.Crawler.MaxDepth,
+			"baseURL", cfg.Crawler.BaseURL,
+			"indexName", cfg.Crawler.IndexName,
+			"maxDepth", cfg.Crawler.MaxDepth,
 		) // Log updated config
 	}
 
@@ -102,7 +104,7 @@ func setupMultiLifecycleHooks(lc fx.Lifecycle, deps struct {
 			deps.Logger.Debug("Starting multi-crawl application...")
 			return deps.MultiSource.Start(ctx)
 		},
-		OnStop: func(ctx context.Context) error {
+		OnStop: func(_ context.Context) error {
 			deps.Logger.Debug("Stopping multi-crawl application...")
 			deps.MultiSource.Stop()
 			return nil
