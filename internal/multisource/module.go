@@ -24,10 +24,9 @@ type MultiSource struct {
 	Logger  logger.Interface `yaml:"-"`
 }
 
-func NewMultiSource(logger logger.Interface, crawler *crawler.Crawler, configPath string) (*MultiSource, error) {
-	if configPath == "" {
-		configPath = "sources.yml"
-	}
+func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string) (*MultiSource, error) {
+	log.Debug("NewMultiSource", "configPath", configPath)
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read sources.yml")
@@ -38,8 +37,8 @@ func NewMultiSource(logger logger.Interface, crawler *crawler.Crawler, configPat
 		return nil, errors.Wrap(unmarshalErr, "failed to unmarshal sources.yml")
 	}
 
-	ms.Crawler = crawler
-	ms.Logger = logger
+	ms.Crawler = c
+	ms.Logger = log
 	return &ms, nil
 }
 
