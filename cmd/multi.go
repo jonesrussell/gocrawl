@@ -63,18 +63,16 @@ func setupMultiCrawlCmd(
 func executeMultiCrawlCmd(cmd *cobra.Command, log logger.Interface, multiSource *multisource.MultiSource, sourceName string) error {
 	app := newMultiCrawlFxApp(log)
 
-	if sourceName != "" {
-		var err error
-		multiSource.Sources, err = filterSources(multiSource.Sources, sourceName)
-		if err != nil {
-			return err
-		}
-	}
-
 	if err := app.Start(cmd.Context()); err != nil {
 		log.Error("Error starting application", "error", err)
 		return fmt.Errorf("error starting application: %w", err)
 	}
+
+	if err := multiSource.Start(cmd.Context(), sourceName); err != nil {
+		log.Error("Error starting multi-source crawl", "error", err)
+		return fmt.Errorf("error starting multi-source crawl: %w", err)
+	}
+
 	defer func() {
 		if err := app.Stop(cmd.Context()); err != nil {
 			log.Error("Error stopping application", "error", err)
@@ -116,11 +114,12 @@ func setupMultiLifecycleHooks(lc fx.Lifecycle, deps struct {
 	Crawler     *crawler.Crawler
 	MultiSource *multisource.MultiSource
 	Config      *config.Config
+	SourceName  string
 }) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			deps.Logger.Debug("Starting multi-crawl application...")
-			return deps.MultiSource.Start(ctx)
+			return deps.MultiSource.Start(ctx, deps.SourceName)
 		},
 		OnStop: func(_ context.Context) error {
 			deps.Logger.Debug("Stopping multi-crawl application...")

@@ -48,6 +48,18 @@ type CrawlerConfig struct {
 	SourceFile string
 }
 
+// SetMaxDepth sets the MaxDepth in the CrawlerConfig
+func (c *CrawlerConfig) SetMaxDepth(depth int) {
+	c.MaxDepth = depth
+	viper.Set(CrawlerMaxDepthKey, depth) // Also set it in Viper
+}
+
+// SetRateLimit sets the RateLimit in the CrawlerConfig
+func (c *CrawlerConfig) SetRateLimit(rate time.Duration) {
+	c.RateLimit = rate
+	viper.Set(CrawlerRateLimitKey, rate.String()) // Also set it in Viper
+}
+
 // SetBaseURL sets the BaseURL in the CrawlerConfig
 func (c *CrawlerConfig) SetBaseURL(url string) {
 	c.BaseURL = url

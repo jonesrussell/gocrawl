@@ -2,6 +2,7 @@ package multisource
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -42,8 +43,34 @@ func NewMultiSource(logger logger.Interface, crawler *crawler.Crawler, configPat
 	return &ms, nil
 }
 
-func (ms *MultiSource) Start(ctx context.Context) error {
+func (ms *MultiSource) filterSources(sourceName string) ([]SourceConfig, error) {
+	var filteredSources []SourceConfig
 	for _, source := range ms.Sources {
+		if source.Name == sourceName {
+			filteredSources = append(filteredSources, source)
+		}
+	}
+	if len(filteredSources) == 0 {
+		return nil, fmt.Errorf("no source found with name: %s", sourceName)
+	}
+	return filteredSources, nil
+}
+
+func (ms *MultiSource) Start(ctx context.Context, sourceName string) error {
+	var sourcesToCrawl []SourceConfig
+
+	// Filter sources based on the provided sourceName
+	if sourceName != "" {
+		filteredSources, err := ms.filterSources(sourceName)
+		if err != nil {
+			return err
+		}
+		sourcesToCrawl = filteredSources
+	} else {
+		sourcesToCrawl = ms.Sources
+	}
+
+	for _, source := range sourcesToCrawl {
 		ms.Logger.Info("Starting crawl", "source", source.Name)
 
 		ms.Crawler.Config.Crawler.SetBaseURL(source.URL)
