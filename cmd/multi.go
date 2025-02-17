@@ -60,8 +60,8 @@ func setupMultiCrawlCmd(
 
 // executeMultiCrawlCmd handles the execution of the multi-crawl command
 func executeMultiCrawlCmd(cmd *cobra.Command, log logger.Interface) error {
-	// Initialize fx container
-	app := newMultiCrawlFxApp(log)
+	// Initialize fx container with the config path
+	app := newMultiCrawlFxApp(log) // Pass the config path
 
 	// Start the application
 	if err := app.Start(cmd.Context()); err != nil {

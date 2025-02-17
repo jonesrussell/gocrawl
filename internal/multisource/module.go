@@ -71,5 +71,10 @@ func (ms *MultiSource) Stop() {
 // Module provides the fx module for MultiSource
 var Module = fx.Module(
 	"multisource",
-	fx.Provide(NewMultiSource),
+	fx.Provide(
+		func() string {
+			return "sources.yml" // Provide the default config path
+		},
+		NewMultiSource,
+	),
 )
