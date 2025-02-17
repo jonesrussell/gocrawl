@@ -10,6 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // MockConfig is a mock implementation of the config.Config interface
@@ -45,17 +46,13 @@ func TestCommandsRegistered(t *testing.T) {
 	// Initialize the logger and config for testing
 	log := logger.NewMockLogger() // or use a mock logger
 
+	// Set up expectations for the mock logger
+	log.On("Info", mock.Anything, mock.Anything).Return() // Expect Info method to be called
+
 	cfg := NewMockConfig() // Use the mock config
 
 	// Initialize the storage
-	elasticClient, err := storage.ProvideElasticsearchClient(cfg, log) // Create the Elasticsearch client
-	if err != nil {
-		t.Fatalf("Failed to create Elasticsearch client: %v", err)
-	}
-	storageInstance, err := storage.NewStorage(elasticClient, log) // Create the storage instance
-	if err != nil {
-		t.Fatalf("Failed to create storage instance: %v", err)
-	}
+	storageInstance := storage.NewMockStorage() // Create the storage instance
 
 	// Initialize the commands
 	crawlCmd := NewCrawlCmd(log, cfg)   // Pass only logger and config
@@ -77,7 +74,7 @@ func TestCommandsRegistered(t *testing.T) {
 	}
 
 	// Initialize multisource
-	multiSourceInstance, err := multisource.NewMultiSource(log, crawlerInstance.Crawler) // Pass logger and crawler
+	multiSourceInstance, err := multisource.NewMultiSource(log, crawlerInstance.Crawler, "../sources.yml") // Pass logger, crawler, and config path
 	if err != nil {
 		t.Fatalf("Failed to create multi source instance: %v", err)
 	}

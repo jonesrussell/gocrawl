@@ -26,8 +26,7 @@ type MultiSource struct {
 }
 
 // NewMultiSource creates a new MultiSource instance
-func NewMultiSource(logger logger.Interface, crawler *crawler.Crawler) (*MultiSource, error) {
-	configPath := os.Getenv("CONFIG_PATH")
+func NewMultiSource(logger logger.Interface, crawler *crawler.Crawler, configPath string) (*MultiSource, error) {
 	if configPath == "" {
 		configPath = "sources.yml"
 	}
