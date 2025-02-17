@@ -20,9 +20,9 @@ type SourceConfig struct {
 
 // MultiSource manages multiple sources for crawling
 type MultiSource struct {
-	Sources []SourceConfig
-	Crawler *crawler.Crawler
-	Logger  logger.Interface
+	Sources []SourceConfig   `yaml:"sources"`
+	Crawler *crawler.Crawler `yaml:"-"`
+	Logger  logger.Interface `yaml:"-"`
 }
 
 // NewMultiSource creates a new MultiSource instance
@@ -38,7 +38,7 @@ func NewMultiSource(logger logger.Interface, crawler *crawler.Crawler) (*MultiSo
 
 	var ms MultiSource
 	if unmarshalErr := yaml.Unmarshal(data, &ms); unmarshalErr != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal sources.yml")
+		return nil, errors.Wrap(unmarshalErr, "failed to unmarshal sources.yml")
 	}
 
 	ms.Crawler = crawler
