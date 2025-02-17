@@ -28,6 +28,9 @@ func NewMultiCrawlCmd(log logger.Interface, cfg *config.Config, multiSource *mul
 	}
 
 	multiCrawlCmd.Flags().StringVar(&sourceName, "source", "", "Specify the source to crawl")
+	if err := multiCrawlCmd.MarkFlagRequired("source"); err != nil {
+		log.Error("Error marking source flag as required", "error", err)
+	}
 
 	return multiCrawlCmd
 }
