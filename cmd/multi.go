@@ -19,9 +19,6 @@ func NewMultiCrawlCmd(log logger.Interface, cfg *config.Config, multiSource *mul
 	var multiCrawlCmd = &cobra.Command{
 		Use:   "multi",
 		Short: "Crawl multiple sources defined in sources.yml",
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return setupMultiCrawlCmd(cmd, cfg, log, multiSource)
-		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeMultiCrawlCmd(cmd, log, multiSource, sourceName)
 		},
@@ -33,31 +30,6 @@ func NewMultiCrawlCmd(log logger.Interface, cfg *config.Config, multiSource *mul
 	}
 
 	return multiCrawlCmd
-}
-
-func setupMultiCrawlCmd(
-	_ *cobra.Command,
-	cfg *config.Config,
-	log logger.Interface,
-	multiSource *multisource.MultiSource,
-) error {
-	for _, source := range multiSource.Sources {
-		log.Debug("Loaded source", "name", source.Name, "url", source.URL, "index", source.Index)
-	}
-
-	if len(multiSource.Sources) > 0 {
-		cfg.Crawler.SetBaseURL(multiSource.Sources[0].URL)
-		cfg.Crawler.SetIndexName(multiSource.Sources[0].Index)
-
-		log.Debug(
-			"Updated config",
-			"baseURL", cfg.Crawler.BaseURL,
-			"indexName", cfg.Crawler.IndexName,
-			"maxDepth", cfg.Crawler.MaxDepth,
-		)
-	}
-
-	return nil
 }
 
 func executeMultiCrawlCmd(cmd *cobra.Command, log logger.Interface, multiSource *multisource.MultiSource, sourceName string) error {

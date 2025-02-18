@@ -27,6 +27,13 @@ type MultiSource struct {
 func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string) (*MultiSource, error) {
 	log.Debug("NewMultiSource", "configPath", configPath)
 
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Error("Error getting current working directory", "error", err)
+		return nil, err
+	}
+	log.Debug("Current working directory", "directory", wd)
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read sources.yml")
@@ -45,13 +52,18 @@ func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string)
 func (ms *MultiSource) filterSources(sourceName string) ([]SourceConfig, error) {
 	var filteredSources []SourceConfig
 	for _, source := range ms.Sources {
+		ms.Logger.Debug("Checking source", "name", source.Name)
 		if source.Name == sourceName {
+			ms.Logger.Debug("Source found", "name", source.Name)
 			filteredSources = append(filteredSources, source)
 		}
 	}
 	if len(filteredSources) == 0 {
+		ms.Logger.Error("No source found with name", "name", sourceName)
 		return nil, fmt.Errorf("no source found with name: %s", sourceName)
 	}
+	ms.Logger.Debug("Found sources", "count", len(filteredSources))
+
 	return filteredSources, nil
 }
 
@@ -90,9 +102,7 @@ func (ms *MultiSource) Stop() {
 var Module = fx.Module(
 	"multisource",
 	fx.Provide(
-		func() string {
-			return "sources.yml"
-		},
+
 		NewMultiSource,
 	),
 )
