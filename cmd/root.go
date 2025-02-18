@@ -114,7 +114,7 @@ func initializeDependencies() (*cobra.Command, error) {
 	}
 
 	// Initialize multisource
-	multiSource, err := multisource.NewMultiSource(log, crawlerInstance.Crawler, "../sources.yml") // Pass logger and crawler
+	multiSource, err := multisource.NewMultiSource(log, crawlerInstance.Crawler, "sources.yml") // Pass logger and crawler
 	if err != nil {
 		return nil, err
 	}
