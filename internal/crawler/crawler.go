@@ -92,40 +92,6 @@ func (c *Crawler) SetService(svc article.Interface) {
 	c.ArticleService = svc
 }
 
-func configureCollectorCallbacks(c *colly.Collector, crawler *Crawler) {
-	c.OnRequest(func(r *colly.Request) {
-		crawler.Logger.Debug("Requesting URL", r.URL.String())
-	})
-
-	c.OnResponse(func(r *colly.Response) {
-		crawler.Logger.Debug("Received response", "url", r.Request.URL.String(), "status", r.StatusCode)
-	})
-
-	c.OnError(func(r *colly.Response, err error) {
-		crawler.Logger.Error("Error scraping", "url", r.Request.URL.String(), "error", err)
-	})
-
-	c.OnHTML("div.details", func(e *colly.HTMLElement) {
-		crawler.Logger.Debug("Found details", "url", e.Request.URL.String())
-		crawler.ProcessPage(e)
-	})
-
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if link == "" {
-			return
-		}
-		crawler.Logger.Debug("Found link", "url", link)
-		if err := e.Request.Visit(link); err != nil {
-			crawler.Logger.Debug("Could not visit link", "url", link, "error", err)
-		}
-	})
-
-	if crawler.Debugger != nil {
-		c.SetDebugger(crawler.Debugger)
-	}
-}
-
 // Getter methods for configuration
 func (c *Crawler) GetBaseURL() string {
 	return c.Config.Crawler.BaseURL

@@ -6,37 +6,72 @@ import (
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/multisource"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 )
 
-var (
-	rootCmd = &cobra.Command{
-		Use:   "gocrawl",
-		Short: "A web crawler that stores content in Elasticsearch",
+var cfgFile string
+
+var globalLogger logger.Interface
+
+var globalConfig *config.Config
+
+var rootCmd = &cobra.Command{
+	Use:   "gocrawl",
+	Short: "A web crawler that stores content in Elasticsearch",
+}
+
+// Execute is the entry point for the CLI
+func Execute() {
+	// Initialize configuration
+	globalConfig, err := config.NewConfig() // This should be the only place you call NewConfig
+	if err != nil {
+		globalLogger.Error("Error creating Config", "error", err)
+		os.Exit(1)
 	}
-)
+
+	// Initialize logger
+	globalLogger, err := InitializeLogger(globalConfig)
+	if err != nil {
+		globalLogger.Error("Error creating Logger", "error", err)
+		os.Exit(1)
+	}
+
+	// Register the crawl and search commands
+	rootCmd.AddCommand(NewCrawlCmd(globalLogger, globalConfig))  // Pass logger and config to crawl command
+	rootCmd.AddCommand(NewSearchCmd(globalLogger, globalConfig)) // Pass logger and config to search command
+
+	err = rootCmd.Execute()
+	if err != nil {
+		globalLogger.Error("Error executing root command", "error", err)
+		os.Exit(1)
+	}
+}
 
 // Initialize the command
 func init() {
 	cobra.OnInitialize(initConfig)
+
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
 }
 
 // Initialize configuration
 func initConfig() {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-	viper.AutomaticEnv()
+	if cfgFile != "" {
+		// Use config file from the flag.
+		viper.SetConfigFile(cfgFile)
+	} else {
+		viper.AddConfigPath(".")
+		viper.SetConfigType("yaml")
+		viper.SetConfigName("config")
+	}
 
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println("Failed to load configuration", err)
-		os.Exit(1)
+	viper.AutomaticEnv() // read in environment variables that match
+
+	// If a config file is found, read it in.
+	if err := viper.ReadInConfig(); err == nil {
+		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 }
 
@@ -53,84 +88,8 @@ func InitializeLogger(cfg *config.Config) (logger.Interface, error) {
 	return logger.NewProductionLogger(cfg) // Use a different logger for production
 }
 
-// Execute is the entry point for the CLI
-func Execute() error {
-	// Initialize dependencies
-	sourceName := ""                                       // Initialize sourceName
-	cmdInstance, err := initializeDependencies(sourceName) // Pass sourceName here
-	if err != nil {
-		fmt.Println("Failed to initialize dependencies", err)
-		os.Exit(1)
-	}
-
-	return cmdInstance.Execute()
-}
-
 // Shutdown gracefully shuts down the application
 func Shutdown(ctx context.Context) error {
 	// Implement shutdown logic if necessary
 	return nil
-}
-
-// initializeDependencies initializes all dependencies for the CLI
-func initializeDependencies(sourceName string) (*cobra.Command, error) {
-	// Initialize configuration
-	cfg, err := config.NewConfig() // This should be the only place you call NewConfig
-	if err != nil {
-		return nil, err
-	}
-
-	// Initialize logger
-	log, err := InitializeLogger(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Initialize Elasticsearch client using the provided function
-	elasticClient, err := storage.ProvideElasticsearchClient(cfg, log) // Use the function from storage module
-	if err != nil {
-		return nil, err
-	}
-
-	// Initialize storage
-	storageInstance, err := storage.NewStorage(elasticClient, log) // Ensure the storage is initialized
-	if err != nil {
-		return nil, err
-	}
-
-	// Initialize the debugger
-	debuggerInstance := logger.NewCollyDebugger(log) // Pass the logger to the debugger
-
-	// Initialize the crawler
-	crawlerParams := crawler.Params{
-		Logger:   log,
-		Storage:  storageInstance,
-		Debugger: debuggerInstance,
-		Config:   cfg,
-	}
-	crawlerInstance, err := crawler.NewCrawler(crawlerParams) // Ensure the crawler is initialized
-	if err != nil {
-		return nil, err
-	}
-
-	// Initialize multisource
-	multiSource, err := multisource.NewMultiSource(log, crawlerInstance.Crawler, "sources.yml", sourceName) // Pass logger, crawler, configPath, and sourceName
-	if err != nil {
-		return nil, err
-	}
-
-	// Create the multi crawl command
-	multiCmd := NewMultiCrawlCmd(log, cfg, multiSource, crawlerInstance.Crawler) // Pass c here
-	rootCmd.AddCommand(multiCmd)                                                 // Register the multi crawl command
-
-	// Register the crawl and search commands
-	rootCmd.AddCommand(NewCrawlCmd(log, cfg))  // Pass logger and config to crawl command
-	rootCmd.AddCommand(NewSearchCmd(log, cfg)) // Pass logger and config to search command
-
-	// Provide the sourceName for lifecycle hooks
-	fx.Provide(func() string {
-		return sourceName
-	})
-
-	return rootCmd, nil
 }
