@@ -25,14 +25,17 @@ var rootCmd = &cobra.Command{
 // Execute is the entry point for the CLI
 func Execute() {
 	// Initialize configuration
-	globalConfig, err := config.NewConfig() // This should be the only place you call NewConfig
+	var err error
+	globalConfig, err = config.NewConfig() // This should be the only place you call NewConfig
 	if err != nil {
+		// Initialize logger before logging the error
+		globalLogger, _ = InitializeLogger(&config.Config{}) // Initialize with an empty config to avoid nil logger
 		globalLogger.Error("Error creating Config", "error", err)
 		os.Exit(1)
 	}
 
 	// Initialize logger
-	globalLogger, err := InitializeLogger(globalConfig)
+	globalLogger, err = InitializeLogger(globalConfig)
 	if err != nil {
 		globalLogger.Error("Error creating Logger", "error", err)
 		os.Exit(1)

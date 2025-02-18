@@ -19,6 +19,11 @@ var multiCmd = &cobra.Command{
 	Use:   "multi",
 	Short: "Crawl multiple sources defined in sources.yml",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check if sourceName is empty
+		if sourceName == "" {
+			return fmt.Errorf("source name must be provided")
+		}
+
 		ctx := cmd.Context()
 		globalLogger.Debug("Starting multi-crawl command...", "sourceName", sourceName)
 
