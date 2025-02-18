@@ -7,92 +7,84 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/pkg/errors"
 	"go.uber.org/fx"
 	"gopkg.in/yaml.v3"
 )
 
+// SourceConfig represents the configuration for a source
 type SourceConfig struct {
-	Name  string `yaml:"name"`
-	URL   string `yaml:"url"`
-	Index string `yaml:"index"`
+	Name      string `yaml:"name"`
+	URL       string `yaml:"url"`
+	Index     string `yaml:"index"`
+	RateLimit string `yaml:"rate_limit"`
+	MaxDepth  int    `yaml:"max_depth"`
 }
 
+// MultiSource represents a multi-source configuration
 type MultiSource struct {
 	Sources []SourceConfig   `yaml:"sources"`
 	Crawler *crawler.Crawler `yaml:"-"`
 	Logger  logger.Interface `yaml:"-"`
 }
 
-func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string) (*MultiSource, error) {
+// NewMultiSource creates a new MultiSource instance
+func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string, sourceName string) (*MultiSource, error) {
 	log.Debug("NewMultiSource", "configPath", configPath)
 
-	wd, err := os.Getwd()
+	file, err := os.Open(configPath)
 	if err != nil {
-		log.Error("Error getting current working directory", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to read %s: %w", configPath, err)
 	}
-	log.Debug("Current working directory", "directory", wd)
+	defer file.Close()
 
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read sources.yml")
+	var config struct {
+		Sources []SourceConfig `yaml:"sources"`
 	}
 
-	var ms MultiSource
-	if unmarshalErr := yaml.Unmarshal(data, &ms); unmarshalErr != nil {
-		return nil, errors.Wrap(unmarshalErr, "failed to unmarshal sources.yml")
+	if err := yaml.NewDecoder(file).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode %s: %w", configPath, err)
 	}
 
-	ms.Crawler = c
-	ms.Logger = log
-	return &ms, nil
+	ms := &MultiSource{Sources: config.Sources, Crawler: c, Logger: log}
+	return ms, nil
 }
 
-func (ms *MultiSource) filterSources(sourceName string) ([]SourceConfig, error) {
-	var filteredSources []SourceConfig
-	for _, source := range ms.Sources {
-		ms.Logger.Debug("Checking source", "name", source.Name)
-		if source.Name == sourceName {
-			ms.Logger.Debug("Source found", "name", source.Name)
-			filteredSources = append(filteredSources, source)
-		}
-	}
-	if len(filteredSources) == 0 {
-		ms.Logger.Error("No source found with name", "name", sourceName)
-		return nil, fmt.Errorf("no source found with name: %s", sourceName)
-	}
-	ms.Logger.Debug("Found sources", "count", len(filteredSources))
-
-	return filteredSources, nil
-}
-
+// Start starts the multi-source crawling for the specified source name
 func (ms *MultiSource) Start(ctx context.Context, sourceName string) error {
-	var sourcesToCrawl []SourceConfig
+	ms.Logger.Debug("Starting multi-source crawl", "sourceName", sourceName)
 
-	// Filter sources based on the provided sourceName
-	if sourceName != "" {
-		filteredSources, err := ms.filterSources(sourceName)
-		if err != nil {
-			return err
-		}
-		sourcesToCrawl = filteredSources
-	} else {
-		sourcesToCrawl = ms.Sources
+	filteredSources, err := filterSources(ms.Sources, sourceName)
+	if err != nil {
+		return err
 	}
 
-	for _, source := range sourcesToCrawl {
+	// Start crawling with filtered sources
+	for _, source := range filteredSources {
 		ms.Logger.Info("Starting crawl", "source", source.Name)
 
 		ms.Crawler.Config.Crawler.SetBaseURL(source.URL)
 		ms.Crawler.Config.Crawler.SetIndexName(source.Index)
 
 		if err := ms.Crawler.Start(ctx); err != nil {
-			return errors.Wrapf(err, "error crawling source %s", source.Name)
+			return fmt.Errorf("error crawling source %s: %w", source.Name, err)
 		}
 		ms.Logger.Info("Finished crawl", "source", source.Name)
 	}
 	return nil
+}
+
+// filterSources filters the sources based on source name
+func filterSources(sources []SourceConfig, sourceName string) ([]SourceConfig, error) {
+	var filteredSources []SourceConfig
+	for _, source := range sources {
+		if source.Name == sourceName {
+			filteredSources = append(filteredSources, source)
+		}
+	}
+	if len(filteredSources) == 0 {
+		return nil, fmt.Errorf("no source found with name: %s", sourceName)
+	}
+	return filteredSources, nil
 }
 
 func (ms *MultiSource) Stop() {
@@ -101,8 +93,4 @@ func (ms *MultiSource) Stop() {
 
 var Module = fx.Module(
 	"multisource",
-	fx.Provide(
-
-		NewMultiSource,
-	),
 )

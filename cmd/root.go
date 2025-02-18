@@ -12,6 +12,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/fx"
 )
 
 var (
@@ -34,8 +35,7 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
-		//nolint:forbidigo // This is a CLI error
-		fmt.Println("Failed to load configuration:", err)
+		fmt.Println("Failed to load configuration", err)
 		os.Exit(1)
 	}
 }
@@ -56,10 +56,10 @@ func InitializeLogger(cfg *config.Config) (logger.Interface, error) {
 // Execute is the entry point for the CLI
 func Execute() error {
 	// Initialize dependencies
-	cmdInstance, err := initializeDependencies()
+	sourceName := ""                                       // Initialize sourceName
+	cmdInstance, err := initializeDependencies(sourceName) // Pass sourceName here
 	if err != nil {
-		//nolint:forbidigo // This is a CLI error
-		fmt.Println("Failed to initialize dependencies:", err)
+		fmt.Println("Failed to initialize dependencies", err)
 		os.Exit(1)
 	}
 
@@ -67,13 +67,13 @@ func Execute() error {
 }
 
 // Shutdown gracefully shuts down the application
-func Shutdown(_ context.Context) error {
+func Shutdown(ctx context.Context) error {
 	// Implement shutdown logic if necessary
 	return nil
 }
 
 // initializeDependencies initializes all dependencies for the CLI
-func initializeDependencies() (*cobra.Command, error) {
+func initializeDependencies(sourceName string) (*cobra.Command, error) {
 	// Initialize configuration
 	cfg, err := config.NewConfig() // This should be the only place you call NewConfig
 	if err != nil {
@@ -114,18 +114,23 @@ func initializeDependencies() (*cobra.Command, error) {
 	}
 
 	// Initialize multisource
-	multiSource, err := multisource.NewMultiSource(log, crawlerInstance.Crawler, "sources.yml") // Pass logger and crawler
+	multiSource, err := multisource.NewMultiSource(log, crawlerInstance.Crawler, "sources.yml", sourceName) // Pass logger, crawler, configPath, and sourceName
 	if err != nil {
 		return nil, err
 	}
 
 	// Create the multi crawl command
-	multiCmd := NewMultiCrawlCmd(log, cfg, multiSource) // Pass multiSource to the command
-	rootCmd.AddCommand(multiCmd)                        // Register the multi crawl command
+	multiCmd := NewMultiCrawlCmd(log, cfg, multiSource, crawlerInstance.Crawler) // Pass c here
+	rootCmd.AddCommand(multiCmd)                                                 // Register the multi crawl command
 
 	// Register the crawl and search commands
 	rootCmd.AddCommand(NewCrawlCmd(log, cfg))  // Pass logger and config to crawl command
 	rootCmd.AddCommand(NewSearchCmd(log, cfg)) // Pass logger and config to search command
+
+	// Provide the sourceName for lifecycle hooks
+	fx.Provide(func() string {
+		return sourceName
+	})
 
 	return rootCmd, nil
 }

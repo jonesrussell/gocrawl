@@ -74,11 +74,11 @@ func TestCommandsRegistered(t *testing.T) {
 	}
 
 	// Initialize multisource
-	multiSourceInstance, err := multisource.NewMultiSource(log, crawlerInstance.Crawler, "../sources.yml") // Pass logger, crawler, and config path
+	multiSourceInstance, err := multisource.NewMultiSource(log, crawlerInstance.Crawler, "../sources.yml", "example") // Pass logger, crawler, and config path
 	if err != nil {
 		t.Fatalf("Failed to create multi source instance: %v", err)
 	}
-	multiCrawlCmd := NewMultiCrawlCmd(log, cfg, multiSourceInstance) // Pass the instance to the command
+	multiCrawlCmd := NewMultiCrawlCmd(log, cfg, multiSourceInstance, crawlerInstance.Crawler) // Pass the instance to the command
 
 	// Register commands
 	rootCmd.AddCommand(crawlCmd)
@@ -97,4 +97,16 @@ func TestCommandsRegistered(t *testing.T) {
 	multiCommand, _, err := rootCmd.Find([]string{"multi"}) // Use a slice of strings
 	assert.NoError(t, err)
 	assert.NotNil(t, multiCommand, "Multi command should be registered")
+}
+
+func TestNewMultiCrawlCmd(t *testing.T) {
+	log := logger.NewMockLogger()             // Assuming you have a mock logger
+	cfg := &config.Config{}                   // Initialize your config as needed
+	multiSource := &multisource.MultiSource{} // Initialize your multisource as needed
+	crawlerInstance := &crawler.Crawler{}     // Initialize your crawler as needed
+
+	// Update this line to include the crawler instance
+	multiCmd := NewMultiCrawlCmd(log, cfg, multiSource, crawlerInstance)
+
+	assert.NotNil(t, multiCmd)
 }
