@@ -1,6 +1,6 @@
 module github.com/jonesrussell/gocrawl
 
-go 1.23.4
+go 1.24
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.2
@@ -8,7 +8,7 @@ require (
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/google/uuid v1.6.0
 	github.com/pkg/errors v0.9.1
-	github.com/spf13/cobra v1.9.0
+	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/fx v1.23.0
