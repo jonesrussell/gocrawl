@@ -8,6 +8,7 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -77,27 +78,26 @@ func NewCrawler(p Params) (Result, error) {
 	// Log the entire configuration to ensure it's set correctly
 	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
 
-	// Log the base URL to ensure it's set correctly
-	p.Logger.Debug("Initializing Crawler", "baseURL", p.Config.Crawler.BaseURL)
-
-	if p.Config.Crawler.BaseURL == "" {
-		return Result{}, errors.New("base URL cannot be empty")
-	}
-
 	p.Logger.Info("Crawler initialized",
-		"baseURL", p.Config.Crawler.BaseURL,
 		"maxDepth", p.Config.Crawler.MaxDepth,
 		"rateLimit", p.Config.Crawler.RateLimit,
 	)
 
-	collector, err := createCollector(p.Config.Crawler, p.Logger)
+	// Use the collector's New function to create a collector instance
+	collectorResult, err := collector.New(collector.Params{
+		BaseURL:   p.Config.Crawler.BaseURL,
+		MaxDepth:  p.Config.Crawler.MaxDepth,
+		RateLimit: p.Config.Crawler.RateLimit,
+		Debugger:  p.Debugger,
+		Logger:    p.Logger,
+	})
 	if err != nil {
 		return Result{}, err
 	}
 
 	crawler := &Crawler{
 		Storage:        p.Storage,
-		Collector:      collector,
+		Collector:      collectorResult.Collector,
 		Logger:         p.Logger,
 		Debugger:       p.Debugger,
 		IndexName:      p.Config.Crawler.IndexName,
@@ -108,7 +108,7 @@ func NewCrawler(p Params) (Result, error) {
 	}
 
 	// Configure collector callbacks
-	configureCollectorCallbacks(collector, crawler)
+	configureCollectorCallbacks(collectorResult.Collector, crawler)
 
 	return Result{Crawler: crawler}, nil
 }

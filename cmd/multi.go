@@ -19,11 +19,6 @@ var multiCmd = &cobra.Command{
 	Use:   "multi",
 	Short: "Crawl multiple sources defined in sources.yml",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if sourceName is empty
-		if sourceName == "" {
-			return fmt.Errorf("source name must be provided")
-		}
-
 		ctx := cmd.Context()
 		globalLogger.Debug("Starting multi-crawl command...", "sourceName", sourceName)
 
@@ -56,10 +51,9 @@ var multiCmd = &cobra.Command{
 		}
 
 		// Initialize MultiSource
-		multiSource, err := multisource.NewMultiSource(globalLogger, crawlerInstance.Crawler, "sources.yml", sourceName)
+		sources, err := multisource.NewMultiSource(globalLogger, crawlerInstance.Crawler, "sources.yml")
 		if err != nil {
-			globalLogger.Error("Error creating MultiSource", "error", err)
-			return fmt.Errorf("error creating MultiSource: %w", err)
+			return fmt.Errorf("error creating sources: %w", err)
 		}
 
 		app := newMultiCrawlFxApp(globalLogger, "sources.yml", sourceName, crawlerInstance.Crawler)
@@ -75,7 +69,7 @@ var multiCmd = &cobra.Command{
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		if err := multiSource.Start(ctx, sourceName); err != nil {
+		if err := sources.Start(ctx, sourceName); err != nil {
 			globalLogger.Error("Error starting multi-source crawl", "context", ctx, "sourceName", sourceName, "error", err)
 			return fmt.Errorf("error starting multi-source crawl: %w", err)
 		}
@@ -128,7 +122,7 @@ func newMultiCrawlFxApp(log logger.Interface, configPath string, sourceName stri
 		crawler.Module,
 		multisource.Module,
 		fx.Provide(func() *multisource.MultiSource {
-			ms, err := multisource.NewMultiSource(log, c, configPath, sourceName)
+			ms, err := multisource.NewMultiSource(log, c, configPath)
 			if err != nil {
 				log.Error("Error creating MultiSource", "error", err)
 				return nil

@@ -17,8 +17,14 @@ const (
 )
 
 // Start method to begin crawling
-func (c *Crawler) Start(ctx context.Context) error {
-	c.Logger.Debug("Starting crawl at base URL", "url", c.Config.Crawler.BaseURL)
+func (c *Crawler) Start(ctx context.Context, baseURL string) error {
+	if baseURL == "" {
+		return fmt.Errorf("base URL cannot be empty")
+	}
+	c.Logger.Debug("Starting crawl at base URL", "url", baseURL)
+
+	// Set the BaseURL in the configuration
+	c.Config.Crawler.BaseURL = baseURL
 
 	// Perform initial setup (e.g., test connection, ensure index)
 	if err := c.Storage.TestConnection(ctx); err != nil {
@@ -38,7 +44,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	go func() {
 		defer close(done)
 		// Visit the base URL to start crawling
-		if err := c.Collector.Visit(c.Config.Crawler.BaseURL); err != nil {
+		if err := c.Collector.Visit(baseURL); err != nil {
 			c.Logger.Error("Failed to visit base URL", "error", err)
 			return
 		}

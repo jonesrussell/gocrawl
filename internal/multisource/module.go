@@ -28,7 +28,7 @@ type MultiSource struct {
 }
 
 // NewMultiSource creates a new MultiSource instance
-func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string, sourceName string) (*MultiSource, error) {
+func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string) (*MultiSource, error) {
 	log.Debug("NewMultiSource", "configPath", configPath)
 
 	file, err := os.Open(configPath)
@@ -62,12 +62,12 @@ func (ms *MultiSource) Start(ctx context.Context, sourceName string) error {
 	for _, source := range filteredSources {
 		ms.Logger.Info("Starting crawl", "source", source.Name)
 
-		ms.Crawler.Config.Crawler.SetBaseURL(source.URL)
 		ms.Crawler.Config.Crawler.SetIndexName(source.Index)
 
-		if err := ms.Crawler.Start(ctx); err != nil {
+		if err := ms.Crawler.Start(ctx, source.URL); err != nil {
 			return fmt.Errorf("error crawling source %s: %w", source.Name, err)
 		}
+
 		ms.Logger.Info("Finished crawl", "source", source.Name)
 	}
 	return nil
@@ -76,14 +76,17 @@ func (ms *MultiSource) Start(ctx context.Context, sourceName string) error {
 // filterSources filters the sources based on source name
 func filterSources(sources []SourceConfig, sourceName string) ([]SourceConfig, error) {
 	var filteredSources []SourceConfig
+
 	for _, source := range sources {
 		if source.Name == sourceName {
 			filteredSources = append(filteredSources, source)
 		}
 	}
+
 	if len(filteredSources) == 0 {
 		return nil, fmt.Errorf("no source found with name: %s", sourceName)
 	}
+
 	return filteredSources, nil
 }
 
