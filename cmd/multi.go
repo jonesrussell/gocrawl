@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -57,6 +58,23 @@ var multiCmd = &cobra.Command{
 		}
 
 		app := newMultiCrawlFxApp(globalLogger, "sources.yml", sourceName, crawlerInstance.Crawler)
+
+		globalConfig.Crawler.SetBaseURL(sources.Sources[0].URL)
+
+		// Create the collector
+		collectorResult, err := collector.New(collector.Params{
+			BaseURL:   globalConfig.Crawler.BaseURL,
+			MaxDepth:  globalConfig.Crawler.MaxDepth,
+			RateLimit: globalConfig.Crawler.RateLimit,
+			Debugger:  debuggerInstance,
+			Logger:    globalLogger,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating collector: %w", err)
+		}
+
+		// Set the collector in the crawler instance
+		crawlerInstance.Crawler.SetCollector(collectorResult.Collector)
 
 		defer func() {
 			if err := app.Stop(ctx); err != nil {

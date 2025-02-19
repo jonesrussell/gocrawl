@@ -8,7 +8,6 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -48,7 +47,7 @@ type Result struct {
 // Crawler represents a web crawler
 type Crawler struct {
 	Storage        storage.Interface
-	Collector      *colly.Collector
+	Collector      *colly.Collector // This will be set later
 	Logger         logger.Interface
 	Debugger       *logger.CollyDebugger
 	IndexName      string
@@ -78,26 +77,8 @@ func NewCrawler(p Params) (Result, error) {
 	// Log the entire configuration to ensure it's set correctly
 	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
 
-	p.Logger.Info("Crawler initialized",
-		"maxDepth", p.Config.Crawler.MaxDepth,
-		"rateLimit", p.Config.Crawler.RateLimit,
-	)
-
-	// Use the collector's New function to create a collector instance
-	collectorResult, err := collector.New(collector.Params{
-		BaseURL:   p.Config.Crawler.BaseURL,
-		MaxDepth:  p.Config.Crawler.MaxDepth,
-		RateLimit: p.Config.Crawler.RateLimit,
-		Debugger:  p.Debugger,
-		Logger:    p.Logger,
-	})
-	if err != nil {
-		return Result{}, err
-	}
-
 	crawler := &Crawler{
 		Storage:        p.Storage,
-		Collector:      collectorResult.Collector,
 		Logger:         p.Logger,
 		Debugger:       p.Debugger,
 		IndexName:      p.Config.Crawler.IndexName,
@@ -108,7 +89,7 @@ func NewCrawler(p Params) (Result, error) {
 	}
 
 	// Configure collector callbacks
-	configureCollectorCallbacks(collectorResult.Collector, crawler)
+	// Note: We will set the collector later in cmd/multi.go
 
 	return Result{Crawler: crawler}, nil
 }
