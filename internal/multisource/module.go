@@ -56,7 +56,7 @@ func (ms *MultiSource) Start(ctx context.Context, sourceName string) error {
 		return errors.New("MultiSource is nil")
 	}
 	if ms.Crawler == nil {
-		return errors.New("Crawler is not initialized")
+		return errors.New("crawler is not initialized")
 	}
 	ms.Logger.Debug("Starting multi-source crawl", "sourceName", sourceName)
 

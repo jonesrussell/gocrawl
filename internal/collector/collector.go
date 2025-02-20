@@ -91,7 +91,9 @@ func New(p Params, crawlerInstance *crawler.Crawler) (Result, error) {
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 		p.Logger.Debug("Link found", "text", e.Text, "link", link)
-		c.Visit(e.Request.AbsoluteURL(link)) // Visit the link
+		if err := c.Visit(e.Request.AbsoluteURL(link)); err != nil {
+			p.Logger.Error("Failed to visit link", "link", link, "error", err)
+		}
 	})
 
 	c.OnHTML("div.details", func(e *colly.HTMLElement) {
