@@ -93,7 +93,12 @@ func New(p Params, crawlerInstance *crawler.Crawler) (Result, error) {
 		p.Logger.Debug("Link found", "text", e.Text, "link", link)
 		visitErr := e.Request.Visit(e.Request.AbsoluteURL(link))
 		if visitErr != nil {
-			p.Logger.Error("Failed to visit link", "link", link, "error", visitErr)
+			// Check if the error is due to max depth limit
+			if visitErr.Error() == "Max depth limit reached" {
+				p.Logger.Info("Max depth limit reached for link", "link", link) // Log as info instead of error
+			} else {
+				p.Logger.Error("Failed to visit link", "link", link, "error", visitErr)
+			}
 		}
 	})
 
