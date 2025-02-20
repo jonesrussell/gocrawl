@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
@@ -17,7 +16,7 @@ type SearchRequest struct {
 }
 
 // StartHTTPServer starts the HTTP server for search requests
-func StartHTTPServer(lc fx.Lifecycle, log logger.Interface) (*http.Server, error) {
+func StartHTTPServer(log logger.Interface) (*http.Server, error) {
 	log.Info("StartHTTPServer function called")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
@@ -43,29 +42,11 @@ func StartHTTPServer(lc fx.Lifecycle, log logger.Interface) (*http.Server, error
 
 	server := &http.Server{Addr: ":8081", Handler: mux}
 
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			log.Info("Preparing to start HTTP server...")
-			go func() {
-				if err := server.ListenAndServe(); err != nil {
-					log.Error("HTTP server failed", "error", err)
-				}
-			}()
-			log.Info("HTTP server started on :8081")
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			log.Info("Shutting down HTTP server")
-			return server.Shutdown(ctx) // Graceful shutdown
-		},
-	})
-
 	return server, nil // Return the server instance
 }
 
 // executeSearch performs the search operation
 func executeSearch(query, index string, size int, log logger.Interface) error {
-	// Here you can call the existing search logic
 	log.Info("Executing search", "query", query, "index", index, "size", size)
 	return nil
 }

@@ -27,6 +27,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"net/http"
+
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
@@ -48,8 +50,14 @@ You can send POST requests to /search with a JSON body containing the search par
 					return globalLogger // Use the global logger
 				},
 			),
-			fx.Invoke(func() {
-				globalLogger.Info("Fx application started")
+			fx.Invoke(func(server *http.Server) {
+				// Start the server
+				go func() {
+					if err := server.ListenAndServe(); err != nil {
+						globalLogger.Error("HTTP server failed", "error", err)
+					}
+				}()
+				globalLogger.Info("HTTP server started on :8081")
 			}),
 		)
 
