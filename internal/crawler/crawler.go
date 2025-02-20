@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,7 +20,7 @@ const (
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 	if baseURL == "" {
-		return fmt.Errorf("base URL cannot be empty")
+		return errors.New("base URL cannot be empty")
 	}
 	c.Logger.Debug("Starting crawl at base URL", "url", baseURL)
 

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -92,7 +91,7 @@ func InitializeLogger(cfg *config.Config) (logger.Interface, error) {
 }
 
 // Shutdown gracefully shuts down the application
-func Shutdown(ctx context.Context) error {
+func Shutdown() error {
 	// Implement shutdown logic if necessary
 	return nil
 }

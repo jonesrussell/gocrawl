@@ -20,7 +20,7 @@ var sourceName string
 var multiCmd = &cobra.Command{
 	Use:   "multi",
 	Short: "Crawl multiple sources defined in sources.yml",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
 		globalLogger.Debug("Starting multi-crawl command...", "sourceName", sourceName)
 
@@ -169,7 +169,7 @@ func setupMultiLifecycleHooks(lc fx.Lifecycle, deps struct {
 			deps.Logger.Debug("Starting multi-source crawl", "sourceName", deps.SourceName)
 			return deps.MultiSource.Start(ctx, deps.SourceName)
 		},
-		OnStop: func(ctx context.Context) error {
+		OnStop: func(_ context.Context) error {
 			deps.Logger.Debug("Stopping multi-crawl application...")
 			deps.MultiSource.Stop()
 			return nil
