@@ -161,7 +161,8 @@ func TestNewCollector(t *testing.T) {
 // TestNewCollector_MissingLogger tests the New function of the collector package
 func TestNewCollector_MissingLogger(t *testing.T) {
 	params := collector.Params{
-		Logger: nil, // Pass nil for the logger
+		BaseURL: "http://example.com", // Provide a valid base URL
+		Logger:  nil,                  // Pass nil for the logger
 	}
 
 	result, err := collector.New(params, nil) // Pass nil for the crawler
