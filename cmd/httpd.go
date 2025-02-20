@@ -23,14 +23,15 @@ package cmd
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"net/http"
-
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -44,7 +45,9 @@ You can send POST requests to /search with a JSON body containing the search par
 	Run: func(_ *cobra.Command, args []string) {
 		// Initialize the Fx application with the HTTP server
 		app := fx.New(
+			config.Module,
 			api.Module,
+			storage.Module,
 			fx.Provide(
 				func() logger.Interface {
 					return globalLogger // Use the global logger
