@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 )
 
@@ -16,7 +18,7 @@ type SearchRequest struct {
 }
 
 // StartHTTPServer starts the HTTP server for search requests
-func StartHTTPServer(log logger.Interface) (*http.Server, error) {
+func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceInterface) (*http.Server, error) {
 	log.Info("StartHTTPServer function called")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
@@ -31,24 +33,20 @@ func StartHTTPServer(log logger.Interface) (*http.Server, error) {
 			return
 		}
 
-		// Call the search function with the extracted parameters
-		if err := executeSearch(req.Query, req.Index, req.Size, log); err != nil {
+		// Use the search service to perform the search
+		articles, err := searchService.SearchArticles(context.Background(), req.Query, req.Size)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(articles)
 	})
 
 	server := &http.Server{Addr: ":8081", Handler: mux}
 
 	return server, nil // Return the server instance
-}
-
-// executeSearch performs the search operation
-func executeSearch(query, index string, size int, log logger.Interface) error {
-	log.Info("Executing search", "query", query, "index", index, "size", size)
-	return nil
 }
 
 // Module is the Fx module for the API
