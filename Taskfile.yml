@@ -14,7 +14,7 @@ tasks:
   search:
     desc: "Search crawled content"
     cmds:
-      - go run main.go search -q "{{.CLI_ARGS}}" -i articles
+      - go run main.go search -q "{{.CLI_ARGS}}" -i elliotlake_elliotlaketoday_articles
 
   build:
     desc: "Build the web crawler executable"

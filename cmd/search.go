@@ -36,6 +36,9 @@ func createSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 
 // setupSearchCmd handles the setup for the search command
 func setupSearchCmd(cmd *cobra.Command, cfg *config.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("configuration is required") // Check if cfg is nil
+	}
 	cfg.Elasticsearch.IndexName = cmd.Flag("index").Value.String()
 	return nil
 }
@@ -116,18 +119,10 @@ func runSearchApp(ctx context.Context, log logger.Interface, searchSvc *search.S
 
 func init() {
 	searchCmd = createSearchCmd(globalLogger, globalConfig)
+
 	rootCmd.AddCommand(searchCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// searchCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// searchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-
+	// Define flags for the search command in init
 	searchCmd.Flags().StringP("index", "i", "articles", "Index to search")
 	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return")
 	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
