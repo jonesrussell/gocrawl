@@ -55,6 +55,11 @@ func New(p Params, crawlerInstance *crawler.Crawler) (Result, error) {
 		return Result{}, errors.New("base URL cannot be empty")
 	}
 
+	// Check if crawlerInstance is nil
+	if crawlerInstance == nil {
+		return Result{}, errors.New("crawler instance is required")
+	}
+
 	parsedURL, err := url.Parse(p.BaseURL)
 	if err != nil || (!strings.HasPrefix(parsedURL.Scheme, "http") && !strings.HasPrefix(parsedURL.Scheme, "https")) {
 		return Result{}, errors.New("invalid base URL: must be a valid HTTP/HTTPS URL")

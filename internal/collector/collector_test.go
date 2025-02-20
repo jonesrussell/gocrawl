@@ -38,8 +38,14 @@ func TestNew(t *testing.T) {
 	// Set expectation for the "Collector created" log message
 	mockLogger.On("Debug", "Collector created", mock.Anything).Return()
 
-	// Pass nil for the crawler if not needed
-	result, err := collector.New(params, nil)
+	// Create a mock crawler instance
+	mockCrawler := &crawler.Crawler{
+		Logger: mockLogger, // Use the mock logger
+		// Initialize other necessary fields if needed...
+	}
+
+	// Pass the mock crawler to the New function
+	result, err := collector.New(params, mockCrawler)
 	require.NoError(t, err)
 	require.NotNil(t, result.Collector)
 
@@ -141,6 +147,9 @@ func TestNewCollector(t *testing.T) {
 		Logger:    mockLogger,
 	}
 
+	// Set expectation for the "Collector created" log message
+	mockLogger.On("Debug", "Collector created", mock.Anything).Return()
+
 	// Create the collector using the collector module
 	collectorResult, err := collector.New(params, mockCrawler) // Pass the mockCrawler here
 
@@ -149,6 +158,7 @@ func TestNewCollector(t *testing.T) {
 	// Add additional assertions as needed
 }
 
+// TestNewCollector_MissingLogger tests the New function of the collector package
 func TestNewCollector_MissingLogger(t *testing.T) {
 	params := collector.Params{
 		Logger: nil, // Pass nil for the logger
