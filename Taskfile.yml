@@ -4,12 +4,17 @@ tasks:
   crawl:
     desc: "Run the web crawler"
     cmds:
-      - go run main.go crawl -u https://www.elliotlaketoday.com/opp-beat -d 2 -r 2s -i articles
+      - go run main.go crawl -u https://www.elliotlaketoday.com/opp-beat -d 2 -r 2s -i elliotlake_elliotlaketoday_articles
+
+  crawl:multi:
+    desc: "Run the web crawler for multiple sources defined in sources.yml"
+    cmds:
+      - go run main.go multi --source "Mid North Monitor"
 
   search:
     desc: "Search crawled content"
     cmds:
-      - go run main.go search -q "{{.CLI_ARGS}}" -i articles
+      - go run main.go search -q "{{.CLI_ARGS}}" -i elliotlake_elliotlaketoday_articles
 
   build:
     desc: "Build the web crawler executable"

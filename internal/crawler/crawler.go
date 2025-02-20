@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,8 +18,14 @@ const (
 )
 
 // Start method to begin crawling
-func (c *Crawler) Start(ctx context.Context) error {
-	c.Logger.Debug("Starting crawl at base URL", "url", c.Config.Crawler.BaseURL)
+func (c *Crawler) Start(ctx context.Context, baseURL string) error {
+	if baseURL == "" {
+		return errors.New("base URL cannot be empty")
+	}
+	c.Logger.Debug("Starting crawl at base URL", "url", baseURL)
+
+	// Log the entire configuration being used by the crawler
+	c.Logger.Debug("Crawler configuration", "baseURL", baseURL)
 
 	// Perform initial setup (e.g., test connection, ensure index)
 	if err := c.Storage.TestConnection(ctx); err != nil {
@@ -38,7 +45,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	go func() {
 		defer close(done)
 		// Visit the base URL to start crawling
-		if err := c.Collector.Visit(c.Config.Crawler.BaseURL); err != nil {
+		if err := c.Collector.Visit(baseURL); err != nil {
 			c.Logger.Error("Failed to visit base URL", "error", err)
 			return
 		}
@@ -74,8 +81,8 @@ func (c *Crawler) ProcessPage(e *colly.HTMLElement) {
 	}
 	c.Logger.Debug("Article extracted", "url", e.Request.URL.String(), "title", article.Title)
 
-	// Index the article after extraction
-	if err := c.Storage.IndexDocument(context.Background(), "articles", article.ID, article); err != nil {
+	// Use the dynamic index name from the Crawler instance
+	if err := c.Storage.IndexDocument(context.Background(), c.IndexName, article.ID, article); err != nil {
 		c.Logger.Error("Failed to index article", "articleID", article.ID, "error", err)
 		return
 	}
@@ -92,49 +99,7 @@ func (c *Crawler) SetService(svc article.Interface) {
 	c.ArticleService = svc
 }
 
-func configureCollectorCallbacks(c *colly.Collector, crawler *Crawler) {
-	c.OnRequest(func(r *colly.Request) {
-		crawler.Logger.Debug("Requesting URL", r.URL.String())
-	})
-
-	c.OnResponse(func(r *colly.Response) {
-		crawler.Logger.Debug("Received response", "url", r.Request.URL.String(), "status", r.StatusCode)
-	})
-
-	c.OnError(func(r *colly.Response, err error) {
-		crawler.Logger.Error("Error scraping", "url", r.Request.URL.String(), "error", err)
-	})
-
-	c.OnHTML("div.details", func(e *colly.HTMLElement) {
-		crawler.Logger.Debug("Found details", "url", e.Request.URL.String())
-		crawler.ProcessPage(e)
-	})
-
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if link == "" {
-			return
-		}
-		crawler.Logger.Debug("Found link", "url", link)
-		if err := e.Request.Visit(link); err != nil {
-			crawler.Logger.Debug("Could not visit link", "url", link, "error", err)
-		}
-	})
-
-	if crawler.Debugger != nil {
-		c.SetDebugger(crawler.Debugger)
-	}
-}
-
 // Getter methods for configuration
 func (c *Crawler) GetBaseURL() string {
 	return c.Config.Crawler.BaseURL
-}
-
-func (c *Crawler) GetMaxDepth() int {
-	return c.Config.Crawler.MaxDepth
-}
-
-func (c *Crawler) GetRateLimit() time.Duration {
-	return c.Config.Crawler.RateLimit
 }

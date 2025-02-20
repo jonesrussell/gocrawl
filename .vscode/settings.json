@@ -5,4 +5,5 @@
     ".golangci.yml",
     "--issues-exit-code=0"
 ],
+"editor.defaultFormatter": "golang.go",
 }

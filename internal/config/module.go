@@ -5,9 +5,9 @@ import (
 )
 
 // Module provides the config module and its dependencies
-var Module = fx.Module("config",
+var Module = fx.Options(
 	fx.Provide(
-		NewConfig,        // Function to create a new config instance
-		NewHTTPTransport, // Ensure this is provided
+		NewConfig,        // Provide the NewConfig function to return *Config
+		NewHTTPTransport, // Ensure this is also provided if needed
 	),
 )

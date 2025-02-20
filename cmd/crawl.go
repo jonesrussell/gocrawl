@@ -20,18 +20,89 @@ const (
 )
 
 // NewCrawlCmd creates a new crawl command
-func NewCrawlCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
-	var crawlCmd = &cobra.Command{
-		Use:   "crawl",
-		Short: "Start crawling a website",
-		Long:  `Crawl a website and store the content in Elasticsearch`,
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return setupCrawlCmd(cmd, cfg)
-		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return executeCrawlCmd(cmd, log)
-		},
+var crawlCmd = &cobra.Command{
+	Use:   "crawl",
+	Short: "Start crawling a website",
+	Long:  `Crawl a website and store the content in Elasticsearch`,
+	PreRunE: func(cmd *cobra.Command, _ []string) error {
+		return setupCrawlCmd(cmd)
+	},
+	RunE: runCrawlCmd,
+}
+
+// setupCrawlCmd handles the setup for the crawl command
+func setupCrawlCmd(cmd *cobra.Command) error {
+	// Set the configuration values directly from cmd flags
+	globalConfig.Crawler.BaseURL = cmd.Flag("url").Value.String()
+	if depth, err := cmd.Flags().GetInt("depth"); err == nil {
+		globalConfig.Crawler.MaxDepth = depth
 	}
+	rateLimit, err := cmd.Flags().GetDuration("rate")
+	if err == nil {
+		globalConfig.Crawler.RateLimit = rateLimit
+	}
+	globalConfig.Crawler.IndexName = cmd.Flag("index").Value.String()
+	return nil
+}
+
+// runCrawlCmd handles the execution of the crawl command
+func runCrawlCmd(cmd *cobra.Command, _ []string) error {
+	// Initialize fx container
+	app := fx.New(
+		config.Module,
+		logger.Module,
+		storage.Module,
+		collector.Module,
+		crawler.Module,
+		fx.Invoke(startCrawlCmd),
+	)
+
+	// Start the application
+	if err := app.Start(cmd.Context()); err != nil {
+		globalLogger.Error("Error starting application", "error", err)
+		return fmt.Errorf("error starting application: %w", err)
+	}
+
+	defer func() {
+		if err := app.Stop(cmd.Context()); err != nil {
+			globalLogger.Error("Error stopping application", "error", err)
+		}
+	}()
+
+	return nil
+}
+
+// startCrawl starts the crawling process
+func startCrawlCmd(crawler *crawler.Crawler) error {
+	globalLogger.Debug("Starting crawl...")
+
+	// Create the collector using global configuration
+	params := collector.Params{
+		BaseURL:   globalConfig.Crawler.BaseURL,
+		MaxDepth:  globalConfig.Crawler.MaxDepth,
+		RateLimit: globalConfig.Crawler.RateLimit,
+		Logger:    globalLogger,
+	}
+
+	// Create the collector
+	collectorResult, err := collector.New(params, crawler)
+	if err != nil {
+		return fmt.Errorf("error creating collector: %w", err)
+	}
+
+	// Set the collector in the crawler instance
+	crawler.SetCollector(collectorResult.Collector)
+
+	// Start the crawling process
+	if startErr := crawler.Start(context.Background(), params.BaseURL); startErr != nil {
+		return fmt.Errorf("error starting crawler: %w", startErr)
+	}
+
+	return nil
+}
+
+func init() {
+	rootCmd.AddCommand(crawlCmd)
 
 	crawlCmd.Flags().StringP("url", "u", "", "Base URL to crawl (required)")
 	crawlCmd.Flags().IntP("depth", "d", DefaultMaxDepth, "Maximum crawl depth")
@@ -40,73 +111,6 @@ func NewCrawlCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 
 	err := crawlCmd.MarkFlagRequired("url")
 	if err != nil {
-		log.Error("Error marking URL flag as required", "error", err)
+		globalLogger.Error("Error marking URL flag as required", "error", err)
 	}
-
-	return crawlCmd
-}
-
-// setupCrawlCmd handles the setup for the crawl command
-func setupCrawlCmd(cmd *cobra.Command, cfg *config.Config) error {
-	// Set the configuration values directly from cfg
-	cfg.Crawler.BaseURL = cmd.Flag("url").Value.String()
-	if depth, err := cmd.Flags().GetInt("depth"); err == nil {
-		cfg.Crawler.MaxDepth = depth
-	}
-	rateLimit, err := cmd.Flags().GetDuration("rate")
-	if err == nil {
-		cfg.Crawler.RateLimit = rateLimit
-	}
-	cfg.Crawler.IndexName = cmd.Flag("index").Value.String()
-	return nil
-}
-
-// executeCrawlCmd handles the execution of the crawl command
-func executeCrawlCmd(cmd *cobra.Command, log logger.Interface) error {
-	// Initialize fx container
-	app := newCrawlFxApp()
-
-	// Start the application
-	if err := app.Start(cmd.Context()); err != nil {
-		log.Error("Error starting application", "error", err)
-		return fmt.Errorf("error starting application: %w", err)
-	}
-	defer func() {
-		if err := app.Stop(cmd.Context()); err != nil {
-			log.Error("Error stopping application", "error", err)
-		}
-	}()
-
-	return nil
-}
-
-// newFxApp initializes the Fx application with dependencies
-func newCrawlFxApp() *fx.App {
-	return fx.New(
-		config.Module,
-		logger.Module,
-		storage.Module,
-		collector.Module,
-		crawler.Module,
-		fx.Invoke(setupLifecycleHooks),
-	)
-}
-
-// setupLifecycleHooks sets up the lifecycle hooks for the Fx application
-func setupLifecycleHooks(lc fx.Lifecycle, deps struct {
-	fx.In
-	Logger  logger.Interface
-	Crawler *crawler.Crawler
-}) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			deps.Logger.Debug("Starting application...")
-			return deps.Crawler.Start(ctx)
-		},
-		OnStop: func(_ context.Context) error {
-			deps.Logger.Debug("Stopping application...")
-			deps.Crawler.Stop()
-			return nil
-		},
-	})
 }

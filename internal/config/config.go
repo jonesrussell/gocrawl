@@ -16,17 +16,18 @@ var (
 
 // Configuration keys
 const (
-	AppEnvKey           = "APP_ENV"
-	LogLevelKey         = "LOG_LEVEL"
-	AppDebugKey         = "APP_DEBUG"
-	CrawlerBaseURLKey   = "CRAWLER_BASE_URL"
-	CrawlerMaxDepthKey  = "CRAWLER_MAX_DEPTH"
-	CrawlerRateLimitKey = "CRAWLER_RATE_LIMIT"
-	ElasticURLKey       = "ELASTIC_URL"
-	ElasticUsernameKey  = "ELASTIC_USERNAME"
-	ElasticPasswordKey  = "ELASTIC_PASSWORD"
-	ElasticIndexNameKey = "ELASTIC_INDEX_NAME"
-	ElasticSkipTLSKey   = "ELASTIC_SKIP_TLS"
+	AppEnvKey            = "APP_ENV"
+	LogLevelKey          = "LOG_LEVEL"
+	AppDebugKey          = "APP_DEBUG"
+	CrawlerBaseURLKey    = "CRAWLER_BASE_URL"
+	CrawlerMaxDepthKey   = "CRAWLER_MAX_DEPTH"
+	CrawlerRateLimitKey  = "CRAWLER_RATE_LIMIT"
+	CrawlerSourceFileKey = "CRAWLER_SOURCE_FILE"
+	ElasticURLKey        = "ELASTIC_URL"
+	ElasticUsernameKey   = "ELASTIC_USERNAME"
+	ElasticPasswordKey   = "ELASTIC_PASSWORD"
+	ElasticIndexNameKey  = "ELASTIC_INDEX_NAME"
+	ElasticSkipTLSKey    = "ELASTIC_SKIP_TLS"
 	//nolint:gosec // This is a false positive
 	ElasticAPIKeyKey = "ELASTIC_API_KEY"
 )
@@ -40,10 +41,35 @@ type AppConfig struct {
 
 // CrawlerConfig holds crawler-specific configuration
 type CrawlerConfig struct {
-	BaseURL   string
-	MaxDepth  int
-	RateLimit time.Duration
-	IndexName string
+	BaseURL    string
+	MaxDepth   int
+	RateLimit  time.Duration
+	IndexName  string
+	SourceFile string
+}
+
+// SetMaxDepth sets the MaxDepth in the CrawlerConfig
+func (c *CrawlerConfig) SetMaxDepth(depth int) {
+	c.MaxDepth = depth
+	viper.Set(CrawlerMaxDepthKey, depth) // Also set it in Viper
+}
+
+// SetRateLimit sets the RateLimit in the CrawlerConfig
+func (c *CrawlerConfig) SetRateLimit(rate time.Duration) {
+	c.RateLimit = rate
+	viper.Set(CrawlerRateLimitKey, rate.String()) // Also set it in Viper
+}
+
+// SetBaseURL sets the BaseURL in the CrawlerConfig
+func (c *CrawlerConfig) SetBaseURL(url string) {
+	c.BaseURL = url
+	viper.Set(CrawlerBaseURLKey, url) // Also set it in Viper
+}
+
+// SetIndexName sets the IndexName in the CrawlerConfig
+func (c *CrawlerConfig) SetIndexName(index string) {
+	c.IndexName = index
+	viper.Set(ElasticIndexNameKey, index) // Also set it in Viper
 }
 
 // ElasticsearchConfig holds Elasticsearch-specific configuration
@@ -95,10 +121,11 @@ func NewConfig() (*Config, error) {
 			Debug:       viper.GetBool(AppDebugKey),
 		},
 		Crawler: CrawlerConfig{
-			BaseURL:   viper.GetString(CrawlerBaseURLKey),
-			MaxDepth:  viper.GetInt(CrawlerMaxDepthKey),
-			RateLimit: rateLimit,
-			IndexName: viper.GetString(ElasticIndexNameKey),
+			BaseURL:    viper.GetString(CrawlerBaseURLKey),
+			MaxDepth:   viper.GetInt(CrawlerMaxDepthKey),
+			RateLimit:  rateLimit,
+			IndexName:  viper.GetString(ElasticIndexNameKey),
+			SourceFile: viper.GetString(CrawlerSourceFileKey),
 		},
 		Elasticsearch: ElasticsearchConfig{
 			URL:       viper.GetString(ElasticURLKey),
