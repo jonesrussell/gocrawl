@@ -49,3 +49,8 @@ tasks:
     desc: "Show available commands"
     cmds:
       - go run main.go --help
+
+  api:
+    desc: "Run the HTTP API server"
+    cmds:
+      - go run main.go httpd

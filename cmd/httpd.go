@@ -22,30 +22,48 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
+	"go.uber.org/fx"
 )
 
 // httpdCmd represents the httpd command
 var httpdCmd = &cobra.Command{
 	Use:   "httpd",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Start the HTTP server for search",
+	Long: `This command starts an HTTP server that listens for search requests.
+You can send POST requests to /search with a JSON body containing the search parameters.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("httpd called")
+		// Initialize the Fx application with the HTTP server
+		app := fx.New(
+			api.Module,
+			fx.Provide(
+				func() logger.Interface {
+					return globalLogger // Use the global logger
+				},
+			),
+		)
+
+		// Start the application
+		if err := app.Start(context.Background()); err != nil {
+			fmt.Println("Error starting HTTP server:", err)
+			return
+		}
+
+		// Wait for the application to stop
+		defer app.Stop(context.Background())
+		fmt.Println("HTTP server started on :8080")
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(httpdCmd)
 
-	// Here you will define your flags and configuration settings.
+	// Here you can define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
