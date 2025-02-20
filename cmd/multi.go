@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -127,52 +126,4 @@ func filterSources(sources []multisource.SourceConfig, sourceName string) ([]mul
 		return nil, fmt.Errorf("no source found with name: %s", sourceName)
 	}
 	return filteredSources, nil
-}
-
-// newMultiCrawlFxApp initializes a new Fx application for multi-source crawling
-func newMultiCrawlFxApp(log logger.Interface, configPath string, sourceName string, c *crawler.Crawler) *fx.App {
-	log.Debug("Initializing multi-crawl application...")
-
-	return fx.New(
-		config.Module,
-		logger.Module,
-		storage.Module,
-		crawler.Module,
-		multisource.Module,
-		fx.Provide(func() *multisource.MultiSource {
-			ms, err := multisource.NewMultiSource(log, c, configPath)
-			if err != nil {
-				log.Error("Error creating MultiSource", "error", err)
-				return nil
-			}
-			return ms
-		}),
-		fx.Provide(func() string {
-			return sourceName
-		}),
-		fx.Invoke(setupMultiLifecycleHooks),
-	)
-}
-
-// setupMultiLifecycleHooks sets up lifecycle hooks for the multi-crawl application
-func setupMultiLifecycleHooks(lc fx.Lifecycle, deps struct {
-	fx.In
-	Logger      logger.Interface
-	Crawler     *crawler.Crawler
-	MultiSource *multisource.MultiSource
-	Config      *config.Config
-	SourceName  string
-}) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			deps.Logger.Debug("Starting multi-crawl application...")
-			deps.Logger.Debug("Starting multi-source crawl", "sourceName", deps.SourceName)
-			return deps.MultiSource.Start(ctx, deps.SourceName)
-		},
-		OnStop: func(_ context.Context) error {
-			deps.Logger.Debug("Stopping multi-crawl application...")
-			deps.MultiSource.Stop()
-			return nil
-		},
-	})
 }

@@ -32,9 +32,9 @@ type MultiSource struct {
 func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string) (*MultiSource, error) {
 	log.Debug("NewMultiSource", "configPath", configPath)
 
-	file, err := os.Open(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read %s: %w", configPath, err)
+	file, openErr := os.Open(configPath)
+	if openErr != nil {
+		return nil, fmt.Errorf("failed to read %s: %w", configPath, openErr)
 	}
 	defer file.Close()
 
@@ -42,8 +42,8 @@ func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string)
 		Sources []SourceConfig `yaml:"sources"`
 	}
 
-	if err := yaml.NewDecoder(file).Decode(&config); err != nil {
-		return nil, fmt.Errorf("failed to decode %s: %w", configPath, err)
+	if decodeErr := yaml.NewDecoder(file).Decode(&config); decodeErr != nil {
+		return nil, fmt.Errorf("failed to decode %s: %w", configPath, decodeErr)
 	}
 
 	ms := &MultiSource{Sources: config.Sources, Crawler: c, Logger: log}
@@ -68,8 +68,6 @@ func (ms *MultiSource) Start(ctx context.Context, sourceName string) error {
 	// Start crawling with filtered sources
 	for _, source := range filteredSources {
 		ms.Logger.Info("Starting crawl", "source", source.Name)
-
-		// ms.Crawler.Config.Crawler.SetIndexName(source.Index)
 
 		if err := ms.Crawler.Start(ctx, source.URL); err != nil {
 			return fmt.Errorf("error crawling source %s: %w", source.Name, err)
