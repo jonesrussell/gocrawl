@@ -2,6 +2,7 @@ package multisource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -51,6 +52,12 @@ func NewMultiSource(log logger.Interface, c *crawler.Crawler, configPath string)
 
 // Start starts the multi-source crawling for the specified source name
 func (ms *MultiSource) Start(ctx context.Context, sourceName string) error {
+	if ms == nil {
+		return errors.New("MultiSource is nil")
+	}
+	if ms.Crawler == nil {
+		return errors.New("Crawler is not initialized")
+	}
 	ms.Logger.Debug("Starting multi-source crawl", "sourceName", sourceName)
 
 	filteredSources, err := filterSources(ms.Sources, sourceName)

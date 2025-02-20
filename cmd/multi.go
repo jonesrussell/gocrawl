@@ -23,86 +23,64 @@ var multiCmd = &cobra.Command{
 		ctx := cmd.Context()
 		globalLogger.Debug("Starting multi-crawl command...", "sourceName", sourceName)
 
-		// Initialize Elasticsearch client
-		elasticClient, err := storage.ProvideElasticsearchClient(globalConfig, globalLogger)
-		if err != nil {
-			return fmt.Errorf("error creating Elasticsearch client: %w", err)
+		// Create an Fx application
+		app := fx.New(
+			config.Module,
+			logger.Module,
+			storage.Module,
+			crawler.Module,
+			multisource.Module,
+			fx.Provide(func(c *crawler.Crawler) *multisource.MultiSource {
+				ms, err := multisource.NewMultiSource(globalLogger, c, "sources.yml")
+				if err != nil {
+					return nil
+				}
+				return ms
+			}),
+			fx.Invoke(func(ms *multisource.MultiSource, c *crawler.Crawler) error {
+				if c == nil {
+					return fmt.Errorf("Crawler is not initialized")
+				}
+
+				// Filter sources based on sourceName
+				filteredSources, err := filterSources(ms.Sources, sourceName)
+				if err != nil {
+					return err
+				}
+
+				// Set the base URL from the filtered source
+				globalConfig.Crawler.SetBaseURL(filteredSources[0].URL)
+
+				// Create the collector
+				collectorResult, err := collector.New(collector.Params{
+					BaseURL:   globalConfig.Crawler.BaseURL,
+					MaxDepth:  globalConfig.Crawler.MaxDepth,
+					RateLimit: globalConfig.Crawler.RateLimit,
+					Debugger:  logger.NewCollyDebugger(globalLogger),
+					Logger:    globalLogger,
+				})
+				if err != nil {
+					return fmt.Errorf("error creating collector: %w", err)
+				}
+
+				// Set the collector in the crawler instance
+				c.SetCollector(collectorResult.Collector)
+
+				// Start the multi-source crawl
+				return ms.Start(ctx, sourceName)
+			}),
+		)
+
+		// Start the application
+		if err := app.Start(ctx); err != nil {
+			return fmt.Errorf("error starting application: %w", err)
 		}
-
-		// Initialize storage
-		storageInstance, err := storage.NewStorage(elasticClient, globalLogger)
-		if err != nil {
-			return fmt.Errorf("error creating storage: %w", err)
-		}
-
-		// Initialize the debugger
-		debuggerInstance := logger.NewCollyDebugger(globalLogger)
-
-		// Initialize the crawler parameters
-		crawlerParams := crawler.Params{
-			Logger:   globalLogger,
-			Storage:  storageInstance,
-			Debugger: debuggerInstance,
-			Config:   globalConfig,
-		}
-
-		// Initialize MultiSource
-		sources, err := multisource.NewMultiSource(globalLogger, nil, "sources.yml") // Pass nil for crawler temporarily
-		if err != nil {
-			return fmt.Errorf("error creating sources: %w", err)
-		}
-
-		// Filter sources based on sourceName
-		filteredSources, err := filterSources(sources.Sources, sourceName)
-		if err != nil {
-			return err
-		}
-
-		// Set the base URL from the filtered source
-		globalConfig.Crawler.SetBaseURL(filteredSources[0].URL)
-
-		// Create the collector
-		collectorResult, err := collector.New(collector.Params{
-			BaseURL:   globalConfig.Crawler.BaseURL,
-			MaxDepth:  globalConfig.Crawler.MaxDepth,
-			RateLimit: globalConfig.Crawler.RateLimit,
-			Debugger:  debuggerInstance,
-			Logger:    globalLogger,
-		})
-		if err != nil {
-			return fmt.Errorf("error creating collector: %w", err)
-		}
-
-		// Set the collector in the crawler instance
-		crawlerInstance, err := crawler.ProvideCrawler(crawlerParams)
-		if err != nil {
-			return fmt.Errorf("error creating Crawler: %w", err)
-		}
-		crawlerInstance.SetCollector(collectorResult.Collector)
-
-		// Now that the collector is set, we can initialize MultiSource with the crawler
-		sources, err = multisource.NewMultiSource(globalLogger, crawlerInstance, "sources.yml")
-		if err != nil {
-			return fmt.Errorf("error creating sources: %w", err)
-		}
-
-		app := newMultiCrawlFxApp(globalLogger, "sources.yml", sourceName, crawlerInstance)
 
 		defer func() {
 			if err := app.Stop(ctx); err != nil {
 				globalLogger.Error("Error stopping application", "context", ctx, "error", err)
 			}
 		}()
-
-		if err := app.Start(ctx); err != nil {
-			globalLogger.Error("Error starting application", "context", ctx, "error", err)
-			return fmt.Errorf("error starting application: %w", err)
-		}
-
-		if err := sources.Start(ctx, sourceName); err != nil {
-			globalLogger.Error("Error starting multi-source crawl", "context", ctx, "sourceName", sourceName, "error", err)
-			return fmt.Errorf("error starting multi-source crawl: %w", err)
-		}
 
 		return nil
 	},
