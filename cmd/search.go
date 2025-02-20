@@ -17,9 +17,11 @@ const (
 	DefaultSearchSize = 10 // Default number of results to return
 )
 
-// NewSearchCmd creates a new search command
-func NewSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
-	var searchCmd = &cobra.Command{
+var searchCmd *cobra.Command
+
+// createSearchCmd creates a new search command
+func createSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "search",
 		Short: "Search content in Elasticsearch",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
@@ -29,17 +31,7 @@ func NewSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
 			return executeSearchCmd(cmd, log)
 		},
 	}
-
-	searchCmd.Flags().StringP("index", "i", "articles", "Index to search")
-	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return")
-	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
-
-	err := searchCmd.MarkFlagRequired("query")
-	if err != nil {
-		log.Error("Error marking query flag as required", "error", err)
-	}
-
-	return searchCmd
+	return cmd
 }
 
 // setupSearchCmd handles the setup for the search command
@@ -73,7 +65,7 @@ func executeSearchCmd(cmd *cobra.Command, log logger.Interface) error {
 	return nil
 }
 
-// newFxApp initializes the Fx application with dependencies
+// newSearchFxApp initializes the Fx application with dependencies
 func newSearchFxApp(query string) *fx.App {
 	return fx.New(
 		config.Module,
@@ -120,4 +112,28 @@ func runSearchApp(ctx context.Context, log logger.Interface, searchSvc *search.S
 	}
 
 	return nil
+}
+
+func init() {
+	searchCmd = createSearchCmd(globalLogger, globalConfig)
+	rootCmd.AddCommand(searchCmd)
+
+	// Here you will define your flags and configuration settings.
+
+	// Cobra supports Persistent Flags which will work for this command
+	// and all subcommands, e.g.:
+	// searchCmd.PersistentFlags().String("foo", "", "A help for foo")
+
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	// searchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	searchCmd.Flags().StringP("index", "i", "articles", "Index to search")
+	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return")
+	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
+
+	err := searchCmd.MarkFlagRequired("query")
+	if err != nil {
+		globalLogger.Error("Error marking query flag as required", "error", err)
+	}
 }
