@@ -34,12 +34,11 @@ type DebuggerInterface interface {
 type Params struct {
 	fx.In
 
-	BaseURL        string
-	MaxDepth       int
-	RateLimit      time.Duration
-	Debugger       *logger.CollyDebugger
-	Logger         logger.Interface
-	AllowedDomains []string // New field for allowed domains
+	BaseURL   string
+	MaxDepth  int
+	RateLimit time.Duration
+	Debugger  *logger.CollyDebugger
+	Logger    logger.Interface
 }
 
 // Result holds the collector instance
