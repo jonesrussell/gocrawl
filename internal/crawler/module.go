@@ -19,11 +19,38 @@ func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {
 	return logger.NewCollyDebugger(log)
 }
 
+// ProvideCrawler creates a new Crawler instance
+func ProvideCrawler(p Params) (*Crawler, error) {
+	if p.Logger == nil {
+		return nil, errors.New("logger is required")
+	}
+
+	if p.Config == nil {
+		return nil, errors.New("config is required")
+	}
+
+	// Log the entire configuration to ensure it's set correctly
+	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
+
+	crawler := &Crawler{
+		Storage:        p.Storage,
+		Logger:         p.Logger,
+		Debugger:       p.Debugger,
+		IndexName:      p.Config.Crawler.IndexName,
+		articleChan:    make(chan *models.Article, DefaultBatchSize),
+		ArticleService: article.NewService(p.Logger),
+		IndexSvc:       storage.NewIndexService(p.Logger),
+		Config:         p.Config,
+	}
+
+	return crawler, nil
+}
+
 // Module provides the crawler module and its dependencies
 var Module = fx.Module("crawler",
 	fx.Provide(
 		provideCollyDebugger,
-		NewCrawler,
+		ProvideCrawler,
 	),
 )
 
@@ -63,36 +90,6 @@ const (
 	DefaultParallelism = 2
 	DefaultBatchSize   = 100
 )
-
-// NewCrawler creates a new Crawler instance
-func NewCrawler(p Params) (Result, error) {
-	if p.Logger == nil {
-		return Result{}, errors.New("logger is required")
-	}
-
-	if p.Config == nil {
-		return Result{}, errors.New("config is required")
-	}
-
-	// Log the entire configuration to ensure it's set correctly
-	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
-
-	crawler := &Crawler{
-		Storage:        p.Storage,
-		Logger:         p.Logger,
-		Debugger:       p.Debugger,
-		IndexName:      p.Config.Crawler.IndexName,
-		articleChan:    make(chan *models.Article, DefaultBatchSize),
-		ArticleService: article.NewService(p.Logger),
-		IndexSvc:       storage.NewIndexService(p.Logger),
-		Config:         p.Config,
-	}
-
-	// Configure collector callbacks
-	// Note: We will set the collector later in cmd/multi.go
-
-	return Result{Crawler: crawler}, nil
-}
 
 // createCollector initializes a new Colly collector with the specified configuration
 func createCollector(config config.CrawlerConfig, log logger.Interface) (*colly.Collector, error) {

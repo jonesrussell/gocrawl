@@ -38,7 +38,7 @@ var multiCmd = &cobra.Command{
 		// Initialize the debugger
 		debuggerInstance := logger.NewCollyDebugger(globalLogger)
 
-		// Initialize the crawler
+		// Initialize the crawler parameters
 		crawlerParams := crawler.Params{
 			Logger:   globalLogger,
 			Storage:  storageInstance,
@@ -46,20 +46,20 @@ var multiCmd = &cobra.Command{
 			Config:   globalConfig,
 		}
 
-		crawlerInstance, err := crawler.NewCrawler(crawlerParams)
-		if err != nil {
-			return fmt.Errorf("error creating Crawler: %w", err)
-		}
-
 		// Initialize MultiSource
-		sources, err := multisource.NewMultiSource(globalLogger, crawlerInstance.Crawler, "sources.yml")
+		sources, err := multisource.NewMultiSource(globalLogger, nil, "sources.yml") // Pass nil for crawler temporarily
 		if err != nil {
 			return fmt.Errorf("error creating sources: %w", err)
 		}
 
-		app := newMultiCrawlFxApp(globalLogger, "sources.yml", sourceName, crawlerInstance.Crawler)
+		// Filter sources based on sourceName
+		filteredSources, err := filterSources(sources.Sources, sourceName)
+		if err != nil {
+			return err
+		}
 
-		globalConfig.Crawler.SetBaseURL(sources.Sources[0].URL)
+		// Set the base URL from the filtered source
+		globalConfig.Crawler.SetBaseURL(filteredSources[0].URL)
 
 		// Create the collector
 		collectorResult, err := collector.New(collector.Params{
@@ -74,7 +74,19 @@ var multiCmd = &cobra.Command{
 		}
 
 		// Set the collector in the crawler instance
-		crawlerInstance.Crawler.SetCollector(collectorResult.Collector)
+		crawlerInstance, err := crawler.ProvideCrawler(crawlerParams)
+		if err != nil {
+			return fmt.Errorf("error creating Crawler: %w", err)
+		}
+		crawlerInstance.SetCollector(collectorResult.Collector)
+
+		// Now that the collector is set, we can initialize MultiSource with the crawler
+		sources, err = multisource.NewMultiSource(globalLogger, crawlerInstance, "sources.yml")
+		if err != nil {
+			return fmt.Errorf("error creating sources: %w", err)
+		}
+
+		app := newMultiCrawlFxApp(globalLogger, "sources.yml", sourceName, crawlerInstance)
 
 		defer func() {
 			if err := app.Stop(ctx); err != nil {
