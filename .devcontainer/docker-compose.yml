@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     env_file:
         # Ensure that the variables in .env match the same variables in devcontainer.json
-        - "../.env"
+        - ".env"
 
     volumes:
       - ../..:/workspaces:cached
@@ -15,15 +15,15 @@ services:
     command: sleep infinity
 
     # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
-    network_mode: service:elasticsearch
+    # network_mode: service:elasticsearch
 
     # Use "forwardPorts" in **devcontainer.json** to forward an app port locally. 
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
     env_file:
-      - "../.env"
+      - ".env"
     environment:
       - discovery.type=single-node
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
@@ -31,6 +31,18 @@ services:
       - "9200:9200"
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  kibana:  # New Kibana service
+    image: docker.elastic.co/kibana/kibana:8.17.1  # Set image version
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200  # Connect to Elasticsearch
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}  # Use the same password as Elasticsearch
+    ports:
+      - "5601:5601"  # Expose Kibana on port 5601
 
 volumes:
   elasticsearch-data:

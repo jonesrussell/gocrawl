@@ -1,4 +1,5 @@
-FROM mcr.microsoft.com/devcontainers/go:1-1.23-bookworm
+ARG VARIANT=1.24-bookworm
+FROM golang:${VARIANT}
 
 # [Optional] Uncomment this section to install additional OS packages.
 # RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
