@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"errors"
+
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -39,7 +41,7 @@ var multiCmd = &cobra.Command{
 			}),
 			fx.Invoke(func(ms *multisource.MultiSource, c *crawler.Crawler) error {
 				if c == nil {
-					return fmt.Errorf("Crawler is not initialized")
+					return errors.New("Crawler is not initialized")
 				}
 
 				// Filter sources based on sourceName

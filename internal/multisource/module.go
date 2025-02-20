@@ -60,17 +60,17 @@ func (ms *MultiSource) Start(ctx context.Context, sourceName string) error {
 	}
 	ms.Logger.Debug("Starting multi-source crawl", "sourceName", sourceName)
 
-	filteredSources, err := filterSources(ms.Sources, sourceName)
-	if err != nil {
-		return err
+	filteredSources, filterErr := filterSources(ms.Sources, sourceName)
+	if filterErr != nil {
+		return filterErr
 	}
 
 	// Start crawling with filtered sources
 	for _, source := range filteredSources {
 		ms.Logger.Info("Starting crawl", "source", source.Name)
 
-		if err := ms.Crawler.Start(ctx, source.URL); err != nil {
-			return fmt.Errorf("error crawling source %s: %w", source.Name, err)
+		if crawlErr := ms.Crawler.Start(ctx, source.URL); crawlErr != nil {
+			return fmt.Errorf("error crawling source %s: %w", source.Name, crawlErr)
 		}
 
 		ms.Logger.Info("Finished crawl", "source", source.Name)
