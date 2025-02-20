@@ -27,9 +27,7 @@ var crawlCmd = &cobra.Command{
 	PreRunE: func(cmd *cobra.Command, _ []string) error {
 		return setupCrawlCmd(cmd)
 	},
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		return executeCrawlCmd(cmd)
-	},
+	RunE: runCrawlCmd,
 }
 
 // setupCrawlCmd handles the setup for the crawl command
@@ -47,16 +45,24 @@ func setupCrawlCmd(cmd *cobra.Command) error {
 	return nil
 }
 
-// executeCrawlCmd handles the execution of the crawl command
-func executeCrawlCmd(cmd *cobra.Command) error {
+// runCrawlCmd handles the execution of the crawl command
+func runCrawlCmd(cmd *cobra.Command, _ []string) error {
 	// Initialize fx container
-	app := newCrawlFxApp()
+	app := fx.New(
+		config.Module,
+		logger.Module,
+		storage.Module,
+		collector.Module,
+		crawler.Module,
+		fx.Invoke(startCrawlCmd),
+	)
 
 	// Start the application
 	if err := app.Start(cmd.Context()); err != nil {
 		globalLogger.Error("Error starting application", "error", err)
 		return fmt.Errorf("error starting application: %w", err)
 	}
+
 	defer func() {
 		if err := app.Stop(cmd.Context()); err != nil {
 			globalLogger.Error("Error stopping application", "error", err)
@@ -66,53 +72,33 @@ func executeCrawlCmd(cmd *cobra.Command) error {
 	return nil
 }
 
-// newCrawlFxApp initializes the Fx application with dependencies
-func newCrawlFxApp() *fx.App {
-	return fx.New(
-		config.Module,
-		logger.Module,
-		storage.Module,
-		collector.Module,
-		crawler.Module,
-		fx.Provide(
-			func() *collector.Params {
-				return &collector.Params{
-					BaseURL:   globalConfig.Crawler.BaseURL,
-					MaxDepth:  globalConfig.Crawler.MaxDepth,
-					RateLimit: globalConfig.Crawler.RateLimit,
-					Logger:    globalLogger,
-				}
-			},
-		),
-		fx.Invoke(setupLifecycleHooks),
-	)
-}
+// startCrawl starts the crawling process
+func startCrawlCmd(ctx context.Context, crawler *crawler.Crawler) error {
+	globalLogger.Debug("Starting crawl...")
 
-// setupLifecycleHooks sets up the lifecycle hooks for the Fx application
-func setupLifecycleHooks(lc fx.Lifecycle, deps struct {
-	fx.In
-	Logger  logger.Interface
-	Crawler *crawler.Crawler
-	Params  *collector.Params
-}) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			deps.Logger.Debug("Starting application...")
-			// Create the collector
-			collectorResult, err := collector.New(*deps.Params, deps.Crawler)
-			if err != nil {
-				return fmt.Errorf("error creating collector: %w", err)
-			}
-			// Set the collector in the crawler instance
-			deps.Crawler.SetCollector(collectorResult.Collector)
-			return nil
-		},
-		OnStop: func(_ context.Context) error {
-			deps.Logger.Debug("Stopping application...")
-			deps.Crawler.Stop()
-			return nil
-		},
-	})
+	// Create the collector using global configuration
+	params := collector.Params{
+		BaseURL:   globalConfig.Crawler.BaseURL,
+		MaxDepth:  globalConfig.Crawler.MaxDepth,
+		RateLimit: globalConfig.Crawler.RateLimit,
+		Logger:    globalLogger,
+	}
+
+	// Create the collector
+	collectorResult, err := collector.New(params, crawler)
+	if err != nil {
+		return fmt.Errorf("error creating collector: %w", err)
+	}
+
+	// Set the collector in the crawler instance
+	crawler.SetCollector(collectorResult.Collector)
+
+	// Start the crawling process
+	if err := crawler.Start(ctx, params.BaseURL); err != nil {
+		return fmt.Errorf("error starting crawler: %w", err)
+	}
+
+	return nil
 }
 
 func init() {
