@@ -51,13 +51,14 @@ var multiCmd = &cobra.Command{
 				// Set the base URL from the filtered source
 				globalConfig.Crawler.SetBaseURL(filteredSources[0].URL)
 
-				// Create the collector
+				// Create the collector using the collector module
 				collectorResult, err := collector.New(collector.Params{
-					BaseURL:   globalConfig.Crawler.BaseURL,
-					MaxDepth:  globalConfig.Crawler.MaxDepth,
-					RateLimit: globalConfig.Crawler.RateLimit,
-					Debugger:  logger.NewCollyDebugger(globalLogger),
-					Logger:    globalLogger,
+					BaseURL:        globalConfig.Crawler.BaseURL,
+					MaxDepth:       globalConfig.Crawler.MaxDepth,
+					RateLimit:      globalConfig.Crawler.RateLimit,
+					Debugger:       logger.NewCollyDebugger(globalLogger),
+					Logger:         globalLogger,
+					AllowedDomains: []string{"elliotlaketoday.com"},
 				})
 				if err != nil {
 					return fmt.Errorf("error creating collector: %w", err)

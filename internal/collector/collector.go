@@ -33,11 +33,12 @@ type DebuggerInterface interface {
 type Params struct {
 	fx.In
 
-	BaseURL   string
-	MaxDepth  int
-	RateLimit time.Duration
-	Debugger  *logger.CollyDebugger
-	Logger    logger.Interface
+	BaseURL        string
+	MaxDepth       int
+	RateLimit      time.Duration
+	Debugger       *logger.CollyDebugger
+	Logger         logger.Interface
+	AllowedDomains []string // New field for allowed domains
 }
 
 // Result holds the collector instance
@@ -63,6 +64,7 @@ func New(p Params) (Result, error) {
 	c := colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(p.MaxDepth),
+		colly.AllowedDomains(p.AllowedDomains...),
 	)
 
 	// Set rate limiting
