@@ -23,7 +23,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -40,7 +39,7 @@ var httpdCmd = &cobra.Command{
 	Short: "Start the HTTP server for search",
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		// Initialize the Fx application with the HTTP server
 		app := fx.New(
 			api.Module,
@@ -49,11 +48,14 @@ You can send POST requests to /search with a JSON body containing the search par
 					return globalLogger // Use the global logger
 				},
 			),
+			fx.Invoke(func() {
+				globalLogger.Info("Fx application started")
+			}),
 		)
 
 		// Start the application
 		if err := app.Start(context.Background()); err != nil {
-			fmt.Println("Error starting HTTP server:", err)
+			globalLogger.Error("Error starting application", "error", err)
 			return
 		}
 
@@ -63,8 +65,12 @@ You can send POST requests to /search with a JSON body containing the search par
 		<-sigChan // Block until a signal is received
 
 		// Wait for the application to stop
-		defer app.Stop(context.Background())
-		fmt.Println("HTTP server stopped")
+		defer func() {
+			if err := app.Stop(context.Background()); err != nil {
+				globalLogger.Error("Error stopping application", "error", err)
+			}
+		}()
+		globalLogger.Debug("HTTP server stopped")
 	},
 }
 
