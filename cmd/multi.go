@@ -49,16 +49,17 @@ var multiCmd = &cobra.Command{
 					return err
 				}
 
-				// Set the base URL from the filtered source
-				// globalConfig.Crawler.SetBaseURL(filteredSources[0].URL)
-
-				// Extract max_depth and rate_limit from the filtered source
+				// Extract base URL, max_depth, rate_limit, and index from the filtered source
 				baseURL := filteredSources[0].URL
 				maxDepth := filteredSources[0].MaxDepth
 				rateLimit, err := time.ParseDuration(filteredSources[0].RateLimit) // Parse rate limit
 				if err != nil {
 					return fmt.Errorf("invalid rate limit: %w", err)
 				}
+				indexName := filteredSources[0].Index // Extract index name
+
+				// Set the index name in the Crawler's configuration
+				c.IndexName = indexName // Set the IndexName from the source
 
 				// Create the collector using the collector module
 				collectorResult, err := collector.New(collector.Params{
