@@ -46,13 +46,13 @@ You can send POST requests to /search with a JSON body containing the search par
 		// Initialize the Fx application with the HTTP server
 		app := fx.New(
 			config.Module,
-			api.Module,
-			storage.Module,
 			fx.Provide(
 				func() logger.Interface {
 					return globalLogger // Use the global logger
 				},
 			),
+			api.Module,
+			storage.Module,
 			fx.Invoke(func(server *http.Server) {
 				// Start the server
 				go func() {
