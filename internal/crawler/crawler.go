@@ -103,11 +103,3 @@ func (c *Crawler) SetService(svc article.Interface) {
 func (c *Crawler) GetBaseURL() string {
 	return c.Config.Crawler.BaseURL
 }
-
-func (c *Crawler) GetMaxDepth() int {
-	return c.Config.Crawler.MaxDepth
-}
-
-func (c *Crawler) GetRateLimit() time.Duration {
-	return c.Config.Crawler.RateLimit
-}

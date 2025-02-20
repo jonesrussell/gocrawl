@@ -2,7 +2,6 @@ package crawler_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/stretchr/testify/assert"
@@ -46,24 +45,4 @@ func TestCrawler_GetBaseURL(t *testing.T) {
 	}
 	c := &crawler.Crawler{Config: configInstance}
 	assert.Equal(t, "http://example.com", c.GetBaseURL())
-}
-
-func TestCrawler_GetMaxDepth(t *testing.T) {
-	configInstance := &config.Config{
-		Crawler: config.CrawlerConfig{
-			MaxDepth: 3,
-		},
-	}
-	c := &crawler.Crawler{Config: configInstance}
-	assert.Equal(t, 3, c.GetMaxDepth())
-}
-
-func TestCrawler_GetRateLimit(t *testing.T) {
-	configInstance := &config.Config{
-		Crawler: config.CrawlerConfig{
-			RateLimit: time.Second,
-		},
-	}
-	c := &crawler.Crawler{Config: configInstance}
-	assert.Equal(t, time.Second, c.GetRateLimit())
 }
