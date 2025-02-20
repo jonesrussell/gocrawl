@@ -80,8 +80,8 @@ func (c *Crawler) ProcessPage(e *colly.HTMLElement) {
 	}
 	c.Logger.Debug("Article extracted", "url", e.Request.URL.String(), "title", article.Title)
 
-	// Index the article after extraction
-	if err := c.Storage.IndexDocument(context.Background(), "articles", article.ID, article); err != nil {
+	// Use the dynamic index name from the Crawler instance
+	if err := c.Storage.IndexDocument(context.Background(), c.IndexName, article.ID, article); err != nil {
 		c.Logger.Error("Failed to index article", "articleID", article.ID, "error", err)
 		return
 	}
