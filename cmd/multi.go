@@ -51,10 +51,16 @@ var multiCmd = &cobra.Command{
 				// Set the base URL from the filtered source
 				globalConfig.Crawler.SetBaseURL(filteredSources[0].URL)
 
+				// Extract max_depth from the filtered source
+				maxDepth := filteredSources[0].MaxDepth
+
+				// Set the MaxDepth in the Crawler's configuration
+				c.Config.Crawler.MaxDepth = maxDepth // Set the MaxDepth from the source
+
 				// Create the collector using the collector module
 				collectorResult, err := collector.New(collector.Params{
 					BaseURL:   globalConfig.Crawler.BaseURL,
-					MaxDepth:  globalConfig.Crawler.MaxDepth,
+					MaxDepth:  maxDepth, // Use the extracted max_depth
 					RateLimit: globalConfig.Crawler.RateLimit,
 					Debugger:  logger.NewCollyDebugger(globalLogger),
 					Logger:    globalLogger,

@@ -26,6 +26,9 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 	// Set the BaseURL in the configuration
 	c.Config.Crawler.BaseURL = baseURL
 
+	// Log the entire configuration being used by the crawler
+	c.Logger.Debug("Crawler configuration", "config", c.Config)
+
 	// Perform initial setup (e.g., test connection, ensure index)
 	if err := c.Storage.TestConnection(ctx); err != nil {
 		c.Logger.Error("Storage connection failed", "error", err)
