@@ -41,8 +41,6 @@ func Execute() {
 	}
 
 	// Register the crawl and search commands
-	rootCmd.AddCommand(NewCrawlCmd(globalLogger, globalConfig)) // Pass logger and config to crawl command
-
 	err = rootCmd.Execute()
 	if err != nil {
 		globalLogger.Error("Error executing root command", "error", err)
