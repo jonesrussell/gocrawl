@@ -41,7 +41,7 @@ var multiCmd = &cobra.Command{
 			}),
 			fx.Invoke(func(ms *multisource.MultiSource, c *crawler.Crawler) error {
 				if c == nil {
-					return errors.New("Crawler is not initialized")
+					return errors.New("crawler is not initialized")
 				}
 
 				// Filter sources based on sourceName
