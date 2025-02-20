@@ -73,7 +73,7 @@ func runCrawlCmd(cmd *cobra.Command, _ []string) error {
 }
 
 // startCrawl starts the crawling process
-func startCrawlCmd(ctx context.Context, crawler *crawler.Crawler) error {
+func startCrawlCmd(crawler *crawler.Crawler) error {
 	globalLogger.Debug("Starting crawl...")
 
 	// Create the collector using global configuration
@@ -94,7 +94,7 @@ func startCrawlCmd(ctx context.Context, crawler *crawler.Crawler) error {
 	crawler.SetCollector(collectorResult.Collector)
 
 	// Start the crawling process
-	if err := crawler.Start(ctx, params.BaseURL); err != nil {
+	if err := crawler.Start(context.Background(), params.BaseURL); err != nil {
 		return fmt.Errorf("error starting crawler: %w", err)
 	}
 
