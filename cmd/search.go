@@ -17,37 +17,31 @@ const (
 	DefaultSearchSize = 10 // Default number of results to return
 )
 
-var searchCmd *cobra.Command
-
-// createSearchCmd creates a new search command
-func createSearchCmd(log logger.Interface, cfg *config.Config) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "search",
-		Short: "Search content in Elasticsearch",
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return setupSearchCmd(cmd, cfg)
-		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return executeSearchCmd(cmd, log)
-		},
-	}
-	return cmd
+var searchCmd = &cobra.Command{
+	Use:   "search",
+	Short: "Search content in Elasticsearch",
+	PreRunE: func(cmd *cobra.Command, _ []string) error {
+		return setupSearchCmd(cmd)
+	},
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		return executeSearchCmd(cmd)
+	},
 }
 
 // setupSearchCmd handles the setup for the search command
-func setupSearchCmd(cmd *cobra.Command, cfg *config.Config) error {
-	if cfg == nil {
+func setupSearchCmd(cmd *cobra.Command) error {
+	if globalConfig == nil {
 		return fmt.Errorf("configuration is required") // Check if cfg is nil
 	}
-	cfg.Elasticsearch.IndexName = cmd.Flag("index").Value.String()
+	globalConfig.Elasticsearch.IndexName = cmd.Flag("index").Value.String()
 	return nil
 }
 
 // executeSearchCmd handles the search command execution
-func executeSearchCmd(cmd *cobra.Command, log logger.Interface) error {
+func executeSearchCmd(cmd *cobra.Command) error {
 	query, err := cmd.Flags().GetString("query")
 	if err != nil {
-		log.Error("Error retrieving query", "error", err)
+		globalLogger.Error("Error retrieving query", "error", err)
 		return fmt.Errorf("error retrieving query: %w", err)
 	}
 
@@ -56,12 +50,12 @@ func executeSearchCmd(cmd *cobra.Command, log logger.Interface) error {
 
 	// Start the application
 	if startErr := app.Start(cmd.Context()); startErr != nil {
-		log.Error("Error starting application", "error", startErr)
+		globalLogger.Error("Error starting application", "error", startErr)
 		return fmt.Errorf("error starting application: %w", startErr)
 	}
 	defer func() {
 		if stopErr := app.Stop(cmd.Context()); stopErr != nil {
-			log.Error("Error stopping application", "error", stopErr)
+			globalLogger.Error("Error stopping application", "error", stopErr)
 		}
 	}()
 
@@ -118,8 +112,6 @@ func runSearchApp(ctx context.Context, log logger.Interface, searchSvc *search.S
 }
 
 func init() {
-	searchCmd = createSearchCmd(globalLogger, globalConfig)
-
 	rootCmd.AddCommand(searchCmd)
 
 	// Define flags for the search command in init
