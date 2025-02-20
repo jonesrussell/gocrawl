@@ -24,6 +24,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -54,9 +57,14 @@ You can send POST requests to /search with a JSON body containing the search par
 			return
 		}
 
+		// Wait for a termination signal
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan // Block until a signal is received
+
 		// Wait for the application to stop
 		defer app.Stop(context.Background())
-		fmt.Println("HTTP server started on :8080")
+		fmt.Println("HTTP server stopped")
 	},
 }
 
