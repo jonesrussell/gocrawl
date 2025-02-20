@@ -22,7 +22,6 @@ func NewMockStorage() *MockStorage {
 	// Set up default expectations
 	m.On("TestConnection", mock.Anything).Return(nil)
 	m.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-	m.On("BulkIndexArticles", mock.Anything, mock.Anything).Return(nil)
 	return m
 }
 
