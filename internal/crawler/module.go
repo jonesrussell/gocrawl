@@ -2,9 +2,6 @@ package crawler
 
 import (
 	"errors"
-	"fmt"
-	"net/url"
-	"strings"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
@@ -90,96 +87,3 @@ const (
 	DefaultParallelism = 2
 	DefaultBatchSize   = 100
 )
-
-// createCollector initializes a new Colly collector with the specified configuration
-func createCollector(config config.CrawlerConfig, log logger.Interface) (*colly.Collector, error) {
-	// Log the base URL before parsing
-	log.Debug("Creating collector with base URL", "baseURL", config.BaseURL)
-
-	// Parse domain from BaseURL
-	parsedURL, err := url.Parse(config.BaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid base URL: %w", err)
-	}
-	domain := parsedURL.Host
-
-	// Check if the domain is empty
-	if domain == "" {
-		return nil, errors.New("parsed domain is empty; please provide a valid base URL")
-	}
-
-	// Allow the main domain and its subdomains
-	allowedDomains := []string{domain}
-	if strings.HasPrefix(domain, "www.") {
-		allowedDomains = append(allowedDomains, strings.TrimPrefix(domain, "www."))
-	} else {
-		allowedDomains = append(allowedDomains, "www."+domain)
-	}
-
-	// Log the allowed domains and other configuration values
-	log.Debug("Allowed domains for collector", "allowedDomains", allowedDomains)
-
-	maxDepth := config.MaxDepth
-	if maxDepth <= 0 {
-		maxDepth = DefaultMaxDepth
-	}
-
-	// Create a new collector with proper configuration
-	c := colly.NewCollector(
-		colly.MaxDepth(maxDepth),
-		colly.Async(true),
-		colly.AllowedDomains(allowedDomains...), // Use the dynamically created allowed domains
-		colly.MaxBodySize(DefaultMaxBodySize),
-		colly.UserAgent(
-			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "+
-				"(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-		),
-	)
-
-	// Set rate limiting
-	err = c.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		RandomDelay: config.RateLimit,
-		Parallelism: DefaultParallelism,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error setting rate limit: %w", err)
-	}
-
-	return c, nil
-}
-
-// configureCollectorCallbacks sets up the callbacks for the Colly collector
-func configureCollectorCallbacks(c *colly.Collector, crawler *Crawler) {
-	c.OnRequest(func(r *colly.Request) {
-		crawler.Logger.Debug("Requesting URL", "url", r.URL.String())
-	})
-
-	c.OnResponse(func(r *colly.Response) {
-		crawler.Logger.Debug("Received response", "url", r.Request.URL.String(), "status", r.StatusCode)
-	})
-
-	c.OnError(func(r *colly.Response, err error) {
-		crawler.Logger.Error("Error scraping", "url", r.Request.URL.String(), "error", err)
-	})
-
-	c.OnHTML("div.details", func(e *colly.HTMLElement) {
-		crawler.Logger.Debug("Found details", "url", e.Request.URL.String())
-		crawler.ProcessPage(e)
-	})
-
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if link == "" {
-			return
-		}
-		crawler.Logger.Debug("Found link", "url", link)
-		if err := e.Request.Visit(link); err != nil {
-			crawler.Logger.Debug("Could not visit link", "url", link, "error", err)
-		}
-	})
-
-	if crawler.Debugger != nil {
-		c.SetDebugger(crawler.Debugger)
-	}
-}

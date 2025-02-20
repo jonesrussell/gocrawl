@@ -53,6 +53,7 @@ var multiCmd = &cobra.Command{
 				// globalConfig.Crawler.SetBaseURL(filteredSources[0].URL)
 
 				// Extract max_depth and rate_limit from the filtered source
+				baseURL := filteredSources[0].URL
 				maxDepth := filteredSources[0].MaxDepth
 				rateLimit, err := time.ParseDuration(filteredSources[0].RateLimit) // Parse rate limit
 				if err != nil {
@@ -61,12 +62,12 @@ var multiCmd = &cobra.Command{
 
 				// Create the collector using the collector module
 				collectorResult, err := collector.New(collector.Params{
-					BaseURL:   filteredSources[0].URL,
+					BaseURL:   baseURL,
 					MaxDepth:  maxDepth,  // Use the extracted max_depth
 					RateLimit: rateLimit, // Use the extracted rate_limit
 					Debugger:  logger.NewCollyDebugger(globalLogger),
 					Logger:    globalLogger,
-				})
+				}, c)
 				if err != nil {
 					return fmt.Errorf("error creating collector: %w", err)
 				}

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 
 	"github.com/gocolly/colly/v2"
@@ -49,7 +50,7 @@ type Result struct {
 }
 
 // New creates a new collector instance
-func New(p Params) (Result, error) {
+func New(p Params, crawlerInstance *crawler.Crawler) (Result, error) {
 	// Validate URL
 	if p.BaseURL == "" {
 		return Result{}, errors.New("base URL cannot be empty")
@@ -92,6 +93,11 @@ func New(p Params) (Result, error) {
 		link := e.Attr("href")
 		p.Logger.Debug("Link found", "text", e.Text, "link", link)
 		c.Visit(e.Request.AbsoluteURL(link)) // Visit the link
+	})
+
+	c.OnHTML("div.details", func(e *colly.HTMLElement) {
+		p.Logger.Debug("Found details", "url", e.Request.URL.String())
+		crawlerInstance.ProcessPage(e) // Call ProcessPage on the Crawler instance directly
 	})
 
 	p.Logger.Debug("Collector created",

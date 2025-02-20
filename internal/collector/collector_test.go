@@ -9,6 +9,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/jonesrussell/gocrawl/internal/crawler"
 )
 
 // Helper function to create a mock logger
@@ -36,7 +38,8 @@ func TestNew(t *testing.T) {
 	// Set expectation for the "Collector created" log message
 	mockLogger.On("Debug", "Collector created", mock.Anything).Return()
 
-	result, err := collector.New(params)
+	// Pass nil for the crawler if not needed
+	result, err := collector.New(params, nil)
 	require.NoError(t, err)
 	require.NotNil(t, result.Collector)
 
@@ -104,7 +107,12 @@ func TestCollector(t *testing.T) {
 				Logger: testLogger, // Ensure logger is initialized
 			}
 
-			result, err := collector.New(params)
+			mockCrawler := &crawler.Crawler{
+				Logger: testLogger, // Use the testLogger here
+				// Initialize other necessary fields...
+			}
+
+			result, err := collector.New(params, mockCrawler)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -115,4 +123,40 @@ func TestCollector(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestNewCollector tests the New function of the collector package
+func TestNewCollector(t *testing.T) {
+	mockLogger := logger.NewMockLogger()
+	mockCrawler := &crawler.Crawler{
+		Logger: mockLogger,
+		// Initialize other necessary fields...
+	}
+
+	params := collector.Params{
+		BaseURL:   "http://example.com",
+		MaxDepth:  3,
+		RateLimit: time.Second,
+		Debugger:  logger.NewCollyDebugger(mockLogger),
+		Logger:    mockLogger,
+	}
+
+	// Create the collector using the collector module
+	collectorResult, err := collector.New(params, mockCrawler) // Pass the mockCrawler here
+
+	require.NoError(t, err)
+	require.NotNil(t, collectorResult.Collector)
+	// Add additional assertions as needed
+}
+
+func TestNewCollector_MissingLogger(t *testing.T) {
+	params := collector.Params{
+		Logger: nil, // Pass nil for the logger
+	}
+
+	result, err := collector.New(params, nil) // Pass nil for the crawler
+
+	require.Error(t, err)
+	require.Equal(t, "crawler instance is required", err.Error())
+	require.Empty(t, result)
 }
