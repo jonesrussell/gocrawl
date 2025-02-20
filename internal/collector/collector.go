@@ -87,6 +87,13 @@ func New(p Params) (Result, error) {
 	// Configure logging
 	ConfigureLogging(c, p.Logger)
 
+	// Set up link following
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		p.Logger.Debug("Link found", "text", e.Text, "link", link)
+		c.Visit(e.Request.AbsoluteURL(link)) // Visit the link
+	})
+
 	p.Logger.Debug("Collector created",
 		"baseURL", p.BaseURL,
 		"maxDepth", p.MaxDepth,
