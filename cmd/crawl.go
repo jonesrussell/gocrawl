@@ -94,8 +94,8 @@ func startCrawlCmd(crawler *crawler.Crawler) error {
 	crawler.SetCollector(collectorResult.Collector)
 
 	// Start the crawling process
-	if err := crawler.Start(context.Background(), params.BaseURL); err != nil {
-		return fmt.Errorf("error starting crawler: %w", err)
+	if startErr := crawler.Start(context.Background(), params.BaseURL); startErr != nil {
+		return fmt.Errorf("error starting crawler: %w", startErr)
 	}
 
 	return nil

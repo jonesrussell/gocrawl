@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -31,7 +32,7 @@ var searchCmd = &cobra.Command{
 // setupSearchCmd handles the setup for the search command
 func setupSearchCmd(cmd *cobra.Command) error {
 	if globalConfig == nil {
-		return fmt.Errorf("configuration is required") // Check if cfg is nil
+		return errors.New("configuration is required") // Check if cfg is nil
 	}
 	globalConfig.Elasticsearch.IndexName = cmd.Flag("index").Value.String()
 	return nil
