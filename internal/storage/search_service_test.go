@@ -44,6 +44,11 @@ func TestSearchService_SearchArticles(t *testing.T) {
 			// Set up expectations
 			mockStorage.On("SearchArticles", mock.Anything, tt.query, tt.size).Return(tt.expectedArticles, tt.expectedError)
 
+			// Mock other necessary methods
+			mockStorage.On("TestConnection", mock.Anything).Return(nil)
+			mockStorage.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+			// No expectation set for BulkIndexArticles
+
 			// Call the method under test
 			articles, err := searchService.SearchArticles(context.Background(), tt.query, tt.size)
 

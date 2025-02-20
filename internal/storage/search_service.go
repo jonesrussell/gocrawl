@@ -25,5 +25,22 @@ func NewSearchService(storage Interface) SearchServiceInterface {
 
 // SearchArticles searches for articles based on a query
 func (s *SearchService) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
-	return s.storage.SearchArticles(ctx, query, size)
+	// Ensure the connection is valid
+	if err := s.storage.TestConnection(ctx); err != nil {
+		return nil, err
+	}
+
+	// Check if the index exists
+	exists, err := s.storage.IndexExists(ctx, "articles")
+	if err != nil || !exists {
+		return nil, err
+	}
+
+	// Perform the search
+	articles, err := s.storage.SearchArticles(ctx, query, size)
+	if err != nil {
+		return nil, err
+	}
+
+	return articles, nil
 }
