@@ -60,11 +60,14 @@ func New(p Params) (Result, error) {
 		return Result{}, errors.New("invalid base URL: must be a valid HTTP/HTTPS URL")
 	}
 
+	// Extract the domain from the BaseURL
+	domain := parsedURL.Hostname()
+
 	// Create collector with base configuration
 	c := colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(p.MaxDepth),
-		colly.AllowedDomains(p.AllowedDomains...),
+		colly.AllowedDomains(domain), // Set the allowed domain
 	)
 
 	// Set rate limiting
