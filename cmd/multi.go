@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -49,19 +50,20 @@ var multiCmd = &cobra.Command{
 				}
 
 				// Set the base URL from the filtered source
-				globalConfig.Crawler.SetBaseURL(filteredSources[0].URL)
+				// globalConfig.Crawler.SetBaseURL(filteredSources[0].URL)
 
-				// Extract max_depth from the filtered source
+				// Extract max_depth and rate_limit from the filtered source
 				maxDepth := filteredSources[0].MaxDepth
-
-				// Set the MaxDepth in the Crawler's configuration
-				c.Config.Crawler.MaxDepth = maxDepth // Set the MaxDepth from the source
+				rateLimit, err := time.ParseDuration(filteredSources[0].RateLimit) // Parse rate limit
+				if err != nil {
+					return fmt.Errorf("invalid rate limit: %w", err)
+				}
 
 				// Create the collector using the collector module
 				collectorResult, err := collector.New(collector.Params{
-					BaseURL:   globalConfig.Crawler.BaseURL,
-					MaxDepth:  maxDepth, // Use the extracted max_depth
-					RateLimit: globalConfig.Crawler.RateLimit,
+					BaseURL:   filteredSources[0].URL,
+					MaxDepth:  maxDepth,  // Use the extracted max_depth
+					RateLimit: rateLimit, // Use the extracted rate_limit
 					Debugger:  logger.NewCollyDebugger(globalLogger),
 					Logger:    globalLogger,
 				})

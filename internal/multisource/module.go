@@ -69,7 +69,7 @@ func (ms *MultiSource) Start(ctx context.Context, sourceName string) error {
 	for _, source := range filteredSources {
 		ms.Logger.Info("Starting crawl", "source", source.Name)
 
-		ms.Crawler.Config.Crawler.SetIndexName(source.Index)
+		// ms.Crawler.Config.Crawler.SetIndexName(source.Index)
 
 		if err := ms.Crawler.Start(ctx, source.URL); err != nil {
 			return fmt.Errorf("error crawling source %s: %w", source.Name, err)

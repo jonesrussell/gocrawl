@@ -101,7 +101,7 @@ func setupLifecycleHooks(lc fx.Lifecycle, deps struct {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			deps.Logger.Debug("Starting application...")
-			return deps.Crawler.Start(ctx, deps.Crawler.Config.Crawler.BaseURL)
+			return deps.Crawler.Start(ctx, deps.Crawler.GetBaseURL())
 		},
 		OnStop: func(_ context.Context) error {
 			deps.Logger.Debug("Stopping application...")
