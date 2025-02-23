@@ -34,7 +34,11 @@ func setupSearchCmd(cmd *cobra.Command) error {
 	if globalConfig == nil {
 		return errors.New("configuration is required") // Check if cfg is nil
 	}
-	globalConfig.Elasticsearch.IndexName = cmd.Flag("index").Value.String()
+
+	// Use the SetIndexName method to set the index name
+	indexName := cmd.Flag("index").Value.String()
+	globalConfig.Crawler.SetIndexName(indexName) // Set the index name using the method
+
 	return nil
 }
 
@@ -98,7 +102,10 @@ func setupSearchLifecycleHooks(lc fx.Lifecycle, deps struct {
 
 // runSearchApp executes the main logic of the search application
 func runSearchApp(ctx context.Context, log logger.Interface, searchSvc *search.Service, query string) error {
-	results, err := searchSvc.SearchContent(ctx, query, "articles", DefaultSearchSize)
+	// Use the index name from the global configuration
+	indexName := globalConfig.Elasticsearch.IndexName
+
+	results, err := searchSvc.SearchContent(ctx, query, indexName, DefaultSearchSize)
 	if err != nil {
 		log.Error("Search failed", err)
 		return fmt.Errorf("search failed: %w", err)
