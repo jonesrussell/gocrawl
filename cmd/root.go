@@ -71,10 +71,11 @@ func initLogger() {
 	fmt.Fprintln(os.Stderr, "Initializing logger in environment:", env)
 
 	var loggerErr error
+
 	if env == "development" {
-		globalLogger, loggerErr = logger.NewDevelopmentLogger() // Use colored logger in development
+		globalLogger, loggerErr = logger.NewDevelopmentLogger(globalConfig.Log.Level) // Pass log level as string
 	} else {
-		globalLogger, loggerErr = logger.NewProductionLogger() // Use a different logger for production
+		globalLogger, loggerErr = logger.NewProductionLogger(globalConfig.Log.Level) // Pass log level as string
 	}
 
 	if loggerErr != nil {

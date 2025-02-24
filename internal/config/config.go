@@ -35,8 +35,6 @@ const (
 // AppConfig holds application-level configuration
 type AppConfig struct {
 	Environment string
-	LogLevel    string
-	Debug       bool
 }
 
 // CrawlerConfig holds crawler-specific configuration
@@ -82,11 +80,18 @@ type ElasticsearchConfig struct {
 	SkipTLS   bool
 }
 
+// LogConfig holds logging-related configuration
+type LogConfig struct {
+	Level string
+	Debug bool
+}
+
 // Config holds all configuration settings
 type Config struct {
 	App           AppConfig
 	Crawler       CrawlerConfig
 	Elasticsearch ElasticsearchConfig
+	Log           LogConfig
 }
 
 // NewConfig creates a new Config instance with values from Viper
@@ -117,8 +122,6 @@ func NewConfig() (*Config, error) {
 	cfg := &Config{
 		App: AppConfig{
 			Environment: viper.GetString(AppEnvKey),
-			LogLevel:    viper.GetString(LogLevelKey),
-			Debug:       viper.GetBool(AppDebugKey),
 		},
 		Crawler: CrawlerConfig{
 			BaseURL:    viper.GetString(CrawlerBaseURLKey),
@@ -134,6 +137,10 @@ func NewConfig() (*Config, error) {
 			APIKey:    viper.GetString(ElasticAPIKeyKey),
 			IndexName: viper.GetString(ElasticIndexNameKey),
 			SkipTLS:   viper.GetBool(ElasticSkipTLSKey),
+		},
+		Log: LogConfig{
+			Level: viper.GetString(LogLevelKey),
+			Debug: viper.GetBool(AppDebugKey),
 		},
 	}
 

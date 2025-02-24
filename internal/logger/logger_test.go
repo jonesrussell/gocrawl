@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -44,7 +43,8 @@ func TestNewCustomLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, err := logger.NewDevelopmentLogger()
+			logLevel := "info"                                   // Set the desired log level
+			logger, err := logger.NewDevelopmentLogger(logLevel) // Pass log level as string
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewDevelopmentLogger() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -76,12 +76,23 @@ func TestNewCustomLogger(t *testing.T) {
 }
 
 func TestNewDevelopmentLogger(t *testing.T) {
-	// Call NewDevelopmentLogger without parameters
-	log, err := logger.NewDevelopmentLogger() // Ensure no parameters are passed
+	logLevel := "info"                                   // Set the desired log level
+	logger, err := logger.NewDevelopmentLogger(logLevel) // Pass log level as string
 	if err != nil {
-		t.Fatalf("failed to create logger: %v", err)
+		t.Fatalf("expected no error, got %v", err)
 	}
+	if logger == nil {
+		t.Fatal("expected logger to be non-nil")
+	}
+}
 
-	assert.NotNil(t, log, "Logger should not be nil")
-	// Add more assertions as needed
+func TestNewProductionLogger(t *testing.T) {
+	logLevel := "info"                                  // Set the desired log level
+	logger, err := logger.NewProductionLogger(logLevel) // Pass log level as string
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if logger == nil {
+		t.Fatal("expected logger to be non-nil")
+	}
 }
