@@ -39,11 +39,13 @@ type AppConfig struct {
 
 // CrawlerConfig holds crawler-specific configuration
 type CrawlerConfig struct {
-	BaseURL    string
-	MaxDepth   int
-	RateLimit  time.Duration
-	IndexName  string
-	SourceFile string
+	BaseURL     string
+	MaxDepth    int
+	RateLimit   time.Duration
+	RandomDelay time.Duration
+	IndexName   string
+	SourceFile  string
+	Parallelism int
 }
 
 // SetMaxDepth sets the MaxDepth in the CrawlerConfig
@@ -124,11 +126,13 @@ func NewConfig() (*Config, error) {
 			Environment: viper.GetString(AppEnvKey),
 		},
 		Crawler: CrawlerConfig{
-			BaseURL:    viper.GetString(CrawlerBaseURLKey),
-			MaxDepth:   viper.GetInt(CrawlerMaxDepthKey),
-			RateLimit:  rateLimit,
-			IndexName:  viper.GetString(ElasticIndexNameKey),
-			SourceFile: viper.GetString(CrawlerSourceFileKey),
+			BaseURL:     viper.GetString(CrawlerBaseURLKey),
+			MaxDepth:    viper.GetInt(CrawlerMaxDepthKey),
+			RateLimit:   rateLimit,
+			RandomDelay: viper.GetDuration("CRAWLER_RANDOM_DELAY"),
+			IndexName:   viper.GetString(ElasticIndexNameKey),
+			SourceFile:  viper.GetString(CrawlerSourceFileKey),
+			Parallelism: viper.GetInt("CRAWLER_PARALLELISM"),
 		},
 		Elasticsearch: ElasticsearchConfig{
 			URL:       viper.GetString(ElasticURLKey),

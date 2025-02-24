@@ -79,28 +79,29 @@ func runCrawlCmd(cmd *cobra.Command, _ []string) error {
 }
 
 // startCrawl starts the crawling process
-func startCrawlCmd(crawler *crawler.Crawler) error {
+func startCrawlCmd(crawlerInstance *crawler.Crawler) error {
 	globalLogger.Debug("Starting crawl...")
 
 	// Create the collector using global configuration
 	params := collector.Params{
-		BaseURL:   globalConfig.Crawler.BaseURL,
-		MaxDepth:  globalConfig.Crawler.MaxDepth,
-		RateLimit: globalConfig.Crawler.RateLimit,
-		Logger:    globalLogger,
+		BaseURL:         globalConfig.Crawler.BaseURL,
+		MaxDepth:        globalConfig.Crawler.MaxDepth,
+		RateLimit:       globalConfig.Crawler.RateLimit,
+		Logger:          globalLogger,
+		CrawlerInstance: crawlerInstance,
 	}
 
 	// Create the collector
-	collectorResult, err := collector.New(params, crawler)
+	collectorResult, err := collector.New(params)
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)
 	}
 
 	// Set the collector in the crawler instance
-	crawler.SetCollector(collectorResult.Collector)
+	crawlerInstance.SetCollector(collectorResult.Collector)
 
 	// Start the crawling process
-	if startErr := crawler.Start(context.Background(), params.BaseURL); startErr != nil {
+	if startErr := crawlerInstance.Start(context.Background(), params.BaseURL); startErr != nil {
 		return fmt.Errorf("error starting crawler: %w", startErr)
 	}
 
