@@ -223,9 +223,9 @@ func TestNewCollector_MissingLogger(t *testing.T) {
 		Context:          context.Background(), // Initialize context
 	}
 
-	result, err := collector.New(params) // Pass nil for the crawler
+	result, err := collector.New(params)
 
 	require.Error(t, err)
-	require.Equal(t, "crawler instance is required", err.Error())
+	require.Equal(t, "logger is required", err.Error())
 	require.Empty(t, result)
 }
