@@ -42,7 +42,7 @@ var httpdCmd = &cobra.Command{
 	Short: "Start the HTTP server for search",
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
-	Run: func(cmd *cobra.Command, _ []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		// Initialize the Fx application with the HTTP server
 		app := fx.New(
 			config.Module,
