@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -79,16 +80,16 @@ func runCrawlCmd(cmd *cobra.Command, _ []string) error {
 }
 
 // startCrawl starts the crawling process
-func startCrawlCmd(crawlerInstance *crawler.Crawler) error {
+func startCrawlCmd(crawlerInstance *crawler.Crawler, articleProcessor *article.Processor) error {
 	globalLogger.Debug("Starting crawl...")
 
 	// Create the collector using global configuration
 	params := collector.Params{
-		BaseURL:         globalConfig.Crawler.BaseURL,
-		MaxDepth:        globalConfig.Crawler.MaxDepth,
-		RateLimit:       globalConfig.Crawler.RateLimit,
-		Logger:          globalLogger,
-		CrawlerInstance: crawlerInstance,
+		BaseURL:          globalConfig.Crawler.BaseURL,
+		MaxDepth:         globalConfig.Crawler.MaxDepth,
+		RateLimit:        globalConfig.Crawler.RateLimit,
+		Logger:           globalLogger,
+		ArticleProcessor: articleProcessor,
 	}
 
 	// Create the collector

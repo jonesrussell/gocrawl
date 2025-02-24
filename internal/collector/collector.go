@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 
 	"github.com/gocolly/colly/v2"
@@ -30,15 +30,15 @@ type DebuggerInterface interface {
 type Params struct {
 	fx.In
 
-	BaseURL         string
-	MaxDepth        int
-	RateLimit       time.Duration
-	RandomDelay     time.Duration
-	Debugger        *logger.CollyDebugger
-	Logger          logger.Interface
-	Parallelism     int
-	Context         context.Context
-	CrawlerInstance *crawler.Crawler // Add the crawler instance here
+	BaseURL          string
+	MaxDepth         int
+	RateLimit        time.Duration
+	RandomDelay      time.Duration
+	Debugger         *logger.CollyDebugger
+	Logger           logger.Interface
+	Parallelism      int
+	Context          context.Context
+	ArticleProcessor *article.Processor
 }
 
 // Result holds the collector instance
@@ -55,9 +55,9 @@ func New(p Params) (Result, error) {
 		return Result{}, errors.New("base URL cannot be empty")
 	}
 
-	// Check if crawlerInstance is nil
-	if p.CrawlerInstance == nil {
-		return Result{}, errors.New("crawler instance is required")
+	// Check if ArticleProcessor is nil
+	if p.ArticleProcessor == nil {
+		return Result{}, errors.New("article processor is required")
 	}
 
 	parsedURL, err := url.Parse(p.BaseURL)
@@ -110,7 +110,7 @@ func New(p Params) (Result, error) {
 
 	c.OnHTML("div.details", func(e *colly.HTMLElement) {
 		p.Logger.Debug("Found details", "url", e.Request.URL.String())
-		p.CrawlerInstance.ProcessPage(e) // Call ProcessPage on the Crawler instance directly
+		p.ArticleProcessor.ProcessPage(e) // Call ProcessPage on the ArticleProcessor instance
 	})
 
 	p.Logger.Debug("Collector created",

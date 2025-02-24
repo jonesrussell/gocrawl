@@ -6,12 +6,11 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/jonesrussell/gocrawl/internal/crawler"
 )
 
 // Helper function to create a mock logger
@@ -33,30 +32,30 @@ func TestNew(t *testing.T) {
 		{
 			name: "valid parameters",
 			params: collector.Params{
-				BaseURL:         "http://example.com",
-				MaxDepth:        2,
-				RateLimit:       1 * time.Second,
-				Debugger:        &logger.CollyDebugger{Logger: newMockLogger()},
-				Logger:          newMockLogger(),
-				Parallelism:     2,
-				RandomDelay:     2 * time.Second,
-				Context:         context.Background(),
-				CrawlerInstance: &crawler.Crawler{Logger: newMockLogger()},
+				BaseURL:          "http://example.com",
+				MaxDepth:         2,
+				RateLimit:        1 * time.Second,
+				Debugger:         &logger.CollyDebugger{Logger: newMockLogger()},
+				Logger:           newMockLogger(),
+				Parallelism:      2,
+				RandomDelay:      2 * time.Second,
+				Context:          context.Background(),
+				ArticleProcessor: &article.Processor{Logger: newMockLogger()},
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty base URL",
 			params: collector.Params{
-				BaseURL:         "",
-				MaxDepth:        2,
-				RateLimit:       1 * time.Second,
-				Debugger:        &logger.CollyDebugger{Logger: newMockLogger()},
-				Logger:          newMockLogger(),
-				Parallelism:     2,
-				RandomDelay:     2 * time.Second,
-				Context:         context.Background(),
-				CrawlerInstance: &crawler.Crawler{Logger: newMockLogger()},
+				BaseURL:          "",
+				MaxDepth:         2,
+				RateLimit:        1 * time.Second,
+				Debugger:         &logger.CollyDebugger{Logger: newMockLogger()},
+				Logger:           newMockLogger(),
+				Parallelism:      2,
+				RandomDelay:      2 * time.Second,
+				Context:          context.Background(),
+				ArticleProcessor: &article.Processor{Logger: newMockLogger()},
 			},
 			wantErr:    true,
 			wantErrMsg: "base URL cannot be empty",
@@ -64,15 +63,15 @@ func TestNew(t *testing.T) {
 		{
 			name: "invalid base URL",
 			params: collector.Params{
-				BaseURL:         "not-a-url",
-				MaxDepth:        2,
-				RateLimit:       1 * time.Second,
-				Debugger:        &logger.CollyDebugger{Logger: newMockLogger()},
-				Logger:          newMockLogger(),
-				Parallelism:     2,
-				RandomDelay:     2 * time.Second,
-				Context:         context.Background(),
-				CrawlerInstance: &crawler.Crawler{Logger: newMockLogger()},
+				BaseURL:          "not-a-url",
+				MaxDepth:         2,
+				RateLimit:        1 * time.Second,
+				Debugger:         &logger.CollyDebugger{Logger: newMockLogger()},
+				Logger:           newMockLogger(),
+				Parallelism:      2,
+				RandomDelay:      2 * time.Second,
+				Context:          context.Background(),
+				ArticleProcessor: &article.Processor{Logger: newMockLogger()},
 			},
 			wantErr:    true,
 			wantErrMsg: "invalid base URL: not-a-url, must be a valid HTTP/HTTPS URL",
@@ -148,9 +147,6 @@ func TestCollectorCreation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockLogger := newMockLogger()
-			mockCrawler := &crawler.Crawler{
-				Logger: mockLogger,
-			}
 
 			params := collector.Params{
 				BaseURL:   tt.baseURL,
@@ -159,9 +155,9 @@ func TestCollectorCreation(t *testing.T) {
 				Debugger: &logger.CollyDebugger{
 					Logger: mockLogger,
 				},
-				Logger:          mockLogger,
-				CrawlerInstance: mockCrawler,
-				Context:         context.Background(),
+				Logger:           mockLogger,
+				ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+				Context:          context.Background(),
 			}
 
 			result, err := collector.New(params)
@@ -179,16 +175,16 @@ func TestCollectorCreation(t *testing.T) {
 	// Test for missing logger
 	t.Run("missing logger", func(t *testing.T) {
 		params := collector.Params{
-			BaseURL:         "http://example.com",
-			Logger:          nil,
-			CrawlerInstance: nil,
-			Context:         context.Background(),
+			BaseURL:          "http://example.com",
+			Logger:           nil,
+			ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+			Context:          context.Background(),
 		}
 
 		result, err := collector.New(params)
 
 		require.Error(t, err)
-		require.Equal(t, "crawler instance is required", err.Error())
+		require.Equal(t, "article processor is required", err.Error())
 		require.Empty(t, result)
 	})
 }
@@ -196,19 +192,15 @@ func TestCollectorCreation(t *testing.T) {
 // TestNewCollector tests the New function of the collector package
 func TestNewCollector(t *testing.T) {
 	mockLogger := logger.NewMockLogger()
-	mockCrawler := &crawler.Crawler{
-		Logger: mockLogger,
-		// Initialize other necessary fields...
-	}
 
 	params := collector.Params{
-		BaseURL:         "http://example.com",
-		MaxDepth:        3,
-		RateLimit:       time.Second,
-		Debugger:        logger.NewCollyDebugger(mockLogger),
-		Logger:          mockLogger,
-		CrawlerInstance: mockCrawler,
-		Context:         context.Background(), // Initialize context
+		BaseURL:          "http://example.com",
+		MaxDepth:         3,
+		RateLimit:        time.Second,
+		Debugger:         logger.NewCollyDebugger(mockLogger),
+		Logger:           mockLogger,
+		ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+		Context:          context.Background(), // Initialize context
 	}
 
 	// Set expectation for the "Collector created" log message
@@ -225,10 +217,10 @@ func TestNewCollector(t *testing.T) {
 // TestNewCollector_MissingLogger tests the New function of the collector package
 func TestNewCollector_MissingLogger(t *testing.T) {
 	params := collector.Params{
-		BaseURL:         "http://example.com", // Provide a valid base URL
-		Logger:          nil,                  // Pass nil for the logger
-		CrawlerInstance: nil,                  // Pass nil for the crawler
-		Context:         context.Background(), // Initialize context
+		BaseURL:          "http://example.com", // Provide a valid base URL
+		Logger:           nil,                  // Pass nil for the logger
+		ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+		Context:          context.Background(), // Initialize context
 	}
 
 	result, err := collector.New(params) // Pass nil for the crawler

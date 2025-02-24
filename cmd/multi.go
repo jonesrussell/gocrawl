@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -95,12 +96,12 @@ func startMultiSourceCrawl(ms *multisource.MultiSource, crawlerInstance *crawler
 
 	// Create the collector using the collector module
 	collectorResult, err := collector.New(collector.Params{
-		BaseURL:         baseURL,
-		MaxDepth:        maxDepth,  // Use the extracted max_depth
-		RateLimit:       rateLimit, // Use the extracted rate_limit
-		Debugger:        logger.NewCollyDebugger(globalLogger),
-		Logger:          globalLogger,
-		CrawlerInstance: crawlerInstance,
+		BaseURL:          baseURL,
+		MaxDepth:         maxDepth,  // Use the extracted max_depth
+		RateLimit:        rateLimit, // Use the extracted rate_limit
+		Debugger:         logger.NewCollyDebugger(globalLogger),
+		Logger:           globalLogger,
+		ArticleProcessor: &article.Processor{Logger: globalLogger},
 	})
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)
