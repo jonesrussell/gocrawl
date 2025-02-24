@@ -11,6 +11,11 @@ import (
 	"go.uber.org/fx"
 )
 
+// Constants
+const (
+	readHeaderTimeout = 10 * time.Second // Timeout for reading headers
+)
+
 // SearchRequest represents the structure of the search request
 type SearchRequest struct {
 	Query string `json:"query"`
@@ -23,13 +28,15 @@ func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceIn
 	log.Info("StartHTTPServer function called")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
+		var err error
+
 		if r.Method != http.MethodPost {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
 
 		var req SearchRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request payload", http.StatusBadRequest)
 			return
 		}
@@ -42,7 +49,7 @@ func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceIn
 		}
 
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(articles); err != nil {
+		if err = json.NewEncoder(w).Encode(articles); err != nil {
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 			return
 		}
@@ -51,7 +58,7 @@ func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceIn
 	server := &http.Server{
 		Addr:              ":8081",
 		Handler:           mux,
-		ReadHeaderTimeout: 10 * time.Second,
+		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
 	return server, nil
