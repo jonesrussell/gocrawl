@@ -63,20 +63,24 @@ func NewProductionLogger(cfg *config.Config) (*CustomLogger, error) {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
 
+	// Use JSON encoder for file logging
 	fileCore := zapcore.NewCore(
 		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
 		zapcore.AddSync(logFile),
 		zapcore.InfoLevel,
 	)
+
+	// Use JSON encoder for console logging as well
 	consoleCore := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), // Change to JSON
 		zapcore.AddSync(os.Stdout),
 		zapcore.DebugLevel,
 	)
+
 	core := zapcore.NewTee(fileCore, consoleCore)
 	logger := zap.New(core)
 
-	// Test logging to ensure it's working
+	// Log when the logger is created
 	logger.Info("Production logger initialized successfully")
 
 	return &CustomLogger{Logger: logger, logFile: logFile}, nil

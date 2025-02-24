@@ -23,26 +23,10 @@ var rootCmd = &cobra.Command{
 
 // Execute is the entry point for the CLI
 func Execute() {
-	// Initialize configuration
-	var err error
-	globalConfig, err = config.NewConfig() // This should be the only place you call NewConfig
-	if err != nil {
-		// Initialize logger before logging the error
-		globalLogger, _ = InitializeLogger(&config.Config{}) // Initialize with an empty config to avoid nil logger
-		globalLogger.Error("Error creating Config", "error", err)
-		os.Exit(1)
-	}
-
-	// Initialize logger
-	globalLogger, err = InitializeLogger(globalConfig)
-	if err != nil {
-		globalLogger.Error("Error creating Logger", "error", err)
-		os.Exit(1)
-	}
+	fmt.Println("Executing command: Execute")
 
 	// Register the crawl and search commands
-	err = rootCmd.Execute()
-	if err != nil {
+	if err := rootCmd.Execute(); err != nil {
 		globalLogger.Error("Error executing root command", "error", err)
 		os.Exit(1)
 	}
@@ -50,13 +34,16 @@ func Execute() {
 
 // Initialize the command
 func init() {
-	cobra.OnInitialize(initConfig)
+	fmt.Println("Initializing command: init")
+	cobra.OnInitialize(initConfig, initLogger)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
 }
 
 // Initialize configuration
 func initConfig() {
+	fmt.Println("Initializing configuration: initConfig")
+
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
@@ -72,19 +59,32 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+
+	// Initialize configuration
+	var configErr error
+	globalConfig, configErr = config.NewConfig() // This should be the only place you call NewConfig
+	if configErr != nil {
+		fmt.Println("Error creating Config", "error", configErr)
+	}
 }
 
-// InitializeLogger initializes the logger
-func InitializeLogger(cfg *config.Config) (logger.Interface, error) {
-	env := cfg.App.Environment
+func initLogger() {
+	env := globalConfig.App.Environment
 	if env == "" {
 		env = "development" // Set a default environment
 	}
 
+	var loggerErr error
 	if env == "development" {
-		return logger.NewDevelopmentLogger() // Use colored logger in development
+		globalLogger, loggerErr = logger.NewDevelopmentLogger() // Use colored logger in development
+	} else {
+		globalLogger, loggerErr = logger.NewProductionLogger(globalConfig) // Use a different logger for production
 	}
-	return logger.NewProductionLogger(cfg) // Use a different logger for production
+
+	if loggerErr != nil {
+		fmt.Fprintln(os.Stderr, "Error creating Logger:", loggerErr)
+		os.Exit(1)
+	}
 }
 
 // Shutdown gracefully shuts down the application
