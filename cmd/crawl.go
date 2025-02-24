@@ -49,8 +49,14 @@ func setupCrawlCmd(cmd *cobra.Command) error {
 func runCrawlCmd(cmd *cobra.Command, _ []string) error {
 	// Initialize fx container
 	app := fx.New(
-		config.Module,
-		logger.Module,
+		fx.Provide(
+			func() *config.Config {
+				return globalConfig // Provide the global config
+			},
+			func() logger.Interface {
+				return globalLogger // Provide the global logger
+			},
+		),
 		storage.Module,
 		collector.Module,
 		crawler.Module,
