@@ -57,6 +57,9 @@ func TestConfigureLogging(t *testing.T) {
 	c := colly.NewCollector()
 	testLogger := newMockLogger() // Use the helper function
 
+	// Set expectation for the "Error occurred" log message
+	testLogger.On("Error", "Error occurred", mock.Anything).Return()
+
 	// Call the ConfigureLogging function
 	collector.ConfigureLogging(c, testLogger)
 
