@@ -30,15 +30,15 @@ type DebuggerInterface interface {
 type Params struct {
 	fx.In
 
+	ArticleProcessor *article.Processor
 	BaseURL          string
-	MaxDepth         int
-	RateLimit        time.Duration
-	RandomDelay      time.Duration
+	Context          context.Context
 	Debugger         *logger.CollyDebugger
 	Logger           logger.Interface
+	MaxDepth         int
 	Parallelism      int
-	Context          context.Context
-	ArticleProcessor *article.Processor
+	RandomDelay      time.Duration
+	RateLimit        time.Duration
 }
 
 // Result holds the collector instance
