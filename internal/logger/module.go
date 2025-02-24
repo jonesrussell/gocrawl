@@ -36,20 +36,9 @@ var Module = fx.Module("logger",
 
 // NewDevelopmentLogger initializes a new CustomLogger for development with colored output
 func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
-	var logLevel zapcore.Level // Declare logLevel without initialization
-
-	// Convert string log level to zapcore.Level
-	switch logLevelStr {
-	case "debug":
-		logLevel = zapcore.DebugLevel
-	case "info":
-		logLevel = zapcore.InfoLevel
-	case "warn":
-		logLevel = zapcore.WarnLevel
-	case "error":
-		logLevel = zapcore.ErrorLevel
-	default:
-		return nil, errors.New("unknown log level")
+	logLevel, err := parseLogLevel(logLevelStr)
+	if err != nil {
+		return nil, err
 	}
 
 	devCfg := zap.NewDevelopmentConfig()
@@ -70,20 +59,9 @@ func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
 
 // NewProductionLogger initializes a new CustomLogger for production
 func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
-	var logLevel zapcore.Level // Declare logLevel without initialization
-
-	// Convert string log level to zapcore.Level
-	switch logLevelStr {
-	case "debug":
-		logLevel = zapcore.DebugLevel
-	case "info":
-		logLevel = zapcore.InfoLevel
-	case "warn":
-		logLevel = zapcore.WarnLevel
-	case "error":
-		logLevel = zapcore.ErrorLevel
-	default:
-		return nil, errors.New("unknown log level")
+	logLevel, err := parseLogLevel(logLevelStr)
+	if err != nil {
+		return nil, err
 	}
 
 	logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -112,4 +90,24 @@ func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
 	logger.Info("Production logger initialized successfully")
 
 	return &CustomLogger{Logger: logger, logFile: logFile}, nil
+}
+
+// parseLogLevel converts a string log level to a zapcore.Level
+func parseLogLevel(logLevelStr string) (zapcore.Level, error) {
+	var logLevel zapcore.Level
+
+	switch logLevelStr {
+	case "debug":
+		logLevel = zapcore.DebugLevel
+	case "info":
+		logLevel = zapcore.InfoLevel
+	case "warn":
+		logLevel = zapcore.WarnLevel
+	case "error":
+		logLevel = zapcore.ErrorLevel
+	default:
+		return zapcore.DebugLevel, errors.New("unknown log level")
+	}
+
+	return logLevel, nil
 }

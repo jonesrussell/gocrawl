@@ -45,8 +45,10 @@ You can send POST requests to /search with a JSON body containing the search par
 	Run: func(_ *cobra.Command, _ []string) {
 		// Initialize the Fx application with the HTTP server
 		app := fx.New(
-			config.Module,
 			fx.Provide(
+				func() *config.Config {
+					return globalConfig // Provide the global config
+				},
 				func() logger.Interface {
 					return globalLogger // Use the global logger
 				},
