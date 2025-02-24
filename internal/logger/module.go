@@ -36,7 +36,7 @@ var Module = fx.Module("logger",
 
 // NewDevelopmentLogger initializes a new CustomLogger for development with colored output
 func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
-	logLevel := zapcore.InfoLevel // Default log level
+	var logLevel zapcore.Level // Declare logLevel without initialization
 
 	// Convert string log level to zapcore.Level
 	switch logLevelStr {
@@ -70,7 +70,7 @@ func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
 
 // NewProductionLogger initializes a new CustomLogger for production
 func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
-	logLevel := zapcore.InfoLevel // Default log level
+	var logLevel zapcore.Level // Declare logLevel without initialization
 
 	// Convert string log level to zapcore.Level
 	switch logLevelStr {
@@ -95,7 +95,7 @@ func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
 	fileCore := zapcore.NewCore(
 		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
 		zapcore.AddSync(logFile),
-		zapcore.Level(logLevel), // Set log level for file logging
+		logLevel, // Set log level for file logging directly
 	)
 
 	// Use JSON encoder for console logging as well
