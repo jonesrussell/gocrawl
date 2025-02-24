@@ -34,8 +34,14 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 
 	// Create an Fx application
 	app := fx.New(
-		config.Module,
-		logger.Module,
+		fx.Provide(
+			func() *config.Config {
+				return globalConfig // Provide the global config
+			},
+			func() logger.Interface {
+				return globalLogger // Provide the global logger
+			},
+		),
 		storage.Module,
 		crawler.Module,
 		multisource.Module,
