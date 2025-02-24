@@ -47,6 +47,12 @@ func (m *MockLogger) Fatal(msg string, _ ...interface{}) {
 	m.Messages = append(m.Messages, msg)
 }
 
+// Implement Printf method
+func (m *MockLogger) Printf(format string, args ...interface{}) {
+	m.Called(fmt.Sprintf(format, args...))
+	m.Messages = append(m.Messages, fmt.Sprintf(format, args...))
+}
+
 // Implement Fatalf method
 func (m *MockLogger) Fatalf(format string, args ...interface{}) {
 	m.Called(fmt.Sprintf(format, args...))

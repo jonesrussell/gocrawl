@@ -17,6 +17,7 @@ type Interface interface {
 	Debug(msg string, fields ...interface{})
 	Warn(msg string, fields ...interface{})
 	Fatal(msg string, fields ...interface{})
+	Printf(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
 	Sync() error
 }
@@ -62,6 +63,11 @@ func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
 // Fatal logs a fatal message
 func (c *CustomLogger) Fatal(msg string, fields ...interface{}) {
 	c.Logger.Fatal(msg, convertToZapFields(fields)...)
+}
+
+// Printf logs a formatted message
+func (c *CustomLogger) Printf(format string, args ...interface{}) {
+	c.Logger.Info(fmt.Sprintf(format, args...))
 }
 
 // Errorf logs a formatted error message

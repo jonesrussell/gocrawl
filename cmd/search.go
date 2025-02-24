@@ -72,6 +72,7 @@ func newSearchFxApp(query string) *fx.App {
 	return fx.New(
 		config.Module,
 		logger.Module,
+		fx.Logger(globalLogger),
 		storage.Module,
 		search.Module,
 		fx.Invoke(setupSearchLifecycleHooks),
