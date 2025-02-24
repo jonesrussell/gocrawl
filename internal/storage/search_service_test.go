@@ -1,7 +1,6 @@
 package storage_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -50,7 +49,7 @@ func TestSearchService_SearchArticles(t *testing.T) {
 			// No expectation set for BulkIndexArticles
 
 			// Call the method under test
-			articles, err := searchService.SearchArticles(context.Background(), tt.query, tt.size)
+			articles, err := searchService.SearchArticles(t.Context(), tt.query, tt.size)
 
 			// Assert results
 			assert.Equal(t, tt.expectedArticles, articles)
