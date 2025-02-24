@@ -184,7 +184,7 @@ func TestCollectorCreation(t *testing.T) {
 		result, err := collector.New(params)
 
 		require.Error(t, err)
-		require.Equal(t, "article processor is required", err.Error())
+		require.Equal(t, "logger is required", err.Error())
 		require.Empty(t, result)
 	})
 }

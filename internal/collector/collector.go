@@ -60,6 +60,11 @@ func New(p Params) (Result, error) {
 		return Result{}, errors.New("article processor is required")
 	}
 
+	// Check if Logger is nil
+	if p.Logger == nil {
+		return Result{}, errors.New("logger is required")
+	}
+
 	parsedURL, err := url.Parse(p.BaseURL)
 	if err != nil || (!strings.HasPrefix(parsedURL.Scheme, "http") && !strings.HasPrefix(parsedURL.Scheme, "https")) {
 		return Result{}, fmt.Errorf("invalid base URL: %s, must be a valid HTTP/HTTPS URL", p.BaseURL)
