@@ -41,6 +41,7 @@ func TestNew(t *testing.T) {
 				RandomDelay:      2 * time.Second,
 				Context:          context.Background(),
 				ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+				CrawlerInstance:  colly.NewCollector(),
 			},
 			wantErr: false,
 		},
@@ -56,6 +57,7 @@ func TestNew(t *testing.T) {
 				RandomDelay:      2 * time.Second,
 				Context:          context.Background(),
 				ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+				CrawlerInstance:  colly.NewCollector(),
 			},
 			wantErr:    true,
 			wantErrMsg: "base URL cannot be empty",
@@ -72,6 +74,7 @@ func TestNew(t *testing.T) {
 				RandomDelay:      2 * time.Second,
 				Context:          context.Background(),
 				ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+				CrawlerInstance:  colly.NewCollector(),
 			},
 			wantErr:    true,
 			wantErrMsg: "invalid base URL: not-a-url, must be a valid HTTP/HTTPS URL",
@@ -157,6 +160,7 @@ func TestCollectorCreation(t *testing.T) {
 				},
 				Logger:           mockLogger,
 				ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+				CrawlerInstance:  colly.NewCollector(),
 				Context:          context.Background(),
 			}
 
@@ -178,6 +182,7 @@ func TestCollectorCreation(t *testing.T) {
 			BaseURL:          "http://example.com",
 			Logger:           nil,
 			ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+			CrawlerInstance:  colly.NewCollector(),
 			Context:          context.Background(),
 		}
 
@@ -200,6 +205,7 @@ func TestNewCollector(t *testing.T) {
 		Debugger:         logger.NewCollyDebugger(mockLogger),
 		Logger:           mockLogger,
 		ArticleProcessor: &article.Processor{Logger: newMockLogger()},
+		CrawlerInstance:  colly.NewCollector(), // Initialize the CrawlerInstance
 		Context:          context.Background(), // Initialize context
 	}
 
@@ -207,7 +213,7 @@ func TestNewCollector(t *testing.T) {
 	mockLogger.On("Debug", "Collector created", mock.Anything).Return()
 
 	// Create the collector using the collector module
-	collectorResult, err := collector.New(params) // Pass the mockCrawler here
+	collectorResult, err := collector.New(params)
 
 	require.NoError(t, err)
 	require.NotNil(t, collectorResult.Collector)
