@@ -100,7 +100,7 @@ func New(p Params, crawlerInstance *crawler.Crawler) (Result, error) {
 		if visitErr != nil {
 			// Check if the error is due to max depth limit
 			if visitErr.Error() == "Max depth limit reached" {
-				p.Logger.Info("Max depth limit reached for link", "link", link) // Log as info instead of error
+				p.Logger.Warn("Max depth limit reached for link", "link", link) // Change to Warn level
 			} else {
 				p.Logger.Error("Failed to visit link", "link", link, "error", visitErr)
 			}
