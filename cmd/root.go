@@ -10,22 +10,18 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
-
-var globalLogger logger.Interface
-
-var globalConfig *config.Config
-
-var rootCmd = &cobra.Command{
-	Use:   "gocrawl",
-	Short: "A web crawler that stores content in Elasticsearch",
-}
+var (
+	cfgFile      string
+	globalLogger logger.Interface
+	globalConfig *config.Config
+	rootCmd      = &cobra.Command{
+		Use:   "gocrawl",
+		Short: "A web crawler that stores content in Elasticsearch",
+	}
+)
 
 // Execute is the entry point for the CLI
 func Execute() {
-	fmt.Println("Executing command: Execute")
-
-	// Register the crawl and search commands
 	if err := rootCmd.Execute(); err != nil {
 		globalLogger.Error("Error executing root command", "error", err)
 		os.Exit(1)
@@ -34,16 +30,12 @@ func Execute() {
 
 // Initialize the command
 func init() {
-	fmt.Println("Initializing command: init")
 	cobra.OnInitialize(initConfig, initLogger)
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
 }
 
 // Initialize configuration
 func initConfig() {
-	fmt.Println("Initializing configuration: initConfig")
-
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
@@ -64,7 +56,8 @@ func initConfig() {
 	var configErr error
 	globalConfig, configErr = config.NewConfig() // This should be the only place you call NewConfig
 	if configErr != nil {
-		fmt.Println("Error creating Config", "error", configErr)
+		fmt.Fprintln(os.Stderr, "Error creating Config:", configErr)
+		os.Exit(1)
 	}
 }
 
@@ -74,11 +67,14 @@ func initLogger() {
 		env = "development" // Set a default environment
 	}
 
+	// Log the environment
+	fmt.Fprintln(os.Stderr, "Initializing logger in environment:", env)
+
 	var loggerErr error
 	if env == "development" {
 		globalLogger, loggerErr = logger.NewDevelopmentLogger() // Use colored logger in development
 	} else {
-		globalLogger, loggerErr = logger.NewProductionLogger(globalConfig) // Use a different logger for production
+		globalLogger, loggerErr = logger.NewProductionLogger() // Use a different logger for production
 	}
 
 	if loggerErr != nil {
