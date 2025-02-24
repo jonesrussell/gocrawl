@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -70,8 +71,8 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 }
 
 // startMultiSourceCrawl starts the multi-source crawl
-func startMultiSourceCrawl(ms *multisource.MultiSource, c *crawler.Crawler) error {
-	if c == nil {
+func startMultiSourceCrawl(ms *multisource.MultiSource, crawlerInstance *crawler.Crawler) error {
+	if crawlerInstance == nil {
 		return errors.New("crawler is not initialized")
 	}
 
@@ -91,22 +92,23 @@ func startMultiSourceCrawl(ms *multisource.MultiSource, c *crawler.Crawler) erro
 	indexName := filteredSources[0].Index // Extract index name
 
 	// Set the index name in the Crawler's configuration
-	c.IndexName = indexName // Set the IndexName from the source
+	crawlerInstance.IndexName = indexName // Set the IndexName from the source
 
 	// Create the collector using the collector module
 	collectorResult, err := collector.New(collector.Params{
-		BaseURL:   baseURL,
-		MaxDepth:  maxDepth,  // Use the extracted max_depth
-		RateLimit: rateLimit, // Use the extracted rate_limit
-		Debugger:  logger.NewCollyDebugger(globalLogger),
-		Logger:    globalLogger,
-	}, c)
+		BaseURL:          baseURL,
+		MaxDepth:         maxDepth,  // Use the extracted max_depth
+		RateLimit:        rateLimit, // Use the extracted rate_limit
+		Debugger:         logger.NewCollyDebugger(globalLogger),
+		Logger:           globalLogger,
+		ArticleProcessor: &article.Processor{Logger: globalLogger},
+	})
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)
 	}
 
 	// Set the collector in the crawler instance
-	c.SetCollector(collectorResult.Collector)
+	crawlerInstance.SetCollector(collectorResult.Collector)
 
 	// Start the multi-source crawl
 	return ms.Start(context.Background(), sourceName)

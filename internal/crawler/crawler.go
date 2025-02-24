@@ -71,25 +71,6 @@ func (c *Crawler) Stop() {
 	// Perform any necessary cleanup here
 }
 
-// ProcessPage handles article extraction
-func (c *Crawler) ProcessPage(e *colly.HTMLElement) {
-	c.Logger.Debug("Processing page", "url", e.Request.URL.String())
-	article := c.ArticleService.ExtractArticle(e)
-	if article == nil {
-		c.Logger.Debug("No article extracted", "url", e.Request.URL.String())
-		return
-	}
-	c.Logger.Debug("Article extracted", "url", e.Request.URL.String(), "title", article.Title)
-
-	// Use the dynamic index name from the Crawler instance
-	if err := c.Storage.IndexDocument(context.Background(), c.IndexName, article.ID, article); err != nil {
-		c.Logger.Error("Failed to index article", "articleID", article.ID, "error", err)
-		return
-	}
-
-	c.articleChan <- article
-}
-
 // Add these methods to the Crawler struct
 func (c *Crawler) SetCollector(collector *colly.Collector) {
 	c.Collector = collector
