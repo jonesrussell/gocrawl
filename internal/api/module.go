@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -41,17 +42,24 @@ func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceIn
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(articles)
+		if err := json.NewEncoder(w).Encode(articles); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			return
+		}
 	})
 
-	server := &http.Server{Addr: ":8081", Handler: mux}
+	server := &http.Server{
+		Addr:              ":8081",
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 
-	return server, nil // Return the server instance
+	return server, nil
 }
 
 // Module is the Fx module for the API
 var Module = fx.Options(
 	fx.Provide(
-		StartHTTPServer, // Ensure this is correctly provided
+		StartHTTPServer,
 	),
 )
