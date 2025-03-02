@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"gopkg.in/yaml.v2"
 )
@@ -20,10 +19,16 @@ type Config struct {
 	Time      []string `yaml:"time"`
 }
 
+// Crawler interface defines the methods required for a crawler
+type Crawler interface {
+	Start(ctx context.Context, url string) error
+	Stop()
+}
+
 // Sources represents the root YAML structure and handles crawling
 type Sources struct {
 	Sources []Config         `yaml:"sources"`
-	Crawler *crawler.Crawler `yaml:"-"`
+	Crawler Crawler          `yaml:"-"`
 	Logger  logger.Interface `yaml:"-"`
 }
 
