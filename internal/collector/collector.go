@@ -10,6 +10,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
@@ -26,6 +27,23 @@ type DebuggerInterface interface {
 	Event(e *debug.Event)
 }
 
+const (
+	// Default selectors when none are specified in the source config
+	DefaultContentSelector    = "body"
+	DefaultTitleSelector      = "h1"
+	DefaultDateSelector       = "time"
+	DefaultAuthorSelector     = "span.author"
+	DefaultCategoriesSelector = "div.categories"
+)
+
+// getSelector returns the specified selector or falls back to a default
+func getSelector(specified, defaultSelector string) string {
+	if specified == "" {
+		return defaultSelector
+	}
+	return specified
+}
+
 // Params holds the parameters for creating a Collector
 type Params struct {
 	fx.In
@@ -39,6 +57,7 @@ type Params struct {
 	Parallelism      int
 	RandomDelay      time.Duration
 	RateLimit        time.Duration
+	Source           *sources.Config
 }
 
 // Result holds the collector instance
@@ -113,9 +132,11 @@ func New(p Params) (Result, error) {
 		}
 	})
 
-	c.OnHTML("div.details", func(e *colly.HTMLElement) {
-		p.Logger.Debug("Found details", "url", e.Request.URL.String())
-		p.ArticleProcessor.ProcessPage(e) // Call ProcessPage on the ArticleProcessor instance
+	// Get the content selector with fallback
+	contentSelector := getSelector(p.Source.Selectors.Content, DefaultContentSelector)
+	c.OnHTML(contentSelector, func(e *colly.HTMLElement) {
+		p.Logger.Debug("Found content", "url", e.Request.URL.String(), "selector", contentSelector)
+		p.ArticleProcessor.ProcessPage(e)
 	})
 
 	p.Logger.Debug("Collector created",
