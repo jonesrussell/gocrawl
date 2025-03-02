@@ -82,7 +82,7 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 // startMultiSourceCrawl starts the multi-source crawl
 func startMultiSourceCrawl(
 	sources *sources.Sources,
-	crawlerInstance *crawler.Crawler,
+	crawlerInstance crawler.Interface,
 	processor *article.Processor,
 ) error {
 	if crawlerInstance == nil {
@@ -114,7 +114,11 @@ func startMultiSourceCrawl(
 	}
 
 	// Set the collector in the crawler instance
-	crawlerInstance.SetCollector(collectorResult.Collector)
+	if c, ok := crawlerInstance.(*crawler.Crawler); ok {
+		c.SetCollector(collectorResult.Collector)
+	} else {
+		return fmt.Errorf("crawler instance is not of type *crawler.Crawler")
+	}
 
 	// Start the crawl
 	return sources.Start(context.Background(), sourceName)

@@ -10,7 +10,7 @@ import (
 var Module = fx.Module("sources",
 	fx.Provide(
 		// Provide the sources configuration with crawler
-		func(logger logger.Interface, c *crawler.Crawler) (*Sources, error) {
+		func(logger logger.Interface, c crawler.Interface) (*Sources, error) {
 			sources, err := Load("sources.yml")
 			if err != nil {
 				return nil, err
