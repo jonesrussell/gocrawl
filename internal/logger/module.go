@@ -41,20 +41,38 @@ func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
 		return nil, err
 	}
 
-	devCfg := zap.NewDevelopmentConfig()
-	devCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder // Add color to log levels
-	devCfg.Level = zap.NewAtomicLevelAt(logLevel)                       // Set log level
-
-	// Ensure the output is set to os.Stdout
-	devCfg.OutputPaths = []string{"stdout"} // This should work in most environments
-
-	log, err := devCfg.Build()
+	// Open log file
+	logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
+
+	// Development encoder config with colors for console
+	devEncoderConfig := zap.NewDevelopmentEncoderConfig()
+	devEncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+
+	// Console core with colored output
+	consoleCore := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(devEncoderConfig),
+		zapcore.AddSync(os.Stdout),
+		logLevel,
+	)
+
+	// File core with more detailed output
+	fileCore := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.AddSync(logFile),
+		logLevel,
+	)
+
+	// Combine both cores
+	core := zapcore.NewTee(consoleCore, fileCore)
+	logger := zap.New(core, zap.AddCaller(), zap.Development())
+
 	// Log when the logger is created
-	log.Info("Development logger initialized successfully")
-	return &CustomLogger{Logger: log}, nil
+	logger.Info("Development logger initialized successfully")
+
+	return &CustomLogger{Logger: logger, logFile: logFile}, nil
 }
 
 // NewProductionLogger initializes a new CustomLogger for production

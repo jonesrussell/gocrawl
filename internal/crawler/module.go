@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"context"
 	"errors"
 
 	"github.com/gocolly/colly/v2"
@@ -12,12 +13,18 @@ import (
 	"go.uber.org/fx"
 )
 
+// Interface defines the methods required for a crawler
+type Interface interface {
+	Start(ctx context.Context, url string) error
+	Stop()
+}
+
 func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {
 	return logger.NewCollyDebugger(log)
 }
 
 // ProvideCrawler creates a new Crawler instance
-func ProvideCrawler(p Params) (*Crawler, error) {
+func ProvideCrawler(p Params) (Interface, error) {
 	if p.Logger == nil {
 		return nil, errors.New("logger is required")
 	}
@@ -65,7 +72,7 @@ type Params struct {
 type Result struct {
 	fx.Out
 
-	Crawler *Crawler
+	Crawler Interface
 }
 
 // Crawler represents a web crawler

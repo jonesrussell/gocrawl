@@ -11,7 +11,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/multisource"
+	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -37,22 +38,30 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 	app := fx.New(
 		fx.Provide(
 			func() *config.Config {
-				return globalConfig // Provide the global config
+				return globalConfig
 			},
 			func() logger.Interface {
-				return globalLogger // Provide the global logger
+				return globalLogger
 			},
+			func() chan *models.Article {
+				return make(chan *models.Article, 100)
+			},
+			// Provide IndexName using sources
+			fx.Annotate(
+				func(s *sources.Sources) string {
+					source, _ := s.FindByName(sourceName)
+					if source != nil {
+						return source.Index
+					}
+					return ""
+				},
+				fx.ResultTags(`name:"indexName"`),
+			),
 		),
 		storage.Module,
 		crawler.Module,
-		multisource.Module,
-		fx.Provide(func(c *crawler.Crawler) *multisource.MultiSource {
-			ms, err := multisource.NewMultiSource(globalLogger, c, "sources.yml")
-			if err != nil {
-				return nil
-			}
-			return ms
-		}),
+		article.Module,
+		sources.Module,
 		fx.Invoke(startMultiSourceCrawl),
 	)
 
@@ -71,79 +80,55 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 }
 
 // startMultiSourceCrawl starts the multi-source crawl
-func startMultiSourceCrawl(ms *multisource.MultiSource, crawlerInstance *crawler.Crawler) error {
+func startMultiSourceCrawl(
+	sources *sources.Sources,
+	crawlerInstance crawler.Interface,
+	processor *article.Processor,
+) error {
 	if crawlerInstance == nil {
 		return errors.New("crawler is not initialized")
 	}
 
-	// Filter sources based on sourceName
-	filteredSources, err := filterSources(ms.Sources, sourceName)
+	source, err := sources.FindByName(sourceName)
 	if err != nil {
 		return err
 	}
 
-	// Extract base URL, max_depth, rate_limit, and index from the filtered source
-	baseURL := filteredSources[0].URL
-	maxDepth := filteredSources[0].MaxDepth
-	rateLimit, err := time.ParseDuration(filteredSources[0].RateLimit) // Parse rate limit
+	// Parse rate limit
+	rateLimit, err := time.ParseDuration(source.RateLimit)
 	if err != nil {
 		return fmt.Errorf("invalid rate limit: %w", err)
 	}
-	indexName := filteredSources[0].Index // Extract index name
-
-	// Set the index name in the Crawler's configuration
-	crawlerInstance.IndexName = indexName // Set the IndexName from the source
 
 	// Create the collector using the collector module
 	collectorResult, err := collector.New(collector.Params{
-		BaseURL:          baseURL,
-		MaxDepth:         maxDepth,  // Use the extracted max_depth
-		RateLimit:        rateLimit, // Use the extracted rate_limit
+		BaseURL:          source.URL,
+		MaxDepth:         source.MaxDepth,
+		RateLimit:        rateLimit,
 		Debugger:         logger.NewCollyDebugger(globalLogger),
 		Logger:           globalLogger,
-		ArticleProcessor: &article.Processor{Logger: globalLogger},
+		ArticleProcessor: processor,
 	})
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)
 	}
 
 	// Set the collector in the crawler instance
-	crawlerInstance.SetCollector(collectorResult.Collector)
+	if c, ok := crawlerInstance.(*crawler.Crawler); ok {
+		c.SetCollector(collectorResult.Collector)
+	} else {
+		return fmt.Errorf("crawler instance is not of type *crawler.Crawler")
+	}
 
-	// Start the multi-source crawl
-	return ms.Start(context.Background(), sourceName)
+	// Start the crawl
+	return sources.Start(context.Background(), sourceName)
 }
 
 func init() {
 	multiCmd := createMultiCmd()
 	rootCmd.AddCommand(multiCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// multiCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// multiCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-
 	multiCmd.Flags().StringVar(&sourceName, "source", "", "Specify the source to crawl")
 	if err := multiCmd.MarkFlagRequired("source"); err != nil {
 		globalLogger.Error("Error marking source flag as required", "error", err)
 	}
-}
-
-// filterSources filters the sources based on source name
-func filterSources(sources []multisource.SourceConfig, sourceName string) ([]multisource.SourceConfig, error) {
-	var filteredSources []multisource.SourceConfig
-	for _, source := range sources {
-		if source.Name == sourceName {
-			filteredSources = append(filteredSources, source)
-		}
-	}
-	if len(filteredSources) == 0 {
-		return nil, fmt.Errorf("no source found with name: %s", sourceName)
-	}
-	return filteredSources, nil
 }

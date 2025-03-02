@@ -39,7 +39,6 @@ type Params struct {
 	Parallelism      int
 	RandomDelay      time.Duration
 	RateLimit        time.Duration
-	CrawlerInstance  *colly.Collector
 }
 
 // Result holds the collector instance
@@ -64,11 +63,6 @@ func New(p Params) (Result, error) {
 	// Check if Logger is nil
 	if p.Logger == nil {
 		return Result{}, errors.New("logger is required")
-	}
-
-	// Check if CrawlerInstance is nil (if applicable)
-	if p.CrawlerInstance == nil {
-		return Result{}, errors.New("crawler instance is required")
 	}
 
 	parsedURL, err := url.Parse(p.BaseURL)
