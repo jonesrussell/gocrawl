@@ -22,40 +22,13 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 )
-
-// Define a struct to hold source information
-type Source struct {
-	Name      string   `yaml:"name"`
-	URL       string   `yaml:"url"`
-	Index     string   `yaml:"index"`
-	RateLimit string   `yaml:"rate_limit"`
-	MaxDepth  int      `yaml:"max_depth"`
-	Time      []string `yaml:"time"`
-}
-
-// Load sources from YAML file
-func loadSources(filename string) ([]Source, error) {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	var sources struct {
-		Sources []Source `yaml:"sources"`
-	}
-	if err := yaml.Unmarshal(data, &sources); err != nil {
-		return nil, err
-	}
-	return sources.Sources, nil
-}
 
 // jobCmd represents the job command
 var jobCmd = &cobra.Command{
@@ -63,9 +36,10 @@ var jobCmd = &cobra.Command{
 	Short: "Schedule and run multi-source crawl jobs",
 	Long:  `Schedule and run multi-source crawl jobs based on the times specified in sources.yml`,
 	Run: func(cmd *cobra.Command, args []string) {
-		sources, err := loadSources("sources.yml")
+		// Load sources using our package
+		s, err := sources.Load("sources.yml")
 		if err != nil {
-			fmt.Println("Error loading sources:", err)
+			globalLogger.Error("Error loading sources", "error", err)
 			return
 		}
 
@@ -73,17 +47,17 @@ var jobCmd = &cobra.Command{
 		for {
 			now := time.Now()
 
-			for _, source := range sources {
+			for _, source := range s.Sources {
 				for _, t := range source.Time {
 					scheduledTime, err := time.Parse("15:04", t)
 					if err != nil {
-						fmt.Println("Invalid time format for source:", source.Name)
+						globalLogger.Error("Invalid time format for source", "source", source.Name, "time", t)
 						continue
 					}
 
 					// Check if it's time to run the job
 					if now.Hour() == scheduledTime.Hour() && now.Minute() == scheduledTime.Minute() {
-						fmt.Printf("Running job for %s at %s...\n", source.Name, t)
+						globalLogger.Info("Running scheduled crawl", "source", source.Name, "time", t)
 
 						// Create a new command instance for the multi command
 						args := []string{"multi", "--source", source.Name}
@@ -92,7 +66,7 @@ var jobCmd = &cobra.Command{
 						cmd.Stderr = os.Stderr
 
 						if err := cmd.Run(); err != nil {
-							fmt.Printf("Error executing multi command for %s: %v\n", source.Name, err)
+							globalLogger.Error("Error executing multi command", "source", source.Name, "error", err)
 						}
 					}
 				}
