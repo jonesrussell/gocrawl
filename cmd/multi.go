@@ -108,6 +108,7 @@ func startMultiSourceCrawl(
 		Debugger:         logger.NewCollyDebugger(globalLogger),
 		Logger:           globalLogger,
 		ArticleProcessor: processor,
+		Source:           source,
 	})
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)
