@@ -18,6 +18,13 @@ type Config struct {
 	RateLimit string   `yaml:"rate_limit"`
 	MaxDepth  int      `yaml:"max_depth"`
 	Time      []string `yaml:"time"`
+	Selectors struct {
+		Content    string `yaml:"content"`    // Main content selector
+		Title      string `yaml:"title"`      // Title selector
+		Date       string `yaml:"date"`       // Date selector
+		Author     string `yaml:"author"`     // Author selector
+		Categories string `yaml:"categories"` // Categories selector
+	} `yaml:"selectors"`
 }
 
 // Sources represents the root YAML structure and handles crawling
