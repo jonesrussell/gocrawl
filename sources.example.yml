@@ -4,28 +4,35 @@ sources:
     index: "fictional_news_articles"
     rate_limit: 2s
     max_depth: 3
+    time:
+      - "09:00"
+      - "15:00"
 
   - name: "Imaginary Times"
     url: "https://www.imaginarytimes.com/news/"
     index: "imaginary_times_articles"
     rate_limit: 1s
     max_depth: 2
+    time: "10:00"
 
   - name: "Example Daily"
     url: "https://www.exampledaily.com/current-events"
     index: "example_daily_articles"
     rate_limit: 1s
     max_depth: 4
+    time: "11:00"
 
   - name: "Sample Gazette"
     url: "https://www.samplegazette.com/world/"
     index: "sample_gazette_articles"
     rate_limit: 3s
     max_depth: 2
+    time: "14:00"
 
   - name: "Fable Report"
     url: "https://www.fablereport.com/stories"
     index: "fable_report_articles"
     rate_limit: 2s
     max_depth: 5
+    time: "16:00"
     
