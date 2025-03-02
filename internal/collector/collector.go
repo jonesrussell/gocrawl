@@ -29,7 +29,7 @@ type DebuggerInterface interface {
 
 const (
 	// Default selectors when none are specified in the source config
-	DefaultContentSelector    = "body"
+	DefaultArticleSelector    = "body"
 	DefaultTitleSelector      = "h1"
 	DefaultDateSelector       = "time"
 	DefaultAuthorSelector     = "span.author"
@@ -133,9 +133,9 @@ func New(p Params) (Result, error) {
 	})
 
 	// Get the content selector with fallback
-	contentSelector := getSelector(p.Source.Selectors.Content, DefaultContentSelector)
-	c.OnHTML(contentSelector, func(e *colly.HTMLElement) {
-		p.Logger.Debug("Found content", "url", e.Request.URL.String(), "selector", contentSelector)
+	articleSelector := getSelector(p.Source.Selectors.Article, DefaultArticleSelector)
+	c.OnHTML(articleSelector, func(e *colly.HTMLElement) {
+		p.Logger.Debug("Found content", "url", e.Request.URL.String(), "selector", articleSelector)
 		p.ArticleProcessor.ProcessPage(e)
 	})
 

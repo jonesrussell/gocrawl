@@ -12,14 +12,15 @@ import (
 
 // Config represents a source configuration
 type Config struct {
-	Name      string   `yaml:"name"`
-	URL       string   `yaml:"url"`
-	Index     string   `yaml:"index"`
-	RateLimit string   `yaml:"rate_limit"`
-	MaxDepth  int      `yaml:"max_depth"`
-	Time      []string `yaml:"time"`
-	Selectors struct {
-		Content    string `yaml:"content"`    // Main content selector
+	Name         string   `yaml:"name"`
+	URL          string   `yaml:"url"`
+	ArticleIndex string   `yaml:"article_index"` // Index for articles
+	Index        string   `yaml:"index"`         // Index for non-article content
+	RateLimit    string   `yaml:"rate_limit"`
+	MaxDepth     int      `yaml:"max_depth"`
+	Time         []string `yaml:"time"`
+	Selectors    struct {
+		Article    string `yaml:"article"`    // Article content selector
 		Title      string `yaml:"title"`      // Title selector
 		Date       string `yaml:"date"`       // Date selector
 		Author     string `yaml:"author"`     // Author selector

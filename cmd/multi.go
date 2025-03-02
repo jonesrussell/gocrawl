@@ -46,7 +46,18 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 			func() chan *models.Article {
 				return make(chan *models.Article, 100)
 			},
-			// Provide IndexName using sources
+			// Provide ArticleIndex name
+			fx.Annotate(
+				func(s *sources.Sources) string {
+					source, _ := s.FindByName(sourceName)
+					if source != nil {
+						return source.ArticleIndex
+					}
+					return ""
+				},
+				fx.ResultTags(`name:"indexName"`),
+			),
+			// Provide ContentIndex name
 			fx.Annotate(
 				func(s *sources.Sources) string {
 					source, _ := s.FindByName(sourceName)
@@ -55,7 +66,7 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 					}
 					return ""
 				},
-				fx.ResultTags(`name:"indexName"`),
+				fx.ResultTags(`name:"contentIndex"`),
 			),
 		),
 		storage.Module,
