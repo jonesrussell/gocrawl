@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/multisource"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
@@ -42,17 +43,45 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 			func() logger.Interface {
 				return globalLogger // Provide the global logger
 			},
+			// Provide ArticleChan
+			func() chan *models.Article {
+				return make(chan *models.Article, 100)
+			},
+			// Provide Sources first
+			func(logger logger.Interface) ([]multisource.SourceConfig, error) {
+				ms, err := multisource.NewMultiSource(logger, nil, "sources.yml")
+				if err != nil {
+					return nil, err
+				}
+				return ms.Sources, nil
+			},
+			// Provide IndexName using the sources
+			fx.Annotate(
+				func(sources []multisource.SourceConfig) string {
+					for _, source := range sources {
+						if source.Name == sourceName {
+							return source.Index
+						}
+					}
+					return ""
+				},
+				fx.ResultTags(`name:"indexName"`),
+			),
 		),
 		storage.Module,
 		crawler.Module,
+		article.Module,
 		multisource.Module,
-		fx.Provide(func(c *crawler.Crawler) *multisource.MultiSource {
-			ms, err := multisource.NewMultiSource(globalLogger, c, "sources.yml")
-			if err != nil {
-				return nil
-			}
-			return ms
-		}),
+		fx.Provide(
+			func(logger logger.Interface, sources []multisource.SourceConfig, c *crawler.Crawler) *multisource.MultiSource {
+				ms := &multisource.MultiSource{
+					Logger:  logger,
+					Sources: sources,
+					Crawler: c,
+				}
+				return ms
+			},
+		),
 		fx.Invoke(startMultiSourceCrawl),
 	)
 
@@ -71,7 +100,11 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 }
 
 // startMultiSourceCrawl starts the multi-source crawl
-func startMultiSourceCrawl(ms *multisource.MultiSource, crawlerInstance *crawler.Crawler) error {
+func startMultiSourceCrawl(
+	ms *multisource.MultiSource,
+	crawlerInstance *crawler.Crawler,
+	processor *article.Processor, // Add processor parameter
+) error {
 	if crawlerInstance == nil {
 		return errors.New("crawler is not initialized")
 	}
@@ -82,26 +115,22 @@ func startMultiSourceCrawl(ms *multisource.MultiSource, crawlerInstance *crawler
 		return err
 	}
 
-	// Extract base URL, max_depth, rate_limit, and index from the filtered source
+	// Extract base URL, max_depth, rate_limit from the filtered source
 	baseURL := filteredSources[0].URL
 	maxDepth := filteredSources[0].MaxDepth
-	rateLimit, err := time.ParseDuration(filteredSources[0].RateLimit) // Parse rate limit
+	rateLimit, err := time.ParseDuration(filteredSources[0].RateLimit)
 	if err != nil {
 		return fmt.Errorf("invalid rate limit: %w", err)
 	}
-	indexName := filteredSources[0].Index // Extract index name
-
-	// Set the index name in the Crawler's configuration
-	crawlerInstance.IndexName = indexName // Set the IndexName from the source
 
 	// Create the collector using the collector module
 	collectorResult, err := collector.New(collector.Params{
 		BaseURL:          baseURL,
-		MaxDepth:         maxDepth,  // Use the extracted max_depth
-		RateLimit:        rateLimit, // Use the extracted rate_limit
+		MaxDepth:         maxDepth,
+		RateLimit:        rateLimit,
 		Debugger:         logger.NewCollyDebugger(globalLogger),
 		Logger:           globalLogger,
-		ArticleProcessor: &article.Processor{Logger: globalLogger},
+		ArticleProcessor: processor, // Use the injected processor
 	})
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)
