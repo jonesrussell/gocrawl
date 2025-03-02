@@ -22,74 +22,80 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
 )
 
-// Update the job command to accept scheduling parameters
-var schedule string
+// Define a struct to hold source information
+type Source struct {
+	Name      string   `yaml:"name"`
+	URL       string   `yaml:"url"`
+	Index     string   `yaml:"index"`
+	RateLimit string   `yaml:"rate_limit"`
+	MaxDepth  int      `yaml:"max_depth"`
+	Time      []string `yaml:"time"` // Change to a slice of strings
+}
+
+// Load sources from YAML file
+func loadSources(filename string) ([]Source, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	var sources struct {
+		Sources []Source `yaml:"sources"`
+	}
+	if err := yaml.Unmarshal(data, &sources); err != nil {
+		return nil, err
+	}
+	return sources.Sources, nil
+}
 
 // jobCmd represents the job command
 var jobCmd = &cobra.Command{
 	Use:   "job",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+and usage of using your command.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Parse the schedule and run the multi command accordingly
-		duration, err := time.ParseDuration(schedule)
+		sources, err := loadSources("sources.yml")
 		if err != nil {
-			fmt.Println("Invalid schedule duration:", err)
+			fmt.Println("Error loading sources:", err)
 			return
 		}
 
-		// Create a context for cancellation
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		// Infinite loop to keep the application running
+		for {
+			now := time.Now()
 
-		// Schedule the multi command using a ticker
-		ticker := time.NewTicker(duration)
-		defer ticker.Stop()
+			for _, source := range sources {
+				for _, t := range source.Time {
+					scheduledTime, err := time.Parse("15:04", t)
+					if err != nil {
+						fmt.Println("Invalid time format for source:", source.Name)
+						continue
+					}
 
-		go func() {
-			for {
-				select {
-				case <-ticker.C:
-					// Call the multi command here
-					fmt.Println("Running multi command...")
-					// You may need to invoke the multi command function directly or use cobra to execute it
-					// Example: multiCmd.ExecuteContext(ctx)
-				case <-ctx.Done():
-					return
+					// Check if it's time to run the job
+					if now.Hour() == scheduledTime.Hour() && now.Minute() == scheduledTime.Minute() {
+						fmt.Printf("Running job for %s...\n", source.Name)
+						// Call the multi command here
+						// Example: multiCmd.ExecuteContext(ctx)
+					}
 				}
 			}
-		}()
 
-		// Block the main goroutine to keep the application running
-		select {}
+			// Sleep for a minute before checking again
+			time.Sleep(1 * time.Minute)
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(jobCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// jobCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Define the schedule flag
-	jobCmd.Flags().StringVar(&schedule, "schedule", "1m", "Schedule the job to run at a specified interval (e.g., 1m, 2h)")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// jobCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
