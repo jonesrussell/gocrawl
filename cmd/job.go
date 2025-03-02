@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ type Source struct {
 	Index     string   `yaml:"index"`
 	RateLimit string   `yaml:"rate_limit"`
 	MaxDepth  int      `yaml:"max_depth"`
-	Time      []string `yaml:"time"` // Change to a slice of strings
+	Time      []string `yaml:"time"`
 }
 
 // Load sources from YAML file
@@ -59,9 +60,8 @@ func loadSources(filename string) ([]Source, error) {
 // jobCmd represents the job command
 var jobCmd = &cobra.Command{
 	Use:   "job",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command.`,
+	Short: "Schedule and run multi-source crawl jobs",
+	Long:  `Schedule and run multi-source crawl jobs based on the times specified in sources.yml`,
 	Run: func(cmd *cobra.Command, args []string) {
 		sources, err := loadSources("sources.yml")
 		if err != nil {
@@ -83,9 +83,17 @@ and usage of using your command.`,
 
 					// Check if it's time to run the job
 					if now.Hour() == scheduledTime.Hour() && now.Minute() == scheduledTime.Minute() {
-						fmt.Printf("Running job for %s...\n", source.Name)
-						// Call the multi command here
-						// Example: multiCmd.ExecuteContext(ctx)
+						fmt.Printf("Running job for %s at %s...\n", source.Name, t)
+
+						// Create a new command instance for the multi command
+						args := []string{"multi", "--source", source.Name}
+						cmd := exec.Command(os.Args[0], args...)
+						cmd.Stdout = os.Stdout
+						cmd.Stderr = os.Stderr
+
+						if err := cmd.Run(); err != nil {
+							fmt.Printf("Error executing multi command for %s: %v\n", source.Name, err)
+						}
 					}
 				}
 			}
