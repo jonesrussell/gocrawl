@@ -9,7 +9,7 @@ tasks:
   crawl:multi:
     desc: "Run the web crawler for multiple sources defined in sources.yml"
     cmds:
-      - go run main.go multi --source "{{.CLI_ARGS}}"
+      - go run main.go multi --source {{.CLI_ARGS}}
 
   search:
     desc: "Search crawled content"

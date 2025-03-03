@@ -12,7 +12,7 @@ type ContentProcessor interface {
 // Constants for default selectors
 const (
 	// Default selectors when none are specified in the source config
-	DefaultArticleSelector    = "body"
+	DefaultArticleSelector    = "article, .article, .post, .entry, .content" // Common article selectors
 	DefaultTitleSelector      = "h1"
 	DefaultDateSelector       = "time"
 	DefaultAuthorSelector     = "span.author"
