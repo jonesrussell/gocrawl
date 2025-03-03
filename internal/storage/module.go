@@ -23,7 +23,7 @@ var Module = fx.Module("storage",
 )
 
 // NewStorage initializes a new Storage instance
-func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface, error) {
+func NewStorage(esClient *elasticsearch.Client, cfg *config.Config, log logger.Interface) (Interface, error) {
 	if esClient == nil {
 		return nil, errors.New("elasticsearch client is nil")
 	}
@@ -42,10 +42,14 @@ func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface
 		return nil, fmt.Errorf("error response from Elasticsearch: %s", res.String())
 	}
 
-	// Create storage instance
+	// Create storage instance with options
+	opts := DefaultOptions()
+	opts.IndexName = cfg.Elasticsearch.IndexName
+
 	storageInstance := &ElasticsearchStorage{
 		ESClient: esClient,
 		Logger:   log,
+		opts:     opts,
 	}
 
 	// Test connection to Elasticsearch

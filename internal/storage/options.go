@@ -12,6 +12,7 @@ type Options struct {
 	APIKey         string
 	ScrollDuration string
 	Transport      http.RoundTripper
+	IndexName      string // Name of the index to use for content
 }
 
 // DefaultOptions returns default options for ElasticsearchStorage
@@ -19,5 +20,6 @@ func DefaultOptions() Options {
 	return Options{
 		ScrollDuration: "5m",
 		Transport:      http.DefaultTransport,
+		IndexName:      "content", // Default index name
 	}
 }

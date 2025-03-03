@@ -49,6 +49,12 @@ type Interface interface {
 	// Index operations
 	IndexExists(ctx context.Context, indexName string) (bool, error)
 	TestConnection(ctx context.Context) error
+
+	// Content operations
+	IndexContent(id string, content *models.Content) error
+	GetContent(id string) (*models.Content, error)
+	SearchContent(query string) ([]*models.Content, error)
+	DeleteContent(id string) error
 }
 
 // ElasticsearchStorage struct to hold the Elasticsearch client
@@ -418,8 +424,9 @@ func (es *ElasticsearchStorage) IndexContent(id string, content *models.Content)
 		return fmt.Errorf("error marshaling content: %w", err)
 	}
 
+	// Use the configured index name from the content processor
 	res, err := es.ESClient.Index(
-		content.Type, // Use content type as index name
+		es.opts.IndexName, // Use configured index name instead of content type
 		bytes.NewReader(body),
 		es.ESClient.Index.WithContext(ctx),
 		es.ESClient.Index.WithDocumentID(id),
@@ -434,6 +441,7 @@ func (es *ElasticsearchStorage) IndexContent(id string, content *models.Content)
 		return fmt.Errorf("error indexing content: %s", res.String())
 	}
 
+	es.Logger.Info("Content indexed successfully", "id", id, "index", es.opts.IndexName)
 	return nil
 }
 

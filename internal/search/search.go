@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 )
@@ -19,19 +20,21 @@ type Result struct {
 type Service struct {
 	ESClient *elasticsearch.Client
 	Logger   logger.Interface
+	Config   *config.Config
 }
 
 // NewSearchService creates a new instance of the search service
-func NewSearchService(esClient *elasticsearch.Client, log logger.Interface) *Service {
+func NewSearchService(esClient *elasticsearch.Client, cfg *config.Config, log logger.Interface) *Service {
 	return &Service{
 		ESClient: esClient,
 		Logger:   log,
+		Config:   cfg,
 	}
 }
 
 // SearchContent performs a search query
 func (s *Service) SearchContent(ctx context.Context, query string, _ string, size int) ([]Result, error) {
-	storageInstance, err := storage.NewStorage(s.ESClient, s.Logger)
+	storageInstance, err := storage.NewStorage(s.ESClient, s.Config, s.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}

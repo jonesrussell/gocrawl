@@ -167,3 +167,35 @@ func (m *MockStorage) SearchDocuments(ctx context.Context, index string, query s
 	}
 	return result, args.Error(1)
 }
+
+// IndexContent implements Interface
+func (m *MockStorage) IndexContent(id string, content *models.Content) error {
+	args := m.Called(id, content)
+	return args.Error(0)
+}
+
+// GetContent implements Interface
+func (m *MockStorage) GetContent(id string) (*models.Content, error) {
+	args := m.Called(id)
+	result, ok := args.Get(0).(*models.Content)
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
+}
+
+// SearchContent implements Interface
+func (m *MockStorage) SearchContent(query string) ([]*models.Content, error) {
+	args := m.Called(query)
+	result, ok := args.Get(0).([]*models.Content)
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
+}
+
+// DeleteContent implements Interface
+func (m *MockStorage) DeleteContent(id string) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
