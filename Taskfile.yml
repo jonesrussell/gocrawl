@@ -9,6 +9,7 @@ tasks:
   crawl:multi:
     desc: "Run the web crawler for multiple sources defined in sources.yml"
     cmds:
+      - echo '' >app.log
       - go run main.go multi --source {{.CLI_ARGS}}
 
   search:
