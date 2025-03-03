@@ -416,53 +416,6 @@ func (es *ElasticsearchStorage) Close() error {
 	return nil // Elasticsearch client doesn't need explicit closing
 }
 
-// IndexContent implements Interface
-func (es *ElasticsearchStorage) IndexContent(id string, content *models.Content) error {
-	ctx := context.Background()
-	body, err := json.Marshal(content)
-	if err != nil {
-		return fmt.Errorf("error marshaling content: %w", err)
-	}
-
-	// Use the configured index name from the content processor
-	res, err := es.ESClient.Index(
-		es.opts.IndexName, // Use configured index name instead of content type
-		bytes.NewReader(body),
-		es.ESClient.Index.WithContext(ctx),
-		es.ESClient.Index.WithDocumentID(id),
-		es.ESClient.Index.WithRefresh("true"),
-	)
-	if err != nil {
-		return fmt.Errorf("error indexing content: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return fmt.Errorf("error indexing content: %s", res.String())
-	}
-
-	es.Logger.Info("Content indexed successfully", "id", id, "index", es.opts.IndexName)
-	return nil
-}
-
-// GetContent implements Interface
-func (es *ElasticsearchStorage) GetContent(id string) (*models.Content, error) {
-	// Implementation similar to GetArticle but for Content
-	return nil, fmt.Errorf("not implemented")
-}
-
-// SearchContent implements Interface
-func (es *ElasticsearchStorage) SearchContent(query string) ([]*models.Content, error) {
-	// Implementation similar to SearchArticles but for Content
-	return nil, fmt.Errorf("not implemented")
-}
-
-// DeleteContent implements Interface
-func (es *ElasticsearchStorage) DeleteContent(id string) error {
-	// Implementation similar to DeleteArticle but for Content
-	return fmt.Errorf("not implemented")
-}
-
 // GetDocument implements Interface
 func (es *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id string, document interface{}) error {
 	res, err := es.ESClient.Get(

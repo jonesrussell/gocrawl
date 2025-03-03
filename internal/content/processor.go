@@ -42,11 +42,4 @@ func (p *Processor) ProcessContent(e *colly.HTMLElement) {
 		)
 		return
 	}
-
-	p.logger.Debug("Content indexed successfully",
-		"url", content.URL,
-		"id", content.ID,
-		"type", content.Type,
-		"index", p.indexName,
-	)
 }
