@@ -67,13 +67,5 @@ func (p *Processor) Process(e *colly.HTMLElement) {
 		"index", p.indexName)
 }
 
-// ProcessArticle implements the models.ContentProcessor interface for articles
-func (p *Processor) ProcessArticle(e *colly.HTMLElement) {
-	// Skip articles - we only process content
-	p.logger.Debug("Skipping article in content processor",
-		"component", "content/processor",
-		"url", e.Request.URL.String())
-}
-
 // Ensure Processor implements models.ContentProcessor
 var _ models.ContentProcessor = (*Processor)(nil)
