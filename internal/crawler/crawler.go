@@ -8,6 +8,10 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
 // Constants for configuration
@@ -16,6 +20,22 @@ const (
 	HTTPStatusOK     = 200
 	DefaultRateLimit = time.Second
 )
+
+// Crawler represents a web crawler
+type Crawler struct {
+	Storage        storage.Interface
+	Collector      *colly.Collector
+	Logger         logger.Interface
+	Debugger       *logger.CollyDebugger
+	IndexName      string
+	articleChan    chan *models.Article
+	ArticleService article.Interface
+	IndexSvc       storage.Interface
+	Config         *config.Config
+}
+
+// Ensure Crawler implements the Interface
+var _ Interface = (*Crawler)(nil)
 
 // Start method to begin crawling
 func (c *Crawler) Start(ctx context.Context, baseURL string) error {
@@ -27,15 +47,35 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 	// Log the entire configuration being used by the crawler
 	c.Logger.Debug("Crawler configuration", "baseURL", baseURL)
 
-	// Perform initial setup (e.g., test connection, ensure index)
-	if err := c.Storage.TestConnection(ctx); err != nil {
+	// Test storage connection before starting
+	if err := c.Storage.Ping(ctx); err != nil {
 		c.Logger.Error("Storage connection failed", "error", err)
 		return fmt.Errorf("storage connection failed: %w", err)
 	}
 
-	if err := c.IndexSvc.EnsureIndex(ctx, c.IndexName); err != nil {
-		c.Logger.Error("Index setup failed", "error", err)
-		return fmt.Errorf("index setup failed: %w", err)
+	// Create index with default mapping
+	mapping := map[string]interface{}{
+		"mappings": map[string]interface{}{
+			"properties": map[string]interface{}{
+				"title": map[string]interface{}{
+					"type": "text",
+				},
+				"body": map[string]interface{}{
+					"type": "text",
+				},
+				"url": map[string]interface{}{
+					"type": "keyword",
+				},
+				"created_at": map[string]interface{}{
+					"type": "date",
+				},
+			},
+		},
+	}
+
+	// Try to create the index - ignore error if it already exists
+	if err := c.Storage.CreateIndex(ctx, c.IndexName, mapping); err != nil {
+		c.Logger.Debug("Index creation failed (might already exist)", "error", err)
 	}
 
 	// Create a channel to track completion
@@ -71,16 +111,17 @@ func (c *Crawler) Stop() {
 	// Perform any necessary cleanup here
 }
 
-// Add these methods to the Crawler struct
+// SetCollector sets the collector for the crawler
 func (c *Crawler) SetCollector(collector *colly.Collector) {
 	c.Collector = collector
 }
 
+// SetService sets the article service for the crawler
 func (c *Crawler) SetService(svc article.Interface) {
 	c.ArticleService = svc
 }
 
-// Getter methods for configuration
+// GetBaseURL returns the base URL from the configuration
 func (c *Crawler) GetBaseURL() string {
 	return c.Config.Crawler.BaseURL
 }

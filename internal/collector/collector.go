@@ -27,6 +27,11 @@ type DebuggerInterface interface {
 	Event(e *debug.Event)
 }
 
+// ContentProcessor processes non-article content
+type ContentProcessor interface {
+	ProcessContent(e *colly.HTMLElement)
+}
+
 const (
 	// Default selectors when none are specified in the source config
 	DefaultArticleSelector    = "body"
@@ -34,6 +39,10 @@ const (
 	DefaultDateSelector       = "time"
 	DefaultAuthorSelector     = "span.author"
 	DefaultCategoriesSelector = "div.categories"
+
+	// Context keys
+	articleFoundKey = "articleFound"
+	bodyElementKey  = "bodyElement"
 )
 
 // getSelector returns the specified selector or falls back to a default
@@ -49,6 +58,7 @@ type Params struct {
 	fx.In
 
 	ArticleProcessor *article.Processor
+	ContentProcessor ContentProcessor
 	BaseURL          string
 	Context          context.Context
 	Debugger         *logger.CollyDebugger
@@ -132,11 +142,34 @@ func New(p Params) (Result, error) {
 		}
 	})
 
-	// Get the content selector with fallback
+	// Get the article selector with fallback
 	articleSelector := getSelector(p.Source.Selectors.Article, DefaultArticleSelector)
+
+	// Store body element when found
+	c.OnHTML("body", func(e *colly.HTMLElement) {
+		e.Request.Ctx.Put(bodyElementKey, e)
+	})
+
 	c.OnHTML(articleSelector, func(e *colly.HTMLElement) {
-		p.Logger.Debug("Found content", "url", e.Request.URL.String(), "selector", articleSelector)
+		e.Request.Ctx.Put(articleFoundKey, "true")
+		p.Logger.Debug("Found article", "url", e.Request.URL.String(), "selector", articleSelector)
 		p.ArticleProcessor.ProcessPage(e)
+	})
+
+	// Handle non-article content after response is received
+	c.OnResponse(func(r *colly.Response) {
+		if r.Ctx.Get(articleFoundKey) != "true" && p.ContentProcessor != nil {
+			p.Logger.Debug("Processing non-article content", "url", r.Request.URL.String())
+			// Create a temporary collector to parse the response
+			temp := colly.NewCollector()
+			temp.OnHTML("body", func(e *colly.HTMLElement) {
+				p.ContentProcessor.ProcessContent(e)
+			})
+			err := temp.Visit("data:text/html;charset=utf-8," + string(r.Body))
+			if err != nil {
+				p.Logger.Error("Failed to process non-article content", "url", r.Request.URL.String(), "error", err)
+			}
+		}
 	})
 
 	p.Logger.Debug("Collector created",

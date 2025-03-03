@@ -22,19 +22,33 @@ const (
 	DefaultTestConnectionTimeout = 5 * time.Second
 )
 
-// Interface defines the methods that any storage implementation must have
+// Interface defines the storage operations
 type Interface interface {
+	// Document operations
+	IndexDocument(ctx context.Context, index string, id string, document interface{}) error
+	GetDocument(ctx context.Context, index string, id string, document interface{}) error
+	SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error)
+	DeleteDocument(ctx context.Context, index string, id string) error
+
+	// Bulk operations
 	BulkIndex(ctx context.Context, index string, documents []interface{}) error
-	BulkIndexArticles(ctx context.Context, articles []*models.Article) error
+
+	// Index management
 	CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error
-	DeleteDocument(ctx context.Context, index string, docID string) error
 	DeleteIndex(ctx context.Context, index string) error
-	IndexDocument(ctx context.Context, index string, docID string, document interface{}) error
-	IndexExists(ctx context.Context, indexName string) (bool, error)
-	Search(ctx context.Context, index string, query map[string]interface{}) ([]map[string]interface{}, error)
+
+	// Common operations
+	Close() error
+	Ping(ctx context.Context) error
+
+	// Article operations
 	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
+	IndexArticle(ctx context.Context, article *models.Article) error
+	BulkIndexArticles(ctx context.Context, articles []*models.Article) error
+
+	// Index operations
+	IndexExists(ctx context.Context, indexName string) (bool, error)
 	TestConnection(ctx context.Context) error
-	UpdateDocument(ctx context.Context, index string, docID string, update map[string]interface{}) error
 }
 
 // ElasticsearchStorage struct to hold the Elasticsearch client
@@ -63,12 +77,7 @@ func (s *ElasticsearchStorage) createContextWithTimeout(
 }
 
 // IndexDocument indexes a document in Elasticsearch
-func (s *ElasticsearchStorage) IndexDocument(
-	ctx context.Context,
-	index string,
-	docID string,
-	document interface{},
-) error {
+func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, id string, document interface{}) error {
 	if s.ESClient == nil {
 		return errors.New("elasticsearch client is not initialized")
 	}
@@ -76,17 +85,17 @@ func (s *ElasticsearchStorage) IndexDocument(
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
 	defer cancel()
 
-	data, err := json.Marshal(document)
+	body, err := json.Marshal(document)
 	if err != nil {
 		return fmt.Errorf("error marshaling document: %w", err)
 	}
 
-	req := bytes.NewReader(data)
 	res, err := s.ESClient.Index(
 		index,
-		req,
-		s.ESClient.Index.WithDocumentID(docID),
+		bytes.NewReader(body),
 		s.ESClient.Index.WithContext(ctx),
+		s.ESClient.Index.WithDocumentID(id),
+		s.ESClient.Index.WithRefresh("true"),
 	)
 	if err != nil {
 		s.Logger.Error("Failed to index document", "error", err)
@@ -98,7 +107,7 @@ func (s *ElasticsearchStorage) IndexDocument(
 		return fmt.Errorf("error indexing document: %s", res.String())
 	}
 
-	s.Logger.Info("Document indexed successfully", "index", index, "docID", docID)
+	s.Logger.Info("Document indexed successfully", "index", index, "docID", id)
 	return nil
 }
 
@@ -393,5 +402,139 @@ func (s *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles [
 	}
 
 	s.Logger.Info("Bulk indexed documents", "count", len(articles))
+	return nil
+}
+
+// Close implements Interface
+func (es *ElasticsearchStorage) Close() error {
+	return nil // Elasticsearch client doesn't need explicit closing
+}
+
+// IndexContent implements Interface
+func (es *ElasticsearchStorage) IndexContent(id string, content *models.Content) error {
+	ctx := context.Background()
+	body, err := json.Marshal(content)
+	if err != nil {
+		return fmt.Errorf("error marshaling content: %w", err)
+	}
+
+	res, err := es.ESClient.Index(
+		content.Type, // Use content type as index name
+		bytes.NewReader(body),
+		es.ESClient.Index.WithContext(ctx),
+		es.ESClient.Index.WithDocumentID(id),
+		es.ESClient.Index.WithRefresh("true"),
+	)
+	if err != nil {
+		return fmt.Errorf("error indexing content: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("error indexing content: %s", res.String())
+	}
+
+	return nil
+}
+
+// GetContent implements Interface
+func (es *ElasticsearchStorage) GetContent(id string) (*models.Content, error) {
+	// Implementation similar to GetArticle but for Content
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SearchContent implements Interface
+func (es *ElasticsearchStorage) SearchContent(query string) ([]*models.Content, error) {
+	// Implementation similar to SearchArticles but for Content
+	return nil, fmt.Errorf("not implemented")
+}
+
+// DeleteContent implements Interface
+func (es *ElasticsearchStorage) DeleteContent(id string) error {
+	// Implementation similar to DeleteArticle but for Content
+	return fmt.Errorf("not implemented")
+}
+
+// GetDocument implements Interface
+func (es *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id string, document interface{}) error {
+	res, err := es.ESClient.Get(
+		index,
+		id,
+		es.ESClient.Get.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("error getting document: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("error getting document: %s", res.String())
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(document); err != nil {
+		return fmt.Errorf("error decoding document: %w", err)
+	}
+
+	return nil
+}
+
+// SearchDocuments implements Interface
+func (es *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error) {
+	// Basic query string query
+	searchQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"query_string": map[string]interface{}{
+				"query": query,
+			},
+		},
+	}
+
+	body, err := json.Marshal(searchQuery)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling search query: %w", err)
+	}
+
+	res, err := es.ESClient.Search(
+		es.ESClient.Search.WithContext(ctx),
+		es.ESClient.Search.WithIndex(index),
+		es.ESClient.Search.WithBody(bytes.NewReader(body)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error searching documents: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("error searching documents: %s", res.String())
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("error parsing search response: %w", err)
+	}
+
+	hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
+	documents := make([]interface{}, len(hits))
+	for i, hit := range hits {
+		documents[i] = hit.(map[string]interface{})["_source"]
+	}
+
+	return documents, nil
+}
+
+// Ping implements Interface
+func (es *ElasticsearchStorage) Ping(ctx context.Context) error {
+	res, err := es.ESClient.Ping(
+		es.ESClient.Ping.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("error pinging Elasticsearch: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("error pinging Elasticsearch: %s", res.String())
+	}
+
 	return nil
 }

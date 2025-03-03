@@ -16,18 +16,34 @@ type MockStorage struct {
 	mock.Mock
 }
 
+// Ensure MockStorage implements the Interface
+var _ Interface = (*MockStorage)(nil)
+
 // NewMockStorage creates a new instance of MockStorage
 func NewMockStorage() *MockStorage {
 	m := &MockStorage{}
 	// Set up default expectations
 	m.On("TestConnection", mock.Anything).Return(nil)
 	m.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	m.On("Close").Return(nil)
 	return m
+}
+
+// Close implements Interface
+func (m *MockStorage) Close() error {
+	args := m.Called()
+	return args.Error(0)
 }
 
 // IndexDocument mocks the indexing of a document
 func (m *MockStorage) IndexDocument(ctx context.Context, indexName, docID string, document interface{}) error {
 	args := m.Called(ctx, indexName, docID, document)
+	return args.Error(0)
+}
+
+// GetDocument implements Interface
+func (m *MockStorage) GetDocument(ctx context.Context, index string, id string, document interface{}) error {
+	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
@@ -128,4 +144,26 @@ func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int
 func (m *MockStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
 	args := m.Called(ctx, indexName)
 	return args.Bool(0), args.Error(1)
+}
+
+// IndexArticle implements Interface
+func (m *MockStorage) IndexArticle(ctx context.Context, article *models.Article) error {
+	args := m.Called(ctx, article)
+	return args.Error(0)
+}
+
+// Ping implements Interface
+func (m *MockStorage) Ping(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+// SearchDocuments implements Interface
+func (m *MockStorage) SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error) {
+	args := m.Called(ctx, index, query)
+	result, ok := args.Get(0).([]interface{})
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }

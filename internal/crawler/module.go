@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -36,6 +35,7 @@ func ProvideCrawler(p Params) (Interface, error) {
 	// Log the entire configuration to ensure it's set correctly
 	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
 
+	// Create a new crawler instance
 	crawler := &Crawler{
 		Storage:        p.Storage,
 		Logger:         p.Logger,
@@ -43,7 +43,6 @@ func ProvideCrawler(p Params) (Interface, error) {
 		IndexName:      p.Config.Crawler.IndexName,
 		articleChan:    make(chan *models.Article, DefaultBatchSize),
 		ArticleService: article.NewService(p.Logger),
-		IndexSvc:       storage.NewIndexService(p.Logger),
 		Config:         p.Config,
 	}
 
@@ -73,19 +72,6 @@ type Result struct {
 	fx.Out
 
 	Crawler Interface
-}
-
-// Crawler represents a web crawler
-type Crawler struct {
-	Storage        storage.Interface
-	Collector      *colly.Collector // This will be set later
-	Logger         logger.Interface
-	Debugger       *logger.CollyDebugger
-	IndexName      string
-	articleChan    chan *models.Article
-	ArticleService article.Interface
-	IndexSvc       storage.IndexServiceInterface
-	Config         *config.Config
 }
 
 const (
