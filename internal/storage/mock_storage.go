@@ -199,3 +199,29 @@ func (m *MockStorage) DeleteContent(id string) error {
 	args := m.Called(id)
 	return args.Error(0)
 }
+
+// GetMapping implements Interface
+func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]interface{}, error) {
+	args := m.Called(ctx, index)
+	result, ok := args.Get(0).(map[string]interface{})
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
+}
+
+// ListIndices implements Interface
+func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
+	args := m.Called(ctx)
+	result, ok := args.Get(0).([]string)
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
+}
+
+// UpdateMapping implements Interface
+func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error {
+	args := m.Called(ctx, index, mapping)
+	return args.Error(0)
+}

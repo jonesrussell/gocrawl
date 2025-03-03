@@ -36,6 +36,9 @@ type Interface interface {
 	// Index management
 	CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error
 	DeleteIndex(ctx context.Context, index string) error
+	ListIndices(ctx context.Context) ([]string, error)
+	GetMapping(ctx context.Context, index string) (map[string]interface{}, error)
+	UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error
 
 	// Common operations
 	Close() error
@@ -496,6 +499,83 @@ func (es *ElasticsearchStorage) Ping(ctx context.Context) error {
 
 	if res.IsError() {
 		return fmt.Errorf("error pinging Elasticsearch: %s", res.String())
+	}
+
+	return nil
+}
+
+// ListIndices lists all indices in the cluster
+func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error) {
+	res, err := s.ESClient.Cat.Indices(
+		s.ESClient.Cat.Indices.WithContext(ctx),
+		s.ESClient.Cat.Indices.WithFormat("json"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list indices: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("error listing indices: %s", res.String())
+	}
+
+	var indices []struct {
+		Index string `json:"index"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&indices); err != nil {
+		return nil, fmt.Errorf("error decoding indices: %w", err)
+	}
+
+	result := make([]string, len(indices))
+	for i, idx := range indices {
+		result[i] = idx.Index
+	}
+
+	return result, nil
+}
+
+// GetMapping gets the mapping for an index
+func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (map[string]interface{}, error) {
+	res, err := s.ESClient.Indices.GetMapping(
+		s.ESClient.Indices.GetMapping.WithContext(ctx),
+		s.ESClient.Indices.GetMapping.WithIndex(index),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mapping: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("error getting mapping: %s", res.String())
+	}
+
+	var mapping map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&mapping); err != nil {
+		return nil, fmt.Errorf("error decoding mapping: %w", err)
+	}
+
+	return mapping, nil
+}
+
+// UpdateMapping updates the mapping for an index
+func (s *ElasticsearchStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(mapping); err != nil {
+		return fmt.Errorf("error encoding mapping: %w", err)
+	}
+
+	res, err := s.ESClient.Indices.PutMapping(
+		[]string{index},
+		&buf,
+		s.ESClient.Indices.PutMapping.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update mapping: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("error updating mapping: %s", res.String())
 	}
 
 	return nil
