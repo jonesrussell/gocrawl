@@ -155,8 +155,8 @@ func startCrawlCmd(p CrawlParams) error {
 		RateLimit:        rateLimit,
 		Debugger:         logger.NewCollyDebugger(globalLogger),
 		Logger:           globalLogger,
-		ArticleProcessor: p.Processors[0], // Use first processor as article processor
-		ContentProcessor: p.Processors[1], // Use second processor as content processor
+		ArticleProcessor: p.Processors[1], // Use second processor as article processor
+		ContentProcessor: p.Processors[0], // Use first processor as content processor
 		Source:           source,
 	})
 	if err != nil {

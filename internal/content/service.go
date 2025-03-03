@@ -64,7 +64,7 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 		ID:        uuid.New().String(),
 		URL:       e.Request.URL.String(),
 		Title:     getFirstNonEmpty(jsonLD.Name, e.ChildText("title"), e.ChildText("h1")),
-		Body:      e.Text,
+		Body:      cleanBody(e),
 		Type:      contentType,
 		Metadata:  metadata,
 		CreatedAt: parseDate([]string{jsonLD.DateCreated, jsonLD.DateModified}, s.Logger),
@@ -209,4 +209,30 @@ func parseDate(dates []string, logger logger.Interface) time.Time {
 	}
 
 	return parsedDate
+}
+
+// cleanBody removes excluded tags and elements from the body content
+func cleanBody(e *colly.HTMLElement) string {
+	// Get a copy of the body element for manipulation
+	bodyEl := e.DOM
+
+	// Remove all style and script tags directly
+	bodyEl.Find("style,script").Remove()
+
+	// Remove other excluded elements
+	excludedSelectors := []string{
+		"header", "footer", "nav", "aside",
+		".advertisement", ".ads", ".social-share",
+		".comments", ".related-posts", ".newsletter",
+		"iframe", "noscript", "form", "button",
+		".cookie-notice", ".popup", ".modal",
+		".newsletter-signup", ".social-buttons",
+	}
+
+	for _, selector := range excludedSelectors {
+		bodyEl.Find(selector).Remove()
+	}
+
+	// Get the cleaned text
+	return bodyEl.Text()
 }
