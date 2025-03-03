@@ -36,15 +36,16 @@ import (
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
-	Use:   "delete [index]",
-	Short: "Delete an Elasticsearch index",
-	Long: `Delete an Elasticsearch index from the cluster.
+	Use:   "delete [indices...]",
+	Short: "Delete one or more Elasticsearch indices",
+	Long: `Delete one or more Elasticsearch indices from the cluster.
 
 Example:
-  gocrawl indices delete my_index`,
-	Args: cobra.ExactArgs(1),
+  gocrawl indices delete my_index
+  gocrawl indices delete index1 index2 index3`,
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		index := args[0]
+		indices := args
 		force, _ := cmd.Flags().GetBool("force")
 
 		app := fx.New(
@@ -63,29 +64,42 @@ Example:
 			fx.Invoke(func(storage storage.Interface) {
 				ctx := context.Background()
 
-				// Check if index exists
-				indices, err := storage.ListIndices(ctx)
+				// Check if all indices exist
+				existingIndices, err := storage.ListIndices(ctx)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error checking indices: %v\n", err)
 					os.Exit(1)
 				}
 
-				indexExists := false
-				for _, idx := range indices {
-					if idx == index {
-						indexExists = true
-						break
+				// Create a map of existing indices for faster lookup
+				existingMap := make(map[string]bool)
+				for _, idx := range existingIndices {
+					existingMap[idx] = true
+				}
+
+				// Check each requested index
+				var missingIndices []string
+				for _, index := range indices {
+					if !existingMap[index] {
+						missingIndices = append(missingIndices, index)
 					}
 				}
 
-				if !indexExists {
-					fmt.Fprintf(os.Stderr, "Index '%s' does not exist\n", index)
+				if len(missingIndices) > 0 {
+					fmt.Fprintf(os.Stderr, "The following indices do not exist:\n")
+					for _, index := range missingIndices {
+						fmt.Fprintf(os.Stderr, "  - %s\n", index)
+					}
 					os.Exit(1)
 				}
 
 				// Confirm deletion unless --force is used
 				if !force {
-					fmt.Printf("Are you sure you want to delete index '%s'? (y/N): ", index)
+					fmt.Printf("Are you sure you want to delete the following indices?\n")
+					for _, index := range indices {
+						fmt.Printf("  - %s\n", index)
+					}
+					fmt.Print("Continue? (y/N): ")
 					var response string
 					fmt.Scanln(&response)
 					if response != "y" && response != "Y" {
@@ -94,13 +108,14 @@ Example:
 					}
 				}
 
-				// Delete the index
-				if err := storage.DeleteIndex(ctx, index); err != nil {
-					fmt.Fprintf(os.Stderr, "Error deleting index: %v\n", err)
-					os.Exit(1)
+				// Delete each index
+				for _, index := range indices {
+					if err := storage.DeleteIndex(ctx, index); err != nil {
+						fmt.Fprintf(os.Stderr, "Error deleting index '%s': %v\n", index, err)
+						os.Exit(1)
+					}
+					fmt.Printf("Successfully deleted index '%s'\n", index)
 				}
-
-				fmt.Printf("Successfully deleted index '%s'\n", index)
 			}),
 		)
 
