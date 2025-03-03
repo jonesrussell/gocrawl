@@ -1,8 +1,6 @@
 package content
 
 import (
-	"context"
-
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -28,18 +26,40 @@ func NewProcessor(service Interface, storage storage.Interface, logger logger.In
 
 // ProcessContent implements the ContentProcessor interface
 func (p *Processor) ProcessContent(e *colly.HTMLElement) {
+	p.logger.Debug("Processing content",
+		"component", "content/processor",
+		"url", e.Request.URL.String(),
+		"index", p.indexName)
+
 	content := p.service.ExtractContent(e)
 	if content == nil {
+		p.logger.Debug("No content extracted",
+			"component", "content/processor",
+			"url", e.Request.URL.String())
 		return
 	}
 
-	ctx := context.Background()
-	err := p.storage.IndexDocument(ctx, p.indexName, content.ID, content)
+	p.logger.Debug("Content extracted",
+		"component", "content/processor",
+		"url", content.URL,
+		"id", content.ID,
+		"type", content.Type,
+		"title", content.Title)
+
+	err := p.storage.IndexContent(content.ID, content)
 	if err != nil {
 		p.logger.Error("Failed to index content",
+			"component", "content/processor",
 			"url", content.URL,
 			"error", err,
 		)
 		return
 	}
+
+	p.logger.Debug("Content processed successfully",
+		"component", "content/processor",
+		"url", content.URL,
+		"id", content.ID,
+		"type", content.Type,
+		"index", p.indexName)
 }

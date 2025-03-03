@@ -54,12 +54,16 @@ const (
 func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	var jsonLD JSONLDArticle
 
-	s.Logger.Debug("Extracting article", "url", e.Request.URL.String())
+	s.Logger.Debug("Extracting article",
+		"component", "article/service",
+		"url", e.Request.URL.String())
 
 	// Extract metadata from JSON-LD first
 	e.ForEach(`script[type="application/ld+json"]`, func(_ int, el *colly.HTMLElement) {
 		if err := json.Unmarshal([]byte(el.Text), &jsonLD); err != nil {
-			s.Logger.Debug("Failed to parse JSON-LD", "error", err)
+			s.Logger.Debug("Failed to parse JSON-LD",
+				"component", "article/service",
+				"error", err)
 		}
 	})
 
@@ -86,11 +90,14 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 
 	// Skip empty articles
 	if article.Title == "" && article.Body == "" {
-		s.Logger.Debug("Skipping empty article", "url", article.Source)
+		s.Logger.Debug("Skipping empty article",
+			"component", "article/service",
+			"url", article.Source)
 		return nil
 	}
 
 	s.Logger.Debug("Extracted article",
+		"component", "article/service",
 		"id", article.ID,
 		"title", article.Title,
 		"url", article.Source,
