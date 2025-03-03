@@ -16,6 +16,9 @@ type SearchService struct {
 	storage Interface
 }
 
+// Ensure SearchService implements SearchServiceInterface
+var _ SearchServiceInterface = (*SearchService)(nil)
+
 // NewSearchService creates a new SearchService instance
 func NewSearchService(storage Interface) SearchServiceInterface {
 	return &SearchService{

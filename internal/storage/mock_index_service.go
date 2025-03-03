@@ -12,6 +12,9 @@ type MockIndexService struct {
 	mock.Mock
 }
 
+// Ensure MockIndexService implements IndexServiceInterface
+var _ IndexServiceInterface = (*MockIndexService)(nil)
+
 // NewMockIndexService creates a new mock index service
 func NewMockIndexService() *MockIndexService {
 	return &MockIndexService{}

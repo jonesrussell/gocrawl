@@ -22,6 +22,9 @@ type Service struct {
 	Logger logger.Interface
 }
 
+// Ensure Service implements Interface
+var _ Interface = (*Service)(nil)
+
 // NewService creates a new Service instance
 func NewService(logger logger.Interface) Interface {
 	return &Service{Logger: logger}

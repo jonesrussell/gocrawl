@@ -19,6 +19,9 @@ type IndexService struct {
 	logger logger.Interface
 }
 
+// Ensure IndexService implements IndexServiceInterface
+var _ IndexServiceInterface = (*IndexService)(nil)
+
 // NewIndexService creates a new IndexService instance
 func NewIndexService(logger logger.Interface) IndexServiceInterface {
 	return &IndexService{
