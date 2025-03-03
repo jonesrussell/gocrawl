@@ -18,8 +18,8 @@ type Processor struct {
 	ArticleChan    chan *models.Article
 }
 
-// ProcessArticle handles article extraction
-func (p *Processor) ProcessArticle(e *colly.HTMLElement) {
+// Process handles article extraction
+func (p *Processor) Process(e *colly.HTMLElement) {
 	p.Logger.Debug("Processing article",
 		"component", "article/processor",
 		"url", e.Request.URL.String())
@@ -51,8 +51,10 @@ func (p *Processor) ProcessArticle(e *colly.HTMLElement) {
 
 // ProcessContent implements the models.ContentProcessor interface
 func (p *Processor) ProcessContent(e *colly.HTMLElement) {
-	// For article processor, we'll just call ProcessArticle
-	p.ProcessArticle(e)
+	// Skip content pages - we only process articles
+	p.Logger.Debug("Skipping content page in article processor",
+		"component", "article/processor",
+		"url", e.Request.URL.String())
 }
 
 // Ensure Processor implements models.ContentProcessor

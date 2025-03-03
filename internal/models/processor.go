@@ -2,8 +2,7 @@ package models
 
 import "github.com/gocolly/colly/v2"
 
-// ContentProcessor processes content and articles
+// ContentProcessor processes content
 type ContentProcessor interface {
-	ProcessContent(e *colly.HTMLElement)
-	ProcessArticle(e *colly.HTMLElement)
+	Process(e *colly.HTMLElement)
 }

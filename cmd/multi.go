@@ -79,6 +79,41 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 				},
 				fx.ResultTags(`name:"contentIndex"`),
 			),
+			// Provide article processor first (will be first in the slice)
+			fx.Annotate(
+				func(
+					logger logger.Interface,
+					service article.Interface,
+					storage storage.Interface,
+					params struct {
+						fx.In
+						IndexName string `name:"indexName"`
+					},
+				) models.ContentProcessor {
+					return &article.Processor{
+						Logger:         logger,
+						ArticleService: service,
+						Storage:        storage,
+						IndexName:      params.IndexName,
+					}
+				},
+				fx.ResultTags(`group:"processors"`),
+			),
+			// Provide content processor second (will be second in the slice)
+			fx.Annotate(
+				func(
+					service content.Interface,
+					storage storage.Interface,
+					logger logger.Interface,
+					params struct {
+						fx.In
+						IndexName string `name:"contentIndex"`
+					},
+				) models.ContentProcessor {
+					return content.NewProcessor(service, storage, logger, params.IndexName)
+				},
+				fx.ResultTags(`group:"processors"`),
+			),
 		),
 		storage.Module,
 		crawler.Module,

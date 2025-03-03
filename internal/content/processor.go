@@ -27,8 +27,8 @@ func NewProcessor(service Interface, storage storage.Interface, logger logger.In
 	}
 }
 
-// ProcessContent implements the ContentProcessor interface
-func (p *Processor) ProcessContent(e *colly.HTMLElement) {
+// Process implements the ContentProcessor interface
+func (p *Processor) Process(e *colly.HTMLElement) {
 	p.logger.Debug("Processing content",
 		"component", "content/processor",
 		"url", e.Request.URL.String(),
@@ -69,8 +69,10 @@ func (p *Processor) ProcessContent(e *colly.HTMLElement) {
 
 // ProcessArticle implements the models.ContentProcessor interface for articles
 func (p *Processor) ProcessArticle(e *colly.HTMLElement) {
-	// For content processor, we'll just use ProcessContent
-	p.ProcessContent(e)
+	// Skip articles - we only process content
+	p.logger.Debug("Skipping article in content processor",
+		"component", "content/processor",
+		"url", e.Request.URL.String())
 }
 
 // Ensure Processor implements models.ContentProcessor

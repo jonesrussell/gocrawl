@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gocolly/colly/v2"
@@ -65,16 +66,22 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 
 		// Get the full HTML element for metadata
 		if htmlEl, ok := e.Request.Ctx.GetAny(bodyElementKey).(*colly.HTMLElement); ok && htmlEl != nil {
-			p.ArticleProcessor.ProcessArticle(htmlEl)
+			p.ArticleProcessor.Process(htmlEl)
 		} else {
-			p.ArticleProcessor.ProcessArticle(e)
+			p.ArticleProcessor.Process(e)
 		}
 	})
 
-	// Final decision point - process as content if not already processed as article
+	// Process content for all pages that weren't processed as articles
 	c.OnScraped(func(r *colly.Response) {
 		// Skip if no content processor or if already processed as article
 		if p.ContentProcessor == nil || r.Ctx.Get(articleFoundKey) == "true" {
+			p.Logger.Debug("Skipping content processing",
+				"url", r.Request.URL.String(),
+				"reason", map[string]string{
+					"no_processor": fmt.Sprintf("%v", p.ContentProcessor == nil),
+					"is_article":   r.Ctx.Get(articleFoundKey),
+				})
 			return
 		}
 
@@ -83,7 +90,10 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 			p.Logger.Debug("Processing as content",
 				"url", r.Request.URL.String(),
 				"title", e.ChildText("title"))
-			p.ContentProcessor.ProcessContent(e)
+			p.ContentProcessor.Process(e)
+		} else {
+			p.Logger.Debug("No HTML element found for content processing",
+				"url", r.Request.URL.String())
 		}
 	})
 }
