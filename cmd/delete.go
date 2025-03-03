@@ -28,22 +28,35 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 )
 
+var deleteSourceName string
+
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete [indices...]",
 	Short: "Delete one or more Elasticsearch indices",
 	Long: `Delete one or more Elasticsearch indices from the cluster.
+If --source is specified, deletes the indices associated with that source.
 
 Example:
   gocrawl indices delete my_index
-  gocrawl indices delete index1 index2 index3`,
-	Args: cobra.MinimumNArgs(1),
+  gocrawl indices delete index1 index2 index3
+  gocrawl indices delete --source "Elliot Lake Today"`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if deleteSourceName == "" && len(args) == 0 {
+			return fmt.Errorf("either specify indices or use --source flag")
+		}
+		if deleteSourceName != "" && len(args) > 0 {
+			return fmt.Errorf("cannot specify both indices and --source flag")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		indices := args
 		force, _ := cmd.Flags().GetBool("force")
@@ -61,8 +74,19 @@ Example:
 				},
 			),
 			storage.Module,
-			fx.Invoke(func(storage storage.Interface) {
+			sources.Module,
+			fx.Invoke(func(storage storage.Interface, sources *sources.Sources) {
 				ctx := context.Background()
+
+				// If source is specified, get its indices
+				if deleteSourceName != "" {
+					source, err := sources.FindByName(deleteSourceName)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Error finding source: %v\n", err)
+						os.Exit(1)
+					}
+					indices = []string{source.ArticleIndex, source.Index}
+				}
 
 				// Check if all indices exist
 				existingIndices, err := storage.ListIndices(ctx)
@@ -136,4 +160,6 @@ func init() {
 
 	// Add --force flag to skip confirmation
 	deleteCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
+	// Add --source flag
+	deleteCmd.Flags().StringVar(&deleteSourceName, "source", "", "Delete indices for a specific source")
 }
