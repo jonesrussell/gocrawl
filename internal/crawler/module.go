@@ -26,12 +26,13 @@ func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {
 type Params struct {
 	fx.In
 
-	Logger       logger.Interface
-	Storage      storage.Interface
-	Debugger     *logger.CollyDebugger
-	Config       *config.Config
-	Source       string `name:"sourceName"`
-	IndexService storage.IndexServiceInterface
+	Logger           logger.Interface
+	Storage          storage.Interface
+	Debugger         *logger.CollyDebugger
+	Config           *config.Config
+	Source           string `name:"sourceName"`
+	IndexService     storage.IndexServiceInterface
+	ContentProcessor []models.ContentProcessor `group:"processors"`
 }
 
 // Result holds the crawler instance
@@ -67,6 +68,10 @@ func ProvideCrawler(p Params) (Interface, error) {
 		return nil, errors.New("index service is required")
 	}
 
+	if len(p.ContentProcessor) == 0 {
+		return nil, errors.New("at least one content processor is required")
+	}
+
 	// Log the entire configuration to ensure it's set correctly
 	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
 
@@ -82,8 +87,9 @@ func ProvideCrawler(p Params) (Interface, error) {
 			Config: p.Config,
 			Source: p.Source,
 		}),
-		IndexService: p.IndexService,
-		Config:       p.Config,
+		IndexService:     p.IndexService,
+		Config:           p.Config,
+		ContentProcessor: p.ContentProcessor[0], // Use the first processor
 	}
 
 	return crawler, nil

@@ -1,6 +1,8 @@
 package content
 
 import (
+	"context"
+
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -47,7 +49,7 @@ func (p *Processor) ProcessContent(e *colly.HTMLElement) {
 		"type", content.Type,
 		"title", content.Title)
 
-	err := p.storage.IndexContent(content.ID, content)
+	err := p.storage.IndexDocument(context.Background(), p.indexName, content.ID, content)
 	if err != nil {
 		p.logger.Error("Failed to index content",
 			"component", "content/processor",

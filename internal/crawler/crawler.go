@@ -23,15 +23,16 @@ const (
 
 // Crawler represents a web crawler
 type Crawler struct {
-	Storage        storage.Interface
-	Collector      *colly.Collector
-	Logger         logger.Interface
-	Debugger       *logger.CollyDebugger
-	IndexName      string
-	articleChan    chan *models.Article
-	ArticleService article.Interface
-	IndexService   storage.IndexServiceInterface
-	Config         *config.Config
+	Storage          storage.Interface
+	Collector        *colly.Collector
+	Logger           logger.Interface
+	Debugger         *logger.CollyDebugger
+	IndexName        string
+	articleChan      chan *models.Article
+	ArticleService   article.Interface
+	IndexService     storage.IndexServiceInterface
+	Config           *config.Config
+	ContentProcessor models.ContentProcessor
 }
 
 // Ensure Crawler implements the Interface
@@ -53,10 +54,10 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 		return fmt.Errorf("storage connection failed: %w", err)
 	}
 
-	// Ensure index exists with default mapping
+	// Ensure article index exists with default mapping
 	if err := c.IndexService.EnsureIndex(ctx, c.IndexName); err != nil {
-		c.Logger.Error("Failed to ensure index exists", "error", err)
-		return fmt.Errorf("failed to ensure index exists: %w", err)
+		c.Logger.Error("Failed to ensure article index exists", "error", err)
+		return fmt.Errorf("failed to ensure article index exists: %w", err)
 	}
 
 	// Create a channel to track completion

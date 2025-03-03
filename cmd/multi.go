@@ -117,6 +117,16 @@ func startMultiSourceCrawl(p MultiSourceParams) error {
 		return errors.New("crawler is not initialized")
 	}
 
+	// Get the crawler instance to access index service
+	crawler, ok := p.CrawlerInstance.(*crawler.Crawler)
+	if !ok {
+		return fmt.Errorf("crawler instance is not of type *crawler.Crawler")
+	}
+
+	// Set both the crawler and index manager in the sources
+	p.Sources.SetCrawler(p.CrawlerInstance)
+	p.Sources.SetIndexManager(crawler.IndexService)
+
 	source, err := p.Sources.FindByName(sourceName)
 	if err != nil {
 		return err
@@ -144,11 +154,7 @@ func startMultiSourceCrawl(p MultiSourceParams) error {
 	}
 
 	// Set the collector in the crawler instance
-	if c, ok := p.CrawlerInstance.(*crawler.Crawler); ok {
-		c.SetCollector(collectorResult.Collector)
-	} else {
-		return fmt.Errorf("crawler instance is not of type *crawler.Crawler")
-	}
+	crawler.SetCollector(collectorResult.Collector)
 
 	// Start the crawl
 	return p.Sources.Start(context.Background(), sourceName)
