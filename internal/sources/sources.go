@@ -20,11 +20,30 @@ type Config struct {
 	MaxDepth     int      `yaml:"max_depth"`
 	Time         []string `yaml:"time"`
 	Selectors    struct {
-		Article    string `yaml:"article"`    // Article content selector
-		Title      string `yaml:"title"`      // Title selector
-		Date       string `yaml:"date"`       // Date selector
-		Author     string `yaml:"author"`     // Author selector
-		Categories string `yaml:"categories"` // Categories selector
+		Article struct {
+			Container     string `yaml:"container,omitempty"`
+			Title         string `yaml:"title"`
+			Body          string `yaml:"body"`
+			Intro         string `yaml:"intro,omitempty"`
+			Byline        string `yaml:"byline,omitempty"`
+			PublishedTime string `yaml:"published_time"`
+			TimeAgo       string `yaml:"time_ago,omitempty"`
+			JsonLd        string `yaml:"json_ld,omitempty"`
+			Section       string `yaml:"section,omitempty"`
+			Keywords      string `yaml:"keywords,omitempty"`
+			Description   string `yaml:"description,omitempty"`
+			OgTitle       string `yaml:"og_title,omitempty"`
+			OgDescription string `yaml:"og_description,omitempty"`
+			OgImage       string `yaml:"og_image,omitempty"`
+			OgUrl         string `yaml:"og_url,omitempty"`
+			Canonical     string `yaml:"canonical,omitempty"`
+			WordCount     string `yaml:"word_count,omitempty"`
+			PublishDate   string `yaml:"publish_date,omitempty"`
+			Category      string `yaml:"category,omitempty"`
+			Tags          string `yaml:"tags,omitempty"`
+			Author        string `yaml:"author,omitempty"`
+			BylineName    string `yaml:"byline_name,omitempty"`
+		} `yaml:"article"`
 	} `yaml:"selectors"`
 }
 

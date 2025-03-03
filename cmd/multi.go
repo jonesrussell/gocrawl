@@ -50,6 +50,13 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 			func() chan *models.Content {
 				return make(chan *models.Content, 100)
 			},
+			// Provide source name
+			fx.Annotate(
+				func() string {
+					return sourceName
+				},
+				fx.ResultTags(`name:"sourceName"`),
+			),
 			// Provide ArticleIndex name
 			fx.Annotate(
 				func(s *sources.Sources) string {
@@ -95,17 +102,22 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
+// MultiSourceParams holds the parameters for multi-source crawl
+type MultiSourceParams struct {
+	fx.In
+
+	Sources         *sources.Sources
+	CrawlerInstance crawler.Interface
+	Processors      []models.ContentProcessor `group:"processors"`
+}
+
 // startMultiSourceCrawl starts the multi-source crawl
-func startMultiSourceCrawl(
-	sources *sources.Sources,
-	crawlerInstance crawler.Interface,
-	contentProcessor models.ContentProcessor,
-) error {
-	if crawlerInstance == nil {
+func startMultiSourceCrawl(p MultiSourceParams) error {
+	if p.CrawlerInstance == nil {
 		return errors.New("crawler is not initialized")
 	}
 
-	source, err := sources.FindByName(sourceName)
+	source, err := p.Sources.FindByName(sourceName)
 	if err != nil {
 		return err
 	}
@@ -123,8 +135,8 @@ func startMultiSourceCrawl(
 		RateLimit:        rateLimit,
 		Debugger:         logger.NewCollyDebugger(globalLogger),
 		Logger:           globalLogger,
-		ArticleProcessor: contentProcessor,
-		ContentProcessor: contentProcessor,
+		ArticleProcessor: p.Processors[0], // Use first processor as article processor
+		ContentProcessor: p.Processors[1], // Use second processor as content processor
 		Source:           source,
 	})
 	if err != nil {
@@ -132,14 +144,14 @@ func startMultiSourceCrawl(
 	}
 
 	// Set the collector in the crawler instance
-	if c, ok := crawlerInstance.(*crawler.Crawler); ok {
+	if c, ok := p.CrawlerInstance.(*crawler.Crawler); ok {
 		c.SetCollector(collectorResult.Collector)
 	} else {
 		return fmt.Errorf("crawler instance is not of type *crawler.Crawler")
 	}
 
 	// Start the crawl
-	return sources.Start(context.Background(), sourceName)
+	return p.Sources.Start(context.Background(), sourceName)
 }
 
 func init() {

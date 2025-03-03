@@ -19,6 +19,15 @@ type ProcessorParams struct {
 	Service     Interface
 }
 
+// ServiceParams contains the dependencies for creating a service
+type ServiceParams struct {
+	fx.In
+
+	Logger logger.Interface
+	Config *config.Config
+	Source string `name:"sourceName"`
+}
+
 // Module provides article-related dependencies
 var Module = fx.Module("article",
 	fx.Provide(
@@ -26,17 +35,32 @@ var Module = fx.Module("article",
 		fx.Annotate(
 			NewProcessor,
 			fx.As(new(models.ContentProcessor)),
+			fx.ResultTags(`group:"processors"`),
 		),
 	),
 )
 
 // NewServiceWithConfig creates a new article service with configuration
-func NewServiceWithConfig(logger logger.Interface, cfg *config.Config) Interface {
-	selectors := cfg.Sources[0].Selectors.Article
-	if selectors == (config.ArticleSelectors{}) {
-		selectors = config.DefaultArticleSelectors()
+func NewServiceWithConfig(p ServiceParams) Interface {
+	// Get the source configuration
+	var selectors config.ArticleSelectors
+	for _, source := range p.Config.Sources {
+		if source.Name == p.Source {
+			selectors = source.Selectors.Article
+			break
+		}
 	}
-	return NewService(logger, selectors)
+
+	if selectors == (config.ArticleSelectors{}) {
+		p.Logger.Debug("Using default article selectors")
+		selectors = config.DefaultArticleSelectors()
+	} else {
+		p.Logger.Debug("Using article selectors",
+			"source", p.Source,
+			"selectors", selectors)
+	}
+
+	return NewService(p.Logger, selectors)
 }
 
 // NewProcessor creates a new article processor

@@ -13,6 +13,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// ArticleSelectors represents the article selectors structure
+type ArticleSelectors struct {
+	Container     string `yaml:"container,omitempty"`
+	Title         string `yaml:"title"`
+	Body          string `yaml:"body"`
+	Intro         string `yaml:"intro,omitempty"`
+	Byline        string `yaml:"byline,omitempty"`
+	PublishedTime string `yaml:"published_time"`
+	TimeAgo       string `yaml:"time_ago,omitempty"`
+	JsonLd        string `yaml:"json_ld,omitempty"`
+	Section       string `yaml:"section,omitempty"`
+	Keywords      string `yaml:"keywords,omitempty"`
+	Description   string `yaml:"description,omitempty"`
+	OgTitle       string `yaml:"og_title,omitempty"`
+	OgDescription string `yaml:"og_description,omitempty"`
+	OgImage       string `yaml:"og_image,omitempty"`
+	OgUrl         string `yaml:"og_url,omitempty"`
+	Canonical     string `yaml:"canonical,omitempty"`
+	WordCount     string `yaml:"word_count,omitempty"`
+	PublishDate   string `yaml:"publish_date,omitempty"`
+	Category      string `yaml:"category,omitempty"`
+	Tags          string `yaml:"tags,omitempty"`
+	Author        string `yaml:"author,omitempty"`
+	BylineName    string `yaml:"byline_name,omitempty"`
+}
+
+// Selectors represents the selectors structure
+type Selectors struct {
+	Article ArticleSelectors `yaml:"article"`
+}
+
+// createTestConfig creates a test sources.Config with default selectors
+func createTestConfig() *sources.Config {
+	cfg := &sources.Config{}
+	cfg.Selectors.Article.Title = "h1"
+	cfg.Selectors.Article.Body = ".article-body"
+	cfg.Selectors.Article.PublishedTime = "time"
+	return cfg
+}
+
 // TestNew tests the New function of the collector package
 func TestNew(t *testing.T) {
 	tests := []struct {
@@ -33,21 +73,7 @@ func TestNew(t *testing.T) {
 				RandomDelay:      2 * time.Second,
 				Context:          context.Background(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
-				Source: &sources.Config{
-					Selectors: struct {
-						Article    string `yaml:"article"`
-						Title      string `yaml:"title"`
-						Date       string `yaml:"date"`
-						Author     string `yaml:"author"`
-						Categories string `yaml:"categories"`
-					}{
-						Article:    "article, .article",
-						Title:      "h1",
-						Date:       "time",
-						Author:     ".author",
-						Categories: "div.categories",
-					},
-				},
+				Source:           createTestConfig(),
 			},
 			wantErr: false,
 		},
@@ -63,21 +89,7 @@ func TestNew(t *testing.T) {
 				RandomDelay:      2 * time.Second,
 				Context:          context.Background(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
-				Source: &sources.Config{
-					Selectors: struct {
-						Article    string `yaml:"article"`
-						Title      string `yaml:"title"`
-						Date       string `yaml:"date"`
-						Author     string `yaml:"author"`
-						Categories string `yaml:"categories"`
-					}{
-						Article:    "article, .article",
-						Title:      "h1",
-						Date:       "time",
-						Author:     ".author",
-						Categories: "div.categories",
-					},
-				},
+				Source:           createTestConfig(),
 			},
 			wantErr:    true,
 			wantErrMsg: "base URL cannot be empty",
@@ -94,21 +106,7 @@ func TestNew(t *testing.T) {
 				RandomDelay:      2 * time.Second,
 				Context:          context.Background(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
-				Source: &sources.Config{
-					Selectors: struct {
-						Article    string `yaml:"article"`
-						Title      string `yaml:"title"`
-						Date       string `yaml:"date"`
-						Author     string `yaml:"author"`
-						Categories string `yaml:"categories"`
-					}{
-						Article:    "article, .article",
-						Title:      "h1",
-						Date:       "time",
-						Author:     ".author",
-						Categories: "div.categories",
-					},
-				},
+				Source:           createTestConfig(),
 			},
 			wantErr:    true,
 			wantErrMsg: "invalid base URL: not-a-url, must be a valid HTTP/HTTPS URL",
@@ -178,21 +176,7 @@ func TestCollectorCreation(t *testing.T) {
 				Logger:           mockLogger,
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Context:          context.Background(),
-				Source: &sources.Config{
-					Selectors: struct {
-						Article    string `yaml:"article"`
-						Title      string `yaml:"title"`
-						Date       string `yaml:"date"`
-						Author     string `yaml:"author"`
-						Categories string `yaml:"categories"`
-					}{
-						Article:    "article, .article",
-						Title:      "h1",
-						Date:       "time",
-						Author:     ".author",
-						Categories: "div.categories",
-					},
-				},
+				Source:           createTestConfig(),
 			}
 
 			result, err := collector.New(params)
@@ -214,21 +198,7 @@ func TestCollectorCreation(t *testing.T) {
 			Logger:           nil,
 			ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 			Context:          context.Background(),
-			Source: &sources.Config{
-				Selectors: struct {
-					Article    string `yaml:"article"`
-					Title      string `yaml:"title"`
-					Date       string `yaml:"date"`
-					Author     string `yaml:"author"`
-					Categories string `yaml:"categories"`
-				}{
-					Article:    "article, .article",
-					Title:      "h1",
-					Date:       "time",
-					Author:     ".author",
-					Categories: "div.categories",
-				},
-			},
+			Source:           createTestConfig(),
 		}
 
 		result, err := collector.New(params)

@@ -21,6 +21,7 @@ var Module = fx.Options(
 				return NewProcessor(p.Service, p.Storage, p.Logger, p.IndexName)
 			},
 			fx.As(new(models.ContentProcessor)),
+			fx.ResultTags(`group:"processors"`),
 		),
 	),
 )

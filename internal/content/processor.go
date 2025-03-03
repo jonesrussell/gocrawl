@@ -3,6 +3,7 @@ package content
 import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
@@ -63,3 +64,12 @@ func (p *Processor) ProcessContent(e *colly.HTMLElement) {
 		"type", content.Type,
 		"index", p.indexName)
 }
+
+// ProcessArticle implements the models.ContentProcessor interface for articles
+func (p *Processor) ProcessArticle(e *colly.HTMLElement) {
+	// For content processor, we'll just use ProcessContent
+	p.ProcessContent(e)
+}
+
+// Ensure Processor implements models.ContentProcessor
+var _ models.ContentProcessor = (*Processor)(nil)

@@ -22,6 +22,32 @@ func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {
 	return logger.NewCollyDebugger(log)
 }
 
+// Params holds the dependencies for creating a crawler
+type Params struct {
+	fx.In
+
+	Logger   logger.Interface
+	Storage  storage.Interface
+	Debugger *logger.CollyDebugger
+	Config   *config.Config
+	Source   string `name:"sourceName"`
+}
+
+// Result holds the crawler instance
+type Result struct {
+	fx.Out
+
+	Crawler Interface
+}
+
+// Module provides crawler-related dependencies
+var Module = fx.Module("crawler",
+	fx.Provide(
+		provideCollyDebugger,
+		ProvideCrawler,
+	),
+)
+
 // ProvideCrawler creates a new Crawler instance
 func ProvideCrawler(p Params) (Interface, error) {
 	if p.Logger == nil {
@@ -37,41 +63,20 @@ func ProvideCrawler(p Params) (Interface, error) {
 
 	// Create a new crawler instance
 	crawler := &Crawler{
-		Storage:        p.Storage,
-		Logger:         p.Logger,
-		Debugger:       p.Debugger,
-		IndexName:      p.Config.Crawler.IndexName,
-		articleChan:    make(chan *models.Article, DefaultBatchSize),
-		ArticleService: article.NewServiceWithConfig(p.Logger, p.Config),
-		Config:         p.Config,
+		Storage:     p.Storage,
+		Logger:      p.Logger,
+		Debugger:    p.Debugger,
+		IndexName:   p.Config.Crawler.IndexName,
+		articleChan: make(chan *models.Article, DefaultBatchSize),
+		ArticleService: article.NewServiceWithConfig(article.ServiceParams{
+			Logger: p.Logger,
+			Config: p.Config,
+			Source: p.Source,
+		}),
+		Config: p.Config,
 	}
 
 	return crawler, nil
-}
-
-// Module provides the crawler module and its dependencies
-var Module = fx.Module("crawler",
-	fx.Provide(
-		provideCollyDebugger,
-		ProvideCrawler,
-	),
-)
-
-// Params holds the dependencies required to create a new Crawler instance
-type Params struct {
-	fx.In
-
-	Logger   logger.Interface
-	Storage  storage.Interface
-	Debugger *logger.CollyDebugger
-	Config   *config.Config
-}
-
-// Result holds the result of creating a new Crawler instance
-type Result struct {
-	fx.Out
-
-	Crawler Interface
 }
 
 const (
