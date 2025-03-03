@@ -46,7 +46,11 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 
 		// Get the stored body element
 		if e, ok := r.Ctx.GetAny(bodyElementKey).(*colly.HTMLElement); ok && e != nil {
-			p.Logger.Debug("Processing non-article content", "url", r.Request.URL.String())
+			p.Logger.Debug("Found webpage",
+				"url", r.Request.URL.String(),
+				"selector", "body",
+				"title", e.ChildText("title"),
+				"h1", e.ChildText("h1"))
 			p.ContentProcessor.ProcessContent(e)
 		}
 	})
