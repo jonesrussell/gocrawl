@@ -1,6 +1,8 @@
 package collector
 
 import (
+	"strings"
+
 	"github.com/gocolly/colly/v2"
 )
 
@@ -33,7 +35,19 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 	// Mark when we find an article
 	c.OnHTML(articleSelector, func(e *colly.HTMLElement) {
 		e.Request.Ctx.Put(articleFoundKey, "true")
-		p.Logger.Debug("Found article", "url", e.Request.URL.String(), "selector", articleSelector)
+		// Get the specific selector that matched
+		matchedSelector := ""
+		for _, selector := range strings.Split(articleSelector, ", ") {
+			// Check if the element itself matches the selector
+			if e.DOM.Is(selector) {
+				matchedSelector = selector
+				break
+			}
+		}
+		p.Logger.Debug("Found article",
+			"url", e.Request.URL.String(),
+			"selector", articleSelector,
+			"matched_selector", matchedSelector)
 		p.ArticleProcessor.ProcessArticle(e)
 	})
 
@@ -46,11 +60,28 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 
 		// Get the stored body element
 		if e, ok := r.Ctx.GetAny(bodyElementKey).(*colly.HTMLElement); ok && e != nil {
+			// Check which selectors were attempted but didn't match
+			attemptedSelectors := strings.Split(articleSelector, ", ")
+			matchedSelector := "body"
+			for _, selector := range attemptedSelectors {
+				// Check if the element itself matches the selector
+				if e.DOM.Is(selector) {
+					matchedSelector = selector
+					break
+				}
+			}
 			p.Logger.Debug("Found webpage",
 				"url", r.Request.URL.String(),
 				"selector", "body",
+				"matched_selector", matchedSelector,
 				"title", e.ChildText("title"),
-				"h1", e.ChildText("h1"))
+				"h1", e.ChildText("h1"),
+				"h2", e.ChildText("h2"),
+				"h3", e.ChildText("h3"),
+				"h4", e.ChildText("h4"),
+				"h5", e.ChildText("h5"),
+				"h6", e.ChildText("h6"),
+			)
 			p.ContentProcessor.ProcessContent(e)
 		}
 	})
