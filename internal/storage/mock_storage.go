@@ -225,3 +225,15 @@ func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping m
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }
+
+// GetIndexHealth implements Interface
+func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
+	args := m.Called(ctx, index)
+	return args.String(0), args.Error(1)
+}
+
+// GetIndexDocCount implements Interface
+func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
+	args := m.Called(ctx, index)
+	return args.Get(0).(int64), args.Error(1)
+}

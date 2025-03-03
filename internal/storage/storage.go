@@ -58,6 +58,10 @@ type Interface interface {
 	GetContent(id string) (*models.Content, error)
 	SearchContent(query string) ([]*models.Content, error)
 	DeleteContent(id string) error
+
+	// Index health and stats
+	GetIndexHealth(ctx context.Context, index string) (string, error)
+	GetIndexDocCount(ctx context.Context, index string) (int64, error)
 }
 
 // ElasticsearchStorage struct to hold the Elasticsearch client
@@ -579,4 +583,60 @@ func (s *ElasticsearchStorage) UpdateMapping(ctx context.Context, index string, 
 	}
 
 	return nil
+}
+
+// GetIndexHealth gets the health status of an index
+func (s *ElasticsearchStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
+	res, err := s.ESClient.Cluster.Health(
+		s.ESClient.Cluster.Health.WithContext(ctx),
+		s.ESClient.Cluster.Health.WithIndex(index),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to get index health: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return "", fmt.Errorf("error getting index health: %s", res.String())
+	}
+
+	var health map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&health); err != nil {
+		return "", fmt.Errorf("error decoding index health: %w", err)
+	}
+
+	status, ok := health["status"].(string)
+	if !ok {
+		return "", fmt.Errorf("invalid index health format")
+	}
+
+	return status, nil
+}
+
+// GetIndexDocCount gets the document count of an index
+func (s *ElasticsearchStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
+	res, err := s.ESClient.Count(
+		s.ESClient.Count.WithContext(ctx),
+		s.ESClient.Count.WithIndex(index),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get index document count: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return 0, fmt.Errorf("error getting index document count: %s", res.String())
+	}
+
+	var count map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&count); err != nil {
+		return 0, fmt.Errorf("error decoding index document count: %w", err)
+	}
+
+	countValue, ok := count["count"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("invalid index document count format")
+	}
+
+	return int64(countValue), nil
 }

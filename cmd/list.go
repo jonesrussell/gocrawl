@@ -78,10 +78,45 @@ Example:
 					return
 				}
 
-				fmt.Println("Indices:")
+				// Print header
+				fmt.Println("\nAvailable indices")
+				fmt.Println("----------------")
+				fmt.Printf("%-40s %-10s %-12s %-15s %-15s\n",
+					"Index name",
+					"Health",
+					"Docs count",
+					"Ingestion name",
+					"Ingestion status")
+				fmt.Println(strings.Repeat("-", 92))
+
+				// Print each index
 				for _, index := range filteredIndices {
-					fmt.Printf("  - %s\n", index)
+					health, err := storage.GetIndexHealth(ctx, index)
+					if err != nil {
+						health = "unknown"
+					}
+
+					docCount, err := storage.GetIndexDocCount(ctx, index)
+					if err != nil {
+						docCount = 0
+					}
+
+					// Determine ingestion status based on health
+					ingestionStatus := "Connected"
+					if health == "red" {
+						ingestionStatus = "Disconnected"
+					} else if health == "yellow" {
+						ingestionStatus = "Warning"
+					}
+
+					fmt.Printf("%-40s %-10s %-12d %-15s %-15s\n",
+						index,
+						health,
+						docCount,
+						"", // Ingestion name (not implemented yet)
+						ingestionStatus)
 				}
+				fmt.Println()
 			}),
 		)
 
@@ -90,7 +125,6 @@ Example:
 			os.Exit(1)
 		}
 
-		// Stop the application after listing indices
 		if err := app.Stop(context.Background()); err != nil {
 			fmt.Fprintf(os.Stderr, "Error stopping application: %v\n", err)
 			os.Exit(1)
