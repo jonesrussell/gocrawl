@@ -18,8 +18,8 @@ type Processor struct {
 	ArticleChan    chan *models.Article
 }
 
-// ProcessPage handles article extraction
-func (p *Processor) ProcessPage(e *colly.HTMLElement) {
+// ProcessArticle handles article extraction
+func (p *Processor) ProcessArticle(e *colly.HTMLElement) {
 	p.Logger.Debug("Processing page", "url", e.Request.URL.String())
 	article := p.ArticleService.ExtractArticle(e)
 	if article == nil {

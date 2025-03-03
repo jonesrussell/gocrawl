@@ -3,6 +3,7 @@ package content
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -55,13 +56,8 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 	// Extract metadata from meta tags and other sources
 	metadata := s.ExtractMetadata(e)
 
-	// Safely get content type from metadata
-	var contentType string
-	if typeVal, ok := metadata["type"]; ok {
-		if typeStr, ok := typeVal.(string); ok {
-			contentType = typeStr
-		}
-	}
+	// Determine content type based on URL and page structure
+	contentType := determineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
 
 	// Create content with basic fields
 	content := &models.Content{
@@ -69,7 +65,7 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 		URL:       e.Request.URL.String(),
 		Title:     getFirstNonEmpty(jsonLD.Name, e.ChildText("title"), e.ChildText("h1")),
 		Body:      e.Text,
-		Type:      getFirstNonEmpty(jsonLD.Type, contentType, "webpage"),
+		Type:      contentType,
 		Metadata:  metadata,
 		CreatedAt: parseDate([]string{jsonLD.DateCreated, jsonLD.DateModified}, s.Logger),
 	}
@@ -88,6 +84,45 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 		"created_at", content.CreatedAt)
 
 	return content
+}
+
+// determineContentType determines the type of content based on URL and metadata
+func determineContentType(url string, metadata map[string]interface{}, jsonLDType string) string {
+	// Check JSON-LD type first
+	if jsonLDType != "" {
+		return jsonLDType
+	}
+
+	// Check metadata for content type
+	if typeVal, ok := metadata["type"]; ok {
+		if typeStr, ok := typeVal.(string); ok {
+			return typeStr
+		}
+	}
+
+	// Check URL patterns
+	switch {
+	case strings.Contains(url, "/category/"), strings.Contains(url, "/categories/"):
+		return "category"
+	case strings.Contains(url, "/tag/"), strings.Contains(url, "/tags/"):
+		return "tag"
+	case strings.Contains(url, "/author/"), strings.Contains(url, "/authors/"):
+		return "author"
+	case strings.Contains(url, "/page/"), strings.Contains(url, "/pages/"):
+		return "page"
+	case strings.Contains(url, "/search"):
+		return "search"
+	case strings.Contains(url, "/feed"):
+		return "feed"
+	case strings.Contains(url, "/rss"):
+		return "rss"
+	case strings.Contains(url, "/sitemap"):
+		return "sitemap"
+	case strings.Contains(url, "/wp-json"), strings.Contains(url, "/wp-admin"):
+		return "system"
+	default:
+		return "webpage"
+	}
 }
 
 // ExtractMetadata extracts metadata from various sources in the HTML

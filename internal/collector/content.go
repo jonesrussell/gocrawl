@@ -34,7 +34,7 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 	c.OnHTML(articleSelector, func(e *colly.HTMLElement) {
 		e.Request.Ctx.Put(articleFoundKey, "true")
 		p.Logger.Debug("Found article", "url", e.Request.URL.String(), "selector", articleSelector)
-		p.ArticleProcessor.ProcessPage(e)
+		p.ArticleProcessor.ProcessArticle(e)
 	})
 
 	// Final decision point - process as content if not already processed as article
