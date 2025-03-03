@@ -12,10 +12,11 @@ import (
 	"go.uber.org/fx"
 )
 
-// Context keys
+// Error messages
 const (
-	articleFoundKey = "articleFound"
-	bodyElementKey  = "bodyElement"
+	errEmptyBaseURL       = "base URL cannot be empty"
+	errMissingArticleProc = "article processor is required"
+	errMissingLogger      = "logger is required"
 )
 
 // Params holds the parameters for creating a Collector
@@ -44,16 +45,19 @@ type Result struct {
 
 // ValidateParams validates the collector parameters
 func ValidateParams(p Params) error {
+	// Ensure BaseURL is not empty
 	if p.BaseURL == "" {
-		return errors.New("base URL cannot be empty")
+		return errors.New(errEmptyBaseURL)
 	}
 
+	// Ensure ArticleProcessor is provided
 	if p.ArticleProcessor == nil {
-		return errors.New("article processor is required")
+		return errors.New(errMissingArticleProc)
 	}
 
+	// Ensure Logger is provided
 	if p.Logger == nil {
-		return errors.New("logger is required")
+		return errors.New(errMissingLogger)
 	}
 
 	return nil
