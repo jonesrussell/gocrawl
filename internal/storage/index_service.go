@@ -16,23 +16,24 @@ type IndexServiceInterface interface {
 
 // IndexService implements the IndexService interface
 type IndexService struct {
-	logger logger.Interface
+	logger  logger.Interface
+	storage Interface
 }
 
 // Ensure IndexService implements IndexServiceInterface
 var _ IndexServiceInterface = (*IndexService)(nil)
 
 // NewIndexService creates a new IndexService instance
-func NewIndexService(logger logger.Interface) IndexServiceInterface {
+func NewIndexService(logger logger.Interface, storage Interface) IndexServiceInterface {
 	return &IndexService{
-		logger: logger,
+		logger:  logger,
+		storage: storage,
 	}
 }
 
-func (s *IndexService) CreateIndex(_ context.Context, _ string, _ map[string]interface{}) error {
-	// Implementation for creating an index
-	// This should call the actual storage mechanism to create the index
-	return nil // Replace with actual implementation
+// CreateIndex creates a new index with the specified mapping
+func (s *IndexService) CreateIndex(ctx context.Context, indexName string, mapping map[string]interface{}) error {
+	return s.storage.CreateIndex(ctx, indexName, mapping)
 }
 
 // EnsureIndex checks if an index exists and creates it if it does not
@@ -81,8 +82,7 @@ func (s *IndexService) createArticleIndex(ctx context.Context, indexName string)
 	return s.CreateIndex(ctx, indexName, mapping)
 }
 
-// Implement the IndexExists method
-func (s *IndexService) IndexExists(_ context.Context, _ string) (bool, error) {
-	// Implementation for checking if an index exists
-	return false, nil // Replace with actual implementation
+// IndexExists checks if an index exists
+func (s *IndexService) IndexExists(ctx context.Context, indexName string) (bool, error) {
+	return s.storage.IndexExists(ctx, indexName)
 }
