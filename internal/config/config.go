@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Error definitions
@@ -88,12 +90,30 @@ type LogConfig struct {
 	Debug bool
 }
 
+// Source represents a news source configuration
+type Source struct {
+	Name         string          `yaml:"name"`
+	URL          string          `yaml:"url"`
+	ArticleIndex string          `yaml:"article_index"`
+	Index        string          `yaml:"index"`
+	RateLimit    time.Duration   `yaml:"rate_limit"`
+	MaxDepth     int             `yaml:"max_depth"`
+	Time         []string        `yaml:"time"`
+	Selectors    SourceSelectors `yaml:"selectors"`
+}
+
+// SourceSelectors defines the selectors for a source
+type SourceSelectors struct {
+	Article ArticleSelectors `yaml:"article"`
+}
+
 // Config holds all configuration settings
 type Config struct {
 	App           AppConfig
 	Crawler       CrawlerConfig
 	Elasticsearch ElasticsearchConfig
 	Log           LogConfig
+	Sources       []Source `yaml:"sources"`
 }
 
 // NewConfig creates a new Config instance with values from Viper
@@ -191,4 +211,19 @@ func ParseRateLimit(rateLimit string) (time.Duration, error) {
 		return time.Second, errors.New("error parsing duration") // Return an error message
 	}
 	return duration, nil
+}
+
+// LoadConfig loads configuration from a YAML file
+func LoadConfig(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
 }

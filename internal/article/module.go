@@ -1,6 +1,7 @@
 package article
 
 import (
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -15,24 +16,36 @@ type ProcessorParams struct {
 	Storage     storage.Interface
 	IndexName   string `name:"indexName"`
 	ArticleChan chan *models.Article
+	Service     Interface
 }
 
-// Module provides the article module and its dependencies
+// Module provides article-related dependencies
 var Module = fx.Module("article",
 	fx.Provide(
-		// Provide the article service
-		func(logger logger.Interface) Interface {
-			return NewService(logger)
-		},
-		// Provide the article processor
-		func(p ProcessorParams) *Processor {
-			return &Processor{
-				Logger:         p.Logger,
-				ArticleService: NewService(p.Logger),
-				Storage:        p.Storage,
-				IndexName:      p.IndexName,
-				ArticleChan:    p.ArticleChan,
-			}
-		},
+		NewServiceWithConfig,
+		fx.Annotate(
+			NewProcessor,
+			fx.As(new(models.ContentProcessor)),
+		),
 	),
 )
+
+// NewServiceWithConfig creates a new article service with configuration
+func NewServiceWithConfig(logger logger.Interface, cfg *config.Config) Interface {
+	selectors := cfg.Sources[0].Selectors.Article
+	if selectors == (config.ArticleSelectors{}) {
+		selectors = config.DefaultArticleSelectors()
+	}
+	return NewService(logger, selectors)
+}
+
+// NewProcessor creates a new article processor
+func NewProcessor(p ProcessorParams) *Processor {
+	return &Processor{
+		Logger:         p.Logger,
+		ArticleService: p.Service,
+		Storage:        p.Storage,
+		IndexName:      p.IndexName,
+		ArticleChan:    p.ArticleChan,
+	}
+}

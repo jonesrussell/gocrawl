@@ -48,3 +48,12 @@ func (p *Processor) ProcessArticle(e *colly.HTMLElement) {
 
 	p.ArticleChan <- article
 }
+
+// ProcessContent implements the models.ContentProcessor interface
+func (p *Processor) ProcessContent(e *colly.HTMLElement) {
+	// For article processor, we'll just call ProcessArticle
+	p.ProcessArticle(e)
+}
+
+// Ensure Processor implements models.ContentProcessor
+var _ models.ContentProcessor = (*Processor)(nil)

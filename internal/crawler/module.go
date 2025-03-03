@@ -42,7 +42,7 @@ func ProvideCrawler(p Params) (Interface, error) {
 		Debugger:       p.Debugger,
 		IndexName:      p.Config.Crawler.IndexName,
 		articleChan:    make(chan *models.Article, DefaultBatchSize),
-		ArticleService: article.NewService(p.Logger),
+		ArticleService: article.NewServiceWithConfig(p.Logger, p.Config),
 		Config:         p.Config,
 	}
 

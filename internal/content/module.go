@@ -1,8 +1,8 @@
 package content
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 )
@@ -20,7 +20,7 @@ var Module = fx.Options(
 			func(p Params) *Processor {
 				return NewProcessor(p.Service, p.Storage, p.Logger, p.IndexName)
 			},
-			fx.As(new(collector.ContentProcessor)),
+			fx.As(new(models.ContentProcessor)),
 		),
 	),
 )

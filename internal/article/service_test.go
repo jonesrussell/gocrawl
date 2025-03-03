@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
@@ -20,6 +21,11 @@ func newMockLogger() *logger.MockLogger {
 	mockLogger := &logger.MockLogger{}
 	mockLogger.On("Debug", mock.Anything, mock.Anything).Return() // Set up expectation for Debug call
 	return mockLogger
+}
+
+// Helper function to create default article selectors
+func newDefaultSelectors() config.ArticleSelectors {
+	return config.DefaultArticleSelectors()
 }
 
 // Common HTML structure for tests
@@ -52,8 +58,8 @@ const testHTML = `
 `
 
 func TestExtractArticle(t *testing.T) {
-	mockLogger := newMockLogger() // Use the helper function
-	svc := article.NewService(mockLogger)
+	mockLogger := newMockLogger()
+	svc := article.NewService(mockLogger, newDefaultSelectors())
 
 	// Create a new document from the common HTML string
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(testHTML))
@@ -88,8 +94,8 @@ func TestExtractArticle(t *testing.T) {
 }
 
 func TestCleanAuthor(t *testing.T) {
-	mockLogger := newMockLogger() // Use the helper function
-	svc := article.NewService(mockLogger)
+	mockLogger := newMockLogger()
+	svc := article.NewService(mockLogger, newDefaultSelectors())
 
 	// Change the author string to match the expected format
 	author := "ElliotLakeToday Staff" // Simplified for testing
@@ -100,8 +106,8 @@ func TestCleanAuthor(t *testing.T) {
 }
 
 func TestParsePublishedDate(t *testing.T) {
-	mockLogger := newMockLogger() // Use the helper function
-	svc := article.NewService(mockLogger)
+	mockLogger := newMockLogger()
+	svc := article.NewService(mockLogger, newDefaultSelectors())
 
 	// Create a mock HTML document
 	html := `

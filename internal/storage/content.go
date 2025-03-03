@@ -33,6 +33,51 @@ func (s *ElasticsearchStorage) CreateContentIndex(ctx context.Context) error {
 				"created_at": map[string]interface{}{
 					"type": "date",
 				},
+				"updated_at": map[string]interface{}{
+					"type": "date",
+				},
+				"description": map[string]interface{}{
+					"type": "text",
+				},
+				"keywords": map[string]interface{}{
+					"type": "keyword",
+				},
+				"tags": map[string]interface{}{
+					"type": "keyword",
+				},
+				"category": map[string]interface{}{
+					"type": "keyword",
+				},
+				"section": map[string]interface{}{
+					"type": "keyword",
+				},
+				"source": map[string]interface{}{
+					"type": "keyword",
+				},
+				"word_count": map[string]interface{}{
+					"type": "integer",
+				},
+				"metadata": map[string]interface{}{
+					"type":    "object",
+					"dynamic": true,
+					"properties": map[string]interface{}{
+						"og_title": map[string]interface{}{
+							"type": "text",
+						},
+						"og_description": map[string]interface{}{
+							"type": "text",
+						},
+						"og_image": map[string]interface{}{
+							"type": "keyword",
+						},
+						"og_url": map[string]interface{}{
+							"type": "keyword",
+						},
+						"canonical_url": map[string]interface{}{
+							"type": "keyword",
+						},
+					},
+				},
 			},
 		},
 	}

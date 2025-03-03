@@ -99,8 +99,7 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 func startMultiSourceCrawl(
 	sources *sources.Sources,
 	crawlerInstance crawler.Interface,
-	processor *article.Processor,
-	contentProcessor collector.ContentProcessor,
+	contentProcessor models.ContentProcessor,
 ) error {
 	if crawlerInstance == nil {
 		return errors.New("crawler is not initialized")
@@ -124,7 +123,7 @@ func startMultiSourceCrawl(
 		RateLimit:        rateLimit,
 		Debugger:         logger.NewCollyDebugger(globalLogger),
 		Logger:           globalLogger,
-		ArticleProcessor: processor,
+		ArticleProcessor: contentProcessor,
 		ContentProcessor: contentProcessor,
 		Source:           source,
 	})

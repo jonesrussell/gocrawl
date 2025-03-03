@@ -30,6 +30,9 @@ func (s *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 				"author": map[string]interface{}{
 					"type": "keyword",
 				},
+				"byline_name": map[string]interface{}{
+					"type": "keyword",
+				},
 				"published_date": map[string]interface{}{
 					"type": "date",
 				},
@@ -38,6 +41,45 @@ func (s *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 				},
 				"tags": map[string]interface{}{
 					"type": "keyword",
+				},
+				"intro": map[string]interface{}{
+					"type": "text",
+				},
+				"description": map[string]interface{}{
+					"type": "text",
+				},
+				"og_title": map[string]interface{}{
+					"type": "text",
+				},
+				"og_description": map[string]interface{}{
+					"type": "text",
+				},
+				"og_image": map[string]interface{}{
+					"type": "keyword",
+				},
+				"og_url": map[string]interface{}{
+					"type": "keyword",
+				},
+				"canonical_url": map[string]interface{}{
+					"type": "keyword",
+				},
+				"word_count": map[string]interface{}{
+					"type": "integer",
+				},
+				"category": map[string]interface{}{
+					"type": "keyword",
+				},
+				"section": map[string]interface{}{
+					"type": "keyword",
+				},
+				"keywords": map[string]interface{}{
+					"type": "keyword",
+				},
+				"created_at": map[string]interface{}{
+					"type": "date",
+				},
+				"updated_at": map[string]interface{}{
+					"type": "date",
 				},
 			},
 		},

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"go.uber.org/fx"
 )
@@ -22,8 +22,8 @@ const (
 type Params struct {
 	fx.In
 
-	ArticleProcessor *article.Processor
-	ContentProcessor ContentProcessor
+	ArticleProcessor models.ContentProcessor
+	ContentProcessor models.ContentProcessor
 	BaseURL          string
 	Context          context.Context
 	Debugger         *logger.CollyDebugger

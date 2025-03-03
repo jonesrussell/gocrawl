@@ -8,6 +8,7 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/google/uuid"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 )
@@ -22,15 +23,19 @@ type Interface interface {
 
 // Service implements the Service interface
 type Service struct {
-	Logger logger.Interface
+	Logger    logger.Interface
+	Selectors config.ArticleSelectors
 }
 
 // Ensure Service implements Interface
 var _ Interface = (*Service)(nil)
 
 // NewService creates a new Service instance
-func NewService(logger logger.Interface) Interface {
-	return &Service{Logger: logger}
+func NewService(logger logger.Interface, selectors config.ArticleSelectors) Interface {
+	return &Service{
+		Logger:    logger,
+		Selectors: selectors,
+	}
 }
 
 type JSONLDArticle struct {
@@ -42,15 +47,6 @@ type JSONLDArticle struct {
 	Section       string   `json:"articleSection"`
 }
 
-const (
-	DetailsBylineSelector = ".details-byline"
-	DetailsTitleSelector  = "h1.details-title"
-	DetailsBodySelector   = "#details-body"
-	DetailsIntroSelector  = ".details-intro"
-	MetaPublishedTime     = "meta[property='article:published_time']"
-	TimeAgoSelector       = "time"
-)
-
 func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	var jsonLD JSONLDArticle
 
@@ -59,7 +55,7 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 		"url", e.Request.URL.String())
 
 	// Extract metadata from JSON-LD first
-	e.ForEach(`script[type="application/ld+json"]`, func(_ int, el *colly.HTMLElement) {
+	e.ForEach(s.Selectors.JSONLD, func(_ int, el *colly.HTMLElement) {
 		if err := json.Unmarshal([]byte(el.Text), &jsonLD); err != nil {
 			s.Logger.Debug("Failed to parse JSON-LD",
 				"component", "article/service",
@@ -67,22 +63,33 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 		}
 	})
 
-	// Clean up author (remove date)
-	author := s.CleanAuthor(e.ChildText(DetailsBylineSelector))
+	// Extract body text
+	body := e.ChildText(s.Selectors.Body)
 
-	// Create article with basic fields
+	// Get intro/description
+	intro := e.ChildText(s.Selectors.Intro)
+	if intro != "" {
+		body = intro + "\n\n" + body
+	}
+
+	// Extract author with fallbacks
+	author := e.ChildText(s.Selectors.Byline)
+	if author == "" {
+		author = e.ChildText(s.Selectors.Author)
+	}
+	if author == "" && jsonLD.Author != "" {
+		author = jsonLD.Author
+	}
+	author = s.CleanAuthor(author)
+
+	// Create article with extracted fields
 	article := &models.Article{
 		ID:     uuid.New().String(),
-		Title:  e.ChildText(DetailsTitleSelector),
-		Body:   e.ChildText(DetailsBodySelector),
+		Title:  e.ChildText(s.Selectors.Title),
+		Body:   body,
 		Source: e.Request.URL.String(),
 		Author: author,
 		Tags:   s.ExtractTags(e, jsonLD),
-	}
-
-	// Get intro/description
-	if intro := e.ChildText(DetailsIntroSelector); intro != "" {
-		article.Body = intro + "\n\n" + article.Body
 	}
 
 	// Parse published date
@@ -132,13 +139,13 @@ func (s *Service) ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []stri
 	}
 
 	// 3. Article section from meta tag
-	if section := e.ChildAttr("meta[property='article:section']", "content"); section != "" {
+	if section := e.ChildAttr(s.Selectors.Section, "content"); section != "" {
 		s.Logger.Debug("Found meta section", "value", section)
 		tags = append(tags, section)
 	}
 
 	// 4. Keywords from meta tag
-	if keywords := e.ChildAttr("meta[name='keywords']", "content"); keywords != "" {
+	if keywords := e.ChildAttr(s.Selectors.Keywords, "content"); keywords != "" {
 		s.Logger.Debug("Found meta keywords", "value", keywords)
 		for _, tag := range strings.Split(keywords, "|") {
 			if tag = strings.TrimSpace(tag); tag != "" {
@@ -173,9 +180,9 @@ func (s *Service) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle)
 		jsonLD.DatePublished,
 		jsonLD.DateModified,
 		jsonLD.DateCreated,
-		e.ChildAttr(MetaPublishedTime, "content"),
-		e.ChildAttr(TimeAgoSelector, "datetime"),
-		e.ChildText(TimeAgoSelector),
+		e.ChildAttr(s.Selectors.PublishedTime, "content"),
+		e.ChildAttr(s.Selectors.TimeAgo, "datetime"),
+		e.ChildText(s.Selectors.TimeAgo),
 	}
 
 	return parseDate(datesToTry, s.Logger)
