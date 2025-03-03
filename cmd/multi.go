@@ -9,6 +9,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -46,6 +47,9 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 			func() chan *models.Article {
 				return make(chan *models.Article, 100)
 			},
+			func() chan *models.Content {
+				return make(chan *models.Content, 100)
+			},
 			// Provide ArticleIndex name
 			fx.Annotate(
 				func(s *sources.Sources) string {
@@ -72,6 +76,7 @@ func runMultiCmd(cmd *cobra.Command, _ []string) error {
 		storage.Module,
 		crawler.Module,
 		article.Module,
+		content.Module,
 		sources.Module,
 		fx.Invoke(startMultiSourceCrawl),
 	)
@@ -95,6 +100,7 @@ func startMultiSourceCrawl(
 	sources *sources.Sources,
 	crawlerInstance crawler.Interface,
 	processor *article.Processor,
+	contentProcessor collector.ContentProcessor,
 ) error {
 	if crawlerInstance == nil {
 		return errors.New("crawler is not initialized")
@@ -119,6 +125,7 @@ func startMultiSourceCrawl(
 		Debugger:         logger.NewCollyDebugger(globalLogger),
 		Logger:           globalLogger,
 		ArticleProcessor: processor,
+		ContentProcessor: contentProcessor,
 		Source:           source,
 	})
 	if err != nil {

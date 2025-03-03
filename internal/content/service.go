@@ -55,13 +55,21 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 	// Extract metadata from meta tags and other sources
 	metadata := s.ExtractMetadata(e)
 
+	// Safely get content type from metadata
+	var contentType string
+	if typeVal, ok := metadata["type"]; ok {
+		if typeStr, ok := typeVal.(string); ok {
+			contentType = typeStr
+		}
+	}
+
 	// Create content with basic fields
 	content := &models.Content{
 		ID:        uuid.New().String(),
 		URL:       e.Request.URL.String(),
 		Title:     getFirstNonEmpty(jsonLD.Name, e.ChildText("title"), e.ChildText("h1")),
 		Body:      e.Text,
-		Type:      getFirstNonEmpty(jsonLD.Type, metadata["type"].(string), "webpage"),
+		Type:      getFirstNonEmpty(jsonLD.Type, contentType, "webpage"),
 		Metadata:  metadata,
 		CreatedAt: parseDate([]string{jsonLD.DateCreated, jsonLD.DateModified}, s.Logger),
 	}

@@ -30,25 +30,24 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 		e.Request.Ctx.Put(bodyElementKey, e)
 	})
 
+	// Mark when we find an article
 	c.OnHTML(articleSelector, func(e *colly.HTMLElement) {
 		e.Request.Ctx.Put(articleFoundKey, "true")
 		p.Logger.Debug("Found article", "url", e.Request.URL.String(), "selector", articleSelector)
 		p.ArticleProcessor.ProcessPage(e)
 	})
 
-	// Handle non-article content after response is received
-	c.OnResponse(func(r *colly.Response) {
-		if r.Ctx.Get(articleFoundKey) != "true" && p.ContentProcessor != nil {
+	// Final decision point - process as content if not already processed as article
+	c.OnScraped(func(r *colly.Response) {
+		// Skip if no content processor or if already processed as article
+		if p.ContentProcessor == nil || r.Ctx.Get(articleFoundKey) == "true" {
+			return
+		}
+
+		// Get the stored body element
+		if e, ok := r.Ctx.GetAny(bodyElementKey).(*colly.HTMLElement); ok && e != nil {
 			p.Logger.Debug("Processing non-article content", "url", r.Request.URL.String())
-			// Create a temporary collector to parse the response
-			temp := colly.NewCollector()
-			temp.OnHTML("body", func(e *colly.HTMLElement) {
-				p.ContentProcessor.ProcessContent(e)
-			})
-			err := temp.Visit("data:text/html;charset=utf-8," + string(r.Body))
-			if err != nil {
-				p.Logger.Error("Failed to process non-article content", "url", r.Request.URL.String(), "error", err)
-			}
+			p.ContentProcessor.ProcessContent(e)
 		}
 	})
 }
