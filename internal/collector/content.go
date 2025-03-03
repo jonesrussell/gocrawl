@@ -26,28 +26,42 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 
 	// Get the article selector with fallback
 	articleSelector := getSelector(p.Source.Selectors.Article, DefaultArticleSelector)
+	p.Logger.Debug("Using article selector", "selector", articleSelector)
 
 	// Store HTML element when found
 	c.OnHTML("html", func(e *colly.HTMLElement) {
+		p.Logger.Debug("Found HTML element", "url", e.Request.URL.String())
 		e.Request.Ctx.Put(bodyElementKey, e)
 	})
 
 	// Mark when we find an article
 	c.OnHTML(articleSelector, func(e *colly.HTMLElement) {
-		e.Request.Ctx.Put(articleFoundKey, "true")
-		// Get the specific selector that matched
+		p.Logger.Debug("Checking article selector match",
+			"url", e.Request.URL.String(),
+			"selector", articleSelector)
+
+		// Check if the element itself matches the selector
 		matchedSelector := ""
 		for _, selector := range strings.Split(articleSelector, ", ") {
-			// Check if the element itself matches the selector
 			if e.DOM.Is(selector) {
 				matchedSelector = selector
 				break
 			}
 		}
+
+		if matchedSelector == "" {
+			p.Logger.Debug("Article selector did not match",
+				"url", e.Request.URL.String(),
+				"selector", articleSelector)
+			return
+		}
+
 		p.Logger.Debug("Found article",
 			"url", e.Request.URL.String(),
 			"selector", articleSelector,
 			"matched_selector", matchedSelector)
+
+		e.Request.Ctx.Put(articleFoundKey, "true")
 
 		// Get the full HTML element for metadata
 		if htmlEl, ok := e.Request.Ctx.GetAny(bodyElementKey).(*colly.HTMLElement); ok && htmlEl != nil {
@@ -66,28 +80,9 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 
 		// Get the stored HTML element
 		if e, ok := r.Ctx.GetAny(bodyElementKey).(*colly.HTMLElement); ok && e != nil {
-			// Check which selectors were attempted but didn't match
-			attemptedSelectors := strings.Split(articleSelector, ", ")
-			matchedSelector := "html"
-			for _, selector := range attemptedSelectors {
-				// Check if the element itself matches the selector
-				if e.DOM.Is(selector) {
-					matchedSelector = selector
-					break
-				}
-			}
-			p.Logger.Debug("Found webpage",
+			p.Logger.Debug("Processing as content",
 				"url", r.Request.URL.String(),
-				"selector", "html",
-				"matched_selector", matchedSelector,
-				"title", e.ChildText("title"),
-				"h1", e.ChildText("h1"),
-				"h2", e.ChildText("h2"),
-				"h3", e.ChildText("h3"),
-				"h4", e.ChildText("h4"),
-				"h5", e.ChildText("h5"),
-				"h6", e.ChildText("h6"),
-			)
+				"title", e.ChildText("title"))
 			p.ContentProcessor.ProcessContent(e)
 		}
 	})

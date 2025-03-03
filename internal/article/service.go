@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -85,10 +86,48 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	// Get a copy of the body element for manipulation
 	bodyEl := e.DOM.Find(s.Selectors.Body)
 
-	// Remove excluded elements from body
-	for _, excludeSelector := range s.Selectors.Exclude {
-		bodyEl.Find(excludeSelector).Remove()
+	s.Logger.Debug("Looking for body element",
+		"component", "article/service",
+		"url", e.Request.URL.String(),
+		"selector", s.Selectors.Body,
+		"found", bodyEl.Length() > 0)
+
+	if bodyEl.Length() == 0 {
+		s.Logger.Debug("Body element not found, using full HTML",
+			"component", "article/service",
+			"url", e.Request.URL.String())
+		bodyEl = e.DOM
 	}
+
+	// Debug print HTML structure before cleaning
+	s.Logger.Debug("HTML structure before cleaning",
+		"component", "article/service",
+		"url", e.Request.URL.String(),
+		"structure", bodyEl.Find("*").Map(func(i int, s *goquery.Selection) string {
+			return s.Get(0).Data // Gets just the tag name
+		}))
+
+	// First remove all style and script tags directly
+	bodyEl.Find("style,script").Remove()
+
+	// Then remove other excluded elements
+	for _, excludeSelector := range s.Selectors.Exclude {
+		if sel := bodyEl.Find(excludeSelector); sel.Length() > 0 {
+			s.Logger.Debug("Removing elements",
+				"component", "article/service",
+				"selector", excludeSelector,
+				"count", sel.Length())
+			sel.Remove()
+		}
+	}
+
+	// Debug print HTML structure after cleaning
+	s.Logger.Debug("HTML structure after cleaning",
+		"component", "article/service",
+		"url", e.Request.URL.String(),
+		"structure", bodyEl.Find("*").Map(func(i int, s *goquery.Selection) string {
+			return s.Get(0).Data // Gets just the tag name
+		}))
 
 	// Extract body text after removing excluded elements
 	body := bodyEl.Text()
