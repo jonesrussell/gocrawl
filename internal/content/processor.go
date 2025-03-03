@@ -10,17 +10,19 @@ import (
 
 // Processor handles the processing of non-article content
 type Processor struct {
-	service Interface
-	storage storage.Interface
-	logger  logger.Interface
+	service   Interface
+	storage   storage.Interface
+	logger    logger.Interface
+	indexName string
 }
 
 // NewProcessor creates a new content processor
-func NewProcessor(service Interface, storage storage.Interface, logger logger.Interface) *Processor {
+func NewProcessor(service Interface, storage storage.Interface, logger logger.Interface, indexName string) *Processor {
 	return &Processor{
-		service: service,
-		storage: storage,
-		logger:  logger,
+		service:   service,
+		storage:   storage,
+		logger:    logger,
+		indexName: indexName,
 	}
 }
 
@@ -32,7 +34,7 @@ func (p *Processor) ProcessContent(e *colly.HTMLElement) {
 	}
 
 	ctx := context.Background()
-	err := p.storage.IndexDocument(ctx, content.Type, content.ID, content)
+	err := p.storage.IndexDocument(ctx, p.indexName, content.ID, content)
 	if err != nil {
 		p.logger.Error("Failed to index content",
 			"url", content.URL,
@@ -45,5 +47,6 @@ func (p *Processor) ProcessContent(e *colly.HTMLElement) {
 		"url", content.URL,
 		"id", content.ID,
 		"type", content.Type,
+		"index", p.indexName,
 	)
 }

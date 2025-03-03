@@ -17,7 +17,9 @@ var Module = fx.Options(
 		),
 		// Provide the content processor
 		fx.Annotate(
-			NewProcessor,
+			func(p Params) *Processor {
+				return NewProcessor(p.Service, p.Storage, p.Logger, p.IndexName)
+			},
 			fx.As(new(collector.ContentProcessor)),
 		),
 	),
@@ -27,9 +29,10 @@ var Module = fx.Options(
 type Params struct {
 	fx.In
 
-	Service Interface
-	Storage storage.Interface
-	Logger  logger.Interface
+	Service   Interface
+	Storage   storage.Interface
+	Logger    logger.Interface
+	IndexName string `name:"contentIndex"`
 }
 
 // Result holds the content processor
@@ -42,6 +45,6 @@ type Result struct {
 // New creates a new content processor with dependencies
 func New(p Params) Result {
 	return Result{
-		Processor: NewProcessor(p.Service, p.Storage, p.Logger),
+		Processor: NewProcessor(p.Service, p.Storage, p.Logger, p.IndexName),
 	}
 }
