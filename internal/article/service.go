@@ -3,6 +3,7 @@ package article
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,12 +40,30 @@ func NewService(logger logger.Interface, selectors config.ArticleSelectors) Inte
 }
 
 type JSONLDArticle struct {
-	DateCreated   string   `json:"dateCreated"`
-	DateModified  string   `json:"dateModified"`
-	DatePublished string   `json:"datePublished"`
-	Author        string   `json:"author"`
-	Keywords      []string `json:"keywords"`
-	Section       string   `json:"articleSection"`
+	DateCreated      string   `json:"dateCreated"`
+	DateModified     string   `json:"dateModified"`
+	DatePublished    string   `json:"datePublished"`
+	Author           string   `json:"author"`
+	Keywords         []string `json:"keywords"`
+	Section          string   `json:"articleSection"`
+	WordCount        int      `json:"wordCount"`
+	Description      string   `json:"description"`
+	Headline         string   `json:"headline"`
+	ArticleBody      string   `json:"articleBody"`
+	Name             string   `json:"name"`
+	URL              string   `json:"url"`
+	Image            string   `json:"image"`
+	MainEntityOfPage struct {
+		ID   string `json:"@id"`
+		Type string `json:"@type"`
+	} `json:"mainEntityOfPage"`
+	Publisher struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+		Logo struct {
+			URL string `json:"url"`
+		} `json:"logo"`
+	} `json:"publisher"`
 }
 
 func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
@@ -63,13 +82,42 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 		}
 	})
 
-	// Extract body text
-	body := e.ChildText(s.Selectors.Body)
+	// Get a copy of the body element for manipulation
+	bodyEl := e.DOM.Find(s.Selectors.Body)
 
-	// Get intro/description
+	// Remove excluded elements from body
+	for _, excludeSelector := range s.Selectors.Exclude {
+		bodyEl.Find(excludeSelector).Remove()
+	}
+
+	// Extract body text after removing excluded elements
+	body := bodyEl.Text()
+	if body == "" && jsonLD.ArticleBody != "" {
+		body = jsonLD.ArticleBody // Fallback to JSON-LD body
+	}
+
+	// Get intro/description with fallbacks
 	intro := e.ChildText(s.Selectors.Intro)
+	if intro == "" {
+		intro = e.ChildAttr(s.Selectors.Description, "content")
+	}
+	if intro == "" && jsonLD.Description != "" {
+		intro = jsonLD.Description
+	}
 	if intro != "" {
 		body = intro + "\n\n" + body
+	}
+
+	// Extract title with fallbacks
+	title := e.ChildText(s.Selectors.Title)
+	if title == "" {
+		title = e.ChildAttr(s.Selectors.OGTitle, "content")
+	}
+	if title == "" && jsonLD.Headline != "" {
+		title = jsonLD.Headline
+	}
+	if title == "" && jsonLD.Name != "" {
+		title = jsonLD.Name
 	}
 
 	// Extract author with fallbacks
@@ -82,14 +130,72 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	}
 	author = s.CleanAuthor(author)
 
-	// Create article with extracted fields
+	// Extract byline name
+	bylineName := e.ChildText(s.Selectors.BylineName)
+	if bylineName == "" {
+		bylineName = author // Use author as fallback
+	}
+
+	// Extract category and section
+	category := e.ChildAttr(s.Selectors.Category, "content")
+	if category == "" && jsonLD.Section != "" {
+		category = jsonLD.Section
+	}
+
+	section := e.ChildAttr(s.Selectors.Section, "content")
+	if section == "" && jsonLD.Section != "" {
+		section = jsonLD.Section
+	}
+
+	// Extract word count with fallback to JSON-LD
+	wordCount := 0
+	if s.Selectors.WordCount != "" {
+		wordCountStr := e.ChildText(s.Selectors.WordCount)
+		if count, err := strconv.Atoi(wordCountStr); err == nil {
+			wordCount = count
+		}
+	}
+	if wordCount == 0 && jsonLD.WordCount > 0 {
+		wordCount = jsonLD.WordCount
+	}
+
+	// Extract canonical URL with fallback to JSON-LD
+	canonicalURL := e.ChildAttr(s.Selectors.Canonical, "href")
+	if canonicalURL == "" && jsonLD.URL != "" {
+		canonicalURL = jsonLD.URL
+	}
+	if canonicalURL == "" && jsonLD.MainEntityOfPage.ID != "" {
+		canonicalURL = jsonLD.MainEntityOfPage.ID
+	}
+
+	// Extract image URL with fallback to JSON-LD
+	ogImage := e.ChildAttr(s.Selectors.OGImage, "content")
+	if ogImage == "" && jsonLD.Image != "" {
+		ogImage = jsonLD.Image
+	}
+
+	// Create article with all available fields
 	article := &models.Article{
-		ID:     uuid.New().String(),
-		Title:  e.ChildText(s.Selectors.Title),
-		Body:   body,
-		Source: e.Request.URL.String(),
-		Author: author,
-		Tags:   s.ExtractTags(e, jsonLD),
+		ID:            uuid.New().String(),
+		Title:         title,
+		Body:          body,
+		Author:        author,
+		BylineName:    bylineName,
+		Source:        e.Request.URL.String(),
+		Tags:          s.ExtractTags(e, jsonLD),
+		Intro:         intro,
+		Description:   e.ChildAttr(s.Selectors.Description, "content"),
+		OgTitle:       e.ChildAttr(s.Selectors.OGTitle, "content"),
+		OgDescription: e.ChildAttr(s.Selectors.OGDescription, "content"),
+		OgImage:       ogImage,
+		OgUrl:         e.ChildAttr(s.Selectors.OGURL, "content"),
+		CanonicalUrl:  canonicalURL,
+		WordCount:     wordCount,
+		Category:      category,
+		Section:       section,
+		Keywords:      strings.Split(e.ChildAttr(s.Selectors.Keywords, "content"), ","),
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	// Parse published date
@@ -110,7 +216,10 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 		"url", article.Source,
 		"date", article.PublishedDate,
 		"author", article.Author,
-		"tags", article.Tags)
+		"tags", article.Tags,
+		"wordCount", article.WordCount,
+		"category", article.Category,
+		"section", article.Section)
 
 	return article
 }

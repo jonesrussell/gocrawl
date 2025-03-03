@@ -51,7 +51,7 @@ func NewServiceWithConfig(p ServiceParams) Interface {
 		}
 	}
 
-	if selectors == (config.ArticleSelectors{}) {
+	if isEmptySelectors(selectors) {
 		p.Logger.Debug("Using default article selectors")
 		selectors = config.DefaultArticleSelectors()
 	} else {
@@ -61,6 +61,33 @@ func NewServiceWithConfig(p ServiceParams) Interface {
 	}
 
 	return NewService(p.Logger, selectors)
+}
+
+// isEmptySelectors checks if the article selectors are empty
+func isEmptySelectors(s config.ArticleSelectors) bool {
+	return s.Container == "" &&
+		s.Title == "" &&
+		s.Body == "" &&
+		s.Intro == "" &&
+		s.Byline == "" &&
+		s.PublishedTime == "" &&
+		s.TimeAgo == "" &&
+		s.JSONLD == "" &&
+		s.Section == "" &&
+		s.Keywords == "" &&
+		s.Description == "" &&
+		s.OGTitle == "" &&
+		s.OGDescription == "" &&
+		s.OGImage == "" &&
+		s.OGURL == "" &&
+		s.Canonical == "" &&
+		s.WordCount == "" &&
+		s.PublishDate == "" &&
+		s.Category == "" &&
+		s.Tags == "" &&
+		s.Author == "" &&
+		s.BylineName == "" &&
+		len(s.Exclude) == 0
 }
 
 // NewProcessor creates a new article processor

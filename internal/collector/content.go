@@ -27,8 +27,8 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 	// Get the article selector with fallback
 	articleSelector := getSelector(p.Source.Selectors.Article, DefaultArticleSelector)
 
-	// Store body element when found
-	c.OnHTML("body", func(e *colly.HTMLElement) {
+	// Store HTML element when found
+	c.OnHTML("html", func(e *colly.HTMLElement) {
 		e.Request.Ctx.Put(bodyElementKey, e)
 	})
 
@@ -48,7 +48,13 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 			"url", e.Request.URL.String(),
 			"selector", articleSelector,
 			"matched_selector", matchedSelector)
-		p.ArticleProcessor.ProcessArticle(e)
+
+		// Get the full HTML element for metadata
+		if htmlEl, ok := e.Request.Ctx.GetAny(bodyElementKey).(*colly.HTMLElement); ok && htmlEl != nil {
+			p.ArticleProcessor.ProcessArticle(htmlEl)
+		} else {
+			p.ArticleProcessor.ProcessArticle(e)
+		}
 	})
 
 	// Final decision point - process as content if not already processed as article
@@ -58,11 +64,11 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 			return
 		}
 
-		// Get the stored body element
+		// Get the stored HTML element
 		if e, ok := r.Ctx.GetAny(bodyElementKey).(*colly.HTMLElement); ok && e != nil {
 			// Check which selectors were attempted but didn't match
 			attemptedSelectors := strings.Split(articleSelector, ", ")
-			matchedSelector := "body"
+			matchedSelector := "html"
 			for _, selector := range attemptedSelectors {
 				// Check if the element itself matches the selector
 				if e.DOM.Is(selector) {
@@ -72,7 +78,7 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 			}
 			p.Logger.Debug("Found webpage",
 				"url", r.Request.URL.String(),
-				"selector", "body",
+				"selector", "html",
 				"matched_selector", matchedSelector,
 				"title", e.ChildText("title"),
 				"h1", e.ChildText("h1"),
