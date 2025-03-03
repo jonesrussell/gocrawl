@@ -21,20 +21,27 @@ type Service struct {
 	ESClient *elasticsearch.Client
 	Logger   logger.Interface
 	Config   *config.Config
+	Options  storage.Options
 }
 
 // NewSearchService creates a new instance of the search service
-func NewSearchService(esClient *elasticsearch.Client, cfg *config.Config, log logger.Interface) *Service {
+func NewSearchService(
+	esClient *elasticsearch.Client,
+	cfg *config.Config,
+	log logger.Interface,
+) *Service {
+	opts := storage.NewOptionsFromConfig(cfg)
 	return &Service{
 		ESClient: esClient,
 		Logger:   log,
 		Config:   cfg,
+		Options:  opts,
 	}
 }
 
 // SearchContent performs a search query
 func (s *Service) SearchContent(ctx context.Context, query string, _ string, size int) ([]Result, error) {
-	storageInstance, err := storage.NewStorage(s.ESClient, s.Config, s.Logger)
+	storageInstance, err := storage.NewStorage(s.ESClient, s.Options, s.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}

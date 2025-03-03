@@ -68,7 +68,8 @@ type ElasticsearchStorage struct {
 type Result struct {
 	fx.Out
 
-	Storage Interface // Use the interface type here
+	Storage      Interface
+	IndexService IndexServiceInterface
 }
 
 // Ensure ElasticsearchStorage implements the Storage interface

@@ -30,7 +30,7 @@ type Crawler struct {
 	IndexName      string
 	articleChan    chan *models.Article
 	ArticleService article.Interface
-	IndexSvc       storage.Interface
+	IndexService   storage.IndexServiceInterface
 	Config         *config.Config
 }
 
@@ -53,29 +53,10 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 		return fmt.Errorf("storage connection failed: %w", err)
 	}
 
-	// Create index with default mapping
-	mapping := map[string]interface{}{
-		"mappings": map[string]interface{}{
-			"properties": map[string]interface{}{
-				"title": map[string]interface{}{
-					"type": "text",
-				},
-				"body": map[string]interface{}{
-					"type": "text",
-				},
-				"url": map[string]interface{}{
-					"type": "keyword",
-				},
-				"created_at": map[string]interface{}{
-					"type": "date",
-				},
-			},
-		},
-	}
-
-	// Try to create the index - ignore error if it already exists
-	if err := c.Storage.CreateIndex(ctx, c.IndexName, mapping); err != nil {
-		c.Logger.Debug("Index creation failed (might already exist)", "error", err)
+	// Ensure index exists with default mapping
+	if err := c.IndexService.EnsureIndex(ctx, c.IndexName); err != nil {
+		c.Logger.Error("Failed to ensure index exists", "error", err)
+		return fmt.Errorf("failed to ensure index exists: %w", err)
 	}
 
 	// Create a channel to track completion

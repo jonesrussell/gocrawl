@@ -26,11 +26,12 @@ func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {
 type Params struct {
 	fx.In
 
-	Logger   logger.Interface
-	Storage  storage.Interface
-	Debugger *logger.CollyDebugger
-	Config   *config.Config
-	Source   string `name:"sourceName"`
+	Logger       logger.Interface
+	Storage      storage.Interface
+	Debugger     *logger.CollyDebugger
+	Config       *config.Config
+	Source       string `name:"sourceName"`
+	IndexService storage.IndexServiceInterface
 }
 
 // Result holds the crawler instance
@@ -58,6 +59,14 @@ func ProvideCrawler(p Params) (Interface, error) {
 		return nil, errors.New("config is required")
 	}
 
+	if p.Storage == nil {
+		return nil, errors.New("storage is required")
+	}
+
+	if p.IndexService == nil {
+		return nil, errors.New("index service is required")
+	}
+
 	// Log the entire configuration to ensure it's set correctly
 	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
 
@@ -73,7 +82,8 @@ func ProvideCrawler(p Params) (Interface, error) {
 			Config: p.Config,
 			Source: p.Source,
 		}),
-		Config: p.Config,
+		IndexService: p.IndexService,
+		Config:       p.Config,
 	}
 
 	return crawler, nil
