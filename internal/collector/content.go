@@ -41,6 +41,43 @@ func (cm *contextManager) isArticle() bool {
 	return cm.ctx.Get(articleFoundKey) == "true"
 }
 
+// isArticleType checks if the content appears to be an article based on metadata
+func isArticleType(e *colly.HTMLElement) bool {
+	// Check meta type
+	metaType := e.ChildAttr(`meta[property="og:type"]`, "content")
+	if metaType == "article" {
+		return true
+	}
+
+	// Check schema.org type (fixed the selector)
+	schemaType := e.ChildAttr(`meta[name="type"]`, "content")
+	if schemaType == "NewsArticle" || schemaType == "Article" {
+		return true
+	}
+
+	// Check meta name type
+	if e.ChildAttr(`meta[name="type"]`, "content") == "article" {
+		return true
+	}
+
+	// Check if URL contains typical article patterns
+	url := e.Request.URL.String()
+	articlePatterns := []string{
+		"/article/",
+		"/news/",
+		"/story/",
+		"/post/",
+		"/opp-beat/",
+	}
+	for _, pattern := range articlePatterns {
+		if strings.Contains(url, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // contentLogger wraps logging functionality with consistent tags
 type contentLogger struct {
 	p Params
@@ -118,14 +155,33 @@ func setupArticleProcessing(c *colly.Collector, p Params, log *contentLogger) {
 	setupContentProcessing(c, p, log)
 }
 
+// setupArticleDetection sets up article processing logic for the collector
 func setupArticleDetection(c *colly.Collector, articleSelector string, log *contentLogger) {
-	c.OnHTML(articleSelector, func(e *colly.HTMLElement) {
-		if !isArticleMatched(e, articleSelector) {
-			log.debug("Article selector did not match", "url", e.Request.URL.String(), "selector", articleSelector)
+	// Set up detection for the entire HTML document
+	c.OnHTML("html", func(e *colly.HTMLElement) {
+		// First check metadata and URL patterns
+		if !isArticleType(e) {
+			log.debug("Content type is not an article", "url", e.Request.URL.String())
 			return
 		}
 
-		log.debug("Found article", "url", e.Request.URL.String(), "selector", articleSelector)
+		// If a specific article selector is provided, use it as additional validation
+		if articleSelector != "" && !isArticleMatched(e, articleSelector) {
+			log.debug("Article selector did not match",
+				"url", e.Request.URL.String(),
+				"selector", articleSelector,
+				"meta_type", e.ChildAttr(`meta[property="og:type"]`, "content"),
+				"schema_type", e.ChildAttr(`meta[name="type"]`, "content"),
+			)
+			return
+		}
+
+		log.debug("Found article",
+			"url", e.Request.URL.String(),
+			"selector", articleSelector,
+			"meta_type", e.ChildAttr(`meta[property="og:type"]`, "content"),
+			"schema_type", e.ChildAttr(`meta[name="type"]`, "content"),
+		)
 		cm := newContextManager(e.Request.Ctx)
 		cm.markAsArticle()
 	})
@@ -158,10 +214,12 @@ func processContent(e *colly.HTMLElement, r *colly.Response, p Params, cm *conte
 	case cm.isArticle() && p.ArticleProcessor != nil:
 		log.debug("Processing as article", "url", r.Request.URL.String(), "title", e.ChildText("title"))
 		p.ArticleProcessor.Process(e)
+		return // Exit after processing as article
 
-	case p.ContentProcessor != nil:
+	case p.ContentProcessor != nil && !cm.isArticle(): // Only process as content if NOT marked as article
 		log.debug("Processing as content", "url", r.Request.URL.String(), "title", e.ChildText("title"))
 		p.ContentProcessor.Process(e)
+		return // Exit after processing as content
 
 	default:
 		log.debug("No suitable processor found", "url", r.Request.URL.String(),

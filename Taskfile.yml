@@ -9,8 +9,10 @@ tasks:
   crawl:multi:
     desc: "Run the web crawler for multiple sources defined in sources.yml"
     cmds:
-      - echo '' >app.log
+      - echo '' > app.log
+      - go run main.go indices delete --source {{.CLI_ARGS}} --force
       - go run main.go multi --source {{.CLI_ARGS}}
+      - go run main.go indices list
 
   search:
     desc: "Search crawled content"
