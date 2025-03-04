@@ -19,6 +19,18 @@ const (
 	DefaultBodySelector    = "article, .article"
 )
 
+// URL patterns for content classification
+var (
+	listingPatterns = []string{
+		"/category/", "/tag/", "/topics/", "/search/",
+		"/archive/", "/author/", "/index/", "/feed/", "/rss/",
+	}
+
+	articlePatterns = []string{
+		"/article/", "/news/", "/story/", "/opp-beat/", "/local-news/",
+	}
+)
+
 // ContentParams contains the parameters for configuring content collection
 type ContentParams struct {
 	Logger           logger.Interface
@@ -54,76 +66,34 @@ func (cm *contextManager) isArticle() bool {
 }
 
 // isArticleType checks if the content appears to be an article based on metadata
-func isArticleType(e *colly.HTMLElement, p ContentParams) bool {
-	// Check meta type
-	metaType := e.ChildAttr(`meta[property="og:type"]`, "content")
-	if metaType == "article" {
+func isArticleType(e *colly.HTMLElement) bool {
+	// Check meta type first as it's most reliable
+	if metaType := e.ChildAttr(`meta[property="og:type"]`, "content"); metaType == "article" {
 		return true
 	}
 
 	// Check schema.org type
-	schemaType := e.ChildAttr(`meta[name="type"]`, "content")
-	if schemaType == "NewsArticle" || schemaType == "Article" {
+	if schemaType := e.ChildAttr(`meta[name="type"]`, "content"); strings.Contains(strings.ToLower(schemaType), "article") {
 		return true
 	}
 
-	// Check meta name type
-	if e.ChildAttr(`meta[name="type"]`, "content") == "article" {
-		return true
-	}
-
-	// Check for Village Media specific article class
-	if e.DOM.Find(".details").Length() > 0 && e.DOM.Find(".details-title").Length() > 0 {
-		return true
-	}
-
-	// Check if URL contains typical article patterns
+	// Check URL patterns - if it's a listing page, it's not an article
 	url := e.Request.URL.String()
 
-	// Check for listing page patterns first - if found, definitely not an article
-	listingPatterns := []string{
-		"/category/",
-		"/tag/",
-		"/topics/",
-		"/search/",
-		"/archive/",
-		"/author/",
-		"/index/",
-		"/feed/",
-		"/rss/",
-	}
-
+	// Early return if it's a listing page
 	for _, pattern := range listingPatterns {
 		if strings.Contains(url, pattern) {
 			return false
 		}
 	}
 
-	// Only check article patterns if we haven't matched a listing pattern
-	articlePatterns := []string{
-		"/article/",
-		"/news/",
-		"/story/",
-		"/opp-beat/", // Include police beat articles
-		"/local-news/",
-	}
-
-	// Additional validation for URL patterns
+	// Check for article patterns in URL
 	for _, pattern := range articlePatterns {
 		if strings.Contains(url, pattern) {
-			// Additional checks to ensure it's really an article:
-			// 1. Check if there's a date element
-			if e.DOM.Find("time").Length() > 0 {
-				return true
-			}
-			// 2. Check for article body using source-specific selector or default
-			bodySelector := DefaultBodySelector
-			if p.Source.Selectors.Article.Body != "" {
-				bodySelector = p.Source.Selectors.Article.Body
-			}
-			if e.DOM.Find(bodySelector).Length() > 0 {
-				return true
-			}
+			// Additional validation to ensure it's an article
+			hasTime := e.DOM.Find("time").Length() > 0
+			hasDetails := e.DOM.Find(".details").Length() > 0
+			return hasTime || hasDetails
 		}
 	}
 
@@ -196,42 +166,32 @@ func setupHTMLProcessing(c *colly.Collector, log *contentLogger) {
 
 // setupArticleProcessing sets up article processing logic for the collector
 func setupArticleProcessing(c *colly.Collector, p ContentParams, log *contentLogger) {
-	articleSelector := getSelector(p.Source.Selectors.Article, DefaultArticleSelector)
-	log.debug("Using article selector", "selector", articleSelector)
-
-	setupArticleDetection(c, articleSelector, log, p)
+	log.debug("Setting up article processing")
+	setupArticleDetection(c, log)
 	setupContentProcessing(c, p, log)
 }
 
 // setupArticleDetection sets up article processing logic for the collector
-func setupArticleDetection(c *colly.Collector, articleSelector string, log *contentLogger, p ContentParams) {
-	// Set up detection for the entire HTML document
+func setupArticleDetection(c *colly.Collector, log *contentLogger) {
 	c.OnHTML("html", func(e *colly.HTMLElement) {
-		// First check metadata and URL patterns
-		if !isArticleType(e, p) {
-			log.debug("Content type is not an article", "url", e.Request.URL.String())
-			return
-		}
+		cm := newContextManager(e.Request.Ctx)
 
-		// If a specific article selector is provided, use it as additional validation
-		if articleSelector != "" && !isArticleMatched(e, articleSelector) {
-			log.debug("Article selector did not match",
+		// Check if it's an article type
+		if isArticleType(e) {
+			log.debug("Found article",
 				"url", e.Request.URL.String(),
-				"selector", articleSelector,
 				"meta_type", e.ChildAttr(`meta[property="og:type"]`, "content"),
 				"schema_type", e.ChildAttr(`meta[name="type"]`, "content"),
 			)
+			cm.markAsArticle()
 			return
 		}
 
-		log.debug("Found article",
+		log.debug("Content type is not an article",
 			"url", e.Request.URL.String(),
-			"selector", articleSelector,
 			"meta_type", e.ChildAttr(`meta[property="og:type"]`, "content"),
 			"schema_type", e.ChildAttr(`meta[name="type"]`, "content"),
 		)
-		cm := newContextManager(e.Request.Ctx)
-		cm.markAsArticle()
 	})
 }
 
@@ -257,36 +217,42 @@ func canProcess(p ContentParams) bool {
 	return p.ArticleProcessor != nil || p.ContentProcessor != nil
 }
 
+// processContent handles the processing of HTML content based on its type
 func processContent(e *colly.HTMLElement, r *colly.Response, p ContentParams, cm *contextManager, log *contentLogger) {
-	// Early return if no processors are available
-	if p.ArticleProcessor == nil && p.ContentProcessor == nil {
+	if !canProcess(p) {
 		log.debug("No processors available", "url", r.Request.URL.String())
 		return
 	}
 
-	switch {
-	case cm.isArticle():
-		log.debug("Processing as article", "url", r.Request.URL.String(), "title", e.ChildText("title"))
-		p.ArticleProcessor.Process(e)
-		return // Exit after processing as article
+	url := r.Request.URL.String()
+	title := e.ChildText("title")
 
-	case !cm.isArticle(): // Only process as content if NOT marked as article
-		log.debug("Processing as content", "url", r.Request.URL.String(), "title", e.ChildText("title"))
-		p.ContentProcessor.Process(e)
-		return // Exit after processing as content
-
-	default:
-		log.debug("No suitable processor found", "url", r.Request.URL.String(),
-			"is_article", cm.isArticle())
+	if cm.isArticle() {
+		processArticle(e, p, url, title, log)
+		return
 	}
+
+	processGenericContent(e, p, url, title, log)
 }
 
-// isArticleMatched checks if the HTML element matches the article selector
-func isArticleMatched(e *colly.HTMLElement, articleSelector string) bool {
-	for _, selector := range strings.Split(articleSelector, ", ") {
-		if e.DOM.Is(selector) {
-			return true
-		}
+// processArticle handles article-specific content processing
+func processArticle(e *colly.HTMLElement, p ContentParams, url, title string, log *contentLogger) {
+	if p.ArticleProcessor == nil {
+		log.debug("No article processor available", "url", url)
+		return
 	}
-	return false
+
+	log.debug("Processing as article", "url", url, "title", title)
+	p.ArticleProcessor.Process(e)
+}
+
+// processGenericContent handles non-article content processing
+func processGenericContent(e *colly.HTMLElement, p ContentParams, url, title string, log *contentLogger) {
+	if p.ContentProcessor == nil {
+		log.debug("No content processor available", "url", url)
+		return
+	}
+
+	log.debug("Processing as content", "url", url, "title", title)
+	p.ContentProcessor.Process(e)
 }
