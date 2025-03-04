@@ -30,9 +30,9 @@ type ArticleSelectors struct {
 // DefaultArticleSelectors returns default selectors that work for most sites
 func DefaultArticleSelectors() ArticleSelectors {
 	return ArticleSelectors{
-		Container:     "article, .article",
+		Container:     "article, .article, [itemtype*='Article']",
 		Title:         "h1",
-		Body:          "article, .article-content, .post-content, .entry-content",
+		Body:          "article, [role='main'], .content, .article-content",
 		Intro:         ".article-intro, .post-intro, .entry-summary",
 		Byline:        ".article-byline, .post-meta, .entry-meta",
 		PublishedTime: "meta[property='article:published_time']",
