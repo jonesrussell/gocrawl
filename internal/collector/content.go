@@ -219,40 +219,26 @@ func canProcess(p ContentParams) bool {
 
 // processContent handles the processing of HTML content based on its type
 func processContent(e *colly.HTMLElement, r *colly.Response, p ContentParams, cm *contextManager, log *contentLogger) {
-	if !canProcess(p) {
-		log.debug("No processors available", "url", r.Request.URL.String())
-		return
-	}
-
 	url := r.Request.URL.String()
 	title := e.ChildText("title")
 
-	if cm.isArticle() {
-		processArticle(e, p, url, title, log)
+	// Double check if it's an article using isArticleType
+	isArticle := cm.isArticle() && isArticleType(e)
+
+	if isArticle {
+		if p.ArticleProcessor == nil {
+			log.debug("No article processor available", "url", url)
+			return
+		}
+		log.debug("Processing as article", "url", url, "title", title)
+		p.ArticleProcessor.Process(e)
 		return
 	}
 
-	processGenericContent(e, p, url, title, log)
-}
-
-// processArticle handles article-specific content processing
-func processArticle(e *colly.HTMLElement, p ContentParams, url, title string, log *contentLogger) {
-	if p.ArticleProcessor == nil {
-		log.debug("No article processor available", "url", url)
-		return
-	}
-
-	log.debug("Processing as article", "url", url, "title", title)
-	p.ArticleProcessor.Process(e)
-}
-
-// processGenericContent handles non-article content processing
-func processGenericContent(e *colly.HTMLElement, p ContentParams, url, title string, log *contentLogger) {
 	if p.ContentProcessor == nil {
 		log.debug("No content processor available", "url", url)
 		return
 	}
-
 	log.debug("Processing as content", "url", url, "title", title)
 	p.ContentProcessor.Process(e)
 }
