@@ -69,9 +69,14 @@ func configureContentProcessing(c *colly.Collector, p Params) {
 	}
 
 	log := newLogger(p)
+
 	setupLinkFollowing(c, log, ignoredErrors)
 	setupHTMLProcessing(c, log)
 	setupArticleProcessing(c, p, log)
+
+	// Wait for all requests to complete
+	c.Wait()
+	log.debug("All requests completed")
 }
 
 // setupLinkFollowing sets up link following logic for the collector
