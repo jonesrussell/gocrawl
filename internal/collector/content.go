@@ -4,6 +4,9 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
 const (
@@ -13,7 +16,16 @@ const (
 	articleFoundKey        = "articleFound"
 	htmlElementKey         = "htmlElement"
 	logTag                 = "collector/content"
+	DefaultBodySelector    = "article, .article"
 )
+
+// ContentParams contains the parameters for configuring content collection
+type ContentParams struct {
+	Logger           logger.Interface
+	Source           config.Source
+	ArticleProcessor models.ContentProcessor
+	ContentProcessor models.ContentProcessor
+}
 
 // contextManager handles storing and retrieving data from colly context
 type contextManager struct {
@@ -42,14 +54,14 @@ func (cm *contextManager) isArticle() bool {
 }
 
 // isArticleType checks if the content appears to be an article based on metadata
-func isArticleType(e *colly.HTMLElement) bool {
+func isArticleType(e *colly.HTMLElement, p ContentParams) bool {
 	// Check meta type
 	metaType := e.ChildAttr(`meta[property="og:type"]`, "content")
 	if metaType == "article" {
 		return true
 	}
 
-	// Check schema.org type (fixed the selector)
+	// Check schema.org type
 	schemaType := e.ChildAttr(`meta[name="type"]`, "content")
 	if schemaType == "NewsArticle" || schemaType == "Article" {
 		return true
@@ -60,18 +72,58 @@ func isArticleType(e *colly.HTMLElement) bool {
 		return true
 	}
 
+	// Check for Village Media specific article class
+	if e.DOM.Find(".details").Length() > 0 && e.DOM.Find(".details-title").Length() > 0 {
+		return true
+	}
+
 	// Check if URL contains typical article patterns
 	url := e.Request.URL.String()
+
+	// Check for listing page patterns first - if found, definitely not an article
+	listingPatterns := []string{
+		"/category/",
+		"/tag/",
+		"/topics/",
+		"/search/",
+		"/archive/",
+		"/author/",
+		"/index/",
+		"/feed/",
+		"/rss/",
+	}
+
+	for _, pattern := range listingPatterns {
+		if strings.Contains(url, pattern) {
+			return false
+		}
+	}
+
+	// Only check article patterns if we haven't matched a listing pattern
 	articlePatterns := []string{
 		"/article/",
 		"/news/",
 		"/story/",
-		"/post/",
-		"/opp-beat/",
+		"/opp-beat/", // Include police beat articles
+		"/local-news/",
 	}
+
+	// Additional validation for URL patterns
 	for _, pattern := range articlePatterns {
 		if strings.Contains(url, pattern) {
-			return true
+			// Additional checks to ensure it's really an article:
+			// 1. Check if there's a date element
+			if e.DOM.Find("time").Length() > 0 {
+				return true
+			}
+			// 2. Check for article body using source-specific selector or default
+			bodySelector := DefaultBodySelector
+			if p.Source.Selectors.Article.Body != "" {
+				bodySelector = p.Source.Selectors.Article.Body
+			}
+			if e.DOM.Find(bodySelector).Length() > 0 {
+				return true
+			}
 		}
 	}
 
@@ -80,10 +132,10 @@ func isArticleType(e *colly.HTMLElement) bool {
 
 // contentLogger wraps logging functionality with consistent tags
 type contentLogger struct {
-	p Params
+	p ContentParams
 }
 
-func newLogger(p Params) *contentLogger {
+func newLogger(p ContentParams) *contentLogger {
 	return &contentLogger{p: p}
 }
 
@@ -98,7 +150,7 @@ func (l *contentLogger) error(msg string, keysAndValues ...interface{}) {
 }
 
 // configureContentProcessing sets up content processing for the collector
-func configureContentProcessing(c *colly.Collector, p Params) {
+func configureContentProcessing(c *colly.Collector, p ContentParams) {
 	ignoredErrors := map[string]bool{
 		maxDepthError:          true,
 		forbiddenDomainError:   true,
@@ -118,13 +170,13 @@ func setupLinkFollowing(c *colly.Collector, log *contentLogger, ignoredErrors ma
 		link := e.Attr("href")
 		log.debug("Link found", "text", e.Text, "link", link)
 
-		if err := visitLink(c, e, link, ignoredErrors); err != nil {
+		if err := visitLink(e, link, ignoredErrors); err != nil {
 			log.error("Failed to visit link", "link", link, "error", err)
 		}
 	})
 }
 
-func visitLink(c *colly.Collector, e *colly.HTMLElement, link string, ignoredErrors map[string]bool) error {
+func visitLink(e *colly.HTMLElement, link string, ignoredErrors map[string]bool) error {
 	if err := e.Request.Visit(e.Request.AbsoluteURL(link)); err != nil {
 		if !ignoredErrors[err.Error()] {
 			return err
@@ -143,20 +195,20 @@ func setupHTMLProcessing(c *colly.Collector, log *contentLogger) {
 }
 
 // setupArticleProcessing sets up article processing logic for the collector
-func setupArticleProcessing(c *colly.Collector, p Params, log *contentLogger) {
+func setupArticleProcessing(c *colly.Collector, p ContentParams, log *contentLogger) {
 	articleSelector := getSelector(p.Source.Selectors.Article, DefaultArticleSelector)
 	log.debug("Using article selector", "selector", articleSelector)
 
-	setupArticleDetection(c, articleSelector, log)
+	setupArticleDetection(c, articleSelector, log, p)
 	setupContentProcessing(c, p, log)
 }
 
 // setupArticleDetection sets up article processing logic for the collector
-func setupArticleDetection(c *colly.Collector, articleSelector string, log *contentLogger) {
+func setupArticleDetection(c *colly.Collector, articleSelector string, log *contentLogger, p ContentParams) {
 	// Set up detection for the entire HTML document
 	c.OnHTML("html", func(e *colly.HTMLElement) {
 		// First check metadata and URL patterns
-		if !isArticleType(e) {
+		if !isArticleType(e, p) {
 			log.debug("Content type is not an article", "url", e.Request.URL.String())
 			return
 		}
@@ -183,7 +235,7 @@ func setupArticleDetection(c *colly.Collector, articleSelector string, log *cont
 	})
 }
 
-func setupContentProcessing(c *colly.Collector, p Params, log *contentLogger) {
+func setupContentProcessing(c *colly.Collector, p ContentParams, log *contentLogger) {
 	c.OnScraped(func(r *colly.Response) {
 		if !canProcess(p) {
 			log.debug("Skipping processing - no processors available", "url", r.Request.URL.String())
@@ -201,27 +253,31 @@ func setupContentProcessing(c *colly.Collector, p Params, log *contentLogger) {
 	})
 }
 
-func canProcess(p Params) bool {
+func canProcess(p ContentParams) bool {
 	return p.ArticleProcessor != nil || p.ContentProcessor != nil
 }
 
-func processContent(e *colly.HTMLElement, r *colly.Response, p Params, cm *contextManager, log *contentLogger) {
+func processContent(e *colly.HTMLElement, r *colly.Response, p ContentParams, cm *contextManager, log *contentLogger) {
+	// Early return if no processors are available
+	if p.ArticleProcessor == nil && p.ContentProcessor == nil {
+		log.debug("No processors available", "url", r.Request.URL.String())
+		return
+	}
+
 	switch {
-	case cm.isArticle() && p.ArticleProcessor != nil:
+	case cm.isArticle():
 		log.debug("Processing as article", "url", r.Request.URL.String(), "title", e.ChildText("title"))
 		p.ArticleProcessor.Process(e)
 		return // Exit after processing as article
 
-	case p.ContentProcessor != nil && !cm.isArticle(): // Only process as content if NOT marked as article
+	case !cm.isArticle(): // Only process as content if NOT marked as article
 		log.debug("Processing as content", "url", r.Request.URL.String(), "title", e.ChildText("title"))
 		p.ContentProcessor.Process(e)
 		return // Exit after processing as content
 
 	default:
 		log.debug("No suitable processor found", "url", r.Request.URL.String(),
-			"is_article", cm.isArticle(),
-			"has_article_processor", p.ArticleProcessor != nil,
-			"has_content_processor", p.ContentProcessor != nil)
+			"is_article", cm.isArticle())
 	}
 }
 
