@@ -3,11 +3,11 @@ version: '3'
 tasks:
   
   crawl:
-    desc: "Run the web crawler for multiple sources defined in sources.yml"
+    desc: "Run the web crawler for a single source defined in sources.yml"
     cmds:
       - echo '' > app.log
       - go run main.go indices delete --source {{.CLI_ARGS}} --force
-      - go run main.go multi --source {{.CLI_ARGS}}
+      - go run main.go crawl --source {{.CLI_ARGS}}
       - go run main.go indices list
 
   search:

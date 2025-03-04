@@ -110,17 +110,27 @@ Example:
 				}
 
 				if len(missingIndices) > 0 {
-					fmt.Fprintf(os.Stderr, "The following indices do not exist:\n")
+					fmt.Println("The following indices do not exist (already deleted):")
 					for _, index := range missingIndices {
-						fmt.Fprintf(os.Stderr, "  - %s\n", index)
+						fmt.Printf("  - %s\n", index)
 					}
-					os.Exit(1)
+					if len(missingIndices) == len(indices) {
+						return // All indices are already deleted, exit successfully
+					}
+				}
+
+				// Get list of indices that do exist and need to be deleted
+				var indicesToDelete []string
+				for _, index := range indices {
+					if existingMap[index] {
+						indicesToDelete = append(indicesToDelete, index)
+					}
 				}
 
 				// Confirm deletion unless --force is used
-				if !force {
+				if !force && len(indicesToDelete) > 0 {
 					fmt.Printf("Are you sure you want to delete the following indices?\n")
-					for _, index := range indices {
+					for _, index := range indicesToDelete {
 						fmt.Printf("  - %s\n", index)
 					}
 					fmt.Print("Continue? (y/N): ")
@@ -132,8 +142,8 @@ Example:
 					}
 				}
 
-				// Delete each index
-				for _, index := range indices {
+				// Delete each existing index
+				for _, index := range indicesToDelete {
 					if err := storage.DeleteIndex(ctx, index); err != nil {
 						fmt.Fprintf(os.Stderr, "Error deleting index '%s': %v\n", index, err)
 						os.Exit(1)

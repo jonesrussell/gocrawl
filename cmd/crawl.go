@@ -22,117 +22,115 @@ import (
 var sourceName string
 
 // createCrawlCmd creates the crawl command
-func createCrawlCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "crawl",
-		Short: "Crawl a single source defined in sources.yml",
+var crawlCmd = &cobra.Command{
+	Use:   "crawl",
+	Short: "Crawl a single source defined in sources.yml",
 
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := cmd.Context()
-			globalLogger.Debug("Starting crawl-crawl command...", "sourceName", sourceName)
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		ctx := cmd.Context()
+		globalLogger.Debug("Starting crawl-crawl command...", "sourceName", sourceName)
 
-			// Create an Fx application
-			app := fx.New(
-				fx.Provide(
-					func() *config.Config {
-						return globalConfig
+		// Create an Fx application
+		app := fx.New(
+			fx.Provide(
+				func() *config.Config {
+					return globalConfig
+				},
+				func() logger.Interface {
+					return globalLogger
+				},
+				func() chan *models.Article {
+					return make(chan *models.Article, 100)
+				},
+				func() chan *models.Content {
+					return make(chan *models.Content, 100)
+				},
+				// Provide source name
+				fx.Annotate(
+					func() string {
+						return sourceName
 					},
-					func() logger.Interface {
-						return globalLogger
-					},
-					func() chan *models.Article {
-						return make(chan *models.Article, 100)
-					},
-					func() chan *models.Content {
-						return make(chan *models.Content, 100)
-					},
-					// Provide source name
-					fx.Annotate(
-						func() string {
-							return sourceName
-						},
-						fx.ResultTags(`name:"sourceName"`),
-					),
-					// Provide ArticleIndex name
-					fx.Annotate(
-						func(s *sources.Sources) string {
-							source, _ := s.FindByName(sourceName)
-							if source != nil {
-								return source.ArticleIndex
-							}
-							return ""
-						},
-						fx.ResultTags(`name:"indexName"`),
-					),
-					// Provide ContentIndex name
-					fx.Annotate(
-						func(s *sources.Sources) string {
-							source, _ := s.FindByName(sourceName)
-							if source != nil {
-								return source.Index
-							}
-							return ""
-						},
-						fx.ResultTags(`name:"contentIndex"`),
-					),
-					// Provide article processor first (will be first in the slice)
-					fx.Annotate(
-						func(
-							logger logger.Interface,
-							service article.Interface,
-							storage storage.Interface,
-							params struct {
-								fx.In
-								IndexName string `name:"indexName"`
-							},
-						) models.ContentProcessor {
-							return &article.Processor{
-								Logger:         logger,
-								ArticleService: service,
-								Storage:        storage,
-								IndexName:      params.IndexName,
-							}
-						},
-						fx.ResultTags(`group:"processors"`),
-					),
-					// Provide content processor second (will be second in the slice)
-					fx.Annotate(
-						func(
-							service content.Interface,
-							storage storage.Interface,
-							logger logger.Interface,
-							params struct {
-								fx.In
-								IndexName string `name:"contentIndex"`
-							},
-						) models.ContentProcessor {
-							return content.NewProcessor(service, storage, logger, params.IndexName)
-						},
-						fx.ResultTags(`group:"processors"`),
-					),
+					fx.ResultTags(`name:"sourceName"`),
 				),
-				storage.Module,
-				crawler.Module,
-				article.Module,
-				content.Module,
-				sources.Module,
-				fx.Invoke(startCrawl),
-			)
+				// Provide ArticleIndex name
+				fx.Annotate(
+					func(s *sources.Sources) string {
+						source, _ := s.FindByName(sourceName)
+						if source != nil {
+							return source.ArticleIndex
+						}
+						return ""
+					},
+					fx.ResultTags(`name:"indexName"`),
+				),
+				// Provide ContentIndex name
+				fx.Annotate(
+					func(s *sources.Sources) string {
+						source, _ := s.FindByName(sourceName)
+						if source != nil {
+							return source.Index
+						}
+						return ""
+					},
+					fx.ResultTags(`name:"contentIndex"`),
+				),
+				// Provide article processor first (will be first in the slice)
+				fx.Annotate(
+					func(
+						logger logger.Interface,
+						service article.Interface,
+						storage storage.Interface,
+						params struct {
+							fx.In
+							IndexName string `name:"indexName"`
+						},
+					) models.ContentProcessor {
+						return &article.Processor{
+							Logger:         logger,
+							ArticleService: service,
+							Storage:        storage,
+							IndexName:      params.IndexName,
+						}
+					},
+					fx.ResultTags(`group:"processors"`),
+				),
+				// Provide content processor second (will be second in the slice)
+				fx.Annotate(
+					func(
+						service content.Interface,
+						storage storage.Interface,
+						logger logger.Interface,
+						params struct {
+							fx.In
+							IndexName string `name:"contentIndex"`
+						},
+					) models.ContentProcessor {
+						return content.NewProcessor(service, storage, logger, params.IndexName)
+					},
+					fx.ResultTags(`group:"processors"`),
+				),
+			),
+			storage.Module,
+			crawler.Module,
+			article.Module,
+			content.Module,
+			sources.Module,
+			fx.Invoke(startCrawl),
+		)
 
-			// Start the application
-			if err := app.Start(ctx); err != nil {
-				return fmt.Errorf("error starting application: %w", err)
+		// Start the application
+		if err := app.Start(ctx); err != nil {
+			return fmt.Errorf("error starting application: %w", err)
+		}
+
+		defer func() {
+			if err := app.Stop(ctx); err != nil {
+				globalLogger.Error("Error stopping application", "context", ctx, "error", err)
 			}
+		}()
 
-			defer func() {
-				if err := app.Stop(ctx); err != nil {
-					globalLogger.Error("Error stopping application", "context", ctx, "error", err)
-				}
-			}()
-
-			return nil
-		},
-	}
+		return nil
+	},
 }
 
 // CrawlParams holds the parameters for crawl-source crawl
@@ -194,8 +192,8 @@ func startCrawl(p CrawlParams) error {
 }
 
 func init() {
-	crawlCmd := createCrawlCmd()
 	rootCmd.AddCommand(crawlCmd)
+
 	crawlCmd.Flags().StringVar(&sourceName, "source", "", "Specify the source to crawl")
 	if err := crawlCmd.MarkFlagRequired("source"); err != nil {
 		globalLogger.Error("Error marking source flag as required", "error", err)
