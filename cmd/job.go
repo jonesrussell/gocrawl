@@ -33,8 +33,8 @@ import (
 // jobCmd represents the job command
 var jobCmd = &cobra.Command{
 	Use:   "job",
-	Short: "Schedule and run multi-source crawl jobs",
-	Long:  `Schedule and run multi-source crawl jobs based on the times specified in sources.yml`,
+	Short: "Schedule and run crawl-source crawl jobs",
+	Long:  `Schedule and run crawl-source crawl jobs based on the times specified in sources.yml`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Load sources using our package
 		s, err := sources.Load("sources.yml")
@@ -59,14 +59,14 @@ var jobCmd = &cobra.Command{
 					if now.Hour() == scheduledTime.Hour() && now.Minute() == scheduledTime.Minute() {
 						globalLogger.Info("Running scheduled crawl", "source", source.Name, "time", t)
 
-						// Create a new command instance for the multi command
-						args := []string{"multi", "--source", source.Name}
+						// Create a new command instance for the crawl command
+						args := []string{"crawl", "--source", source.Name}
 						cmd := exec.Command(os.Args[0], args...)
 						cmd.Stdout = os.Stdout
 						cmd.Stderr = os.Stderr
 
 						if err := cmd.Run(); err != nil {
-							globalLogger.Error("Error executing multi command", "source", source.Name, "error", err)
+							globalLogger.Error("Error executing crawl command", "source", source.Name, "error", err)
 						}
 					}
 				}

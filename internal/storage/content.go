@@ -169,7 +169,7 @@ func (s *ElasticsearchStorage) SearchContent(query string) ([]*models.Content, e
 	ctx := context.Background()
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
-			"multi_match": map[string]interface{}{
+			"crawl_match": map[string]interface{}{
 				"query":  query,
 				"fields": []string{"title^2", "body"},
 			},
