@@ -118,14 +118,14 @@ func setupLinkFollowing(c *colly.Collector, log *contentLogger, ignoredErrors ma
 		link := e.Attr("href")
 		log.debug("Link found", "text", e.Text, "link", link)
 
-		if err := visitLink(e, link, ignoredErrors); err != nil {
+		if err := visitLink(c, e, link, ignoredErrors); err != nil {
 			log.error("Failed to visit link", "link", link, "error", err)
 		}
 	})
 }
 
-func visitLink(e *colly.HTMLElement, link string, ignoredErrors map[string]bool) error {
-	if err := e.Request.Visit(e.Request.AbsoluteURL(link)); err != nil {
+func visitLink(c *colly.Collector, e *colly.HTMLElement, link string, ignoredErrors map[string]bool) error {
+	if err := c.Visit(e.Request.AbsoluteURL(link)); err != nil {
 		if !ignoredErrors[err.Error()] {
 			return err
 		}
