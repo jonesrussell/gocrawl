@@ -35,6 +35,7 @@ const testHTML = `
 <head>
     <meta charset="utf-8">
     <title>Test Article</title>
+    <meta property="og:type" content="article">
     <script type="application/ld+json">
     {
         "datePublished": "2025-02-11T17:37:42Z",
@@ -49,8 +50,11 @@ const testHTML = `
         <h1 class="details-title">Elliot Lake man arrested after threatening to kill victim and police</h1>
         <div class="details-intro">Police were called to house on Milliken Road for report of break-and-enter</div>
         <div class="details-byline">
-            ElliotLakeToday Staff
+            <span class="author">ElliotLakeToday Staff</span>
             <time datetime="2025-02-11T17:37:42Z">Feb 11, 2025 12:37 PM</time>
+        </div>
+        <div class="details-body">
+            Police were called to house on Milliken Road for report of break-and-enter
         </div>
     </div>
 </body>
@@ -84,8 +88,8 @@ func TestExtractArticle(t *testing.T) {
 	assert.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", article.Title)
 	assert.Equal(
 		t,
-		"Police were called to house on Milliken Road for report of break-and-enter\n\n",
-		article.Body,
+		"Police were called to house on Milliken Road for report of break-and-enter",
+		strings.TrimSpace(article.Body),
 	)
 	assert.Equal(t, "ElliotLakeToday Staff", article.Author)
 

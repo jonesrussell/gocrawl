@@ -130,7 +130,10 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 		}))
 
 	// Extract body text after removing excluded elements
-	body := bodyEl.Text()
+	body := bodyEl.Find(".details-body").Text()
+	if body == "" {
+		body = bodyEl.Text()
+	}
 	if body == "" && jsonLD.ArticleBody != "" {
 		body = jsonLD.ArticleBody // Fallback to JSON-LD body
 	}
@@ -142,9 +145,6 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	}
 	if intro == "" && jsonLD.Description != "" {
 		intro = jsonLD.Description
-	}
-	if intro != "" {
-		body = intro + "\n\n" + body
 	}
 
 	// Extract title with fallbacks
@@ -160,7 +160,7 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	}
 
 	// Extract author with fallbacks
-	author := e.ChildText(s.Selectors.Byline)
+	author := e.DOM.Find(".details-byline .author").Text()
 	if author == "" {
 		author = e.ChildText(s.Selectors.Author)
 	}
@@ -265,9 +265,11 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 
 // CleanAuthor cleans up the author string
 func (s *Service) CleanAuthor(author string) string {
-	if idx := strings.Index(author, "    "); idx != -1 {
-		author = strings.TrimSpace(author[:idx])
+	if author == "" {
+		return ""
 	}
+	// Remove any extra whitespace
+	author = strings.TrimSpace(author)
 	return author
 }
 
