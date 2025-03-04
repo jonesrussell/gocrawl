@@ -125,7 +125,7 @@ func setupLinkFollowing(c *colly.Collector, log *contentLogger, ignoredErrors ma
 }
 
 func visitLink(c *colly.Collector, e *colly.HTMLElement, link string, ignoredErrors map[string]bool) error {
-	if err := c.Visit(e.Request.AbsoluteURL(link)); err != nil {
+	if err := e.Request.Visit(e.Request.AbsoluteURL(link)); err != nil {
 		if !ignoredErrors[err.Error()] {
 			return err
 		}
