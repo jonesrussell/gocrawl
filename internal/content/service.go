@@ -16,6 +16,7 @@ import (
 type Interface interface {
 	ExtractContent(e *colly.HTMLElement) *models.Content
 	ExtractMetadata(e *colly.HTMLElement) map[string]interface{}
+	DetermineContentType(url string, metadata map[string]interface{}, jsonLDType string) string
 }
 
 // Service implements the Interface
@@ -57,7 +58,7 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 	metadata := s.ExtractMetadata(e)
 
 	// Determine content type based on URL and page structure
-	contentType := determineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
+	contentType := s.DetermineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
 
 	// Create content with basic fields
 	content := &models.Content{
@@ -86,8 +87,8 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 	return content
 }
 
-// determineContentType determines the type of content based on URL and metadata
-func determineContentType(url string, metadata map[string]interface{}, jsonLDType string) string {
+// DetermineContentType determines the type of content based on URL and metadata
+func (s *Service) DetermineContentType(url string, metadata map[string]interface{}, jsonLDType string) string {
 	// Check JSON-LD type first
 	if jsonLDType != "" {
 		return jsonLDType
