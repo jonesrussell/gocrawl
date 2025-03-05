@@ -10,6 +10,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -72,8 +73,31 @@ const testHTML = `
 `
 
 func TestExtractArticle(t *testing.T) {
-	mockLogger := newMockLogger()
-	svc := article.NewService(mockLogger, newDefaultSelectors())
+	mockLogger := logger.NewMockLogger()
+	selectors := newDefaultSelectors()
+	service := article.NewService(mockLogger, selectors)
+
+	// Set up mock expectations for all debug calls with variable arguments
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("bool")).Return()
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("[]string")).Return()
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int")).Return()
+	mockLogger.On("Debug", "No valid published date found", "dates", mock.AnythingOfType("[]string")).Return()
+	mockLogger.On("Debug", "Successfully parsed date",
+		"source", mock.AnythingOfType("string"),
+		"format", mock.AnythingOfType("string"),
+		"result", mock.AnythingOfType("time.Time")).Return()
+	mockLogger.On("Debug", "Extracted article",
+		"component", "article/service",
+		"id", mock.AnythingOfType("string"),
+		"title", mock.AnythingOfType("string"),
+		"url", mock.AnythingOfType("string"),
+		"date", mock.AnythingOfType("time.Time"),
+		"author", mock.AnythingOfType("string"),
+		"tags", mock.AnythingOfType("[]string"),
+		"wordCount", mock.AnythingOfType("int"),
+		"category", mock.AnythingOfType("string"),
+		"section", mock.AnythingOfType("string")).Return()
 
 	// Create a new document from the common HTML string
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(testHTML))
@@ -83,28 +107,21 @@ func TestExtractArticle(t *testing.T) {
 
 	// Create a colly HTMLElement for the div.details
 	e := &colly.HTMLElement{
-		DOM: doc.Find("div.details"),
+		DOM: doc.Find(selectors.Container),
 		Request: &colly.Request{
 			URL: &url.URL{Path: "/mock-url"},
 		},
 	}
 
 	// Call the ExtractArticle method
-	article := svc.ExtractArticle(e)
+	article := service.ExtractArticle(e)
 
 	// Validate the extracted article
-	assert.NotNil(t, article)
-	assert.Equal(t, "/mock-url", article.Source)
-	assert.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", article.Title)
-	assert.Equal(
-		t,
-		"Police were called to house on Milliken Road for report of break-and-enter",
-		strings.TrimSpace(article.Body),
-	)
-	assert.Equal(t, "ElliotLakeToday Staff", article.Author)
-
-	// Assert that the expectations were met
-	mockLogger.AssertExpectations(t)
+	require.NotNil(t, article)
+	require.Equal(t, "/mock-url", article.Source)
+	require.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", article.Title)
+	require.Equal(t, "Police were called to house on Milliken Road for report of break-and-enter", strings.TrimSpace(article.Body))
+	require.Equal(t, "ElliotLakeToday Staff", article.Author)
 }
 
 func TestCleanAuthor(t *testing.T) {
@@ -120,8 +137,22 @@ func TestCleanAuthor(t *testing.T) {
 }
 
 func TestParsePublishedDate(t *testing.T) {
-	mockLogger := newMockLogger()
+	mockLogger := logger.NewMockLogger()
 	svc := article.NewService(mockLogger, newDefaultSelectors())
+
+	// Set up mock expectations for debug calls
+	mockLogger.On("Debug",
+		"Trying to parse date",
+		"value", "2025-02-14T15:04:05Z",
+	).Return()
+
+	expectedDate, _ := time.Parse(time.RFC3339, "2025-02-14T15:04:05Z")
+	mockLogger.On("Debug",
+		"Successfully parsed date",
+		"source", "2025-02-14T15:04:05Z",
+		"format", "2006-01-02T15:04:05Z07:00",
+		"result", expectedDate,
+	).Return()
 
 	// Create a mock HTML document
 	html := `
@@ -155,6 +186,5 @@ func TestParsePublishedDate(t *testing.T) {
 
 	date := svc.ParsePublishedDate(e, jsonLD)
 
-	expectedDate, _ := time.Parse(time.RFC3339, "2025-02-14T15:04:05Z")
 	assert.Equal(t, expectedDate, date)
 }
