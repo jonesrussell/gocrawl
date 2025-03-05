@@ -55,9 +55,24 @@ var jobCmd = &cobra.Command{
 						continue
 					}
 
+					// Add debug logging for time comparison
+					globalLogger.Debug("Checking scheduled time",
+						"source", source.Name,
+						"current_time", now.Format("15:04"),
+						"scheduled_time", t,
+						"current_hour", now.Hour(),
+						"scheduled_hour", scheduledTime.Hour(),
+						"current_minute", now.Minute(),
+						"scheduled_minute", scheduledTime.Minute(),
+					)
+
 					// Check if it's time to run the job
 					if now.Hour() == scheduledTime.Hour() && now.Minute() == scheduledTime.Minute() {
-						globalLogger.Info("Running scheduled crawl", "source", source.Name, "time", t)
+						globalLogger.Info("Running scheduled crawl",
+							"source", source.Name,
+							"time", t,
+							"current_time", now.Format("15:04"),
+						)
 
 						// Create a new command instance for the crawl command
 						args := []string{"crawl", "--source", source.Name}
