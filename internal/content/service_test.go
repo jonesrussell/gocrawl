@@ -17,11 +17,16 @@ func TestExtractContent(t *testing.T) {
 	// Create mock logger
 	mockLogger := logger.NewMockLogger()
 	mockLogger.On("Debug", "Extracting content", "url", "./http://example.com").Return()
+	mockLogger.On("Debug", "Trying to parse date", "value", "2024-03-03T12:00:00Z").Return()
+	mockLogger.On("Debug", "Successfully parsed date",
+		"source", "2024-03-03T12:00:00Z",
+		"format", "2006-01-02T15:04:05Z07:00",
+		"result", mock.AnythingOfType("time.Time")).Return()
 	mockLogger.On("Debug", "Extracted content",
 		"id", mock.AnythingOfType("string"),
 		"title", "Test Content",
 		"url", "./http://example.com",
-		"type", "webpage",
+		"type", "WebPage",
 		"created_at", mock.AnythingOfType("time.Time")).Return()
 
 	// Create service
@@ -57,6 +62,9 @@ func TestExtractContent(t *testing.T) {
 	e := &colly.HTMLElement{
 		DOM:     doc.Selection,
 		Request: &colly.Request{URL: &url.URL{Path: "http://example.com"}},
+		Response: &colly.Response{
+			Request: &colly.Request{URL: &url.URL{Path: "http://example.com"}},
+		},
 	}
 
 	// Extract content
@@ -67,7 +75,7 @@ func TestExtractContent(t *testing.T) {
 	assert.NotEmpty(t, result.ID)
 	assert.Equal(t, "Test Content", result.Title)
 	assert.Equal(t, "./http://example.com", result.URL)
-	assert.Equal(t, "webpage", result.Type)
+	assert.Equal(t, "WebPage", result.Type)
 	assert.Contains(t, result.Body, "Test body content")
 	assert.NotZero(t, result.CreatedAt)
 
@@ -107,6 +115,9 @@ func TestExtractMetadata(t *testing.T) {
 	e := &colly.HTMLElement{
 		DOM:     doc.Selection,
 		Request: &colly.Request{URL: &url.URL{Path: "http://example.com"}},
+		Response: &colly.Response{
+			Request: &colly.Request{URL: &url.URL{Path: "http://example.com"}},
+		},
 	}
 
 	// Extract metadata

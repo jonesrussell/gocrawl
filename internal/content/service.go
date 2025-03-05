@@ -130,30 +130,38 @@ func (s *Service) DetermineContentType(url string, metadata map[string]interface
 func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]interface{} {
 	metadata := make(map[string]interface{})
 
-	// Extract OpenGraph metadata
+	// Extract OpenGraph metadata first (highest precedence)
 	e.ForEach(`meta[property^="og:"]`, func(_ int, el *colly.HTMLElement) {
 		property := el.Attr("property")
 		content := el.Attr("content")
 		if property != "" && content != "" {
-			metadata[property[3:]] = content // Remove "og:" prefix
+			key := property[3:] // Remove "og:" prefix
+			if _, exists := metadata[key]; !exists {
+				metadata[key] = content
+			}
 		}
 	})
 
-	// Extract Twitter metadata
+	// Extract Twitter metadata (second precedence)
 	e.ForEach(`meta[name^="twitter:"]`, func(_ int, el *colly.HTMLElement) {
 		name := el.Attr("name")
 		content := el.Attr("content")
 		if name != "" && content != "" {
-			metadata[name[8:]] = content // Remove "twitter:" prefix
+			key := name[8:] // Remove "twitter:" prefix
+			if _, exists := metadata[key]; !exists {
+				metadata[key] = content
+			}
 		}
 	})
 
-	// Extract other meta tags
+	// Extract other meta tags (lowest precedence)
 	e.ForEach(`meta[name]`, func(_ int, el *colly.HTMLElement) {
 		name := el.Attr("name")
 		content := el.Attr("content")
 		if name != "" && content != "" {
-			metadata[name] = content
+			if _, exists := metadata[name]; !exists {
+				metadata[name] = content
+			}
 		}
 	})
 
