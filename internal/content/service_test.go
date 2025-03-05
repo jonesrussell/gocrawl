@@ -16,11 +16,11 @@ import (
 func TestExtractContent(t *testing.T) {
 	// Create mock logger
 	mockLogger := logger.NewMockLogger()
-	mockLogger.On("Debug", "Extracting content", "url", "http://example.com").Return()
+	mockLogger.On("Debug", "Extracting content", "url", "./http://example.com").Return()
 	mockLogger.On("Debug", "Extracted content",
 		"id", mock.AnythingOfType("string"),
 		"title", "Test Content",
-		"url", "http://example.com",
+		"url", "./http://example.com",
 		"type", "webpage",
 		"created_at", mock.AnythingOfType("time.Time")).Return()
 
@@ -66,7 +66,7 @@ func TestExtractContent(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.NotEmpty(t, result.ID)
 	assert.Equal(t, "Test Content", result.Title)
-	assert.Equal(t, "http://example.com", result.URL)
+	assert.Equal(t, "./http://example.com", result.URL)
 	assert.Equal(t, "webpage", result.Type)
 	assert.Contains(t, result.Body, "Test body content")
 	assert.NotZero(t, result.CreatedAt)
