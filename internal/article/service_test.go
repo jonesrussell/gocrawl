@@ -188,3 +188,94 @@ func TestParsePublishedDate(t *testing.T) {
 
 	assert.Equal(t, expectedDate, date)
 }
+
+func TestExtractTags(t *testing.T) {
+	mockLogger := logger.NewMockLogger()
+	selectors := config.DefaultArticleSelectors()
+	service := article.NewService(mockLogger, selectors)
+
+	// Set up mock expectations for debug calls
+	mockLogger.On("Debug", "Found JSON-LD keywords", "values", mock.AnythingOfType("[]string")).Return()
+	mockLogger.On("Debug", "Found JSON-LD section", "value", mock.AnythingOfType("string")).Return()
+	mockLogger.On("Debug", "Found meta section", "value", mock.AnythingOfType("string")).Return()
+	mockLogger.On("Debug", "Found meta keywords", "value", mock.AnythingOfType("string")).Return()
+
+	// Create test HTML with meta tags
+	html := `
+		<!DOCTYPE html>
+		<html>
+		<head>
+			<meta property="article:section" content="News">
+			<meta name="keywords" content="crime|police|arrest">
+		</head>
+		<body>
+			<article></article>
+		</body>
+		</html>
+	`
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		t.Fatalf("Failed to create document: %v", err)
+	}
+
+	// Create a colly HTMLElement with the full document
+	e := &colly.HTMLElement{
+		DOM: doc.Selection,
+		Request: &colly.Request{
+			URL: &url.URL{
+				Path: "/opp-beat/article-123",
+			},
+		},
+	}
+
+	// Create JSON-LD data
+	jsonLD := article.JSONLDArticle{
+		Keywords: []string{"OPP", "arrest", "assault"},
+		Section:  "Police",
+	}
+
+	// Extract tags
+	tags := service.ExtractTags(e, jsonLD)
+
+	// Validate tags (note: "arrest" appears only once due to deduplication)
+	expectedTags := []string{"OPP", "arrest", "assault", "Police", "News", "crime", "police", "OPP Beat"}
+	require.Equal(t, expectedTags, tags)
+}
+
+func TestRemoveDuplicates(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "Empty slice",
+			input:    []string{},
+			expected: []string{},
+		},
+		{
+			name:     "No duplicates",
+			input:    []string{"a", "b", "c"},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "With duplicates",
+			input:    []string{"a", "b", "a", "c", "b"},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "Case sensitive",
+			input:    []string{"A", "a", "B", "b"},
+			expected: []string{"A", "a", "B", "b"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := article.RemoveDuplicates(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

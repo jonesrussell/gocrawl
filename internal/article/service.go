@@ -310,10 +310,11 @@ func (s *Service) ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []stri
 	}
 
 	// Remove duplicates from tags
-	return removeDuplicates(tags)
+	return RemoveDuplicates(tags)
 }
 
-func removeDuplicates(tags []string) []string {
+// RemoveDuplicates removes duplicate strings from a slice
+func RemoveDuplicates(tags []string) []string {
 	seen := make(map[string]bool)
 	uniqueTags := make([]string, 0)
 	for _, tag := range tags {
@@ -377,17 +378,4 @@ func parseDate(dates []string, logger logger.Interface) time.Time {
 	}
 
 	return publishedDate
-}
-
-// RemoveDuplicates removes duplicate tags from a slice
-func RemoveDuplicates(tags []string) []string {
-	seen := make(map[string]bool)
-	uniqueTags := make([]string, 0)
-	for _, tag := range tags {
-		if !seen[tag] {
-			seen[tag] = true
-			uniqueTags = append(uniqueTags, tag)
-		}
-	}
-	return uniqueTags
 }
