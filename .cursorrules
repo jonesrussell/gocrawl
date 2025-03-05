@@ -3,6 +3,10 @@
 - Maintain code readability and structure.
 - Avoid global state where possible.
 - Use go 1.23.
+- Interface definitions:
+  - Define interfaces in the package that uses them, not where they are implemented
+  - For module-specific interfaces, define them in module.go
+  - For interfaces used across multiple packages, define them in the consuming package
 - Use the following dependencies:
 	github.com/elastic/go-elasticsearch/v8 v8.17.0
 	github.com/gocolly/colly/v2 v2.1.0

@@ -1,68 +1,19 @@
 package collector
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/logger"
-
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/debug"
-	"go.uber.org/fx"
+	"github.com/jonesrussell/gocrawl/internal/config"
 )
-
-// DebuggerInterface is an interface for the debugger
-type DebuggerInterface interface {
-	Init() error
-	OnRequest(e *colly.Request)
-	OnResponse(e *colly.Response)
-	OnError(e *colly.Response, err error)
-	OnEvent(e *debug.Event)
-	Event(e *debug.Event)
-}
-
-// Params holds the parameters for creating a Collector
-type Params struct {
-	fx.In
-
-	ArticleProcessor *article.Processor
-	BaseURL          string
-	Context          context.Context
-	Debugger         *logger.CollyDebugger
-	Logger           logger.Interface
-	MaxDepth         int
-	Parallelism      int
-	RandomDelay      time.Duration
-	RateLimit        time.Duration
-}
-
-// Result holds the collector instance
-type Result struct {
-	fx.Out
-
-	Collector *colly.Collector
-}
 
 // New creates a new collector instance
 func New(p Params) (Result, error) {
-	// Validate URL
-	if p.BaseURL == "" {
-		return Result{}, errors.New("base URL cannot be empty")
-	}
-
-	// Check if ArticleProcessor is nil
-	if p.ArticleProcessor == nil {
-		return Result{}, errors.New("article processor is required")
-	}
-
-	// Check if Logger is nil
-	if p.Logger == nil {
-		return Result{}, errors.New("logger is required")
+	if err := ValidateParams(p); err != nil {
+		return Result{}, err
 	}
 
 	parsedURL, err := url.Parse(p.BaseURL)
@@ -77,7 +28,7 @@ func New(p Params) (Result, error) {
 	c := colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(p.MaxDepth),
-		colly.AllowedDomains(domain), // Set the allowed domain
+		colly.AllowedDomains(domain),
 	)
 
 	// Set rate limiting
@@ -97,26 +48,59 @@ func New(p Params) (Result, error) {
 	// Configure logging
 	ConfigureLogging(c, p.Logger)
 
-	// Set up link following
-	var ignoredErrors = map[string]bool{
-		"Max depth limit reached": true,
-		"Forbidden domain":        true,
-		"URL already visited":     true,
+	// Parse rate limit duration
+	rateLimit, err := time.ParseDuration(p.Source.RateLimit)
+	if err != nil {
+		return Result{}, fmt.Errorf("invalid rate limit: %w", err)
 	}
 
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Attr("href")
-		p.Logger.Debug("Link found", "text", e.Text, "link", link)
-		visitErr := e.Request.Visit(e.Request.AbsoluteURL(link))
-		if visitErr != nil && !ignoredErrors[visitErr.Error()] {
-			p.Logger.Error("Failed to visit link", "link", link, "error", visitErr)
-		}
-	})
+	// Convert sources.Config to config.Source
+	source := config.Source{
+		Name:         p.Source.Name,
+		URL:          p.Source.URL,
+		ArticleIndex: p.Source.ArticleIndex,
+		Index:        p.Source.Index,
+		RateLimit:    rateLimit,
+		MaxDepth:     p.Source.MaxDepth,
+		Time:         p.Source.Time,
+		Selectors: config.SourceSelectors{
+			Article: config.ArticleSelectors{
+				Container:     p.Source.Selectors.Article.Container,
+				Title:         p.Source.Selectors.Article.Title,
+				Body:          p.Source.Selectors.Article.Body,
+				Intro:         p.Source.Selectors.Article.Intro,
+				Byline:        p.Source.Selectors.Article.Byline,
+				PublishedTime: p.Source.Selectors.Article.PublishedTime,
+				TimeAgo:       p.Source.Selectors.Article.TimeAgo,
+				JSONLD:        p.Source.Selectors.Article.JsonLd,
+				Section:       p.Source.Selectors.Article.Section,
+				Keywords:      p.Source.Selectors.Article.Keywords,
+				Description:   p.Source.Selectors.Article.Description,
+				OGTitle:       p.Source.Selectors.Article.OgTitle,
+				OGDescription: p.Source.Selectors.Article.OgDescription,
+				OGImage:       p.Source.Selectors.Article.OgImage,
+				OGURL:         p.Source.Selectors.Article.OgUrl,
+				Canonical:     p.Source.Selectors.Article.Canonical,
+				WordCount:     p.Source.Selectors.Article.WordCount,
+				PublishDate:   p.Source.Selectors.Article.PublishDate,
+				Category:      p.Source.Selectors.Article.Category,
+				Tags:          p.Source.Selectors.Article.Tags,
+				Author:        p.Source.Selectors.Article.Author,
+				BylineName:    p.Source.Selectors.Article.BylineName,
+			},
+		},
+	}
 
-	c.OnHTML("div.details", func(e *colly.HTMLElement) {
-		p.Logger.Debug("Found details", "url", e.Request.URL.String())
-		p.ArticleProcessor.ProcessPage(e) // Call ProcessPage on the ArticleProcessor instance
-	})
+	// Convert Params to ContentParams
+	contentParams := ContentParams{
+		Logger:           p.Logger,
+		Source:           source,
+		ArticleProcessor: p.ArticleProcessor,
+		ContentProcessor: p.ContentProcessor,
+	}
+
+	// Configure content processing
+	configureContentProcessing(c, contentParams)
 
 	p.Logger.Debug("Collector created",
 		"baseURL", p.BaseURL,
@@ -126,25 +110,4 @@ func New(p Params) (Result, error) {
 	)
 
 	return Result{Collector: c}, nil
-}
-
-// ConfigureLogging sets up logging for the collector
-func ConfigureLogging(c *colly.Collector, log logger.Interface) {
-	c.OnRequest(func(r *colly.Request) {
-		log.Debug("Requesting URL", "url", r.URL.String())
-	})
-
-	c.OnResponse(func(r *colly.Response) {
-		log.Debug("Received response",
-			"url", r.Request.URL.String(),
-			"status", r.StatusCode,
-		)
-	})
-
-	c.OnError(func(r *colly.Response, err error) {
-		log.Error("Error occurred",
-			"url", r.Request.URL.String(),
-			"error", err.Error(),
-		)
-	})
 }

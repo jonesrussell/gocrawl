@@ -2,28 +2,64 @@ package storage
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
 
-// Module provides the storage module and its dependencies
+// Module provides storage dependencies
 var Module = fx.Module("storage",
 	fx.Provide(
+		NewOptionsFromConfig,
 		ProvideElasticsearchClient,
-		NewStorage,       // Ensure this is provided
-		NewSearchService, // Provide the search service
+		NewElasticsearchStorage,
+		NewSearchService,
 	),
 )
 
+// NewElasticsearchStorage creates a new ElasticsearchStorage instance
+func NewElasticsearchStorage(
+	client *elasticsearch.Client,
+	logger logger.Interface,
+	opts Options,
+) Result {
+	storage := &ElasticsearchStorage{
+		ESClient: client,
+		Logger:   logger,
+		opts:     opts,
+	}
+
+	indexService := NewIndexService(logger, storage)
+
+	return Result{
+		Storage:      storage,
+		IndexService: indexService,
+	}
+}
+
+// ProvideElasticsearchClient provides the Elasticsearch client
+func ProvideElasticsearchClient(opts Options, log logger.Interface) (*elasticsearch.Client, error) {
+	client, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses: []string{opts.URL},
+		Username:  opts.Username,
+		Password:  opts.Password,
+		APIKey:    opts.APIKey,
+		Transport: opts.Transport,
+	})
+	if err != nil {
+		log.Error("Failed to create Elasticsearch client", "error", err)
+		return nil, err
+	}
+
+	log.Info("Elasticsearch client initialized successfully")
+	return client, nil
+}
+
 // NewStorage initializes a new Storage instance
-func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface, error) {
+func NewStorage(esClient *elasticsearch.Client, opts Options, log logger.Interface) (Interface, error) {
 	if esClient == nil {
 		return nil, errors.New("elasticsearch client is nil")
 	}
@@ -42,10 +78,10 @@ func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface
 		return nil, fmt.Errorf("error response from Elasticsearch: %s", res.String())
 	}
 
-	// Create storage instance
 	storageInstance := &ElasticsearchStorage{
 		ESClient: esClient,
 		Logger:   log,
+		opts:     opts,
 	}
 
 	// Test connection to Elasticsearch
@@ -54,29 +90,4 @@ func NewStorage(esClient *elasticsearch.Client, log logger.Interface) (Interface
 	}
 
 	return storageInstance, nil
-}
-
-// ProvideElasticsearchClient initializes the Elasticsearch client
-func ProvideElasticsearchClient(cfg *config.Config, log logger.Interface) (*elasticsearch.Client, error) {
-	// Create a custom HTTP transport
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			//nolint:gosec // We are using the SkipTLS setting from the config
-			InsecureSkipVerify: cfg.Elasticsearch.SkipTLS, // Use the SkipTLS setting from the config
-		},
-	}
-
-	client, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{cfg.Elasticsearch.URL},
-		Username:  cfg.Elasticsearch.Username,
-		Password:  cfg.Elasticsearch.Password,
-		APIKey:    cfg.Elasticsearch.APIKey,
-		Transport: transport, // Use the custom transport
-	})
-	if err != nil {
-		log.Error("Failed to create Elasticsearch client", "error", err)
-		return nil, err
-	}
-	log.Info("Elasticsearch client initialized successfully")
-	return client, nil
 }

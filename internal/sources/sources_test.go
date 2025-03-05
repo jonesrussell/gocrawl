@@ -65,6 +65,20 @@ func (m *MockCrawler) Stop() {
 	m.Called()
 }
 
+// MockIndexManager is a mock implementation of IndexManager
+type MockIndexManager struct {
+	mock.Mock
+}
+
+func NewMockIndexManager() *MockIndexManager {
+	return &MockIndexManager{}
+}
+
+func (m *MockIndexManager) EnsureIndex(ctx context.Context, indexName string) error {
+	args := m.Called(ctx, indexName)
+	return args.Error(0)
+}
+
 func TestLoad(t *testing.T) {
 	// Create a temporary test file
 	content := `sources:
@@ -180,16 +194,20 @@ func TestFindByName(t *testing.T) {
 func TestStart(t *testing.T) {
 	mockLogger := new(MockLogger)
 	mockCrawler := NewMockCrawler()
+	mockIndexMgr := NewMockIndexManager()
 
 	sources := &Sources{
 		Sources: []Config{
 			{
-				Name: "test1",
-				URL:  "http://example1.com",
+				Name:         "test1",
+				URL:          "http://example1.com",
+				ArticleIndex: "test1_articles",
+				Index:        "test1_content",
 			},
 		},
-		Logger:  mockLogger,
-		Crawler: mockCrawler,
+		Logger:   mockLogger,
+		Crawler:  mockCrawler,
+		IndexMgr: mockIndexMgr,
 	}
 
 	ctx := context.Background()
@@ -205,6 +223,8 @@ func TestStart(t *testing.T) {
 			source: "test1",
 			setupMock: func() {
 				mockLogger.On("Info", "Starting crawl", []interface{}{"source", "test1"}).Once()
+				mockIndexMgr.On("EnsureIndex", ctx, "test1_articles").Return(nil).Once()
+				mockIndexMgr.On("EnsureIndex", ctx, "test1_content").Return(nil).Once()
 				mockCrawler.On("Start", ctx, "http://example1.com").Return(nil).Once()
 				mockLogger.On("Info", "Finished crawl", []interface{}{"source", "test1"}).Once()
 			},
@@ -215,6 +235,8 @@ func TestStart(t *testing.T) {
 			source: "test1",
 			setupMock: func() {
 				mockLogger.On("Info", "Starting crawl", []interface{}{"source", "test1"}).Once()
+				mockIndexMgr.On("EnsureIndex", ctx, "test1_articles").Return(nil).Once()
+				mockIndexMgr.On("EnsureIndex", ctx, "test1_content").Return(nil).Once()
 				mockCrawler.On("Start", ctx, "http://example1.com").Return(assert.AnError).Once()
 			},
 			wantErr: true,
@@ -238,6 +260,7 @@ func TestStart(t *testing.T) {
 			}
 			mockLogger.AssertExpectations(t)
 			mockCrawler.AssertExpectations(t)
+			mockIndexMgr.AssertExpectations(t)
 		})
 	}
 }

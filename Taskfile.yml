@@ -1,15 +1,14 @@
 version: '3'
 
 tasks:
+  
   crawl:
-    desc: "Run the web crawler"
+    desc: "Run the web crawler for a single source defined in sources.yml"
     cmds:
-      - go run main.go crawl -u https://www.elliotlaketoday.com/opp-beat -d 2 -r 2s -i elliotlake_elliotlaketoday_articles
-
-  crawl:multi:
-    desc: "Run the web crawler for multiple sources defined in sources.yml"
-    cmds:
-      - go run main.go multi --source "Elliot Lake Today"
+      - echo '' > app.log
+      - go run main.go indices delete --source {{.CLI_ARGS}} --force
+      - go run main.go crawl --source {{.CLI_ARGS}}
+      - go run main.go indices list
 
   search:
     desc: "Search crawled content"

@@ -18,21 +18,44 @@ type Processor struct {
 	ArticleChan    chan *models.Article
 }
 
-// ProcessPage handles article extraction
-func (p *Processor) ProcessPage(e *colly.HTMLElement) {
-	p.Logger.Debug("Processing page", "url", e.Request.URL.String())
+// Process handles article extraction
+func (p *Processor) Process(e *colly.HTMLElement) {
+	p.Logger.Debug("Processing article",
+		"component", "article/processor",
+		"url", e.Request.URL.String())
+
 	article := p.ArticleService.ExtractArticle(e)
 	if article == nil {
-		p.Logger.Debug("No article extracted", "url", e.Request.URL.String())
+		p.Logger.Debug("No article extracted",
+			"component", "article/processor",
+			"url", e.Request.URL.String())
 		return
 	}
-	p.Logger.Debug("Article extracted", "url", e.Request.URL.String(), "title", article.Title)
+
+	p.Logger.Debug("Article extracted",
+		"component", "article/processor",
+		"url", e.Request.URL.String(),
+		"title", article.Title)
 
 	// Use the dynamic index name from the Processor instance
 	if err := p.Storage.IndexDocument(context.Background(), p.IndexName, article.ID, article); err != nil {
-		p.Logger.Error("Failed to index article", "articleID", article.ID, "error", err)
+		p.Logger.Error("Failed to index article",
+			"component", "article/processor",
+			"articleID", article.ID,
+			"error", err)
 		return
 	}
 
 	p.ArticleChan <- article
 }
+
+// ProcessContent implements the models.ContentProcessor interface
+func (p *Processor) ProcessContent(e *colly.HTMLElement) {
+	// Skip content pages - we only process articles
+	p.Logger.Debug("Skipping content page in article processor",
+		"component", "article/processor",
+		"url", e.Request.URL.String())
+}
+
+// Ensure Processor implements models.ContentProcessor
+var _ models.ContentProcessor = (*Processor)(nil)

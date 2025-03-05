@@ -2,123 +2,200 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
-// Constants for default values
-const (
-	DefaultMaxDepth = 2 // Default maximum crawl depth
-)
+var sourceName string
 
-// NewCrawlCmd creates a new crawl command
+// createCrawlCmd creates the crawl command
 var crawlCmd = &cobra.Command{
 	Use:   "crawl",
-	Short: "Start crawling a website",
-	Long:  `Crawl a website and store the content in Elasticsearch`,
-	PreRunE: func(cmd *cobra.Command, _ []string) error {
-		return setupCrawlCmd(cmd)
-	},
-	RunE: runCrawlCmd,
-}
+	Short: "Crawl a single source defined in sources.yml",
 
-// setupCrawlCmd handles the setup for the crawl command
-func setupCrawlCmd(cmd *cobra.Command) error {
-	// Set the configuration values directly from cmd flags
-	globalConfig.Crawler.BaseURL = cmd.Flag("url").Value.String()
-	if depth, err := cmd.Flags().GetInt("depth"); err == nil {
-		globalConfig.Crawler.MaxDepth = depth
-	}
-	rateLimit, err := cmd.Flags().GetDuration("rate")
-	if err == nil {
-		globalConfig.Crawler.RateLimit = rateLimit
-	}
-	globalConfig.Crawler.IndexName = cmd.Flag("index").Value.String()
-	return nil
-}
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		ctx := cmd.Context()
+		globalLogger.Debug("Starting crawl-crawl command...", "sourceName", sourceName)
 
-// runCrawlCmd handles the execution of the crawl command
-func runCrawlCmd(cmd *cobra.Command, _ []string) error {
-	// Initialize fx container
-	app := fx.New(
-		fx.Provide(
-			func() *config.Config {
-				return globalConfig // Provide the global config
-			},
-			func() logger.Interface {
-				return globalLogger // Provide the global logger
-			},
-		),
-		storage.Module,
-		collector.Module,
-		crawler.Module,
-		fx.Invoke(startCrawlCmd),
-	)
+		// Create an Fx application
+		app := fx.New(
+			fx.Provide(
+				func() *config.Config {
+					return globalConfig
+				},
+				func() logger.Interface {
+					return globalLogger
+				},
+				func() chan *models.Article {
+					return make(chan *models.Article, 100)
+				},
+				func() chan *models.Content {
+					return make(chan *models.Content, 100)
+				},
+				// Provide source name
+				fx.Annotate(
+					func() string {
+						return sourceName
+					},
+					fx.ResultTags(`name:"sourceName"`),
+				),
+				// Provide ArticleIndex name
+				fx.Annotate(
+					func(s *sources.Sources) string {
+						source, _ := s.FindByName(sourceName)
+						if source != nil {
+							return source.ArticleIndex
+						}
+						return ""
+					},
+					fx.ResultTags(`name:"indexName"`),
+				),
+				// Provide ContentIndex name
+				fx.Annotate(
+					func(s *sources.Sources) string {
+						source, _ := s.FindByName(sourceName)
+						if source != nil {
+							return source.Index
+						}
+						return ""
+					},
+					fx.ResultTags(`name:"contentIndex"`),
+				),
+				// Provide article processor first (will be first in the slice)
+				fx.Annotate(
+					func(
+						logger logger.Interface,
+						service article.Interface,
+						storage storage.Interface,
+						params struct {
+							fx.In
+							IndexName string `name:"indexName"`
+						},
+					) models.ContentProcessor {
+						return &article.Processor{
+							Logger:         logger,
+							ArticleService: service,
+							Storage:        storage,
+							IndexName:      params.IndexName,
+						}
+					},
+					fx.ResultTags(`group:"processors"`),
+				),
+				// Provide content processor second (will be second in the slice)
+				fx.Annotate(
+					func(
+						service content.Interface,
+						storage storage.Interface,
+						logger logger.Interface,
+						params struct {
+							fx.In
+							IndexName string `name:"contentIndex"`
+						},
+					) models.ContentProcessor {
+						return content.NewProcessor(service, storage, logger, params.IndexName)
+					},
+					fx.ResultTags(`group:"processors"`),
+				),
+			),
+			storage.Module,
+			crawler.Module,
+			article.Module,
+			content.Module,
+			sources.Module,
+			fx.Invoke(startCrawl),
+		)
 
-	// Start the application
-	if err := app.Start(cmd.Context()); err != nil {
-		globalLogger.Error("Error starting application", "error", err)
-		return fmt.Errorf("error starting application: %w", err)
-	}
-
-	defer func() {
-		if err := app.Stop(cmd.Context()); err != nil {
-			globalLogger.Error("Error stopping application", "error", err)
+		// Start the application
+		if err := app.Start(ctx); err != nil {
+			return fmt.Errorf("error starting application: %w", err)
 		}
-	}()
 
-	return nil
+		defer func() {
+			if err := app.Stop(ctx); err != nil {
+				globalLogger.Error("Error stopping application", "context", ctx, "error", err)
+			}
+		}()
+
+		return nil
+	},
 }
 
-// startCrawl starts the crawling process
-func startCrawlCmd(crawlerInstance *crawler.Crawler, articleProcessor *article.Processor) error {
-	globalLogger.Debug("Starting crawl...")
+// CrawlParams holds the parameters for crawl-source crawl
+type CrawlParams struct {
+	fx.In
 
-	// Create the collector using global configuration
-	params := collector.Params{
-		BaseURL:          globalConfig.Crawler.BaseURL,
-		MaxDepth:         globalConfig.Crawler.MaxDepth,
-		RateLimit:        globalConfig.Crawler.RateLimit,
-		Logger:           globalLogger,
-		ArticleProcessor: articleProcessor,
+	Sources         *sources.Sources
+	CrawlerInstance crawler.Interface
+	Processors      []models.ContentProcessor `group:"processors"`
+}
+
+// startCrawl starts the crawl-source crawl
+func startCrawl(p CrawlParams) error {
+	if p.CrawlerInstance == nil {
+		return errors.New("crawler is not initialized")
 	}
 
-	// Create the collector
-	collectorResult, err := collector.New(params)
+	// Get the crawler instance to access index service
+	crawler, ok := p.CrawlerInstance.(*crawler.Crawler)
+	if !ok {
+		return fmt.Errorf("crawler instance is not of type *crawler.Crawler")
+	}
+
+	// Set both the crawler and index manager in the sources
+	p.Sources.SetCrawler(p.CrawlerInstance)
+	p.Sources.SetIndexManager(crawler.IndexService)
+
+	source, err := p.Sources.FindByName(sourceName)
+	if err != nil {
+		return err
+	}
+
+	// Parse rate limit
+	rateLimit, err := time.ParseDuration(source.RateLimit)
+	if err != nil {
+		return fmt.Errorf("invalid rate limit: %w", err)
+	}
+
+	// Create the collector using the collector module
+	collectorResult, err := collector.New(collector.Params{
+		BaseURL:          source.URL,
+		MaxDepth:         source.MaxDepth,
+		RateLimit:        rateLimit,
+		Debugger:         logger.NewCollyDebugger(globalLogger),
+		Logger:           globalLogger,
+		ArticleProcessor: p.Processors[0], // Use first processor as article processor
+		ContentProcessor: p.Processors[1], // Use second processor as content processor
+		Source:           source,
+	})
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)
 	}
 
 	// Set the collector in the crawler instance
-	crawlerInstance.SetCollector(collectorResult.Collector)
+	crawler.SetCollector(collectorResult.Collector)
 
-	// Start the crawling process
-	if startErr := crawlerInstance.Start(context.Background(), params.BaseURL); startErr != nil {
-		return fmt.Errorf("error starting crawler: %w", startErr)
-	}
-
-	return nil
+	// Start the crawl
+	return p.Sources.Start(context.Background(), sourceName)
 }
 
 func init() {
 	rootCmd.AddCommand(crawlCmd)
 
-	crawlCmd.Flags().StringP("url", "u", "", "Base URL to crawl (required)")
-	crawlCmd.Flags().IntP("depth", "d", DefaultMaxDepth, "Maximum crawl depth")
-	crawlCmd.Flags().DurationP("rate", "r", time.Second, "Rate limit between requests")
-	crawlCmd.Flags().StringP("index", "i", "articles", "Elasticsearch index name")
-
-	err := crawlCmd.MarkFlagRequired("url")
-	if err != nil {
-		globalLogger.Error("Error marking URL flag as required", "error", err)
+	crawlCmd.Flags().StringVar(&sourceName, "source", "", "Specify the source to crawl")
+	if err := crawlCmd.MarkFlagRequired("source"); err != nil {
+		globalLogger.Error("Error marking source flag as required", "error", err)
 	}
 }

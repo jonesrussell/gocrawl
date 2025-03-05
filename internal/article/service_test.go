@@ -10,8 +10,10 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
@@ -22,6 +24,21 @@ func newMockLogger() *logger.MockLogger {
 	return mockLogger
 }
 
+// Helper function to create default article selectors
+func newDefaultSelectors() config.ArticleSelectors {
+	return config.ArticleSelectors{
+		Container:     "div.details",
+		Title:         "h1.details-title",
+		Body:          "div.details-body",
+		Intro:         "div.details-intro",
+		Byline:        "div.details-byline",
+		Author:        "span.author",
+		PublishedTime: "time.timeago",
+		TimeAgo:       "time.timeago",
+		JSONLD:        "script[type='application/ld+json']",
+	}
+}
+
 // Common HTML structure for tests
 const testHTML = `
 <!DOCTYPE html>
@@ -29,6 +46,7 @@ const testHTML = `
 <head>
     <meta charset="utf-8">
     <title>Test Article</title>
+    <meta property="og:type" content="article">
     <script type="application/ld+json">
     {
         "datePublished": "2025-02-11T17:37:42Z",
@@ -43,8 +61,11 @@ const testHTML = `
         <h1 class="details-title">Elliot Lake man arrested after threatening to kill victim and police</h1>
         <div class="details-intro">Police were called to house on Milliken Road for report of break-and-enter</div>
         <div class="details-byline">
-            ElliotLakeToday Staff
-            <time datetime="2025-02-11T17:37:42Z">Feb 11, 2025 12:37 PM</time>
+            <span class="author">ElliotLakeToday Staff</span>
+            <time class="timeago" datetime="2025-02-11T17:37:42Z">Feb 11, 2025 12:37 PM</time>
+        </div>
+        <div class="details-body">
+            Police were called to house on Milliken Road for report of break-and-enter
         </div>
     </div>
 </body>
@@ -52,8 +73,31 @@ const testHTML = `
 `
 
 func TestExtractArticle(t *testing.T) {
-	mockLogger := newMockLogger() // Use the helper function
-	svc := article.NewService(mockLogger)
+	mockLogger := logger.NewMockLogger()
+	selectors := newDefaultSelectors()
+	service := article.NewService(mockLogger, selectors)
+
+	// Set up mock expectations for all debug calls with variable arguments
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("bool")).Return()
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("[]string")).Return()
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int")).Return()
+	mockLogger.On("Debug", "No valid published date found", "dates", mock.AnythingOfType("[]string")).Return()
+	mockLogger.On("Debug", "Successfully parsed date",
+		"source", mock.AnythingOfType("string"),
+		"format", mock.AnythingOfType("string"),
+		"result", mock.AnythingOfType("time.Time")).Return()
+	mockLogger.On("Debug", "Extracted article",
+		"component", "article/service",
+		"id", mock.AnythingOfType("string"),
+		"title", mock.AnythingOfType("string"),
+		"url", mock.AnythingOfType("string"),
+		"date", mock.AnythingOfType("time.Time"),
+		"author", mock.AnythingOfType("string"),
+		"tags", mock.AnythingOfType("[]string"),
+		"wordCount", mock.AnythingOfType("int"),
+		"category", mock.AnythingOfType("string"),
+		"section", mock.AnythingOfType("string")).Return()
 
 	// Create a new document from the common HTML string
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(testHTML))
@@ -63,33 +107,26 @@ func TestExtractArticle(t *testing.T) {
 
 	// Create a colly HTMLElement for the div.details
 	e := &colly.HTMLElement{
-		DOM: doc.Find("div.details"),
+		DOM: doc.Find(selectors.Container),
 		Request: &colly.Request{
 			URL: &url.URL{Path: "/mock-url"},
 		},
 	}
 
 	// Call the ExtractArticle method
-	article := svc.ExtractArticle(e)
+	article := service.ExtractArticle(e)
 
 	// Validate the extracted article
-	assert.NotNil(t, article)
-	assert.Equal(t, "/mock-url", article.Source)
-	assert.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", article.Title)
-	assert.Equal(
-		t,
-		"Police were called to house on Milliken Road for report of break-and-enter\n\n",
-		article.Body,
-	)
-	assert.Equal(t, "ElliotLakeToday Staff", article.Author)
-
-	// Assert that the expectations were met
-	mockLogger.AssertExpectations(t)
+	require.NotNil(t, article)
+	require.Equal(t, "/mock-url", article.Source)
+	require.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", article.Title)
+	require.Equal(t, "Police were called to house on Milliken Road for report of break-and-enter", strings.TrimSpace(article.Body))
+	require.Equal(t, "ElliotLakeToday Staff", article.Author)
 }
 
 func TestCleanAuthor(t *testing.T) {
-	mockLogger := newMockLogger() // Use the helper function
-	svc := article.NewService(mockLogger)
+	mockLogger := newMockLogger()
+	svc := article.NewService(mockLogger, newDefaultSelectors())
 
 	// Change the author string to match the expected format
 	author := "ElliotLakeToday Staff" // Simplified for testing
@@ -100,8 +137,22 @@ func TestCleanAuthor(t *testing.T) {
 }
 
 func TestParsePublishedDate(t *testing.T) {
-	mockLogger := newMockLogger() // Use the helper function
-	svc := article.NewService(mockLogger)
+	mockLogger := logger.NewMockLogger()
+	svc := article.NewService(mockLogger, newDefaultSelectors())
+
+	// Set up mock expectations for debug calls
+	mockLogger.On("Debug",
+		"Trying to parse date",
+		"value", "2025-02-14T15:04:05Z",
+	).Return()
+
+	expectedDate, _ := time.Parse(time.RFC3339, "2025-02-14T15:04:05Z")
+	mockLogger.On("Debug",
+		"Successfully parsed date",
+		"source", "2025-02-14T15:04:05Z",
+		"format", "2006-01-02T15:04:05Z07:00",
+		"result", expectedDate,
+	).Return()
 
 	// Create a mock HTML document
 	html := `
@@ -135,6 +186,96 @@ func TestParsePublishedDate(t *testing.T) {
 
 	date := svc.ParsePublishedDate(e, jsonLD)
 
-	expectedDate, _ := time.Parse(time.RFC3339, "2025-02-14T15:04:05Z")
 	assert.Equal(t, expectedDate, date)
+}
+
+func TestExtractTags(t *testing.T) {
+	mockLogger := logger.NewMockLogger()
+	selectors := config.DefaultArticleSelectors()
+	service := article.NewService(mockLogger, selectors)
+
+	// Set up mock expectations for debug calls
+	mockLogger.On("Debug", "Found JSON-LD keywords", "values", mock.AnythingOfType("[]string")).Return()
+	mockLogger.On("Debug", "Found JSON-LD section", "value", mock.AnythingOfType("string")).Return()
+	mockLogger.On("Debug", "Found meta section", "value", mock.AnythingOfType("string")).Return()
+	mockLogger.On("Debug", "Found meta keywords", "value", mock.AnythingOfType("string")).Return()
+
+	// Create test HTML with meta tags
+	html := `
+		<!DOCTYPE html>
+		<html>
+		<head>
+			<meta property="article:section" content="News">
+			<meta name="keywords" content="crime|police|arrest">
+		</head>
+		<body>
+			<article></article>
+		</body>
+		</html>
+	`
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		t.Fatalf("Failed to create document: %v", err)
+	}
+
+	// Create a colly HTMLElement with the full document
+	e := &colly.HTMLElement{
+		DOM: doc.Selection,
+		Request: &colly.Request{
+			URL: &url.URL{
+				Path: "/opp-beat/article-123",
+			},
+		},
+	}
+
+	// Create JSON-LD data
+	jsonLD := article.JSONLDArticle{
+		Keywords: []string{"OPP", "arrest", "assault"},
+		Section:  "Police",
+	}
+
+	// Extract tags
+	tags := service.ExtractTags(e, jsonLD)
+
+	// Validate tags (note: "arrest" appears only once due to deduplication)
+	expectedTags := []string{"OPP", "arrest", "assault", "Police", "News", "crime", "police", "OPP Beat"}
+	require.Equal(t, expectedTags, tags)
+}
+
+func TestRemoveDuplicates(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "Empty slice",
+			input:    []string{},
+			expected: []string{},
+		},
+		{
+			name:     "No duplicates",
+			input:    []string{"a", "b", "c"},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "With duplicates",
+			input:    []string{"a", "b", "a", "c", "b"},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "Case sensitive",
+			input:    []string{"A", "a", "B", "b"},
+			expected: []string{"A", "a", "B", "b"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := article.RemoveDuplicates(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

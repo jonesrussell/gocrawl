@@ -9,7 +9,6 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestCollyDebugger(t *testing.T) {
@@ -40,8 +39,12 @@ func TestCollyDebugger(t *testing.T) {
 			RequestID:   1,
 			CollectorID: 1,
 		}
-		// Set expectation for the Debug method
-		mockLogger.On("Debug", "Colly event", mock.Anything).Return()
+		// Set expectation for the Debug method with the correct format
+		mockLogger.On("Debug", "Colly event",
+			"type", "test",
+			"requestID", uint32(1),
+			"collectorID", uint32(1),
+		).Return()
 
 		debugger.Event(event)
 
@@ -57,7 +60,11 @@ func TestCollyDebugger(t *testing.T) {
 			Headers: &http.Header{},
 		}
 		// Set expectation for the Debug method in OnRequest
-		mockLogger.On("Debug", "Request", mock.Anything).Return()
+		mockLogger.On("Debug", "Request",
+			"url", "http://example.com",
+			"method", "GET",
+			"headers", &http.Header{},
+		).Return()
 
 		debugger.OnRequest(req)
 
@@ -74,7 +81,11 @@ func TestCollyDebugger(t *testing.T) {
 			Headers:    &http.Header{},
 		}
 		// Set expectation for the Info method in OnResponse
-		mockLogger.On("Info", "Response", mock.Anything).Return()
+		mockLogger.On("Info", "Response",
+			"url", "http://example.com",
+			"status", 200,
+			"headers", &http.Header{},
+		).Return()
 
 		debugger.OnResponse(resp)
 
@@ -91,7 +102,11 @@ func TestCollyDebugger(t *testing.T) {
 			Headers:    &http.Header{},
 		}
 		// Set expectation for the Error method in OnError
-		mockLogger.On("Error", "Error", mock.Anything).Return()
+		mockLogger.On("Error", "Error",
+			"url", "http://example.com",
+			"status", 404,
+			"error", "unknown error",
+		).Return()
 
 		debugger.OnError(resp, errors.New("unknown error"))
 
@@ -106,7 +121,11 @@ func TestCollyDebugger(t *testing.T) {
 			CollectorID: 1,
 		}
 		// Set expectation for the Info method in OnEvent
-		mockLogger.On("Info", "Event", mock.Anything).Return()
+		mockLogger.On("Info", "Event",
+			"type", "test",
+			"requestID", uint32(1),
+			"collectorID", uint32(1),
+		).Return()
 
 		debugger.OnEvent(event)
 

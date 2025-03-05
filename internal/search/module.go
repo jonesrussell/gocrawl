@@ -2,6 +2,7 @@ package search
 
 import (
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
@@ -14,7 +15,7 @@ var Module = fx.Module("search",
 )
 
 // ProvideSearchService initializes the search service
-func ProvideSearchService(esClient *elasticsearch.Client, log logger.Interface) (*Service, error) {
+func ProvideSearchService(esClient *elasticsearch.Client, cfg *config.Config, log logger.Interface) (*Service, error) {
 	// Initialize and return the search service
-	return NewSearchService(esClient, log), nil
+	return NewSearchService(esClient, cfg, log), nil
 }

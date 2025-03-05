@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Error definitions
@@ -39,13 +41,14 @@ type AppConfig struct {
 
 // CrawlerConfig holds crawler-specific configuration
 type CrawlerConfig struct {
-	BaseURL     string
-	MaxDepth    int
-	RateLimit   time.Duration
-	RandomDelay time.Duration
-	IndexName   string
-	SourceFile  string
-	Parallelism int
+	BaseURL          string
+	MaxDepth         int
+	RateLimit        time.Duration
+	RandomDelay      time.Duration
+	IndexName        string
+	ContentIndexName string
+	SourceFile       string
+	Parallelism      int
 }
 
 // SetMaxDepth sets the MaxDepth in the CrawlerConfig
@@ -88,12 +91,30 @@ type LogConfig struct {
 	Debug bool
 }
 
+// Source represents a news source configuration
+type Source struct {
+	Name         string          `yaml:"name"`
+	URL          string          `yaml:"url"`
+	ArticleIndex string          `yaml:"article_index"`
+	Index        string          `yaml:"index"`
+	RateLimit    time.Duration   `yaml:"rate_limit"`
+	MaxDepth     int             `yaml:"max_depth"`
+	Time         []string        `yaml:"time"`
+	Selectors    SourceSelectors `yaml:"selectors"`
+}
+
+// SourceSelectors defines the selectors for a source
+type SourceSelectors struct {
+	Article ArticleSelectors `yaml:"article"`
+}
+
 // Config holds all configuration settings
 type Config struct {
 	App           AppConfig
 	Crawler       CrawlerConfig
 	Elasticsearch ElasticsearchConfig
 	Log           LogConfig
+	Sources       []Source `yaml:"sources"`
 }
 
 // NewConfig creates a new Config instance with values from Viper
@@ -126,13 +147,14 @@ func NewConfig() (*Config, error) {
 			Environment: viper.GetString(AppEnvKey),
 		},
 		Crawler: CrawlerConfig{
-			BaseURL:     viper.GetString(CrawlerBaseURLKey),
-			MaxDepth:    viper.GetInt(CrawlerMaxDepthKey),
-			RateLimit:   rateLimit,
-			RandomDelay: viper.GetDuration("CRAWLER_RANDOM_DELAY"),
-			IndexName:   viper.GetString(ElasticIndexNameKey),
-			SourceFile:  viper.GetString(CrawlerSourceFileKey),
-			Parallelism: viper.GetInt("CRAWLER_PARALLELISM"),
+			BaseURL:          viper.GetString(CrawlerBaseURLKey),
+			MaxDepth:         viper.GetInt(CrawlerMaxDepthKey),
+			RateLimit:        rateLimit,
+			RandomDelay:      viper.GetDuration("CRAWLER_RANDOM_DELAY"),
+			IndexName:        viper.GetString(ElasticIndexNameKey),
+			ContentIndexName: viper.GetString("ELASTIC_CONTENT_INDEX_NAME"),
+			SourceFile:       viper.GetString(CrawlerSourceFileKey),
+			Parallelism:      viper.GetInt("CRAWLER_PARALLELISM"),
 		},
 		Elasticsearch: ElasticsearchConfig{
 			URL:       viper.GetString(ElasticURLKey),
@@ -191,4 +213,19 @@ func ParseRateLimit(rateLimit string) (time.Duration, error) {
 		return time.Second, errors.New("error parsing duration") // Return an error message
 	}
 	return duration, nil
+}
+
+// LoadConfig loads configuration from a YAML file
+func LoadConfig(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
 }

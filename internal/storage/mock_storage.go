@@ -16,18 +16,34 @@ type MockStorage struct {
 	mock.Mock
 }
 
+// Ensure MockStorage implements the Interface
+var _ Interface = (*MockStorage)(nil)
+
 // NewMockStorage creates a new instance of MockStorage
 func NewMockStorage() *MockStorage {
 	m := &MockStorage{}
 	// Set up default expectations
 	m.On("TestConnection", mock.Anything).Return(nil)
 	m.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	m.On("Close").Return(nil)
 	return m
+}
+
+// Close implements Interface
+func (m *MockStorage) Close() error {
+	args := m.Called()
+	return args.Error(0)
 }
 
 // IndexDocument mocks the indexing of a document
 func (m *MockStorage) IndexDocument(ctx context.Context, indexName, docID string, document interface{}) error {
 	args := m.Called(ctx, indexName, docID, document)
+	return args.Error(0)
+}
+
+// GetDocument implements Interface
+func (m *MockStorage) GetDocument(ctx context.Context, index string, id string, document interface{}) error {
+	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
@@ -128,4 +144,96 @@ func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int
 func (m *MockStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
 	args := m.Called(ctx, indexName)
 	return args.Bool(0), args.Error(1)
+}
+
+// IndexArticle implements Interface
+func (m *MockStorage) IndexArticle(ctx context.Context, article *models.Article) error {
+	args := m.Called(ctx, article)
+	return args.Error(0)
+}
+
+// Ping implements Interface
+func (m *MockStorage) Ping(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+// SearchDocuments implements Interface
+func (m *MockStorage) SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error) {
+	args := m.Called(ctx, index, query)
+	result, ok := args.Get(0).([]interface{})
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
+}
+
+// IndexContent implements Interface
+func (m *MockStorage) IndexContent(id string, content *models.Content) error {
+	args := m.Called(id, content)
+	return args.Error(0)
+}
+
+// GetContent implements Interface
+func (m *MockStorage) GetContent(id string) (*models.Content, error) {
+	args := m.Called(id)
+	result, ok := args.Get(0).(*models.Content)
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
+}
+
+// SearchContent implements Interface
+func (m *MockStorage) SearchContent(query string) ([]*models.Content, error) {
+	args := m.Called(query)
+	result, ok := args.Get(0).([]*models.Content)
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
+}
+
+// DeleteContent implements Interface
+func (m *MockStorage) DeleteContent(id string) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+// GetMapping implements Interface
+func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]interface{}, error) {
+	args := m.Called(ctx, index)
+	result, ok := args.Get(0).(map[string]interface{})
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
+}
+
+// ListIndices implements Interface
+func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
+	args := m.Called(ctx)
+	result, ok := args.Get(0).([]string)
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
+}
+
+// UpdateMapping implements Interface
+func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error {
+	args := m.Called(ctx, index, mapping)
+	return args.Error(0)
+}
+
+// GetIndexHealth implements Interface
+func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
+	args := m.Called(ctx, index)
+	return args.String(0), args.Error(1)
+}
+
+// GetIndexDocCount implements Interface
+func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
+	args := m.Called(ctx, index)
+	return args.Get(0).(int64), args.Error(1)
 }

@@ -34,19 +34,20 @@ func TestSearchService_SearchArticles(t *testing.T) {
 			query:            "error",
 			size:             5,
 			expectedArticles: nil,
-			expectedError:    assert.AnError, // Use a predefined error
+			expectedError:    assert.AnError,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set up expectations
-			mockStorage.On("SearchArticles", mock.Anything, tt.query, tt.size).Return(tt.expectedArticles, tt.expectedError)
+			// Reset mock expectations
+			mockStorage.ExpectedCalls = nil
 
-			// Mock other necessary methods
+			// Set up expectations with a more flexible context matcher
+			mockStorage.On("SearchArticles", mock.Anything, tt.query, tt.size).Return(tt.expectedArticles, tt.expectedError)
 			mockStorage.On("TestConnection", mock.Anything).Return(nil)
-			mockStorage.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-			// No expectation set for BulkIndexArticles
+			mockStorage.On("IndexExists", mock.Anything, "articles").Return(true, nil)
+			mockStorage.On("Close").Return(nil).Maybe()
 
 			// Call the method under test
 			articles, err := searchService.SearchArticles(t.Context(), tt.query, tt.size)
