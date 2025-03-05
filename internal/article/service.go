@@ -160,7 +160,7 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	}
 
 	// Extract author with fallbacks
-	author := e.DOM.Find(".details-byline .author").Text()
+	author := e.DOM.Find(s.Selectors.Byline + " " + s.Selectors.Author).Text()
 	if author == "" {
 		author = e.ChildText(s.Selectors.Author)
 	}

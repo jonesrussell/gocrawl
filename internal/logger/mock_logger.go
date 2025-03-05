@@ -21,29 +21,29 @@ func NewMockLogger() *MockLogger {
 
 // Implement the same methods as CustomLogger
 func (m *MockLogger) Info(msg string, args ...interface{}) {
-	m.Called(msg, args)
+	m.Called(append([]interface{}{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 
-func (m *MockLogger) Error(msg string, _ ...interface{}) {
-	m.Called(msg)
+func (m *MockLogger) Error(msg string, args ...interface{}) {
+	m.Called(append([]interface{}{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 
-func (m *MockLogger) Debug(msg string, _ ...interface{}) {
-	m.Called(msg)
+func (m *MockLogger) Debug(msg string, args ...interface{}) {
+	m.Called(append([]interface{}{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 
 // Implement Warn method
-func (m *MockLogger) Warn(msg string, _ ...interface{}) {
-	m.Called(msg)
+func (m *MockLogger) Warn(msg string, args ...interface{}) {
+	m.Called(append([]interface{}{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 
 // Implement Fatal method
-func (m *MockLogger) Fatal(msg string, _ ...interface{}) {
-	m.Called(msg)
+func (m *MockLogger) Fatal(msg string, args ...interface{}) {
+	m.Called(append([]interface{}{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 

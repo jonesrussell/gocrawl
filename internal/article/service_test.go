@@ -25,7 +25,17 @@ func newMockLogger() *logger.MockLogger {
 
 // Helper function to create default article selectors
 func newDefaultSelectors() config.ArticleSelectors {
-	return config.DefaultArticleSelectors()
+	return config.ArticleSelectors{
+		Container:     "div.details",
+		Title:         "h1.details-title",
+		Body:          "div.details-body",
+		Intro:         "div.details-intro",
+		Byline:        "div.details-byline",
+		Author:        "span.author",
+		PublishedTime: "time.timeago",
+		TimeAgo:       "time.timeago",
+		JSONLD:        "script[type='application/ld+json']",
+	}
 }
 
 // Common HTML structure for tests
@@ -51,7 +61,7 @@ const testHTML = `
         <div class="details-intro">Police were called to house on Milliken Road for report of break-and-enter</div>
         <div class="details-byline">
             <span class="author">ElliotLakeToday Staff</span>
-            <time datetime="2025-02-11T17:37:42Z">Feb 11, 2025 12:37 PM</time>
+            <time class="timeago" datetime="2025-02-11T17:37:42Z">Feb 11, 2025 12:37 PM</time>
         </div>
         <div class="details-body">
             Police were called to house on Milliken Road for report of break-and-enter

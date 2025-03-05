@@ -9,7 +9,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,6 +49,7 @@ func createTestConfig() *sources.Config {
 	cfg.Selectors.Article.Title = "h1"
 	cfg.Selectors.Article.Body = ".article-body"
 	cfg.Selectors.Article.PublishedTime = "time"
+	cfg.RateLimit = "1s"
 	return cfg
 }
 
@@ -117,7 +117,17 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up mock expectations for the logger
 			if !tt.wantErr {
-				tt.params.Logger.(*logger.MockLogger).On("Debug", "Collector created", mock.Anything).Return()
+				mockLogger := tt.params.Logger.(*logger.MockLogger)
+				// Set up expectations for all debug calls
+				mockLogger.On("Debug", "Collector created",
+					"baseURL", tt.params.BaseURL,
+					"maxDepth", tt.params.MaxDepth,
+					"rateLimit", tt.params.RateLimit,
+					"parallelism", tt.params.Parallelism,
+				).Return()
+				mockLogger.On("Debug", "Setting up article processing", "tag", "collector/content").Return()
+				mockLogger.On("Debug", "Setting up HTML processing", "tag", "collector/content").Return()
+				mockLogger.On("Debug", "Setting up link following", "tag", "collector/content").Return()
 			}
 
 			result, err := collector.New(tt.params)
@@ -161,10 +171,22 @@ func TestCollectorCreation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockLogger := logger.NewMockLogger()
-			// Set up mock expectations
+			// Set up mock expectations for all debug calls
 			if !tt.wantErr {
-				mockLogger.On("Debug", "Collector created", mock.Anything).Return()
+				mockLogger.On("Debug", "Collector created",
+					"baseURL", tt.baseURL,
+					"maxDepth", 2,
+					"rateLimit", time.Second,
+					"parallelism", 0,
+				).Return()
+				mockLogger.On("Debug", "Setting up article processing", "tag", "collector/content").Return()
+				mockLogger.On("Debug", "Setting up HTML processing", "tag", "collector/content").Return()
+				mockLogger.On("Debug", "Setting up link following", "tag", "collector/content").Return()
 			}
+
+			// Create test config with rate limit
+			cfg := createTestConfig()
+			cfg.RateLimit = "1s"
 
 			params := collector.Params{
 				BaseURL:   tt.baseURL,
@@ -176,7 +198,7 @@ func TestCollectorCreation(t *testing.T) {
 				Logger:           mockLogger,
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Context:          context.Background(),
-				Source:           createTestConfig(),
+				Source:           cfg,
 			}
 
 			result, err := collector.New(params)
