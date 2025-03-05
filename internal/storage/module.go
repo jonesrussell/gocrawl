@@ -33,10 +33,13 @@ func NewElasticsearchStorage(
 	}
 
 	indexService := NewIndexService(logger, storage)
+	mappingService := NewMappingService(logger, storage)
+	storage.mappingService = mappingService
 
 	return Result{
-		Storage:      storage,
-		IndexService: indexService,
+		Storage:        storage,
+		IndexService:   indexService,
+		MappingService: mappingService,
 	}
 }
 

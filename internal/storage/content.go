@@ -82,28 +82,12 @@ func (s *ElasticsearchStorage) CreateContentIndex(ctx context.Context) error {
 		},
 	}
 
-	// Convert mappings to JSON
-	data, err := json.Marshal(mappings)
-	if err != nil {
-		return fmt.Errorf("error marshaling mappings: %w", err)
+	// Use the mapping service to ensure the mapping is correct
+	if err := s.mappingService.EnsureMapping(ctx, s.opts.IndexName, mappings); err != nil {
+		return fmt.Errorf("failed to ensure content index mapping: %w", err)
 	}
 
-	// Create the index
-	res, err := s.ESClient.Indices.Create(
-		s.opts.IndexName,
-		s.ESClient.Indices.Create.WithContext(ctx),
-		s.ESClient.Indices.Create.WithBody(bytes.NewReader(data)),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create index: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return fmt.Errorf("failed to create index: %s", res.String())
-	}
-
-	s.Logger.Info("Content index created successfully", "index", s.opts.IndexName)
+	s.Logger.Info("Content index mapping ensured", "index", s.opts.IndexName)
 	return nil
 }
 

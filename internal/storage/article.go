@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
@@ -85,41 +83,12 @@ func (s *ElasticsearchStorage) CreateArticlesIndex(ctx context.Context) error {
 		},
 	}
 
-	// Convert mappings to JSON
-	data, err := json.Marshal(mappings)
-	if err != nil {
-		return fmt.Errorf("error marshaling mappings: %w", err)
+	// Use the mapping service to ensure the mapping is correct
+	if err := s.mappingService.EnsureMapping(ctx, "articles", mappings); err != nil {
+		return fmt.Errorf("failed to ensure article index mapping: %w", err)
 	}
 
-	// Create the index
-	req := esapi.IndicesCreateRequest{
-		Index: "articles",
-		Body:  bytes.NewReader(data),
-	}
-
-	s.Logger.Debug("Attempting to create index", "index", "articles", "mappings", mappings)
-
-	res, err := req.Do(ctx, s.ESClient)
-	if err != nil {
-		return fmt.Errorf("failed to create index: %w", err)
-	}
-	defer func(Body io.ReadCloser) {
-		closeErr := Body.Close()
-		if closeErr != nil {
-			s.Logger.Error("Failed to close response body", "error", closeErr)
-		}
-	}(res.Body)
-
-	if res.IsError() {
-		var e map[string]interface{}
-		if decodeErr := json.NewDecoder(res.Body).Decode(&e); decodeErr != nil {
-			return fmt.Errorf("error parsing error response: %w", decodeErr)
-		}
-		s.Logger.Error("Failed to create index", "error", e["error"])
-		return fmt.Errorf("elasticsearch error: %v", e["error"])
-	}
-
-	s.Logger.Info("Index created successfully", "index", "articles")
+	s.Logger.Info("Article index mapping ensured", "index", "articles")
 	return nil
 }
 

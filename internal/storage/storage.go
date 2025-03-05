@@ -66,17 +66,19 @@ type Interface interface {
 
 // ElasticsearchStorage struct to hold the Elasticsearch client
 type ElasticsearchStorage struct {
-	ESClient *elasticsearch.Client
-	Logger   logger.Interface
-	opts     Options
+	ESClient       *elasticsearch.Client
+	Logger         logger.Interface
+	opts           Options
+	mappingService MappingServiceInterface
 }
 
 // Result holds the dependencies for the storage
 type Result struct {
 	fx.Out
 
-	Storage      Interface
-	IndexService IndexServiceInterface
+	Storage        Interface
+	IndexService   IndexServiceInterface
+	MappingService MappingServiceInterface
 }
 
 // Ensure ElasticsearchStorage implements the Storage interface
