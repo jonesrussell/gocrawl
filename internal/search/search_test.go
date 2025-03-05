@@ -2,6 +2,7 @@ package search_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -12,6 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+// ErrMockTypeAssertion is returned when a type assertion fails in mock methods
+var ErrMockTypeAssertion = errors.New("mock type assertion failed")
 
 type mockStorage struct {
 	mock.Mock
@@ -27,18 +31,18 @@ func (m *mockStorage) Close() error {
 	return args.Error(0)
 }
 
-func (m *mockStorage) IndexDocument(ctx context.Context, index string, document interface{}) error {
-	args := m.Called(ctx, index, document)
+func (m *mockStorage) IndexDocument(ctx context.Context, index string, id string, document interface{}) error {
+	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
-func (m *mockStorage) GetDocument(ctx context.Context, index string, id string) (interface{}, error) {
-	args := m.Called(ctx, index, id)
-	return args.Get(0), args.Error(1)
+func (m *mockStorage) GetDocument(ctx context.Context, index string, id string, document interface{}) error {
+	args := m.Called(ctx, index, id, document)
+	return args.Error(0)
 }
 
-func (m *mockStorage) TestConnection() error {
-	args := m.Called()
+func (m *mockStorage) TestConnection(ctx context.Context) error {
+	args := m.Called(ctx)
 	return args.Error(0)
 }
 
@@ -52,7 +56,7 @@ func (m *mockStorage) Search(ctx context.Context, index string, query interface{
 	return args.Get(0), args.Error(1)
 }
 
-func (m *mockStorage) CreateIndex(ctx context.Context, index string, mapping interface{}) error {
+func (m *mockStorage) CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error {
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }
@@ -92,39 +96,43 @@ func (m *mockStorage) IndexArticle(ctx context.Context, article *models.Article)
 	return args.Error(0)
 }
 
-func (m *mockStorage) Ping() error {
-	args := m.Called()
+func (m *mockStorage) Ping(ctx context.Context) error {
+	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-func (m *mockStorage) SearchDocuments(ctx context.Context, index string, query interface{}) ([]interface{}, error) {
+func (m *mockStorage) SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error) {
 	args := m.Called(ctx, index, query)
 	return args.Get(0).([]interface{}), args.Error(1)
 }
 
-func (m *mockStorage) IndexContent(ctx context.Context, content *models.Content) error {
-	args := m.Called(ctx, content)
+func (m *mockStorage) IndexContent(id string, content *models.Content) error {
+	args := m.Called(id, content)
 	return args.Error(0)
 }
 
-func (m *mockStorage) GetContent(ctx context.Context, id string) (*models.Content, error) {
-	args := m.Called(ctx, id)
+func (m *mockStorage) GetContent(id string) (*models.Content, error) {
+	args := m.Called(id)
 	return args.Get(0).(*models.Content), args.Error(1)
 }
 
-func (m *mockStorage) SearchContent(ctx context.Context, query string, size int) ([]*models.Content, error) {
-	args := m.Called(ctx, query, size)
+func (m *mockStorage) SearchContent(query string) ([]*models.Content, error) {
+	args := m.Called(query)
 	return args.Get(0).([]*models.Content), args.Error(1)
 }
 
-func (m *mockStorage) DeleteContent(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
+func (m *mockStorage) DeleteContent(id string) error {
+	args := m.Called(id)
 	return args.Error(0)
 }
 
-func (m *mockStorage) GetMapping(ctx context.Context, index string) (interface{}, error) {
+func (m *mockStorage) GetMapping(ctx context.Context, index string) (map[string]interface{}, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0), args.Error(1)
+	result, ok := args.Get(0).(map[string]interface{})
+	if !ok && args.Get(0) != nil {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }
 
 func (m *mockStorage) ListIndices(ctx context.Context) ([]string, error) {
@@ -132,14 +140,14 @@ func (m *mockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	return args.Get(0).([]string), args.Error(1)
 }
 
-func (m *mockStorage) UpdateMapping(ctx context.Context, index string, mapping interface{}) error {
+func (m *mockStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error {
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }
 
-func (m *mockStorage) GetIndexHealth(ctx context.Context, index string) (interface{}, error) {
+func (m *mockStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0), args.Error(1)
+	return args.String(0), args.Error(1)
 }
 
 func (m *mockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
@@ -171,7 +179,7 @@ func TestNewSearchService(t *testing.T) {
 func TestSearchContent(t *testing.T) {
 	// Create mock dependencies
 	mockLogger := logger.NewMockLogger()
-	mockLogger.On("Info", "URL: http://example.com, Content: Test content").Return()
+	mockLogger.On("Info", "Search result", "url", "http://example.com", "content", "Test content").Return()
 
 	mockConfig := &config.Config{
 		Elasticsearch: config.ElasticsearchConfig{
@@ -190,8 +198,9 @@ func TestSearchContent(t *testing.T) {
 	}
 	mockStorage.On("SearchArticles", mock.Anything, "test query", 10).Return(mockArticles, nil)
 
-	// Create service
+	// Create service with mock storage
 	svc := search.NewSearchService(mockESClient, mockConfig, mockLogger)
+	svc.Storage = mockStorage
 
 	// Perform search
 	results, err := svc.SearchContent(context.Background(), "test query", "", 10)
