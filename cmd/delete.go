@@ -49,7 +49,7 @@ Example:
   gocrawl indices delete my_index
   gocrawl indices delete index1 index2 index3
   gocrawl indices delete --source "Elliot Lake Today"`,
-	Args: func(cmd *cobra.Command, args []string) error {
+	Args: func(_ *cobra.Command, args []string) error {
 		if deleteSourceName == "" && len(args) == 0 {
 			return errors.New("either specify indices or use --source flag")
 		}
@@ -136,7 +136,10 @@ Example:
 					}
 					fmt.Print("Continue? (y/N): ")
 					var response string
-					fmt.Scanln(&response)
+					if _, err := fmt.Scanln(&response); err != nil {
+						fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+						return
+					}
 					if response != "y" && response != "Y" {
 						fmt.Println("Operation cancelled")
 						return
@@ -145,8 +148,9 @@ Example:
 
 				// Delete each existing index
 				for _, index := range indicesToDelete {
-					if err := storage.DeleteIndex(ctx, index); err != nil {
-						fmt.Fprintf(os.Stderr, "Error deleting index '%s': %v\n", index, err)
+					deleteErr := storage.DeleteIndex(ctx, index)
+					if deleteErr != nil {
+						fmt.Fprintf(os.Stderr, "Error deleting index '%s': %v\n", index, deleteErr)
 						os.Exit(1)
 					}
 					fmt.Printf("Successfully deleted index '%s'\n", index)

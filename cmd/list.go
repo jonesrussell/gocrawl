@@ -91,9 +91,10 @@ Example:
 
 				// Print each index
 				for _, index := range filteredIndices {
-					health, err := storage.GetIndexHealth(ctx, index)
-					if err != nil {
-						health = "unknown"
+					healthStatus, healthErr := storage.GetIndexHealth(ctx, index)
+					if healthErr != nil {
+						fmt.Fprintf(os.Stderr, "Error getting health for index '%s': %v\n", index, healthErr)
+						continue
 					}
 
 					docCount, err := storage.GetIndexDocCount(ctx, index)
@@ -103,15 +104,15 @@ Example:
 
 					// Determine ingestion status based on health
 					ingestionStatus := "Connected"
-					if health == "red" {
+					if healthStatus == "red" {
 						ingestionStatus = "Disconnected"
-					} else if health == "yellow" {
+					} else if healthStatus == "yellow" {
 						ingestionStatus = "Warning"
 					}
 
 					fmt.Printf("%-40s %-10s %-12d %-15s %-15s\n",
 						index,
-						health,
+						healthStatus,
 						docCount,
 						"", // Ingestion name (not implemented yet)
 						ingestionStatus)

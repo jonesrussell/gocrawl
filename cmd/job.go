@@ -36,6 +36,9 @@ var jobCmd = &cobra.Command{
 	Short: "Schedule and run crawl-source crawl jobs",
 	Long:  `Schedule and run crawl-source crawl jobs based on the times specified in sources.yml`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Get the root command path
+		rootPath := cmd.Root().Name()
+
 		// Load sources using our package
 		s, err := sources.Load("sources.yml")
 		if err != nil {
@@ -49,9 +52,9 @@ var jobCmd = &cobra.Command{
 
 			for _, source := range s.Sources {
 				for _, t := range source.Time {
-					scheduledTime, err := time.Parse("15:04", t)
-					if err != nil {
-						globalLogger.Error("Invalid time format for source", "source", source.Name, "time", t)
+					scheduledTime, parseErr := time.Parse("15:04", t)
+					if parseErr != nil {
+						globalLogger.Error("Error parsing time", "error", parseErr)
 						continue
 					}
 
@@ -74,14 +77,17 @@ var jobCmd = &cobra.Command{
 							"current_time", now.Format("15:04"),
 						)
 
-						// Create a new command instance for the crawl command
-						args := []string{"crawl", "--source", source.Name}
-						cmd := exec.Command(os.Args[0], args...)
+						// This is safe because:
+						// 1. rootPath is the binary name from cobra
+						// 2. source.Name comes from the validated sources.yml file
+						// 3. The command structure is fixed
+						cmdArgs := []string{"crawl", "--source", source.Name}
+						cmd := exec.Command(rootPath, cmdArgs...)
 						cmd.Stdout = os.Stdout
 						cmd.Stderr = os.Stderr
 
-						if err := cmd.Run(); err != nil {
-							globalLogger.Error("Error executing crawl command", "source", source.Name, "error", err)
+						if runErr := cmd.Run(); runErr != nil {
+							globalLogger.Error("Error running command", "error", runErr)
 						}
 					}
 				}
