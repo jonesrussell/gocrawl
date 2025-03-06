@@ -7,7 +7,7 @@ import (
 // Module provides the config module and its dependencies
 var Module = fx.Options(
 	fx.Provide(
-		NewConfig,        // Provide the NewConfig function to return *Config
+		New,              // Provide the New function to return *Config
 		NewHTTPTransport, // Ensure this is also provided if needed
 	),
 )

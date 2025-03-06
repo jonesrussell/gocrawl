@@ -67,7 +67,7 @@ func initConfig() {
 
 	// Create a new config instance
 	var err error
-	globalConfig, err = config.NewConfig()
+	globalConfig, err = config.New()
 	if err != nil {
 		fmt.Println(fmt.Errorf("unable to create config: %w", err))
 		os.Exit(1)

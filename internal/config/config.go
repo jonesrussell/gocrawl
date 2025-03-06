@@ -119,8 +119,8 @@ type Config struct {
 	Sources       []Source            `yaml:"sources"`
 }
 
-// NewConfig creates a new Config instance with values from Viper
-func NewConfig() (*Config, error) {
+// New creates a new Config instance with values from Viper
+func New() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")

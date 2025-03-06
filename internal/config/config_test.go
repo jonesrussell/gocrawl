@@ -10,7 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 )
 
-func TestNewConfig(t *testing.T) {
+func TestNew(t *testing.T) {
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")     // Name of the file without extension
 	viper.AddConfigPath("./testdata") // Path to the testdata directory
@@ -18,7 +18,7 @@ func TestNewConfig(t *testing.T) {
 	err := viper.ReadInConfig()
 	require.NoError(t, err)
 
-	cfg, err := config.NewConfig()
+	cfg, err := config.New()
 
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
