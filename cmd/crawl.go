@@ -28,11 +28,22 @@ var sourceName string
 
 // createCrawlCmd creates the crawl command
 var crawlCmd = &cobra.Command{
-	Use:   "crawl",
+	Use:   "crawl [source]",
 	Short: "Crawl a single source defined in sources.yml",
+	Long: `Crawl a single source defined in sources.yml.
+The source argument must match a name defined in your sources.yml configuration file.
 
-	RunE: func(cmd *cobra.Command, _ []string) error {
+Example:
+  gocrawl crawl example-blog`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return fmt.Errorf("requires exactly one source name from sources.yml\n\nUsage:\n  %s\n\nRun 'gocrawl list' to see available sources", cmd.UseLine())
+		}
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+		sourceName = args[0]
 		globalLogger.Debug("Starting crawl-crawl command...", "sourceName", sourceName)
 
 		// Create an Fx application
@@ -198,9 +209,4 @@ func startCrawl(p CrawlParams) error {
 
 func init() {
 	rootCmd.AddCommand(crawlCmd)
-
-	crawlCmd.Flags().StringVar(&sourceName, "source", "", "Specify the source to crawl")
-	if err := crawlCmd.MarkFlagRequired("source"); err != nil {
-		globalLogger.Error("Error marking source flag as required", "error", err)
-	}
 }
