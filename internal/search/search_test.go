@@ -24,7 +24,14 @@ type mockStorage struct {
 
 func (m *mockStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
 	args := m.Called(ctx, query, size)
-	return args.Get(0).([]*models.Article), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result, ok := args.Get(0).([]*models.Article)
+	if !ok {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }
 
 func (m *mockStorage) Close() error {
@@ -111,7 +118,11 @@ func (m *mockStorage) Ping(ctx context.Context) error {
 }
 
 // SearchDocuments implements storage.Interface
-func (m *mockStorage) SearchDocuments(ctx context.Context, index string, query string) ([]map[string]interface{}, error) {
+func (m *mockStorage) SearchDocuments(
+	ctx context.Context,
+	index string,
+	query string,
+) ([]map[string]interface{}, error) {
 	args := m.Called(ctx, index, query)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -126,12 +137,26 @@ func (m *mockStorage) IndexContent(id string, content *models.Content) error {
 
 func (m *mockStorage) GetContent(id string) (*models.Content, error) {
 	args := m.Called(id)
-	return args.Get(0).(*models.Content), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result, ok := args.Get(0).(*models.Content)
+	if !ok {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }
 
 func (m *mockStorage) SearchContent(query string) ([]*models.Content, error) {
 	args := m.Called(query)
-	return args.Get(0).([]*models.Content), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result, ok := args.Get(0).([]*models.Content)
+	if !ok {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }
 
 func (m *mockStorage) DeleteContent(id string) error {
@@ -150,7 +175,14 @@ func (m *mockStorage) GetMapping(ctx context.Context, index string) (map[string]
 
 func (m *mockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	args := m.Called(ctx)
-	return args.Get(0).([]string), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result, ok := args.Get(0).([]string)
+	if !ok {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }
 
 func (m *mockStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error {
@@ -165,7 +197,14 @@ func (m *mockStorage) GetIndexHealth(ctx context.Context, index string) (string,
 
 func (m *mockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(int64), args.Error(1)
+	if args.Get(0) == nil {
+		return 0, args.Error(1)
+	}
+	result, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }
 
 func TestNewSearchService(t *testing.T) {

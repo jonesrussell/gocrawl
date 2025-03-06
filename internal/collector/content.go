@@ -73,7 +73,8 @@ func isArticleType(e *colly.HTMLElement) bool {
 	}
 
 	// Check schema.org type
-	if schemaType := e.ChildAttr(`meta[name="type"]`, "content"); strings.Contains(strings.ToLower(schemaType), "article") {
+	schemaType := e.ChildAttr(`meta[name="type"]`, "content")
+	if strings.Contains(strings.ToLower(schemaType), "article") {
 		return true
 	}
 

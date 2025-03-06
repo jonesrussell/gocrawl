@@ -39,14 +39,14 @@ type Config struct {
 			Byline        string `yaml:"byline,omitempty"`
 			PublishedTime string `yaml:"published_time"`
 			TimeAgo       string `yaml:"time_ago,omitempty"`
-			JsonLd        string `yaml:"json_ld,omitempty"`
+			JSONLd        string `yaml:"json_ld,omitempty"`
 			Section       string `yaml:"section,omitempty"`
 			Keywords      string `yaml:"keywords,omitempty"`
 			Description   string `yaml:"description,omitempty"`
 			OgTitle       string `yaml:"og_title,omitempty"`
 			OgDescription string `yaml:"og_description,omitempty"`
 			OgImage       string `yaml:"og_image,omitempty"`
-			OgUrl         string `yaml:"og_url,omitempty"`
+			OgURL         string `yaml:"og_url,omitempty"`
 			Canonical     string `yaml:"canonical,omitempty"`
 			WordCount     string `yaml:"word_count,omitempty"`
 			PublishDate   string `yaml:"publish_date,omitempty"`
