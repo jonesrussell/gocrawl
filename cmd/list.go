@@ -43,7 +43,7 @@ var listCmd = &cobra.Command{
 
 Example:
   gocrawl indices list`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		app := fx.New(
 			fx.WithLogger(func() fxevent.Logger {
 				return &fxevent.NopLogger
@@ -74,31 +74,31 @@ Example:
 				}
 
 				if len(filteredIndices) == 0 {
-					fmt.Println("No indices found")
+					globalLogger.Info("No indices found")
 					return
 				}
 
 				// Print header
-				fmt.Println("\nAvailable indices")
-				fmt.Println("----------------")
-				fmt.Printf("%-40s %-10s %-12s %-15s %-15s\n",
+				globalLogger.Info("\nAvailable indices")
+				globalLogger.Info("----------------")
+				globalLogger.Info(fmt.Sprintf("%-40s %-10s %-12s %-15s %-15s",
 					"Index name",
 					"Health",
 					"Docs count",
 					"Ingestion name",
-					"Ingestion status")
-				fmt.Println(strings.Repeat("-", 92))
+					"Ingestion status"))
+				globalLogger.Info(strings.Repeat("-", 92))
 
 				// Print each index
 				for _, index := range filteredIndices {
 					healthStatus, healthErr := storage.GetIndexHealth(ctx, index)
 					if healthErr != nil {
-						fmt.Fprintf(os.Stderr, "Error getting health for index '%s': %v\n", index, healthErr)
+						globalLogger.Error("Error getting health for index", "index", index, "error", healthErr)
 						continue
 					}
 
-					docCount, err := storage.GetIndexDocCount(ctx, index)
-					if err != nil {
+					docCount, docErr := storage.GetIndexDocCount(ctx, index)
+					if docErr != nil {
 						docCount = 0
 					}
 
@@ -110,14 +110,14 @@ Example:
 						ingestionStatus = "Warning"
 					}
 
-					fmt.Printf("%-40s %-10s %-12d %-15s %-15s\n",
+					globalLogger.Info(fmt.Sprintf("%-40s %-10s %-12d %-15s %-15s",
 						index,
 						healthStatus,
 						docCount,
 						"", // Ingestion name (not implemented yet)
-						ingestionStatus)
+						ingestionStatus))
 				}
-				fmt.Println()
+				globalLogger.Info("")
 			}),
 		)
 

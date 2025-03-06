@@ -81,18 +81,18 @@ Example:
 
 				// If source is specified, get its indices
 				if deleteSourceName != "" {
-					source, err := sources.FindByName(deleteSourceName)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "Error finding source: %v\n", err)
+					source, findErr := sources.FindByName(deleteSourceName)
+					if findErr != nil {
+						globalLogger.Error("Error finding source", "error", findErr)
 						os.Exit(1)
 					}
 					indices = []string{source.ArticleIndex, source.Index}
 				}
 
 				// Check if all indices exist
-				existingIndices, err := storage.ListIndices(ctx)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error checking indices: %v\n", err)
+				existingIndices, listErr := storage.ListIndices(ctx)
+				if listErr != nil {
+					globalLogger.Error("Error checking indices", "error", listErr)
 					os.Exit(1)
 				}
 
@@ -111,9 +111,9 @@ Example:
 				}
 
 				if len(missingIndices) > 0 {
-					fmt.Println("The following indices do not exist (already deleted):")
+					globalLogger.Info("The following indices do not exist (already deleted):")
 					for _, index := range missingIndices {
-						fmt.Printf("  - %s\n", index)
+						globalLogger.Info(fmt.Sprintf("  - %s", index))
 					}
 					if len(missingIndices) == len(indices) {
 						return // All indices are already deleted, exit successfully
@@ -130,18 +130,18 @@ Example:
 
 				// Confirm deletion unless --force is used
 				if !force && len(indicesToDelete) > 0 {
-					fmt.Printf("Are you sure you want to delete the following indices?\n")
+					globalLogger.Info("Are you sure you want to delete the following indices?")
 					for _, index := range indicesToDelete {
-						fmt.Printf("  - %s\n", index)
+						globalLogger.Info(fmt.Sprintf("  - %s", index))
 					}
-					fmt.Print("Continue? (y/N): ")
+					globalLogger.Info("Continue? (y/N): ")
 					var response string
-					if _, err := fmt.Scanln(&response); err != nil {
-						fmt.Fprintf(os.Stderr, "Error reading response: %v\n", err)
+					if _, scanErr := fmt.Scanln(&response); scanErr != nil {
+						globalLogger.Error("Error reading response", "error", scanErr)
 						return
 					}
 					if response != "y" && response != "Y" {
-						fmt.Println("Operation cancelled")
+						globalLogger.Info("Operation cancelled")
 						return
 					}
 				}
@@ -150,21 +150,21 @@ Example:
 				for _, index := range indicesToDelete {
 					deleteErr := storage.DeleteIndex(ctx, index)
 					if deleteErr != nil {
-						fmt.Fprintf(os.Stderr, "Error deleting index '%s': %v\n", index, deleteErr)
+						globalLogger.Error("Error deleting index", "index", index, "error", deleteErr)
 						os.Exit(1)
 					}
-					fmt.Printf("Successfully deleted index '%s'\n", index)
+					globalLogger.Info(fmt.Sprintf("Successfully deleted index '%s'", index))
 				}
 			}),
 		)
 
-		if err := app.Start(context.Background()); err != nil {
-			fmt.Fprintf(os.Stderr, "Error starting application: %v\n", err)
+		if startErr := app.Start(context.Background()); startErr != nil {
+			globalLogger.Error("Error starting application", "error", startErr)
 			os.Exit(1)
 		}
 
-		if err := app.Stop(context.Background()); err != nil {
-			fmt.Fprintf(os.Stderr, "Error stopping application: %v\n", err)
+		if stopErr := app.Stop(context.Background()); stopErr != nil {
+			globalLogger.Error("Error stopping application", "error", stopErr)
 			os.Exit(1)
 		}
 	},

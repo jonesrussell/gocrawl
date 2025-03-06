@@ -35,7 +35,7 @@ var jobCmd = &cobra.Command{
 	Use:   "job",
 	Short: "Schedule and run crawl-source crawl jobs",
 	Long:  `Schedule and run crawl-source crawl jobs based on the times specified in sources.yml`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		// Get the root command path
 		rootPath := cmd.Root().Name()
 
