@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -50,10 +51,10 @@ Example:
   gocrawl indices delete --source "Elliot Lake Today"`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if deleteSourceName == "" && len(args) == 0 {
-			return fmt.Errorf("either specify indices or use --source flag")
+			return errors.New("either specify indices or use --source flag")
 		}
 		if deleteSourceName != "" && len(args) > 0 {
-			return fmt.Errorf("cannot specify both indices and --source flag")
+			return errors.New("cannot specify both indices and --source flag")
 		}
 		return nil
 	},

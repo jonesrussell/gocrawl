@@ -19,6 +19,11 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// DefaultChannelBufferSize is the default size for buffered channels
+	DefaultChannelBufferSize = 100
+)
+
 var sourceName string
 
 // createCrawlCmd creates the crawl command
@@ -40,10 +45,10 @@ var crawlCmd = &cobra.Command{
 					return globalLogger
 				},
 				func() chan *models.Article {
-					return make(chan *models.Article, 100)
+					return make(chan *models.Article, DefaultChannelBufferSize)
 				},
 				func() chan *models.Content {
-					return make(chan *models.Content, 100)
+					return make(chan *models.Content, DefaultChannelBufferSize)
 				},
 				// Provide source name
 				fx.Annotate(
@@ -151,7 +156,7 @@ func startCrawl(p CrawlParams) error {
 	// Get the crawler instance to access index service
 	crawler, ok := p.CrawlerInstance.(*crawler.Crawler)
 	if !ok {
-		return fmt.Errorf("crawler instance is not of type *crawler.Crawler")
+		return errors.New("crawler instance is not of type *crawler.Crawler")
 	}
 
 	// Set both the crawler and index manager in the sources

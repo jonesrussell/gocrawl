@@ -2,6 +2,7 @@ package sources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -103,11 +104,11 @@ func (s *Sources) SetIndexManager(m IndexManager) {
 // Start starts crawling for the specified source
 func (s *Sources) Start(ctx context.Context, sourceName string) error {
 	if s.Crawler == nil {
-		return fmt.Errorf("crawler is not initialized - call SetCrawler first")
+		return errors.New("crawler is not initialized - call SetCrawler first")
 	}
 
 	if s.IndexMgr == nil {
-		return fmt.Errorf("index manager is not initialized - call SetIndexManager first")
+		return errors.New("index manager is not initialized - call SetIndexManager first")
 	}
 
 	source, err := s.FindByName(sourceName)
