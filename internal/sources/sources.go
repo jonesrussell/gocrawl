@@ -2,7 +2,6 @@ package sources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -70,12 +69,12 @@ type Sources struct {
 func Load(filename string) (*Sources, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read sources file: %w", err)
 	}
 
 	var sources Sources
-	if err := yaml.Unmarshal(data, &sources); err != nil {
-		return nil, err
+	if unmarshalErr := yaml.Unmarshal(data, &sources); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal sources: %w", unmarshalErr)
 	}
 
 	return &sources, nil
@@ -103,38 +102,22 @@ func (s *Sources) SetIndexManager(m IndexManager) {
 
 // Start starts crawling for the specified source
 func (s *Sources) Start(ctx context.Context, sourceName string) error {
-	if s.Crawler == nil {
-		return errors.New("crawler is not initialized - call SetCrawler first")
-	}
-
-	if s.IndexMgr == nil {
-		return errors.New("index manager is not initialized - call SetIndexManager first")
-	}
-
 	source, err := s.FindByName(sourceName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to find source: %w", err)
 	}
 
-	s.Logger.Info("Starting crawl", "source", source.Name)
-
-	// Ensure article index exists
-	if err := s.IndexMgr.EnsureIndex(ctx, source.ArticleIndex); err != nil {
-		s.Logger.Error("Failed to ensure article index exists", "error", err)
-		return fmt.Errorf("failed to ensure article index exists: %w", err)
+	if ensureArticleErr := s.IndexMgr.EnsureIndex(ctx, source.ArticleIndex); ensureArticleErr != nil {
+		return fmt.Errorf("failed to ensure article index: %w", ensureArticleErr)
 	}
 
-	// Ensure content index exists
-	if err := s.IndexMgr.EnsureIndex(ctx, source.Index); err != nil {
-		s.Logger.Error("Failed to ensure content index exists", "error", err)
-		return fmt.Errorf("failed to ensure content index exists: %w", err)
+	if ensureContentErr := s.IndexMgr.EnsureIndex(ctx, source.Index); ensureContentErr != nil {
+		return fmt.Errorf("failed to ensure content index: %w", ensureContentErr)
 	}
 
-	// Start the crawl
-	if err := s.Crawler.Start(ctx, source.URL); err != nil {
-		return fmt.Errorf("error crawling source %s: %w", source.Name, err)
+	if crawlErr := s.Crawler.Start(ctx, source.URL); crawlErr != nil {
+		return fmt.Errorf("failed to start crawler: %w", crawlErr)
 	}
-	s.Logger.Info("Finished crawl", "source", source.Name)
 
 	return nil
 }
