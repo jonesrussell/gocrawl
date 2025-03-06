@@ -1,10 +1,11 @@
-package cmd
+package cmd_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // mockSource represents a simplified version of sources.Source for testing
@@ -48,7 +49,7 @@ func TestJobScheduling(t *testing.T) {
 			shouldRunCount := 0
 			for _, scheduledTime := range source.Time {
 				parsedTime, err := time.Parse("15:04", scheduledTime)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				if tt.currentTime.Hour() == parsedTime.Hour() && tt.currentTime.Minute() == parsedTime.Minute() {
 					shouldRunCount++
@@ -98,7 +99,7 @@ func TestTimeFormatParsing(t *testing.T) {
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expectHour, parsedTime.Hour())
 		})
 	}

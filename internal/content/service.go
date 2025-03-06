@@ -95,8 +95,9 @@ func (s *Service) DetermineContentType(url string, metadata map[string]interface
 	}
 
 	// Check metadata for content type
-	if typeVal, ok := metadata["type"]; ok {
-		if typeStr, ok := typeVal.(string); ok {
+	typeVal, ok := metadata["type"]
+	if ok {
+		if typeStr, isString := typeVal.(string); isString {
 			return typeStr
 		}
 	}
