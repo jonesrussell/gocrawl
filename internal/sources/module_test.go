@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -33,7 +34,9 @@ sources:
 	defer os.Remove("sources.yml")
 
 	var s *sources.Sources
+	mockLogger := logger.NewMockLogger()
 	app := fxtest.New(t,
+		fx.Provide(func() logger.Interface { return mockLogger }),
 		sources.Module,
 		fx.Invoke(func(sources *sources.Sources) {
 			s = sources
