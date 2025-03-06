@@ -27,7 +27,7 @@ type Interface interface {
 	// Document operations
 	IndexDocument(ctx context.Context, index string, id string, document interface{}) error
 	GetDocument(ctx context.Context, index string, id string, document interface{}) error
-	SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error)
+	SearchDocuments(ctx context.Context, index string, query string) ([]map[string]interface{}, error)
 	DeleteDocument(ctx context.Context, index string, id string) error
 
 	// Bulk operations
@@ -240,15 +240,21 @@ func (s *ElasticsearchStorage) Search(
 
 	var documents []map[string]interface{}
 	for _, hit := range hits {
-		hitMap, isMap := hit.(map[string]interface{})
+		hitMap, isHitMap := hit.(map[string]interface{})
+		if !isHitMap {
+			continue
+		}
+		source, ok := hitMap["_source"]
+		if !ok {
+			continue
+		}
+
+		sourceMap, isMap := source.(map[string]interface{})
 		if !isMap {
 			continue
 		}
-		source, isSource := hitMap["_source"].(map[string]interface{})
-		if !isSource {
-			continue
-		}
-		documents = append(documents, source)
+
+		documents = append(documents, sourceMap)
 	}
 
 	return documents, nil
@@ -456,7 +462,7 @@ func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id
 }
 
 // SearchDocuments implements Interface
-func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error) {
+func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string, query string) ([]map[string]interface{}, error) {
 	// Basic query string query
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
@@ -492,18 +498,18 @@ func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string
 
 	hitsObj, ok := result["hits"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("invalid response format: hits object not found")
+		return nil, errors.New("invalid response format: hits object not found")
 	}
 
 	hitsArray, ok := hitsObj["hits"].([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("invalid response format: hits array not found")
+		return nil, errors.New("invalid response format: hits array not found")
 	}
 
-	documents := make([]interface{}, 0, len(hitsArray))
+	documents := make([]map[string]interface{}, 0, len(hitsArray))
 	for _, hit := range hitsArray {
-		hitMap, ok := hit.(map[string]interface{})
-		if !ok {
+		hitMap, isHitMap := hit.(map[string]interface{})
+		if !isHitMap {
 			continue
 		}
 
@@ -512,7 +518,12 @@ func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string
 			continue
 		}
 
-		documents = append(documents, source)
+		sourceMap, isMap := source.(map[string]interface{})
+		if !isMap {
+			continue
+		}
+
+		documents = append(documents, sourceMap)
 	}
 
 	return documents, nil

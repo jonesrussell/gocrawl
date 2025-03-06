@@ -45,7 +45,11 @@ func (s *MappingService) UpdateMapping(ctx context.Context, index string, mappin
 }
 
 // ValidateMapping validates if the current mapping matches the expected mapping
-func (s *MappingService) ValidateMapping(ctx context.Context, index string, expectedMapping map[string]interface{}) (bool, error) {
+func (s *MappingService) ValidateMapping(
+	ctx context.Context,
+	index string,
+	expectedMapping map[string]interface{},
+) (bool, error) {
 	currentMapping, err := s.GetCurrentMapping(ctx, index)
 	if err != nil {
 		return false, fmt.Errorf("failed to get current mapping: %w", err)
@@ -56,7 +60,11 @@ func (s *MappingService) ValidateMapping(ctx context.Context, index string, expe
 }
 
 // EnsureMapping ensures the index mapping matches the expected mapping
-func (s *MappingService) EnsureMapping(ctx context.Context, index string, expectedMapping map[string]interface{}) error {
+func (s *MappingService) EnsureMapping(
+	ctx context.Context,
+	index string,
+	expectedMapping map[string]interface{},
+) error {
 	exists, err := s.storage.IndexExists(ctx, index)
 	if err != nil {
 		return fmt.Errorf("failed to check if index exists: %w", err)

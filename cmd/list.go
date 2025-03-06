@@ -35,6 +35,11 @@ import (
 	"go.uber.org/fx/fxevent"
 )
 
+const (
+	// TableWidth is the total width of the table output
+	TableWidth = 92
+)
+
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
@@ -43,7 +48,7 @@ var listCmd = &cobra.Command{
 
 Example:
   gocrawl indices list`,
-	Run: func(_ *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		app := fx.New(
 			fx.WithLogger(func() fxevent.Logger {
 				return &fxevent.NopLogger
@@ -87,7 +92,7 @@ Example:
 					"Docs count",
 					"Ingestion name",
 					"Ingestion status"))
-				globalLogger.Info(strings.Repeat("-", 92))
+				globalLogger.Info(strings.Repeat("-", TableWidth))
 
 				// Print each index
 				for _, index := range filteredIndices {

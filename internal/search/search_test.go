@@ -110,9 +110,13 @@ func (m *mockStorage) Ping(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *mockStorage) SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error) {
+// SearchDocuments implements storage.Interface
+func (m *mockStorage) SearchDocuments(ctx context.Context, index string, query string) ([]map[string]interface{}, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).([]interface{}), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]map[string]interface{}), args.Error(1)
 }
 
 func (m *mockStorage) IndexContent(id string, content *models.Content) error {
