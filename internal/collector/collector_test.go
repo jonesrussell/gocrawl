@@ -1,7 +1,6 @@
 package collector_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -21,14 +20,14 @@ type ArticleSelectors struct {
 	Byline        string `yaml:"byline,omitempty"`
 	PublishedTime string `yaml:"published_time"`
 	TimeAgo       string `yaml:"time_ago,omitempty"`
-	JsonLd        string `yaml:"json_ld,omitempty"`
+	JSONLD        string `yaml:"json_ld,omitempty"`
 	Section       string `yaml:"section,omitempty"`
 	Keywords      string `yaml:"keywords,omitempty"`
 	Description   string `yaml:"description,omitempty"`
 	OgTitle       string `yaml:"og_title,omitempty"`
 	OgDescription string `yaml:"og_description,omitempty"`
 	OgImage       string `yaml:"og_image,omitempty"`
-	OgUrl         string `yaml:"og_url,omitempty"`
+	OGURL         string `yaml:"og_url,omitempty"`
 	Canonical     string `yaml:"canonical,omitempty"`
 	WordCount     string `yaml:"word_count,omitempty"`
 	PublishDate   string `yaml:"publish_date,omitempty"`
@@ -71,7 +70,7 @@ func TestNew(t *testing.T) {
 				Logger:           logger.NewMockLogger(),
 				Parallelism:      2,
 				RandomDelay:      2 * time.Second,
-				Context:          context.Background(),
+				Context:          t.Context(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Source:           createTestConfig(),
 			},
@@ -87,7 +86,7 @@ func TestNew(t *testing.T) {
 				Logger:           logger.NewMockLogger(),
 				Parallelism:      2,
 				RandomDelay:      2 * time.Second,
-				Context:          context.Background(),
+				Context:          t.Context(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Source:           createTestConfig(),
 			},
@@ -104,7 +103,7 @@ func TestNew(t *testing.T) {
 				Logger:           logger.NewMockLogger(),
 				Parallelism:      2,
 				RandomDelay:      2 * time.Second,
-				Context:          context.Background(),
+				Context:          t.Context(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Source:           createTestConfig(),
 			},
@@ -197,7 +196,7 @@ func TestCollectorCreation(t *testing.T) {
 				},
 				Logger:           mockLogger,
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
-				Context:          context.Background(),
+				Context:          t.Context(),
 				Source:           cfg,
 			}
 
@@ -219,7 +218,7 @@ func TestCollectorCreation(t *testing.T) {
 			BaseURL:          "http://example.com",
 			Logger:           nil,
 			ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
-			Context:          context.Background(),
+			Context:          t.Context(),
 			Source:           createTestConfig(),
 		}
 

@@ -57,32 +57,28 @@ func (s *MappingService) ValidateMapping(ctx context.Context, index string, expe
 
 // EnsureMapping ensures the index mapping matches the expected mapping
 func (s *MappingService) EnsureMapping(ctx context.Context, index string, expectedMapping map[string]interface{}) error {
-	// First, check if the index exists
 	exists, err := s.storage.IndexExists(ctx, index)
 	if err != nil {
-		return fmt.Errorf("failed to check index existence: %w", err)
+		return fmt.Errorf("failed to check if index exists: %w", err)
 	}
 
 	if !exists {
-		// If the index doesn't exist, create it with the expected mapping
-		if err := s.storage.CreateIndex(ctx, index, expectedMapping); err != nil {
-			return fmt.Errorf("failed to create index with mapping: %w", err)
+		s.logger.Info("Creating new index with mapping", "index", index)
+		if createErr := s.storage.CreateIndex(ctx, index, expectedMapping); createErr != nil {
+			return fmt.Errorf("failed to create index: %w", createErr)
 		}
-		s.logger.Info("Created new index with mapping", "index", index)
 		return nil
 	}
 
-	// Validate the current mapping
-	matches, err := s.ValidateMapping(ctx, index, expectedMapping)
+	match, err := s.ValidateMapping(ctx, index, expectedMapping)
 	if err != nil {
 		return fmt.Errorf("failed to validate mapping: %w", err)
 	}
 
-	if !matches {
-		// If the mapping doesn't match, update it
+	if !match {
 		s.logger.Info("Updating index mapping", "index", index)
-		if err := s.UpdateMapping(ctx, index, expectedMapping); err != nil {
-			return fmt.Errorf("failed to update mapping: %w", err)
+		if updateErr := s.UpdateMapping(ctx, index, expectedMapping); updateErr != nil {
+			return fmt.Errorf("failed to update mapping: %w", updateErr)
 		}
 		s.logger.Info("Successfully updated index mapping", "index", index)
 	}

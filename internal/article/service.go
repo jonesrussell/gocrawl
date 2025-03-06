@@ -227,7 +227,7 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 		OgTitle:       e.ChildAttr(s.Selectors.OGTitle, "content"),
 		OgDescription: e.ChildAttr(s.Selectors.OGDescription, "content"),
 		OgImage:       ogImage,
-		OgUrl:         e.ChildAttr(s.Selectors.OGURL, "content"),
+		OGURL:         e.ChildAttr(s.Selectors.OGURL, "content"),
 		CanonicalUrl:  canonicalURL,
 		WordCount:     wordCount,
 		Category:      category,

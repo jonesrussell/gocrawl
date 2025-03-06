@@ -125,11 +125,9 @@ func (s *ElasticsearchStorage) IndexContent(id string, content *models.Content) 
 
 // GetContent retrieves a content document by ID
 func (s *ElasticsearchStorage) GetContent(id string) (*models.Content, error) {
-	ctx := context.Background()
 	res, err := s.ESClient.Get(
-		s.opts.IndexName,
+		"content",
 		id,
-		s.ESClient.Get.WithContext(ctx),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting content: %w", err)
@@ -141,8 +139,8 @@ func (s *ElasticsearchStorage) GetContent(id string) (*models.Content, error) {
 	}
 
 	var content models.Content
-	if err := json.NewDecoder(res.Body).Decode(&content); err != nil {
-		return nil, fmt.Errorf("error decoding content: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&content); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding content: %w", decodeErr)
 	}
 
 	return &content, nil
@@ -150,72 +148,64 @@ func (s *ElasticsearchStorage) GetContent(id string) (*models.Content, error) {
 
 // SearchContent searches for content based on a query
 func (s *ElasticsearchStorage) SearchContent(query string) ([]*models.Content, error) {
-	ctx := context.Background()
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
-			"crawl_match": map[string]interface{}{
-				"query":  query,
-				"fields": []string{"title^2", "body"},
+			"query_string": map[string]interface{}{
+				"query": query,
 			},
 		},
 	}
 
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(searchQuery); err != nil {
-		return nil, fmt.Errorf("error encoding search query: %w", err)
+	body, err := json.Marshal(searchQuery)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling search query: %w", err)
 	}
 
 	res, err := s.ESClient.Search(
-		s.ESClient.Search.WithContext(ctx),
-		s.ESClient.Search.WithIndex(s.opts.IndexName),
-		s.ESClient.Search.WithBody(&buf),
+		s.ESClient.Search.WithIndex("content"),
+		s.ESClient.Search.WithBody(bytes.NewReader(body)),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error executing search: %w", err)
+		return nil, fmt.Errorf("error searching content: %w", err)
 	}
 	defer res.Body.Close()
 
+	if res.IsError() {
+		return nil, fmt.Errorf("error searching content: %s", res.String())
+	}
+
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error parsing response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("error parsing search response: %w", decodeErr)
 	}
 
-	hitsObj, ok := result["hits"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid hits object structure")
-	}
+	hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
+	contents := make([]*models.Content, 0, len(hits))
 
-	hitsArray, ok := hitsObj["hits"].([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid hits array structure")
-	}
-
-	var contents []*models.Content
-	for _, hit := range hitsArray {
-		hitMap, ok := hit.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("invalid hit structure")
+	for _, hit := range hits {
+		hitMap, isMap := hit.(map[string]interface{})
+		if !isMap {
+			continue
 		}
 
-		source, ok := hitMap["_source"].(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("invalid source structure")
+		source, isSource := hitMap["_source"].(map[string]interface{})
+		if !isSource {
+			continue
+		}
+
+		sourceData, marshalErr := json.Marshal(source)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("error marshaling source data: %w", marshalErr)
 		}
 
 		var content models.Content
-		sourceData, err := json.Marshal(source)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling hit source: %w", err)
-		}
-
-		if err := json.Unmarshal(sourceData, &content); err != nil {
-			return nil, fmt.Errorf("error unmarshaling content: %w", err)
+		if unmarshalErr := json.Unmarshal(sourceData, &content); unmarshalErr != nil {
+			return nil, fmt.Errorf("error unmarshaling content: %w", unmarshalErr)
 		}
 
 		contents = append(contents, &content)
 	}
 
-	s.Logger.Info("Content search completed", "query", query, "results", len(contents))
 	return contents, nil
 }
 

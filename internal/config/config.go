@@ -219,12 +219,12 @@ func ParseRateLimit(rateLimit string) (time.Duration, error) {
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
 
 	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, err
+	if unmarshalErr := yaml.Unmarshal(data, &config); unmarshalErr != nil {
+		return nil, fmt.Errorf("error unmarshaling config: %w", unmarshalErr)
 	}
 
 	return &config, nil

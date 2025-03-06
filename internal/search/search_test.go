@@ -12,6 +12,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/search"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // ErrMockTypeAssertion is returned when a type assertion fails in mock methods
@@ -76,7 +77,15 @@ func (m *mockStorage) DeleteDocument(ctx context.Context, index string, id strin
 	return args.Error(0)
 }
 
-func (m *mockStorage) ScrollSearch(ctx context.Context, index string, query interface{}, size int) (interface{}, error) {
+// ScrollSearchFunc represents the function signature for ScrollSearch
+type ScrollSearchFunc func(context.Context, string, interface{}, int) (interface{}, error)
+
+func (m *mockStorage) ScrollSearch(
+	ctx context.Context,
+	index string,
+	query interface{},
+	size int,
+) (interface{}, error) {
 	args := m.Called(ctx, index, query, size)
 	return args.Get(0), args.Error(1)
 }
@@ -203,10 +212,8 @@ func TestSearchContent(t *testing.T) {
 	svc.Storage = mockStorage
 
 	// Perform search
-	results, err := svc.SearchContent(context.Background(), "test query", "", 10)
-
-	// Verify results
-	assert.NoError(t, err)
+	results, err := svc.SearchContent(t.Context(), "test query", "", 10)
+	require.NoError(t, err)
 	assert.Len(t, results, 1)
 	assert.Equal(t, "http://example.com", results[0].URL)
 	assert.Equal(t, "Test content", results[0].Content)

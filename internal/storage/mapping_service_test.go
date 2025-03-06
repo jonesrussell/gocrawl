@@ -1,27 +1,28 @@
-package storage
+package storage_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewMappingService(t *testing.T) {
 	mockLogger := logger.NewMockLogger()
-	mockStorage := NewMockStorage()
+	mockStorage := storage.NewMockStorage()
 
-	service := NewMappingService(mockLogger, mockStorage)
+	service := storage.NewMappingService(mockLogger, mockStorage)
 	assert.NotNil(t, service)
 }
 
 func TestGetCurrentMapping(t *testing.T) {
 	mockLogger := logger.NewMockLogger()
-	mockStorage := NewMockStorage()
-	service := NewMappingService(mockLogger, mockStorage)
+	mockStorage := storage.NewMockStorage()
+	service := storage.NewMappingService(mockLogger, mockStorage)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	expectedMapping := map[string]interface{}{
 		"mappings": map[string]interface{}{
 			"properties": map[string]interface{}{
@@ -37,17 +38,17 @@ func TestGetCurrentMapping(t *testing.T) {
 	mockStorage.On("GetMapping", ctx, "test-index").Return(expectedMapping, nil)
 
 	mapping, err := service.GetCurrentMapping(ctx, "test-index")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedMapping, mapping)
 	mockStorage.AssertExpectations(t)
 }
 
 func TestUpdateMapping(t *testing.T) {
 	mockLogger := logger.NewMockLogger()
-	mockStorage := NewMockStorage()
-	service := NewMappingService(mockLogger, mockStorage)
+	mockStorage := storage.NewMockStorage()
+	service := storage.NewMappingService(mockLogger, mockStorage)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	mapping := map[string]interface{}{
 		"mappings": map[string]interface{}{
 			"properties": map[string]interface{}{
@@ -63,16 +64,16 @@ func TestUpdateMapping(t *testing.T) {
 	mockStorage.On("UpdateMapping", ctx, "test-index", mapping).Return(nil)
 
 	err := service.UpdateMapping(ctx, "test-index", mapping)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mockStorage.AssertExpectations(t)
 }
 
 func TestValidateMapping(t *testing.T) {
 	mockLogger := logger.NewMockLogger()
-	mockStorage := NewMockStorage()
-	service := NewMappingService(mockLogger, mockStorage)
+	mockStorage := storage.NewMockStorage()
+	service := storage.NewMappingService(mockLogger, mockStorage)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	expectedMapping := map[string]interface{}{
 		"mappings": map[string]interface{}{
 			"properties": map[string]interface{}{
@@ -118,7 +119,7 @@ func TestValidateMapping(t *testing.T) {
 			mockStorage.On("GetMapping", ctx, "test-index").Return(tt.currentMapping, nil)
 
 			match, err := service.ValidateMapping(ctx, "test-index", tt.expectedMapping)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expectedMatch, match)
 			mockStorage.AssertExpectations(t)
 		})
@@ -127,10 +128,10 @@ func TestValidateMapping(t *testing.T) {
 
 func TestEnsureMapping(t *testing.T) {
 	mockLogger := logger.NewMockLogger()
-	mockStorage := NewMockStorage()
-	service := NewMappingService(mockLogger, mockStorage)
+	mockStorage := storage.NewMockStorage()
+	service := storage.NewMappingService(mockLogger, mockStorage)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	expectedMapping := map[string]interface{}{
 		"mappings": map[string]interface{}{
 			"properties": map[string]interface{}{
@@ -200,7 +201,7 @@ func TestEnsureMapping(t *testing.T) {
 			}
 
 			err := service.EnsureMapping(ctx, "test-index", expectedMapping)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			mockStorage.AssertExpectations(t)
 			mockLogger.AssertExpectations(t)
 		})

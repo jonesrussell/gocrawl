@@ -24,7 +24,7 @@ func TestConfigureLogging(t *testing.T) {
 
 	// Create a channel to signal when the error occurs
 	errorChan := make(chan bool)
-	c.OnError(func(_ *colly.Response, err error) {
+	c.OnError(func(_ *colly.Response, _ error) {
 		errorChan <- true
 	})
 
