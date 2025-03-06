@@ -180,12 +180,27 @@ func (s *ElasticsearchStorage) SearchContent(query string) ([]*models.Content, e
 		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
-	hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
-	contents := make([]*models.Content, 0, len(hits))
+	hitsObj, ok := result["hits"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid hits object structure")
+	}
 
-	for _, hit := range hits {
-		hitMap := hit.(map[string]interface{})
-		source := hitMap["_source"].(map[string]interface{})
+	hitsArray, ok := hitsObj["hits"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid hits array structure")
+	}
+
+	var contents []*models.Content
+	for _, hit := range hitsArray {
+		hitMap, ok := hit.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("invalid hit structure")
+		}
+
+		source, ok := hitMap["_source"].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("invalid source structure")
+		}
 
 		var content models.Content
 		sourceData, err := json.Marshal(source)
