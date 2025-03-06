@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -179,10 +180,19 @@ func (s *ElasticsearchStorage) SearchContent(query string) ([]*models.Content, e
 		return nil, fmt.Errorf("error parsing search response: %w", decodeErr)
 	}
 
-	hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
-	contents := make([]*models.Content, 0, len(hits))
+	hitsObj, ok := result["hits"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("invalid response format: hits object not found")
+	}
 
-	for _, hit := range hits {
+	hitsArray, ok := hitsObj["hits"].([]interface{})
+	if !ok {
+		return nil, errors.New("invalid response format: hits array not found")
+	}
+
+	contents := make([]*models.Content, 0, len(hitsArray))
+
+	for _, hit := range hitsArray {
 		hitMap, isMap := hit.(map[string]interface{})
 		if !isMap {
 			continue
