@@ -9,7 +9,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/shared"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -41,38 +40,12 @@ func init() {
 
 // Initialize configuration
 func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		viper.AddConfigPath(".")
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("config")
-	}
-
-	// Set default values
-	viper.SetDefault("LOG_LEVEL", "info")
-	viper.SetDefault("APP_ENV", "development")
-
-	// Bind environment variables
-	viper.BindEnv("LOG_LEVEL")
-	viper.BindEnv("APP_ENV")
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
-
-	// Create a new config instance
 	var err error
-	globalConfig, err = config.New()
+	globalConfig, err = config.InitializeConfig(cfgFile)
 	if err != nil {
-		fmt.Println(fmt.Errorf("unable to create config: %w", err))
+		fmt.Fprintf(os.Stderr, "Unable to initialize config: %v\n", err)
 		os.Exit(1)
 	}
-
 	shared.SetConfig(globalConfig)
 }
 

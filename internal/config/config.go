@@ -119,64 +119,29 @@ type Config struct {
 	Sources       []Source            `yaml:"sources"`
 }
 
-// New creates a new Config instance with values from Viper
-func New() (*Config, error) {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+// InitializeConfig sets up the configuration
+func InitializeConfig(cfgFile string) (*Config, error) {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	} else {
+		viper.AddConfigPath(".")
+		viper.SetConfigType("yaml")
+		viper.SetConfigName("config")
+	}
+
+	viper.SetDefault("LOG_LEVEL", "info")
+	viper.SetDefault("APP_ENV", "development")
+
+	viper.BindEnv("LOG_LEVEL")
+	viper.BindEnv("APP_ENV")
+
 	viper.AutomaticEnv()
 
-	// Attempt to read the config file
-	if err := viper.ReadInConfig(); err != nil {
-		var configErr *viper.ConfigFileNotFoundError
-		if errors.As(err, &configErr) {
-			//nolint:forbidigo // No logger here
-			fmt.Println("Config file not found; ignoring error")
-		} else {
-			// Config file was found but another error was produced
-			return nil, err
-		}
+	if err := viper.ReadInConfig(); err == nil {
+		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
-	// Proceed to read the configuration values
-	rateLimit, err := parseRateLimit(viper.GetString(CrawlerRateLimitKey))
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := &Config{
-		App: AppConfig{
-			Environment: viper.GetString(AppEnvKey),
-		},
-		Crawler: CrawlerConfig{
-			BaseURL:          viper.GetString(CrawlerBaseURLKey),
-			MaxDepth:         viper.GetInt(CrawlerMaxDepthKey),
-			RateLimit:        rateLimit,
-			RandomDelay:      viper.GetDuration("CRAWLER_RANDOM_DELAY"),
-			IndexName:        viper.GetString(ElasticIndexNameKey),
-			ContentIndexName: viper.GetString("ELASTIC_CONTENT_INDEX_NAME"),
-			SourceFile:       viper.GetString(CrawlerSourceFileKey),
-			Parallelism:      viper.GetInt("CRAWLER_PARALLELISM"),
-		},
-		Elasticsearch: ElasticsearchConfig{
-			URL:       viper.GetString(ElasticURLKey),
-			Username:  viper.GetString(ElasticUsernameKey),
-			Password:  viper.GetString(ElasticPasswordKey),
-			APIKey:    viper.GetString(ElasticAPIKeyKey),
-			IndexName: viper.GetString(ElasticIndexNameKey),
-			SkipTLS:   viper.GetBool(ElasticSkipTLSKey),
-		},
-		Log: LogConfig{
-			Level: viper.GetString(LogLevelKey),
-			Debug: viper.GetBool(AppDebugKey),
-		},
-	}
-
-	if validateErr := ValidateConfig(cfg); validateErr != nil {
-		return nil, validateErr
-	}
-
-	return cfg, nil
+	return New() // Use your `New` function to return a Config instance
 }
 
 // parseRateLimit parses the rate limit duration from a string
