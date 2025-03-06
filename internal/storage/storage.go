@@ -244,8 +244,9 @@ func (s *ElasticsearchStorage) Search(
 		if !isHitMap {
 			continue
 		}
-		source, ok := hitMap["_source"]
-		if !ok {
+
+		source, hasSource := hitMap["_source"]
+		if !hasSource {
 			continue
 		}
 
@@ -517,8 +518,8 @@ func (s *ElasticsearchStorage) SearchDocuments(
 			continue
 		}
 
-		source, ok := hitMap["_source"]
-		if !ok {
+		source, hasSource := hitMap["_source"]
+		if !hasSource {
 			continue
 		}
 
