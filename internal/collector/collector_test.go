@@ -27,7 +27,7 @@ type ArticleSelectors struct {
 	OgTitle       string `yaml:"og_title,omitempty"`
 	OgDescription string `yaml:"og_description,omitempty"`
 	OgImage       string `yaml:"og_image,omitempty"`
-	OGURL         string `yaml:"og_url,omitempty"`
+	OgURL         string `yaml:"og_url,omitempty"`
 	Canonical     string `yaml:"canonical,omitempty"`
 	WordCount     string `yaml:"word_count,omitempty"`
 	PublishDate   string `yaml:"publish_date,omitempty"`

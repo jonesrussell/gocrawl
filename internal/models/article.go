@@ -18,7 +18,7 @@ type Article struct {
 	OgTitle       string `json:"og_title"`       // Open Graph title
 	OgDescription string `json:"og_description"` // Open Graph description
 	OgImage       string `json:"og_image"`       // Open Graph image URL
-	OGURL         string `json:"og_url"`         // Open Graph URL
+	OgURL         string `json:"og_url"`         // Open Graph URL
 
 	// Additional metadata
 	CanonicalURL string    `json:"canonical_url"` // Canonical URL if different from source

@@ -79,7 +79,7 @@ func New(p Params) (Result, error) {
 				OGTitle:       p.Source.Selectors.Article.OgTitle,
 				OGDescription: p.Source.Selectors.Article.OgDescription,
 				OGImage:       p.Source.Selectors.Article.OgImage,
-				OGURL:         p.Source.Selectors.Article.OgURL,
+				OgURL:         p.Source.Selectors.Article.OgURL,
 				Canonical:     p.Source.Selectors.Article.Canonical,
 				WordCount:     p.Source.Selectors.Article.WordCount,
 				PublishDate:   p.Source.Selectors.Article.PublishDate,

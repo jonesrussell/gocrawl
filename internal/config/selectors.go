@@ -16,7 +16,7 @@ type ArticleSelectors struct {
 	OGTitle       string   `yaml:"og_title"`       // OpenGraph title
 	OGDescription string   `yaml:"og_description"` // OpenGraph description
 	OGImage       string   `yaml:"og_image"`       // OpenGraph image
-	OGURL         string   `yaml:"og_url"`         // OpenGraph URL
+	OgURL         string   `yaml:"og_url"`         // OpenGraph URL
 	Canonical     string   `yaml:"canonical"`      // Canonical URL link
 	WordCount     string   `yaml:"word_count"`     // Word count script
 	PublishDate   string   `yaml:"publish_date"`   // Publish date script
@@ -44,7 +44,7 @@ func DefaultArticleSelectors() ArticleSelectors {
 		OGTitle:       "meta[property='og:title']",
 		OGDescription: "meta[property='og:description']",
 		OGImage:       "meta[property='og:image']",
-		OGURL:         "meta[property='og:url']",
+		OgURL:         "meta[property='og:url']",
 		Canonical:     "link[rel='canonical']",
 	}
 }

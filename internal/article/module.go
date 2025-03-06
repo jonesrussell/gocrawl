@@ -79,7 +79,7 @@ func isEmptySelectors(s config.ArticleSelectors) bool {
 		s.OGTitle == "" &&
 		s.OGDescription == "" &&
 		s.OGImage == "" &&
-		s.OGURL == "" &&
+		s.OgURL == "" &&
 		s.Canonical == "" &&
 		s.WordCount == "" &&
 		s.PublishDate == "" &&
