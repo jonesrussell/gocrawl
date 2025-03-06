@@ -14,7 +14,7 @@ func TestModule(t *testing.T) {
 	t.Parallel()
 
 	// Create a temporary YAML file with source configuration
-	tmpFile, err := os.CreateTemp("", "sources*.yaml")
+	tmpFile, err := os.CreateTemp(t.TempDir(), "sources*.yaml")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 

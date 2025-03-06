@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/mock"
@@ -159,12 +160,17 @@ func (m *MockStorage) Ping(ctx context.Context) error {
 }
 
 // SearchDocuments implements Interface
-func (m *MockStorage) SearchDocuments(ctx context.Context, index string, query string) ([]map[string]interface{}, error) {
+func (m *MockStorage) SearchDocuments(
+	ctx context.Context,
+	index string,
+	query string,
+) ([]map[string]interface{}, error) {
 	args := m.Called(ctx, index, query)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+	result, ok := args.Get(0).([]map[string]interface{})
+	if !ok && args.Get(0) != nil {
+		return nil, fmt.Errorf("invalid type assertion for SearchDocuments result")
 	}
-	return args.Get(0).([]map[string]interface{}), args.Error(1)
+	return result, args.Error(1)
 }
 
 // IndexContent implements Interface
@@ -234,5 +240,9 @@ func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string,
 // GetIndexDocCount implements Interface
 func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(int64), args.Error(1)
+	result, ok := args.Get(0).(int64)
+	if !ok && args.Get(0) != nil {
+		return 0, fmt.Errorf("invalid type assertion for GetIndexDocCount result")
+	}
+	return result, args.Error(1)
 }

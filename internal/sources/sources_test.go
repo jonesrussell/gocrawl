@@ -91,7 +91,7 @@ type mockCrawler struct {
 	startErr    error
 }
 
-func (m *mockCrawler) Start(ctx context.Context, url string) error {
+func (m *mockCrawler) Start(_ context.Context, url string) error {
 	m.startCalled = true
 	m.startURL = url
 	return m.startErr
@@ -107,7 +107,7 @@ type mockIndexManager struct {
 	ensureIndexErr    error
 }
 
-func (m *mockIndexManager) EnsureIndex(ctx context.Context, name string) error {
+func (m *mockIndexManager) EnsureIndex(_ context.Context, name string) error {
 	m.ensureIndexCalled = true
 	m.ensureIndexName = name
 	return m.ensureIndexErr
@@ -144,7 +144,7 @@ func TestLoad(t *testing.T) {
 			require.NoError(t, err)
 			defer os.Remove(tmpfile.Name())
 
-			_, err = tmpfile.Write([]byte(tt.content))
+			_, err = tmpfile.WriteString(tt.content)
 			require.NoError(t, err)
 
 			err = tmpfile.Close()
@@ -156,7 +156,7 @@ func TestLoad(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tt.want, len(s.Sources))
+			require.Len(t, s.Sources, tt.want)
 		})
 	}
 }

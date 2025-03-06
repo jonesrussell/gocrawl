@@ -13,6 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockSearchService struct {
@@ -38,7 +39,7 @@ func TestStartHTTPServer(t *testing.T) {
 
 	// Start the server
 	server, err := api.StartHTTPServer(mockLogger, mockSearch)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, server)
 
 	// Create test request
@@ -58,7 +59,7 @@ func TestStartHTTPServer(t *testing.T) {
 
 	var response []*models.Article
 	err = json.NewDecoder(recorder.Body).Decode(&response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, mockArticles, response)
 
 	// Verify mock expectations
