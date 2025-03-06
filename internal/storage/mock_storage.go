@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/mock"
@@ -168,7 +167,7 @@ func (m *MockStorage) SearchDocuments(
 	args := m.Called(ctx, index, query)
 	result, ok := args.Get(0).([]map[string]interface{})
 	if !ok && args.Get(0) != nil {
-		return nil, fmt.Errorf("invalid type assertion for SearchDocuments result")
+		return nil, errors.New("invalid type assertion for SearchDocuments result")
 	}
 	return result, args.Error(1)
 }
@@ -242,7 +241,7 @@ func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64
 	args := m.Called(ctx, index)
 	result, ok := args.Get(0).(int64)
 	if !ok && args.Get(0) != nil {
-		return 0, fmt.Errorf("invalid type assertion for GetIndexDocCount result")
+		return 0, errors.New("invalid type assertion for GetIndexDocCount result")
 	}
 	return result, args.Error(1)
 }
