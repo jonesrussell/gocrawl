@@ -192,7 +192,7 @@ func TestEnsureMapping(t *testing.T) {
 			}
 			if tt.expectCreate {
 				mockStorage.On("CreateIndex", ctx, "test-index", expectedMapping).Return(nil)
-				mockLogger.On("Info", "Created new index with mapping", "index", "test-index").Return()
+				mockLogger.On("Info", "Creating new index with mapping", "index", "test-index").Return()
 			}
 			if tt.expectUpdate {
 				mockStorage.On("UpdateMapping", ctx, "test-index", expectedMapping).Return(nil)
