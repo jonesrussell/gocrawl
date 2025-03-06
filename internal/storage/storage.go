@@ -462,7 +462,11 @@ func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id
 }
 
 // SearchDocuments implements Interface
-func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string, query string) ([]map[string]interface{}, error) {
+func (s *ElasticsearchStorage) SearchDocuments(
+	ctx context.Context,
+	index string,
+	query string,
+) ([]map[string]interface{}, error) {
 	// Basic query string query
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{

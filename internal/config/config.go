@@ -36,19 +36,21 @@ const (
 
 // AppConfig holds application-level configuration
 type AppConfig struct {
-	Environment string
+	Environment string `yaml:"environment"`
+	Name        string `yaml:"name"`
+	Version     string `yaml:"version"`
 }
 
 // CrawlerConfig holds crawler-specific configuration
 type CrawlerConfig struct {
-	BaseURL          string
-	MaxDepth         int
-	RateLimit        time.Duration
-	RandomDelay      time.Duration
-	IndexName        string
-	ContentIndexName string
-	SourceFile       string
-	Parallelism      int
+	BaseURL          string        `yaml:"base_url"`
+	MaxDepth         int           `yaml:"max_depth"`
+	RateLimit        time.Duration `yaml:"rate_limit"`
+	RandomDelay      time.Duration `yaml:"random_delay"`
+	IndexName        string        `yaml:"index_name"`
+	ContentIndexName string        `yaml:"content_index_name"`
+	SourceFile       string        `yaml:"source_file"`
+	Parallelism      int           `yaml:"parallelism"`
 }
 
 // SetMaxDepth sets the MaxDepth in the CrawlerConfig
@@ -77,18 +79,18 @@ func (c *CrawlerConfig) SetIndexName(index string) {
 
 // ElasticsearchConfig holds Elasticsearch-specific configuration
 type ElasticsearchConfig struct {
-	URL       string
-	Username  string
-	Password  string
-	APIKey    string
-	IndexName string
-	SkipTLS   bool
+	URL       string `yaml:"url"`
+	Username  string `yaml:"username"`
+	Password  string `yaml:"password"`
+	APIKey    string `yaml:"api_key"`
+	IndexName string `yaml:"index_name"`
+	SkipTLS   bool   `yaml:"skip_tls"`
 }
 
 // LogConfig holds logging-related configuration
 type LogConfig struct {
-	Level string
-	Debug bool
+	Level string `yaml:"level"`
+	Debug bool   `yaml:"debug"`
 }
 
 // Source represents a news source configuration
@@ -108,13 +110,13 @@ type SourceSelectors struct {
 	Article ArticleSelectors `yaml:"article"`
 }
 
-// Config holds all configuration settings
+// Config represents the application configuration
 type Config struct {
-	App           AppConfig
-	Crawler       CrawlerConfig
-	Elasticsearch ElasticsearchConfig
-	Log           LogConfig
-	Sources       []Source `yaml:"sources"`
+	App           AppConfig           `yaml:"app"`
+	Crawler       CrawlerConfig       `yaml:"crawler"`
+	Elasticsearch ElasticsearchConfig `yaml:"elasticsearch"`
+	Log           LogConfig           `yaml:"log"`
+	Sources       []Source            `yaml:"sources"`
 }
 
 // NewConfig creates a new Config instance with values from Viper
