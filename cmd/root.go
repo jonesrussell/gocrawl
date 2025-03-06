@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/shared"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -32,6 +34,9 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig, initLogger)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
+
+	// Add commands
+	rootCmd.AddCommand(sources.Command())
 }
 
 // Initialize configuration
@@ -45,6 +50,14 @@ func initConfig() {
 		viper.SetConfigName("config")
 	}
 
+	// Set default values
+	viper.SetDefault("LOG_LEVEL", "info")
+	viper.SetDefault("APP_ENV", "development")
+
+	// Bind environment variables
+	viper.BindEnv("LOG_LEVEL")
+	viper.BindEnv("APP_ENV")
+
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
@@ -52,13 +65,15 @@ func initConfig() {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
-	// Initialize configuration
-	var configErr error
-	globalConfig, configErr = config.NewConfig() // This should be the only place you call NewConfig
-	if configErr != nil {
-		fmt.Fprintln(os.Stderr, "Error creating Config:", configErr)
+	// Create a new config instance
+	var err error
+	globalConfig, err = config.NewConfig()
+	if err != nil {
+		fmt.Println(fmt.Errorf("unable to create config: %w", err))
 		os.Exit(1)
 	}
+
+	shared.SetConfig(globalConfig)
 }
 
 func initLogger() {
@@ -67,21 +82,28 @@ func initLogger() {
 		env = "development" // Set a default environment
 	}
 
-	// Log the environment
-	fmt.Fprintln(os.Stderr, "Initializing logger in environment:", env)
+	// Ensure we have a valid log level
+	logLevel := globalConfig.Log.Level
+	if logLevel == "" {
+		logLevel = "info" // Set a default log level
+	}
+
+	// Log the initialization details
+	fmt.Fprintf(os.Stderr, "Initializing logger in environment: %s with level: %s\n", env, logLevel)
 
 	var loggerErr error
-
 	if env == "development" {
-		globalLogger, loggerErr = logger.NewDevelopmentLogger(globalConfig.Log.Level) // Pass log level as string
+		globalLogger, loggerErr = logger.NewDevelopmentLogger(logLevel)
 	} else {
-		globalLogger, loggerErr = logger.NewProductionLogger(globalConfig.Log.Level) // Pass log level as string
+		globalLogger, loggerErr = logger.NewProductionLogger(logLevel)
 	}
 
 	if loggerErr != nil {
-		fmt.Fprintln(os.Stderr, "Error creating Logger:", loggerErr)
+		fmt.Fprintf(os.Stderr, "Error creating Logger: %v\n", loggerErr)
 		os.Exit(1)
 	}
+
+	shared.SetLogger(globalLogger)
 }
 
 // Shutdown gracefully shuts down the application
