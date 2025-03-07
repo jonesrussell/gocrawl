@@ -30,6 +30,7 @@ func TestNew(t *testing.T) {
 	require.Equal(t, "http://test.example.com", cfg.Crawler.BaseURL)
 	require.Equal(t, 5, cfg.Crawler.MaxDepth)
 	require.Equal(t, 2*time.Second, cfg.Crawler.RateLimit)
+	require.Equal(t, 2, cfg.Crawler.Parallelism)
 	require.Equal(t, "http://localhost:9200", cfg.Elasticsearch.URL)
 	require.Equal(t, "test_user", cfg.Elasticsearch.Username)
 	require.Equal(t, "test_pass", cfg.Elasticsearch.Password)
@@ -87,36 +88,88 @@ func TestParseRateLimit(t *testing.T) {
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
 		name    string
-		cfg     *config.Config
-		wantErr error
+		config  *config.Config
+		wantErr bool
 	}{
 		{
 			name: "valid config",
-			cfg: &config.Config{
+			config: &config.Config{
 				Elasticsearch: config.ElasticsearchConfig{
 					URL: "http://localhost:9200",
 				},
-			},
-			wantErr: nil,
-		},
-		{
-			name: "missing elasticsearch URL",
-			cfg: &config.Config{
-				Elasticsearch: config.ElasticsearchConfig{
-					URL: "",
+				Crawler: config.CrawlerConfig{
+					Parallelism: 2,
+					MaxDepth:    2,
+					RateLimit:   time.Second,
+					RandomDelay: time.Second,
 				},
 			},
-			wantErr: config.ErrMissingElasticURL,
+			wantErr: false,
+		},
+		{
+			name: "missing elastic URL",
+			config: &config.Config{
+				Elasticsearch: config.ElasticsearchConfig{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid parallelism",
+			config: &config.Config{
+				Elasticsearch: config.ElasticsearchConfig{
+					URL: "http://localhost:9200",
+				},
+				Crawler: config.CrawlerConfig{
+					Parallelism: 0,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative max depth",
+			config: &config.Config{
+				Elasticsearch: config.ElasticsearchConfig{
+					URL: "http://localhost:9200",
+				},
+				Crawler: config.CrawlerConfig{
+					MaxDepth: -1,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative rate limit",
+			config: &config.Config{
+				Elasticsearch: config.ElasticsearchConfig{
+					URL: "http://localhost:9200",
+				},
+				Crawler: config.CrawlerConfig{
+					RateLimit: -time.Second,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative random delay",
+			config: &config.Config{
+				Elasticsearch: config.ElasticsearchConfig{
+					URL: "http://localhost:9200",
+				},
+				Crawler: config.CrawlerConfig{
+					RandomDelay: -time.Second,
+				},
+			},
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := config.ValidateConfig(tt.cfg)
-			if tt.wantErr != nil {
-				assert.Equal(t, tt.wantErr, err)
+			err := config.ValidateConfig(tt.config)
+			if tt.wantErr {
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -174,8 +227,9 @@ func TestInitializeConfig(t *testing.T) {
 			name:    "with config file",
 			cfgFile: "testdata/config.yml",
 			envVars: map[string]string{
-				"LOG_LEVEL": "debug",
-				"APP_ENV":   "test",
+				"LOG_LEVEL":           "debug",
+				"APP_ENV":             "test",
+				"CRAWLER_PARALLELISM": "2",
 			},
 			wantErr: false,
 		},
@@ -183,8 +237,9 @@ func TestInitializeConfig(t *testing.T) {
 			name:    "without config file",
 			cfgFile: "",
 			envVars: map[string]string{
-				"LOG_LEVEL": "info",
-				"APP_ENV":   "development",
+				"LOG_LEVEL":           "info",
+				"APP_ENV":             "development",
+				"CRAWLER_PARALLELISM": "2",
 			},
 			wantErr: false,
 		},
@@ -206,6 +261,7 @@ func TestInitializeConfig(t *testing.T) {
 				require.NotNil(t, cfg)
 				require.Equal(t, tt.envVars["LOG_LEVEL"], cfg.Log.Level)
 				require.Equal(t, tt.envVars["APP_ENV"], cfg.App.Environment)
+				require.Equal(t, 2, cfg.Crawler.Parallelism)
 			}
 		})
 	}

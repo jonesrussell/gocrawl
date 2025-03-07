@@ -136,6 +136,18 @@ func ValidateConfig(cfg *Config) error {
 	if cfg.Elasticsearch.URL == "" {
 		return ErrMissingElasticURL
 	}
+	if cfg.Crawler.Parallelism < 1 {
+		return errors.New("crawler parallelism must be positive")
+	}
+	if cfg.Crawler.MaxDepth < 0 {
+		return errors.New("crawler max depth must be non-negative")
+	}
+	if cfg.Crawler.RateLimit < 0 {
+		return errors.New("crawler rate limit must be non-negative")
+	}
+	if cfg.Crawler.RandomDelay < 0 {
+		return errors.New("crawler random delay must be non-negative")
+	}
 	return nil
 }
 

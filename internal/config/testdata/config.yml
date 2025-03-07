@@ -4,6 +4,7 @@ APP_DEBUG: true
 CRAWLER_BASE_URL: "http://test.example.com"
 CRAWLER_MAX_DEPTH: 5
 CRAWLER_RATE_LIMIT: "2s"
+CRAWLER_PARALLELISM: 2
 ELASTIC_URL: "http://localhost:9200"
 ELASTIC_USERNAME: "test_user"
 ELASTIC_PASSWORD: "test_pass"
