@@ -63,7 +63,7 @@ func TestCrawler_Start(t *testing.T) {
 		{
 			name:    "empty base URL",
 			baseURL: "",
-			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mis *storage.MockIndexService, c *colly.Collector) {
+			setupMock: func(_ *storage.MockStorage, _ *logger.MockLogger, _ *storage.MockIndexService, _ *colly.Collector) {
 				// No setup needed for empty URL test
 			},
 			wantErr: true,
@@ -81,7 +81,7 @@ func TestCrawler_Start(t *testing.T) {
 		{
 			name:    "index ensure failure",
 			baseURL: "http://example.com",
-			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mis *storage.MockIndexService, c *colly.Collector) {
+			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mis *storage.MockIndexService, _ *colly.Collector) {
 				ms.On("Ping", mock.Anything).Return(nil)
 				ml.On("Debug", mock.Anything, mock.Anything, mock.Anything).Return()
 				ml.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
