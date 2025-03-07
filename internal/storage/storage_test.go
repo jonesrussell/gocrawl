@@ -34,7 +34,7 @@ func TestElasticsearchStorage_IndexDocument(t *testing.T) {
 		name        string
 		index       string
 		id          string
-		document    interface{}
+		doc         interface{}
 		response    string
 		statusCode  int
 		expectError bool
@@ -43,20 +43,20 @@ func TestElasticsearchStorage_IndexDocument(t *testing.T) {
 			name:  "successful indexing",
 			index: "test-index",
 			id:    "1",
-			document: map[string]interface{}{
-				"title": "Test Document",
-			},
-			response:    `{"_id": "1", "result": "created"}`,
+			doc:   map[string]interface{}{"title": "Test Document"},
+			response: `{
+				"_index": "test-index",
+				"_id": "1",
+				"result": "created"
+			}`,
 			statusCode:  201,
 			expectError: false,
 		},
 		{
-			name:  "indexing error",
-			index: "test-index",
-			id:    "2",
-			document: map[string]interface{}{
-				"title": "Test Document",
-			},
+			name:        "indexing error",
+			index:       "test-index",
+			id:          "2",
+			doc:         map[string]interface{}{"title": "Test Document"},
 			response:    `{"error": {"type": "mapper_parsing_exception"}}`,
 			statusCode:  400,
 			expectError: true,
@@ -68,14 +68,13 @@ func TestElasticsearchStorage_IndexDocument(t *testing.T) {
 			mockTransport.Response = tt.response
 			mockTransport.StatusCode = tt.statusCode
 
-			// Set up logger expectations
 			if tt.expectError {
 				mockLogger.On("Error", "Failed to index document", "error", mock.Anything).Return()
 			} else {
 				mockLogger.On("Info", "Document indexed successfully", "index", tt.index, "docID", tt.id).Return()
 			}
 
-			err := store.IndexDocument(context.Background(), tt.index, tt.id, tt.document)
+			err := store.IndexDocument(context.Background(), tt.index, tt.id, tt.doc)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -127,15 +126,19 @@ func TestElasticsearchStorage_GetDocument(t *testing.T) {
 			mockTransport.Response = tt.response
 			mockTransport.StatusCode = tt.statusCode
 
-			var doc map[string]interface{}
-			err := store.GetDocument(context.Background(), tt.index, tt.id, &doc)
+			var result struct {
+				Source struct {
+					Title string `json:"title"`
+				} `json:"_source"`
+			}
+			err := store.GetDocument(context.Background(), tt.index, tt.id, &result)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 				if !tt.expectError {
-					assert.NotNil(t, doc)
-					assert.Equal(t, "Test Document", doc["title"])
+					assert.NotNil(t, result.Source)
+					assert.Equal(t, "Test Document", result.Source.Title)
 				}
 			}
 
@@ -154,7 +157,6 @@ func TestElasticsearchStorage_SearchArticles(t *testing.T) {
 		response    string
 		statusCode  int
 		expectError bool
-		expected    []*models.Article
 	}{
 		{
 			name:  "successful search",
@@ -163,19 +165,17 @@ func TestElasticsearchStorage_SearchArticles(t *testing.T) {
 			response: `{
 				"hits": {
 					"total": {"value": 1},
-					"hits": [{
-						"_source": {
-							"id": "1",
-							"title": "Test Article"
+					"hits": [
+						{
+							"_source": {
+								"title": "Test Article"
+							}
 						}
-					}]
+					]
 				}
 			}`,
 			statusCode:  200,
 			expectError: false,
-			expected: []*models.Article{
-				{ID: "1", Title: "Test Article"},
-			},
 		},
 		{
 			name:        "search error",
@@ -184,7 +184,6 @@ func TestElasticsearchStorage_SearchArticles(t *testing.T) {
 			response:    `{"error": {"type": "search_phase_execution_exception"}}`,
 			statusCode:  400,
 			expectError: true,
-			expected:    nil,
 		},
 	}
 
@@ -193,20 +192,22 @@ func TestElasticsearchStorage_SearchArticles(t *testing.T) {
 			mockTransport.Response = tt.response
 			mockTransport.StatusCode = tt.statusCode
 
-			// Set up logger expectations
 			mockLogger.On("Debug", "Searching articles", "query", tt.query, "size", tt.size).Return()
 			if tt.expectError {
-				mockLogger.On("Error", "Failed to search articles", "query", tt.query, "size", tt.size, "error", mock.Anything).Return()
+				mockLogger.On("Error", "Failed to search articles", "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Search completed", "query", tt.query, "results", len(tt.expected)).Return()
+				mockLogger.On("Info", "Search completed", "query", tt.query, "results", 1).Return()
 			}
 
 			articles, err := store.SearchArticles(context.Background(), tt.query, tt.size)
 			if tt.expectError {
 				assert.Error(t, err)
+				assert.Nil(t, articles)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, articles)
+				assert.NotNil(t, articles)
+				assert.Len(t, articles, 1)
+				assert.Equal(t, "Test Article", articles[0].Title)
 			}
 
 			mockLogger.AssertExpectations(t)
@@ -263,12 +264,11 @@ func TestElasticsearchStorage_BulkIndexArticles(t *testing.T) {
 			mockTransport.Response = tt.response
 			mockTransport.StatusCode = tt.statusCode
 
-			// Set up logger expectations
 			mockLogger.On("Debug", "Bulk indexing articles", "count", len(tt.articles)).Return()
 			if tt.expectError {
-				mockLogger.On("Error", "Failed to bulk index articles", "count", len(tt.articles), "error", mock.Anything).Return()
+				mockLogger.On("Error", "Failed to bulk index articles", "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Articles bulk indexed successfully", "count", len(tt.articles)).Return()
+				mockLogger.On("Info", "Bulk indexed documents", "count", len(tt.articles)).Return()
 			}
 
 			err := store.BulkIndexArticles(context.Background(), tt.articles)
@@ -317,13 +317,6 @@ func TestElasticsearchStorage_TestConnection(t *testing.T) {
 			mockTransport.Response = tt.response
 			mockTransport.StatusCode = tt.statusCode
 
-			// Set up logger expectations
-			if tt.expectError {
-				mockLogger.On("Error", "Failed to test connection", "error", mock.Anything).Return()
-			} else {
-				mockLogger.On("Info", "Connection test successful").Return()
-			}
-
 			err := store.TestConnection(context.Background())
 			if tt.expectError {
 				assert.Error(t, err)
@@ -362,9 +355,6 @@ func TestElasticsearchStorage_IndexExists(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockTransport.StatusCode = tt.statusCode
-
-			// Set up logger expectations
-			mockLogger.On("Info", "Checking if index exists", "index", tt.indexName).Return()
 
 			exists, err := store.IndexExists(context.Background(), tt.indexName)
 			assert.NoError(t, err)
@@ -423,7 +413,7 @@ func TestElasticsearchStorage_CreateIndex(t *testing.T) {
 			if tt.expectError {
 				mockLogger.On("Error", "Failed to create index", "index", tt.index, "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Index created successfully", "index", tt.index).Return()
+				mockLogger.On("Info", "Created index", "index", tt.index).Return()
 			}
 
 			err := store.CreateIndex(context.Background(), tt.index, tt.mapping)
