@@ -268,9 +268,9 @@ func startCrawl(p CrawlParams) error {
 		OnStart: func(ctx context.Context) error {
 			// Start the crawl in a goroutine to not block
 			go func() {
-				if err := p.Sources.Start(ctx, sourceName); err != nil {
-					if !errors.Is(err, context.Canceled) {
-						p.Logger.Error("Crawl failed", "error", err)
+				if startErr := p.Sources.Start(ctx, sourceName); startErr != nil {
+					if !errors.Is(startErr, context.Canceled) {
+						p.Logger.Error("Crawl failed", "error", startErr)
 					}
 				}
 				// Signal completion by closing the done channel
@@ -280,8 +280,14 @@ func startCrawl(p CrawlParams) error {
 		},
 		OnStop: func(ctx context.Context) error {
 			p.Logger.Info("Stopping crawler...")
-			p.Sources.Stop()
-			return nil
+			// Use context to ensure we don't block indefinitely during shutdown
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				p.Sources.Stop()
+				return nil
+			}
 		},
 	})
 
