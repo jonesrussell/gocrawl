@@ -26,13 +26,15 @@ type Handlers struct {
 // Parameters:
 //   - config: The collector configuration
 //   - done: Channel to signal when crawling is complete
+//   - collector: The Colly collector instance to configure
 //
 // Returns:
 //   - *Handlers: The initialized handlers instance
-func NewHandlers(config *Config, done chan struct{}) *Handlers {
+func NewHandlers(config *Config, done chan struct{}, collector *colly.Collector) *Handlers {
 	return &Handlers{
-		config: config,
-		done:   done,
+		config:    config,
+		done:      done,
+		collector: collector,
 	}
 }
 

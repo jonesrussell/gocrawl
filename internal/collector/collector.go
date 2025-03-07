@@ -62,8 +62,8 @@ func New(p Params) (Result, error) {
 
 	// Create completion channel and event handlers
 	done := make(chan struct{})
-	handlers := NewHandlers(cfg, done)
-	handlers.ConfigureHandlers(c)
+	handlers := NewHandlers(cfg, done, c)
+	handlers.ConfigureHandlers()
 
 	// Log successful collector creation with configuration details
 	p.Logger.Debug("Collector created",
