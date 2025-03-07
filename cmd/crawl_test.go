@@ -56,13 +56,24 @@ func TestStartCrawl(t *testing.T) {
 				mockCrawler := crawler.NewMockCrawler()
 				mockLogger := logger.NewMockLogger()
 				mockStorage := storage.NewMockStorage()
-				cmd.SetSourceName("test-source") // Using exported function to set source name
+				mockIndexService := storage.NewMockIndexService()
+				cmd.SetSourceName("test-source")
 
 				sources, err := sources.Load("sources.yml")
 				require.NoError(t, err)
 				sources.Logger = mockLogger
+				sources.SetCrawler(mockCrawler)
+				sources.SetIndexManager(mockIndexService)
 
 				doneChan := make(chan struct{})
+
+				// Set up all necessary mock expectations with variadic arguments
+				mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int"), mock.AnythingOfType("string"), mock.AnythingOfType("time.Duration"), mock.AnythingOfType("string"), mock.AnythingOfType("int")).Return()
+				mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+				mockLogger.On("Info", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+				mockLogger.On("Error", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+
+				mockIndexService.On("EnsureIndex", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 				mockCrawler.On("SetCollector", mock.Anything).Return()
 				mockCrawler.On("Start", mock.Anything, mock.Anything).Return(nil)
