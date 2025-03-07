@@ -1,5 +1,6 @@
 // Package sources manages the configuration and lifecycle of web content sources for GoCrawl.
-// It handles source configuration loading, validation, and crawling operations through a YAML-based configuration system.
+// It handles source configuration loading, validation, and crawling operations through a
+// YAML-based configuration system.
 package sources
 
 import (

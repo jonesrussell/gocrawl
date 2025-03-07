@@ -5,6 +5,7 @@ package crawler
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
@@ -107,6 +108,12 @@ func ProvideCrawler(p Params) (Interface, error) {
 	// Log the entire configuration to ensure it's set correctly
 	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
 
+	// Create a new collector with the configuration
+	collector, err := NewCollector(p.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create collector: %w", err)
+	}
+
 	// Create a new crawler instance
 	crawler := &Crawler{
 		Storage:     p.Storage,
@@ -122,6 +129,7 @@ func ProvideCrawler(p Params) (Interface, error) {
 		IndexService:     p.IndexService,
 		Config:           p.Config,
 		ContentProcessor: p.ContentProcessor[0], // Use the first processor
+		Collector:        collector,
 	}
 
 	return crawler, nil
@@ -135,7 +143,7 @@ const (
 
 // NewCollector creates a new collector instance with the specified configuration.
 // It sets up rate limiting, parallelism, and other collector-specific settings.
-func NewCollector(cfg *config.Config) *colly.Collector {
+func NewCollector(cfg *config.Config) (*colly.Collector, error) {
 	// Create a new collector with the specified configuration
 	c := colly.NewCollector(
 		colly.MaxDepth(cfg.Crawler.MaxDepth),
@@ -143,13 +151,15 @@ func NewCollector(cfg *config.Config) *colly.Collector {
 	)
 
 	// Set up rate limiting
-	c.Limit(&colly.LimitRule{
+	if err := c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: cfg.Crawler.RandomDelay,
 		Parallelism: cfg.Crawler.Parallelism,
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("failed to set rate limit: %w", err)
+	}
 
-	return c
+	return c, nil
 }
 
 // New creates a new crawler instance with all required dependencies.
