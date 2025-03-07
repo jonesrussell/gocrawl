@@ -137,7 +137,7 @@ Example:
 			stopCtx, cancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
 			defer cancel()
 			if err := app.Stop(stopCtx); err != nil {
-				fmt.Printf("Error stopping application: %v\n", err)
+				common.PrintErrorf("Error stopping application: %v", err)
 			}
 		}()
 

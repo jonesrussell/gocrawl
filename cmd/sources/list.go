@@ -34,6 +34,7 @@ func listCommand() *cobra.Command {
 
 func runList(cmd *cobra.Command, _ []string) {
 	var logger common.Logger
+	var exitCode int
 
 	app := fx.New(
 		common.Module,
@@ -54,8 +55,11 @@ func runList(cmd *cobra.Command, _ []string) {
 		if err := app.Stop(ctx); err != nil {
 			if logger != nil {
 				logger.Error("Error stopping application", "error", err)
+				exitCode = 1
 			}
-			os.Exit(1)
+		}
+		if exitCode != 0 {
+			os.Exit(exitCode)
 		}
 	}()
 
@@ -63,7 +67,8 @@ func runList(cmd *cobra.Command, _ []string) {
 		if logger != nil {
 			logger.Error("Error starting application", "error", err)
 		}
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 }
 

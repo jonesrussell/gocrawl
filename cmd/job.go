@@ -23,7 +23,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -140,7 +139,7 @@ var jobCmd = &cobra.Command{
 		)
 
 		if err := app.Start(context.Background()); err != nil {
-			fmt.Printf("Error starting application: %v\n", err)
+			common.PrintErrorf("Error starting application: %v", err)
 			os.Exit(1)
 		}
 
@@ -148,7 +147,7 @@ var jobCmd = &cobra.Command{
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		sig := <-sigChan
-		fmt.Printf("\nReceived signal %v, initiating shutdown...\n", sig)
+		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
 
 		// Create a context with timeout for graceful shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)

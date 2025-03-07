@@ -93,12 +93,13 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 
 	// Create a context with timeout for graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
-	defer cancel()
-
-	if stopErr := app.Stop(ctx); stopErr != nil {
-		common.PrintErrorf("Error during shutdown: %v", stopErr)
-		os.Exit(1)
-	}
+	defer func() {
+		cancel()
+		if stopErr := app.Stop(ctx); stopErr != nil {
+			common.PrintErrorf("Error during shutdown: %v", stopErr)
+			os.Exit(1)
+		}
+	}()
 
 	return nil
 }

@@ -57,6 +57,7 @@ func validateDeleteArgs(_ *cobra.Command, args []string) error {
 func runDelete(cmd *cobra.Command, args []string) {
 	force, _ := cmd.Flags().GetBool("force")
 	var logger common.Logger
+	var exitCode int
 
 	app := fx.New(
 		common.Module,
@@ -72,26 +73,31 @@ func runDelete(cmd *cobra.Command, args []string) {
 			}
 			if err := executeDelete(params); err != nil {
 				l.Error("Error executing delete", "error", err)
-				os.Exit(1)
+				exitCode = 1
 			}
 		}),
 	)
 
 	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
-	defer cancel()
+	defer func() {
+		cancel()
+		if err := app.Stop(ctx); err != nil {
+			if logger != nil {
+				logger.Error("Error stopping application", "error", err)
+				exitCode = 1
+			}
+		}
+		if exitCode != 0 {
+			os.Exit(exitCode)
+		}
+	}()
 
 	if err := app.Start(ctx); err != nil {
 		if logger != nil {
 			logger.Error("Error starting application", "error", err)
 		}
-		os.Exit(1)
-	}
-
-	if err := app.Stop(ctx); err != nil {
-		if logger != nil {
-			logger.Error("Error stopping application", "error", err)
-		}
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 }
 
