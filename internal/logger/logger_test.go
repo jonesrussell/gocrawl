@@ -273,10 +273,10 @@ func TestCustomLogger_Methods(t *testing.T) {
 	})
 
 	t.Run("Sync", func(t *testing.T) {
-		err := log.Sync()
+		syncErr := log.Sync()
 		// Ignore sync errors as they're expected when writing to console
-		if err != nil {
-			t.Log("Sync() error (expected):", err)
+		if syncErr != nil {
+			t.Log("Sync() error (expected):", syncErr)
 		}
 	})
 }
@@ -386,7 +386,7 @@ func TestConvertToZapFields(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			fields := logger.ConvertToZapFields(tt.fields)
 			assert.Len(t, fields, tt.expectedCount)
 		})
