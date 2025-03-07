@@ -75,9 +75,9 @@ func TestParseRateLimit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			duration, err := config.ParseRateLimit(tt.input)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.expected, duration)
 		})

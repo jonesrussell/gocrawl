@@ -42,6 +42,10 @@ type Params struct {
 	AppEnv string `name:"appEnv"`
 }
 
+const (
+	defaultLogLevel = "info"
+)
+
 // InitializeLogger sets up the global logger based on the configuration
 func InitializeLogger(cfg *config.Config) (Interface, error) {
 	env := cfg.App.Environment
@@ -52,7 +56,7 @@ func InitializeLogger(cfg *config.Config) (Interface, error) {
 	// Ensure we have a valid log level
 	logLevel := cfg.Log.Level
 	if logLevel == "" {
-		logLevel = "info" // Set a default log level
+		logLevel = defaultLogLevel // Set a default log level
 	}
 
 	var customLogger *CustomLogger

@@ -220,10 +220,10 @@ func TestInitializeLogger(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log, err := logger.InitializeLogger(tt.cfg)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, log)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, log)
 			}
 		})
