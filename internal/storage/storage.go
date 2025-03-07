@@ -69,9 +69,9 @@ type Interface interface {
 
 // Article represents a document in Elasticsearch
 type Article struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
-	URL     string `json:"url"`
+	Title   string `json:"title" mapstructure:"title"`
+	Content string `json:"content" mapstructure:"content"`
+	URL     string `json:"url" mapstructure:"url"`
 }
 
 // ElasticsearchStorage struct to hold the Elasticsearch client
@@ -217,38 +217,6 @@ func (s *ElasticsearchStorage) prepareBulkIndexRequest(
 	return nil
 }
 
-// parseSearchResponse parses the search response and returns articles
-func (s *ElasticsearchStorage) parseSearchResponse(searchResult map[string]interface{}) ([]Article, int64, error) {
-	hits, ok := searchResult["hits"].(map[string]interface{})
-	if !ok {
-		return nil, 0, errors.New("invalid search response format")
-	}
-
-	total := int64(0)
-	if totalMap, ok := hits["total"].(map[string]interface{}); ok {
-		if value, ok := totalMap["value"].(float64); ok {
-			total = int64(value)
-		}
-	}
-
-	var articles []Article
-	if hitsArray, ok := hits["hits"].([]interface{}); ok {
-		for _, hit := range hitsArray {
-			if hitMap, ok := hit.(map[string]interface{}); ok {
-				if source, ok := hitMap["_source"].(map[string]interface{}); ok {
-					article := Article{}
-					if decodeErr := mapstructure.Decode(source, &article); decodeErr != nil {
-						return nil, 0, fmt.Errorf("error decoding article: %w", decodeErr)
-					}
-					articles = append(articles, article)
-				}
-			}
-		}
-	}
-
-	return articles, total, nil
-}
-
 // Search performs a search query
 func (s *ElasticsearchStorage) Search(ctx context.Context, query string, size int) ([]Article, error) {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
@@ -293,9 +261,9 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, query string, size in
 	}
 
 	var searchResult map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&searchResult); err != nil {
-		s.Logger.Error("Failed to search documents", "error", err)
-		return nil, fmt.Errorf("error parsing search response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&searchResult); decodeErr != nil {
+		s.Logger.Error("Failed to search documents", "error", decodeErr)
+		return nil, fmt.Errorf("error parsing search response: %w", decodeErr)
 	}
 
 	articles, total, err := s.parseSearchResponse(searchResult)
@@ -305,6 +273,47 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, query string, size in
 
 	s.Logger.Info("Search completed", "query", query, "results", total)
 	return articles, nil
+}
+
+// parseSearchResponse parses the search response and returns articles
+func (s *ElasticsearchStorage) parseSearchResponse(searchResult map[string]interface{}) ([]Article, int64, error) {
+	hits, ok := searchResult["hits"].(map[string]interface{})
+	if !ok {
+		return nil, 0, errors.New("invalid search response format")
+	}
+
+	total := int64(0)
+	if totalMap, totalOk := hits["total"].(map[string]interface{}); totalOk {
+		if value, valueOk := totalMap["value"].(float64); valueOk {
+			total = int64(value)
+		}
+	}
+
+	var articles []Article
+	hitsArray, hitsOk := hits["hits"].([]interface{})
+	if !hitsOk {
+		return nil, 0, errors.New("invalid hits array format")
+	}
+
+	for _, hit := range hitsArray {
+		hitMap, hitOk := hit.(map[string]interface{})
+		if !hitOk {
+			continue
+		}
+
+		source, sourceOk := hitMap["_source"].(map[string]interface{})
+		if !sourceOk {
+			continue
+		}
+
+		article := Article{}
+		if decodeErr := mapstructure.Decode(source, &article); decodeErr != nil {
+			return nil, 0, fmt.Errorf("error decoding article: %w", decodeErr)
+		}
+		articles = append(articles, article)
+	}
+
+	return articles, total, nil
 }
 
 // CreateIndex creates a new index with optional mapping

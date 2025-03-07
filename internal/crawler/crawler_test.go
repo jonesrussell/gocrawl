@@ -9,6 +9,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -70,7 +71,7 @@ func TestCrawler_Start(t *testing.T) {
 		{
 			name:    "storage ping failure",
 			baseURL: "http://example.com",
-			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mis *storage.MockIndexService, c *colly.Collector) {
+			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, _ *storage.MockIndexService, _ *colly.Collector) {
 				ms.On("Ping", mock.Anything).Return(errors.New("ping failed"))
 				ml.On("Debug", mock.Anything, mock.Anything, mock.Anything).Return()
 				ml.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
@@ -91,16 +92,11 @@ func TestCrawler_Start(t *testing.T) {
 		{
 			name:    "successful start",
 			baseURL: "http://example.com",
-			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mis *storage.MockIndexService, c *colly.Collector) {
+			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mis *storage.MockIndexService, _ *colly.Collector) {
 				ms.On("Ping", mock.Anything).Return(nil)
 				ml.On("Debug", mock.Anything, mock.Anything, mock.Anything).Return()
 				ml.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 				mis.On("EnsureIndex", mock.Anything, mock.Anything).Return(nil)
-
-				// Configure collector to immediately return without actually crawling
-				c.OnRequest(func(r *colly.Request) {
-					r.Abort()
-				})
 			},
 			wantErr: false,
 		},
@@ -123,7 +119,7 @@ func TestCrawler_Start(t *testing.T) {
 				Collector:    collector,
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 			defer cancel()
 
 			err := c.Start(ctx, tt.baseURL)
@@ -154,13 +150,13 @@ func TestCrawler_Start_ContextCancellation(t *testing.T) {
 		Collector:    colly.NewCollector(),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
 
 	err := c.Start(ctx, "http://example.com")
-	assert.Error(t, err)
-	assert.Equal(t, context.Canceled, err)
+	require.Error(t, err)
+	require.Equal(t, context.Canceled, err)
 }

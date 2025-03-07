@@ -1,7 +1,6 @@
 package logger_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -242,36 +241,34 @@ func TestCustomLogger_Methods(t *testing.T) {
 	require.NotNil(t, log)
 
 	// Test all logging methods
-	t.Run("Info", func(t *testing.T) {
+	t.Run("Info", func(_ *testing.T) {
 		log.Info("test info message", "key", "value")
 	})
 
-	t.Run("Error", func(t *testing.T) {
+	t.Run("Error", func(_ *testing.T) {
 		log.Error("test error message", "key", "value")
 	})
 
-	t.Run("Debug", func(t *testing.T) {
+	t.Run("Debug", func(_ *testing.T) {
 		log.Debug("test debug message", "key", "value")
 	})
 
-	t.Run("Warn", func(t *testing.T) {
+	t.Run("Warn", func(_ *testing.T) {
 		log.Warn("test warn message", "key", "value")
 	})
 
-	t.Run("Fatal with recovery", func(t *testing.T) {
+	t.Run("Fatal with recovery", func(_ *testing.T) {
 		defer func() {
-			if r := recover(); r != nil {
-				// Expected panic from Fatal
-			}
+			_ = recover() // Expected panic from Fatal
 		}()
 		log.Fatal("test fatal message", "key", "value")
 	})
 
-	t.Run("Printf", func(t *testing.T) {
+	t.Run("Printf", func(_ *testing.T) {
 		log.Printf("test printf %s", "value")
 	})
 
-	t.Run("Errorf", func(t *testing.T) {
+	t.Run("Errorf", func(_ *testing.T) {
 		log.Errorf("test errorf %s", "value")
 	})
 
@@ -287,7 +284,7 @@ func TestCustomLogger_Methods(t *testing.T) {
 func TestLoggerContext(t *testing.T) {
 	// Create a context with logger
 	zapLogger := zap.NewExample()
-	ctx := logger.WithContext(context.Background(), zapLogger)
+	ctx := logger.WithContext(t.Context(), zapLogger)
 
 	// Test retrieving logger from context
 	t.Run("FromContext with logger", func(t *testing.T) {
@@ -297,7 +294,7 @@ func TestLoggerContext(t *testing.T) {
 	})
 
 	t.Run("FromContext without logger", func(t *testing.T) {
-		emptyCtx := context.Background()
+		emptyCtx := t.Context()
 		retrieved := logger.FromContext(emptyCtx)
 		assert.NotNil(t, retrieved) // Should return no-op logger
 	})
@@ -391,7 +388,7 @@ func TestConvertToZapFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fields := logger.ConvertToZapFields(tt.fields)
-			assert.Equal(t, tt.expectedCount, len(fields))
+			assert.Len(t, fields, tt.expectedCount)
 		})
 	}
 }

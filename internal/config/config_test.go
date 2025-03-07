@@ -153,13 +153,11 @@ func TestLoadConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := config.LoadConfig(tt.path)
+			_, loadErr := config.LoadConfig(tt.path)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Nil(t, cfg)
+				require.Error(t, loadErr)
 			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, cfg)
+				require.NoError(t, loadErr)
 			}
 		})
 	}
@@ -201,13 +199,13 @@ func TestInitializeConfig(t *testing.T) {
 
 			cfg, err := config.InitializeConfig(tt.cfgFile)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Nil(t, cfg)
+				require.Error(t, err)
+				require.Nil(t, cfg)
 			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, cfg)
-				assert.Equal(t, tt.envVars["LOG_LEVEL"], cfg.Log.Level)
-				assert.Equal(t, tt.envVars["APP_ENV"], cfg.App.Environment)
+				require.NoError(t, err)
+				require.NotNil(t, cfg)
+				require.Equal(t, tt.envVars["LOG_LEVEL"], cfg.Log.Level)
+				require.Equal(t, tt.envVars["APP_ENV"], cfg.App.Environment)
 			}
 		})
 	}
