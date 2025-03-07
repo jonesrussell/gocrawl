@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/stretchr/testify/require"
 )
@@ -234,6 +233,7 @@ func TestStart(t *testing.T) {
 			ctx := t.Context()
 			crawler := &mockCrawler{startErr: tt.mockErr}
 			indexMgr := &mockIndexManager{}
+			mockLogger := &MockLogger{}
 
 			s := &sources.Sources{
 				Sources: []sources.Config{
@@ -244,7 +244,7 @@ func TestStart(t *testing.T) {
 						ArticleIndex: "articles",
 					},
 				},
-				Logger:   &logger.MockLogger{},
+				Logger:   mockLogger,
 				Crawler:  crawler,
 				IndexMgr: indexMgr,
 			}
@@ -254,12 +254,12 @@ func TestStart(t *testing.T) {
 				require.Error(t, err)
 				return
 			}
-			require.NoError(t, err)
 
+			require.NoError(t, err)
 			require.True(t, crawler.startCalled)
 			require.Equal(t, "http://example.com", crawler.startURL)
-			require.True(t, indexMgr.ensureIndexCalled)
-			require.Equal(t, "test_index", indexMgr.ensureIndexName)
+			require.True(t, mockLogger.debugCalled)
+			require.Equal(t, "Source crawl finished", mockLogger.debugMsg)
 		})
 	}
 }

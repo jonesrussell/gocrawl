@@ -2,11 +2,12 @@ package sources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // IndexManager defines the interface for index management
@@ -100,33 +101,43 @@ func (s *Sources) SetIndexManager(m IndexManager) {
 	s.IndexMgr = m
 }
 
-// Start starts crawling for the specified source
+// Start starts crawling a source
 func (s *Sources) Start(ctx context.Context, sourceName string) error {
 	source, err := s.FindByName(sourceName)
 	if err != nil {
-		return fmt.Errorf("failed to find source: %w", err)
+		return err
 	}
 
-	if ensureArticleErr := s.IndexMgr.EnsureIndex(ctx, source.ArticleIndex); ensureArticleErr != nil {
-		return fmt.Errorf("failed to ensure article index: %w", ensureArticleErr)
-	}
+	done := make(chan struct{})
+	var crawlErr error
 
-	if ensureContentErr := s.IndexMgr.EnsureIndex(ctx, source.Index); ensureContentErr != nil {
-		return fmt.Errorf("failed to ensure content index: %w", ensureContentErr)
-	}
+	// Start crawling in a goroutine
+	go func() {
+		defer close(done)
+		if err := s.Crawler.Start(ctx, source.URL); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				s.Logger.Error("Failed to start crawler", "error", err)
+				crawlErr = err
+			}
+		}
+		s.Logger.Debug("Source crawl finished", "source", sourceName)
+	}()
 
-	if crawlErr := s.Crawler.Start(ctx, source.URL); crawlErr != nil {
-		return fmt.Errorf("failed to start crawler: %w", crawlErr)
+	// Wait for either completion or context cancellation
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return crawlErr
 	}
-
-	s.Logger.Debug("Source crawl finished", "source", sourceName)
-	return nil
 }
 
 // Stop stops the crawler
 func (s *Sources) Stop() {
 	if s.Crawler != nil {
-		s.Logger.Debug("Stopping source crawler")
+		if s.Logger != nil {
+			s.Logger.Debug("Stopping source crawler")
+		}
 		s.Crawler.Stop()
 	}
 }
