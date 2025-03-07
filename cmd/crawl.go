@@ -69,8 +69,15 @@ Example:
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+		// Create a channel to receive the done signal
+		doneChan := make(chan struct{})
+
 		// Create an Fx application with common module
 		app := fx.New(
+			fx.Supply(fx.Annotate(
+				doneChan,
+				fx.ResultTags(`name:"crawlDone"`),
+			)),
 			fx.Provide(
 				func() chan *models.Article {
 					return make(chan *models.Article, DefaultChannelBufferSize)
@@ -106,13 +113,6 @@ Example:
 						return ""
 					},
 					fx.ResultTags(`name:"contentIndex"`),
-				),
-				// Provide done channel
-				fx.Annotate(
-					func() chan struct{} {
-						return make(chan struct{})
-					},
-					fx.ResultTags(`name:"crawlDone"`),
 				),
 				// Provide article processor first (will be first in the slice)
 				fx.Annotate(
@@ -168,6 +168,8 @@ Example:
 			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
 		case <-ctx.Done():
 			common.PrintInfof("\nContext cancelled, initiating shutdown...")
+		case <-doneChan:
+			common.PrintInfof("\nCrawl completed successfully, initiating shutdown...")
 		}
 
 		// Create a context with timeout for graceful shutdown
