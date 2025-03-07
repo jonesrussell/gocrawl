@@ -54,9 +54,6 @@ func InitializeLogger(cfg *config.Config) (Interface, error) {
 		logLevel = "info" // Set a default log level
 	}
 
-	// Log the initialization details
-	fmt.Fprintf(os.Stderr, "Initializing logger in environment: %s with level: %s\n", env, logLevel)
-
 	var customLogger *CustomLogger
 	var err error
 	if env == "development" {
