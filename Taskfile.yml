@@ -10,6 +10,11 @@ tasks:
       - go run main.go crawl --source {{.CLI_ARGS}}
       - go run main.go indices list
 
+  indices:list:
+    desc: "List all Elasticsearch indices"
+    cmds:
+      - go run main.go indices list
+
   search:
     desc: "Search crawled content"
     cmds:
