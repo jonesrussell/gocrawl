@@ -76,9 +76,9 @@ func TestElasticsearchStorage_IndexDocument(t *testing.T) {
 
 			err := store.IndexDocument(context.Background(), tt.index, tt.id, tt.doc)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			mockLogger.AssertExpectations(t)
@@ -133,11 +133,11 @@ func TestElasticsearchStorage_GetDocument(t *testing.T) {
 			}
 			err := store.GetDocument(context.Background(), tt.index, tt.id, &result)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if !tt.expectError {
-					assert.NotNil(t, result.Source)
+					require.NotNil(t, result.Source)
 					assert.Equal(t, "Test Document", result.Source.Title)
 				}
 			}
@@ -201,12 +201,12 @@ func TestElasticsearchStorage_SearchArticles(t *testing.T) {
 
 			articles, err := store.Search(context.Background(), tt.query, tt.size)
 			if tt.expectError {
-				assert.Error(t, err)
-				assert.Nil(t, articles)
+				require.Error(t, err)
+				require.Nil(t, articles)
 			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, articles)
-				assert.Len(t, articles, 1)
+				require.NoError(t, err)
+				require.NotNil(t, articles)
+				require.Len(t, articles, 1)
 				assert.Equal(t, "Test Article", articles[0].Title)
 			}
 
@@ -273,9 +273,9 @@ func TestElasticsearchStorage_BulkIndexArticles(t *testing.T) {
 
 			err := store.BulkIndexArticles(context.Background(), tt.articles)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			mockLogger.AssertExpectations(t)
@@ -319,9 +319,9 @@ func TestElasticsearchStorage_TestConnection(t *testing.T) {
 
 			err := store.TestConnection(context.Background())
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			mockLogger.AssertExpectations(t)
@@ -357,7 +357,7 @@ func TestElasticsearchStorage_IndexExists(t *testing.T) {
 			mockTransport.StatusCode = tt.statusCode
 
 			exists, err := store.IndexExists(context.Background(), tt.indexName)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, exists)
 
 			mockLogger.AssertExpectations(t)
@@ -418,9 +418,9 @@ func TestElasticsearchStorage_CreateIndex(t *testing.T) {
 
 			err := store.CreateIndex(context.Background(), tt.index, tt.mapping)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			mockLogger.AssertExpectations(t)
@@ -468,9 +468,9 @@ func TestElasticsearchStorage_DeleteIndex(t *testing.T) {
 
 			err := store.DeleteIndex(context.Background(), tt.index)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			mockLogger.AssertExpectations(t)
@@ -521,9 +521,9 @@ func TestElasticsearchStorage_DeleteDocument(t *testing.T) {
 
 			err := store.DeleteDocument(context.Background(), tt.index, tt.docID)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			mockLogger.AssertExpectations(t)
@@ -592,9 +592,9 @@ func TestElasticsearchStorage_GetMapping(t *testing.T) {
 
 			mapping, err := store.GetMapping(context.Background(), tt.index)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, mapping)
 			}
 
@@ -646,9 +646,9 @@ func TestElasticsearchStorage_ListIndices(t *testing.T) {
 
 			indices, err := store.ListIndices(context.Background())
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, indices)
 			}
 
@@ -700,11 +700,11 @@ func TestElasticsearchStorage_GetIndexHealth(t *testing.T) {
 				mockLogger.On("Info", "Retrieved index health", "index", tt.index, "health", tt.expected).Return()
 			}
 
-			health, err := store.GetIndexHealth(context.Background(), tt.index)
+			health, err := store.GetIndexHealth(t.Context(), tt.index)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, health)
 			}
 
@@ -756,11 +756,11 @@ func TestElasticsearchStorage_GetIndexDocCount(t *testing.T) {
 				mockLogger.On("Info", "Retrieved index document count", "index", tt.index, "count", tt.expected).Return()
 			}
 
-			count, err := store.GetIndexDocCount(context.Background(), tt.index)
+			count, err := store.GetIndexDocCount(t.Context(), tt.index)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, count)
 			}
 

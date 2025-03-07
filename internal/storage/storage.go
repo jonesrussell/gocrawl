@@ -217,6 +217,38 @@ func (s *ElasticsearchStorage) prepareBulkIndexRequest(
 	return nil
 }
 
+// parseSearchResponse parses the search response and returns articles
+func (s *ElasticsearchStorage) parseSearchResponse(searchResult map[string]interface{}) ([]Article, int64, error) {
+	hits, ok := searchResult["hits"].(map[string]interface{})
+	if !ok {
+		return nil, 0, errors.New("invalid search response format")
+	}
+
+	total := int64(0)
+	if totalMap, ok := hits["total"].(map[string]interface{}); ok {
+		if value, ok := totalMap["value"].(float64); ok {
+			total = int64(value)
+		}
+	}
+
+	var articles []Article
+	if hitsArray, ok := hits["hits"].([]interface{}); ok {
+		for _, hit := range hitsArray {
+			if hitMap, ok := hit.(map[string]interface{}); ok {
+				if source, ok := hitMap["_source"].(map[string]interface{}); ok {
+					article := Article{}
+					if decodeErr := mapstructure.Decode(source, &article); decodeErr != nil {
+						return nil, 0, fmt.Errorf("error decoding article: %w", decodeErr)
+					}
+					articles = append(articles, article)
+				}
+			}
+		}
+	}
+
+	return articles, total, nil
+}
+
 // Search performs a search query
 func (s *ElasticsearchStorage) Search(ctx context.Context, query string, size int) ([]Article, error) {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
@@ -266,33 +298,9 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, query string, size in
 		return nil, fmt.Errorf("error parsing search response: %w", err)
 	}
 
-	hits, ok := searchResult["hits"].(map[string]interface{})
-	if !ok {
-		s.Logger.Error("Failed to search documents", "error", "invalid search response format")
-		return nil, fmt.Errorf("invalid search response format")
-	}
-
-	total := int64(0)
-	if totalMap, ok := hits["total"].(map[string]interface{}); ok {
-		if value, ok := totalMap["value"].(float64); ok {
-			total = int64(value)
-		}
-	}
-
-	var articles []Article
-	if hitsArray, ok := hits["hits"].([]interface{}); ok {
-		for _, hit := range hitsArray {
-			if hitMap, ok := hit.(map[string]interface{}); ok {
-				if source, ok := hitMap["_source"].(map[string]interface{}); ok {
-					article := Article{}
-					if err := mapstructure.Decode(source, &article); err != nil {
-						s.Logger.Error("Failed to search documents", "error", err)
-						return nil, fmt.Errorf("error decoding article: %w", err)
-					}
-					articles = append(articles, article)
-				}
-			}
-		}
+	articles, total, err := s.parseSearchResponse(searchResult)
+	if err != nil {
+		return nil, err
 	}
 
 	s.Logger.Info("Search completed", "query", query, "results", total)

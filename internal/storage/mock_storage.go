@@ -65,7 +65,11 @@ func (m *MockStorage) Search(ctx context.Context, query string, size int) ([]Art
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]Article), args.Error(1)
+	result, ok := args.Get(0).([]Article)
+	if !ok {
+		return nil, ErrMockTypeAssertion
+	}
+	return result, args.Error(1)
 }
 
 // CreateIndex implements Storage
