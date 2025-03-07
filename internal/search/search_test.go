@@ -10,6 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/search"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -59,9 +60,13 @@ func (m *mockStorage) BulkIndex(ctx context.Context, index string, documents []i
 	return args.Error(0)
 }
 
-func (m *mockStorage) Search(ctx context.Context, index string, query interface{}) (interface{}, error) {
-	args := m.Called(ctx, index, query)
-	return args.Get(0), args.Error(1)
+// Search implements storage.Interface
+func (m *mockStorage) Search(ctx context.Context, query string, size int) ([]storage.Article, error) {
+	args := m.Called(ctx, query, size)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]storage.Article), args.Error(1)
 }
 
 func (m *mockStorage) CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error {
