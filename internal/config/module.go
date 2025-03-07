@@ -3,39 +3,67 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
 
+// InitializeConfig sets up the configuration
+func InitializeConfig(cfgFile string) (*Config, error) {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	}
+
+	// Set default values
+	viper.SetDefault("LOG_LEVEL", "info")
+	viper.SetDefault("APP_ENV", "development")
+
+	// Bind environment variables and check for errors
+	if err := viper.BindEnv("LOG_LEVEL"); err != nil {
+		return nil, fmt.Errorf("failed to bind LOG_LEVEL environment variable: %w", err)
+	}
+	if err := viper.BindEnv("APP_ENV"); err != nil {
+		return nil, fmt.Errorf("failed to bind APP_ENV environment variable: %w", err)
+	}
+
+	return New()
+}
+
 // New creates a new Config instance with values from Viper
 func New() (*Config, error) {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+	// Set config defaults if not already configured
+	if viper.ConfigFileUsed() == "" {
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath(".")
+	}
+
 	viper.AutomaticEnv()
 
 	// Attempt to read the config file
 	if err := viper.ReadInConfig(); err != nil {
 		var configErr *viper.ConfigFileNotFoundError
 		if errors.As(err, &configErr) {
-			//nolint:forbidigo // No logger here
-			fmt.Println("Config file not found; ignoring error")
+			// Log to stderr instead of using fmt.Println
+			fmt.Fprintf(os.Stderr, "Config file not found; using environment variables\n")
 		} else {
 			// Config file was found but another error was produced
-			return nil, err
+			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
 	}
 
 	// Proceed to read the configuration values
 	rateLimit, err := parseRateLimit(viper.GetString(CrawlerRateLimitKey))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing rate limit: %w", err)
 	}
 
 	cfg := &Config{
 		App: AppConfig{
 			Environment: viper.GetString(AppEnvKey),
+			Name:        viper.GetString("APP_NAME"),
+			Version:     viper.GetString("APP_VERSION"),
 		},
 		Crawler: CrawlerConfig{
 			BaseURL:          viper.GetString(CrawlerBaseURLKey),
@@ -62,7 +90,7 @@ func New() (*Config, error) {
 	}
 
 	if validateErr := ValidateConfig(cfg); validateErr != nil {
-		return nil, validateErr
+		return nil, fmt.Errorf("config validation failed: %w", validateErr)
 	}
 
 	return cfg, nil

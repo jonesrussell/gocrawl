@@ -119,31 +119,6 @@ type Config struct {
 	Sources       []Source            `yaml:"sources"`
 }
 
-// InitializeConfig sets up the configuration
-func InitializeConfig(cfgFile string) (*Config, error) {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		viper.AddConfigPath(".")
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("config")
-	}
-
-	viper.SetDefault("LOG_LEVEL", "info")
-	viper.SetDefault("APP_ENV", "development")
-
-	viper.BindEnv("LOG_LEVEL")
-	viper.BindEnv("APP_ENV")
-
-	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
-
-	return New() // Use your `New` function to return a Config instance
-}
-
 // parseRateLimit parses the rate limit duration from a string
 func parseRateLimit(rateLimitStr string) (time.Duration, error) {
 	if rateLimitStr == "" {

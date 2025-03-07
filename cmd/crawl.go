@@ -37,7 +37,10 @@ Example:
   gocrawl crawl example-blog`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
-			return fmt.Errorf("requires exactly one source name from sources.yml\n\nUsage:\n  %s\n\nRun 'gocrawl list' to see available sources", cmd.UseLine())
+			const errMsg = "requires exactly one source name from sources.yml\n\n" +
+				"Usage:\n  %s\n\n" +
+				"Run 'gocrawl list' to see available sources"
+			return fmt.Errorf(errMsg, cmd.UseLine())
 		}
 		return nil
 	},
