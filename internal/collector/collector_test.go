@@ -176,7 +176,7 @@ func TestCollectorCreation(t *testing.T) {
 					"baseURL", tt.baseURL,
 					"maxDepth", 2,
 					"rateLimit", time.Second,
-					"parallelism", 0,
+					"parallelism", 2,
 				).Return()
 				mockLogger.On("Debug", "Setting up article processing", "tag", "collector/content").Return()
 				mockLogger.On("Debug", "Setting up HTML processing", "tag", "collector/content").Return()
@@ -188,9 +188,10 @@ func TestCollectorCreation(t *testing.T) {
 			cfg.RateLimit = "1s"
 
 			params := collector.Params{
-				BaseURL:   tt.baseURL,
-				MaxDepth:  2,
-				RateLimit: time.Second,
+				BaseURL:     tt.baseURL,
+				MaxDepth:    2,
+				RateLimit:   time.Second,
+				Parallelism: 2,
 				Debugger: &logger.CollyDebugger{
 					Logger: mockLogger,
 				},
