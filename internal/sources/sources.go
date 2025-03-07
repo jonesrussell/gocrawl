@@ -119,6 +119,7 @@ func (s *Sources) Start(ctx context.Context, sourceName string) error {
 		return fmt.Errorf("failed to start crawler: %w", crawlErr)
 	}
 
+	s.Logger.Info("Crawl completed", "source", sourceName)
 	return nil
 }
 

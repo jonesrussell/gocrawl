@@ -227,7 +227,7 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, query string, size in
 	// Build the search query
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
-			"multi_match": map[string]interface{}{
+			"weighted_field_search": map[string]interface{}{
 				"query":  query,
 				"fields": []string{"title", "content"},
 			},

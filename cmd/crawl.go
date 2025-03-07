@@ -198,7 +198,7 @@ Example:
 		case <-ctx.Done():
 			common.PrintInfof("\nContext cancelled, initiating shutdown...")
 		case <-doneChan:
-			common.PrintInfof("\nCrawl completed successfully, initiating shutdown...")
+			common.PrintInfof("\nCrawl completed, initiating shutdown...")
 		}
 
 		// Create a context with timeout for graceful shutdown
