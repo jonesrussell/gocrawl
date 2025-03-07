@@ -17,14 +17,14 @@ func New(p Params) (Result, error) {
 		return Result{}, fmt.Errorf("failed to create collector config: %w", err)
 	}
 
-	if err := cfg.ValidateConfig(); err != nil {
-		return Result{}, fmt.Errorf("invalid collector config: %w", err)
+	if validateErr := cfg.ValidateConfig(); validateErr != nil {
+		return Result{}, fmt.Errorf("invalid collector config: %w", validateErr)
 	}
 
 	// Create collector setup
 	setup := NewSetup(cfg)
-	if err := setup.ValidateURL(); err != nil {
-		return Result{}, err
+	if urlErr := setup.ValidateURL(); urlErr != nil {
+		return Result{}, urlErr
 	}
 
 	// Parse URL to get domain
@@ -37,8 +37,8 @@ func New(p Params) (Result, error) {
 	c := setup.CreateBaseCollector(parsedURL.Hostname())
 
 	// Configure collector settings
-	if err := setup.ConfigureCollector(c); err != nil {
-		return Result{}, fmt.Errorf("failed to configure collector: %w", err)
+	if configErr := setup.ConfigureCollector(c); configErr != nil {
+		return Result{}, fmt.Errorf("failed to configure collector: %w", configErr)
 	}
 
 	// Create completion channel and handlers

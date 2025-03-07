@@ -1,22 +1,41 @@
-- Provide a brief explanation of updates made to the code.
-- Use proper dependency injection for better testability.
-- Maintain code readability and structure.
-- Avoid global state where possible.
-- Use go 1.24.
-- Interface definitions:
-  - Define interfaces in the package that uses them, not where they are implemented
-  - For module-specific interfaces, define them in module.go
-  - For interfaces used across multiple packages, define them in the consuming package
-- Use the following dependencies:
-	github.com/elastic/go-elasticsearch/v8
-	github.com/gocolly/colly/v2
-	github.com/joho/godotenv
-	github.com/spf13/cobra
-	go.uber.org/fx
-	go.uber.org/zap
+Code Organization & Structure
+- Split large files into smaller, focused modules
+- Keep related functionality together
+- Use consistent naming across related components
+- Avoid type stuttering in package names (e.g., use `Config` not `CollectorConfig`)
+- Use descriptive variable names to avoid shadowing
+- Avoid global state where possible
+
+Dependency Injection & Interfaces
+- Use fx.In and fx.Out for dependency injection
+- Define interfaces in the package that uses them, not where they are implemented
+- For module-specific interfaces, define them in module.go
+- For interfaces used across multiple packages, define them in the consuming package
+- Avoid interface stuttering (e.g., use `Logger` instead of `CollectorLogger`)
+
+Error Handling
+- Prefer errors.New over fmt.Errorf for simple error messages
+- Check error return values
+- Use descriptive error variable names to avoid shadowing
+- Wrap errors with context when appropriate
 
 Testing
-- for error assertions use require
-- avoid allocations with (*os.File).WriteString
-- avoid shadow declarations
-- check error return values
+- Use require for error assertions
+- Avoid allocations with (*os.File).WriteString
+- Avoid shadow declarations
+- Test each module independently
+
+Dependencies
+- Use go 1.24
+- Required packages:
+  github.com/elastic/go-elasticsearch/v8
+  github.com/gocolly/colly/v2
+  github.com/joho/godotenv
+  github.com/spf13/cobra
+  go.uber.org/fx
+  go.uber.org/zap
+
+Documentation
+- Provide brief explanations of code updates
+- Document interface requirements
+- Include examples for complex patterns
