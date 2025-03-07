@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -49,6 +50,17 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 		size = DefaultSearchSize
 	}
 
+	// Create a cancellable context for managing the application lifecycle
+	ctx, cancel := context.WithCancel(cmd.Context())
+	defer cancel()
+
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Create a channel to signal search completion
+	doneChan := make(chan struct{})
+
 	app := fx.New(
 		common.Module,
 		search.Module,
@@ -68,38 +80,41 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 			),
 		),
 		fx.Invoke(func(p SearchParams) {
-			if startErr := executeSearch(cmd.Context(), p); startErr != nil {
+			if startErr := executeSearch(ctx, p); startErr != nil {
 				p.Logger.Error("Error executing search", "error", startErr)
-				os.Exit(1)
+				cancel() // Cancel context to trigger shutdown
 			}
+			close(doneChan) // Signal completion
 		}),
 	)
 
-	if startErr := app.Start(cmd.Context()); startErr != nil {
-		common.PrintErrorf("Error starting application: %v", startErr)
-		os.Exit(1)
+	// Start the application and handle any startup errors
+	if err := app.Start(ctx); err != nil {
+		return fmt.Errorf("error starting application: %w", err)
 	}
 
-	// Wait for termination signal or search completion
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
+	// Wait for either:
+	// - A signal interrupt (SIGINT/SIGTERM)
+	// - Context cancellation
+	// - Search completion
 	select {
 	case sig := <-sigChan:
 		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-	case <-cmd.Context().Done():
+	case <-ctx.Done():
+		common.PrintInfof("\nContext cancelled, initiating shutdown...")
+	case <-doneChan:
 		common.PrintInfof("\nSearch completed, shutting down...")
 	}
 
 	// Create a context with timeout for graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
-	defer func() {
-		cancel()
-		if stopErr := app.Stop(ctx); stopErr != nil {
-			common.PrintErrorf("Error during shutdown: %v", stopErr)
-			os.Exit(1)
-		}
-	}()
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
+	defer stopCancel()
+
+	// Stop the application and handle any shutdown errors
+	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+		common.PrintErrorf("Error stopping application: %v", err)
+		return err
+	}
 
 	return nil
 }

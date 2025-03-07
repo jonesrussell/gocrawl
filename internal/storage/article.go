@@ -126,7 +126,7 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
-			"crawl_match": map[string]interface{}{
+			"multi_match": map[string]interface{}{
 				"query":  query,
 				"fields": []string{"title^2", "body", "tags"},
 			},
@@ -141,7 +141,7 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 
 	res, err := s.ESClient.Search(
 		s.ESClient.Search.WithContext(ctx),
-		s.ESClient.Search.WithIndex("articles"),
+		s.ESClient.Search.WithIndex(s.IndexName),
 		s.ESClient.Search.WithBody(&buf),
 	)
 	if err != nil {
