@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/search"
@@ -35,105 +34,102 @@ type SearchParams struct {
 var searchCmd = &cobra.Command{
 	Use:   "search",
 	Short: "Search content in Elasticsearch",
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		query, err := cmd.Flags().GetString("query")
-		if err != nil {
-			return fmt.Errorf("error retrieving query: %w", err)
-		}
-
-		indexName := cmd.Flag("index").Value.String()
-		size, err := cmd.Flags().GetInt("size")
-		if err != nil {
-			size = DefaultSearchSize
-		}
-
-		app := fx.New(
-			common.Module,
-			search.Module,
-			fx.Provide(
-				// Provide search parameters
-				fx.Annotate(
-					func() string { return query },
-					fx.ResultTags(`name:"query"`),
-				),
-				fx.Annotate(
-					func() string { return indexName },
-					fx.ResultTags(`name:"indexName"`),
-				),
-				fx.Annotate(
-					func() int { return size },
-					fx.ResultTags(`name:"resultSize"`),
-				),
-			),
-			fx.Invoke(startSearch),
-		)
-
-		if err := app.Start(cmd.Context()); err != nil {
-			fmt.Printf("Error starting application: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Wait for termination signal or search completion
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-		select {
-		case sig := <-sigChan:
-			fmt.Printf("\nReceived signal %v, initiating shutdown...\n", sig)
-		case <-cmd.Context().Done():
-			fmt.Println("\nSearch completed, shutting down...")
-		}
-
-		// Create a context with timeout for graceful shutdown
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := app.Stop(ctx); err != nil {
-			fmt.Printf("Error during shutdown: %v\n", err)
-			os.Exit(1)
-		}
-
-		return nil
-	},
+	RunE:  runSearch,
 }
 
-// startSearch initializes and runs the search operation
-func startSearch(lc fx.Lifecycle, p SearchParams) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			p.Logger.Info("Starting search...",
-				"query", p.Query,
-				"index", p.IndexName,
-				"size", p.ResultSize,
-			)
+func runSearch(cmd *cobra.Command, _ []string) error {
+	queryStr, queryErr := cmd.Flags().GetString("query")
+	if queryErr != nil {
+		return fmt.Errorf("error retrieving query: %w", queryErr)
+	}
 
-			results, err := p.SearchSvc.SearchContent(ctx, p.Query, p.IndexName, p.ResultSize)
-			if err != nil {
-				p.Logger.Error("Search failed", "error", err)
-				return fmt.Errorf("search failed: %w", err)
+	indexName := cmd.Flag("index").Value.String()
+	size, sizeErr := cmd.Flags().GetInt("size")
+	if sizeErr != nil {
+		size = DefaultSearchSize
+	}
+
+	app := fx.New(
+		common.Module,
+		search.Module,
+		fx.Provide(
+			// Provide search parameters
+			fx.Annotate(
+				func() string { return queryStr },
+				fx.ResultTags(`name:"query"`),
+			),
+			fx.Annotate(
+				func() string { return indexName },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() int { return size },
+				fx.ResultTags(`name:"resultSize"`),
+			),
+		),
+		fx.Invoke(func(p SearchParams) {
+			if startErr := executeSearch(cmd.Context(), p); startErr != nil {
+				p.Logger.Error("Error executing search", "error", startErr)
+				os.Exit(1)
 			}
+		}),
+	)
 
-			// Print results
-			if len(results) == 0 {
-				p.Logger.Info("No results found")
-				return nil
-			}
+	if startErr := app.Start(cmd.Context()); startErr != nil {
+		common.PrintError("Error starting application: %v", startErr)
+		os.Exit(1)
+	}
 
-			p.Logger.Info(fmt.Sprintf("Found %d results:", len(results)))
-			for i, result := range results {
-				p.Logger.Info(fmt.Sprintf("\nResult %d:", i+1),
-					"url", result.URL,
-					"content", result.Content,
-				)
-			}
+	// Wait for termination signal or search completion
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-			return nil
-		},
-		OnStop: func(_ context.Context) error {
-			p.Logger.Debug("Search operation completed")
-			return nil
-		},
-	})
+	select {
+	case sig := <-sigChan:
+		common.PrintInfo("\nReceived signal %v, initiating shutdown...", sig)
+	case <-cmd.Context().Done():
+		common.PrintInfo("\nSearch completed, shutting down...")
+	}
+
+	// Create a context with timeout for graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+	defer cancel()
+
+	if stopErr := app.Stop(ctx); stopErr != nil {
+		common.PrintError("Error during shutdown: %v", stopErr)
+		os.Exit(1)
+	}
+
+	return nil
+}
+
+func executeSearch(ctx context.Context, p SearchParams) error {
+	p.Logger.Info("Starting search...",
+		"query", p.Query,
+		"index", p.IndexName,
+		"size", p.ResultSize,
+	)
+
+	results, err := p.SearchSvc.SearchContent(ctx, p.Query, p.IndexName, p.ResultSize)
+	if err != nil {
+		p.Logger.Error("Search failed", "error", err)
+		return fmt.Errorf("search failed: %w", err)
+	}
+
+	// Print results
+	if len(results) == 0 {
+		common.PrintInfo("No results found")
+		return nil
+	}
+
+	common.PrintInfo("\nFound %d results:", len(results))
+	for i, result := range results {
+		common.PrintInfo("\nResult %d:", i+1)
+		common.PrintInfo("URL: %s", result.URL)
+		common.PrintInfo("Content: %s", result.Content)
+	}
+
+	return nil
 }
 
 func init() {
@@ -145,7 +141,7 @@ func init() {
 	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
 
 	if err := searchCmd.MarkFlagRequired("query"); err != nil {
-		fmt.Printf("Error marking query flag as required: %v\n", err)
+		common.PrintError("Error marking query flag as required: %v", err)
 		os.Exit(1)
 	}
 }

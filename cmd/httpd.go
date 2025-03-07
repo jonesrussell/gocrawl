@@ -26,7 +26,7 @@ type ServerParams struct {
 // startServer starts the HTTP server and handles graceful shutdown
 func startServer(lc fx.Lifecycle, p ServerParams) {
 	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(_ context.Context) error {
 			go func() {
 				p.Logger.Info("HTTP server started", "address", p.Server.Addr)
 				if err := p.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

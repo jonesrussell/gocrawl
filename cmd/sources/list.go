@@ -1,72 +1,83 @@
 package sources
 
 import (
-	"fmt"
-	"strings"
+	"context"
+	"os"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 )
 
-// listCommand creates and returns the list subcommand
+type listParams struct {
+	ctx     context.Context
+	sources *sources.Sources
+	logger  common.Logger
+}
+
 func listCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all configured sources",
-		Long: `Display a list of all sources configured in sources.yml.
-Shows details like URL, rate limit, and index names for each source.
-
-Example:
-gocrawl sources list`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Create an Fx application with config.Module and logger.Module
-			app := fx.New(
-				fx.WithLogger(func() fxevent.Logger {
-					return &fxevent.NopLogger
-				}),
-				config.Module, // Provide *config.Config via config.Module
-				logger.Module, // Provide logger.Interface via logger.Module
-				sources.Module,
-				fx.Invoke(func(s *sources.Sources, cfg *config.Config, log logger.Interface) {
-					log.Info("Listing configured sources")
-
-					fmt.Println("\nConfigured Sources")
-					fmt.Println("-----------------")
-					fmt.Printf("%-20s %-30s %-15s %-15s %-10s\n",
-						"Name",
-						"URL",
-						"Article Index",
-						"Content Index",
-						"Max Depth")
-					fmt.Println(strings.Repeat("-", 92))
-
-					for _, source := range s.Sources {
-						fmt.Printf("%-20s %-30s %-15s %-15s %-10d\n",
-							source.Name,
-							source.URL,
-							source.ArticleIndex,
-							source.Index,
-							source.MaxDepth)
-					}
-					fmt.Println()
-				}),
-			)
-
-			// Start the Fx app
-			if err := app.Start(cmd.Context()); err != nil {
-				return fmt.Errorf("error starting application: %w", err)
-			}
-
-			// Stop the Fx app
-			if err := app.Stop(cmd.Context()); err != nil {
-				return fmt.Errorf("error stopping application: %w", err)
-			}
-
-			return nil
-		},
+		Long:  `Display a list of all sources configured in sources.yml.`,
+		Run:   runList,
 	}
+}
+
+func runList(cmd *cobra.Command, _ []string) {
+	var logger common.Logger
+
+	app := fx.New(
+		common.Module,
+		fx.Invoke(func(s *sources.Sources, l common.Logger) {
+			logger = l
+			params := &listParams{
+				ctx:     cmd.Context(),
+				sources: s,
+				logger:  l,
+			}
+			if err := executeList(params); err != nil {
+				l.Error("Error executing list", "error", err)
+				os.Exit(1)
+			}
+		}),
+	)
+
+	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
+	defer cancel()
+
+	if err := app.Start(ctx); err != nil {
+		if logger != nil {
+			logger.Error("Error starting application", "error", err)
+		}
+		os.Exit(1)
+	}
+
+	if err := app.Stop(ctx); err != nil {
+		if logger != nil {
+			logger.Error("Error stopping application", "error", err)
+		}
+		os.Exit(1)
+	}
+}
+
+func executeList(p *listParams) error {
+	common.PrintInfo("\nConfigured Sources")
+	common.PrintDivider(17)
+	common.PrintTableHeader("%-20s %-30s %-15s %-15s %-10s",
+		"Name", "URL", "Article Index", "Content Index", "Max Depth")
+	common.PrintDivider(92)
+
+	for _, source := range p.sources.Sources {
+		common.PrintTableHeader("%-20s %-30s %-15s %-15s %-10d",
+			source.Name,
+			source.URL,
+			source.ArticleIndex,
+			source.Index,
+			source.MaxDepth)
+	}
+
+	common.PrintInfo("")
+	return nil
 }
