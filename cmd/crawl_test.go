@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -269,21 +270,43 @@ func TestCrawlCommand_Execute(t *testing.T) {
 	mockLogger := logger.NewMockLogger()
 	mockStorage := storage.NewMockStorage()
 	mockCrawler := crawler.NewMockCrawler()
+	mockIndexService := storage.NewMockIndexService()
 
 	mockCrawler.On("SetCollector", mock.Anything).Return()
 	mockCrawler.On("Start", mock.Anything, mock.Anything).Return(nil)
 	mockCrawler.On("Stop").Return()
+
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int"), mock.AnythingOfType("string"), mock.AnythingOfType("time.Duration"), mock.AnythingOfType("string"), mock.AnythingOfType("int")).Return()
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+	mockLogger.On("Info", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+	mockLogger.On("Error", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+
+	mockIndexService.On("EnsureIndex", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 	// Create a test app
 	app := fxtest.New(t,
 		fx.Supply(mockLogger),
 		fx.Supply(mockStorage),
 		fx.Supply(mockCrawler),
+		fx.Supply(mockIndexService),
 		fx.Provide(
 			func() crawler.Interface { return mockCrawler },
+			func() storage.IndexServiceInterface { return mockIndexService },
+			func() storage.Interface { return mockStorage },
+			func() storage.MappingServiceInterface { return storage.NewMappingService(mockLogger, mockStorage) },
+		),
+		fx.Replace(
+			fx.Provide(
+				func() storage.Result {
+					return storage.Result{
+						Storage:        mockStorage,
+						IndexService:   mockIndexService,
+						MappingService: storage.NewMappingService(mockLogger, mockStorage),
+					}
+				},
+			),
 		),
 		common.Module,
-		crawler.Module,
 		article.Module,
 		content.Module,
 	)
@@ -310,6 +333,52 @@ func TestCrawlCommand_Execute(t *testing.T) {
 
 func TestCrawlCommand_ExecuteError(t *testing.T) {
 	setupTestConfig(t)
+
+	// Set up mocks
+	mockLogger := logger.NewMockLogger()
+	mockStorage := storage.NewMockStorage()
+	mockCrawler := crawler.NewMockCrawler()
+	mockIndexService := storage.NewMockIndexService()
+
+	// Set up expectations for error case
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int"), mock.AnythingOfType("string"), mock.AnythingOfType("time.Duration"), mock.AnythingOfType("string"), mock.AnythingOfType("int")).Return()
+	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+	mockLogger.On("Info", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+	mockLogger.On("Error", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
+
+	mockIndexService.On("EnsureIndex", mock.Anything, mock.AnythingOfType("string")).Return(fmt.Errorf("index error"))
+
+	// Create a test app
+	app := fxtest.New(t,
+		fx.Supply(mockLogger),
+		fx.Supply(mockStorage),
+		fx.Supply(mockCrawler),
+		fx.Supply(mockIndexService),
+		fx.Provide(
+			func() crawler.Interface { return mockCrawler },
+			func() storage.IndexServiceInterface { return mockIndexService },
+			func() storage.Interface { return mockStorage },
+			func() storage.MappingServiceInterface { return storage.NewMappingService(mockLogger, mockStorage) },
+		),
+		fx.Replace(
+			fx.Provide(
+				func() storage.Result {
+					return storage.Result{
+						Storage:        mockStorage,
+						IndexService:   mockIndexService,
+						MappingService: storage.NewMappingService(mockLogger, mockStorage),
+					}
+				},
+			),
+		),
+		common.Module,
+		article.Module,
+		content.Module,
+	)
+
+	// Start the test app
+	app.RequireStart()
+	defer app.RequireStop()
 
 	// Test with invalid source name
 	cmd := cmd.CrawlCmd
