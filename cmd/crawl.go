@@ -22,25 +22,43 @@ import (
 )
 
 const (
-	// DefaultChannelBufferSize is the default size for buffered channels
+	// DefaultChannelBufferSize is the default size for buffered channels used for
+	// processing articles and content during crawling.
 	DefaultChannelBufferSize = 100
 )
 
+// sourceName holds the name of the source being crawled, populated from command line arguments.
 var sourceName string
 
-// CrawlParams holds the parameters for crawl-source crawl
+// CrawlParams holds the dependencies and parameters required for the crawl operation.
+// It uses fx.In to indicate that these fields should be injected by the fx dependency
+// injection framework.
 type CrawlParams struct {
 	fx.In
 
-	Lifecycle       fx.Lifecycle
-	Sources         *sources.Sources
+	// Lifecycle manages the application's startup and shutdown hooks
+	Lifecycle fx.Lifecycle
+
+	// Sources provides access to configured crawl sources
+	Sources *sources.Sources
+
+	// CrawlerInstance handles the core crawling functionality
 	CrawlerInstance crawler.Interface
-	Processors      []models.ContentProcessor `group:"processors"`
-	Logger          common.Logger
-	Done            chan struct{} `name:"crawlDone"`
+
+	// Processors is a slice of content processors, injected as a group
+	// The first processor handles articles, the second handles content
+	Processors []models.ContentProcessor `group:"processors"`
+
+	// Logger provides structured logging capabilities
+	Logger common.Logger
+
+	// Done is a channel that signals when the crawl operation is complete
+	Done chan struct{} `name:"crawlDone"`
 }
 
-// createCrawlCmd creates the crawl command
+// crawlCmd represents the crawl command that initiates the crawling process for a
+// specified source. It reads the source configuration from sources.yml and starts
+// the crawling process with the configured parameters.
 var crawlCmd = &cobra.Command{
 	Use:   "crawl [source]",
 	Short: "Crawl a single source defined in sources.yml",
@@ -59,40 +77,42 @@ Example:
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Create a cancellable context
+		// Create a cancellable context for managing the application lifecycle
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
 		sourceName = args[0]
 
-		// Set up signal handling
+		// Set up signal handling for graceful shutdown
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-		// Create a channel to receive the done signal
+		// Create a channel to receive the done signal when crawling completes
 		doneChan := make(chan struct{})
 
-		// Create an Fx application with common module
+		// Create an Fx application with all required dependencies
 		app := fx.New(
+			// Supply the done channel to the application
 			fx.Supply(fx.Annotate(
 				doneChan,
 				fx.ResultTags(`name:"crawlDone"`),
 			)),
 			fx.Provide(
+				// Provide buffered channels for article and content processing
 				func() chan *models.Article {
 					return make(chan *models.Article, DefaultChannelBufferSize)
 				},
 				func() chan *models.Content {
 					return make(chan *models.Content, DefaultChannelBufferSize)
 				},
-				// Provide source name
+				// Provide the source name from command line argument
 				fx.Annotate(
 					func() string {
 						return sourceName
 					},
 					fx.ResultTags(`name:"sourceName"`),
 				),
-				// Provide ArticleIndex name
+				// Provide the article index name from source configuration
 				fx.Annotate(
 					func(s *sources.Sources) string {
 						source, _ := s.FindByName(sourceName)
@@ -103,7 +123,7 @@ Example:
 					},
 					fx.ResultTags(`name:"indexName"`),
 				),
-				// Provide ContentIndex name
+				// Provide the content index name from source configuration
 				fx.Annotate(
 					func(s *sources.Sources) string {
 						source, _ := s.FindByName(sourceName)
@@ -114,7 +134,7 @@ Example:
 					},
 					fx.ResultTags(`name:"contentIndex"`),
 				),
-				// Provide article processor first (will be first in the slice)
+				// Provide the article processor
 				fx.Annotate(
 					func(
 						logger common.Logger,
@@ -134,7 +154,7 @@ Example:
 					},
 					fx.ResultTags(`group:"processors"`),
 				),
-				// Provide content processor second (will be second in the slice)
+				// Provide the content processor
 				fx.Annotate(
 					func(
 						service content.Interface,
@@ -150,6 +170,7 @@ Example:
 					fx.ResultTags(`group:"processors"`),
 				),
 			),
+			// Include required modules
 			common.Module,
 			crawler.Module,
 			article.Module,
@@ -157,12 +178,15 @@ Example:
 			fx.Invoke(startCrawl),
 		)
 
-		// Start the application
+		// Start the application and handle any startup errors
 		if err := app.Start(ctx); err != nil {
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		// Wait for either signal or completion
+		// Wait for either:
+		// - A signal interrupt (SIGINT/SIGTERM)
+		// - Context cancellation
+		// - Crawl completion (doneChan closed)
 		select {
 		case sig := <-sigChan:
 			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
@@ -176,7 +200,7 @@ Example:
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
 		defer stopCancel()
 
-		// Stop the application
+		// Stop the application and handle any shutdown errors
 		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
 			common.PrintErrorf("Error stopping application: %v", err)
 			return err
@@ -186,7 +210,14 @@ Example:
 	},
 }
 
-// startCrawl starts the crawl-source crawl
+// startCrawl initializes and starts the crawling process. It sets up the crawler
+// with the specified source configuration and manages the crawl lifecycle.
+//
+// Parameters:
+//   - p: CrawlParams containing all required dependencies and configuration
+//
+// Returns:
+//   - error: Any error that occurred during setup or initialization
 func startCrawl(p CrawlParams) error {
 	if p.CrawlerInstance == nil {
 		return errors.New("crawler is not initialized")
@@ -198,30 +229,31 @@ func startCrawl(p CrawlParams) error {
 		return errors.New("crawler instance is not of type *crawler.Crawler")
 	}
 
-	// Set both the crawler and index manager in the sources
+	// Configure the sources with crawler and index manager
 	p.Sources.SetCrawler(p.CrawlerInstance)
 	p.Sources.SetIndexManager(crawler.IndexService)
 
+	// Get the source configuration
 	source, err := p.Sources.FindByName(sourceName)
 	if err != nil {
 		return err
 	}
 
-	// Parse rate limit
+	// Parse and validate rate limit from configuration
 	rateLimit, err := time.ParseDuration(source.RateLimit)
 	if err != nil {
 		return fmt.Errorf("invalid rate limit: %w", err)
 	}
 
-	// Create the collector using the collector module
+	// Create and configure the collector
 	collectorResult, err := collector.New(collector.Params{
 		BaseURL:          source.URL,
 		MaxDepth:         source.MaxDepth,
 		RateLimit:        rateLimit,
 		Debugger:         logger.NewCollyDebugger(p.Logger),
 		Logger:           p.Logger,
-		ArticleProcessor: p.Processors[0], // Use first processor as article processor
-		ContentProcessor: p.Processors[1], // Use second processor as content processor
+		ArticleProcessor: p.Processors[0], // First processor handles articles
+		ContentProcessor: p.Processors[1], // Second processor handles content
 		Source:           source,
 	})
 	if err != nil {
@@ -231,17 +263,17 @@ func startCrawl(p CrawlParams) error {
 	// Set the collector in the crawler instance
 	crawler.SetCollector(collectorResult.Collector)
 
-	// Use lifecycle hooks to manage the crawl
+	// Configure lifecycle hooks for crawl management
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			// Start the crawl in a goroutine
+			// Start the crawl in a goroutine to not block
 			go func() {
 				if err := p.Sources.Start(ctx, sourceName); err != nil {
 					if !errors.Is(err, context.Canceled) {
 						p.Logger.Error("Crawl failed", "error", err)
 					}
 				}
-				// Signal completion
+				// Signal completion by closing the done channel
 				close(p.Done)
 			}()
 			return nil
