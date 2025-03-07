@@ -15,6 +15,8 @@ type Handlers struct {
 	config *Config
 	// done is a channel used to signal when crawling is complete
 	done chan struct{}
+	// collector is the Colly collector instance
+	collector *colly.Collector
 }
 
 // NewHandlers creates a new collector handlers instance.
@@ -35,37 +37,32 @@ func NewHandlers(config *Config, done chan struct{}) *Handlers {
 }
 
 // ConfigureHandlers sets up all event handlers for the collector.
-// It configures handlers for various collector events including:
-// - Scraping completion
-// - Error handling
-// - Request tracking
-// - Response tracking
-//
-// Parameters:
-//   - c: The Colly collector instance to configure
-func (h *Handlers) ConfigureHandlers(c *colly.Collector) {
-	// Add completion handler to ensure proper completion signaling
-	c.OnScraped(func(r *colly.Response) {
-		// Check if this is the last request (base URL)
-		if r.Request.URL.String() == h.config.BaseURL {
-			h.config.Logger.Debug("Base URL scraped, crawl complete")
-			// Signal completion by closing the done channel
-			close(h.done)
-		}
+// It:
+// - Sets up handlers for scraping completion
+// - Configures error handling
+// - Sets up request and response tracking
+// - Manages crawl completion signaling
+func (h *Handlers) ConfigureHandlers() {
+	// Handle scraping completion
+	h.collector.OnScraped(func(r *colly.Response) {
+		h.config.Logger.Debug("Scraped URL", "url", r.Request.URL.String())
 	})
 
-	// Add error handler to ensure we know about any failures
-	c.OnError(func(r *colly.Response, err error) {
-		h.config.Logger.Error("Request failed", "url", r.Request.URL, "error", err)
+	// Handle errors
+	h.collector.OnError(func(r *colly.Response, err error) {
+		h.config.Logger.Error("Error scraping URL",
+			"url", r.Request.URL.String(),
+			"error", err,
+		)
 	})
 
-	// Add request handler to track progress
-	c.OnRequest(func(r *colly.Request) {
-		h.config.Logger.Debug("Starting request", "url", r.URL)
+	// Handle requests
+	h.collector.OnRequest(func(r *colly.Request) {
+		h.config.Logger.Debug("Starting request", "url", r.URL.String())
 	})
 
-	// Add response handler to track completion
-	c.OnResponse(func(r *colly.Response) {
-		h.config.Logger.Debug("Received response", "url", r.Request.URL, "status", r.StatusCode)
+	// Handle responses
+	h.collector.OnResponse(func(r *colly.Response) {
+		h.config.Logger.Debug("Received response", "url", r.Request.URL.String())
 	})
 }
