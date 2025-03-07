@@ -94,7 +94,7 @@ func runDelete(cmd *cobra.Command, args []string) {
 		fx.Invoke(func(storage common.Storage, sources common.Sources, l common.Logger) {
 			logger = l
 			params := &deleteParams{
-				ctx:     context.Background(),
+				ctx:     cmd.Context(),
 				storage: storage,
 				sources: sources,
 				logger:  l,
