@@ -1,12 +1,13 @@
 {
-  "go.lintTool": "golangci-lint",
-  "go.lintFlags": [
-    "-c",
-    "${workspaceFolder}/.golangci.yml",
-    "--issues-exit-code=0"
-  ],
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
   "editor.defaultFormatter": "golang.go",
+  "go.lintFlags": [
+    "--fast"
+  ],
   "go.lintOnSave": "package",
+  "go.lintTool": "golangci-lint",
   "go.useLanguageServer": true,
   "gopls": {
     "ui.diagnostic.analyses": {
@@ -14,8 +15,5 @@
       "unusedvariable": true
     },
     "ui.diagnostic.staticcheck": true
-  },
-  "[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
   }
 }
