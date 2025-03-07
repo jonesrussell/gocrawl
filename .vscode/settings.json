@@ -2,7 +2,7 @@
   "go.lintTool": "golangci-lint",
   "go.lintFlags": [
     "-c",
-    "../.golangci.yml",
+    "${workspaceFolder}/.golangci.yml",
     "--issues-exit-code=0"
   ],
   "editor.defaultFormatter": "golang.go",
