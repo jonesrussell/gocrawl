@@ -12,17 +12,17 @@ func New(p Params) (Result, error) {
 	}
 
 	// Create collector configuration
-	config, err := NewCollectorConfig(p)
+	cfg, err := NewConfig(p)
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to create collector config: %w", err)
 	}
 
-	if err := config.ValidateConfig(); err != nil {
+	if err := cfg.ValidateConfig(); err != nil {
 		return Result{}, fmt.Errorf("invalid collector config: %w", err)
 	}
 
 	// Create collector setup
-	setup := NewCollectorSetup(config)
+	setup := NewSetup(cfg)
 	if err := setup.ValidateURL(); err != nil {
 		return Result{}, err
 	}
@@ -43,7 +43,7 @@ func New(p Params) (Result, error) {
 
 	// Create completion channel and handlers
 	done := make(chan struct{})
-	handlers := NewCollectorHandlers(config, done)
+	handlers := NewHandlers(cfg, done)
 	handlers.ConfigureHandlers(c)
 
 	p.Logger.Debug("Collector created",

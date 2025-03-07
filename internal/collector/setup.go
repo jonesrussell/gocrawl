@@ -8,20 +8,20 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
-// CollectorSetup handles the setup and configuration of the collector
-type CollectorSetup struct {
-	config *CollectorConfig
+// Setup handles the setup and configuration of the collector
+type Setup struct {
+	config *Config
 }
 
-// NewCollectorSetup creates a new collector setup instance
-func NewCollectorSetup(config *CollectorConfig) *CollectorSetup {
-	return &CollectorSetup{
+// NewSetup creates a new collector setup instance
+func NewSetup(config *Config) *Setup {
+	return &Setup{
 		config: config,
 	}
 }
 
 // CreateBaseCollector creates a new collector with base configuration
-func (s *CollectorSetup) CreateBaseCollector(domain string) *colly.Collector {
+func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 	return colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(s.config.MaxDepth),
@@ -30,7 +30,7 @@ func (s *CollectorSetup) CreateBaseCollector(domain string) *colly.Collector {
 }
 
 // ConfigureCollector sets up the collector with all necessary settings
-func (s *CollectorSetup) ConfigureCollector(c *colly.Collector) error {
+func (s *Setup) ConfigureCollector(c *colly.Collector) error {
 	// Configure rate limiting
 	if err := c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
@@ -59,7 +59,7 @@ func (s *CollectorSetup) ConfigureCollector(c *colly.Collector) error {
 }
 
 // ValidateURL validates the base URL
-func (s *CollectorSetup) ValidateURL() error {
+func (s *Setup) ValidateURL() error {
 	parsedURL, err := url.Parse(s.config.BaseURL)
 	if err != nil || (!strings.HasPrefix(parsedURL.Scheme, "http") && !strings.HasPrefix(parsedURL.Scheme, "https")) {
 		return fmt.Errorf("invalid base URL: %s, must be a valid HTTP/HTTPS URL", s.config.BaseURL)

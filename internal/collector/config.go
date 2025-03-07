@@ -66,8 +66,8 @@ func ValidateParams(p Params) error {
 	return nil
 }
 
-// CollectorConfig holds all configuration for the collector
-type CollectorConfig struct {
+// Config holds all configuration for the collector
+type Config struct {
 	BaseURL          string
 	MaxDepth         int
 	RateLimit        string
@@ -80,14 +80,14 @@ type CollectorConfig struct {
 	ContentProcessor models.ContentProcessor
 }
 
-// NewCollectorConfig creates a new collector configuration
-func NewCollectorConfig(p Params) (*CollectorConfig, error) {
+// NewConfig creates a new collector configuration
+func NewConfig(p Params) (*Config, error) {
 	rateLimit, err := time.ParseDuration(p.Source.RateLimit)
 	if err != nil {
 		return nil, fmt.Errorf("invalid rate limit: %w", err)
 	}
 
-	return &CollectorConfig{
+	return &Config{
 		BaseURL:          p.BaseURL,
 		MaxDepth:         p.MaxDepth,
 		RateLimit:        p.Source.RateLimit,
@@ -136,18 +136,18 @@ func NewCollectorConfig(p Params) (*CollectorConfig, error) {
 }
 
 // ValidateConfig validates the collector configuration
-func (c *CollectorConfig) ValidateConfig() error {
+func (c *Config) ValidateConfig() error {
 	if c.BaseURL == "" {
-		return fmt.Errorf("base URL is required")
+		return errors.New("base URL is required")
 	}
 	if c.MaxDepth < 0 {
-		return fmt.Errorf("max depth must be non-negative")
+		return errors.New("max depth must be non-negative")
 	}
 	if c.Parallelism < 1 {
-		return fmt.Errorf("parallelism must be positive")
+		return errors.New("parallelism must be positive")
 	}
 	if c.RandomDelay < 0 {
-		return fmt.Errorf("random delay must be non-negative")
+		return errors.New("random delay must be non-negative")
 	}
 	return nil
 }

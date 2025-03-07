@@ -4,22 +4,22 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
-// CollectorHandlers manages all event handlers for the collector
-type CollectorHandlers struct {
-	config *CollectorConfig
+// Handlers manages all event handlers for the collector
+type Handlers struct {
+	config *Config
 	done   chan struct{}
 }
 
-// NewCollectorHandlers creates a new collector handlers instance
-func NewCollectorHandlers(config *CollectorConfig, done chan struct{}) *CollectorHandlers {
-	return &CollectorHandlers{
+// NewHandlers creates a new collector handlers instance
+func NewHandlers(config *Config, done chan struct{}) *Handlers {
+	return &Handlers{
 		config: config,
 		done:   done,
 	}
 }
 
 // ConfigureHandlers sets up all event handlers for the collector
-func (h *CollectorHandlers) ConfigureHandlers(c *colly.Collector) {
+func (h *Handlers) ConfigureHandlers(c *colly.Collector) {
 	// Add completion handler to ensure proper completion signaling
 	c.OnScraped(func(r *colly.Response) {
 		// Check if this is the last request
