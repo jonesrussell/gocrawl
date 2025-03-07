@@ -1,4 +1,4 @@
-package cmd
+package cmd_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/cmd"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/content"
@@ -22,17 +23,11 @@ import (
 )
 
 // setupTestConfig creates a temporary sources.yml file for testing
-func setupTestConfig(t *testing.T) func() {
+func setupTestConfig(t *testing.T) {
 	t.Helper()
 
-	// Create a temporary directory
-	tmpDir := t.TempDir()
-	originalWd, err := os.Getwd()
-	require.NoError(t, err)
-
-	// Change to temp directory
-	err = os.Chdir(tmpDir)
-	require.NoError(t, err)
+	// Create a temporary directory and change to it
+	t.Chdir(t.TempDir())
 
 	// Create test sources.yml
 	content := []byte(`
@@ -44,32 +39,24 @@ sources:
     rate_limit: 1s
     max_depth: 2
 `)
-	err = os.WriteFile("sources.yml", content, 0644)
-	require.NoError(t, err)
-
-	// Return cleanup function
-	return func() {
-		err := os.Chdir(originalWd)
-		require.NoError(t, err)
-	}
+	require.NoError(t, os.WriteFile("sources.yml", content, 0644))
 }
 
 func TestStartCrawl(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name    string
-		setup   func(*testing.T) (*fxtest.App, CrawlParams)
+		setup   func(*testing.T) (*fxtest.App, cmd.CrawlParams)
 		wantErr bool
 	}{
 		{
 			name: "successful crawl",
-			setup: func(t *testing.T) (*fxtest.App, CrawlParams) {
+			setup: func(t *testing.T) (*fxtest.App, cmd.CrawlParams) {
 				mockCrawler := crawler.NewMockCrawler()
 				mockLogger := logger.NewMockLogger()
 				mockStorage := storage.NewMockStorage()
-				sourceName = "test-source"
+				cmd.SetSourceName("test-source") // Using exported function to set source name
 
 				sources, err := sources.Load("sources.yml")
 				require.NoError(t, err)
@@ -86,7 +73,7 @@ func TestStartCrawl(t *testing.T) {
 					fx.Populate(&lifecycle),
 				)
 
-				params := CrawlParams{
+				params := cmd.CrawlParams{
 					Lifecycle:       lifecycle,
 					Sources:         sources,
 					CrawlerInstance: mockCrawler,
@@ -111,7 +98,7 @@ func TestStartCrawl(t *testing.T) {
 		},
 		{
 			name: "nil crawler instance",
-			setup: func(t *testing.T) (*fxtest.App, CrawlParams) {
+			setup: func(t *testing.T) (*fxtest.App, cmd.CrawlParams) {
 				mockLogger := logger.NewMockLogger()
 				sources, err := sources.Load("sources.yml")
 				require.NoError(t, err)
@@ -122,7 +109,7 @@ func TestStartCrawl(t *testing.T) {
 					fx.Populate(&lifecycle),
 				)
 
-				params := CrawlParams{
+				params := cmd.CrawlParams{
 					Lifecycle:       lifecycle,
 					Sources:         sources,
 					CrawlerInstance: nil,
@@ -138,14 +125,14 @@ func TestStartCrawl(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app, params := tt.setup(t)
-			err := startCrawl(params)
+			err := cmd.StartCrawl(params)
 
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Start the application
 			app.RequireStart()
@@ -160,8 +147,7 @@ func TestStartCrawl(t *testing.T) {
 }
 
 func TestCrawlCommand(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name    string
@@ -211,15 +197,15 @@ func TestCrawlCommand(t *testing.T) {
 			}
 
 			// Test command argument validation
-			err = crawlCmd.Args(crawlCmd, tt.args)
+			err = cmd.CrawlCmd.Args(cmd.CrawlCmd, tt.args)
 
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
 
-			assert.NoError(t, err)
-			assert.NotNil(t, testApp)
+			require.NoError(t, err)
+			require.NotNil(t, testApp)
 
 			// Test command execution
 			if testApp != nil {
@@ -255,19 +241,18 @@ func TestCrawlCommand_Args(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := crawlCmd.Args(crawlCmd, tt.args)
+			err := cmd.CrawlCmd.Args(cmd.CrawlCmd, tt.args)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
 }
 
 func TestCrawlCommand_Execute(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Set up mocks
 	mockLogger := logger.NewMockLogger()
@@ -297,34 +282,33 @@ func TestCrawlCommand_Execute(t *testing.T) {
 	defer app.RequireStop()
 
 	// Test execution
-	cmd := crawlCmd
+	cmd := cmd.CrawlCmd
 	cmd.SetArgs([]string{"test-source"})
 
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	// Execute the command
 	err := cmd.ExecuteContext(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify mock expectations
 	mockCrawler.AssertExpectations(t)
 }
 
 func TestCrawlCommand_ExecuteError(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Test with invalid source name
-	cmd := crawlCmd
+	cmd := cmd.CrawlCmd
 	cmd.SetArgs([]string{"nonexistent-source"})
 
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	// Execute the command
 	err := cmd.ExecuteContext(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 }

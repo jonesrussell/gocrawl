@@ -30,6 +30,11 @@ const (
 // sourceName holds the name of the source being crawled, populated from command line arguments.
 var sourceName string
 
+// SetSourceName sets the source name for testing purposes
+func SetSourceName(name string) {
+	sourceName = name
+}
+
 // CrawlParams holds the dependencies and parameters required for the crawl operation.
 // It uses fx.In to indicate that these fields should be injected by the fx dependency
 // injection framework.
@@ -56,10 +61,10 @@ type CrawlParams struct {
 	Done chan struct{} `name:"crawlDone"`
 }
 
-// crawlCmd represents the crawl command that initiates the crawling process for a
+// CrawlCmd represents the crawl command that initiates the crawling process for a
 // specified source. It reads the source configuration from sources.yml and starts
 // the crawling process with the configured parameters.
-var crawlCmd = &cobra.Command{
+var CrawlCmd = &cobra.Command{
 	Use:   "crawl [source]",
 	Short: "Crawl a single source defined in sources.yml",
 	Long: `Crawl a single source defined in sources.yml.
@@ -175,7 +180,7 @@ Example:
 			crawler.Module,
 			article.Module,
 			content.Module,
-			fx.Invoke(startCrawl),
+			fx.Invoke(StartCrawl),
 		)
 
 		// Start the application and handle any startup errors
@@ -210,7 +215,7 @@ Example:
 	},
 }
 
-// startCrawl initializes and starts the crawling process. It sets up the crawler
+// StartCrawl initializes and starts the crawling process. It sets up the crawler
 // with the specified source configuration and manages the crawl lifecycle.
 //
 // Parameters:
@@ -218,6 +223,11 @@ Example:
 //
 // Returns:
 //   - error: Any error that occurred during setup or initialization
+func StartCrawl(p CrawlParams) error {
+	return startCrawl(p)
+}
+
+// startCrawl is the internal implementation of StartCrawl
 func startCrawl(p CrawlParams) error {
 	if p.CrawlerInstance == nil {
 		return errors.New("crawler is not initialized")
@@ -295,5 +305,5 @@ func startCrawl(p CrawlParams) error {
 }
 
 func init() {
-	rootCmd.AddCommand(crawlCmd)
+	rootCmd.AddCommand(CrawlCmd)
 }
