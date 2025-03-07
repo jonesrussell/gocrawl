@@ -1,7 +1,7 @@
 package storage_test
 
 import (
-	"context"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -13,6 +13,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// ErrMockTypeAssertion is returned when a type assertion fails in mock methods
+var ErrMockTypeAssertion = errors.New("mock type assertion failed")
 
 func setupTestStorage(t *testing.T) (*storage.MockTransport, storage.Interface, *logger.MockLogger) {
 	mockLogger := logger.NewMockLogger()
@@ -74,7 +77,7 @@ func TestElasticsearchStorage_IndexDocument(t *testing.T) {
 				mockLogger.On("Info", "Document indexed successfully", "index", tt.index, "docID", tt.id).Return()
 			}
 
-			err := store.IndexDocument(context.Background(), tt.index, tt.id, tt.doc)
+			err := store.IndexDocument(t.Context(), tt.index, tt.id, tt.doc)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -131,7 +134,7 @@ func TestElasticsearchStorage_GetDocument(t *testing.T) {
 					Title string `json:"title"`
 				} `json:"_source"`
 			}
-			err := store.GetDocument(context.Background(), tt.index, tt.id, &result)
+			err := store.GetDocument(t.Context(), tt.index, tt.id, &result)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -199,7 +202,7 @@ func TestElasticsearchStorage_SearchArticles(t *testing.T) {
 				mockLogger.On("Info", "Search completed", "query", tt.query, "results", int64(1)).Return()
 			}
 
-			articles, err := store.Search(context.Background(), tt.query, tt.size)
+			articles, err := store.Search(t.Context(), tt.query, tt.size)
 			if tt.expectError {
 				require.Error(t, err)
 				require.Nil(t, articles)
@@ -271,7 +274,7 @@ func TestElasticsearchStorage_BulkIndexArticles(t *testing.T) {
 				mockLogger.On("Info", "Bulk indexed documents", "count", len(tt.articles)).Return()
 			}
 
-			err := store.BulkIndexArticles(context.Background(), tt.articles)
+			err := store.BulkIndexArticles(t.Context(), tt.articles)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -317,7 +320,7 @@ func TestElasticsearchStorage_TestConnection(t *testing.T) {
 			mockTransport.Response = tt.response
 			mockTransport.StatusCode = tt.statusCode
 
-			err := store.TestConnection(context.Background())
+			err := store.TestConnection(t.Context())
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -356,7 +359,7 @@ func TestElasticsearchStorage_IndexExists(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockTransport.StatusCode = tt.statusCode
 
-			exists, err := store.IndexExists(context.Background(), tt.indexName)
+			exists, err := store.IndexExists(t.Context(), tt.indexName)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, exists)
 
@@ -416,7 +419,7 @@ func TestElasticsearchStorage_CreateIndex(t *testing.T) {
 				mockLogger.On("Info", "Created index", "index", tt.index).Return()
 			}
 
-			err := store.CreateIndex(context.Background(), tt.index, tt.mapping)
+			err := store.CreateIndex(t.Context(), tt.index, tt.mapping)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -466,7 +469,7 @@ func TestElasticsearchStorage_DeleteIndex(t *testing.T) {
 				mockLogger.On("Info", "Deleted index", "index", tt.index).Return()
 			}
 
-			err := store.DeleteIndex(context.Background(), tt.index)
+			err := store.DeleteIndex(t.Context(), tt.index)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -519,7 +522,7 @@ func TestElasticsearchStorage_DeleteDocument(t *testing.T) {
 				mockLogger.On("Info", "Deleted document", "index", tt.index, "docID", tt.docID).Return()
 			}
 
-			err := store.DeleteDocument(context.Background(), tt.index, tt.docID)
+			err := store.DeleteDocument(t.Context(), tt.index, tt.docID)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -590,7 +593,7 @@ func TestElasticsearchStorage_GetMapping(t *testing.T) {
 				mockLogger.On("Info", "Retrieved mapping", "index", tt.index).Return()
 			}
 
-			mapping, err := store.GetMapping(context.Background(), tt.index)
+			mapping, err := store.GetMapping(t.Context(), tt.index)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -644,7 +647,7 @@ func TestElasticsearchStorage_ListIndices(t *testing.T) {
 				mockLogger.On("Info", "Retrieved indices list").Return()
 			}
 
-			indices, err := store.ListIndices(context.Background())
+			indices, err := store.ListIndices(t.Context())
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
