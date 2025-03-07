@@ -37,6 +37,7 @@ type CrawlParams struct {
 	CrawlerInstance crawler.Interface
 	Processors      []models.ContentProcessor `group:"processors"`
 	Logger          common.Logger
+	Done            chan struct{} `name:"crawlDone"`
 }
 
 // createCrawlCmd creates the crawl command
@@ -106,6 +107,13 @@ Example:
 					},
 					fx.ResultTags(`name:"contentIndex"`),
 				),
+				// Provide done channel
+				fx.Annotate(
+					func() chan struct{} {
+						return make(chan struct{})
+					},
+					fx.ResultTags(`name:"crawlDone"`),
+				),
 				// Provide article processor first (will be first in the slice)
 				fx.Annotate(
 					func(
@@ -154,9 +162,13 @@ Example:
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		// Wait for signal
-		sig := <-sigChan
-		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+		// Wait for either signal or completion
+		select {
+		case sig := <-sigChan:
+			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+		case <-ctx.Done():
+			common.PrintInfof("\nContext cancelled, initiating shutdown...")
+		}
 
 		// Create a context with timeout for graceful shutdown
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
@@ -227,6 +239,8 @@ func startCrawl(p CrawlParams) error {
 						p.Logger.Error("Crawl failed", "error", err)
 					}
 				}
+				// Signal completion
+				close(p.Done)
 			}()
 			return nil
 		},
