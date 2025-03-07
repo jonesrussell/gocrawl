@@ -24,16 +24,8 @@ func New(p Params) (Result, error) {
 	// Create collector with base configuration
 	c := createBaseCollector(p, parsedURL.Hostname())
 
-	// Configure rate limiting
-	if err := configureRateLimit(c, p); err != nil {
-		return Result{}, err
-	}
-
-	// Configure debugger and logging
-	configureDebuggerAndLogging(c, p)
-
-	// Convert source config and configure content processing
-	if err := initializeContentProcessing(c, p); err != nil {
+	// Configure collector settings
+	if err := configureCollector(c, p); err != nil {
 		return Result{}, err
 	}
 
@@ -59,22 +51,22 @@ func createBaseCollector(p Params, domain string) *colly.Collector {
 	)
 }
 
-func configureRateLimit(c *colly.Collector, p Params) error {
-	return c.Limit(&colly.LimitRule{
+func configureCollector(c *colly.Collector, p Params) error {
+	// Configure rate limiting
+	if err := c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: p.RandomDelay,
 		Parallelism: p.Parallelism,
-	})
-}
+	}); err != nil {
+		return fmt.Errorf("failed to set rate limit: %w", err)
+	}
 
-func configureDebuggerAndLogging(c *colly.Collector, p Params) {
+	// Configure debugger and logging
 	if p.Debugger != nil {
 		c.SetDebugger(p.Debugger)
 	}
 	ConfigureLogging(c, p.Logger)
-}
 
-func initializeContentProcessing(c *colly.Collector, p Params) error {
 	// Parse rate limit duration
 	rateLimit, err := time.ParseDuration(p.Source.RateLimit)
 	if err != nil {
@@ -118,16 +110,15 @@ func initializeContentProcessing(c *colly.Collector, p Params) error {
 		},
 	}
 
-	// Convert Params to ContentParams
+	// Configure content processing
 	contentParams := ContentParams{
 		Logger:           p.Logger,
 		Source:           source,
 		ArticleProcessor: p.ArticleProcessor,
 		ContentProcessor: p.ContentProcessor,
 	}
-
-	// Configure content processing
 	configureContentProcessing(c, contentParams)
+
 	return nil
 }
 

@@ -121,7 +121,7 @@ func (l *contentLogger) error(msg string, keysAndValues ...interface{}) {
 }
 
 // setupArticleProcessing sets up article processing logic for the collector
-func setupArticleProcessing(c *colly.Collector, p ContentParams, log *contentLogger) {
+func setupArticleProcessing(c *colly.Collector, log *contentLogger) {
 	log.debug("Setting up article processing")
 	setupArticleDetection(c, log)
 }
@@ -157,7 +157,7 @@ func configureContentProcessing(c *colly.Collector, p ContentParams) {
 
 	setupLinkFollowing(c, log, ignoredErrors)
 	setupHTMLProcessing(c, log)
-	setupArticleProcessing(c, p, log)
+	setupArticleProcessing(c, log)
 	processScrapedContent(c, p, log)
 }
 
