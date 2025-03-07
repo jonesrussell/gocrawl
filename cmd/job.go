@@ -1,24 +1,6 @@
-/*
-Copyright © 2025 Russell Jones <russell@web.net>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+// Package cmd implements the command-line interface for GoCrawl.
+// This file contains the job scheduler command implementation that manages
+// scheduled crawling tasks based on configuration in sources.yml.
 package cmd
 
 import (
@@ -34,15 +16,22 @@ import (
 	"go.uber.org/fx"
 )
 
-// JobParams holds the parameters for the job scheduler
+// JobParams holds the parameters required for running the job scheduler.
+// It uses fx.In for dependency injection of required components.
 type JobParams struct {
 	fx.In
 
-	Logger  common.Logger
+	// Logger provides logging capabilities for the job scheduler
+	Logger common.Logger
+	// Sources contains the configuration for all content sources
 	Sources common.Sources
 }
 
-// startJobScheduler starts the job scheduler and handles graceful shutdown
+// startJobScheduler initializes and manages the job scheduler lifecycle.
+// It:
+// - Creates a cancellable context for managing scheduled jobs
+// - Starts the scheduler in a goroutine
+// - Handles graceful shutdown when the application stops
 func startJobScheduler(p JobParams, rootCmd string) fx.Option {
 	return fx.Invoke(func(lc fx.Lifecycle) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -60,6 +49,11 @@ func startJobScheduler(p JobParams, rootCmd string) fx.Option {
 	})
 }
 
+// runScheduler manages the execution of scheduled jobs.
+// It:
+// - Runs a ticker to check for scheduled jobs every minute
+// - Handles context cancellation for graceful shutdown
+// - Delegates job execution to checkAndRunJobs
 func runScheduler(ctx context.Context, p JobParams, rootCmd string) {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
@@ -75,6 +69,11 @@ func runScheduler(ctx context.Context, p JobParams, rootCmd string) {
 	}
 }
 
+// checkAndRunJobs evaluates and executes scheduled jobs.
+// It:
+// - Checks each source's configured schedule times
+// - Executes crawl commands when scheduled times match
+// - Logs job execution and any errors
 func checkAndRunJobs(p JobParams, rootCmd string, now time.Time) {
 	for _, source := range p.Sources.Sources {
 		for _, t := range source.Time {
@@ -113,6 +112,11 @@ func checkAndRunJobs(p JobParams, rootCmd string, now time.Time) {
 	}
 }
 
+// runCrawlCommand executes a crawl command for a specific source.
+// It:
+// - Constructs the command with appropriate arguments
+// - Sets up stdout and stderr
+// - Logs command execution
 func runCrawlCommand(rootCmd, sourceName string, logger common.Logger) error {
 	cmdArgs := []string{"crawl", sourceName}
 	cmd := exec.Command(rootCmd, cmdArgs...)
@@ -123,7 +127,7 @@ func runCrawlCommand(rootCmd, sourceName string, logger common.Logger) error {
 	return cmd.Run()
 }
 
-// jobCmd represents the job command
+// jobCmd represents the job scheduler command that manages scheduled crawling tasks.
 var jobCmd = &cobra.Command{
 	Use:   "job",
 	Short: "Schedule and run crawl jobs",
@@ -131,6 +135,7 @@ var jobCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, _ []string) {
 		rootPath := cmd.Root().Name()
 
+		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
 			common.Module,
 			fx.Invoke(func(p JobParams) {
@@ -138,12 +143,13 @@ var jobCmd = &cobra.Command{
 			}),
 		)
 
+		// Start the application and handle any startup errors
 		if err := app.Start(cmd.Context()); err != nil {
 			common.PrintErrorf("Error starting application: %v", err)
 			os.Exit(1)
 		}
 
-		// Wait for termination signal
+		// Set up signal handling for graceful shutdown
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		sig := <-sigChan
@@ -161,6 +167,7 @@ var jobCmd = &cobra.Command{
 	},
 }
 
+// init initializes the job scheduler command by adding it to the root command.
 func init() {
 	rootCmd.AddCommand(jobCmd)
 }
