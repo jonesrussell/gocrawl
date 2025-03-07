@@ -1,8 +1,8 @@
 package logger_test
 
 import (
-	"os"
 	"testing"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -231,10 +231,6 @@ func TestInitializeLogger(t *testing.T) {
 }
 
 func TestCustomLogger_Methods(t *testing.T) {
-	// Create a temporary log file
-	tmpLogFile := "test.log"
-	defer os.Remove(tmpLogFile)
-
 	// Create a development logger
 	log, err := logger.NewDevelopmentLogger("debug")
 	require.NoError(t, err)
@@ -258,16 +254,33 @@ func TestCustomLogger_Methods(t *testing.T) {
 	})
 
 	t.Run("Fatal with recovery", func(t *testing.T) {
-		panicked := false
-		func() {
+		// Create a new logger for this test to avoid affecting other tests
+		testLogger, err := logger.NewDevelopmentLogger("debug")
+		require.NoError(t, err)
+		require.NotNil(t, testLogger)
+
+		// Create a channel to signal when the goroutine is done
+		done := make(chan struct{})
+		var panicMsg interface{}
+
+		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					panicked = true
+					panicMsg = r
 				}
+				close(done)
 			}()
-			log.Fatal("test fatal message", "key", "value")
+			testLogger.Fatal("test fatal message", "key", "value")
 		}()
-		require.True(t, panicked, "Fatal() should have panicked")
+
+		// Wait for the goroutine to finish or timeout
+		select {
+		case <-done:
+			require.NotNil(t, panicMsg, "Fatal() should have panicked")
+			assert.Equal(t, "test fatal message", panicMsg, "Panic message should match")
+		case <-time.After(time.Second):
+			t.Fatal("Test timed out waiting for panic")
+		}
 	})
 
 	t.Run("Printf", func(_ *testing.T) {

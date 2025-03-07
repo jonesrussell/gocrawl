@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
@@ -27,7 +26,6 @@ type Interface interface {
 // CustomLogger wraps the zap.Logger
 type CustomLogger struct {
 	*zap.Logger
-	logFile *os.File
 }
 
 // Ensure CustomLogger implements Interface
@@ -94,9 +92,10 @@ func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
 	c.Logger.Warn(msg, ConvertToZapFields(fields)...)
 }
 
-// Fatal logs a fatal message
+// Fatal logs a fatal message and panics
 func (c *CustomLogger) Fatal(msg string, fields ...interface{}) {
-	c.Logger.Fatal(msg, ConvertToZapFields(fields)...)
+	c.Logger.Error(msg, ConvertToZapFields(fields)...)
+	panic(msg)
 }
 
 // Printf logs a formatted message
@@ -111,15 +110,7 @@ func (c *CustomLogger) Errorf(format string, args ...interface{}) {
 
 // Sync flushes any buffered log entries
 func (c *CustomLogger) Sync() error {
-	if err := c.Logger.Sync(); err != nil {
-		return err
-	}
-	if c.logFile != nil {
-		if err := c.logFile.Close(); err != nil {
-			return fmt.Errorf("failed to close log file: %w", err)
-		}
-	}
-	return nil
+	return c.Logger.Sync()
 }
 
 // GetZapLogger returns the underlying zap.Logger
