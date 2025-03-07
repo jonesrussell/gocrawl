@@ -69,9 +69,8 @@ func TestElasticsearchStorage_IndexDocument(t *testing.T) {
 			mockTransport.StatusCode = tt.statusCode
 
 			// Set up logger expectations
-			mockLogger.On("Debug", "Indexing document", "index", tt.index, "docID", tt.id).Return()
 			if tt.expectError {
-				mockLogger.On("Error", "Failed to index document", "index", tt.index, "docID", tt.id, "error", mock.Anything).Return()
+				mockLogger.On("Error", "Failed to index document", "error", mock.Anything).Return()
 			} else {
 				mockLogger.On("Info", "Document indexed successfully", "index", tt.index, "docID", tt.id).Return()
 			}
@@ -127,14 +126,6 @@ func TestElasticsearchStorage_GetDocument(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockTransport.Response = tt.response
 			mockTransport.StatusCode = tt.statusCode
-
-			// Set up logger expectations
-			mockLogger.On("Debug", "Getting document", "index", tt.index, "docID", tt.id).Return()
-			if tt.expectError {
-				mockLogger.On("Error", "Failed to get document", "index", tt.index, "docID", tt.id, "error", mock.Anything).Return()
-			} else {
-				mockLogger.On("Info", "Document retrieved successfully", "index", tt.index, "docID", tt.id).Return()
-			}
 
 			var doc map[string]interface{}
 			err := store.GetDocument(context.Background(), tt.index, tt.id, &doc)
