@@ -2,18 +2,45 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
+
+// ServerParams holds the parameters for the HTTP server
+type ServerParams struct {
+	fx.In
+
+	Server *http.Server
+	Logger common.Logger
+}
+
+// startServer starts the HTTP server and handles graceful shutdown
+func startServer(lc fx.Lifecycle, p ServerParams) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go func() {
+				p.Logger.Info("HTTP server started", "address", p.Server.Addr)
+				if err := p.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					p.Logger.Error("HTTP server failed", "error", err)
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			p.Logger.Info("Shutting down HTTP server...")
+			return p.Server.Shutdown(ctx)
+		},
+	})
+}
 
 // httpdCmd represents the httpd command
 var httpdCmd = &cobra.Command{
@@ -24,45 +51,32 @@ You can send POST requests to /search with a JSON body containing the search par
 	Run: func(_ *cobra.Command, _ []string) {
 		// Initialize the Fx application with the HTTP server
 		app := fx.New(
-			fx.Provide(
-				func() *config.Config {
-					return globalConfig // Provide the global config
-				},
-				func() logger.Interface {
-					return globalLogger // Use the global logger
-				},
-			),
+			common.Module,
 			api.Module,
-			storage.Module,
-			fx.Invoke(func(server *http.Server) {
-				// Start the server
-				go func() {
-					if err := server.ListenAndServe(); err != nil {
-						globalLogger.Error("HTTP server failed", "error", err)
-					}
-				}()
-				globalLogger.Info("HTTP server started on :8081")
-			}),
+			fx.Invoke(startServer),
 		)
 
 		// Start the application
 		if err := app.Start(context.Background()); err != nil {
-			globalLogger.Error("Error starting application", "error", err)
-			return
+			fmt.Printf("Error starting application: %v\n", err)
+			os.Exit(1)
 		}
 
-		// Wait for a termination signal
+		// Wait for termination signal
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		<-sigChan // Block until a signal is received
+		sig := <-sigChan
+		fmt.Printf("\nReceived signal %v, initiating shutdown...\n", sig)
 
-		// Wait for the application to stop
-		defer func() {
-			if err := app.Stop(context.Background()); err != nil {
-				globalLogger.Error("Error stopping application", "error", err)
-			}
-		}()
-		globalLogger.Debug("HTTP server stopped")
+		// Create a context with timeout for graceful shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// Stop the application
+		if err := app.Stop(ctx); err != nil {
+			fmt.Printf("Error during shutdown: %v\n", err)
+			os.Exit(1)
+		}
 	},
 }
 

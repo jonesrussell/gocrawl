@@ -22,79 +22,141 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/spf13/cobra"
+	"go.uber.org/fx"
 )
+
+// JobParams holds the parameters for the job scheduler
+type JobParams struct {
+	fx.In
+
+	Logger  common.Logger
+	Sources common.Sources
+}
+
+// startJobScheduler starts the job scheduler and handles graceful shutdown
+func startJobScheduler(p JobParams, rootCmd string) fx.Option {
+	return fx.Invoke(func(lc fx.Lifecycle) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		lc.Append(fx.Hook{
+			OnStart: func(_ context.Context) error {
+				go runScheduler(ctx, p, rootCmd)
+				return nil
+			},
+			OnStop: func(_ context.Context) error {
+				cancel()
+				return nil
+			},
+		})
+	})
+}
+
+func runScheduler(ctx context.Context, p JobParams, rootCmd string) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			p.Logger.Info("Job scheduler shutting down")
+			return
+		case now := <-ticker.C:
+			checkAndRunJobs(p, rootCmd, now)
+		}
+	}
+}
+
+func checkAndRunJobs(p JobParams, rootCmd string, now time.Time) {
+	for _, source := range p.Sources.Sources {
+		for _, t := range source.Time {
+			scheduledTime, parseErr := time.Parse("15:04", t)
+			if parseErr != nil {
+				p.Logger.Error("Error parsing time", "error", parseErr, "source", source.Name, "time", t)
+				continue
+			}
+
+			p.Logger.Debug("Checking scheduled time",
+				"source", source.Name,
+				"current_time", now.Format("15:04"),
+				"scheduled_time", t,
+				"current_hour", now.Hour(),
+				"scheduled_hour", scheduledTime.Hour(),
+				"current_minute", now.Minute(),
+				"scheduled_minute", scheduledTime.Minute(),
+			)
+
+			if now.Hour() == scheduledTime.Hour() && now.Minute() == scheduledTime.Minute() {
+				p.Logger.Info("Running scheduled crawl",
+					"source", source.Name,
+					"time", t,
+					"current_time", now.Format("15:04"),
+				)
+
+				if err := runCrawlCommand(rootCmd, source.Name, p.Logger); err != nil {
+					p.Logger.Error("Error running crawl command",
+						"error", err,
+						"source", source.Name,
+						"time", t,
+					)
+				}
+			}
+		}
+	}
+}
+
+func runCrawlCommand(rootCmd, sourceName string, logger common.Logger) error {
+	cmdArgs := []string{"crawl", sourceName}
+	cmd := exec.Command(rootCmd, cmdArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	logger.Debug("Executing crawl command", "command", rootCmd, "args", cmdArgs)
+	return cmd.Run()
+}
 
 // jobCmd represents the job command
 var jobCmd = &cobra.Command{
 	Use:   "job",
-	Short: "Schedule and run crawl-source crawl jobs",
-	Long:  `Schedule and run crawl-source crawl jobs based on the times specified in sources.yml`,
+	Short: "Schedule and run crawl jobs",
+	Long:  `Schedule and run crawl jobs based on the times specified in sources.yml`,
 	Run: func(cmd *cobra.Command, _ []string) {
-		// Get the root command path
 		rootPath := cmd.Root().Name()
 
-		// Load sources using our package
-		s, err := sources.Load("sources.yml")
-		if err != nil {
-			globalLogger.Error("Error loading sources", "error", err)
-			return
+		app := fx.New(
+			common.Module,
+			fx.Invoke(func(p JobParams) {
+				startJobScheduler(p, rootPath)
+			}),
+		)
+
+		if err := app.Start(context.Background()); err != nil {
+			fmt.Printf("Error starting application: %v\n", err)
+			os.Exit(1)
 		}
 
-		// Infinite loop to keep the application running
-		for {
-			now := time.Now()
+		// Wait for termination signal
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		sig := <-sigChan
+		fmt.Printf("\nReceived signal %v, initiating shutdown...\n", sig)
 
-			for _, source := range s.Sources {
-				for _, t := range source.Time {
-					scheduledTime, parseErr := time.Parse("15:04", t)
-					if parseErr != nil {
-						globalLogger.Error("Error parsing time", "error", parseErr)
-						continue
-					}
+		// Create a context with timeout for graceful shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 
-					// Add debug logging for time comparison
-					globalLogger.Debug("Checking scheduled time",
-						"source", source.Name,
-						"current_time", now.Format("15:04"),
-						"scheduled_time", t,
-						"current_hour", now.Hour(),
-						"scheduled_hour", scheduledTime.Hour(),
-						"current_minute", now.Minute(),
-						"scheduled_minute", scheduledTime.Minute(),
-					)
-
-					// Check if it's time to run the job
-					if now.Hour() == scheduledTime.Hour() && now.Minute() == scheduledTime.Minute() {
-						globalLogger.Info("Running scheduled crawl",
-							"source", source.Name,
-							"time", t,
-							"current_time", now.Format("15:04"),
-						)
-
-						// This is safe because:
-						// 1. rootPath is the binary name from cobra
-						// 2. source.Name comes from the validated sources.yml file
-						// 3. The command structure is fixed
-						cmdArgs := []string{"crawl", "--source", source.Name}
-						cmd := exec.Command(rootPath, cmdArgs...)
-						cmd.Stdout = os.Stdout
-						cmd.Stderr = os.Stderr
-
-						if runErr := cmd.Run(); runErr != nil {
-							globalLogger.Error("Error running command", "error", runErr)
-						}
-					}
-				}
-			}
-
-			// Sleep for a minute before checking again
-			time.Sleep(1 * time.Minute)
+		if err := app.Stop(ctx); err != nil {
+			fmt.Printf("Error during shutdown: %v\n", err)
+			os.Exit(1)
 		}
 	},
 }

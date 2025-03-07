@@ -8,13 +8,12 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -47,17 +46,11 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		sourceName = args[0]
-		globalLogger.Debug("Starting crawl-crawl command...", "sourceName", sourceName)
 
-		// Create an Fx application
+		// Create an Fx application with common module
 		app := fx.New(
+			common.Module,
 			fx.Provide(
-				func() *config.Config {
-					return globalConfig
-				},
-				func() logger.Interface {
-					return globalLogger
-				},
 				func() chan *models.Article {
 					return make(chan *models.Article, DefaultChannelBufferSize)
 				},
@@ -96,9 +89,9 @@ Example:
 				// Provide article processor first (will be first in the slice)
 				fx.Annotate(
 					func(
-						logger logger.Interface,
+						logger common.Logger,
 						service article.Interface,
-						storage storage.Interface,
+						storage common.Storage,
 						params struct {
 							fx.In
 							IndexName string `name:"indexName"`
@@ -117,8 +110,8 @@ Example:
 				fx.Annotate(
 					func(
 						service content.Interface,
-						storage storage.Interface,
-						logger logger.Interface,
+						storage common.Storage,
+						logger common.Logger,
 						params struct {
 							fx.In
 							IndexName string `name:"contentIndex"`
@@ -129,11 +122,9 @@ Example:
 					fx.ResultTags(`group:"processors"`),
 				),
 			),
-			storage.Module,
 			crawler.Module,
 			article.Module,
 			content.Module,
-			sources.Module,
 			fx.Invoke(startCrawl),
 		)
 
@@ -143,8 +134,10 @@ Example:
 		}
 
 		defer func() {
-			if err := app.Stop(ctx); err != nil {
-				globalLogger.Error("Error stopping application", "context", ctx, "error", err)
+			stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := app.Stop(stopCtx); err != nil {
+				fmt.Printf("Error stopping application: %v\n", err)
 			}
 		}()
 
@@ -159,6 +152,7 @@ type CrawlParams struct {
 	Sources         *sources.Sources
 	CrawlerInstance crawler.Interface
 	Processors      []models.ContentProcessor `group:"processors"`
+	Logger          common.Logger
 }
 
 // startCrawl starts the crawl-source crawl
@@ -193,8 +187,8 @@ func startCrawl(p CrawlParams) error {
 		BaseURL:          source.URL,
 		MaxDepth:         source.MaxDepth,
 		RateLimit:        rateLimit,
-		Debugger:         logger.NewCollyDebugger(globalLogger),
-		Logger:           globalLogger,
+		Debugger:         logger.NewCollyDebugger(p.Logger),
+		Logger:           p.Logger,
 		ArticleProcessor: p.Processors[0], // Use first processor as article processor
 		ContentProcessor: p.Processors[1], // Use second processor as content processor
 		Source:           source,
