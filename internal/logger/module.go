@@ -2,6 +2,7 @@ package logger
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -32,14 +33,26 @@ func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
 	devEncoderConfig := zap.NewDevelopmentEncoderConfig()
 	devEncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
+	// Create file writer
+	fileWriter, _, err := zap.Open("app.log")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	// Create multi-writer for both console and file
+	multiWriter := zapcore.NewMultiWriteSyncer(
+		zapcore.AddSync(os.Stdout),
+		zapcore.AddSync(fileWriter),
+	)
+
 	// Console core with colored output
 	consoleCore := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(devEncoderConfig),
-		zapcore.AddSync(os.Stdout),
+		multiWriter,
 		logLevel,
 	)
 
-	// Create logger without file output for testing
+	// Create logger with both console and file output
 	logger := zap.New(consoleCore, zap.AddCaller(), zap.Development())
 
 	// Log when the logger is created
@@ -55,10 +68,22 @@ func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
 		return nil, err
 	}
 
-	// Use JSON encoder for console logging
+	// Create file writer
+	fileWriter, _, err := zap.Open("app.log")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	// Create multi-writer for both console and file
+	multiWriter := zapcore.NewMultiWriteSyncer(
+		zapcore.AddSync(os.Stdout),
+		zapcore.AddSync(fileWriter),
+	)
+
+	// Use JSON encoder for both console and file logging
 	consoleCore := zapcore.NewCore(
 		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-		zapcore.AddSync(os.Stdout),
+		multiWriter,
 		logLevel,
 	)
 
