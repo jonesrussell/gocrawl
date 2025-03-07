@@ -2,6 +2,7 @@ package indices
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 
@@ -58,7 +59,7 @@ func runList(cmd *cobra.Command, _ []string) {
 	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
 	defer func() {
 		cancel()
-		if err := app.Stop(ctx); err != nil {
+		if err := app.Stop(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			if logger != nil {
 				logger.Error("Error stopping application", "error", err)
 				exitCode = 1
