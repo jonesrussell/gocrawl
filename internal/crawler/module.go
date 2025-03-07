@@ -168,7 +168,7 @@ func New(
 		Collector:      collector,
 		Logger:         logger,
 		IndexName:      cfg.Elasticsearch.IndexName,
-		articleChan:    make(chan *models.Article, 100),
+		articleChan:    make(chan *models.Article, DefaultBatchSize),
 		ArticleService: articleService,
 		IndexService:   indexService,
 		Config:         cfg,
