@@ -255,8 +255,8 @@ func TestCustomLogger_Methods(t *testing.T) {
 
 	t.Run("Fatal with recovery", func(t *testing.T) {
 		// Create a new logger for this test to avoid affecting other tests
-		testLogger, err := logger.NewDevelopmentLogger("debug")
-		require.NoError(t, err)
+		testLogger, testErr := logger.NewDevelopmentLogger("debug")
+		require.NoError(t, testErr)
 		require.NotNil(t, testLogger)
 
 		// Create a channel to signal when the goroutine is done
