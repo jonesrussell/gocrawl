@@ -60,17 +60,12 @@ func (m *MockStorage) BulkIndex(ctx context.Context, index string, documents []i
 }
 
 // Search implements Storage
-func (m *MockStorage) Search(
-	ctx context.Context,
-	index string,
-	query map[string]interface{},
-) ([]map[string]interface{}, error) {
-	args := m.Called(ctx, index, query)
-	result, ok := args.Get(0).([]map[string]interface{})
-	if !ok && args.Get(0) != nil {
-		return nil, ErrMockTypeAssertion
+func (m *MockStorage) Search(ctx context.Context, query string, size int) ([]Article, error) {
+	args := m.Called(ctx, query, size)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return result, args.Error(1)
+	return args.Get(0).([]Article), args.Error(1)
 }
 
 // CreateIndex implements Storage

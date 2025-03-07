@@ -194,12 +194,12 @@ func TestElasticsearchStorage_SearchArticles(t *testing.T) {
 
 			mockLogger.On("Debug", "Searching articles", "query", tt.query, "size", tt.size).Return()
 			if tt.expectError {
-				mockLogger.On("Error", "Failed to search articles", "error", mock.Anything).Return()
+				mockLogger.On("Error", "Failed to search documents", "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Search completed", "query", tt.query, "results", 1).Return()
+				mockLogger.On("Info", "Search completed", "query", tt.query, "results", int64(1)).Return()
 			}
 
-			articles, err := store.SearchArticles(context.Background(), tt.query, tt.size)
+			articles, err := store.Search(context.Background(), tt.query, tt.size)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Nil(t, articles)
@@ -461,9 +461,9 @@ func TestElasticsearchStorage_DeleteIndex(t *testing.T) {
 
 			// Set up logger expectations
 			if tt.expectError {
-				mockLogger.On("Error", "Failed to delete index", "index", tt.index, "error", mock.Anything).Return()
+				mockLogger.On("Error", "Failed to delete index", "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Index deleted successfully", "index", tt.index).Return()
+				mockLogger.On("Info", "Deleted index", "index", tt.index).Return()
 			}
 
 			err := store.DeleteIndex(context.Background(), tt.index)
@@ -514,9 +514,9 @@ func TestElasticsearchStorage_DeleteDocument(t *testing.T) {
 
 			// Set up logger expectations
 			if tt.expectError {
-				mockLogger.On("Error", "Failed to delete document", "index", tt.index, "docID", tt.docID, "error", mock.Anything).Return()
+				mockLogger.On("Error", "Failed to delete document", "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Document deleted successfully", "index", tt.index, "docID", tt.docID).Return()
+				mockLogger.On("Info", "Deleted document", "index", tt.index, "docID", tt.docID).Return()
 			}
 
 			err := store.DeleteDocument(context.Background(), tt.index, tt.docID)
@@ -585,9 +585,9 @@ func TestElasticsearchStorage_GetMapping(t *testing.T) {
 
 			// Set up logger expectations
 			if tt.expectError {
-				mockLogger.On("Error", "Failed to get mapping", "index", tt.index, "error", mock.Anything).Return()
+				mockLogger.On("Error", "Failed to get mapping", "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Retrieved mapping successfully", "index", tt.index).Return()
+				mockLogger.On("Info", "Retrieved mapping", "index", tt.index).Return()
 			}
 
 			mapping, err := store.GetMapping(context.Background(), tt.index)
@@ -641,7 +641,7 @@ func TestElasticsearchStorage_ListIndices(t *testing.T) {
 			if tt.expectError {
 				mockLogger.On("Error", "Failed to list indices", "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Retrieved indices list successfully").Return()
+				mockLogger.On("Info", "Retrieved indices list").Return()
 			}
 
 			indices, err := store.ListIndices(context.Background())
@@ -671,10 +671,9 @@ func TestElasticsearchStorage_GetIndexHealth(t *testing.T) {
 		{
 			name:  "successful health check",
 			index: "test-index",
-			response: `[{
-				"index": "test-index",
+			response: `{
 				"status": "green"
-			}]`,
+			}`,
 			statusCode:  200,
 			expectError: false,
 			expected:    "green",
@@ -696,9 +695,9 @@ func TestElasticsearchStorage_GetIndexHealth(t *testing.T) {
 
 			// Set up logger expectations
 			if tt.expectError {
-				mockLogger.On("Error", "Failed to get index health", "index", tt.index, "error", mock.Anything).Return()
+				mockLogger.On("Error", "Failed to get index health", "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Retrieved index health successfully", "index", tt.index, "health", tt.expected).Return()
+				mockLogger.On("Info", "Retrieved index health", "index", tt.index, "health", tt.expected).Return()
 			}
 
 			health, err := store.GetIndexHealth(context.Background(), tt.index)
@@ -728,10 +727,9 @@ func TestElasticsearchStorage_GetIndexDocCount(t *testing.T) {
 		{
 			name:  "successful doc count",
 			index: "test-index",
-			response: `[{
-				"index": "test-index",
-				"docs.count": 42
-			}]`,
+			response: `{
+				"count": 42
+			}`,
 			statusCode:  200,
 			expectError: false,
 			expected:    42,
@@ -753,9 +751,9 @@ func TestElasticsearchStorage_GetIndexDocCount(t *testing.T) {
 
 			// Set up logger expectations
 			if tt.expectError {
-				mockLogger.On("Error", "Failed to get index document count", "index", tt.index, "error", mock.Anything).Return()
+				mockLogger.On("Error", "Failed to get index document count", "error", mock.Anything).Return()
 			} else {
-				mockLogger.On("Info", "Retrieved index document count successfully", "index", tt.index, "count", tt.expected).Return()
+				mockLogger.On("Info", "Retrieved index document count", "index", tt.index, "count", tt.expected).Return()
 			}
 
 			count, err := store.GetIndexDocCount(context.Background(), tt.index)
