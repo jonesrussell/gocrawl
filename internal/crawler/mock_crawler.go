@@ -3,6 +3,8 @@ package crawler
 import (
 	"context"
 
+	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -23,12 +25,12 @@ func (m *MockCrawler) Stop() {
 }
 
 // SetCollector implements crawler.Interface
-func (m *MockCrawler) SetCollector(collector interface{}) {
+func (m *MockCrawler) SetCollector(collector *colly.Collector) {
 	m.Called(collector)
 }
 
 // SetService implements crawler.Interface
-func (m *MockCrawler) SetService(service interface{}) {
+func (m *MockCrawler) SetService(service article.Interface) {
 	m.Called(service)
 }
 

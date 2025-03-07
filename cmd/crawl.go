@@ -233,15 +233,8 @@ func startCrawl(p CrawlParams) error {
 		return errors.New("crawler is not initialized")
 	}
 
-	// Get the crawler instance to access index service
-	crawler, ok := p.CrawlerInstance.(*crawler.Crawler)
-	if !ok {
-		return errors.New("crawler instance is not of type *crawler.Crawler")
-	}
-
-	// Configure the sources with crawler and index manager
+	// Configure the sources with crawler
 	p.Sources.SetCrawler(p.CrawlerInstance)
-	p.Sources.SetIndexManager(crawler.IndexService)
 
 	// Get the source configuration
 	source, err := p.Sources.FindByName(sourceName)
@@ -271,7 +264,7 @@ func startCrawl(p CrawlParams) error {
 	}
 
 	// Set the collector in the crawler instance
-	crawler.SetCollector(collectorResult.Collector)
+	p.CrawlerInstance.SetCollector(collectorResult.Collector)
 
 	// Configure lifecycle hooks for crawl management
 	p.Lifecycle.Append(fx.Hook{

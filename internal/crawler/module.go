@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -16,6 +17,9 @@ import (
 type Interface interface {
 	Start(ctx context.Context, url string) error
 	Stop()
+	SetCollector(collector *colly.Collector)
+	SetService(service article.Interface)
+	GetBaseURL() string
 }
 
 func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {
