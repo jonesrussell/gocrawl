@@ -3,17 +3,23 @@ package indices
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
-	"time"
 
-	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
 var deleteSourceName string
+
+type deleteParams struct {
+	ctx     context.Context
+	storage common.Storage
+	sources common.Sources
+	logger  common.Logger
+	indices []string
+	force   bool
+}
 
 // deleteCommand returns the delete command
 func deleteCommand() *cobra.Command {
@@ -27,127 +33,8 @@ Example:
   gocrawl indices delete my_index
   gocrawl indices delete index1 index2 index3
   gocrawl indices delete --source "Elliot Lake Today"`,
-		Args: func(_ *cobra.Command, args []string) error {
-			if deleteSourceName == "" && len(args) == 0 {
-				return errors.New("either specify indices or use --source flag")
-			}
-			if deleteSourceName != "" && len(args) > 0 {
-				return errors.New("cannot specify both indices and --source flag")
-			}
-			return nil
-		},
-		Run: func(cmd *cobra.Command, args []string) {
-			indices := args
-			force, _ := cmd.Flags().GetBool("force")
-
-			var logger common.Logger // Capture logger for lifecycle errors
-
-			app := fx.New(
-				common.Module,
-				fx.Invoke(func(storage common.Storage, sources common.Sources, l common.Logger) {
-					logger = l
-					ctx := context.Background()
-
-					// If source is specified, get its indices
-					if deleteSourceName != "" {
-						source, findErr := sources.FindByName(deleteSourceName)
-						if findErr != nil {
-							l.Error("Error finding source", "error", findErr)
-							os.Exit(1)
-						}
-						indices = []string{source.ArticleIndex, source.Index}
-					}
-
-					// Check if all indices exist
-					existingIndices, listErr := storage.ListIndices(ctx)
-					if listErr != nil {
-						l.Error("Error checking indices", "error", listErr)
-						os.Exit(1)
-					}
-
-					// Create a map of existing indices for faster lookup
-					existingMap := make(map[string]bool)
-					for _, idx := range existingIndices {
-						existingMap[idx] = true
-					}
-
-					// Check each requested index
-					var missingIndices []string
-					for _, index := range indices {
-						if !existingMap[index] {
-							missingIndices = append(missingIndices, index)
-						}
-					}
-
-					if len(missingIndices) > 0 {
-						fmt.Println("\nThe following indices do not exist (already deleted):")
-						for _, index := range missingIndices {
-							fmt.Printf("  - %s\n", index)
-						}
-						if len(missingIndices) == len(indices) {
-							return // All indices are already deleted, exit successfully
-						}
-					}
-
-					// Get list of indices that do exist and need to be deleted
-					var indicesToDelete []string
-					for _, index := range indices {
-						if existingMap[index] {
-							indicesToDelete = append(indicesToDelete, index)
-						}
-					}
-
-					// Confirm deletion unless --force is used
-					if !force && len(indicesToDelete) > 0 {
-						fmt.Println("\nAre you sure you want to delete the following indices?")
-						for _, index := range indicesToDelete {
-							fmt.Printf("  - %s\n", index)
-						}
-						fmt.Print("\nContinue? (y/N): ")
-						var response string
-						if _, scanErr := fmt.Scanln(&response); scanErr != nil {
-							l.Error("Error reading response", "error", scanErr)
-							return
-						}
-						if response != "y" && response != "Y" {
-							fmt.Println("Operation cancelled")
-							return
-						}
-					}
-
-					// Delete each existing index
-					for _, index := range indicesToDelete {
-						deleteErr := storage.DeleteIndex(ctx, index)
-						if deleteErr != nil {
-							l.Error("Error deleting index", "index", index, "error", deleteErr)
-							os.Exit(1)
-						}
-						l.Info("Deleted index", "index", index)
-						fmt.Printf("%s Successfully deleted index '%s'\n",
-							text.FgGreen.Sprint("✓"),
-							text.Bold.Sprint(index))
-					}
-				}),
-			)
-
-			// Use Cobra's context with timeout for lifecycle handling
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			if startErr := app.Start(ctx); startErr != nil {
-				if logger != nil {
-					logger.Error("Error starting application", "error", startErr)
-				}
-				os.Exit(1)
-			}
-
-			if stopErr := app.Stop(ctx); stopErr != nil {
-				if logger != nil {
-					logger.Error("Error stopping application", "error", stopErr)
-				}
-				os.Exit(1)
-			}
-		},
+		Args: validateDeleteArgs,
+		Run:  runDelete,
 	}
 
 	// Add flags
@@ -155,4 +42,144 @@ Example:
 	cmd.Flags().StringVar(&deleteSourceName, "source", "", "Delete indices for a specific source")
 
 	return cmd
+}
+
+func validateDeleteArgs(_ *cobra.Command, args []string) error {
+	if deleteSourceName == "" && len(args) == 0 {
+		return errors.New("either specify indices or use --source flag")
+	}
+	if deleteSourceName != "" && len(args) > 0 {
+		return errors.New("cannot specify both indices and --source flag")
+	}
+	return nil
+}
+
+func runDelete(cmd *cobra.Command, args []string) {
+	force, _ := cmd.Flags().GetBool("force")
+	var logger common.Logger
+
+	app := fx.New(
+		common.Module,
+		fx.Invoke(func(storage common.Storage, sources common.Sources, l common.Logger) {
+			logger = l
+			params := &deleteParams{
+				ctx:     context.Background(),
+				storage: storage,
+				sources: sources,
+				logger:  l,
+				indices: args,
+				force:   force,
+			}
+			if err := executeDelete(params); err != nil {
+				l.Error("Error executing delete", "error", err)
+				os.Exit(1)
+			}
+		}),
+	)
+
+	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
+	defer cancel()
+
+	if err := app.Start(ctx); err != nil {
+		if logger != nil {
+			logger.Error("Error starting application", "error", err)
+		}
+		os.Exit(1)
+	}
+
+	if err := app.Stop(ctx); err != nil {
+		if logger != nil {
+			logger.Error("Error stopping application", "error", err)
+		}
+		os.Exit(1)
+	}
+}
+
+func executeDelete(p *deleteParams) error {
+	if err := resolveIndices(p); err != nil {
+		return err
+	}
+
+	existingMap, err := getExistingIndices(p)
+	if err != nil {
+		return err
+	}
+
+	indicesToDelete := filterExistingIndices(p, existingMap)
+	if len(indicesToDelete) == 0 {
+		return nil
+	}
+
+	if !p.force {
+		if !confirmDeletion(indicesToDelete) {
+			return nil
+		}
+	}
+
+	return deleteIndices(p, indicesToDelete)
+}
+
+func resolveIndices(p *deleteParams) error {
+	if deleteSourceName != "" {
+		source, err := p.sources.FindByName(deleteSourceName)
+		if err != nil {
+			return err
+		}
+		p.indices = []string{source.ArticleIndex, source.Index}
+	}
+	return nil
+}
+
+func getExistingIndices(p *deleteParams) (map[string]bool, error) {
+	indices, err := p.storage.ListIndices(p.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	existingMap := make(map[string]bool)
+	for _, idx := range indices {
+		existingMap[idx] = true
+	}
+	return existingMap, nil
+}
+
+func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []string {
+	var missingIndices []string
+	var indicesToDelete []string
+
+	for _, index := range p.indices {
+		if !existingMap[index] {
+			missingIndices = append(missingIndices, index)
+		} else {
+			indicesToDelete = append(indicesToDelete, index)
+		}
+	}
+
+	if len(missingIndices) > 0 {
+		common.PrintInfo("\nThe following indices do not exist (already deleted):")
+		for _, index := range missingIndices {
+			common.PrintInfo("  - %s", index)
+		}
+	}
+
+	return indicesToDelete
+}
+
+func confirmDeletion(indices []string) bool {
+	common.PrintInfo("\nAre you sure you want to delete the following indices?")
+	for _, index := range indices {
+		common.PrintInfo("  - %s", index)
+	}
+	return common.PrintConfirmation("\nContinue?")
+}
+
+func deleteIndices(p *deleteParams, indices []string) error {
+	for _, index := range indices {
+		if err := p.storage.DeleteIndex(p.ctx, index); err != nil {
+			return err
+		}
+		p.logger.Info("Deleted index", "index", index)
+		common.PrintSuccess("Successfully deleted index '%s'", index)
+	}
+	return nil
 }

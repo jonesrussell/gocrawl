@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -17,6 +16,12 @@ const (
 	TableWidth = 92
 )
 
+type listParams struct {
+	ctx     context.Context
+	storage common.Storage
+	logger  common.Logger
+}
+
 // listCommand returns the list command
 func listCommand() *cobra.Command {
 	return &cobra.Command{
@@ -26,59 +31,70 @@ func listCommand() *cobra.Command {
 
 Example:
   gocrawl indices list`,
-		Run: func(cmd *cobra.Command, _ []string) {
-			var logger common.Logger // Capture logger for lifecycle errors
-
-			app := fx.New(
-				common.Module,
-				fx.Invoke(func(s common.Storage, l common.Logger) {
-					logger = l // Store logger for lifecycle errors
-
-					ctx := cmd.Context() // Use Cobra's context
-					indices, err := s.ListIndices(ctx)
-					if err != nil {
-						l.Error("Error listing indices", "error", err)
-						os.Exit(1)
-					}
-
-					// Filter out internal indices
-					var filteredIndices []string
-					for _, index := range indices {
-						if !strings.HasPrefix(index, ".") {
-							filteredIndices = append(filteredIndices, index)
-						}
-					}
-
-					if len(filteredIndices) == 0 {
-						l.Info("No indices found")
-						return
-					}
-
-					printIndices(filteredIndices, s, l, ctx) // Use helper function
-				}),
-			)
-
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second) // Combine Cobra's context with a timeout
-			defer cancel()
-
-			if err := app.Start(ctx); err != nil {
-				if logger != nil {
-					logger.Error("Error starting application", "error", err)
-				}
-				os.Exit(1)
-			}
-
-			if err := app.Stop(ctx); err != nil {
-				if logger != nil {
-					logger.Error("Error stopping application", "error", err)
-				}
-				os.Exit(1)
-			}
-		},
+		Run: runList,
 	}
 }
 
-func printIndices(indices []string, storage common.Storage, logger common.Logger, ctx context.Context) {
+func runList(cmd *cobra.Command, _ []string) {
+	var logger common.Logger
+
+	app := fx.New(
+		common.Module,
+		fx.Invoke(func(s common.Storage, l common.Logger) {
+			logger = l
+			params := &listParams{
+				ctx:     cmd.Context(),
+				storage: s,
+				logger:  l,
+			}
+			if err := executeList(params); err != nil {
+				l.Error("Error executing list", "error", err)
+				os.Exit(1)
+			}
+		}),
+	)
+
+	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
+	defer cancel()
+
+	if err := app.Start(ctx); err != nil {
+		if logger != nil {
+			logger.Error("Error starting application", "error", err)
+		}
+		os.Exit(1)
+	}
+
+	if err := app.Stop(ctx); err != nil {
+		if logger != nil {
+			logger.Error("Error stopping application", "error", err)
+		}
+		os.Exit(1)
+	}
+}
+
+func executeList(p *listParams) error {
+	indices, err := p.storage.ListIndices(p.ctx)
+	if err != nil {
+		return err
+	}
+
+	// Filter out internal indices
+	var filteredIndices []string
+	for _, index := range indices {
+		if !strings.HasPrefix(index, ".") {
+			filteredIndices = append(filteredIndices, index)
+		}
+	}
+
+	if len(filteredIndices) == 0 {
+		p.logger.Info("No indices found")
+		return nil
+	}
+
+	return printIndices(p.ctx, filteredIndices, p.storage, p.logger)
+}
+
+func printIndices(ctx context.Context, indices []string, storage common.Storage, logger common.Logger) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Index Name", "Health", "Docs Count", "Ingestion Name", "Ingestion Status"})
@@ -95,12 +111,7 @@ func printIndices(indices []string, storage common.Storage, logger common.Logger
 			docCount = 0
 		}
 
-		ingestionStatus := "Connected"
-		if healthStatus == "red" {
-			ingestionStatus = "Disconnected"
-		} else if healthStatus == "yellow" {
-			ingestionStatus = "Warning"
-		}
+		ingestionStatus := getIngestionStatus(healthStatus)
 
 		t.AppendRow([]interface{}{
 			index,
@@ -111,11 +122,22 @@ func printIndices(indices []string, storage common.Storage, logger common.Logger
 		})
 	}
 
-	if t.Length() == 0 { // Check the number of rows in the table
+	if t.Length() == 0 {
 		logger.Info("No indices found")
-		return
+		return nil
 	}
 
-	// Render the table
 	t.Render()
+	return nil
+}
+
+func getIngestionStatus(healthStatus string) string {
+	switch healthStatus {
+	case "red":
+		return "Disconnected"
+	case "yellow":
+		return "Warning"
+	default:
+		return "Connected"
+	}
 }
