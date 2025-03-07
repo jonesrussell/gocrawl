@@ -285,30 +285,24 @@ func TestCrawlCommand_Execute(t *testing.T) {
 
 	// Create a test app
 	app := fxtest.New(t,
-		fx.Supply(mockLogger),
-		fx.Supply(mockStorage),
-		fx.Supply(mockCrawler),
-		fx.Supply(mockIndexService),
-		fx.Provide(
-			func() crawler.Interface { return mockCrawler },
-			func() storage.IndexServiceInterface { return mockIndexService },
-			func() storage.Interface { return mockStorage },
-			func() storage.MappingServiceInterface { return storage.NewMappingService(mockLogger, mockStorage) },
-		),
-		fx.Replace(
-			fx.Provide(
-				func() storage.Result {
-					return storage.Result{
-						Storage:        mockStorage,
-						IndexService:   mockIndexService,
-						MappingService: storage.NewMappingService(mockLogger, mockStorage),
-					}
-				},
-			),
-		),
 		common.Module,
 		article.Module,
 		content.Module,
+		fx.Supply(mockLogger),
+		fx.Supply(mockCrawler),
+		fx.Provide(
+			func() crawler.Interface { return mockCrawler },
+		),
+		fx.Decorate(
+			func() storage.Result {
+				mappingService := storage.NewMappingService(mockLogger, mockStorage)
+				return storage.Result{
+					Storage:        mockStorage,
+					IndexService:   mockIndexService,
+					MappingService: mappingService,
+				}
+			},
+		),
 	)
 
 	// Start the test app
@@ -350,30 +344,24 @@ func TestCrawlCommand_ExecuteError(t *testing.T) {
 
 	// Create a test app
 	app := fxtest.New(t,
-		fx.Supply(mockLogger),
-		fx.Supply(mockStorage),
-		fx.Supply(mockCrawler),
-		fx.Supply(mockIndexService),
-		fx.Provide(
-			func() crawler.Interface { return mockCrawler },
-			func() storage.IndexServiceInterface { return mockIndexService },
-			func() storage.Interface { return mockStorage },
-			func() storage.MappingServiceInterface { return storage.NewMappingService(mockLogger, mockStorage) },
-		),
-		fx.Replace(
-			fx.Provide(
-				func() storage.Result {
-					return storage.Result{
-						Storage:        mockStorage,
-						IndexService:   mockIndexService,
-						MappingService: storage.NewMappingService(mockLogger, mockStorage),
-					}
-				},
-			),
-		),
 		common.Module,
 		article.Module,
 		content.Module,
+		fx.Supply(mockLogger),
+		fx.Supply(mockCrawler),
+		fx.Provide(
+			func() crawler.Interface { return mockCrawler },
+		),
+		fx.Decorate(
+			func() storage.Result {
+				mappingService := storage.NewMappingService(mockLogger, mockStorage)
+				return storage.Result{
+					Storage:        mockStorage,
+					IndexService:   mockIndexService,
+					MappingService: mappingService,
+				}
+			},
+		),
 	)
 
 	// Start the test app
