@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
@@ -25,6 +28,17 @@ const (
 
 var sourceName string
 
+// CrawlParams holds the parameters for crawl-source crawl
+type CrawlParams struct {
+	fx.In
+
+	Lifecycle       fx.Lifecycle
+	Sources         *sources.Sources
+	CrawlerInstance crawler.Interface
+	Processors      []models.ContentProcessor `group:"processors"`
+	Logger          common.Logger
+}
+
 // createCrawlCmd creates the crawl command
 var crawlCmd = &cobra.Command{
 	Use:   "crawl [source]",
@@ -44,12 +58,18 @@ Example:
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
+		// Create a cancellable context
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
+
 		sourceName = args[0]
+
+		// Set up signal handling
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 		// Create an Fx application with common module
 		app := fx.New(
-			common.Module,
 			fx.Provide(
 				func() chan *models.Article {
 					return make(chan *models.Article, DefaultChannelBufferSize)
@@ -122,6 +142,7 @@ Example:
 					fx.ResultTags(`group:"processors"`),
 				),
 			),
+			common.Module,
 			crawler.Module,
 			article.Module,
 			content.Module,
@@ -133,26 +154,22 @@ Example:
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		defer func() {
-			stopCtx, cancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
-			defer cancel()
-			if err := app.Stop(stopCtx); err != nil {
-				common.PrintErrorf("Error stopping application: %v", err)
-			}
-		}()
+		// Wait for signal
+		sig := <-sigChan
+		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+
+		// Create a context with timeout for graceful shutdown
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
+		defer stopCancel()
+
+		// Stop the application
+		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+			common.PrintErrorf("Error stopping application: %v", err)
+			return err
+		}
 
 		return nil
 	},
-}
-
-// CrawlParams holds the parameters for crawl-source crawl
-type CrawlParams struct {
-	fx.In
-
-	Sources         *sources.Sources
-	CrawlerInstance crawler.Interface
-	Processors      []models.ContentProcessor `group:"processors"`
-	Logger          common.Logger
 }
 
 // startCrawl starts the crawl-source crawl
@@ -200,8 +217,27 @@ func startCrawl(p CrawlParams) error {
 	// Set the collector in the crawler instance
 	crawler.SetCollector(collectorResult.Collector)
 
-	// Start the crawl
-	return p.Sources.Start(context.Background(), sourceName)
+	// Use lifecycle hooks to manage the crawl
+	p.Lifecycle.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			// Start the crawl in a goroutine
+			go func() {
+				if err := p.Sources.Start(ctx, sourceName); err != nil {
+					if !errors.Is(err, context.Canceled) {
+						p.Logger.Error("Crawl failed", "error", err)
+					}
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			p.Logger.Info("Stopping crawler...")
+			p.Sources.Stop()
+			return nil
+		},
+	})
+
+	return nil
 }
 
 func init() {
