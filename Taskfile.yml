@@ -6,8 +6,8 @@ tasks:
     desc: "Run the web crawler for a single source defined in sources.yml"
     cmds:
       - echo '' > app.log
-      - go run main.go indices delete --source {{.CLI_ARGS}} --force
-      - go run main.go crawl {{.CLI_ARGS}}
+      - go run main.go indices delete --source {{.CLI_ARGS | trim}} --force
+      - go run main.go crawl {{.CLI_ARGS | trim}}
       - go run main.go indices list
 
   indices:list:
