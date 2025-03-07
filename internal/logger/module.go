@@ -13,25 +13,13 @@ import (
 
 // Module provides the logger module and its dependencies
 var Module = fx.Module("logger",
-	fx.Provide(
-		func(cfg *config.Config) Interface { // Provide the logger.Interface
-			var customLogger *CustomLogger
-			var err error
-
-			switch cfg.App.Environment {
-			case "development":
-				customLogger, err = NewDevelopmentLogger(cfg.Log.Level) // Pass log level as string
-			case "production":
-				customLogger, err = NewProductionLogger(cfg.Log.Level) // Pass log level as string
-			default:
-				err = errors.New("unknown environment")
-			}
-			if err != nil {
-				panic(err)
-			}
-			return customLogger
-		},
-	),
+	fx.Provide(func(cfg *config.Config) Interface {
+		logger, err := InitializeLogger(cfg)
+		if err != nil {
+			panic(err)
+		}
+		return logger
+	}),
 )
 
 // NewDevelopmentLogger initializes a new CustomLogger for development with colored output
