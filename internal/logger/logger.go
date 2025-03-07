@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
@@ -138,6 +139,50 @@ func ParseLogLevel(logLevelStr string) (zapcore.Level, error) {
 	return logLevel, nil
 }
 
+// maskSensitiveData masks sensitive information in the given value
+func maskSensitiveData(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		masked := make(map[string]interface{})
+		for k, val := range v {
+			// Mask sensitive fields
+			if isSensitiveField(k) {
+				masked[k] = "[REDACTED]"
+			} else {
+				masked[k] = maskSensitiveData(val)
+			}
+		}
+		return masked
+	case []interface{}:
+		masked := make([]interface{}, len(v))
+		for i, val := range v {
+			masked[i] = maskSensitiveData(val)
+		}
+		return masked
+	default:
+		return value
+	}
+}
+
+// isSensitiveField checks if a field name indicates sensitive data
+func isSensitiveField(field string) bool {
+	sensitiveFields := []string{
+		"password",
+		"apiKey",
+		"apikey",
+		"token",
+		"secret",
+		"key",
+		"credentials",
+	}
+	for _, s := range sensitiveFields {
+		if strings.Contains(strings.ToLower(field), s) {
+			return true
+		}
+	}
+	return false
+}
+
 // ConvertToZapFields converts variadic key-value pairs to zap.Fields
 func ConvertToZapFields(fields []interface{}) []zap.Field {
 	var zapFields []zap.Field
@@ -153,13 +198,13 @@ func ConvertToZapFields(fields []interface{}) []zap.Field {
 		key, ok := fields[i].(string)
 		if !ok {
 			// If key is not a string, use it as a value with a generated key
-			zapFields = append(zapFields, zap.Any(fmt.Sprintf("value%d", i), fields[i]))
+			zapFields = append(zapFields, zap.Any(fmt.Sprintf("value%d", i), maskSensitiveData(fields[i])))
 			i-- // Adjust index since we're not consuming the next value
 			continue
 		}
 
 		// Use the next item as value
-		zapFields = append(zapFields, zap.Any(key, fields[i+1]))
+		zapFields = append(zapFields, zap.Any(key, maskSensitiveData(fields[i+1])))
 	}
 
 	// Handle last item if we have an odd number of fields
@@ -168,7 +213,7 @@ func ConvertToZapFields(fields []interface{}) []zap.Field {
 		if str, ok := last.(string); ok {
 			zapFields = append(zapFields, zap.String("context", str))
 		} else {
-			zapFields = append(zapFields, zap.Any("context", last))
+			zapFields = append(zapFields, zap.Any("context", maskSensitiveData(last)))
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -59,6 +60,12 @@ type CrawlParams struct {
 
 	// Done is a channel that signals when the crawl operation is complete
 	Done chan struct{} `name:"crawlDone"`
+
+	// Config holds the application configuration
+	Config *config.Config
+
+	// Context provides the context for the crawl operation
+	Context context.Context
 }
 
 // CrawlCmd represents the crawl command that initiates the crawling process for a
@@ -101,6 +108,11 @@ Example:
 			fx.Supply(fx.Annotate(
 				doneChan,
 				fx.ResultTags(`name:"crawlDone"`),
+			)),
+			// Supply the context with a concrete type
+			fx.Supply(fx.Annotate(
+				ctx,
+				fx.As(new(context.Context)),
 			)),
 			fx.Provide(
 				// Provide buffered channels for article and content processing
@@ -259,6 +271,9 @@ func startCrawl(p CrawlParams) error {
 		ArticleProcessor: p.Processors[0], // First processor handles articles
 		ContentProcessor: p.Processors[1], // Second processor handles content
 		Source:           source,
+		Parallelism:      p.Config.Crawler.Parallelism,
+		RandomDelay:      p.Config.Crawler.RandomDelay,
+		Context:          p.Context,
 	})
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)
