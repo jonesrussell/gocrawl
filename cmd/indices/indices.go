@@ -1,10 +1,17 @@
+// Package indices implements the command-line interface for managing Elasticsearch
+// indices in GoCrawl. It provides commands for listing, deleting, and managing
+// indices in the Elasticsearch cluster.
 package indices
 
 import (
 	"github.com/spf13/cobra"
 )
 
-// Command returns the indices command
+// Command creates and returns the indices command that serves as the parent
+// command for all index management operations. It:
+// - Sets up the command with appropriate usage and description
+// - Adds subcommands for specific index management operations
+// - Provides a unified interface for index management
 func Command() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "indices",
@@ -13,10 +20,10 @@ func Command() *cobra.Command {
 This command provides subcommands for listing, deleting, and managing indices.`,
 	}
 
-	// Add subcommands
+	// Add subcommands for index management operations
 	cmd.AddCommand(
-		listCommand(),   // Assuming listCommand is defined elsewhere
-		deleteCommand(), // Fixed the function name to deleteCommand
+		listCommand(),   // Command for listing all indices
+		deleteCommand(), // Command for deleting indices
 	)
 
 	return cmd

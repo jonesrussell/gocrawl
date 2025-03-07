@@ -1,3 +1,6 @@
+// Package indices implements the command-line interface for managing Elasticsearch
+// indices in GoCrawl. This file contains the implementation of the delete command
+// that allows users to delete one or more indices from the Elasticsearch cluster.
 package indices
 
 import (
@@ -10,18 +13,34 @@ import (
 	"go.uber.org/fx"
 )
 
+// deleteSourceName holds the name of the source whose indices should be deleted
+// when the --source flag is used
 var deleteSourceName string
 
+// deleteParams holds the parameters required for deleting indices.
+// It contains the context, storage interface, sources configuration, logger,
+// and command-specific parameters needed for the delete operation.
 type deleteParams struct {
-	ctx     context.Context
+	// ctx is the context for the delete operation
+	ctx context.Context
+	// storage provides access to Elasticsearch operations
 	storage common.Storage
+	// sources contains the configuration for all content sources
 	sources common.Sources
-	logger  common.Logger
+	// logger provides logging capabilities for the delete operation
+	logger common.Logger
+	// indices contains the list of indices to delete
 	indices []string
-	force   bool
+	// force indicates whether to skip the confirmation prompt
+	force bool
 }
 
-// deleteCommand returns the delete command
+// deleteCommand creates and returns the delete command that removes indices.
+// It:
+// - Sets up the command with appropriate usage and description
+// - Adds command-line flags for source and force options
+// - Configures argument validation
+// - Configures the command to use runDelete as its execution function
 func deleteCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete [indices...]",
@@ -37,13 +56,17 @@ Example:
 		Run:  runDelete,
 	}
 
-	// Add flags
+	// Add command-line flags
 	cmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
 	cmd.Flags().StringVar(&deleteSourceName, "source", "", "Delete indices for a specific source")
 
 	return cmd
 }
 
+// validateDeleteArgs validates the command arguments to ensure they are valid.
+// It:
+// - Ensures either indices are specified or --source flag is used
+// - Prevents using both indices and --source flag together
 func validateDeleteArgs(_ *cobra.Command, args []string) error {
 	if deleteSourceName == "" && len(args) == 0 {
 		return errors.New("either specify indices or use --source flag")
@@ -54,11 +77,18 @@ func validateDeleteArgs(_ *cobra.Command, args []string) error {
 	return nil
 }
 
+// runDelete executes the delete command and removes the specified indices.
+// It:
+// - Initializes the Fx application with required modules
+// - Sets up context with timeout for graceful shutdown
+// - Handles application lifecycle and error cases
+// - Manages the deletion process
 func runDelete(cmd *cobra.Command, args []string) {
 	force, _ := cmd.Flags().GetBool("force")
 	var logger common.Logger
 	var exitCode int
 
+	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
 		fx.Invoke(func(storage common.Storage, sources common.Sources, l common.Logger) {
@@ -78,6 +108,7 @@ func runDelete(cmd *cobra.Command, args []string) {
 		}),
 	)
 
+	// Set up context with timeout for graceful shutdown
 	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
 	defer func() {
 		cancel()
@@ -92,6 +123,7 @@ func runDelete(cmd *cobra.Command, args []string) {
 		}
 	}()
 
+	// Start the application and handle any startup errors
 	if err := app.Start(ctx); err != nil {
 		if logger != nil {
 			logger.Error("Error starting application", "error", err)
@@ -101,6 +133,13 @@ func runDelete(cmd *cobra.Command, args []string) {
 	}
 }
 
+// executeDelete performs the actual deletion of indices.
+// It:
+// - Resolves indices to delete (from args or source)
+// - Checks which indices exist
+// - Filters out non-existent indices
+// - Requests confirmation if needed
+// - Deletes the specified indices
 func executeDelete(p *deleteParams) error {
 	if err := resolveIndices(p); err != nil {
 		return err
@@ -125,6 +164,10 @@ func executeDelete(p *deleteParams) error {
 	return deleteIndices(p, indicesToDelete)
 }
 
+// resolveIndices determines which indices should be deleted.
+// It:
+// - Uses command-line arguments if provided
+// - Uses source configuration if --source flag is used
 func resolveIndices(p *deleteParams) error {
 	if deleteSourceName != "" {
 		source, err := p.sources.FindByName(deleteSourceName)
@@ -136,6 +179,10 @@ func resolveIndices(p *deleteParams) error {
 	return nil
 }
 
+// getExistingIndices retrieves a list of all existing indices.
+// It:
+// - Queries Elasticsearch for all indices
+// - Creates a map for efficient lookup
 func getExistingIndices(p *deleteParams) (map[string]bool, error) {
 	indices, err := p.storage.ListIndices(p.ctx)
 	if err != nil {
@@ -149,6 +196,11 @@ func getExistingIndices(p *deleteParams) (map[string]bool, error) {
 	return existingMap, nil
 }
 
+// filterExistingIndices filters out non-existent indices and reports them.
+// It:
+// - Checks each requested index against existing indices
+// - Reports non-existent indices to the user
+// - Returns only the indices that exist
 func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []string {
 	var missingIndices []string
 	var indicesToDelete []string
@@ -171,6 +223,10 @@ func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []strin
 	return indicesToDelete
 }
 
+// confirmDeletion prompts the user for confirmation before deleting indices.
+// It:
+// - Displays the list of indices to be deleted
+// - Requests user confirmation
 func confirmDeletion(indices []string) bool {
 	common.PrintInfof("\nAre you sure you want to delete the following indices?")
 	for _, index := range indices {
@@ -179,6 +235,11 @@ func confirmDeletion(indices []string) bool {
 	return common.PrintConfirmation("\nContinue?")
 }
 
+// deleteIndices performs the actual deletion of the specified indices.
+// It:
+// - Deletes each index from Elasticsearch
+// - Logs successful deletions
+// - Reports success to the user
 func deleteIndices(p *deleteParams, indices []string) error {
 	for _, index := range indices {
 		if err := p.storage.DeleteIndex(p.ctx, index); err != nil {

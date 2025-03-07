@@ -1,3 +1,6 @@
+// Package indices implements the command-line interface for managing Elasticsearch
+// indices in GoCrawl. This file contains the implementation of the list command
+// that displays all indices in a formatted table with their health status and metrics.
 package indices
 
 import (
@@ -12,18 +15,28 @@ import (
 	"go.uber.org/fx"
 )
 
+// Constants for table formatting
 const (
-	// TableWidth is the total width of the table output
+	// TableWidth defines the total width of the table output for consistent formatting
 	TableWidth = 92
 )
 
+// listParams holds the parameters required for listing indices.
+// It contains the context, storage interface, and logger needed for
+// the list operation.
 type listParams struct {
-	ctx     context.Context
+	// ctx is the context for the list operation
+	ctx context.Context
+	// storage provides access to Elasticsearch operations
 	storage common.Storage
-	logger  common.Logger
+	// logger provides logging capabilities for the list operation
+	logger common.Logger
 }
 
-// listCommand returns the list command
+// listCommand creates and returns the list command that displays all indices.
+// It:
+// - Sets up the command with appropriate usage and description
+// - Configures the command to use runList as its execution function
 func listCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
@@ -36,10 +49,17 @@ Example:
 	}
 }
 
+// runList executes the list command and displays all indices.
+// It:
+// - Initializes the Fx application with required modules
+// - Sets up context with timeout for graceful shutdown
+// - Handles application lifecycle and error cases
+// - Displays the indices list in a formatted table
 func runList(cmd *cobra.Command, _ []string) {
 	var logger common.Logger
 	var exitCode int
 
+	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
 		fx.Invoke(func(s common.Storage, l common.Logger) {
@@ -56,6 +76,7 @@ func runList(cmd *cobra.Command, _ []string) {
 		}),
 	)
 
+	// Set up context with timeout for graceful shutdown
 	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
 	defer func() {
 		cancel()
@@ -70,6 +91,7 @@ func runList(cmd *cobra.Command, _ []string) {
 		}
 	}()
 
+	// Start the application and handle any startup errors
 	if err := app.Start(ctx); err != nil {
 		if logger != nil {
 			logger.Error("Error starting application", "error", err)
@@ -79,6 +101,12 @@ func runList(cmd *cobra.Command, _ []string) {
 	}
 }
 
+// executeList retrieves and displays the list of indices.
+// It:
+// - Retrieves all indices from Elasticsearch
+// - Filters out internal indices (starting with '.')
+// - Handles empty results
+// - Displays the indices in a formatted table
 func executeList(p *listParams) error {
 	indices, err := p.storage.ListIndices(p.ctx)
 	if err != nil {
@@ -101,6 +129,12 @@ func executeList(p *listParams) error {
 	return printIndices(p.ctx, filteredIndices, p.storage, p.logger)
 }
 
+// printIndices formats and displays the indices in a table.
+// It:
+// - Creates a new table with appropriate headers
+// - Retrieves health status and document count for each index
+// - Handles errors gracefully
+// - Renders the table with all index information
 func printIndices(ctx context.Context, indices []string, storage common.Storage, logger common.Logger) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -138,6 +172,11 @@ func printIndices(ctx context.Context, indices []string, storage common.Storage,
 	return nil
 }
 
+// getIngestionStatus maps the index health status to a human-readable
+// ingestion status. It:
+// - Maps "red" to "Disconnected"
+// - Maps "yellow" to "Warning"
+// - Maps other statuses to "Connected"
 func getIngestionStatus(healthStatus string) string {
 	switch healthStatus {
 	case "red":
