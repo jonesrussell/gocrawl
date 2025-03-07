@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -79,9 +80,9 @@ Example:
 					}
 
 					if len(missingIndices) > 0 {
-						l.Info("The following indices do not exist (already deleted):")
+						fmt.Println("\nThe following indices do not exist (already deleted):")
 						for _, index := range missingIndices {
-							l.Info(fmt.Sprintf("  - %s", index))
+							fmt.Printf("  - %s\n", index)
 						}
 						if len(missingIndices) == len(indices) {
 							return // All indices are already deleted, exit successfully
@@ -98,18 +99,18 @@ Example:
 
 					// Confirm deletion unless --force is used
 					if !force && len(indicesToDelete) > 0 {
-						l.Info("Are you sure you want to delete the following indices?")
+						fmt.Println("\nAre you sure you want to delete the following indices?")
 						for _, index := range indicesToDelete {
-							l.Info(fmt.Sprintf("  - %s", index))
+							fmt.Printf("  - %s\n", index)
 						}
-						l.Info("Continue? (y/N): ")
+						fmt.Print("\nContinue? (y/N): ")
 						var response string
 						if _, scanErr := fmt.Scanln(&response); scanErr != nil {
 							l.Error("Error reading response", "error", scanErr)
 							return
 						}
 						if response != "y" && response != "Y" {
-							l.Info("Operation cancelled")
+							fmt.Println("Operation cancelled")
 							return
 						}
 					}
@@ -121,7 +122,10 @@ Example:
 							l.Error("Error deleting index", "index", index, "error", deleteErr)
 							os.Exit(1)
 						}
-						l.Info(fmt.Sprintf("Successfully deleted index '%s'", index))
+						l.Info("Deleted index", "index", index)
+						fmt.Printf("%s Successfully deleted index '%s'\n",
+							text.FgGreen.Sprint("✓"),
+							text.Bold.Sprint(index))
 					}
 				}),
 			)
