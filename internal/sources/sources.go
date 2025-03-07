@@ -119,13 +119,14 @@ func (s *Sources) Start(ctx context.Context, sourceName string) error {
 		return fmt.Errorf("failed to start crawler: %w", crawlErr)
 	}
 
-	s.Logger.Info("Crawl completed", "source", sourceName)
+	s.Logger.Debug("Source crawl finished", "source", sourceName)
 	return nil
 }
 
 // Stop stops the crawler
 func (s *Sources) Stop() {
 	if s.Crawler != nil {
+		s.Logger.Debug("Stopping source crawler")
 		s.Crawler.Stop()
 	}
 }

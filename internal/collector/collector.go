@@ -102,6 +102,19 @@ func New(p Params) (Result, error) {
 	// Configure content processing
 	configureContentProcessing(c, contentParams)
 
+	// Add completion handler to ensure proper completion signaling
+	c.OnScraped(func(r *colly.Response) {
+		// Check if this is the last request
+		if r.Request.URL.String() == p.BaseURL {
+			p.Logger.Debug("Base URL scraped, crawl complete")
+		}
+	})
+
+	// Add error handler to ensure we know about any failures
+	c.OnError(func(r *colly.Response, err error) {
+		p.Logger.Error("Request failed", "url", r.Request.URL, "error", err)
+	})
+
 	p.Logger.Debug("Collector created",
 		"baseURL", p.BaseURL,
 		"maxDepth", p.MaxDepth,

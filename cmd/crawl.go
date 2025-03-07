@@ -195,6 +195,7 @@ Example:
 		select {
 		case sig := <-sigChan:
 			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+			cancel() // Cancel context to ensure clean shutdown
 		case <-ctx.Done():
 			common.PrintInfof("\nContext cancelled, initiating shutdown...")
 		case <-doneChan:

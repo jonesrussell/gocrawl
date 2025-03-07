@@ -73,6 +73,7 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 		}
 		// Wait for collector to finish all requests
 		c.Collector.Wait()
+		c.Logger.Debug("Collector finished all requests")
 	}()
 
 	// Wait for either completion or context cancellation
