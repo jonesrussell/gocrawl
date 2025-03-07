@@ -107,3 +107,8 @@ func (c *Crawler) SetService(svc article.Interface) {
 func (c *Crawler) GetBaseURL() string {
 	return c.Config.Crawler.BaseURL
 }
+
+// GetIndexManager returns the IndexManager for the crawler
+func (c *Crawler) GetIndexManager() storage.IndexServiceInterface {
+	return c.IndexService
+}

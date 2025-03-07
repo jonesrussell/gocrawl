@@ -266,6 +266,9 @@ func startCrawl(p CrawlParams) error {
 	// Set the collector in the crawler instance
 	p.CrawlerInstance.SetCollector(collectorResult.Collector)
 
+	// Set the IndexManager in the Sources struct
+	p.Sources.SetIndexManager(p.CrawlerInstance.GetIndexManager())
+
 	// Configure lifecycle hooks for crawl management
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {

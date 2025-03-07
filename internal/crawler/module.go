@@ -20,6 +20,7 @@ type Interface interface {
 	SetCollector(collector *colly.Collector)
 	SetService(service article.Interface)
 	GetBaseURL() string
+	GetIndexManager() storage.IndexServiceInterface
 }
 
 func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {

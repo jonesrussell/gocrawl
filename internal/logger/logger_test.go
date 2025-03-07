@@ -257,11 +257,17 @@ func TestCustomLogger_Methods(t *testing.T) {
 		log.Warn("test warn message", "key", "value")
 	})
 
-	t.Run("Fatal with recovery", func(_ *testing.T) {
-		defer func() {
-			_ = recover() // Expected panic from Fatal
+	t.Run("Fatal with recovery", func(t *testing.T) {
+		panicked := false
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					panicked = true
+				}
+			}()
+			log.Fatal("test fatal message", "key", "value")
 		}()
-		log.Fatal("test fatal message", "key", "value")
+		require.True(t, panicked, "Fatal() should have panicked")
 	})
 
 	t.Run("Printf", func(_ *testing.T) {
