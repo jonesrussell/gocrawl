@@ -117,9 +117,9 @@ func TestNewDevelopmentLogger(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log, err := logger.NewDevelopmentLogger(tt.levelStr)
 			if tt.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, log)
 			}
 		})
@@ -153,9 +153,9 @@ func TestNewProductionLogger(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log, err := logger.NewProductionLogger(tt.levelStr)
 			if tt.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, log)
 			}
 		})
@@ -343,9 +343,9 @@ func TestParseLogLevel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			level, err := logger.ParseLogLevel(tt.levelStr)
 			if tt.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, level)
 			}
 		})
