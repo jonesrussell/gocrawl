@@ -1,3 +1,6 @@
+// Package config provides configuration management for the GoCrawl application.
+// This file specifically handles dependency injection and module initialization
+// using the fx framework.
 package config
 
 import (
@@ -9,13 +12,22 @@ import (
 	"go.uber.org/fx"
 )
 
-// InitializeConfig sets up the configuration
+// InitializeConfig sets up the configuration for the application.
+// It handles loading configuration from files and environment variables,
+// setting default values, and validating the configuration.
+//
+// Parameters:
+//   - cfgFile: Path to the configuration file (optional)
+//
+// Returns:
+//   - *Config: The initialized configuration
+//   - error: Any error that occurred during initialization
 func InitializeConfig(cfgFile string) (*Config, error) {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	}
 
-	// Set default values
+	// Set default values for essential configuration
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("APP_ENV", "development")
 
@@ -30,7 +42,14 @@ func InitializeConfig(cfgFile string) (*Config, error) {
 	return New()
 }
 
-// New creates a new Config instance with values from Viper
+// New creates a new Config instance with values from Viper.
+// It handles loading configuration from files, environment variables,
+// and setting up default values. It also performs validation of the
+// configuration values.
+//
+// Returns:
+//   - *Config: The new configuration instance
+//   - error: Any error that occurred during creation
 func New() (*Config, error) {
 	// Set config defaults if not already configured
 	if viper.ConfigFileUsed() == "" {
@@ -39,13 +58,14 @@ func New() (*Config, error) {
 		viper.AddConfigPath(".")
 	}
 
+	// Enable automatic environment variable binding
 	viper.AutomaticEnv()
 
 	// Attempt to read the config file
 	if err := viper.ReadInConfig(); err != nil {
 		var configErr *viper.ConfigFileNotFoundError
 		if errors.As(err, &configErr) {
-			// Log to stderr instead of using fmt.Println
+			// Log to stderr instead of using fmt.Println for better error handling
 			fmt.Fprintf(os.Stderr, "Config file not found; using environment variables\n")
 		} else {
 			// Config file was found but another error was produced
@@ -53,12 +73,13 @@ func New() (*Config, error) {
 		}
 	}
 
-	// Proceed to read the configuration values
+	// Parse and validate the rate limit configuration
 	rateLimit, err := parseRateLimit(viper.GetString(CrawlerRateLimitKey))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing rate limit: %w", err)
 	}
 
+	// Create the configuration instance with values from Viper
 	cfg := &Config{
 		App: AppConfig{
 			Environment: viper.GetString(AppEnvKey),
@@ -89,6 +110,7 @@ func New() (*Config, error) {
 		},
 	}
 
+	// Validate the configuration before returning
 	if validateErr := ValidateConfig(cfg); validateErr != nil {
 		return nil, fmt.Errorf("config validation failed: %w", validateErr)
 	}
@@ -96,10 +118,16 @@ func New() (*Config, error) {
 	return cfg, nil
 }
 
-// Module provides the config module and its dependencies
+// Module provides the config module and its dependencies using fx.
+// It sets up the configuration providers that can be used throughout
+// the application for dependency injection.
+//
+// The module provides:
+// - Config instance via the New constructor
+// - HTTP transport configuration via NewHTTPTransport
 var Module = fx.Options(
 	fx.Provide(
-		New,              // Provide the New function to return *Config
-		NewHTTPTransport, // Ensure this is also provided if needed
+		New,              // Provides the configuration instance
+		NewHTTPTransport, // Provides HTTP transport configuration
 	),
 )
