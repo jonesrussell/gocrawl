@@ -49,21 +49,20 @@ func runList(cmd *cobra.Command, _ []string) {
 	)
 
 	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
-	defer cancel()
+	defer func() {
+		cancel()
+		if err := app.Stop(ctx); err != nil {
+			if logger != nil {
+				logger.Error("Error stopping application", "error", err)
+			}
+			os.Exit(1)
+		}
+	}()
 
 	if err := app.Start(ctx); err != nil {
 		if logger != nil {
 			logger.Error("Error starting application", "error", err)
 		}
-		cancel()
-		os.Exit(1)
-	}
-
-	if err := app.Stop(ctx); err != nil {
-		if logger != nil {
-			logger.Error("Error stopping application", "error", err)
-		}
-		cancel()
 		os.Exit(1)
 	}
 }

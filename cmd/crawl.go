@@ -134,7 +134,7 @@ Example:
 		}
 
 		defer func() {
-			stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			stopCtx, cancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
 			defer cancel()
 			if err := app.Stop(stopCtx); err != nil {
 				fmt.Printf("Error stopping application: %v\n", err)
