@@ -148,7 +148,7 @@ func NewHTTPTransport() http.RoundTripper {
 // If the input is invalid, it returns a default value of 1 second and an error.
 func ParseRateLimit(rateLimit string) (time.Duration, error) {
 	if rateLimit == "" {
-		return time.Second, nil // Return default value
+		return time.Second, errors.New("rate limit cannot be empty") // Return error for empty string
 	}
 	duration, err := time.ParseDuration(rateLimit)
 	if err != nil {

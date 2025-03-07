@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -71,27 +72,27 @@ func InitializeLogger(cfg *config.Config) (Interface, error) {
 
 // Info logs an info message
 func (c *CustomLogger) Info(msg string, fields ...interface{}) {
-	c.Logger.Info(msg, convertToZapFields(fields)...)
+	c.Logger.Info(msg, ConvertToZapFields(fields)...)
 }
 
 // Error logs an error message
 func (c *CustomLogger) Error(msg string, fields ...interface{}) {
-	c.Logger.Error(msg, convertToZapFields(fields)...)
+	c.Logger.Error(msg, ConvertToZapFields(fields)...)
 }
 
 // Debug logs a debug message
 func (c *CustomLogger) Debug(msg string, fields ...interface{}) {
-	c.Logger.Debug(msg, convertToZapFields(fields)...)
+	c.Logger.Debug(msg, ConvertToZapFields(fields)...)
 }
 
 // Warn logs a warning message
 func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
-	c.Logger.Warn(msg, convertToZapFields(fields)...)
+	c.Logger.Warn(msg, ConvertToZapFields(fields)...)
 }
 
 // Fatal logs a fatal message
 func (c *CustomLogger) Fatal(msg string, fields ...interface{}) {
-	c.Logger.Fatal(msg, convertToZapFields(fields)...)
+	c.Logger.Fatal(msg, ConvertToZapFields(fields)...)
 }
 
 // Printf logs a formatted message
@@ -122,8 +123,28 @@ func (c *CustomLogger) GetZapLogger() *zap.Logger {
 	return c.Logger
 }
 
-// convertToZapFields converts variadic key-value pairs to zap.Fields
-func convertToZapFields(fields []interface{}) []zap.Field {
+// ParseLogLevel converts a string log level to a zapcore.Level
+func ParseLogLevel(logLevelStr string) (zapcore.Level, error) {
+	var logLevel zapcore.Level
+
+	switch logLevelStr {
+	case "debug":
+		logLevel = zapcore.DebugLevel
+	case "info":
+		logLevel = zapcore.InfoLevel
+	case "warn":
+		logLevel = zapcore.WarnLevel
+	case "error":
+		logLevel = zapcore.ErrorLevel
+	default:
+		return zapcore.DebugLevel, errors.New("unknown log level")
+	}
+
+	return logLevel, nil
+}
+
+// ConvertToZapFields converts variadic key-value pairs to zap.Fields
+func ConvertToZapFields(fields []interface{}) []zap.Field {
 	var zapFields []zap.Field
 
 	// If no fields provided, return empty slice
