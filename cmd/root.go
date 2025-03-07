@@ -33,12 +33,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig, initLogger)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
-
-	// Add commands
-	rootCmd.AddCommand(
-		sources.Command(),
-		indices.Command(),
-	)
 }
 
 func initConfig() {
@@ -59,4 +53,9 @@ func initLogger() {
 		os.Exit(1)
 	}
 	shared.SetLogger(globalLogger)
+}
+
+func init() {
+	rootCmd.AddCommand(indices.Command())
+	rootCmd.AddCommand(sources.Command())
 }

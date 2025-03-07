@@ -3,6 +3,7 @@ package common
 import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -12,6 +13,7 @@ import (
 type (
 	Logger  = logger.Interface
 	Storage = storage.Interface
+	Sources = *sources.Sources // Add Sources alias
 	Config  = *config.Config
 )
 
@@ -26,4 +28,5 @@ var Module = fx.Options(
 	config.Module,  // Provides *config.Config
 	logger.Module,  // Provides logger.Interface
 	storage.Module, // Commonly used storage module
+	sources.Module, // Provides *sources.Sources
 )

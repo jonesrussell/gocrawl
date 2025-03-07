@@ -15,7 +15,8 @@ This command provides subcommands for listing, deleting, and managing indices.`,
 
 	// Add subcommands
 	cmd.AddCommand(
-		listCommand(),
+		listCommand(),   // Assuming listCommand is defined elsewhere
+		deleteCommand(), // Fixed the function name to deleteCommand
 	)
 
 	return cmd
