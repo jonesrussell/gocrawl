@@ -65,7 +65,7 @@ type CrawlParams struct {
 	Config *config.Config
 
 	// Context provides the context for the crawl operation
-	Context context.Context
+	Context context.Context `name:"crawlContext"`
 }
 
 // CrawlCmd represents the crawl command that initiates the crawling process for a
@@ -89,10 +89,6 @@ Example:
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Create a cancellable context for managing the application lifecycle
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
 		sourceName = args[0]
 
 		// Set up signal handling for graceful shutdown
@@ -109,12 +105,14 @@ Example:
 				doneChan,
 				fx.ResultTags(`name:"crawlDone"`),
 			)),
-			// Supply the context with a concrete type
-			fx.Supply(fx.Annotate(
-				ctx,
-				fx.As(new(context.Context)),
-			)),
+			// Provide the command context as the crawl context
 			fx.Provide(
+				fx.Annotate(
+					func() context.Context {
+						return cmd.Context()
+					},
+					fx.ResultTags(`name:"crawlContext"`),
+				),
 				// Provide buffered channels for article and content processing
 				func() chan *models.Article {
 					return make(chan *models.Article, DefaultChannelBufferSize)
@@ -196,7 +194,7 @@ Example:
 		)
 
 		// Start the application and handle any startup errors
-		if err := app.Start(ctx); err != nil {
+		if err := app.Start(cmd.Context()); err != nil {
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
@@ -207,8 +205,7 @@ Example:
 		select {
 		case sig := <-sigChan:
 			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-			cancel() // Cancel context to ensure clean shutdown
-		case <-ctx.Done():
+		case <-cmd.Context().Done():
 			common.PrintInfof("\nContext cancelled, initiating shutdown...")
 		case <-doneChan:
 			common.PrintInfof("\nCrawl completed, initiating shutdown...")
