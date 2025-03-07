@@ -1,3 +1,4 @@
+// Package collector provides the web page collection functionality.
 package collector
 
 import (

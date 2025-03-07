@@ -1,3 +1,5 @@
+// Package crawler provides the core crawling functionality for the application.
+// This file contains the dependency injection module configuration.
 package crawler
 
 import (
@@ -13,41 +15,65 @@ import (
 	"go.uber.org/fx"
 )
 
-// Interface defines the methods required for a crawler
+// Interface defines the methods required for a crawler.
+// It provides the core functionality for web crawling operations.
 type Interface interface {
+	// Start begins the crawling process at the specified URL.
+	// It manages the crawling lifecycle and handles errors.
 	Start(ctx context.Context, url string) error
+	// Stop performs cleanup operations when the crawler is stopped.
 	Stop()
+	// SetCollector sets the collector for the crawler.
+	// This allows for dependency injection and testing.
 	SetCollector(collector *colly.Collector)
+	// SetService sets the article service for the crawler.
+	// This allows for dependency injection and testing.
 	SetService(service article.Interface)
+	// GetBaseURL returns the base URL from the configuration.
 	GetBaseURL() string
+	// GetIndexManager returns the index service interface.
 	GetIndexManager() storage.IndexServiceInterface
 }
 
+// provideCollyDebugger creates a new CollyDebugger instance for debugging collector operations.
+// It takes a logger interface and returns a configured debugger.
 func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {
 	return logger.NewCollyDebugger(log)
 }
 
-// Params holds the dependencies for creating a crawler
+// Params holds the dependencies for creating a crawler.
+// It uses fx.In for dependency injection.
 type Params struct {
 	fx.In
 
-	Logger           logger.Interface
-	Storage          storage.Interface
-	Debugger         *logger.CollyDebugger
-	Config           *config.Config
-	Source           string `name:"sourceName"`
-	IndexService     storage.IndexServiceInterface
+	// Logger provides structured logging capabilities
+	Logger logger.Interface
+	// Storage handles content storage operations
+	Storage storage.Interface
+	// Debugger handles debugging operations
+	Debugger *logger.CollyDebugger
+	// Config holds the crawler configuration
+	Config *config.Config
+	// Source is the name of the source being crawled
+	Source string `name:"sourceName"`
+	// IndexService manages index operations
+	IndexService storage.IndexServiceInterface
+	// ContentProcessor handles content processing operations
 	ContentProcessor []models.ContentProcessor `group:"processors"`
 }
 
-// Result holds the crawler instance
+// Result holds the crawler instance.
+// It uses fx.Out for dependency injection.
 type Result struct {
 	fx.Out
 
+	// Crawler is the crawler interface implementation
 	Crawler Interface
 }
 
-// Module provides crawler-related dependencies
+// Module provides the dependency injection configuration for the crawler package.
+// It exports the crawler interface and provides implementations for all required
+// components including the crawler instance, collector, and related services.
 var Module = fx.Module("crawler",
 	fx.Provide(
 		provideCollyDebugger,
@@ -55,7 +81,8 @@ var Module = fx.Module("crawler",
 	),
 )
 
-// ProvideCrawler creates a new Crawler instance
+// ProvideCrawler creates a new Crawler instance with all required dependencies.
+// It validates the dependencies and initializes the crawler with the provided configuration.
 func ProvideCrawler(p Params) (Interface, error) {
 	if p.Logger == nil {
 		return nil, errors.New("logger is required")
@@ -101,8 +128,57 @@ func ProvideCrawler(p Params) (Interface, error) {
 }
 
 const (
-	DefaultMaxDepth    = 3
-	DefaultMaxBodySize = 10 * 1024 * 1024 // 10 MB
-	DefaultParallelism = 2
-	DefaultBatchSize   = 100
+	// DefaultBatchSize is the default size for buffered channels used for
+	// processing articles during crawling.
+	DefaultBatchSize = 100
 )
+
+// NewCollector creates a new collector instance with the specified configuration.
+// It sets up rate limiting, parallelism, and other collector-specific settings.
+func NewCollector(cfg *config.Config) *colly.Collector {
+	// Create a new collector with the specified configuration
+	c := colly.NewCollector(
+		colly.MaxDepth(cfg.Crawler.MaxDepth),
+		colly.Async(true),
+	)
+
+	// Set up rate limiting
+	c.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		RandomDelay: cfg.Crawler.RandomDelay,
+		Parallelism: cfg.Crawler.Parallelism,
+	})
+
+	return c
+}
+
+// New creates a new crawler instance with all required dependencies.
+// It initializes the crawler with the provided configuration and services.
+func New(
+	storage storage.Interface,
+	collector *colly.Collector,
+	logger logger.Interface,
+	articleService article.Interface,
+	indexService storage.IndexServiceInterface,
+	cfg *config.Config,
+) Interface {
+	// Create a new crawler instance
+	c := &Crawler{
+		Storage:        storage,
+		Collector:      collector,
+		Logger:         logger,
+		IndexName:      cfg.Elasticsearch.IndexName,
+		articleChan:    make(chan *models.Article, 100),
+		ArticleService: articleService,
+		IndexService:   indexService,
+		Config:         cfg,
+	}
+
+	// Set up the debugger if debug mode is enabled
+	if cfg.Log.Debug {
+		c.Debugger = provideCollyDebugger(logger)
+		c.Collector.SetDebugger(c.Debugger)
+	}
+
+	return c
+}

@@ -1,3 +1,6 @@
+// Package crawler provides the core crawling functionality for the application.
+// It manages the crawling process, coordinates between components, and handles
+// configuration and error management.
 package crawler
 
 import (
@@ -16,29 +19,45 @@ import (
 
 // Constants for configuration
 const (
-	TimeoutDuration  = 5 * time.Second
-	HTTPStatusOK     = 200
+	// TimeoutDuration is the default timeout for operations
+	TimeoutDuration = 5 * time.Second
+	// HTTPStatusOK represents a successful HTTP response
+	HTTPStatusOK = 200
+	// DefaultRateLimit is the default rate limit for requests
 	DefaultRateLimit = time.Second
 )
 
-// Crawler represents a web crawler
+// Crawler represents a web crawler instance that manages the crawling process.
+// It coordinates between the collector, storage, and logger components while
+// handling configuration and error management.
 type Crawler struct {
-	Storage          storage.Interface
-	Collector        *colly.Collector
-	Logger           logger.Interface
-	Debugger         *logger.CollyDebugger
-	IndexName        string
-	articleChan      chan *models.Article
-	ArticleService   article.Interface
-	IndexService     storage.IndexServiceInterface
-	Config           *config.Config
+	// Storage handles content storage operations
+	Storage storage.Interface
+	// Collector manages the actual web page collection
+	Collector *colly.Collector
+	// Logger provides structured logging capabilities
+	Logger logger.Interface
+	// Debugger handles debugging operations
+	Debugger *logger.CollyDebugger
+	// IndexName is the name of the Elasticsearch index
+	IndexName string
+	// articleChan is a channel for processing articles
+	articleChan chan *models.Article
+	// ArticleService handles article-specific operations
+	ArticleService article.Interface
+	// IndexService manages index operations
+	IndexService storage.IndexServiceInterface
+	// Config holds the crawler configuration
+	Config *config.Config
+	// ContentProcessor handles content processing
 	ContentProcessor models.ContentProcessor
 }
 
 // Ensure Crawler implements the Interface
 var _ Interface = (*Crawler)(nil)
 
-// Start method to begin crawling
+// Start begins the crawling process at the specified base URL.
+// It manages the crawling lifecycle, including setup, execution, and cleanup.
 func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 	if baseURL == "" {
 		return errors.New("base URL cannot be empty")
@@ -88,27 +107,32 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 	return nil
 }
 
-// Stop method to cleanly shut down the crawler
+// Stop performs cleanup operations when the crawler is stopped.
+// It ensures all resources are properly released.
 func (c *Crawler) Stop() {
 	// Perform any necessary cleanup here
 }
 
-// SetCollector sets the collector for the crawler
+// SetCollector sets the collector for the crawler.
+// This allows for dependency injection and testing.
 func (c *Crawler) SetCollector(collector *colly.Collector) {
 	c.Collector = collector
 }
 
-// SetService sets the article service for the crawler
+// SetService sets the article service for the crawler.
+// This allows for dependency injection and testing.
 func (c *Crawler) SetService(svc article.Interface) {
 	c.ArticleService = svc
 }
 
-// GetBaseURL returns the base URL from the configuration
+// GetBaseURL returns the base URL from the configuration.
+// This is used for validation and logging purposes.
 func (c *Crawler) GetBaseURL() string {
 	return c.Config.Crawler.BaseURL
 }
 
-// GetIndexManager returns the IndexManager for the crawler
+// GetIndexManager returns the index service interface.
+// This is used for index management operations.
 func (c *Crawler) GetIndexManager() storage.IndexServiceInterface {
 	return c.IndexService
 }
