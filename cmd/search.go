@@ -1,3 +1,6 @@
+// Package cmd implements the command-line interface for GoCrawl.
+// This file contains the search command implementation that allows users to search
+// content in Elasticsearch using various parameters.
 package cmd
 
 import (
@@ -16,34 +19,52 @@ import (
 
 // Constants for default values
 const (
-	DefaultSearchSize = 10 // Default number of results to return
+	// DefaultSearchSize defines the default number of search results to return
+	// when no size is specified via command-line flags
+	DefaultSearchSize = 10
 )
 
-// SearchParams holds the parameters for the search operation
+// SearchParams holds the parameters required for executing a search operation.
+// It uses fx.In for dependency injection of required components.
 type SearchParams struct {
 	fx.In
 
-	Logger     common.Logger
-	Config     common.Config
-	SearchSvc  *search.Service
-	IndexName  string `name:"indexName"`
-	Query      string `name:"query"`
-	ResultSize int    `name:"resultSize"`
+	// Logger provides logging capabilities for the search operation
+	Logger common.Logger
+	// Config holds the application configuration
+	Config common.Config
+	// SearchSvc is the service responsible for executing searches
+	SearchSvc *search.Service
+	// IndexName specifies which Elasticsearch index to search
+	IndexName string `name:"indexName"`
+	// Query contains the search query string
+	Query string `name:"query"`
+	// ResultSize determines how many results to return
+	ResultSize int `name:"resultSize"`
 }
 
-// searchCmd represents the search command
+// searchCmd represents the search command that allows users to search content
+// in Elasticsearch using various parameters.
 var searchCmd = &cobra.Command{
 	Use:   "search",
 	Short: "Search content in Elasticsearch",
 	RunE:  runSearch,
 }
 
+// runSearch executes the search command with the provided parameters.
+// It handles:
+// - Parameter validation and retrieval
+// - Signal handling for graceful shutdown
+// - Application lifecycle management
+// - Search execution and result display
 func runSearch(cmd *cobra.Command, _ []string) error {
+	// Retrieve and validate the search query
 	queryStr, queryErr := cmd.Flags().GetString("query")
 	if queryErr != nil {
 		return fmt.Errorf("error retrieving query: %w", queryErr)
 	}
 
+	// Get the index name and result size from flags
 	indexName := cmd.Flag("index").Value.String()
 	size, sizeErr := cmd.Flags().GetInt("size")
 	if sizeErr != nil {
@@ -57,11 +78,12 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	// Create a channel to signal search completion
 	doneChan := make(chan struct{})
 
+	// Initialize the Fx application with required modules and dependencies
 	app := fx.New(
 		common.Module,
 		search.Module,
 		fx.Provide(
-			// Provide search parameters
+			// Provide search parameters with appropriate tags for dependency injection
 			fx.Annotate(
 				func() string { return queryStr },
 				fx.ResultTags(`name:"query"`),
@@ -76,6 +98,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 			),
 		),
 		fx.Invoke(func(p SearchParams) {
+			// Execute the search and handle any errors
 			if startErr := executeSearch(cmd.Context(), p); startErr != nil {
 				p.Logger.Error("Error executing search", "error", startErr)
 			}
@@ -114,25 +137,34 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
+// executeSearch performs the actual search operation using the provided parameters.
+// It:
+// - Logs the start of the search operation
+// - Executes the search using the search service
+// - Handles and logs any errors
+// - Displays the search results
 func executeSearch(ctx context.Context, p SearchParams) error {
+	// Log the start of the search operation with parameters
 	p.Logger.Info("Starting search...",
 		"query", p.Query,
 		"index", p.IndexName,
 		"size", p.ResultSize,
 	)
 
+	// Execute the search and handle any errors
 	results, err := p.SearchSvc.SearchContent(ctx, p.Query, p.IndexName, p.ResultSize)
 	if err != nil {
 		p.Logger.Error("Search failed", "error", err)
 		return fmt.Errorf("search failed: %w", err)
 	}
 
-	// Print results
+	// Handle empty results
 	if len(results) == 0 {
 		common.PrintInfof("No results found")
 		return nil
 	}
 
+	// Display search results
 	common.PrintInfof("\nFound %d results:", len(results))
 	for i, result := range results {
 		common.PrintInfof("\nResult %d:", i+1)
@@ -143,6 +175,10 @@ func executeSearch(ctx context.Context, p SearchParams) error {
 	return nil
 }
 
+// init initializes the search command by:
+// - Adding it to the root command
+// - Setting up command-line flags
+// - Marking required flags
 func init() {
 	rootCmd.AddCommand(searchCmd)
 
@@ -151,6 +187,7 @@ func init() {
 	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return")
 	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
 
+	// Mark the query flag as required
 	if err := searchCmd.MarkFlagRequired("query"); err != nil {
 		common.PrintErrorf("Error marking query flag as required: %v", err)
 		os.Exit(1)
