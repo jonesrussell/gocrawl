@@ -120,6 +120,31 @@ func (l *contentLogger) error(msg string, keysAndValues ...interface{}) {
 	l.p.Logger.Error(msg, args...)
 }
 
+// setupArticleProcessing sets up article processing logic for the collector
+func setupArticleProcessing(c *colly.Collector, p ContentParams, log *contentLogger) {
+	log.debug("Setting up article processing")
+	setupArticleDetection(c, log)
+}
+
+// processScrapedContent handles the processing of scraped content
+func processScrapedContent(c *colly.Collector, p ContentParams, log *contentLogger) {
+	c.OnScraped(func(r *colly.Response) {
+		if !canProcess(p) {
+			log.debug("Skipping processing - no processors available", "url", r.Request.URL.String())
+			return
+		}
+
+		cm := newContextManager(r.Ctx)
+		e, ok := cm.getHTMLElement()
+		if !ok {
+			log.debug("No HTML element found for processing", "url", r.Request.URL.String())
+			return
+		}
+
+		processContent(e, r, p, cm, log)
+	})
+}
+
 // configureContentProcessing sets up content processing for the collector
 func configureContentProcessing(c *colly.Collector, p ContentParams) {
 	ignoredErrors := map[string]bool{
@@ -133,6 +158,7 @@ func configureContentProcessing(c *colly.Collector, p ContentParams) {
 	setupLinkFollowing(c, log, ignoredErrors)
 	setupHTMLProcessing(c, log)
 	setupArticleProcessing(c, p, log)
+	processScrapedContent(c, p, log)
 }
 
 // setupLinkFollowing sets up link following logic for the collector
@@ -165,13 +191,6 @@ func setupHTMLProcessing(c *colly.Collector, log *contentLogger) {
 	})
 }
 
-// setupArticleProcessing sets up article processing logic for the collector
-func setupArticleProcessing(c *colly.Collector, p ContentParams, log *contentLogger) {
-	log.debug("Setting up article processing")
-	setupArticleDetection(c, log)
-	setupContentProcessing(c, p, log)
-}
-
 // setupArticleDetection sets up article processing logic for the collector
 func setupArticleDetection(c *colly.Collector, log *contentLogger) {
 	c.OnHTML("html", func(e *colly.HTMLElement) {
@@ -193,24 +212,6 @@ func setupArticleDetection(c *colly.Collector, log *contentLogger) {
 			"meta_type", e.ChildAttr(`meta[property="og:type"]`, "content"),
 			"schema_type", e.ChildAttr(`meta[name="type"]`, "content"),
 		)
-	})
-}
-
-func setupContentProcessing(c *colly.Collector, p ContentParams, log *contentLogger) {
-	c.OnScraped(func(r *colly.Response) {
-		if !canProcess(p) {
-			log.debug("Skipping processing - no processors available", "url", r.Request.URL.String())
-			return
-		}
-
-		cm := newContextManager(r.Ctx)
-		e, ok := cm.getHTMLElement()
-		if !ok {
-			log.debug("No HTML element found for processing", "url", r.Request.URL.String())
-			return
-		}
-
-		processContent(e, r, p, cm, log)
 	})
 }
 

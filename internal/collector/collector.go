@@ -21,37 +21,64 @@ func New(p Params) (Result, error) {
 		return Result{}, fmt.Errorf("invalid base URL: %s, must be a valid HTTP/HTTPS URL", p.BaseURL)
 	}
 
-	// Extract the domain from the BaseURL
-	domain := parsedURL.Hostname()
-
 	// Create collector with base configuration
-	c := colly.NewCollector(
+	c := createBaseCollector(p, parsedURL.Hostname())
+
+	// Configure rate limiting
+	if err := configureRateLimit(c, p); err != nil {
+		return Result{}, err
+	}
+
+	// Configure debugger and logging
+	configureDebuggerAndLogging(c, p)
+
+	// Convert source config and configure content processing
+	if err := initializeContentProcessing(c, p); err != nil {
+		return Result{}, err
+	}
+
+	// Create completion channel and handlers
+	done := make(chan struct{})
+	configureHandlers(c, p, done)
+
+	p.Logger.Debug("Collector created",
+		"baseURL", p.BaseURL,
+		"maxDepth", p.MaxDepth,
+		"rateLimit", p.RateLimit,
+		"parallelism", p.Parallelism,
+	)
+
+	return Result{Collector: c, Done: done}, nil
+}
+
+func createBaseCollector(p Params, domain string) *colly.Collector {
+	return colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(p.MaxDepth),
 		colly.AllowedDomains(domain),
 	)
+}
 
-	// Set rate limiting
-	err = c.Limit(&colly.LimitRule{
+func configureRateLimit(c *colly.Collector, p Params) error {
+	return c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: p.RandomDelay,
 		Parallelism: p.Parallelism,
 	})
-	if err != nil {
-		return Result{}, fmt.Errorf("failed to set rate limit: %w", err)
-	}
+}
 
+func configureDebuggerAndLogging(c *colly.Collector, p Params) {
 	if p.Debugger != nil {
 		c.SetDebugger(p.Debugger)
 	}
-
-	// Configure logging
 	ConfigureLogging(c, p.Logger)
+}
 
+func initializeContentProcessing(c *colly.Collector, p Params) error {
 	// Parse rate limit duration
 	rateLimit, err := time.ParseDuration(p.Source.RateLimit)
 	if err != nil {
-		return Result{}, fmt.Errorf("invalid rate limit: %w", err)
+		return fmt.Errorf("invalid rate limit: %w", err)
 	}
 
 	// Convert sources.Config to config.Source
@@ -101,10 +128,10 @@ func New(p Params) (Result, error) {
 
 	// Configure content processing
 	configureContentProcessing(c, contentParams)
+	return nil
+}
 
-	// Create a channel to track completion
-	done := make(chan struct{})
-
+func configureHandlers(c *colly.Collector, p Params, done chan struct{}) {
 	// Add completion handler to ensure proper completion signaling
 	c.OnScraped(func(r *colly.Response) {
 		// Check if this is the last request
@@ -129,13 +156,4 @@ func New(p Params) (Result, error) {
 	c.OnResponse(func(r *colly.Response) {
 		p.Logger.Debug("Received response", "url", r.Request.URL, "status", r.StatusCode)
 	})
-
-	p.Logger.Debug("Collector created",
-		"baseURL", p.BaseURL,
-		"maxDepth", p.MaxDepth,
-		"rateLimit", p.RateLimit,
-		"parallelism", p.Parallelism,
-	)
-
-	return Result{Collector: c, Done: done}, nil
 }

@@ -114,10 +114,10 @@ func (s *Sources) Start(ctx context.Context, sourceName string) error {
 	// Start crawling in a goroutine
 	go func() {
 		defer close(done)
-		if err := s.Crawler.Start(ctx, source.URL); err != nil {
-			if !errors.Is(err, context.Canceled) {
-				s.Logger.Error("Failed to start crawler", "error", err)
-				crawlErr = err
+		if startErr := s.Crawler.Start(ctx, source.URL); startErr != nil {
+			if !errors.Is(startErr, context.Canceled) {
+				s.Logger.Error("Failed to start crawler", "error", startErr)
+				crawlErr = startErr
 			}
 		}
 		s.Logger.Debug("Source crawl finished", "source", sourceName)
