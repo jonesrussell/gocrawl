@@ -156,9 +156,9 @@ func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []strin
 	}
 
 	if len(missingIndices) > 0 {
-		common.PrintInfo("\nThe following indices do not exist (already deleted):")
+		common.PrintInfof("\nThe following indices do not exist (already deleted):")
 		for _, index := range missingIndices {
-			common.PrintInfo("  - %s", index)
+			common.PrintInfof("  - %s", index)
 		}
 	}
 
@@ -166,9 +166,9 @@ func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []strin
 }
 
 func confirmDeletion(indices []string) bool {
-	common.PrintInfo("\nAre you sure you want to delete the following indices?")
+	common.PrintInfof("\nAre you sure you want to delete the following indices?")
 	for _, index := range indices {
-		common.PrintInfo("  - %s", index)
+		common.PrintInfof("  - %s", index)
 	}
 	return common.PrintConfirmation("\nContinue?")
 }
@@ -179,7 +179,7 @@ func deleteIndices(p *deleteParams, indices []string) error {
 			return err
 		}
 		p.logger.Info("Deleted index", "index", index)
-		common.PrintSuccess("Successfully deleted index '%s'", index)
+		common.PrintSuccessf("Successfully deleted index '%s'", index)
 	}
 	return nil
 }

@@ -151,13 +151,14 @@ var jobCmd = &cobra.Command{
 		fmt.Printf("\nReceived signal %v, initiating shutdown...\n", sig)
 
 		// Create a context with timeout for graceful shutdown
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := app.Stop(ctx); err != nil {
-			fmt.Printf("Error during shutdown: %v\n", err)
-			os.Exit(1)
-		}
+		ctx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+		defer func() {
+			cancel()
+			if err := app.Stop(ctx); err != nil {
+				common.PrintErrorf("Error during shutdown: %v", err)
+				os.Exit(1)
+			}
+		}()
 	},
 }
 

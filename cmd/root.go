@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/jonesrussell/gocrawl/cmd/indices"
 	"github.com/jonesrussell/gocrawl/cmd/sources"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/spf13/cobra"
 )
 
@@ -20,16 +20,13 @@ var (
 // Execute is the entry point for the CLI
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Printf("Error executing root command: %v\n", err)
+		common.PrintErrorf("Error executing root command: %v", err)
 		os.Exit(1)
 	}
 }
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
-}
-
-func init() {
 	rootCmd.AddCommand(indices.Command())
 	rootCmd.AddCommand(sources.Command())
 }

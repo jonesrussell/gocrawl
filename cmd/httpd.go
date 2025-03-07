@@ -2,12 +2,10 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -58,7 +56,7 @@ You can send POST requests to /search with a JSON body containing the search par
 
 		// Start the application
 		if err := app.Start(context.Background()); err != nil {
-			fmt.Printf("Error starting application: %v\n", err)
+			common.PrintErrorf("Error starting application: %v", err)
 			os.Exit(1)
 		}
 
@@ -66,17 +64,17 @@ You can send POST requests to /search with a JSON body containing the search par
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		sig := <-sigChan
-		fmt.Printf("\nReceived signal %v, initiating shutdown...\n", sig)
+		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
 
 		// Create a context with timeout for graceful shutdown
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		// Stop the application
-		if err := app.Stop(ctx); err != nil {
-			fmt.Printf("Error during shutdown: %v\n", err)
-			os.Exit(1)
-		}
+		ctx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+		defer func() {
+			cancel()
+			if err := app.Stop(ctx); err != nil {
+				common.PrintErrorf("Error during shutdown: %v", err)
+				os.Exit(1)
+			}
+		}()
 	},
 }
 

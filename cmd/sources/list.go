@@ -10,6 +10,13 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// HeaderWidth is the width of the header divider
+	HeaderWidth = 17
+	// TableWidth is the width of the table divider
+	TableWidth = 92
+)
+
 type listParams struct {
 	ctx     context.Context
 	sources *sources.Sources
@@ -37,10 +44,7 @@ func runList(cmd *cobra.Command, _ []string) {
 				sources: s,
 				logger:  l,
 			}
-			if err := executeList(params); err != nil {
-				l.Error("Error executing list", "error", err)
-				os.Exit(1)
-			}
+			displaySourcesList(params)
 		}),
 	)
 
@@ -51,6 +55,7 @@ func runList(cmd *cobra.Command, _ []string) {
 		if logger != nil {
 			logger.Error("Error starting application", "error", err)
 		}
+		cancel()
 		os.Exit(1)
 	}
 
@@ -58,19 +63,20 @@ func runList(cmd *cobra.Command, _ []string) {
 		if logger != nil {
 			logger.Error("Error stopping application", "error", err)
 		}
+		cancel()
 		os.Exit(1)
 	}
 }
 
-func executeList(p *listParams) error {
-	common.PrintInfo("\nConfigured Sources")
-	common.PrintDivider(17)
-	common.PrintTableHeader("%-20s %-30s %-15s %-15s %-10s",
+func displaySourcesList(p *listParams) {
+	common.PrintInfof("\nConfigured Sources")
+	common.PrintDivider(HeaderWidth)
+	common.PrintTableHeaderf("%-20s %-30s %-15s %-15s %-10s",
 		"Name", "URL", "Article Index", "Content Index", "Max Depth")
-	common.PrintDivider(92)
+	common.PrintDivider(TableWidth)
 
 	for _, source := range p.sources.Sources {
-		common.PrintTableHeader("%-20s %-30s %-15s %-15s %-10d",
+		common.PrintTableHeaderf("%-20s %-30s %-15s %-15s %-10d",
 			source.Name,
 			source.URL,
 			source.ArticleIndex,
@@ -78,6 +84,5 @@ func executeList(p *listParams) error {
 			source.MaxDepth)
 	}
 
-	common.PrintInfo("")
-	return nil
+	common.PrintInfof("")
 }

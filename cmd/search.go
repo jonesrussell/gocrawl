@@ -76,7 +76,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	)
 
 	if startErr := app.Start(cmd.Context()); startErr != nil {
-		common.PrintError("Error starting application: %v", startErr)
+		common.PrintErrorf("Error starting application: %v", startErr)
 		os.Exit(1)
 	}
 
@@ -86,9 +86,9 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 
 	select {
 	case sig := <-sigChan:
-		common.PrintInfo("\nReceived signal %v, initiating shutdown...", sig)
+		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
 	case <-cmd.Context().Done():
-		common.PrintInfo("\nSearch completed, shutting down...")
+		common.PrintInfof("\nSearch completed, shutting down...")
 	}
 
 	// Create a context with timeout for graceful shutdown
@@ -96,7 +96,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	defer cancel()
 
 	if stopErr := app.Stop(ctx); stopErr != nil {
-		common.PrintError("Error during shutdown: %v", stopErr)
+		common.PrintErrorf("Error during shutdown: %v", stopErr)
 		os.Exit(1)
 	}
 
@@ -118,15 +118,15 @@ func executeSearch(ctx context.Context, p SearchParams) error {
 
 	// Print results
 	if len(results) == 0 {
-		common.PrintInfo("No results found")
+		common.PrintInfof("No results found")
 		return nil
 	}
 
-	common.PrintInfo("\nFound %d results:", len(results))
+	common.PrintInfof("\nFound %d results:", len(results))
 	for i, result := range results {
-		common.PrintInfo("\nResult %d:", i+1)
-		common.PrintInfo("URL: %s", result.URL)
-		common.PrintInfo("Content: %s", result.Content)
+		common.PrintInfof("\nResult %d:", i+1)
+		common.PrintInfof("URL: %s", result.URL)
+		common.PrintInfof("Content: %s", result.Content)
 	}
 
 	return nil
@@ -141,7 +141,7 @@ func init() {
 	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
 
 	if err := searchCmd.MarkFlagRequired("query"); err != nil {
-		common.PrintError("Error marking query flag as required: %v", err)
+		common.PrintErrorf("Error marking query flag as required: %v", err)
 		os.Exit(1)
 	}
 }
