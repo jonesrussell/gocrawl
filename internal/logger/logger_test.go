@@ -424,7 +424,7 @@ func TestCustomLogger_LoggingWithFields(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			// Test all logging methods with fields
 			log.Info("test message", tt.fields...)
 			log.Error("test message", tt.fields...)
