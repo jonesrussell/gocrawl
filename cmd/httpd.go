@@ -46,7 +46,7 @@ var httpdCmd = &cobra.Command{
 	Short: "Start the HTTP server for search",
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
-	Run: func(_ *cobra.Command, _ []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		// Initialize the Fx application with the HTTP server
 		app := fx.New(
 			common.Module,
@@ -55,7 +55,7 @@ You can send POST requests to /search with a JSON body containing the search par
 		)
 
 		// Start the application
-		if err := app.Start(context.Background()); err != nil {
+		if err := app.Start(cmd.Context()); err != nil {
 			common.PrintErrorf("Error starting application: %v", err)
 			os.Exit(1)
 		}
@@ -67,7 +67,7 @@ You can send POST requests to /search with a JSON body containing the search par
 		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
 
 		// Create a context with timeout for graceful shutdown
-		ctx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+		ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultShutdownTimeout)
 		defer func() {
 			cancel()
 			if err := app.Stop(ctx); err != nil {

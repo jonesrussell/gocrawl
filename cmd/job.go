@@ -138,7 +138,7 @@ var jobCmd = &cobra.Command{
 			}),
 		)
 
-		if err := app.Start(context.Background()); err != nil {
+		if err := app.Start(cmd.Context()); err != nil {
 			common.PrintErrorf("Error starting application: %v", err)
 			os.Exit(1)
 		}
@@ -150,7 +150,7 @@ var jobCmd = &cobra.Command{
 		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
 
 		// Create a context with timeout for graceful shutdown
-		ctx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+		ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultShutdownTimeout)
 		defer func() {
 			cancel()
 			if err := app.Stop(ctx); err != nil {

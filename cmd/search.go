@@ -50,10 +50,6 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 		size = DefaultSearchSize
 	}
 
-	// Create a cancellable context for managing the application lifecycle
-	ctx, cancel := context.WithCancel(cmd.Context())
-	defer cancel()
-
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -80,16 +76,15 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 			),
 		),
 		fx.Invoke(func(p SearchParams) {
-			if startErr := executeSearch(ctx, p); startErr != nil {
+			if startErr := executeSearch(cmd.Context(), p); startErr != nil {
 				p.Logger.Error("Error executing search", "error", startErr)
-				cancel() // Cancel context to trigger shutdown
 			}
 			close(doneChan) // Signal completion
 		}),
 	)
 
 	// Start the application and handle any startup errors
-	if err := app.Start(ctx); err != nil {
+	if err := app.Start(cmd.Context()); err != nil {
 		return fmt.Errorf("error starting application: %w", err)
 	}
 
@@ -100,14 +95,14 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	select {
 	case sig := <-sigChan:
 		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-	case <-ctx.Done():
+	case <-cmd.Context().Done():
 		common.PrintInfof("\nContext cancelled, initiating shutdown...")
 	case <-doneChan:
 		common.PrintInfof("\nSearch completed, shutting down...")
 	}
 
 	// Create a context with timeout for graceful shutdown
-	stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
+	stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
 	defer stopCancel()
 
 	// Stop the application and handle any shutdown errors
