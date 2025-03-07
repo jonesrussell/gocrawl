@@ -102,17 +102,32 @@ func New(p Params) (Result, error) {
 	// Configure content processing
 	configureContentProcessing(c, contentParams)
 
+	// Create a channel to track completion
+	done := make(chan struct{})
+
 	// Add completion handler to ensure proper completion signaling
 	c.OnScraped(func(r *colly.Response) {
 		// Check if this is the last request
 		if r.Request.URL.String() == p.BaseURL {
 			p.Logger.Debug("Base URL scraped, crawl complete")
+			// Signal completion by closing the done channel
+			close(done)
 		}
 	})
 
 	// Add error handler to ensure we know about any failures
 	c.OnError(func(r *colly.Response, err error) {
 		p.Logger.Error("Request failed", "url", r.Request.URL, "error", err)
+	})
+
+	// Add request handler to track progress
+	c.OnRequest(func(r *colly.Request) {
+		p.Logger.Debug("Starting request", "url", r.URL)
+	})
+
+	// Add response handler to track completion
+	c.OnResponse(func(r *colly.Response) {
+		p.Logger.Debug("Received response", "url", r.Request.URL, "status", r.StatusCode)
 	})
 
 	p.Logger.Debug("Collector created",
@@ -122,5 +137,5 @@ func New(p Params) (Result, error) {
 		"parallelism", p.Parallelism,
 	)
 
-	return Result{Collector: c}, nil
+	return Result{Collector: c, Done: done}, nil
 }

@@ -36,11 +36,12 @@ type Params struct {
 	Source           *sources.Config
 }
 
-// Result holds the collector instance
+// Result holds the collector instance and completion channel
 type Result struct {
 	fx.Out
 
 	Collector *colly.Collector
+	Done      chan struct{} // Channel to signal when crawling is complete
 }
 
 // ValidateParams validates the collector parameters
