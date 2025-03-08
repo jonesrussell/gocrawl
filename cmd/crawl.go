@@ -255,8 +255,8 @@ func startCrawl(p CrawlParams) error {
 
 	// Set crawler configuration
 	p.CrawlerInstance.SetMaxDepth(source.MaxDepth)
-	if err := p.CrawlerInstance.SetRateLimit(source.RateLimit); err != nil {
-		return fmt.Errorf("error setting rate limit: %w", err)
+	if rateLimitErr := p.CrawlerInstance.SetRateLimit(source.RateLimit); rateLimitErr != nil {
+		return fmt.Errorf("error setting rate limit: %w", rateLimitErr)
 	}
 
 	return nil
