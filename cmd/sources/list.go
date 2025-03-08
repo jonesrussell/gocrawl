@@ -6,6 +6,7 @@ package sources
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -54,7 +55,7 @@ func listCommand() *cobra.Command {
 
 Example:
   gocrawl sources list`,
-		Run: runList,
+		RunE: runList,
 	}
 }
 
@@ -65,7 +66,7 @@ Example:
 // - Initializes the Fx application with required modules
 // - Handles application lifecycle and error cases
 // - Displays the sources list in a formatted table
-func runList(cmd *cobra.Command, _ []string) {
+func runList(cmd *cobra.Command, _ []string) error {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -102,8 +103,7 @@ func runList(cmd *cobra.Command, _ []string) {
 
 	// Start the application and handle any startup errors
 	if err := app.Start(cmd.Context()); err != nil {
-		common.PrintErrorf("Error starting application: %v", err)
-		os.Exit(1)
+		return fmt.Errorf("error starting application: %w", err)
 	}
 
 	// Wait for either:
@@ -130,12 +130,12 @@ func runList(cmd *cobra.Command, _ []string) {
 	// Stop the application and handle any shutdown errors
 	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
 		common.PrintErrorf("Error stopping application: %v", err)
-		os.Exit(1)
+		if listErr == nil {
+			listErr = err
+		}
 	}
 
-	if listErr != nil {
-		os.Exit(1)
-	}
+	return listErr
 }
 
 // executeList retrieves and displays the list of sources.

@@ -20,6 +20,11 @@ tasks:
     cmds:
       - go run main.go search -q "{{.CLI_ARGS}}" -i elliotlake_elliotlaketoday_articles
 
+  sources:list:
+    desc: "List all sources"
+    cmds:
+      - go run main.go sources list
+
   build:
     desc: "Build the web crawler executable"
     cmds:
