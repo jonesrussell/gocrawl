@@ -3,12 +3,9 @@
 package sources
 
 import (
-	"context"
 	"fmt"
 	"os"
 
-	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -64,10 +61,7 @@ type SelectorConfig struct {
 
 // Sources manages web content source configurations.
 type Sources struct {
-	Sources      []Config         `yaml:"sources"`
-	Logger       logger.Interface `yaml:"-"`
-	crawler      crawler.Interface
-	indexManager IndexManager
+	Sources []Config `yaml:"sources"`
 }
 
 // LoadFromFile loads source configurations from a YAML file.
@@ -111,38 +105,34 @@ func (s *Sources) FindByName(name string) (*Config, error) {
 	return nil, fmt.Errorf("no source found with name: %s", name)
 }
 
-// SetLogger sets the logger instance.
-// It assigns the provided logger interface to the sources instance.
+// Validate checks if a source configuration is valid.
+// It ensures all required fields are present and properly formatted.
 //
 // Parameters:
-//   - l: The logger interface to set
-func (s *Sources) SetLogger(l logger.Interface) {
-	s.Logger = l
-}
-
-// SetCrawler sets the crawler instance.
-func (s *Sources) SetCrawler(c crawler.Interface) {
-	s.crawler = c
-}
-
-// SetIndexManager sets the index manager instance.
-func (s *Sources) SetIndexManager(im IndexManager) {
-	s.indexManager = im
-}
-
-// Start begins crawling the specified source.
-func (s *Sources) Start(ctx context.Context, sourceName string) error {
-	source, err := s.FindByName(sourceName)
-	if err != nil {
-		return fmt.Errorf("failed to find source: %w", err)
+//   - source: The source configuration to validate
+//
+// Returns:
+//   - error: Any validation errors found
+func (s *Sources) Validate(source *Config) error {
+	if source == nil {
+		return fmt.Errorf("source configuration is nil")
 	}
-	return s.crawler.Start(ctx, source.URL)
-}
 
-// Stop gracefully stops all crawling operations.
-func (s *Sources) Stop(ctx context.Context) error {
-	if s.crawler != nil {
-		return s.crawler.Stop(ctx)
+	if source.Name == "" {
+		return fmt.Errorf("source name is required")
 	}
+
+	if source.URL == "" {
+		return fmt.Errorf("source URL is required")
+	}
+
+	if source.RateLimit == "" {
+		return fmt.Errorf("rate limit is required")
+	}
+
+	if source.MaxDepth <= 0 {
+		return fmt.Errorf("max depth must be greater than 0")
+	}
+
 	return nil
 }

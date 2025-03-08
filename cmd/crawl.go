@@ -253,16 +253,11 @@ func startCrawl(p CrawlParams) error {
 	// Set the collector in the crawler instance
 	p.CrawlerInstance.SetCollector(collectorResult.Collector)
 
-	// Create an adapter for the IndexManager and set it in the Sources struct
-	indexManagerAdapter := sources.NewIndexManagerAdapter(p.CrawlerInstance.GetIndexManager())
-	p.Sources.SetIndexManager(indexManagerAdapter)
-
-	// Configure the sources with crawler - do this last after everything is set up
-	p.Sources.SetCrawler(p.CrawlerInstance)
-
-	// Configure lifecycle hooks for crawl management
-	errChan := make(chan error, 1)
-	configureCrawlLifecycle(p.Lifecycle, p, errChan)
+	// Set crawler configuration
+	p.CrawlerInstance.SetMaxDepth(source.MaxDepth)
+	if err := p.CrawlerInstance.SetRateLimit(source.RateLimit); err != nil {
+		return fmt.Errorf("error setting rate limit: %w", err)
+	}
 
 	return nil
 }
@@ -322,10 +317,16 @@ func convertSourceConfig(source *sources.Config) *config.Source {
 func configureCrawlLifecycle(lc fx.Lifecycle, p CrawlParams, errChan chan error) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
+			// Get source URL for crawling
+			source, findErr := p.Sources.FindByName(sourceName)
+			if findErr != nil {
+				return fmt.Errorf("error finding source: %w", findErr)
+			}
+
 			// Start the crawl in a goroutine to not block
 			go func() {
 				p.Logger.Info("Starting crawl", "source", sourceName)
-				if startErr := p.Sources.Start(ctx, sourceName); startErr != nil {
+				if startErr := p.CrawlerInstance.Start(ctx, source.URL); startErr != nil {
 					if !errors.Is(startErr, context.Canceled) {
 						p.Logger.Error("Crawl failed", "error", startErr)
 						errChan <- startErr
@@ -352,11 +353,15 @@ func configureCrawlLifecycle(lc fx.Lifecycle, p CrawlParams, errChan chan error)
 				return ctx.Err()
 			case <-p.Done:
 				p.Logger.Info("Crawl completed, stopping gracefully")
-				p.Sources.Stop()
+				if stopErr := p.CrawlerInstance.Stop(ctx); stopErr != nil {
+					p.Logger.Error("Error stopping crawler", "error", stopErr)
+				}
 				return nil
 			default:
 				p.Logger.Info("Forcing crawler to stop")
-				p.Sources.Stop()
+				if stopErr := p.CrawlerInstance.Stop(ctx); stopErr != nil {
+					p.Logger.Error("Error stopping crawler", "error", stopErr)
+				}
 				return nil
 			}
 		},
