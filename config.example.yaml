@@ -1,18 +1,34 @@
-APP_NAME: gocrawl
-APP_ENV: development
-APP_DEBUG: true
+app:
+  environment: development
+  name: gocrawl
+  version: 0.1.0
+  debug: true
 
 # Log level for the application. Options: debug, info, warn, error, fatal, panic
-LOG_LEVEL: debug
+log:
+  level: debug
+  debug: true
 
-ELASTIC_URL: https://localhost:9200
-ELASTIC_USERNAME: <your-username>
-ELASTIC_PASSWORD: <your-password>
-ELASTIC_API_KEY: <your-api-key>
+elasticsearch:
+  addresses:
+    - "https://localhost:9200"
+  username: "<your-username>"
+  password: "<your-password>"
+  api_key: "<your-api-key>"
+  tls:
+    enabled: true
+    skip_verify: true  # For development only - set to false in production
+    certificate: ""    # Optional: path to client certificate
+    key: ""           # Optional: path to client key
+    ca: ""           # Optional: path to CA certificate
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 30s
+    max_retries: 3
 
-ELASTIC_SKIP_TLS: true
-
-CRAWLER_MAX_DEPTH: 2
-CRAWLER_RATE_LIMIT: 2s
-CRAWLER_PARALLELISM: 2
-CRAWLER_RANDOM_DELAY: 5s
+crawler:
+  max_depth: 2          # How deep to traverse from the starting URL
+  rate_limit: 2s        # Delay between requests
+  parallelism: 2        # Number of concurrent crawlers
+  random_delay: 5s      # Additional random delay between requests
