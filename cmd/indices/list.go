@@ -78,13 +78,13 @@ func runList(cmd *cobra.Command, _ []string) {
 	// Set up context with timeout for graceful shutdown
 	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
 	defer func() {
-		cancel()
 		if err := app.Stop(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			if logger != nil {
 				logger.Error("Error stopping application", "error", err)
 				exitCode = 1
 			}
 		}
+		cancel()
 		if exitCode != 0 {
 			os.Exit(exitCode)
 		}
