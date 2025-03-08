@@ -1,13 +1,11 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 )
 
@@ -23,8 +21,14 @@ type SearchRequest struct {
 	Size  int    `json:"size"`
 }
 
+// SearchResponse represents the structure of the search response
+type SearchResponse struct {
+	Results []interface{} `json:"results"`
+	Total   int           `json:"total"`
+}
+
 // StartHTTPServer starts the HTTP server for search requests
-func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceInterface) (*http.Server, error) {
+func StartHTTPServer(log logger.Interface, searchManager SearchManager) (*http.Server, error) {
 	log.Info("StartHTTPServer function called")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
@@ -41,22 +45,44 @@ func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceIn
 			return
 		}
 
-		// Use the search service to perform the search
-		articles, err := searchService.SearchArticles(context.Background(), req.Query, req.Size)
+		// Build the search query
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"match": map[string]interface{}{
+					"content": req.Query,
+				},
+			},
+			"size": req.Size,
+		}
+
+		// Use the search manager to perform the search
+		results, err := searchManager.Search(r.Context(), req.Index, query)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
-		if err = json.NewEncoder(w).Encode(articles); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		// Get the total count
+		total, err := searchManager.Count(r.Context(), req.Index, query)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Prepare and send the response
+		response := SearchResponse{
+			Results: results,
+			Total:   int(total),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err = json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	})
 
 	server := &http.Server{
-		Addr:              ":8081",
 		Handler:           mux,
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
@@ -64,8 +90,8 @@ func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceIn
 	return server, nil
 }
 
-// Module is the Fx module for the API
-var Module = fx.Options(
+// Module provides API dependencies
+var Module = fx.Module("api",
 	fx.Provide(
 		StartHTTPServer,
 	),

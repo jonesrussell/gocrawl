@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
@@ -97,12 +98,32 @@ func New() (*Config, error) {
 			Parallelism:      viper.GetInt("CRAWLER_PARALLELISM"),
 		},
 		Elasticsearch: ElasticsearchConfig{
-			URL:       viper.GetString(ElasticURLKey),
+			Addresses: []string{viper.GetString(ElasticURLKey)},
 			Username:  viper.GetString(ElasticUsernameKey),
 			Password:  viper.GetString(ElasticPasswordKey),
 			APIKey:    viper.GetString(ElasticAPIKeyKey),
 			IndexName: viper.GetString(ElasticIndexNameKey),
-			SkipTLS:   viper.GetBool(ElasticSkipTLSKey),
+			TLS: struct {
+				Enabled     bool   `yaml:"enabled"`
+				SkipVerify  bool   `yaml:"skip_verify"`
+				Certificate string `yaml:"certificate"`
+				Key         string `yaml:"key"`
+				CA          string `yaml:"ca"`
+			}{
+				Enabled:    true,
+				SkipVerify: viper.GetBool(ElasticSkipTLSKey),
+			},
+			Retry: struct {
+				Enabled     bool          `yaml:"enabled"`
+				InitialWait time.Duration `yaml:"initial_wait"`
+				MaxWait     time.Duration `yaml:"max_wait"`
+				MaxRetries  int           `yaml:"max_retries"`
+			}{
+				Enabled:     true,
+				InitialWait: time.Second,
+				MaxWait:     time.Second * 30,
+				MaxRetries:  3,
+			},
 		},
 		Log: LogConfig{
 			Level: viper.GetString(LogLevelKey),

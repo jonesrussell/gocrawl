@@ -125,11 +125,10 @@ func (c *CrawlerConfig) SetIndexName(index string) {
 	viper.Set(ElasticIndexNameKey, index)
 }
 
-// ElasticsearchConfig holds Elasticsearch-specific configuration settings.
-// It defines how to connect to and interact with Elasticsearch.
+// ElasticsearchConfig contains Elasticsearch connection and configuration settings.
 type ElasticsearchConfig struct {
-	// URL is the Elasticsearch server URL
-	URL string `yaml:"url"`
+	// Addresses is a list of Elasticsearch node addresses
+	Addresses []string `yaml:"addresses"`
 	// Username for Elasticsearch authentication
 	Username string `yaml:"username"`
 	// Password for Elasticsearch authentication
@@ -138,8 +137,37 @@ type ElasticsearchConfig struct {
 	APIKey string `yaml:"api_key"`
 	// IndexName is the default index for storing data
 	IndexName string `yaml:"index_name"`
-	// SkipTLS determines whether to skip TLS verification
-	SkipTLS bool `yaml:"skip_tls"`
+	// Cloud configuration for Elastic Cloud
+	Cloud struct {
+		// ID is the Elastic Cloud deployment ID
+		ID string `yaml:"id"`
+		// APIKey is the Elastic Cloud API key
+		APIKey string `yaml:"api_key"`
+	} `yaml:"cloud"`
+	// TLS configuration
+	TLS struct {
+		// Enabled indicates whether to use TLS
+		Enabled bool `yaml:"enabled"`
+		// SkipVerify indicates whether to skip TLS certificate verification
+		SkipVerify bool `yaml:"skip_verify"`
+		// Certificate is the path to the client certificate
+		Certificate string `yaml:"certificate"`
+		// Key is the path to the client key
+		Key string `yaml:"key"`
+		// CA is the path to the CA certificate
+		CA string `yaml:"ca"`
+	} `yaml:"tls"`
+	// Retry configuration
+	Retry struct {
+		// Enabled indicates whether to enable retries
+		Enabled bool `yaml:"enabled"`
+		// InitialWait is the initial wait time between retries
+		InitialWait time.Duration `yaml:"initial_wait"`
+		// MaxWait is the maximum wait time between retries
+		MaxWait time.Duration `yaml:"max_wait"`
+		// MaxRetries is the maximum number of retries
+		MaxRetries int `yaml:"max_retries"`
+	} `yaml:"retry"`
 }
 
 // LogConfig holds logging-related configuration settings.
@@ -214,16 +242,9 @@ func parseRateLimit(rateLimitStr string) (time.Duration, error) {
 	return rateLimit, nil
 }
 
-// ValidateConfig validates the configuration values.
-// It checks that all required fields are present and have valid values.
-//
-// Parameters:
-//   - cfg: The configuration to validate
-//
-// Returns:
-//   - error: Any validation errors that occurred
+// ValidateConfig validates the configuration.
 func ValidateConfig(cfg *Config) error {
-	if cfg.Elasticsearch.URL == "" {
+	if len(cfg.Elasticsearch.Addresses) == 0 {
 		return ErrMissingElasticURL
 	}
 	if cfg.Crawler.Parallelism < 1 {

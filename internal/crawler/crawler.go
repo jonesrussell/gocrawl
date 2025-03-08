@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -45,8 +46,8 @@ type Crawler struct {
 	articleChan chan *models.Article
 	// ArticleService handles article-specific operations
 	ArticleService article.Interface
-	// IndexService manages index operations
-	IndexService storage.IndexServiceInterface
+	// IndexManager manages index operations
+	IndexManager api.IndexManager
 	// Config holds the crawler configuration
 	Config *config.Config
 	// ContentProcessor handles content processing
@@ -74,7 +75,26 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 	}
 
 	// Ensure article index exists with default mapping
-	if err := c.IndexService.EnsureIndex(ctx, c.IndexName); err != nil {
+	mapping := map[string]interface{}{
+		"mappings": map[string]interface{}{
+			"properties": map[string]interface{}{
+				"title": map[string]interface{}{
+					"type": "text",
+				},
+				"content": map[string]interface{}{
+					"type": "text",
+				},
+				"url": map[string]interface{}{
+					"type": "keyword",
+				},
+				"created_at": map[string]interface{}{
+					"type": "date",
+				},
+			},
+		},
+	}
+
+	if err := c.IndexManager.EnsureIndex(ctx, c.IndexName, mapping); err != nil {
 		c.Logger.Error("Failed to ensure article index exists", "error", err)
 		return fmt.Errorf("failed to ensure article index exists: %w", err)
 	}
@@ -131,8 +151,7 @@ func (c *Crawler) GetBaseURL() string {
 	return c.Config.Crawler.BaseURL
 }
 
-// GetIndexManager returns the index service interface.
-// This is used for index management operations.
-func (c *Crawler) GetIndexManager() storage.IndexServiceInterface {
-	return c.IndexService
+// GetIndexManager returns the index manager interface
+func (c *Crawler) GetIndexManager() api.IndexManager {
+	return c.IndexManager
 }

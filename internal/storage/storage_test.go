@@ -26,8 +26,8 @@ func setupTestStorage(t *testing.T) (*storage.MockTransport, storage.Interface, 
 	require.NoError(t, err)
 
 	result := storage.NewElasticsearchStorage(client, mockLogger, storage.DefaultOptions())
-	require.NotNil(t, result.Storage)
-	return mockTransport, result.Storage, mockLogger
+	require.NotNil(t, result)
+	return mockTransport, result, mockLogger
 }
 
 func TestElasticsearchStorage_IndexDocument(t *testing.T) {
@@ -202,7 +202,7 @@ func TestElasticsearchStorage_SearchArticles(t *testing.T) {
 				mockLogger.On("Info", "Search completed", "query", tt.query, "results", int64(1)).Return()
 			}
 
-			articles, err := store.Search(t.Context(), tt.query, tt.size)
+			articles, err := store.SearchArticles(t.Context(), tt.query, tt.size)
 			if tt.expectError {
 				require.Error(t, err)
 				require.Nil(t, articles)

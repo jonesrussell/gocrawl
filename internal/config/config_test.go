@@ -13,30 +13,46 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("config")     // Name of the file without extension
-	viper.AddConfigPath("./testdata") // Path to the testdata directory
+	tests := []struct {
+		name     string
+		setup    func()
+		validate func(*testing.T, *config.Config, error)
+	}{
+		{
+			name: "valid configuration",
+			setup: func() {
+				viper.SetConfigType("yaml")
+				viper.SetConfigName("config")
+				viper.AddConfigPath("./testdata")
+				require.NoError(t, viper.ReadInConfig())
+			},
+			validate: func(t *testing.T, cfg *config.Config, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, cfg)
+				require.Equal(t, "test", cfg.App.Environment)
+				require.Equal(t, "debug", cfg.Log.Level)
+				require.True(t, cfg.Log.Debug)
+				require.Equal(t, "http://test.example.com", cfg.Crawler.BaseURL)
+				require.Equal(t, 5, cfg.Crawler.MaxDepth)
+				require.Equal(t, 2*time.Second, cfg.Crawler.RateLimit)
+				require.Equal(t, 2, cfg.Crawler.Parallelism)
+				require.Equal(t, []string{"http://localhost:9200"}, cfg.Elasticsearch.Addresses)
+				require.Equal(t, "test_user", cfg.Elasticsearch.Username)
+				require.Equal(t, "test_pass", cfg.Elasticsearch.Password)
+				require.Equal(t, "test_apikey", cfg.Elasticsearch.APIKey)
+				require.Equal(t, "test_index", cfg.Elasticsearch.IndexName)
+				require.True(t, cfg.Elasticsearch.TLS.SkipVerify)
+			},
+		},
+	}
 
-	err := viper.ReadInConfig()
-	require.NoError(t, err)
-
-	cfg, err := config.New()
-
-	require.NoError(t, err)
-	require.NotNil(t, cfg)
-	require.Equal(t, "test", cfg.App.Environment)
-	require.Equal(t, "debug", cfg.Log.Level)
-	require.True(t, cfg.Log.Debug)
-	require.Equal(t, "http://test.example.com", cfg.Crawler.BaseURL)
-	require.Equal(t, 5, cfg.Crawler.MaxDepth)
-	require.Equal(t, 2*time.Second, cfg.Crawler.RateLimit)
-	require.Equal(t, 2, cfg.Crawler.Parallelism)
-	require.Equal(t, "http://localhost:9200", cfg.Elasticsearch.URL)
-	require.Equal(t, "test_user", cfg.Elasticsearch.Username)
-	require.Equal(t, "test_pass", cfg.Elasticsearch.Password)
-	require.Equal(t, "test_apikey", cfg.Elasticsearch.APIKey)
-	require.Equal(t, "test_index", cfg.Elasticsearch.IndexName)
-	require.False(t, cfg.Elasticsearch.SkipTLS)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			cfg, err := config.New()
+			tt.validate(t, cfg, err)
+		})
+	}
 }
 
 func TestParseRateLimit(t *testing.T) {
@@ -95,7 +111,7 @@ func TestValidateConfig(t *testing.T) {
 			name: "valid config",
 			config: &config.Config{
 				Elasticsearch: config.ElasticsearchConfig{
-					URL: "http://localhost:9200",
+					Addresses: []string{"http://localhost:9200"},
 				},
 				Crawler: config.CrawlerConfig{
 					Parallelism: 2,
@@ -107,7 +123,7 @@ func TestValidateConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "missing elastic URL",
+			name: "missing elastic addresses",
 			config: &config.Config{
 				Elasticsearch: config.ElasticsearchConfig{},
 			},
@@ -117,7 +133,7 @@ func TestValidateConfig(t *testing.T) {
 			name: "invalid parallelism",
 			config: &config.Config{
 				Elasticsearch: config.ElasticsearchConfig{
-					URL: "http://localhost:9200",
+					Addresses: []string{"http://localhost:9200"},
 				},
 				Crawler: config.CrawlerConfig{
 					Parallelism: 0,
@@ -129,7 +145,7 @@ func TestValidateConfig(t *testing.T) {
 			name: "negative max depth",
 			config: &config.Config{
 				Elasticsearch: config.ElasticsearchConfig{
-					URL: "http://localhost:9200",
+					Addresses: []string{"http://localhost:9200"},
 				},
 				Crawler: config.CrawlerConfig{
 					MaxDepth: -1,
@@ -141,7 +157,7 @@ func TestValidateConfig(t *testing.T) {
 			name: "negative rate limit",
 			config: &config.Config{
 				Elasticsearch: config.ElasticsearchConfig{
-					URL: "http://localhost:9200",
+					Addresses: []string{"http://localhost:9200"},
 				},
 				Crawler: config.CrawlerConfig{
 					RateLimit: -time.Second,
@@ -153,7 +169,7 @@ func TestValidateConfig(t *testing.T) {
 			name: "negative random delay",
 			config: &config.Config{
 				Elasticsearch: config.ElasticsearchConfig{
-					URL: "http://localhost:9200",
+					Addresses: []string{"http://localhost:9200"},
 				},
 				Crawler: config.CrawlerConfig{
 					RandomDelay: -time.Second,

@@ -34,22 +34,24 @@ func NewOptionsFromConfig(cfg *config.Config) Options {
 	opts := DefaultOptions()
 
 	// Create transport with TLS config if needed
-	if cfg.Elasticsearch.SkipTLS {
+	if cfg.Elasticsearch.TLS.SkipVerify {
 		opts.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				//nolint:gosec // We are using the SkipTLS setting from the config
+				//nolint:gosec // We are using the SkipVerify setting from the config
 				InsecureSkipVerify: true,
 			},
 		}
 	}
 
 	// Set values from config
-	opts.URL = cfg.Elasticsearch.URL
+	if len(cfg.Elasticsearch.Addresses) > 0 {
+		opts.URL = cfg.Elasticsearch.Addresses[0]
+	}
 	opts.Username = cfg.Elasticsearch.Username
 	opts.Password = cfg.Elasticsearch.Password
 	opts.APIKey = cfg.Elasticsearch.APIKey
 	opts.IndexName = cfg.Elasticsearch.IndexName
-	opts.SkipTLS = cfg.Elasticsearch.SkipTLS
+	opts.SkipTLS = cfg.Elasticsearch.TLS.SkipVerify
 
 	return opts
 }

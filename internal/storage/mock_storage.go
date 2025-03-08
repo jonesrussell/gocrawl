@@ -60,12 +60,12 @@ func (m *MockStorage) BulkIndex(ctx context.Context, index string, documents []i
 }
 
 // Search implements Storage
-func (m *MockStorage) Search(ctx context.Context, query string, size int) ([]Article, error) {
+func (m *MockStorage) Search(ctx context.Context, query string, size int) ([]models.Article, error) {
 	args := m.Called(ctx, query, size)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	result, ok := args.Get(0).([]Article)
+	result, ok := args.Get(0).([]models.Article)
 	if !ok {
 		return nil, ErrMockTypeAssertion
 	}
@@ -116,13 +116,13 @@ func (m *MockStorage) ScrollSearch(
 	return result, args.Error(1)
 }
 
-// BulkIndexArticles implements Storage
+// BulkIndexArticles implements Interface
 func (m *MockStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
 	args := m.Called(ctx, articles)
 	return args.Error(0)
 }
 
-// SearchArticles implements Storage
+// SearchArticles implements Interface
 func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
 	args := m.Called(ctx, query, size)
 	var articles []*models.Article
@@ -139,7 +139,7 @@ func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int
 	return articles, args.Error(1)
 }
 
-// IndexExists implements Storage
+// IndexExists implements Interface
 func (m *MockStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
 	args := m.Called(ctx, indexName)
 	return args.Bool(0), args.Error(1)

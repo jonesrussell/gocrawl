@@ -14,7 +14,7 @@ import (
 // Initialize testConfig
 var testConfig = &config.Config{
 	Elasticsearch: config.ElasticsearchConfig{
-		URL: "http://localhost:9200", // or use a test URL
+		Addresses: []string{"http://localhost:9200"}, // or use a test URL
 	},
 	Crawler: config.CrawlerConfig{},
 }

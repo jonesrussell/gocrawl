@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -57,13 +58,13 @@ func TestCrawler_Start(t *testing.T) {
 	tests := []struct {
 		name      string
 		baseURL   string
-		setupMock func(*storage.MockStorage, *logger.MockLogger, *storage.MockIndexService, *colly.Collector)
+		setupMock func(*storage.MockStorage, *logger.MockLogger, *api.MockIndexManager, *colly.Collector)
 		wantErr   bool
 	}{
 		{
 			name:    "empty base URL",
 			baseURL: "",
-			setupMock: func(_ *storage.MockStorage, _ *logger.MockLogger, _ *storage.MockIndexService, _ *colly.Collector) {
+			setupMock: func(_ *storage.MockStorage, _ *logger.MockLogger, _ *api.MockIndexManager, _ *colly.Collector) {
 				// No setup needed for empty URL test
 			},
 			wantErr: true,
@@ -71,7 +72,7 @@ func TestCrawler_Start(t *testing.T) {
 		{
 			name:    "storage ping failure",
 			baseURL: "http://example.com",
-			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, _ *storage.MockIndexService, _ *colly.Collector) {
+			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, _ *api.MockIndexManager, _ *colly.Collector) {
 				ms.On("Ping", mock.Anything).Return(errors.New("ping failed"))
 				ml.On("Debug", mock.Anything, mock.Anything, mock.Anything).Return()
 				ml.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
@@ -81,22 +82,22 @@ func TestCrawler_Start(t *testing.T) {
 		{
 			name:    "index ensure failure",
 			baseURL: "http://example.com",
-			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mis *storage.MockIndexService, _ *colly.Collector) {
+			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mim *api.MockIndexManager, _ *colly.Collector) {
 				ms.On("Ping", mock.Anything).Return(nil)
 				ml.On("Debug", mock.Anything, mock.Anything, mock.Anything).Return()
 				ml.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
-				mis.On("EnsureIndex", mock.Anything, mock.Anything).Return(errors.New("index creation failed"))
+				mim.On("EnsureIndex", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("index creation failed"))
 			},
 			wantErr: true,
 		},
 		{
 			name:    "successful start",
 			baseURL: "http://example.com",
-			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mis *storage.MockIndexService, _ *colly.Collector) {
+			setupMock: func(ms *storage.MockStorage, ml *logger.MockLogger, mim *api.MockIndexManager, _ *colly.Collector) {
 				ms.On("Ping", mock.Anything).Return(nil)
 				ml.On("Debug", mock.Anything, mock.Anything, mock.Anything).Return()
 				ml.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
-				mis.On("EnsureIndex", mock.Anything, mock.Anything).Return(nil)
+				mim.On("EnsureIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			},
 			wantErr: false,
 		},
@@ -106,15 +107,15 @@ func TestCrawler_Start(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockStorage := storage.NewMockStorage()
 			mockLogger := logger.NewMockLogger()
-			mockIndexService := &storage.MockIndexService{}
+			mockIndexManager := api.NewMockIndexManager()
 			collector := colly.NewCollector()
 
-			tt.setupMock(mockStorage, mockLogger, mockIndexService, collector)
+			tt.setupMock(mockStorage, mockLogger, mockIndexManager, collector)
 
 			c := &crawler.Crawler{
 				Storage:      mockStorage,
 				Logger:       mockLogger,
-				IndexService: mockIndexService,
+				IndexManager: mockIndexManager,
 				Config:       &config.Config{},
 				Collector:    collector,
 			}
@@ -135,17 +136,17 @@ func TestCrawler_Start(t *testing.T) {
 func TestCrawler_Start_ContextCancellation(t *testing.T) {
 	mockStorage := storage.NewMockStorage()
 	mockLogger := logger.NewMockLogger()
-	mockIndexService := &storage.MockIndexService{}
+	mockIndexManager := api.NewMockIndexManager()
 
 	mockStorage.On("Ping", mock.Anything).Return(nil)
 	mockLogger.On("Debug", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockIndexService.On("EnsureIndex", mock.Anything, mock.Anything).Return(nil)
+	mockIndexManager.On("EnsureIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	c := &crawler.Crawler{
 		Storage:      mockStorage,
 		Logger:       mockLogger,
-		IndexService: mockIndexService,
+		IndexManager: mockIndexManager,
 		Config:       &config.Config{},
 		Collector:    colly.NewCollector(),
 	}

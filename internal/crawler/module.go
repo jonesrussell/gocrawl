@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -32,8 +33,8 @@ type Interface interface {
 	SetService(service article.Interface)
 	// GetBaseURL returns the base URL from the configuration.
 	GetBaseURL() string
-	// GetIndexManager returns the index service interface.
-	GetIndexManager() storage.IndexServiceInterface
+	// GetIndexManager returns the index manager interface.
+	GetIndexManager() api.IndexManager
 }
 
 // provideCollyDebugger creates a new CollyDebugger instance for debugging collector operations.
@@ -57,8 +58,8 @@ type Params struct {
 	Config *config.Config
 	// Source is the name of the source being crawled
 	Source string `name:"sourceName"`
-	// IndexService manages index operations
-	IndexService storage.IndexServiceInterface
+	// IndexManager manages index operations
+	IndexManager api.IndexManager
 	// ContentProcessor handles content processing operations
 	ContentProcessor []models.ContentProcessor `group:"processors"`
 }
@@ -82,57 +83,50 @@ var Module = fx.Module("crawler",
 	),
 )
 
-// ProvideCrawler creates a new Crawler instance with all required dependencies.
-// It validates the dependencies and initializes the crawler with the provided configuration.
+// ProvideCrawler creates a new crawler instance with all required dependencies.
 func ProvideCrawler(p Params) (Interface, error) {
 	if p.Logger == nil {
 		return nil, errors.New("logger is required")
-	}
-
-	if p.Config == nil {
-		return nil, errors.New("config is required")
 	}
 
 	if p.Storage == nil {
 		return nil, errors.New("storage is required")
 	}
 
-	if p.IndexService == nil {
-		return nil, errors.New("index service is required")
+	if p.Config == nil {
+		return nil, errors.New("config is required")
+	}
+
+	if p.IndexManager == nil {
+		return nil, errors.New("index manager is required")
 	}
 
 	if len(p.ContentProcessor) == 0 {
 		return nil, errors.New("at least one content processor is required")
 	}
 
-	// Log the entire configuration to ensure it's set correctly
-	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
-
-	// Create a new collector with the configuration
+	// Create a new collector with the provided configuration
 	collector, err := NewCollector(p.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create collector: %w", err)
 	}
 
-	// Create a new crawler instance
-	crawler := &Crawler{
-		Storage:     p.Storage,
-		Logger:      p.Logger,
-		Debugger:    p.Debugger,
-		IndexName:   p.Config.Crawler.IndexName,
-		articleChan: make(chan *models.Article, DefaultBatchSize),
-		ArticleService: article.NewServiceWithConfig(article.ServiceParams{
-			Logger: p.Logger,
-			Config: p.Config,
-			Source: p.Source,
-		}),
-		IndexService:     p.IndexService,
+	// Create a new article service with default selectors
+	articleService := article.NewService(p.Logger, config.DefaultArticleSelectors())
+
+	// Create and return the crawler
+	return &Crawler{
+		Storage:          p.Storage,
+		Collector:        collector,
+		Logger:           p.Logger,
+		Debugger:         p.Debugger,
+		IndexName:        p.Config.Elasticsearch.IndexName,
+		articleChan:      make(chan *models.Article, 100),
+		ArticleService:   articleService,
+		IndexManager:     p.IndexManager,
 		Config:           p.Config,
 		ContentProcessor: p.ContentProcessor[0], // Use the first processor
-		Collector:        collector,
-	}
-
-	return crawler, nil
+	}, nil
 }
 
 const (
@@ -162,33 +156,25 @@ func NewCollector(cfg *config.Config) (*colly.Collector, error) {
 	return c, nil
 }
 
-// New creates a new crawler instance with all required dependencies.
-// It initializes the crawler with the provided configuration and services.
+// New creates a new crawler instance with the provided dependencies.
 func New(
 	storage storage.Interface,
 	collector *colly.Collector,
 	logger logger.Interface,
+	debugger *logger.CollyDebugger,
 	articleService article.Interface,
-	indexService storage.IndexServiceInterface,
+	indexManager api.IndexManager,
 	cfg *config.Config,
 ) Interface {
-	// Create a new crawler instance
-	c := &Crawler{
+	return &Crawler{
 		Storage:        storage,
 		Collector:      collector,
 		Logger:         logger,
+		Debugger:       debugger,
 		IndexName:      cfg.Elasticsearch.IndexName,
-		articleChan:    make(chan *models.Article, DefaultBatchSize),
+		articleChan:    make(chan *models.Article, 100),
 		ArticleService: articleService,
-		IndexService:   indexService,
+		IndexManager:   indexManager,
 		Config:         cfg,
 	}
-
-	// Set up the debugger if debug mode is enabled
-	if cfg.Log.Debug {
-		c.Debugger = provideCollyDebugger(logger)
-		c.Collector.SetDebugger(c.Debugger)
-	}
-
-	return c
 }

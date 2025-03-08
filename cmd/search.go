@@ -13,8 +13,9 @@ import (
 	"syscall"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/search"
+	"github.com/jonesrussell/gocrawl/internal/indexing"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -50,14 +51,20 @@ type SearchParams struct {
 	Logger common.Logger
 	// Config holds the application configuration
 	Config common.Config
-	// SearchSvc is the service responsible for executing searches
-	SearchSvc *search.Service
+	// SearchManager is the service responsible for executing searches
+	SearchManager api.SearchManager
 	// IndexName specifies which Elasticsearch index to search
 	IndexName string `name:"indexName"`
 	// Query contains the search query string
 	Query string `name:"query"`
 	// ResultSize determines how many results to return
 	ResultSize int `name:"resultSize"`
+}
+
+// Result represents a search result
+type Result struct {
+	URL     string
+	Content string
 }
 
 // searchCmd represents the search command that allows users to search content
@@ -99,7 +106,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	// Initialize the Fx application with required modules and dependencies
 	app := fx.New(
 		common.Module,
-		search.Module,
+		indexing.Module,
 		fx.Provide(
 			// Provide search parameters with appropriate tags for dependency injection
 			fx.Annotate(
@@ -170,65 +177,73 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	return searchErr
 }
 
-// executeSearch performs the actual search operation using the provided parameters.
-// It:
-// - Logs the start of the search operation
-// - Executes the search using the search service
-// - Handles and logs any errors
-// - Displays the search results in a formatted table
-func executeSearch(ctx context.Context, p SearchParams) error {
-	// Log the start of the search operation with parameters
-	p.Logger.Info("Starting search...",
-		"query", p.Query,
-		"index", p.IndexName,
-		"size", p.ResultSize,
-	)
-
-	// Execute the search and handle any errors
-	results, err := p.SearchSvc.SearchContent(ctx, p.Query, p.IndexName, p.ResultSize)
-	if err != nil {
-		p.Logger.Error("Search failed", "error", err)
-		return fmt.Errorf("search failed: %w", err)
+// buildSearchQuery constructs the Elasticsearch query from the search parameters
+func buildSearchQuery(size int, query string) map[string]interface{} {
+	return map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"content": query,
+			},
+		},
+		"size": size,
 	}
+}
 
-	// Log completion with result count
-	p.Logger.Info("Search completed",
-		"query", p.Query,
-		"results", len(results),
-	)
+// processSearchResults converts raw Elasticsearch results into Result structs
+func processSearchResults(rawResults []interface{}, logger common.Logger) []Result {
+	results := make([]Result, 0, len(rawResults))
+	for _, raw := range rawResults {
+		hit, ok := raw.(map[string]interface{})
+		if !ok {
+			logger.Error("Invalid hit format", "hit", raw)
+			continue
+		}
 
-	// Handle empty results
-	if len(results) == 0 {
-		common.PrintInfof("No results found for query: %s", p.Query)
-		return nil
+		source, ok := hit["_source"].(map[string]interface{})
+		if !ok {
+			logger.Error("Invalid source format", "source", hit["_source"])
+			continue
+		}
+
+		url, _ := source["url"].(string)
+		content, _ := source["content"].(string)
+
+		results = append(results, Result{
+			URL:     url,
+			Content: content,
+		})
 	}
+	return results
+}
 
-	// Create and configure the table
+// configureResultsTable sets up the table writer with appropriate styling and columns
+func configureResultsTable() table.Writer {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.SetStyle(table.StyleRounded)
 	t.Style().Options.DrawBorder = true
 	t.Style().Options.SeparateRows = true
 
-	// Configure column widths
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: columnNumberIndex, WidthMax: columnWidthIndex},
 		{Number: columnNumberURL, WidthMax: DefaultTableWidth / columnWidthURLRatio},
 		{Number: columnNumberContent, WidthMax: DefaultTableWidth * 2 / columnWidthContentRatio},
 	})
 
-	// Set up the headers
 	t.AppendHeader(table.Row{"#", "URL", "Content Preview"})
+	return t
+}
 
-	// Add each result as a row
+// renderSearchResults formats and displays the search results in a table
+func renderSearchResults(results []Result, query string) {
+	t := configureResultsTable()
+
 	for i, result := range results {
-		// Clean and format the content preview
 		content := strings.TrimSpace(result.Content)
 		content = strings.ReplaceAll(content, "\n", " ")
 		content = strings.Join(strings.Fields(content), " ")
 		contentPreview := truncateString(content, DefaultContentPreviewLength)
 
-		// Clean and format the URL
 		url := strings.TrimSpace(result.URL)
 		if url == "" {
 			url = "N/A"
@@ -241,17 +256,40 @@ func executeSearch(ctx context.Context, p SearchParams) error {
 		})
 	}
 
-	// Add a footer with summary information
-	t.AppendFooter(table.Row{"Total", len(results), fmt.Sprintf("Query: %s", p.Query)})
+	t.AppendFooter(table.Row{"Total", len(results), fmt.Sprintf("Query: %s", query)})
 
-	// Print a header
 	common.PrintInfof("\nSearch Results:")
-	// Render the table
 	t.Render()
+}
 
-	// Print success message
-	common.PrintInfof("\nSearch completed successfully with %d results.", len(results))
+// executeSearch performs the actual search operation using the provided parameters.
+func executeSearch(ctx context.Context, p SearchParams) error {
+	p.Logger.Info("Starting search...",
+		"query", p.Query,
+		"index", p.IndexName,
+		"size", p.ResultSize,
+	)
 
+	query := buildSearchQuery(p.ResultSize, p.Query)
+	rawResults, err := p.SearchManager.Search(ctx, p.IndexName, query)
+	if err != nil {
+		p.Logger.Error("Search failed", "error", err)
+		return fmt.Errorf("search failed: %w", err)
+	}
+
+	results := processSearchResults(rawResults, p.Logger)
+
+	p.Logger.Info("Search completed",
+		"query", p.Query,
+		"results", len(results),
+	)
+
+	if len(results) == 0 {
+		common.PrintInfof("No results found for query: %s", p.Query)
+		return nil
+	}
+
+	renderSearchResults(results, p.Query)
 	return nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -28,7 +29,7 @@ func TestProvideCrawler(t *testing.T) {
 			params: crawler.Params{
 				Config:           &config.Config{},
 				Storage:          &storage.MockStorage{},
-				IndexService:     &storage.MockIndexService{},
+				IndexManager:     api.NewMockIndexManager(),
 				ContentProcessor: []models.ContentProcessor{mockProcessor},
 			},
 			wantErr: true,
@@ -38,7 +39,7 @@ func TestProvideCrawler(t *testing.T) {
 			params: crawler.Params{
 				Logger:           logger.NewMockLogger(),
 				Storage:          &storage.MockStorage{},
-				IndexService:     &storage.MockIndexService{},
+				IndexManager:     api.NewMockIndexManager(),
 				ContentProcessor: []models.ContentProcessor{mockProcessor},
 			},
 			wantErr: true,
@@ -48,13 +49,13 @@ func TestProvideCrawler(t *testing.T) {
 			params: crawler.Params{
 				Logger:           logger.NewMockLogger(),
 				Config:           &config.Config{},
-				IndexService:     &storage.MockIndexService{},
+				IndexManager:     api.NewMockIndexManager(),
 				ContentProcessor: []models.ContentProcessor{mockProcessor},
 			},
 			wantErr: true,
 		},
 		{
-			name: "missing index service",
+			name: "missing index manager",
 			params: crawler.Params{
 				Logger:           logger.NewMockLogger(),
 				Config:           &config.Config{},
@@ -69,7 +70,7 @@ func TestProvideCrawler(t *testing.T) {
 				Logger:       logger.NewMockLogger(),
 				Config:       &config.Config{},
 				Storage:      &storage.MockStorage{},
-				IndexService: &storage.MockIndexService{},
+				IndexManager: api.NewMockIndexManager(),
 			},
 			wantErr: true,
 		},
@@ -79,7 +80,7 @@ func TestProvideCrawler(t *testing.T) {
 				Logger:           logger.NewMockLogger(),
 				Config:           &config.Config{},
 				Storage:          &storage.MockStorage{},
-				IndexService:     &storage.MockIndexService{},
+				IndexManager:     api.NewMockIndexManager(),
 				ContentProcessor: []models.ContentProcessor{mockProcessor},
 			},
 			wantErr: false,

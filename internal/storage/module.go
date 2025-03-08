@@ -16,7 +16,6 @@ var Module = fx.Module("storage",
 		NewOptionsFromConfig,
 		ProvideElasticsearchClient,
 		NewElasticsearchStorage,
-		NewSearchService,
 	),
 )
 
@@ -25,21 +24,11 @@ func NewElasticsearchStorage(
 	client *elasticsearch.Client,
 	logger logger.Interface,
 	opts Options,
-) Result {
-	storage := &ElasticsearchStorage{
+) Interface {
+	return &ElasticsearchStorage{
 		ESClient: client,
 		Logger:   logger,
 		opts:     opts,
-	}
-
-	indexService := NewIndexService(logger, storage)
-	mappingService := NewMappingService(logger, storage)
-	storage.mappingService = mappingService
-
-	return Result{
-		Storage:        storage,
-		IndexService:   indexService,
-		MappingService: mappingService,
 	}
 }
 
@@ -49,15 +38,22 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*elasticsea
 		Addresses: []string{opts.URL},
 		Username:  opts.Username,
 		Password:  opts.Password,
-		APIKey:    opts.APIKey,
-		Transport: opts.Transport,
 	})
 	if err != nil {
-		log.Error("Failed to create Elasticsearch client", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
 	}
 
-	log.Info("Elasticsearch client initialized successfully")
+	// Test the connection
+	res, err := client.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("failed to ping Elasticsearch: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, errors.New("failed to connect to Elasticsearch")
+	}
+
 	return client, nil
 }
 
