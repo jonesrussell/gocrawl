@@ -1,11 +1,12 @@
 package storage
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	es "github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/indexing"
+	"github.com/jonesrussell/gocrawl/internal/indexing/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
@@ -16,12 +17,21 @@ var Module = fx.Module("storage",
 		NewOptionsFromConfig,
 		ProvideElasticsearchClient,
 		NewElasticsearchStorage,
+		ProvideIndexManager,
 	),
 )
 
+// ProvideIndexManager creates and returns an IndexManager implementation
+func ProvideIndexManager(client *es.Client, log logger.Interface) (indexing.Manager, error) {
+	if client == nil {
+		return nil, errors.New("elasticsearch client is required")
+	}
+	return elasticsearch.NewManager(client, log), nil
+}
+
 // NewElasticsearchStorage creates a new ElasticsearchStorage instance
 func NewElasticsearchStorage(
-	client *elasticsearch.Client,
+	client *es.Client,
 	logger logger.Interface,
 	opts Options,
 ) Interface {
@@ -33,12 +43,12 @@ func NewElasticsearchStorage(
 }
 
 // ProvideElasticsearchClient provides the Elasticsearch client
-func ProvideElasticsearchClient(opts Options, log logger.Interface) (*elasticsearch.Client, error) {
+func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client, error) {
 	if len(opts.Addresses) == 0 {
 		return nil, errors.New("elasticsearch addresses are required")
 	}
 
-	cfg := elasticsearch.Config{
+	cfg := es.Config{
 		Addresses: opts.Addresses,
 		Username:  opts.Username,
 		Password:  opts.Password,
@@ -49,7 +59,7 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*elasticsea
 		cfg.Transport = opts.Transport
 	}
 
-	client, err := elasticsearch.NewClient(cfg)
+	client, err := es.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
 	}
@@ -67,38 +77,4 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*elasticsea
 
 	log.Info("Successfully connected to Elasticsearch", "addresses", opts.Addresses)
 	return client, nil
-}
-
-// NewStorage initializes a new Storage instance
-func NewStorage(esClient *elasticsearch.Client, opts Options, log logger.Interface) (Interface, error) {
-	if esClient == nil {
-		return nil, errors.New("elasticsearch client is nil")
-	}
-
-	// Log the Elasticsearch client information for debugging
-	log.Info("Elasticsearch client initialized", "client", esClient)
-
-	// Attempt to ping Elasticsearch to check connectivity
-	res, err := esClient.Info()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Elasticsearch: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return nil, fmt.Errorf("error response from Elasticsearch: %s", res.String())
-	}
-
-	storageInstance := &ElasticsearchStorage{
-		ESClient: esClient,
-		Logger:   log,
-		opts:     opts,
-	}
-
-	// Test connection to Elasticsearch
-	if testErr := storageInstance.TestConnection(context.Background()); testErr != nil {
-		return nil, fmt.Errorf("failed to connect to elasticsearch: %w", testErr)
-	}
-
-	return storageInstance, nil
 }

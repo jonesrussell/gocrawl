@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
@@ -59,13 +57,6 @@ var (
 	ErrInvalidDocCount    = errors.New("invalid index document count format")
 )
 
-// ElasticsearchStorage implements the Interface for Elasticsearch
-type ElasticsearchStorage struct {
-	ESClient *elasticsearch.Client
-	Logger   logger.Interface
-	opts     Options
-}
-
 // Helper function to create a context with timeout
 func (s *ElasticsearchStorage) createContextWithTimeout(
 	ctx context.Context,
@@ -108,26 +99,6 @@ func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, 
 	}
 
 	s.Logger.Info("Document indexed successfully", "index", index, "docID", id)
-	return nil
-}
-
-// TestConnection checks if the Elasticsearch client is working
-func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
-	if s.ESClient == nil {
-		return errors.New("elasticsearch client is nil")
-	}
-
-	// Perform a simple request to test the connection
-	res, err := s.ESClient.Info(s.ESClient.Info.WithContext(ctx))
-	if err != nil {
-		return fmt.Errorf("failed to connect to Elasticsearch: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return fmt.Errorf("error response from Elasticsearch: %s", res.String())
-	}
-
 	return nil
 }
 

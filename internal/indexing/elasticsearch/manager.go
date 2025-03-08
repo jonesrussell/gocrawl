@@ -8,25 +8,24 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/indexing/client"
-	"github.com/jonesrussell/gocrawl/internal/indexing/errors"
+	"github.com/jonesrussell/gocrawl/internal/indexing"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
-// Manager implements the api.IndexManager interface using Elasticsearch.
+// Manager implements the indexing.Manager interface using Elasticsearch.
 type Manager struct {
-	client *client.Client
-	logger common.Logger
+	client *elasticsearch.Client
+	logger logger.Interface
 }
 
-// NewManager creates a new Elasticsearch-based index manager.
-func NewManager(client *client.Client, logger common.Logger) (api.IndexManager, error) {
+// NewManager creates a new Elasticsearch index manager.
+func NewManager(client *elasticsearch.Client, logger logger.Interface) indexing.Manager {
 	return &Manager{
 		client: client,
 		logger: logger,
-	}, nil
+	}
 }
 
 // EnsureIndex ensures that an index exists with the given mapping.
@@ -51,14 +50,14 @@ func (m *Manager) EnsureIndex(ctx context.Context, name string, mapping interfac
 		Body:  bytes.NewReader(body),
 	}
 
-	res, err := req.Do(ctx, m.client.Client())
+	res, err := req.Do(ctx, m.client)
 	if err != nil {
-		return errors.NewIndexError(name, "create", err)
+		return fmt.Errorf("failed to create index %s: %w", name, err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return errors.NewIndexError(name, "create", fmt.Errorf("status: %s", res.Status()))
+		return fmt.Errorf("failed to create index %s: status: %s", name, res.Status())
 	}
 
 	m.logger.Info("Created index", "index", name)
@@ -71,17 +70,17 @@ func (m *Manager) DeleteIndex(ctx context.Context, name string) error {
 		Index: []string{name},
 	}
 
-	res, err := req.Do(ctx, m.client.Client())
+	res, err := req.Do(ctx, m.client)
 	if err != nil {
-		return errors.NewIndexError(name, "delete", err)
+		return fmt.Errorf("failed to delete index %s: %w", name, err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
 		if res.StatusCode == http.StatusNotFound {
-			return nil
+			return fmt.Errorf("index %s not found", name)
 		}
-		return errors.NewIndexError(name, "delete", fmt.Errorf("status: %s", res.Status()))
+		return fmt.Errorf("failed to delete index %s: status: %s", name, res.Status())
 	}
 
 	m.logger.Info("Deleted index", "index", name)
@@ -94,9 +93,9 @@ func (m *Manager) IndexExists(ctx context.Context, name string) (bool, error) {
 		Index: []string{name},
 	}
 
-	res, err := req.Do(ctx, m.client.Client())
+	res, err := req.Do(ctx, m.client)
 	if err != nil {
-		return false, errors.NewIndexError(name, "exists", err)
+		return false, fmt.Errorf("failed to check if index %s exists: %w", name, err)
 	}
 	defer res.Body.Close()
 
@@ -112,7 +111,7 @@ func (m *Manager) UpdateMapping(ctx context.Context, name string, mapping interf
 	}
 
 	if !exists {
-		return errors.ErrIndexNotFound
+		return fmt.Errorf("index %s not found", name)
 	}
 
 	body, err := json.Marshal(mapping)
@@ -125,14 +124,14 @@ func (m *Manager) UpdateMapping(ctx context.Context, name string, mapping interf
 		Body:  bytes.NewReader(body),
 	}
 
-	res, err := req.Do(ctx, m.client.Client())
+	res, err := req.Do(ctx, m.client)
 	if err != nil {
-		return errors.NewIndexError(name, "update_mapping", err)
+		return fmt.Errorf("failed to update mapping for index %s: %w", name, err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return errors.NewIndexError(name, "update_mapping", fmt.Errorf("status: %s", res.Status()))
+		return fmt.Errorf("failed to update mapping for index %s: status: %s", name, res.Status())
 	}
 
 	m.logger.Info("Updated mapping", "index", name)
