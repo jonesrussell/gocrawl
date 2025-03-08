@@ -18,6 +18,8 @@ type Config struct {
 	MaxDepth  int               `yaml:"max_depth"`
 	Selectors SelectorConfig    `yaml:"selectors"`
 	Metadata  map[string]string `yaml:"metadata,omitempty"`
+	// Time specifies the scheduled times for crawling in 24-hour format (HH:MM)
+	Time []string `yaml:"time,omitempty"`
 }
 
 // SelectorConfig defines the CSS selectors used for content extraction.
