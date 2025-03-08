@@ -13,3 +13,4 @@ coverage/coverage.out
 /config.yml
 app.log
 sources.yml
+config.yaml
