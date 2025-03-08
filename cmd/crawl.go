@@ -95,102 +95,52 @@ Example:
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-		// Create a channel to receive the done signal when crawling completes
+		// Create channels for error handling and completion
+		errChan := make(chan error, 1)
 		doneChan := make(chan struct{})
 
-		// Create an Fx application with all required dependencies
+		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
-			// Supply the done channel to the application
-			fx.Supply(fx.Annotate(
-				doneChan,
-				fx.ResultTags(`name:"crawlDone"`),
-			)),
-			// Provide the command context as the crawl context
+			common.Module,
+			crawler.Module,
+			article.Module,
+			content.Module,
+			collector.Module(),
 			fx.Provide(
+				func() chan struct{} {
+					return doneChan
+				},
+				fx.Annotate(
+					func() chan struct{} {
+						return doneChan
+					},
+					fx.ResultTags(`name:"crawlDone"`),
+				),
 				fx.Annotate(
 					func() context.Context {
 						return cmd.Context()
 					},
 					fx.ResultTags(`name:"crawlContext"`),
 				),
-				// Provide buffered channels for article and content processing
-				func() chan *models.Article {
-					return make(chan *models.Article, DefaultChannelBufferSize)
-				},
-				func() chan *models.Content {
-					return make(chan *models.Content, DefaultChannelBufferSize)
-				},
-				// Provide the source name from command line argument
-				fx.Annotate(
-					func() string {
-						return sourceName
-					},
-					fx.ResultTags(`name:"sourceName"`),
-				),
-				// Provide the article index name from source configuration
-				fx.Annotate(
-					func(s *sources.Sources) string {
-						source, _ := s.FindByName(sourceName)
-						if source != nil {
-							return source.ArticleIndex
-						}
-						return ""
-					},
-					fx.ResultTags(`name:"indexName"`),
-				),
-				// Provide the content index name from source configuration
-				fx.Annotate(
-					func(s *sources.Sources) string {
-						source, _ := s.FindByName(sourceName)
-						if source != nil {
-							return source.Index
-						}
-						return ""
-					},
-					fx.ResultTags(`name:"contentIndex"`),
-				),
-				// Provide the article processor
-				fx.Annotate(
-					func(
-						logger logger.Interface,
-						service article.Interface,
-						storage common.Storage,
-						params struct {
-							fx.In
-							IndexName string `name:"indexName"`
-						},
-					) models.ContentProcessor {
-						return &article.Processor{
-							Logger:         logger,
-							ArticleService: service,
-							Storage:        storage,
-							IndexName:      params.IndexName,
-						}
-					},
-					fx.ResultTags(`group:"processors"`),
-				),
-				// Provide the content processor
-				fx.Annotate(
-					func(
-						service content.Interface,
-						storage common.Storage,
-						logger logger.Interface,
-						params struct {
-							fx.In
-							IndexName string `name:"contentIndex"`
-						},
-					) models.ContentProcessor {
-						return content.NewProcessor(service, storage, logger, params.IndexName)
-					},
-					fx.ResultTags(`group:"processors"`),
-				),
 			),
-			// Include required modules
-			common.Module,
-			crawler.Module,
-			article.Module,
-			content.Module,
-			fx.Invoke(StartCrawl),
+			fx.Invoke(func(lc fx.Lifecycle, p CrawlParams) {
+				lc.Append(fx.Hook{
+					OnStart: func(context.Context) error {
+						// Execute the crawl and handle any errors
+						if err := startCrawl(p); err != nil {
+							p.Logger.Error("Error executing crawl", "error", err)
+							common.PrintErrorf("\nCrawl failed: %v", err)
+							errChan <- err
+							return err
+						}
+						close(doneChan)
+						return nil
+					},
+					OnStop: func(context.Context) error {
+						return nil
+					},
+				})
+			}),
 		)
 
 		// Start the application and handle any startup errors
@@ -201,18 +151,22 @@ Example:
 		// Wait for either:
 		// - A signal interrupt (SIGINT/SIGTERM)
 		// - Context cancellation
-		// - Crawl completion (doneChan closed)
+		// - Crawl completion
+		// - Crawl error
+		var crawlErr error
 		select {
 		case sig := <-sigChan:
 			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
 		case <-cmd.Context().Done():
 			common.PrintInfof("\nContext cancelled, initiating shutdown...")
+		case crawlErr = <-errChan:
+			// Error already printed in startCrawl
 		case <-doneChan:
-			common.PrintInfof("\nCrawl completed, initiating shutdown...")
+			// Success message already printed in startCrawl
 		}
 
 		// Create a context with timeout for graceful shutdown
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
+		stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
 		defer stopCancel()
 
 		// Stop the application and handle any shutdown errors
@@ -221,7 +175,7 @@ Example:
 			return err
 		}
 
-		return nil
+		return crawlErr
 	},
 }
 
