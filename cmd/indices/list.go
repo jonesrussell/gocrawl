@@ -11,7 +11,6 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -30,7 +29,7 @@ type listParams struct {
 
 	ctx     context.Context
 	storage common.Storage
-	logger  logger.Interface
+	logger  common.Logger
 }
 
 // listCommand creates and returns the list command that displays all indices.
@@ -56,14 +55,14 @@ Example:
 // - Handles application lifecycle and error cases
 // - Displays the indices list in a formatted table
 func runList(cmd *cobra.Command, _ []string) {
-	var log logger.Interface
+	var logger common.Logger
 	var exitCode int
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
-		fx.Invoke(func(s common.Storage, l logger.Interface) {
-			log = l
+		fx.Invoke(func(s common.Storage, l common.Logger) {
+			logger = l
 			params := &listParams{
 				ctx:     cmd.Context(),
 				storage: s,
@@ -81,8 +80,8 @@ func runList(cmd *cobra.Command, _ []string) {
 	defer func() {
 		cancel()
 		if err := app.Stop(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			if log != nil {
-				log.Error("Error stopping application", "error", err)
+			if logger != nil {
+				logger.Error("Error stopping application", "error", err)
 				exitCode = 1
 			}
 		}
@@ -93,8 +92,8 @@ func runList(cmd *cobra.Command, _ []string) {
 
 	// Start the application and handle any startup errors
 	if err := app.Start(ctx); err != nil {
-		if log != nil {
-			log.Error("Error starting application", "error", err)
+		if logger != nil {
+			logger.Error("Error starting application", "error", err)
 		}
 		exitCode = 1
 		return
@@ -135,7 +134,7 @@ func executeList(p *listParams) error {
 // - Retrieves health status and document count for each index
 // - Handles errors gracefully
 // - Renders the table with all index information
-func printIndices(ctx context.Context, indices []string, storage common.Storage, logger logger.Interface) error {
+func printIndices(ctx context.Context, indices []string, storage common.Storage, logger common.Logger) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Index Name", "Health", "Docs Count", "Ingestion Name", "Ingestion Status"})

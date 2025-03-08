@@ -63,14 +63,14 @@ Example:
 // - Handles application lifecycle and error cases
 // - Displays the sources list in a formatted table
 func runList(cmd *cobra.Command, _ []string) {
-	var log common.Logger
+	var logger common.Logger
 	var exitCode int
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
 		fx.Invoke(func(s *sources.Sources, l common.Logger) {
-			log = l
+			logger = l
 			params := &listParams{
 				ctx:     cmd.Context(),
 				sources: s,
@@ -88,8 +88,8 @@ func runList(cmd *cobra.Command, _ []string) {
 	defer func() {
 		cancel()
 		if err := app.Stop(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			if log != nil {
-				log.Error("Error stopping application", "error", err)
+			if logger != nil {
+				logger.Error("Error stopping application", "error", err)
 				exitCode = 1
 			}
 		}
@@ -100,8 +100,8 @@ func runList(cmd *cobra.Command, _ []string) {
 
 	// Start the application and handle any startup errors
 	if err := app.Start(ctx); err != nil {
-		if log != nil {
-			log.Error("Error starting application", "error", err)
+		if logger != nil {
+			logger.Error("Error starting application", "error", err)
 		}
 		exitCode = 1
 		return

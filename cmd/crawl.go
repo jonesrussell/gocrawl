@@ -255,7 +255,7 @@ func startCrawl(p CrawlParams) error {
 	// Convert the source config to the expected type
 	sourceConfig := convertSourceConfig(source)
 	if sourceConfig == nil {
-		return fmt.Errorf("source configuration is nil")
+		return errors.New("source configuration is nil")
 	}
 
 	// Parse and validate rate limit from configuration
