@@ -35,32 +35,19 @@ const (
 //   - *Config: The initialized configuration
 //   - error: Any error that occurred during initialization
 func InitializeConfig(cfgFile string) (*Config, error) {
-	if cfgFile != "" {
+	// Set config defaults if not already configured
+	if cfgFile == "" {
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath(".")
+	} else {
 		viper.SetConfigFile(cfgFile)
 	}
 
 	// Set default values for essential configuration
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("app.environment", "development")
-
-	return New()
-}
-
-// New creates a new Config instance with values from Viper.
-// It handles loading configuration from files, environment variables,
-// and setting up default values. It also performs validation of the
-// configuration values.
-//
-// Returns:
-//   - *Config: The new configuration instance
-//   - error: Any error that occurred during creation
-func New() (*Config, error) {
-	// Set config defaults if not already configured
-	if viper.ConfigFileUsed() == "" {
-		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath(".")
-	}
+	viper.SetDefault("crawler.source_file", "sources.yml")
 
 	// Enable automatic environment variable binding
 	viper.AutomaticEnv()
@@ -77,6 +64,18 @@ func New() (*Config, error) {
 		}
 	}
 
+	return New()
+}
+
+// New creates a new Config instance with values from Viper.
+// It handles loading configuration from files, environment variables,
+// and setting up default values. It also performs validation of the
+// configuration values.
+//
+// Returns:
+//   - *Config: The new configuration instance
+//   - error: Any error that occurred during creation
+func New() (*Config, error) {
 	// Parse and validate the rate limit configuration
 	rateLimit, err := parseRateLimit(viper.GetString("crawler.rate_limit"))
 	if err != nil {
@@ -154,12 +153,15 @@ func New() (*Config, error) {
 // - HTTP transport configuration via NewHTTPTransport
 var Module = fx.Options(
 	fx.Provide(
-		New,              // Provides the configuration instance
+		func() (*Config, error) {
+			return InitializeConfig("")
+		},
 		NewHTTPTransport, // Provides HTTP transport configuration
 	),
 )
 
 // ProvideConfig provides the configuration with default values.
+// This is used internally by InitializeConfig.
 func ProvideConfig() (*Config, error) {
 	cfg := &Config{
 		Elasticsearch: ElasticsearchConfig{
