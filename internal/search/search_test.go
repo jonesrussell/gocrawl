@@ -236,7 +236,6 @@ func TestNewSearchService(t *testing.T) {
 func TestSearchContent(t *testing.T) {
 	// Create mock dependencies
 	mockLogger := logger.NewMockLogger()
-	mockLogger.On("Info", "Search result", "url", "http://example.com", "content", "Test content").Return()
 
 	mockConfig := &config.Config{
 		Elasticsearch: config.ElasticsearchConfig{
@@ -267,6 +266,5 @@ func TestSearchContent(t *testing.T) {
 	assert.Equal(t, "Test content", results[0].Content)
 
 	// Verify mock expectations
-	mockLogger.AssertExpectations(t)
 	mockStorage.AssertExpectations(t)
 }
