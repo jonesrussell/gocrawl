@@ -6,8 +6,8 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,14 +42,24 @@ type Selectors struct {
 	Article ArticleSelectors `yaml:"article"`
 }
 
-// createTestConfig creates a test sources.Config with default selectors
-func createTestConfig() *sources.Config {
-	cfg := &sources.Config{}
-	cfg.Selectors.Article.Title = "h1"
-	cfg.Selectors.Article.Body = ".article-body"
-	cfg.Selectors.Article.PublishedTime = "time"
-	cfg.RateLimit = "1s"
-	return cfg
+// createTestConfig creates a test config.Source with default selectors
+func createTestConfig() *config.Source {
+	return &config.Source{
+		Name:         "test-source",
+		URL:          "http://example.com",
+		ArticleIndex: "test_articles",
+		Index:        "test_content",
+		RateLimit:    time.Second,
+		MaxDepth:     2,
+		Time:         []string{"03:00"},
+		Selectors: config.SourceSelectors{
+			Article: config.ArticleSelectors{
+				Title:         "h1",
+				Body:          ".article-body",
+				PublishedTime: "time",
+			},
+		},
+	}
 }
 
 // TestNew tests the New function of the collector package
@@ -183,9 +193,8 @@ func TestCollectorCreation(t *testing.T) {
 				mockLogger.On("Debug", "Setting up link following", "tag", "collector/content").Return()
 			}
 
-			// Create test config with rate limit
+			// Create test config
 			cfg := createTestConfig()
-			cfg.RateLimit = "1s"
 
 			params := collector.Params{
 				BaseURL:     tt.baseURL,

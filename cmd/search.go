@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/search"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -30,7 +31,7 @@ type SearchParams struct {
 	fx.In
 
 	// Logger provides logging capabilities for the search operation
-	Logger common.Logger
+	Logger logger.Interface
 	// Config holds the application configuration
 	Config common.Config
 	// SearchSvc is the service responsible for executing searches

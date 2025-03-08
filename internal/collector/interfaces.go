@@ -3,24 +3,6 @@
 // handling URL processing, rate limiting, and content extraction.
 package collector
 
-// Logger defines the interface for logging operations within the collector package.
-// It provides structured logging capabilities with different log levels and
-// support for additional fields in log messages.
-type Logger interface {
-	// Debug logs a debug message with optional fields.
-	// Used for detailed information useful during development.
-	Debug(msg string, fields ...interface{})
-	// Error logs an error message with optional fields.
-	// Used for error conditions that need immediate attention.
-	Error(msg string, fields ...interface{})
-	// Info logs an informational message with optional fields.
-	// Used for general operational information.
-	Info(msg string, fields ...interface{})
-	// Warn logs a warning message with optional fields.
-	// Used for potentially harmful situations.
-	Warn(msg string, fields ...interface{})
-}
-
 // ArticleProcessor defines the interface for processing articles during crawling.
 // It handles the extraction and processing of article content from web pages.
 type ArticleProcessor interface {

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -22,7 +23,7 @@ type JobParams struct {
 	fx.In
 
 	// Logger provides logging capabilities for the job scheduler
-	Logger common.Logger
+	Logger logger.Interface
 	// Sources contains the configuration for all content sources
 	Sources common.Sources
 }
@@ -117,7 +118,7 @@ func checkAndRunJobs(p JobParams, rootCmd string, now time.Time) {
 // - Constructs the command with appropriate arguments
 // - Sets up stdout and stderr
 // - Logs command execution
-func runCrawlCommand(rootCmd, sourceName string, logger common.Logger) error {
+func runCrawlCommand(rootCmd, sourceName string, logger logger.Interface) error {
 	cmdArgs := []string{"crawl", sourceName}
 	cmd := exec.Command(rootCmd, cmdArgs...)
 	cmd.Stdout = os.Stdout

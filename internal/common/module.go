@@ -4,10 +4,13 @@
 package common
 
 import (
+	"context"
+
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 )
@@ -16,10 +19,6 @@ import (
 // These aliases provide a convenient way to reference core types
 // throughout the application while maintaining clear dependencies.
 type (
-	// Logger is an alias for the logger interface, providing
-	// structured logging capabilities across the application.
-	Logger = logger.Interface
-
 	// Storage is an alias for the storage interface, providing
 	// data persistence operations across the application.
 	Storage = storage.Interface
@@ -31,13 +30,17 @@ type (
 	// Config is an alias for the configuration type, providing
 	// access to application-wide settings.
 	Config = *config.Config
+
+	// Logger is an alias for the logger interface, providing
+	// structured logging capabilities across the application.
+	Logger = logger.Interface
 )
 
 // Module provides shared dependencies for commands.
 // It combines core modules that are commonly used across
 // different parts of the application, setting up the
 // dependency injection framework and core services.
-var Module = fx.Options(
+var Module = fx.Module("common",
 	// Suppress fx logging to reduce noise in the application logs.
 	// This replaces the default fx logger with a no-op implementation.
 	fx.WithLogger(func() fxevent.Logger {
@@ -51,4 +54,11 @@ var Module = fx.Options(
 	logger.Module,  // Provides structured logging capabilities
 	storage.Module, // Provides data persistence operations
 	sources.Module, // Provides source configuration and management
+
+	// Provide command context
+	fx.Provide(
+		func(cmd *cobra.Command) context.Context {
+			return cmd.Context()
+		},
+	),
 )

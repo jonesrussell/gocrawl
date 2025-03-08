@@ -6,14 +6,12 @@ package collector
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"go.uber.org/fx"
 )
 
@@ -54,7 +52,7 @@ type Params struct {
 	// RateLimit is the time between requests
 	RateLimit time.Duration
 	// Source contains source-specific configuration
-	Source *sources.Config
+	Source *config.Source
 }
 
 // Result holds the collector instance and completion channel.
@@ -130,58 +128,17 @@ type Config struct {
 //   - *Config: The created configuration
 //   - error: Any error that occurred during creation
 func NewConfig(p Params) (*Config, error) {
-	// Parse rate limit duration from string
-	rateLimit, err := time.ParseDuration(p.Source.RateLimit)
-	if err != nil {
-		return nil, fmt.Errorf("invalid rate limit: %w", err)
-	}
-
-	// Create and return new configuration
 	return &Config{
 		BaseURL:          p.BaseURL,
 		MaxDepth:         p.MaxDepth,
-		RateLimit:        p.Source.RateLimit,
+		RateLimit:        p.Source.RateLimit.String(),
 		Parallelism:      p.Parallelism,
 		RandomDelay:      p.RandomDelay,
 		Debugger:         p.Debugger,
 		Logger:           p.Logger,
 		ArticleProcessor: p.ArticleProcessor,
 		ContentProcessor: p.ContentProcessor,
-		Source: config.Source{
-			Name:         p.Source.Name,
-			URL:          p.Source.URL,
-			ArticleIndex: p.Source.ArticleIndex,
-			Index:        p.Source.Index,
-			RateLimit:    rateLimit,
-			MaxDepth:     p.Source.MaxDepth,
-			Time:         p.Source.Time,
-			Selectors: config.SourceSelectors{
-				Article: config.ArticleSelectors{
-					Container:     p.Source.Selectors.Article.Container,
-					Title:         p.Source.Selectors.Article.Title,
-					Body:          p.Source.Selectors.Article.Body,
-					Intro:         p.Source.Selectors.Article.Intro,
-					Byline:        p.Source.Selectors.Article.Byline,
-					PublishedTime: p.Source.Selectors.Article.PublishedTime,
-					TimeAgo:       p.Source.Selectors.Article.TimeAgo,
-					JSONLD:        p.Source.Selectors.Article.JSONLd,
-					Section:       p.Source.Selectors.Article.Section,
-					Keywords:      p.Source.Selectors.Article.Keywords,
-					Description:   p.Source.Selectors.Article.Description,
-					OGTitle:       p.Source.Selectors.Article.OgTitle,
-					OGDescription: p.Source.Selectors.Article.OgDescription,
-					OGImage:       p.Source.Selectors.Article.OgImage,
-					OgURL:         p.Source.Selectors.Article.OgURL,
-					Canonical:     p.Source.Selectors.Article.Canonical,
-					WordCount:     p.Source.Selectors.Article.WordCount,
-					PublishDate:   p.Source.Selectors.Article.PublishDate,
-					Category:      p.Source.Selectors.Article.Category,
-					Tags:          p.Source.Selectors.Article.Tags,
-					Author:        p.Source.Selectors.Article.Author,
-					BylineName:    p.Source.Selectors.Article.BylineName,
-				},
-			},
-		},
+		Source:           *p.Source, // Dereference the pointer to get the value
 	}, nil
 }
 

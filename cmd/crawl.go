@@ -56,7 +56,7 @@ type CrawlParams struct {
 	Processors []models.ContentProcessor `group:"processors"`
 
 	// Logger provides structured logging capabilities
-	Logger common.Logger
+	Logger logger.Interface
 
 	// Done is a channel that signals when the crawl operation is complete
 	Done chan struct{} `name:"crawlDone"`
@@ -152,7 +152,7 @@ Example:
 				// Provide the article processor
 				fx.Annotate(
 					func(
-						logger common.Logger,
+						logger logger.Interface,
 						service article.Interface,
 						storage common.Storage,
 						params struct {
@@ -174,7 +174,7 @@ Example:
 					func(
 						service content.Interface,
 						storage common.Storage,
-						logger common.Logger,
+						logger logger.Interface,
 						params struct {
 							fx.In
 							IndexName string `name:"contentIndex"`
@@ -249,7 +249,13 @@ func startCrawl(p CrawlParams) error {
 	// Get the source configuration
 	source, err := p.Sources.FindByName(sourceName)
 	if err != nil {
-		return err
+		return fmt.Errorf("error finding source: %w", err)
+	}
+
+	// Convert the source config to the expected type
+	sourceConfig := convertSourceConfig(source)
+	if sourceConfig == nil {
+		return fmt.Errorf("source configuration is nil")
 	}
 
 	// Parse and validate rate limit from configuration
@@ -267,7 +273,7 @@ func startCrawl(p CrawlParams) error {
 		Logger:           p.Logger,
 		ArticleProcessor: p.Processors[0], // First processor handles articles
 		ContentProcessor: p.Processors[1], // Second processor handles content
-		Source:           source,
+		Source:           sourceConfig,
 		Parallelism:      p.Config.Crawler.Parallelism,
 		RandomDelay:      p.Config.Crawler.RandomDelay,
 		Context:          p.Context,
@@ -311,6 +317,56 @@ func startCrawl(p CrawlParams) error {
 	})
 
 	return nil
+}
+
+// convertSourceConfig converts a sources.Config to a config.Source.
+// It handles the conversion of fields between the two types.
+func convertSourceConfig(source *sources.Config) *config.Source {
+	if source == nil {
+		return nil
+	}
+
+	// Parse the rate limit string into a duration
+	rateLimit, err := config.ParseRateLimit(source.RateLimit)
+	if err != nil {
+		rateLimit = time.Second // Default to 1 second if parsing fails
+	}
+
+	return &config.Source{
+		Name:         source.Name,
+		URL:          source.URL,
+		ArticleIndex: source.ArticleIndex,
+		Index:        source.Index,
+		RateLimit:    rateLimit,
+		MaxDepth:     source.MaxDepth,
+		Time:         source.Time,
+		Selectors: config.SourceSelectors{
+			Article: config.ArticleSelectors{
+				Container:     source.Selectors.Article.Container,
+				Title:         source.Selectors.Article.Title,
+				Body:          source.Selectors.Article.Body,
+				Intro:         source.Selectors.Article.Intro,
+				Byline:        source.Selectors.Article.Byline,
+				PublishedTime: source.Selectors.Article.PublishedTime,
+				TimeAgo:       source.Selectors.Article.TimeAgo,
+				JSONLD:        source.Selectors.Article.JSONLd,
+				Section:       source.Selectors.Article.Section,
+				Keywords:      source.Selectors.Article.Keywords,
+				Description:   source.Selectors.Article.Description,
+				OGTitle:       source.Selectors.Article.OgTitle,
+				OGDescription: source.Selectors.Article.OgDescription,
+				OGImage:       source.Selectors.Article.OgImage,
+				OgURL:         source.Selectors.Article.OgURL,
+				Canonical:     source.Selectors.Article.Canonical,
+				WordCount:     source.Selectors.Article.WordCount,
+				PublishDate:   source.Selectors.Article.PublishDate,
+				Category:      source.Selectors.Article.Category,
+				Tags:          source.Selectors.Article.Tags,
+				Author:        source.Selectors.Article.Author,
+				BylineName:    source.Selectors.Article.BylineName,
+			},
+		},
+	}
 }
 
 func init() {

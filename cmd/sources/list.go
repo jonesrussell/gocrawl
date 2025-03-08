@@ -8,66 +8,78 @@ import (
 	"errors"
 	"os"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
+// rootCmd represents the sources command
+var rootCmd = &cobra.Command{
+	Use:   "sources",
+	Short: "Manage content sources",
+	Long: `Manage content sources in GoCrawl.
+This command provides subcommands for listing, adding, and managing content sources.`,
+}
+
 // Constants for table formatting
 const (
-	// HeaderWidth defines the width of the header divider line
-	HeaderWidth = 17
-	// TableWidth defines the width of the table divider line
+	// TableWidth defines the total width of the table output for consistent formatting
 	TableWidth = 92
 )
 
-// listParams holds the parameters required for displaying the sources list.
-// It contains the context, sources configuration, and logger needed for
+// listParams holds the parameters required for listing sources.
+// It contains the context, sources instance, and logger needed for
 // the list operation.
 type listParams struct {
-	// ctx is the context for the list operation
-	ctx context.Context
-	// sources contains the configuration for all content sources
+	fx.In
+
+	ctx     context.Context
 	sources *sources.Sources
-	// logger provides logging capabilities for the list operation
-	logger common.Logger
+	logger  common.Logger
 }
 
-// listCommand creates and returns the list command that displays all configured sources.
+// listCommand creates and returns the list command that displays all sources.
 // It:
 // - Sets up the command with appropriate usage and description
 // - Configures the command to use runList as its execution function
 func listCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "List all configured sources",
-		Long:  `Display a list of all sources configured in sources.yml.`,
-		Run:   runList,
+		Short: "List all configured content sources",
+		Long: `Display a list of all content sources configured in sources.yml.
+
+Example:
+  gocrawl sources list`,
+		Run: runList,
 	}
 }
 
-// runList executes the list command and displays all configured sources.
+// runList executes the list command and displays all sources.
 // It:
 // - Initializes the Fx application with required modules
 // - Sets up context with timeout for graceful shutdown
 // - Handles application lifecycle and error cases
 // - Displays the sources list in a formatted table
 func runList(cmd *cobra.Command, _ []string) {
-	var logger common.Logger
+	var log common.Logger
 	var exitCode int
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
 		fx.Invoke(func(s *sources.Sources, l common.Logger) {
-			logger = l
+			log = l
 			params := &listParams{
 				ctx:     cmd.Context(),
 				sources: s,
 				logger:  l,
 			}
-			displaySourcesList(params)
+			if err := executeList(params); err != nil {
+				l.Error("Error executing list", "error", err)
+				exitCode = 1
+			}
 		}),
 	)
 
@@ -76,8 +88,8 @@ func runList(cmd *cobra.Command, _ []string) {
 	defer func() {
 		cancel()
 		if err := app.Stop(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			if logger != nil {
-				logger.Error("Error stopping application", "error", err)
+			if log != nil {
+				log.Error("Error stopping application", "error", err)
 				exitCode = 1
 			}
 		}
@@ -88,36 +100,58 @@ func runList(cmd *cobra.Command, _ []string) {
 
 	// Start the application and handle any startup errors
 	if err := app.Start(ctx); err != nil {
-		if logger != nil {
-			logger.Error("Error starting application", "error", err)
+		if log != nil {
+			log.Error("Error starting application", "error", err)
 		}
 		exitCode = 1
 		return
 	}
 }
 
-// displaySourcesList formats and displays the list of configured sources.
+// executeList retrieves and displays the list of sources.
 // It:
-// - Prints a header with the command title
-// - Displays a table header with column names
-// - Lists each source with its configuration details
-// - Uses consistent formatting for better readability
-func displaySourcesList(p *listParams) {
-	common.PrintInfof("\nConfigured Sources")
-	common.PrintDivider(HeaderWidth)
-	common.PrintTableHeaderf("%-20s %-30s %-15s %-15s %-10s",
-		"Name", "URL", "Article Index", "Content Index", "Max Depth")
-	common.PrintDivider(TableWidth)
+// - Gets all sources from the sources instance
+// - Handles empty results
+// - Displays the sources in a formatted table
+func executeList(p *listParams) error {
+	if len(p.sources.Sources) == 0 {
+		p.logger.Info("No sources found")
+		return nil
+	}
 
-	// Display each source in a formatted table row
-	for _, source := range p.sources.Sources {
-		common.PrintTableHeaderf("%-20s %-30s %-15s %-15s %-10d",
+	return printSources(p.sources.Sources, p.logger)
+}
+
+// printSources formats and displays the sources in a table.
+// It:
+// - Creates a new table with appropriate headers
+// - Handles errors gracefully
+// - Renders the table with all source information
+func printSources(sources []sources.Config, logger common.Logger) error {
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Name", "URL", "Article Index", "Content Index", "Rate Limit", "Max Depth"})
+
+	for _, source := range sources {
+		t.AppendRow([]interface{}{
 			source.Name,
 			source.URL,
 			source.ArticleIndex,
 			source.Index,
-			source.MaxDepth)
+			source.RateLimit,
+			source.MaxDepth,
+		})
 	}
 
-	common.PrintInfof("")
+	if t.Length() == 0 {
+		logger.Info("No sources found")
+		return nil
+	}
+
+	t.Render()
+	return nil
+}
+
+func init() {
+	rootCmd.AddCommand(listCommand())
 }

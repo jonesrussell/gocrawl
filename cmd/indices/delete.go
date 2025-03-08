@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -21,19 +22,19 @@ var deleteSourceName string
 // It contains the context, storage interface, sources configuration, logger,
 // and command-specific parameters needed for the delete operation.
 type deleteParams struct {
-	// ctx is the context for the delete operation
-	ctx context.Context
-	// storage provides access to Elasticsearch operations
+	fx.In
+
+	ctx     context.Context
 	storage common.Storage
-	// sources contains the configuration for all content sources
 	sources common.Sources
-	// logger provides logging capabilities for the delete operation
-	logger common.Logger
+	logger  logger.Interface
 	// indices contains the list of indices to delete
 	indices []string
 	// force indicates whether to skip the confirmation prompt
 	force bool
 }
+
+var log logger.Interface
 
 // deleteCommand creates and returns the delete command that removes indices.
 // It:
@@ -85,14 +86,12 @@ func validateDeleteArgs(_ *cobra.Command, args []string) error {
 // - Manages the deletion process
 func runDelete(cmd *cobra.Command, args []string) {
 	force, _ := cmd.Flags().GetBool("force")
-	var logger common.Logger
 	var exitCode int
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
-		fx.Invoke(func(storage common.Storage, sources common.Sources, l common.Logger) {
-			logger = l
+		fx.Invoke(func(storage common.Storage, sources common.Sources, l logger.Interface) {
 			params := &deleteParams{
 				ctx:     cmd.Context(),
 				storage: storage,
@@ -113,8 +112,8 @@ func runDelete(cmd *cobra.Command, args []string) {
 	defer func() {
 		cancel()
 		if err := app.Stop(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			if logger != nil {
-				logger.Error("Error stopping application", "error", err)
+			if log != nil {
+				log.Error("Error stopping application", "error", err)
 				exitCode = 1
 			}
 		}
@@ -125,8 +124,8 @@ func runDelete(cmd *cobra.Command, args []string) {
 
 	// Start the application and handle any startup errors
 	if err := app.Start(ctx); err != nil {
-		if logger != nil {
-			logger.Error("Error starting application", "error", err)
+		if log != nil {
+			log.Error("Error starting application", "error", err)
 		}
 		exitCode = 1
 		return

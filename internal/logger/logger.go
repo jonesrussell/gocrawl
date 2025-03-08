@@ -12,15 +12,33 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Interface holds the methods for the logger
+// Interface defines the interface for logging operations.
+// It provides structured logging capabilities with different log levels and
+// support for additional fields in log messages.
 type Interface interface {
-	Info(msg string, fields ...interface{})
-	Error(msg string, fields ...interface{})
+	// Debug logs a debug message with optional fields.
+	// Used for detailed information useful during development.
 	Debug(msg string, fields ...interface{})
+	// Error logs an error message with optional fields.
+	// Used for error conditions that need immediate attention.
+	Error(msg string, fields ...interface{})
+	// Info logs an informational message with optional fields.
+	// Used for general operational information.
+	Info(msg string, fields ...interface{})
+	// Warn logs a warning message with optional fields.
+	// Used for potentially harmful situations.
 	Warn(msg string, fields ...interface{})
+	// Fatal logs a fatal message and panics.
+	// Used for unrecoverable errors that require immediate termination.
 	Fatal(msg string, fields ...interface{})
+	// Printf logs a formatted message.
+	// Used for formatted string logging.
 	Printf(format string, args ...interface{})
+	// Errorf logs a formatted error message.
+	// Used for formatted error string logging.
 	Errorf(format string, args ...interface{})
+	// Sync flushes any buffered log entries.
+	// Used to ensure all logs are written before shutdown.
 	Sync() error
 }
 

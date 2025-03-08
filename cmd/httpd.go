@@ -12,6 +12,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -24,7 +25,7 @@ type ServerParams struct {
 	// Server is the HTTP server instance that handles incoming requests
 	Server *http.Server
 	// Logger provides logging capabilities for the HTTP server
-	Logger common.Logger
+	Logger logger.Interface
 }
 
 // startServer initializes and manages the HTTP server lifecycle.

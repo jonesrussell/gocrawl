@@ -292,3 +292,18 @@ func LoadConfig(path string) (*Config, error) {
 
 	return &config, nil
 }
+
+// Validate validates the source configuration.
+// It checks that all required fields are present and have valid values.
+//
+// Returns:
+//   - error: Any validation errors that occurred
+func (s *Source) Validate() error {
+	if s.RateLimit <= 0 {
+		return errors.New("rate limit must be positive")
+	}
+	if s.MaxDepth < 0 {
+		return errors.New("max depth must be non-negative")
+	}
+	return nil
+}
