@@ -1,34 +1,56 @@
 app:
+  # Application environment: development, staging, production
   environment: development
+  # Application name used in logging and metrics
   name: gocrawl
+  # Semantic version of the application
   version: 0.1.0
+  # Enable debug mode for additional logging
   debug: true
 
 # Log level for the application. Options: debug, info, warn, error, fatal, panic
 log:
   level: debug
+  # Enable debug logging for development
   debug: true
 
 elasticsearch:
+  # List of Elasticsearch nodes to connect to
   addresses:
     - "https://localhost:9200"
-  username: "<your-username>"
-  password: "<your-password>"
-  api_key: "<your-api-key>"
+    # Add additional nodes for high availability
+    # - "https://es2.example.com:9200"
+    # - "https://es3.example.com:9200"
+  
+  # Authentication - use either username/password OR api_key
+  username: ""  # Your Elasticsearch username
+  password: ""  # Your Elasticsearch password
+  api_key: ""   # Alternative to username/password
+  
+  # TLS/SSL Configuration
   tls:
     enabled: true
-    skip_verify: true  # For development only - set to false in production
-    certificate: ""    # Optional: path to client certificate
-    key: ""           # Optional: path to client key
-    ca: ""           # Optional: path to CA certificate
+    skip_verify: false  # Set to true only in development
+    # Optional: Path to client certificate for mTLS
+    certificate: ""
+    # Optional: Path to client key for mTLS
+    key: ""
+    # Optional: Path to CA certificate for custom certificate authorities
+    ca: ""
+  
+  # Retry configuration for resilient connections
   retry:
     enabled: true
-    initial_wait: 1s
-    max_wait: 30s
-    max_retries: 3
+    initial_wait: 1s    # Initial wait time between retries
+    max_wait: 30s      # Maximum wait time between retries
+    max_retries: 3     # Maximum number of retry attempts
 
 crawler:
-  max_depth: 2          # How deep to traverse from the starting URL
-  rate_limit: 2s        # Delay between requests
-  parallelism: 2        # Number of concurrent crawlers
-  random_delay: 5s      # Additional random delay between requests
+  # Maximum depth to crawl from the starting URL
+  max_depth: 2
+  # Minimum time between requests to the same host
+  rate_limit: 2s
+  # Number of concurrent crawlers
+  parallelism: 2
+  # Additional random delay between requests (helps avoid detection)
+  random_delay: 5s
