@@ -29,7 +29,7 @@ This command provides subcommands for listing, adding, and managing content sour
 // Constants for table formatting
 const (
 	// TableWidth defines the total width of the table output for consistent formatting
-	TableWidth = 92
+	TableWidth = 160
 )
 
 // listParams holds the parameters required for listing sources.
