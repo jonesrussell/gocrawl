@@ -40,16 +40,8 @@ func InitializeConfig(cfgFile string) (*Config, error) {
 	}
 
 	// Set default values for essential configuration
-	viper.SetDefault("LOG_LEVEL", "info")
-	viper.SetDefault("APP_ENV", "development")
-
-	// Bind environment variables and check for errors
-	if err := viper.BindEnv("LOG_LEVEL"); err != nil {
-		return nil, fmt.Errorf("failed to bind LOG_LEVEL environment variable: %w", err)
-	}
-	if err := viper.BindEnv("APP_ENV"); err != nil {
-		return nil, fmt.Errorf("failed to bind APP_ENV environment variable: %w", err)
-	}
+	viper.SetDefault("log.level", "info")
+	viper.SetDefault("app.environment", "development")
 
 	return New()
 }
@@ -86,7 +78,7 @@ func New() (*Config, error) {
 	}
 
 	// Parse and validate the rate limit configuration
-	rateLimit, err := parseRateLimit(viper.GetString(CrawlerRateLimitKey))
+	rateLimit, err := parseRateLimit(viper.GetString("crawler.rate_limit"))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing rate limit: %w", err)
 	}
@@ -94,26 +86,26 @@ func New() (*Config, error) {
 	// Create the configuration instance with values from Viper
 	cfg := &Config{
 		App: AppConfig{
-			Environment: viper.GetString(AppEnvKey),
-			Name:        viper.GetString("APP_NAME"),
-			Version:     viper.GetString("APP_VERSION"),
+			Environment: viper.GetString("app.environment"),
+			Name:        viper.GetString("app.name"),
+			Version:     viper.GetString("app.version"),
 		},
 		Crawler: CrawlerConfig{
-			BaseURL:          viper.GetString(CrawlerBaseURLKey),
-			MaxDepth:         viper.GetInt(CrawlerMaxDepthKey),
+			BaseURL:          viper.GetString("crawler.base_url"),
+			MaxDepth:         viper.GetInt("crawler.max_depth"),
 			RateLimit:        rateLimit,
-			RandomDelay:      viper.GetDuration("CRAWLER_RANDOM_DELAY"),
-			IndexName:        viper.GetString(ElasticIndexNameKey),
-			ContentIndexName: viper.GetString("ELASTIC_CONTENT_INDEX_NAME"),
-			SourceFile:       viper.GetString(CrawlerSourceFileKey),
-			Parallelism:      viper.GetInt("CRAWLER_PARALLELISM"),
+			RandomDelay:      viper.GetDuration("crawler.random_delay"),
+			IndexName:        viper.GetString("elasticsearch.index_name"),
+			ContentIndexName: viper.GetString("elasticsearch.content_index_name"),
+			SourceFile:       viper.GetString("crawler.source_file"),
+			Parallelism:      viper.GetInt("crawler.parallelism"),
 		},
 		Elasticsearch: ElasticsearchConfig{
-			Addresses: []string{viper.GetString(ElasticURLKey)},
-			Username:  viper.GetString(ElasticUsernameKey),
-			Password:  viper.GetString(ElasticPasswordKey),
-			APIKey:    viper.GetString(ElasticAPIKeyKey),
-			IndexName: viper.GetString(ElasticIndexNameKey),
+			Addresses: []string{viper.GetString("elasticsearch.addresses")},
+			Username:  viper.GetString("elasticsearch.username"),
+			Password:  viper.GetString("elasticsearch.password"),
+			APIKey:    viper.GetString("elasticsearch.api_key"),
+			IndexName: viper.GetString("elasticsearch.index_name"),
 			TLS: struct {
 				Enabled     bool   `yaml:"enabled"`
 				SkipVerify  bool   `yaml:"skip_verify"`
@@ -121,8 +113,11 @@ func New() (*Config, error) {
 				Key         string `yaml:"key"`
 				CA          string `yaml:"ca"`
 			}{
-				Enabled:    true,
-				SkipVerify: viper.GetBool(ElasticSkipTLSKey),
+				Enabled:     viper.GetBool("elasticsearch.tls.enabled"),
+				SkipVerify:  viper.GetBool("elasticsearch.tls.skip_verify"),
+				Certificate: viper.GetString("elasticsearch.tls.certificate"),
+				Key:         viper.GetString("elasticsearch.tls.key"),
+				CA:          viper.GetString("elasticsearch.tls.ca"),
 			},
 			Retry: struct {
 				Enabled     bool          `yaml:"enabled"`
@@ -130,15 +125,15 @@ func New() (*Config, error) {
 				MaxWait     time.Duration `yaml:"max_wait"`
 				MaxRetries  int           `yaml:"max_retries"`
 			}{
-				Enabled:     true,
-				InitialWait: defaultRetryInitialWait,
-				MaxWait:     defaultRetryMaxWait,
-				MaxRetries:  defaultMaxRetries,
+				Enabled:     viper.GetBool("elasticsearch.retry.enabled"),
+				InitialWait: viper.GetDuration("elasticsearch.retry.initial_wait"),
+				MaxWait:     viper.GetDuration("elasticsearch.retry.max_wait"),
+				MaxRetries:  viper.GetInt("elasticsearch.retry.max_retries"),
 			},
 		},
 		Log: LogConfig{
-			Level: viper.GetString(LogLevelKey),
-			Debug: viper.GetBool(AppDebugKey),
+			Level: viper.GetString("log.level"),
+			Debug: viper.GetBool("log.debug"),
 		},
 	}
 

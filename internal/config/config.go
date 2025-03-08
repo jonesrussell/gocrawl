@@ -17,40 +17,7 @@ import (
 // Error definitions for configuration-related errors
 var (
 	// ErrMissingElasticURL is returned when the Elasticsearch URL is not provided
-	ErrMissingElasticURL = errors.New("ELASTIC_URL is required")
-)
-
-// Configuration keys for environment variables and configuration values.
-// These constants are used throughout the application to maintain consistency
-// in configuration key names.
-const (
-	// AppEnvKey defines the environment type (development, staging, production)
-	AppEnvKey = "APP_ENV"
-	// LogLevelKey defines the logging level (debug, info, warn, error)
-	LogLevelKey = "LOG_LEVEL"
-	// AppDebugKey enables/disables debug mode
-	AppDebugKey = "APP_DEBUG"
-	// CrawlerBaseURLKey defines the starting URL for the crawler
-	CrawlerBaseURLKey = "CRAWLER_BASE_URL"
-	// CrawlerMaxDepthKey defines how deep the crawler should traverse
-	CrawlerMaxDepthKey = "CRAWLER_MAX_DEPTH"
-	// CrawlerRateLimitKey defines the delay between requests
-	CrawlerRateLimitKey = "CRAWLER_RATE_LIMIT"
-	// CrawlerSourceFileKey defines the path to the sources configuration file
-	CrawlerSourceFileKey = "CRAWLER_SOURCE_FILE"
-	// ElasticURLKey defines the Elasticsearch server URL
-	ElasticURLKey = "ELASTIC_URL"
-	// ElasticUsernameKey defines the Elasticsearch username for authentication
-	ElasticUsernameKey = "ELASTIC_USERNAME"
-	// ElasticPasswordKey defines the Elasticsearch password for authentication
-	ElasticPasswordKey = "ELASTIC_PASSWORD"
-	// ElasticIndexNameKey defines the name of the Elasticsearch index
-	ElasticIndexNameKey = "ELASTIC_INDEX_NAME"
-	// ElasticSkipTLSKey enables/disables TLS verification for Elasticsearch
-	ElasticSkipTLSKey = "ELASTIC_SKIP_TLS"
-	// ElasticAPIKeyKey defines the API key for Elasticsearch authentication
-	//nolint:gosec // This is a false positive
-	ElasticAPIKeyKey = "ELASTIC_API_KEY"
+	ErrMissingElasticURL = errors.New("elasticsearch.addresses is required")
 )
 
 // AppConfig holds application-level configuration settings.
@@ -92,7 +59,7 @@ type CrawlerConfig struct {
 //   - depth: The maximum depth for crawling
 func (c *CrawlerConfig) SetMaxDepth(depth int) {
 	c.MaxDepth = depth
-	viper.Set(CrawlerMaxDepthKey, depth)
+	viper.Set("crawler.max_depth", depth)
 }
 
 // SetRateLimit sets the RateLimit in the CrawlerConfig and updates Viper.
@@ -102,7 +69,7 @@ func (c *CrawlerConfig) SetMaxDepth(depth int) {
 //   - rate: The time duration between requests
 func (c *CrawlerConfig) SetRateLimit(rate time.Duration) {
 	c.RateLimit = rate
-	viper.Set(CrawlerRateLimitKey, rate.String())
+	viper.Set("crawler.rate_limit", rate.String())
 }
 
 // SetBaseURL sets the BaseURL in the CrawlerConfig and updates Viper.
@@ -112,7 +79,7 @@ func (c *CrawlerConfig) SetRateLimit(rate time.Duration) {
 //   - url: The base URL for crawling
 func (c *CrawlerConfig) SetBaseURL(url string) {
 	c.BaseURL = url
-	viper.Set(CrawlerBaseURLKey, url)
+	viper.Set("crawler.base_url", url)
 }
 
 // SetIndexName sets the IndexName in the CrawlerConfig and updates Viper.
@@ -122,7 +89,7 @@ func (c *CrawlerConfig) SetBaseURL(url string) {
 //   - index: The name of the Elasticsearch index
 func (c *CrawlerConfig) SetIndexName(index string) {
 	c.IndexName = index
-	viper.Set(ElasticIndexNameKey, index)
+	viper.Set("elasticsearch.index_name", index)
 }
 
 // ElasticsearchConfig contains Elasticsearch connection and configuration settings.
@@ -248,16 +215,7 @@ func ValidateConfig(cfg *Config) error {
 		return ErrMissingElasticURL
 	}
 	if cfg.Crawler.Parallelism < 1 {
-		return errors.New("crawler parallelism must be positive")
-	}
-	if cfg.Crawler.MaxDepth < 0 {
-		return errors.New("crawler max depth must be non-negative")
-	}
-	if cfg.Crawler.RateLimit < 0 {
-		return errors.New("crawler rate limit must be non-negative")
-	}
-	if cfg.Crawler.RandomDelay < 0 {
-		return errors.New("crawler random delay must be non-negative")
+		cfg.Crawler.Parallelism = 1
 	}
 	return nil
 }

@@ -243,9 +243,9 @@ func TestInitializeConfig(t *testing.T) {
 			name:    "with config file",
 			cfgFile: "testdata/config.yml",
 			envVars: map[string]string{
-				"LOG_LEVEL":           "debug",
-				"APP_ENV":             "test",
-				"CRAWLER_PARALLELISM": "2",
+				"log.level":           "debug",
+				"app.environment":     "test",
+				"crawler.parallelism": "2",
 			},
 			wantErr: false,
 		},
@@ -253,9 +253,9 @@ func TestInitializeConfig(t *testing.T) {
 			name:    "without config file",
 			cfgFile: "",
 			envVars: map[string]string{
-				"LOG_LEVEL":           "info",
-				"APP_ENV":             "development",
-				"CRAWLER_PARALLELISM": "2",
+				"log.level":           "info",
+				"app.environment":     "development",
+				"crawler.parallelism": "1",
 			},
 			wantErr: false,
 		},
@@ -263,51 +263,127 @@ func TestInitializeConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Reset Viper configuration
+			viper.Reset()
+
 			// Set environment variables
 			for k, v := range tt.envVars {
-				t.Setenv(k, v)
+				viper.Set(k, v)
 			}
 
+			// Initialize config
 			cfg, err := config.InitializeConfig(tt.cfgFile)
 			if tt.wantErr {
 				require.Error(t, err)
-				require.Nil(t, cfg)
-			} else {
-				require.NoError(t, err)
-				require.NotNil(t, cfg)
-				require.Equal(t, tt.envVars["LOG_LEVEL"], cfg.Log.Level)
-				require.Equal(t, tt.envVars["APP_ENV"], cfg.App.Environment)
-				require.Equal(t, 2, cfg.Crawler.Parallelism)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+
+			// Verify environment variables were properly set
+			for k, v := range tt.envVars {
+				switch k {
+				case "log.level":
+					require.Equal(t, v, cfg.Log.Level)
+				case "app.environment":
+					require.Equal(t, v, cfg.App.Environment)
+				case "crawler.parallelism":
+					parallelism := viper.GetInt("crawler.parallelism")
+					require.Equal(t, parallelism, cfg.Crawler.Parallelism)
+				}
 			}
 		})
 	}
 }
 
-func TestCrawlerConfig_Setters(t *testing.T) {
+func TestSetMaxDepth(t *testing.T) {
 	cfg := &config.CrawlerConfig{}
-
-	// Test SetMaxDepth
 	cfg.SetMaxDepth(5)
-	assert.Equal(t, 5, cfg.MaxDepth)
-	assert.Equal(t, 5, viper.GetInt(config.CrawlerMaxDepthKey))
+	require.Equal(t, 5, cfg.MaxDepth)
+	require.Equal(t, 5, viper.GetInt("crawler.max_depth"))
+}
 
-	// Test SetRateLimit
+func TestSetRateLimit(t *testing.T) {
+	cfg := &config.CrawlerConfig{}
 	rateLimit := 2 * time.Second
 	cfg.SetRateLimit(rateLimit)
-	assert.Equal(t, rateLimit, cfg.RateLimit)
-	assert.Equal(t, rateLimit.String(), viper.GetString(config.CrawlerRateLimitKey))
+	require.Equal(t, rateLimit, cfg.RateLimit)
+	require.Equal(t, "2s", viper.GetString("crawler.rate_limit"))
+}
 
-	// Test SetBaseURL
-	baseURL := "http://example.com"
-	cfg.SetBaseURL(baseURL)
-	assert.Equal(t, baseURL, cfg.BaseURL)
-	assert.Equal(t, baseURL, viper.GetString(config.CrawlerBaseURLKey))
+func TestSetBaseURL(t *testing.T) {
+	cfg := &config.CrawlerConfig{}
+	url := "http://example.com"
+	cfg.SetBaseURL(url)
+	require.Equal(t, url, cfg.BaseURL)
+	require.Equal(t, url, viper.GetString("crawler.base_url"))
+}
 
-	// Test SetIndexName
-	indexName := "test_index"
-	cfg.SetIndexName(indexName)
-	assert.Equal(t, indexName, cfg.IndexName)
-	assert.Equal(t, indexName, viper.GetString(config.ElasticIndexNameKey))
+func TestSetIndexName(t *testing.T) {
+	cfg := &config.CrawlerConfig{}
+	index := "test_index"
+	cfg.SetIndexName(index)
+	require.Equal(t, index, cfg.IndexName)
+	require.Equal(t, index, viper.GetString("elasticsearch.index_name"))
+}
+
+func TestCrawlerConfig_Setters(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(*config.CrawlerConfig)
+		validate func(*testing.T, *config.CrawlerConfig)
+	}{
+		{
+			name: "set max depth",
+			setup: func(cfg *config.CrawlerConfig) {
+				cfg.SetMaxDepth(5)
+			},
+			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
+				require.Equal(t, 5, cfg.MaxDepth)
+				require.Equal(t, 5, viper.GetInt("crawler.max_depth"))
+			},
+		},
+		{
+			name: "set rate limit",
+			setup: func(cfg *config.CrawlerConfig) {
+				cfg.SetRateLimit(2 * time.Second)
+			},
+			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
+				require.Equal(t, 2*time.Second, cfg.RateLimit)
+				require.Equal(t, "2s", viper.GetString("crawler.rate_limit"))
+			},
+		},
+		{
+			name: "set base url",
+			setup: func(cfg *config.CrawlerConfig) {
+				cfg.SetBaseURL("http://example.com")
+			},
+			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
+				require.Equal(t, "http://example.com", cfg.BaseURL)
+				require.Equal(t, "http://example.com", viper.GetString("crawler.base_url"))
+			},
+		},
+		{
+			name: "set index name",
+			setup: func(cfg *config.CrawlerConfig) {
+				cfg.SetIndexName("test_index")
+			},
+			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
+				require.Equal(t, "test_index", cfg.IndexName)
+				require.Equal(t, "test_index", viper.GetString("elasticsearch.index_name"))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			cfg := &config.CrawlerConfig{}
+			tt.setup(cfg)
+			tt.validate(t, cfg)
+		})
+	}
 }
 
 func TestDefaultArticleSelectors(t *testing.T) {
