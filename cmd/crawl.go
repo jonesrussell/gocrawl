@@ -102,7 +102,6 @@ Example:
 		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
 			common.Module,
-			config.Module,
 			sources.Module,
 			crawler.Module,
 			article.Module,
