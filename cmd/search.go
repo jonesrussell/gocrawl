@@ -92,7 +92,8 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Create a channel to signal search completion
+	// Create channels for error handling and completion
+	errChan := make(chan error, 1)
 	doneChan := make(chan struct{})
 
 	// Initialize the Fx application with required modules and dependencies
@@ -114,12 +115,23 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 				fx.ResultTags(`name:"resultSize"`),
 			),
 		),
-		fx.Invoke(func(p SearchParams) {
-			// Execute the search and handle any errors
-			if startErr := executeSearch(cmd.Context(), p); startErr != nil {
-				p.Logger.Error("Error executing search", "error", startErr)
-			}
-			close(doneChan) // Signal completion
+		fx.Invoke(func(lc fx.Lifecycle, p SearchParams) {
+			lc.Append(fx.Hook{
+				OnStart: func(context.Context) error {
+					// Execute the search and handle any errors
+					if err := executeSearch(cmd.Context(), p); err != nil {
+						p.Logger.Error("Error executing search", "error", err)
+						common.PrintErrorf("\nSearch failed: %v", err)
+						errChan <- err
+						return err
+					}
+					close(doneChan)
+					return nil
+				},
+				OnStop: func(context.Context) error {
+					return nil
+				},
+			})
 		}),
 	)
 
@@ -132,13 +144,17 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	// - A signal interrupt (SIGINT/SIGTERM)
 	// - Context cancellation
 	// - Search completion
+	// - Search error
+	var searchErr error
 	select {
 	case sig := <-sigChan:
 		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
 	case <-cmd.Context().Done():
 		common.PrintInfof("\nContext cancelled, initiating shutdown...")
+	case searchErr = <-errChan:
+		// Error already printed in executeSearch
 	case <-doneChan:
-		common.PrintInfof("\nSearch completed, shutting down...")
+		// Success message already printed in executeSearch
 	}
 
 	// Create a context with timeout for graceful shutdown
@@ -151,7 +167,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return nil
+	return searchErr
 }
 
 // executeSearch performs the actual search operation using the provided parameters.
@@ -232,6 +248,9 @@ func executeSearch(ctx context.Context, p SearchParams) error {
 	common.PrintInfof("\nSearch Results:")
 	// Render the table
 	t.Render()
+
+	// Print success message
+	common.PrintInfof("\nSearch completed successfully with %d results.", len(results))
 
 	return nil
 }
