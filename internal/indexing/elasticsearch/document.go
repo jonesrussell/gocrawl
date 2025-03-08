@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -77,7 +78,7 @@ func (dm *DocumentManager) Update(ctx context.Context, index string, id string, 
 	defer res.Body.Close()
 
 	if res.IsError() {
-		if res.StatusCode == 404 {
+		if res.StatusCode == http.StatusNotFound {
 			return errors.ErrDocumentNotFound
 		}
 		return errors.NewDocumentError(index, id, "update", fmt.Errorf("status: %s", res.Status()))
@@ -101,7 +102,7 @@ func (dm *DocumentManager) Delete(ctx context.Context, index string, id string) 
 	defer res.Body.Close()
 
 	if res.IsError() {
-		if res.StatusCode == 404 {
+		if res.StatusCode == http.StatusNotFound {
 			return errors.ErrDocumentNotFound
 		}
 		return errors.NewDocumentError(index, id, "delete", fmt.Errorf("status: %s", res.Status()))
@@ -125,15 +126,16 @@ func (dm *DocumentManager) Get(ctx context.Context, index string, id string) (in
 	defer res.Body.Close()
 
 	if res.IsError() {
-		if res.StatusCode == 404 {
+		if res.StatusCode == http.StatusNotFound {
 			return nil, errors.ErrDocumentNotFound
 		}
 		return nil, errors.NewDocumentError(index, id, "get", fmt.Errorf("status: %s", res.Status()))
 	}
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	decodeErr := json.NewDecoder(res.Body).Decode(&result)
+	if decodeErr != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", decodeErr)
 	}
 
 	return result["_source"], nil

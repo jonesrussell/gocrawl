@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -77,8 +78,8 @@ func (m *Manager) DeleteIndex(ctx context.Context, name string) error {
 	defer res.Body.Close()
 
 	if res.IsError() {
-		if res.StatusCode == 404 {
-			return errors.ErrIndexNotFound
+		if res.StatusCode == http.StatusNotFound {
+			return nil
 		}
 		return errors.NewIndexError(name, "delete", fmt.Errorf("status: %s", res.Status()))
 	}
