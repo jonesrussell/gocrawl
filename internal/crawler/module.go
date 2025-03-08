@@ -4,7 +4,9 @@ package crawler
 import (
 	"context"
 
+	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"go.uber.org/fx"
@@ -22,6 +24,10 @@ type Interface interface {
 	SetRateLimit(duration string) error
 	// SetMaxDepth sets the maximum crawl depth.
 	SetMaxDepth(depth int)
+	// SetCollector sets the collector for the crawler.
+	SetCollector(collector *colly.Collector)
+	// GetIndexManager returns the index manager interface.
+	GetIndexManager() api.IndexManager
 }
 
 // Module provides the crawler's dependencies.
@@ -37,8 +43,9 @@ var Module = fx.Module("crawler",
 type Params struct {
 	fx.In
 
-	Logger   common.Logger
-	Debugger debug.Debugger `optional:"true"`
+	Logger       common.Logger
+	Debugger     debug.Debugger `optional:"true"`
+	IndexManager api.IndexManager
 }
 
 // Result contains the crawler's provided components.
@@ -63,9 +70,10 @@ func provideCollyDebugger(logger common.Logger) debug.Debugger {
 // provideCrawler creates a new crawler instance.
 func provideCrawler(p Params, bus *events.Bus) (Result, error) {
 	c := &Crawler{
-		Logger:   p.Logger,
-		Debugger: p.Debugger,
-		bus:      bus,
+		Logger:       p.Logger,
+		Debugger:     p.Debugger,
+		bus:          bus,
+		indexManager: p.IndexManager,
 	}
 	return Result{Crawler: c}, nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 )
@@ -37,6 +38,8 @@ type Crawler struct {
 	baseURL string
 	// ctx is the main context for the crawler
 	ctx context.Context
+	// indexManager manages Elasticsearch indices
+	indexManager api.IndexManager
 }
 
 // Ensure Crawler implements the Interface
@@ -96,6 +99,16 @@ func (c *Crawler) SetRateLimit(duration string) error {
 // SetMaxDepth sets the maximum crawl depth.
 func (c *Crawler) SetMaxDepth(depth int) {
 	c.collector.MaxDepth = depth
+}
+
+// SetCollector sets the collector for the crawler.
+func (c *Crawler) SetCollector(collector *colly.Collector) {
+	c.collector = collector
+}
+
+// GetIndexManager returns the index manager interface.
+func (c *Crawler) GetIndexManager() api.IndexManager {
+	return c.indexManager
 }
 
 // handleArticle processes discovered article content.
