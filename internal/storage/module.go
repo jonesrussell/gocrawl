@@ -34,11 +34,22 @@ func NewElasticsearchStorage(
 
 // ProvideElasticsearchClient provides the Elasticsearch client
 func ProvideElasticsearchClient(opts Options, log logger.Interface) (*elasticsearch.Client, error) {
-	client, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{opts.URL},
+	if len(opts.Addresses) == 0 {
+		return nil, errors.New("elasticsearch addresses are required")
+	}
+
+	cfg := elasticsearch.Config{
+		Addresses: opts.Addresses,
 		Username:  opts.Username,
 		Password:  opts.Password,
-	})
+	}
+
+	// Configure TLS if needed
+	if opts.SkipTLS {
+		cfg.Transport = opts.Transport
+	}
+
+	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
 	}
@@ -54,6 +65,7 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*elasticsea
 		return nil, errors.New("failed to connect to Elasticsearch")
 	}
 
+	log.Info("Successfully connected to Elasticsearch", "addresses", opts.Addresses)
 	return client, nil
 }
 

@@ -9,7 +9,7 @@ import (
 
 // Options holds configuration options for ElasticsearchStorage
 type Options struct {
-	URL            string
+	Addresses      []string
 	Username       string
 	Password       string
 	APIKey         string
@@ -44,9 +44,7 @@ func NewOptionsFromConfig(cfg *config.Config) Options {
 	}
 
 	// Set values from config
-	if len(cfg.Elasticsearch.Addresses) > 0 {
-		opts.URL = cfg.Elasticsearch.Addresses[0]
-	}
+	opts.Addresses = cfg.Elasticsearch.Addresses
 	opts.Username = cfg.Elasticsearch.Username
 	opts.Password = cfg.Elasticsearch.Password
 	opts.APIKey = cfg.Elasticsearch.APIKey

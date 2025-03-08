@@ -101,7 +101,7 @@ func New() (*Config, error) {
 			Parallelism:      viper.GetInt("crawler.parallelism"),
 		},
 		Elasticsearch: ElasticsearchConfig{
-			Addresses: []string{viper.GetString("elasticsearch.addresses")},
+			Addresses: viper.GetStringSlice("elasticsearch.addresses"),
 			Username:  viper.GetString("elasticsearch.username"),
 			Password:  viper.GetString("elasticsearch.password"),
 			APIKey:    viper.GetString("elasticsearch.api_key"),
