@@ -56,15 +56,15 @@ func provideSearchManager(client *client.Client, logger common.Logger) (api.Sear
 	return elasticsearch.NewSearchManager(client, logger)
 }
 
-// RegisterHooks sets up lifecycle hooks for starting and stopping the indexing services.
-func RegisterHooks(lc fx.Lifecycle, manager api.IndexManager, logger common.Logger) {
+// RegisterHooks registers lifecycle hooks for the indexing module.
+func RegisterHooks(lc fx.Lifecycle, _ api.IndexManager, logger common.Logger) {
 	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			logger.Info("Starting indexing services")
+		OnStart: func(_ context.Context) error {
+			logger.Info("Starting indexing module")
 			return nil
 		},
-		OnStop: func(ctx context.Context) error {
-			logger.Info("Stopping indexing services")
+		OnStop: func(_ context.Context) error {
+			logger.Info("Stopping indexing module")
 			return nil
 		},
 	})

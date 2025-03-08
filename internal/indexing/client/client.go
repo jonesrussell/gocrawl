@@ -13,6 +13,20 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 )
 
+const (
+	// defaultMaxRetries is the default number of retries for failed requests
+	defaultMaxRetries = 3
+
+	// defaultMaxIdleConns is the default maximum number of idle connections
+	defaultMaxIdleConns = 10
+
+	// defaultMaxIdleTime is the default maximum idle time for connections in seconds
+	defaultMaxIdleTime = 30
+
+	// defaultRetryMaxWait is the default maximum wait time between retries
+	defaultRetryMaxWait = 30 * time.Second
+)
+
 // Config holds the Elasticsearch client configuration.
 type Config struct {
 	Addresses []string
@@ -35,19 +49,30 @@ type Client struct {
 
 // New creates a new Elasticsearch client with the given configuration.
 func New(cfg *config.Config, logger common.Logger) (*Client, error) {
-	esCfg := elasticsearch.Config{
-		Addresses: cfg.Elasticsearch.Addresses,
-		Username:  cfg.Elasticsearch.Username,
-		Password:  cfg.Elasticsearch.Password,
+	// #nosec G402 -- InsecureSkipVerify is configurable and documented as a security risk
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: cfg.Elasticsearch.TLS.SkipVerify,
+		},
+		MaxIdleConns:    defaultMaxIdleConns,
+		IdleConnTimeout: defaultMaxIdleTime * time.Second,
 	}
 
-	es, err := elasticsearch.NewClient(esCfg)
+	escfg := elasticsearch.Config{
+		Addresses:  cfg.Elasticsearch.Addresses,
+		Username:   cfg.Elasticsearch.Username,
+		Password:   cfg.Elasticsearch.Password,
+		Transport:  transport,
+		MaxRetries: defaultMaxRetries,
+	}
+
+	client, err := elasticsearch.NewClient(escfg)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		client: es,
+		client: client,
 		logger: logger,
 		config: &Config{
 			Addresses: cfg.Elasticsearch.Addresses,
@@ -57,8 +82,8 @@ func New(cfg *config.Config, logger common.Logger) (*Client, error) {
 				MaxWait    time.Duration
 				MaxRetries int
 			}{
-				MaxWait:    time.Second * 30,
-				MaxRetries: 3,
+				MaxWait:    defaultRetryMaxWait,
+				MaxRetries: defaultMaxRetries,
 			},
 		},
 	}, nil
