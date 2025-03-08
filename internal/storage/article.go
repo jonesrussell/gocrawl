@@ -154,15 +154,15 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 
 	if res.IsError() {
 		var e map[string]interface{}
-		if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
-			return nil, fmt.Errorf("error parsing error response: %w", err)
+		if decodeErr := json.NewDecoder(res.Body).Decode(&e); decodeErr != nil {
+			return nil, fmt.Errorf("error parsing error response: %w", decodeErr)
 		}
 		return nil, fmt.Errorf("search error: %v", e["error"])
 	}
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error parsing response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("error parsing response: %w", decodeErr)
 	}
 
 	hits, ok := result["hits"].(map[string]interface{})
@@ -178,25 +178,25 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 	articles := make([]*models.Article, 0, len(hitItems))
 
 	for _, hit := range hitItems {
-		hitMap, ok := hit.(map[string]interface{})
-		if !ok {
+		hitMap, isMap := hit.(map[string]interface{})
+		if !isMap {
 			continue
 		}
 
-		source, ok := hitMap["_source"].(map[string]interface{})
-		if !ok {
+		source, isMap := hitMap["_source"].(map[string]interface{})
+		if !isMap {
 			continue
 		}
 
 		var article models.Article
-		sourceData, err := json.Marshal(source)
-		if err != nil {
-			s.Logger.Error("Error marshaling hit source", "error", err)
+		sourceData, marshalErr := json.Marshal(source)
+		if marshalErr != nil {
+			s.Logger.Error("Error marshaling hit source", "error", marshalErr)
 			continue
 		}
 
-		if err := json.Unmarshal(sourceData, &article); err != nil {
-			s.Logger.Error("Error unmarshaling article", "error", err)
+		if unmarshalErr := json.Unmarshal(sourceData, &article); unmarshalErr != nil {
+			s.Logger.Error("Error unmarshaling article", "error", unmarshalErr)
 			continue
 		}
 
