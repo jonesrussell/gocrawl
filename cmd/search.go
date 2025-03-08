@@ -30,7 +30,7 @@ const (
 	DefaultContentPreviewLength = 100
 
 	// DefaultTableWidth defines the maximum width for the content preview column
-	DefaultTableWidth = 80
+	DefaultTableWidth = 160
 
 	// Table column configuration constants
 	columnNumberIndex       = 1

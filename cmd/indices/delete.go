@@ -6,6 +6,7 @@ package indices
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -36,8 +37,6 @@ type deleteParams struct {
 	force bool
 }
 
-var log logger.Interface
-
 // deleteCommand creates and returns the delete command that removes indices.
 // It:
 // - Sets up the command with appropriate usage and description
@@ -56,7 +55,7 @@ Example:
   gocrawl indices delete index1 index2 index3
   gocrawl indices delete --source "Elliot Lake Today"`,
 		Args: validateDeleteArgs,
-		Run:  runDelete,
+		RunE: runDelete,
 	}
 
 	// Add command-line flags
@@ -87,7 +86,7 @@ func validateDeleteArgs(_ *cobra.Command, args []string) error {
 // - Initializes the Fx application with required modules
 // - Handles application lifecycle and error cases
 // - Manages the deletion process
-func runDelete(cmd *cobra.Command, args []string) {
+func runDelete(cmd *cobra.Command, args []string) error {
 	force, _ := cmd.Flags().GetBool("force")
 
 	// Set up signal handling for graceful shutdown
@@ -129,8 +128,7 @@ func runDelete(cmd *cobra.Command, args []string) {
 
 	// Start the application and handle any startup errors
 	if err := app.Start(cmd.Context()); err != nil {
-		common.PrintErrorf("Error starting application: %v", err)
-		os.Exit(1)
+		return fmt.Errorf("error starting application: %w", err)
 	}
 
 	// Wait for either:
@@ -157,12 +155,12 @@ func runDelete(cmd *cobra.Command, args []string) {
 	// Stop the application and handle any shutdown errors
 	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
 		common.PrintErrorf("Error stopping application: %v", err)
-		os.Exit(1)
+		if deleteErr == nil {
+			deleteErr = err
+		}
 	}
 
-	if deleteErr != nil {
-		os.Exit(1)
-	}
+	return deleteErr
 }
 
 // executeDelete performs the actual deletion of indices.

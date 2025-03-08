@@ -6,6 +6,7 @@ package indices
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -55,24 +56,18 @@ func listCommand() *cobra.Command {
 
 Example:
   gocrawl indices list`,
-		Run: runList,
+		RunE: runList,
 	}
 }
 
 // runList executes the list command and displays all indices.
-// This function serves as the main entry point for the list command and handles:
-// - Application lifecycle using Fx dependency injection
-// - Context management for graceful shutdown
-// - Error handling and logging
-// - Exit code management
-//
-// Parameters:
-//   - cmd: The Cobra command instance providing command context
-//   - _: Unused args parameter
-//
-// The function uses a deferred shutdown sequence to ensure proper cleanup
-// regardless of how the command exits.
-func runList(cmd *cobra.Command, _ []string) {
+// It:
+// - Sets up signal handling for graceful shutdown
+// - Creates channels for error handling and completion
+// - Initializes the Fx application with required modules
+// - Handles application lifecycle and error cases
+// - Displays the indices list in a formatted table
+func runList(cmd *cobra.Command, _ []string) error {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -109,8 +104,7 @@ func runList(cmd *cobra.Command, _ []string) {
 
 	// Start the application and handle any startup errors
 	if err := app.Start(cmd.Context()); err != nil {
-		common.PrintErrorf("Error starting application: %v", err)
-		os.Exit(1)
+		return fmt.Errorf("error starting application: %w", err)
 	}
 
 	// Wait for either:
@@ -137,12 +131,12 @@ func runList(cmd *cobra.Command, _ []string) {
 	// Stop the application and handle any shutdown errors
 	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
 		common.PrintErrorf("Error stopping application: %v", err)
-		os.Exit(1)
+		if listErr == nil {
+			listErr = err
+		}
 	}
 
-	if listErr != nil {
-		os.Exit(1)
-	}
+	return listErr
 }
 
 // executeList retrieves and displays the list of indices.
