@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -101,6 +102,8 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
+		config.Module,
+		sources.Module,
 		fx.Invoke(func(lc fx.Lifecycle, storage common.Storage, sources *sources.Sources, l logger.Interface) {
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {

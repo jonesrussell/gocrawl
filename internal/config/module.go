@@ -34,15 +34,11 @@ const (
 // Returns:
 //   - *Config: The initialized configuration
 //   - error: Any error that occurred during initialization
-func InitializeConfig(cfgFile string) (*Config, error) {
+func InitializeConfig() (*Config, error) {
 	// Set config defaults if not already configured
-	if cfgFile == "" {
-		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath(".")
-	} else {
-		viper.SetConfigFile(cfgFile)
-	}
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
 
 	// Set default values for essential configuration
 	viper.SetDefault("log.level", "info")
@@ -149,13 +145,11 @@ func New() (*Config, error) {
 // the application for dependency injection.
 //
 // The module provides:
-// - Config instance via the New constructor
+// - Config instance via the InitializeConfig constructor
 // - HTTP transport configuration via NewHTTPTransport
 var Module = fx.Options(
 	fx.Provide(
-		func() (*Config, error) {
-			return InitializeConfig("")
-		},
+		InitializeConfig,
 		NewHTTPTransport, // Provides HTTP transport configuration
 	),
 )
