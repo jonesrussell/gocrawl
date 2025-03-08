@@ -57,14 +57,23 @@ linters-settings:
             desc: "Use github.com/google/uuid instead, satori's package is not maintained"
           - pkg: "github.com/gofrs/uuid$"
             desc: "Use github.com/gofrs/uuid/v5 or later, it was not a go module before v5"
-      # Add a new rule for logger interface
-      logger:
+      # Rules for enforcing type aliases
+      type_aliases:
         deny:
           - pkg: "github.com/jonesrussell/gocrawl/internal/logger.Interface"
             desc: "Use common.Logger type alias instead of logger.Interface directly"
+          - pkg: "github.com/jonesrussell/gocrawl/internal/storage.Interface"
+            desc: "Use common.Storage type alias instead of storage.Interface directly"
+          - pkg: "github.com/jonesrussell/gocrawl/internal/sources.Sources"
+            desc: "Use common.Sources type alias instead of sources.Sources directly"
+          - pkg: "github.com/jonesrussell/gocrawl/internal/config.Config"
+            desc: "Use common.Config type alias instead of config.Config directly"
         files:
-          - "!internal/logger/*"  # Exclude the logger package itself
-          - "!internal/common/*"  # Exclude the common package where the alias is defined
+          - "!internal/logger/*"    # Exclude the logger package itself
+          - "!internal/storage/*"   # Exclude the storage package itself
+          - "!internal/sources/*"   # Exclude the sources package itself
+          - "!internal/config/*"    # Exclude the config package itself
+          - "!internal/common/*"    # Exclude the common package where aliases are defined
 
   errcheck:
     # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.

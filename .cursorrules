@@ -16,7 +16,11 @@ Dependency Injection & Interfaces
 - For module-specific interfaces, define them in module.go
 - For interfaces used across multiple packages, define them in the consuming package
 - Avoid interface stuttering (e.g., use `Logger` instead of `CollectorLogger`)
-- Use common.Logger instead of logger.Interface directly
+- Use type aliases from common package:
+  - Use common.Logger instead of logger.Interface
+  - Use common.Storage instead of storage.Interface
+  - Use common.Sources instead of sources.Sources
+  - Use common.Config instead of config.Config
 - Define New* constructors only in module.go files
 
 Error Handling
