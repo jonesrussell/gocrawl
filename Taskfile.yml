@@ -63,3 +63,5 @@ tasks:
     desc: "Run the HTTP API server"
     cmds:
       - go run main.go httpd
+    ignore_error: true
+    interactive: true

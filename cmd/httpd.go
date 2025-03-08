@@ -87,8 +87,10 @@ You can send POST requests to /search with a JSON body containing the search par
 		select {
 		case sig := <-sigChan:
 			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+			// Graceful shutdown requested, not an error
 		case <-cmd.Context().Done():
 			common.PrintInfof("\nContext cancelled, initiating shutdown...")
+			// Context cancellation requested, not an error
 		case serverErr = <-errChan:
 			// Error already logged in OnStart hook
 		case <-doneChan:
@@ -102,12 +104,16 @@ You can send POST requests to /search with a JSON body containing the search par
 		// Stop the application and handle any shutdown errors
 		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
 			common.PrintErrorf("Error during shutdown: %v", err)
-			if serverErr == nil {
+			if serverErr == nil && !errors.Is(err, context.Canceled) {
 				serverErr = err
 			}
 		}
 
-		return serverErr
+		// Only return error for actual failures, not graceful shutdowns
+		if serverErr != nil && !errors.Is(serverErr, context.Canceled) {
+			return serverErr
+		}
+		return nil
 	},
 }
 
