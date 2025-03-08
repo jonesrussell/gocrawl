@@ -122,6 +122,37 @@ Example:
 					},
 					fx.ResultTags(`name:"crawlContext"`),
 				),
+				fx.Annotate(
+					func() string {
+						return sourceName
+					},
+					fx.ResultTags(`name:"sourceName"`),
+				),
+				fx.Annotate(
+					func(sources *sources.Sources) string {
+						// Get the source configuration
+						source, err := sources.FindByName(sourceName)
+						if err != nil {
+							return "" // Return empty string if source not found
+						}
+						return source.Index
+					},
+					fx.ResultTags(`name:"contentIndex"`),
+				),
+				fx.Annotate(
+					func(sources *sources.Sources) string {
+						// Get the source configuration
+						source, err := sources.FindByName(sourceName)
+						if err != nil {
+							return "" // Return empty string if source not found
+						}
+						return source.ArticleIndex
+					},
+					fx.ResultTags(`name:"indexName"`),
+				),
+				func() chan *models.Article {
+					return make(chan *models.Article, DefaultChannelBufferSize)
+				},
 			),
 			fx.Invoke(func(lc fx.Lifecycle, p CrawlParams) {
 				lc.Append(fx.Hook{
@@ -231,6 +262,7 @@ func startCrawl(p CrawlParams) error {
 		Parallelism:      p.Config.Crawler.Parallelism,
 		RandomDelay:      p.Config.Crawler.RandomDelay,
 		Context:          p.Context,
+		Done:             p.Done,
 	})
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)

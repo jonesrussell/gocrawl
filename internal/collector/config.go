@@ -23,6 +23,8 @@ const (
 	errMissingArticleProc = "article processor is required"
 	// errMissingLogger is returned when the logger is not provided
 	errMissingLogger = "logger is required"
+	// errMissingDone is returned when the done channel is not provided
+	errMissingDone = "done channel is required"
 )
 
 // Params holds the parameters for creating a Collector.
@@ -53,17 +55,17 @@ type Params struct {
 	RateLimit time.Duration
 	// Source contains source-specific configuration
 	Source *config.Source
+	// Done is a channel that signals when crawling is complete
+	Done chan struct{} `name:"crawlDone"`
 }
 
-// Result holds the collector instance and completion channel.
+// Result holds the collector instance.
 // It uses fx.Out for dependency injection.
 type Result struct {
 	fx.Out
 
 	// Collector is the configured Colly collector instance
 	Collector *colly.Collector
-	// Done is a channel that signals when crawling is complete
-	Done chan struct{}
 }
 
 // ValidateParams validates the collector parameters.
@@ -88,6 +90,11 @@ func ValidateParams(p Params) error {
 	// Ensure Logger is provided
 	if p.Logger == nil {
 		return errors.New(errMissingLogger)
+	}
+
+	// Ensure Done channel is provided
+	if p.Done == nil {
+		return errors.New(errMissingDone)
 	}
 
 	return nil

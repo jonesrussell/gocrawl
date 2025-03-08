@@ -15,13 +15,13 @@ import (
 // 3. Sets up the collector with the configuration
 // 4. Validates the base URL
 // 5. Creates and configures the base collector
-// 6. Sets up event handlers and completion channel
+// 6. Sets up event handlers using the provided completion channel
 //
 // Parameters:
 //   - p: Params containing all required configuration and dependencies
 //
 // Returns:
-//   - Result: Contains the configured collector and completion channel
+//   - Result: Contains the configured collector
 //   - error: Any error that occurred during setup
 func New(p Params) (Result, error) {
 	// Validate input parameters
@@ -60,9 +60,8 @@ func New(p Params) (Result, error) {
 		return Result{}, fmt.Errorf("failed to configure collector: %w", configErr)
 	}
 
-	// Create completion channel and event handlers
-	done := make(chan struct{})
-	handlers := NewHandlers(cfg, done, c)
+	// Use the provided done channel for event handlers
+	handlers := NewHandlers(cfg, p.Done, c)
 	handlers.ConfigureHandlers()
 
 	// Log successful collector creation with configuration details
@@ -73,6 +72,6 @@ func New(p Params) (Result, error) {
 		"parallelism", p.Parallelism,
 	)
 
-	// Return configured collector and completion channel
-	return Result{Collector: c, Done: done}, nil
+	// Return configured collector
+	return Result{Collector: c}, nil
 }

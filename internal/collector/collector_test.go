@@ -83,6 +83,7 @@ func TestNew(t *testing.T) {
 				Context:          t.Context(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Source:           createTestConfig(),
+				Done:             make(chan struct{}),
 			},
 			wantErr: false,
 		},
@@ -99,6 +100,7 @@ func TestNew(t *testing.T) {
 				Context:          t.Context(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Source:           createTestConfig(),
+				Done:             make(chan struct{}),
 			},
 			wantErr:    true,
 			wantErrMsg: "base URL cannot be empty",
@@ -116,6 +118,7 @@ func TestNew(t *testing.T) {
 				Context:          t.Context(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Source:           createTestConfig(),
+				Done:             make(chan struct{}),
 			},
 			wantErr:    true,
 			wantErrMsg: "invalid base URL: not-a-url, must be a valid HTTP/HTTPS URL",
@@ -151,6 +154,42 @@ func TestNew(t *testing.T) {
 			}
 		})
 	}
+
+	// Test for missing logger
+	t.Run("missing logger", func(t *testing.T) {
+		params := collector.Params{
+			BaseURL:          "http://example.com",
+			Logger:           nil,
+			ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
+			Context:          t.Context(),
+			Source:           createTestConfig(),
+			Done:             make(chan struct{}),
+		}
+
+		result, err := collector.New(params)
+
+		require.Error(t, err)
+		require.Equal(t, "logger is required", err.Error())
+		require.Empty(t, result)
+	})
+
+	// Test for missing done channel
+	t.Run("missing done channel", func(t *testing.T) {
+		params := collector.Params{
+			BaseURL:          "http://example.com",
+			Logger:           logger.NewMockLogger(),
+			ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
+			Context:          t.Context(),
+			Source:           createTestConfig(),
+			Done:             nil,
+		}
+
+		result, err := collector.New(params)
+
+		require.Error(t, err)
+		require.Equal(t, "done channel is required", err.Error())
+		require.Empty(t, result)
+	})
 }
 
 // TestCollectorCreation tests the collector creation with different URLs
@@ -208,6 +247,7 @@ func TestCollectorCreation(t *testing.T) {
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Context:          t.Context(),
 				Source:           cfg,
+				Done:             make(chan struct{}),
 			}
 
 			result, err := collector.New(params)
@@ -230,6 +270,7 @@ func TestCollectorCreation(t *testing.T) {
 			ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 			Context:          t.Context(),
 			Source:           createTestConfig(),
+			Done:             make(chan struct{}),
 		}
 
 		result, err := collector.New(params)
