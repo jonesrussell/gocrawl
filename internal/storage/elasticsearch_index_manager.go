@@ -1,5 +1,4 @@
-// Package elasticsearch provides Elasticsearch-specific implementations of the indexing interfaces.
-package elasticsearch
+package storage
 
 import (
 	"bytes"
@@ -10,26 +9,26 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/jonesrussell/gocrawl/internal/indexing"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
-// Manager implements the indexing.Manager interface using Elasticsearch.
-type Manager struct {
+// ElasticsearchIndexManager implements the api.IndexManager interface using Elasticsearch.
+type ElasticsearchIndexManager struct {
 	client *elasticsearch.Client
 	logger logger.Interface
 }
 
-// NewManager creates a new Elasticsearch index manager.
-func NewManager(client *elasticsearch.Client, logger logger.Interface) indexing.Manager {
-	return &Manager{
+// NewElasticsearchIndexManager creates a new Elasticsearch index manager.
+func NewElasticsearchIndexManager(client *elasticsearch.Client, logger logger.Interface) api.IndexManager {
+	return &ElasticsearchIndexManager{
 		client: client,
 		logger: logger,
 	}
 }
 
 // EnsureIndex ensures that an index exists with the given mapping.
-func (m *Manager) EnsureIndex(ctx context.Context, name string, mapping interface{}) error {
+func (m *ElasticsearchIndexManager) EnsureIndex(ctx context.Context, name string, mapping interface{}) error {
 	exists, err := m.IndexExists(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to check index existence: %w", err)
@@ -65,7 +64,7 @@ func (m *Manager) EnsureIndex(ctx context.Context, name string, mapping interfac
 }
 
 // DeleteIndex deletes an index.
-func (m *Manager) DeleteIndex(ctx context.Context, name string) error {
+func (m *ElasticsearchIndexManager) DeleteIndex(ctx context.Context, name string) error {
 	req := esapi.IndicesDeleteRequest{
 		Index: []string{name},
 	}
@@ -88,7 +87,7 @@ func (m *Manager) DeleteIndex(ctx context.Context, name string) error {
 }
 
 // IndexExists checks if an index exists.
-func (m *Manager) IndexExists(ctx context.Context, name string) (bool, error) {
+func (m *ElasticsearchIndexManager) IndexExists(ctx context.Context, name string) (bool, error) {
 	req := esapi.IndicesExistsRequest{
 		Index: []string{name},
 	}
@@ -104,7 +103,7 @@ func (m *Manager) IndexExists(ctx context.Context, name string) (bool, error) {
 }
 
 // UpdateMapping updates the mapping of an existing index.
-func (m *Manager) UpdateMapping(ctx context.Context, name string, mapping interface{}) error {
+func (m *ElasticsearchIndexManager) UpdateMapping(ctx context.Context, name string, mapping interface{}) error {
 	exists, err := m.IndexExists(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to check index existence: %w", err)

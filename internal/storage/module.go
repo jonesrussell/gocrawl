@@ -5,8 +5,7 @@ import (
 	"fmt"
 
 	es "github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/indexing"
-	"github.com/jonesrussell/gocrawl/internal/indexing/elasticsearch"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
@@ -22,11 +21,11 @@ var Module = fx.Module("storage",
 )
 
 // ProvideIndexManager creates and returns an IndexManager implementation
-func ProvideIndexManager(client *es.Client, log logger.Interface) (indexing.Manager, error) {
+func ProvideIndexManager(client *es.Client, log logger.Interface) (api.IndexManager, error) {
 	if client == nil {
 		return nil, errors.New("elasticsearch client is required")
 	}
-	return elasticsearch.NewManager(client, log), nil
+	return NewElasticsearchIndexManager(client, log), nil
 }
 
 // NewElasticsearchStorage creates a new ElasticsearchStorage instance

@@ -15,7 +15,6 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/indexing"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -106,7 +105,6 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	// Initialize the Fx application with required modules and dependencies
 	app := fx.New(
 		common.Module,
-		indexing.Module,
 		fx.Provide(
 			// Provide search parameters with appropriate tags for dependency injection
 			fx.Annotate(
