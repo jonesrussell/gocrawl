@@ -126,9 +126,11 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
-			"weighted_field_search": map[string]interface{}{
-				"query":  query,
-				"fields": []string{"title^2", "body", "tags"},
+			"multi_match": map[string]interface{}{
+				"query":    query,
+				"fields":   []string{"title^2", "body", "tags"},
+				"type":     "best_fields",
+				"operator": "or",
 			},
 		},
 		"size": size,
@@ -143,18 +145,26 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 		s.ESClient.Search.WithContext(ctx),
 		s.ESClient.Search.WithIndex(s.IndexName),
 		s.ESClient.Search.WithBody(&buf),
+		s.ESClient.Search.WithTrackTotalHits(true),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error executing search: %w", err)
 	}
 	defer res.Body.Close()
 
-	var result map[string]interface{}
-	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		return nil, fmt.Errorf("error parsing response: %w", decodeErr)
+	if res.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return nil, fmt.Errorf("error parsing error response: %w", err)
+		}
+		return nil, fmt.Errorf("search error: %v", e["error"])
 	}
 
-	// Check if "hits" exists and is of the expected type
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+
 	hits, ok := result["hits"].(map[string]interface{})
 	if !ok {
 		return nil, errors.New("error parsing hits: expected map[string]interface{}")
@@ -168,24 +178,26 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 	articles := make([]*models.Article, 0, len(hitItems))
 
 	for _, hit := range hitItems {
-		hitMap, hitOk := hit.(map[string]interface{})
-		if !hitOk {
-			return nil, errors.New("error parsing hit: expected map[string]interface{}")
+		hitMap, ok := hit.(map[string]interface{})
+		if !ok {
+			continue
 		}
 
-		source, sourceOk := hitMap["_source"].(map[string]interface{})
-		if !sourceOk {
-			return nil, errors.New("error parsing source: expected map[string]interface{}")
+		source, ok := hitMap["_source"].(map[string]interface{})
+		if !ok {
+			continue
 		}
 
 		var article models.Article
-		sourceData, marshalErr := json.Marshal(source)
-		if marshalErr != nil {
-			return nil, fmt.Errorf("error marshaling hit source: %w", marshalErr)
+		sourceData, err := json.Marshal(source)
+		if err != nil {
+			s.Logger.Error("Error marshaling hit source", "error", err)
+			continue
 		}
 
-		if unmarshalErr := json.Unmarshal(sourceData, &article); unmarshalErr != nil {
-			return nil, fmt.Errorf("error unmarshaling article: %w", unmarshalErr)
+		if err := json.Unmarshal(sourceData, &article); err != nil {
+			s.Logger.Error("Error unmarshaling article", "error", err)
+			continue
 		}
 
 		articles = append(articles, &article)

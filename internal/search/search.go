@@ -65,7 +65,6 @@ func (s *Service) SearchContent(ctx context.Context, query string, _ string, siz
 			URL:     article.Source,
 			Content: article.Body,
 		}
-		s.Logger.Info("Search result", "url", article.Source, "content", article.Body)
 	}
 
 	return searchResults, nil

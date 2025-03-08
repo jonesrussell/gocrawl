@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/search"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -23,6 +24,21 @@ const (
 	// DefaultSearchSize defines the default number of search results to return
 	// when no size is specified via command-line flags
 	DefaultSearchSize = 10
+
+	// DefaultContentPreviewLength defines the maximum length for content previews
+	// in search results before truncation
+	DefaultContentPreviewLength = 100
+
+	// DefaultTableWidth defines the maximum width for the content preview column
+	DefaultTableWidth = 80
+
+	// Table column configuration constants
+	columnNumberIndex       = 1
+	columnNumberURL         = 2
+	columnNumberContent     = 3
+	columnWidthIndex        = 4
+	columnWidthURLRatio     = 3 // URL column takes 1/3 of table width
+	columnWidthContentRatio = 3 // Content column takes 2/3 of table width
 )
 
 // SearchParams holds the parameters required for executing a search operation.
@@ -31,7 +47,7 @@ type SearchParams struct {
 	fx.In
 
 	// Logger provides logging capabilities for the search operation
-	Logger logger.Interface
+	Logger common.Logger
 	// Config holds the application configuration
 	Config common.Config
 	// SearchSvc is the service responsible for executing searches
@@ -143,7 +159,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 // - Logs the start of the search operation
 // - Executes the search using the search service
 // - Handles and logs any errors
-// - Displays the search results
+// - Displays the search results in a formatted table
 func executeSearch(ctx context.Context, p SearchParams) error {
 	// Log the start of the search operation with parameters
 	p.Logger.Info("Starting search...",
@@ -159,21 +175,73 @@ func executeSearch(ctx context.Context, p SearchParams) error {
 		return fmt.Errorf("search failed: %w", err)
 	}
 
+	// Log completion with result count
+	p.Logger.Info("Search completed",
+		"query", p.Query,
+		"results", len(results),
+	)
+
 	// Handle empty results
 	if len(results) == 0 {
-		common.PrintInfof("No results found")
+		common.PrintInfof("No results found for query: %s", p.Query)
 		return nil
 	}
 
-	// Display search results
-	common.PrintInfof("\nFound %d results:", len(results))
+	// Create and configure the table
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.SetStyle(table.StyleRounded)
+	t.Style().Options.DrawBorder = true
+	t.Style().Options.SeparateRows = true
+
+	// Configure column widths
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: columnNumberIndex, WidthMax: columnWidthIndex},
+		{Number: columnNumberURL, WidthMax: DefaultTableWidth / columnWidthURLRatio},
+		{Number: columnNumberContent, WidthMax: DefaultTableWidth * 2 / columnWidthContentRatio},
+	})
+
+	// Set up the headers
+	t.AppendHeader(table.Row{"#", "URL", "Content Preview"})
+
+	// Add each result as a row
 	for i, result := range results {
-		common.PrintInfof("\nResult %d:", i+1)
-		common.PrintInfof("URL: %s", result.URL)
-		common.PrintInfof("Content: %s", result.Content)
+		// Clean and format the content preview
+		content := strings.TrimSpace(result.Content)
+		content = strings.ReplaceAll(content, "\n", " ")
+		content = strings.Join(strings.Fields(content), " ")
+		contentPreview := truncateString(content, DefaultContentPreviewLength)
+
+		// Clean and format the URL
+		url := strings.TrimSpace(result.URL)
+		if url == "" {
+			url = "N/A"
+		}
+
+		t.AppendRow(table.Row{
+			i + 1,
+			url,
+			contentPreview,
+		})
 	}
 
+	// Add a footer with summary information
+	t.AppendFooter(table.Row{"Total", len(results), fmt.Sprintf("Query: %s", p.Query)})
+
+	// Print a header
+	common.PrintInfof("\nSearch Results:")
+	// Render the table
+	t.Render()
+
 	return nil
+}
+
+// truncateString truncates a string to the specified length and adds ellipsis if needed
+func truncateString(s string, length int) string {
+	if len(s) <= length {
+		return s
+	}
+	return s[:length-3] + "..."
 }
 
 // init initializes the search command by:
