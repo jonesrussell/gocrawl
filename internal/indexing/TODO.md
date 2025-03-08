@@ -60,6 +60,36 @@ type SearchManager interface {
 }
 ```
 
+### 4. fx Integration
+```go
+// Parameters for fx dependency injection
+type IndexParams struct {
+    fx.In
+    
+    Lifecycle fx.Lifecycle
+    Logger    logger.Interface
+    Config    *config.Config
+}
+
+// Result for fx dependency injection
+type IndexResult struct {
+    fx.Out
+    
+    IndexManager    IndexManager
+    DocumentManager DocumentManager
+    SearchManager   SearchManager
+}
+
+var Module = fx.Module("indexing",
+    fx.Provide(
+        NewIndexManager,
+        NewDocumentManager,
+        NewSearchManager,
+    ),
+    fx.Invoke(RegisterLifecycle),
+)
+```
+
 ## Implementation Tasks
 1. [ ] Create package structure
 2. [ ] Define interfaces in common package
@@ -70,19 +100,39 @@ type SearchManager interface {
 7. [ ] Write comprehensive tests
 8. [ ] Add documentation
 
+## CLI Integration
+1. [ ] Add index management commands
+   - Create index
+   - Delete index
+   - List indices
+   - Update mappings
+2. [ ] Add document management commands
+   - Index document
+   - Delete document
+   - Get document
+3. [ ] Add search commands
+   - Basic search
+   - Aggregations
+4. [ ] Add progress reporting
+5. [ ] Add proper error handling
+6. [ ] Support configuration via flags
+7. [ ] Add index validation commands
+
 ## Migration Plan
 1. Create new package
 2. Move index-related code from storage package
 3. Update crawler to use new interfaces
 4. Update dependency injection
-5. Add metrics and monitoring
-6. Update tests
-7. Update documentation
+5. Add CLI commands
+6. Add metrics and monitoring
+7. Update tests
+8. Update documentation
 
 ## Dependencies
 - github.com/elastic/go-elasticsearch/v8
 - go.uber.org/fx for DI
 - go.uber.org/zap for logging
+- github.com/spf13/cobra for CLI
 
 ## Notes
 - All operations should support context for cancellation
@@ -90,4 +140,10 @@ type SearchManager interface {
 - Include metrics for monitoring
 - Support bulk operations where appropriate
 - Include proper logging
-- Support configuration via environment variables 
+- Support configuration via environment variables
+- Add index templates support
+- Support index aliases
+- Implement index lifecycle management
+- Add index backup/restore commands
+- Support index reindexing
+- Add index optimization commands 
