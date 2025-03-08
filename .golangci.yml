@@ -409,3 +409,14 @@ issues:
         - gosec
         - noctx
         - wrapcheck
+
+  custom:
+    - linters:
+        - gocritic
+      text: "Use common.Logger type alias instead of logger.Interface directly"
+    - linters:
+        - gocritic
+      text: "Use common.Storage type alias instead of storage.Interface directly"
+    - linters:
+        - gocritic
+      text: "Use common.Config type alias instead of config.Config directly"

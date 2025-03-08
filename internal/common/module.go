@@ -4,13 +4,9 @@
 package common
 
 import (
-	"context"
-
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 )
@@ -22,10 +18,6 @@ type (
 	// Storage is an alias for the storage interface, providing
 	// data persistence operations across the application.
 	Storage = storage.Interface
-
-	// Sources is an alias for the sources type, providing
-	// access to source configuration and management.
-	Sources = *sources.Sources
 
 	// Config is an alias for the configuration type, providing
 	// access to application-wide settings.
@@ -48,17 +40,7 @@ var Module = fx.Module("common",
 	}),
 
 	// Core modules used by most commands.
-	// These modules provide essential services and functionality
-	// that are commonly required across different parts of the application.
-	config.Module,  // Provides configuration management
-	logger.Module,  // Provides structured logging capabilities
-	storage.Module, // Provides data persistence operations
-	sources.Module, // Provides source configuration and management
-
-	// Provide command context
-	fx.Provide(
-		func(cmd *cobra.Command) context.Context {
-			return cmd.Context()
-		},
-	),
+	config.Module,
+	logger.Module,
+	storage.Module,
 )

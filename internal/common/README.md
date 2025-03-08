@@ -34,6 +34,45 @@ Key features:
 - Table formatting utilities
 - Visual dividers
 
+## Type Aliases
+
+The package provides type aliases for commonly used interfaces and types:
+
+```go
+// Logger is an alias for the logger interface
+var logger common.Logger
+
+// Storage is an alias for the storage interface
+var storage common.Storage
+
+// Config is an alias for the configuration type
+var config common.Config
+```
+
+## Module
+
+The common module provides shared dependencies for commands:
+
+```go
+var Module = fx.Module("common",
+    config.Module,
+    logger.Module,
+    storage.Module,
+)
+```
+
+## Usage
+
+Import the common package to access shared types and utilities:
+
+```go
+import "github.com/jonesrussell/gocrawl/internal/common"
+
+func example(logger common.Logger, storage common.Storage) {
+    // Use logger and storage
+}
+```
+
 ## Usage Examples
 
 ### Output Formatting
@@ -57,21 +96,6 @@ common.PrintTableHeaderf("%-20s %-10s %s", "Name", "Status", "Description")
 
 // Print divider
 common.PrintDivider(50)
-```
-
-### Using Type Aliases
-```go
-// Use logger interface
-var log common.Logger
-
-// Use storage interface
-var store common.Storage
-
-// Use sources type
-var sources common.Sources
-
-// Use config type
-var cfg common.Config
 ```
 
 ### Using Timeouts

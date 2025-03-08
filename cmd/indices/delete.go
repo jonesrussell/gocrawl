@@ -13,6 +13,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -29,7 +30,7 @@ type deleteParams struct {
 
 	ctx     context.Context
 	storage common.Storage
-	sources common.Sources
+	sources *sources.Sources
 	logger  logger.Interface
 	// indices contains the list of indices to delete
 	indices []string
@@ -100,7 +101,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
-		fx.Invoke(func(lc fx.Lifecycle, storage common.Storage, sources common.Sources, l logger.Interface) {
+		fx.Invoke(func(lc fx.Lifecycle, storage common.Storage, sources *sources.Sources, l logger.Interface) {
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
 					params := &deleteParams{
@@ -194,7 +195,7 @@ func executeDelete(p *deleteParams) error {
 	return deleteIndices(p, indicesToDelete)
 }
 
-// resolveIndices determines which indices should be deleted.
+// resolveIndices determines which indices to delete.
 // It:
 // - Uses command-line arguments if provided
 // - Uses source configuration if --source flag is used
@@ -204,7 +205,8 @@ func resolveIndices(p *deleteParams) error {
 		if err != nil {
 			return err
 		}
-		p.indices = []string{source.ArticleIndex, source.Index}
+		// Use the source name as the index name
+		p.indices = []string{source.Name}
 	}
 	return nil
 }

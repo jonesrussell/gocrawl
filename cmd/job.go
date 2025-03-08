@@ -12,20 +12,26 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
-// JobParams holds the parameters required for running the job scheduler.
-// It uses fx.In for dependency injection of required components.
+// JobParams defines the parameters for job execution.
 type JobParams struct {
 	fx.In
 
-	// Logger provides logging capabilities for the job scheduler
-	Logger logger.Interface
-	// Sources contains the configuration for all content sources
-	Sources common.Sources
+	// Cmd is the cobra command instance
+	Cmd *cobra.Command
+
+	// Logger provides structured logging capabilities
+	Logger common.Logger
+
+	// Sources provides access to source configuration
+	Sources *sources.Sources
+
+	// Storage provides data persistence operations
+	Storage common.Storage
 }
 
 // startJobScheduler initializes and manages the job scheduler lifecycle.
@@ -118,7 +124,7 @@ func checkAndRunJobs(p JobParams, rootCmd string, now time.Time) {
 // - Constructs the command with appropriate arguments
 // - Sets up stdout and stderr
 // - Logs command execution
-func runCrawlCommand(rootCmd, sourceName string, logger logger.Interface) error {
+func runCrawlCommand(rootCmd, sourceName string, logger common.Logger) error {
 	cmdArgs := []string{"crawl", sourceName}
 	cmd := exec.Command(rootCmd, cmdArgs...)
 	cmd.Stdout = os.Stdout
@@ -171,4 +177,15 @@ var jobCmd = &cobra.Command{
 // init initializes the job scheduler command by adding it to the root command.
 func init() {
 	rootCmd.AddCommand(jobCmd)
+}
+
+// NewJobCmd creates a new job command.
+func NewJobCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "job",
+		Short: "Run a job",
+		Long:  "Run a job with the specified configuration",
+	}
+
+	return cmd
 }

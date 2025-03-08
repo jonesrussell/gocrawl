@@ -19,7 +19,6 @@ Dependency Injection & Interfaces
 - Use type aliases from common package:
   - Use common.Logger instead of logger.Interface
   - Use common.Storage instead of storage.Interface
-  - Use common.Sources instead of sources.Sources
   - Use common.Config instead of config.Config
 - Define New* constructors only in module.go files
 
