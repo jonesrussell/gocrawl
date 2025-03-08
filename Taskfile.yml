@@ -1,7 +1,19 @@
 version: '3'
 
 tasks:
-  
+  api:
+    desc: "Run the HTTP API server"
+    cmds:
+      - go run main.go httpd
+    ignore_error: true
+    interactive: true
+
+  build:
+    desc: "Build the web crawler executable"
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/gocrawl main.go
+
   crawl:
     desc: "Run the web crawler for a single source defined in sources.yml"
     cmds:
@@ -10,10 +22,22 @@ tasks:
       - go run main.go crawl {{.CLI_ARGS | trim}}
       - go run main.go indices list
 
+  help:
+    desc: "Show available commands"
+    cmds:
+      - go run main.go --help
+
   indices:list:
     desc: "List all Elasticsearch indices"
     cmds:
       - go run main.go indices list
+
+  lint:
+    desc: "Lint the Go code"
+    cmds:
+      - go fmt ./...
+      - go vet ./...
+      - golangci-lint run ./...
 
   search:
     desc: "Search crawled content"
@@ -24,19 +48,6 @@ tasks:
     desc: "List all sources"
     cmds:
       - go run main.go sources list
-
-  build:
-    desc: "Build the web crawler executable"
-    cmds:
-      - mkdir -p bin
-      - go build -o bin/gocrawl main.go
-
-  lint:
-    desc: "Lint the Go code"
-    cmds:
-      - go fmt ./...
-      - go vet ./...
-      - golangci-lint run ./...
 
   test:
     desc: "Run the tests"
@@ -53,15 +64,3 @@ tasks:
     generates:
       - coverage/coverage.out
       - coverage/coverage.html
-
-  help:
-    desc: "Show available commands"
-    cmds:
-      - go run main.go --help
-
-  api:
-    desc: "Run the HTTP API server"
-    cmds:
-      - go run main.go httpd
-    ignore_error: true
-    interactive: true
