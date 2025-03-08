@@ -18,9 +18,10 @@ tasks:
     desc: "Run the web crawler for a single source defined in sources.yml"
     cmds:
       - echo '' > app.log
-      - go run main.go indices delete --source {{.CLI_ARGS | trim}} --force
+      - go run main.go indices delete --source {{.CLI_ARGS | trim}} --force || true
       - go run main.go crawl {{.CLI_ARGS | trim}}
       - go run main.go indices list
+    interactive: true
 
   help:
     desc: "Show available commands"
@@ -31,6 +32,7 @@ tasks:
     desc: "List all Elasticsearch indices"
     cmds:
       - go run main.go indices list
+    ignore_error: true
 
   lint:
     desc: "Lint the Go code"
@@ -43,11 +45,14 @@ tasks:
     desc: "Search crawled content"
     cmds:
       - go run main.go search -q "{{.CLI_ARGS}}" -i elliotlake_elliotlaketoday_articles
+    ignore_error: true
+    interactive: true
 
   sources:list:
     desc: "List all sources"
     cmds:
       - go run main.go sources list
+    ignore_error: true
 
   test:
     desc: "Run the tests"
