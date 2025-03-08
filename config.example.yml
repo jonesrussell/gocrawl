@@ -1,17 +1,18 @@
-# Application Environment Configuration
+APP_NAME: gocrawl
 APP_ENV: development
-LOG_LEVEL: debug
 APP_DEBUG: true
 
-# Elasticsearch Configuration
+# Log level for the application. Options: debug, info, warn, error, fatal, panic
+LOG_LEVEL: debug
+
 ELASTIC_URL: https://localhost:9200
-ELASTIC_USERNAME: elastic
-ELASTIC_PASSWORD: new_password_here
-ELASTIC_API_KEY: new_api_key_here
-ELASTIC_INDEX_NAME: articles
+ELASTIC_USERNAME: <your-username>
+ELASTIC_PASSWORD: <your-password>
+ELASTIC_API_KEY: <your-api-key>
+
 ELASTIC_SKIP_TLS: true
 
-# Crawler Configuration
-CRAWLER_BASE_URL: https://www.newwebsite.com/police-beat
 CRAWLER_MAX_DEPTH: 2
 CRAWLER_RATE_LIMIT: 2s
+CRAWLER_PARALLELISM: 2
+CRAWLER_RANDOM_DELAY: 5s
