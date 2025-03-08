@@ -19,6 +19,10 @@ var (
 	errInvalidHitsFormat     = errors.New("invalid response format: missing hits")
 	errInvalidHitsListFormat = errors.New("invalid response format: missing hits list")
 	errInvalidAggregations   = errors.New("invalid response format: missing aggregations")
+	errFailedDecode          = errors.New("failed to decode response")
+	errFailedMarshalQuery    = errors.New("failed to marshal query")
+	errFailedMarshalAggs     = errors.New("failed to marshal aggregation")
+	errInvalidStatus         = errors.New("invalid response status")
 )
 
 // SearchManager implements the api.SearchManager interface using Elasticsearch.
@@ -39,7 +43,7 @@ func NewSearchManager(client *client.Client, logger common.Logger) (api.SearchMa
 func (sm *SearchManager) Search(ctx context.Context, index string, query interface{}) ([]interface{}, error) {
 	body, err := json.Marshal(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal query: %w", err)
+		return nil, fmt.Errorf("%w: %w", errFailedMarshalQuery, err)
 	}
 
 	req := esapi.SearchRequest{
@@ -54,13 +58,15 @@ func (sm *SearchManager) Search(ctx context.Context, index string, query interfa
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, indexerrors.NewSearchError(index, query, "search", fmt.Errorf("status: %s", res.Status()))
+		statusErr := errors.New(res.Status())
+		wrappedErr := fmt.Errorf("%w: %w", errInvalidStatus, statusErr)
+		return nil, indexerrors.NewSearchError(index, query, "search", wrappedErr)
 	}
 
 	var result map[string]interface{}
 	decodeErr := json.NewDecoder(res.Body).Decode(&result)
 	if decodeErr != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", decodeErr)
+		return nil, fmt.Errorf("%w: %w", errFailedDecode, decodeErr)
 	}
 
 	hits, isMap := result["hits"].(map[string]interface{})
@@ -92,7 +98,7 @@ func (sm *SearchManager) Search(ctx context.Context, index string, query interfa
 func (sm *SearchManager) Count(ctx context.Context, index string, query interface{}) (int64, error) {
 	body, err := json.Marshal(query)
 	if err != nil {
-		return 0, fmt.Errorf("failed to marshal query: %w", err)
+		return 0, fmt.Errorf("%w: %w", errFailedMarshalQuery, err)
 	}
 
 	req := esapi.CountRequest{
@@ -107,7 +113,9 @@ func (sm *SearchManager) Count(ctx context.Context, index string, query interfac
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return 0, indexerrors.NewSearchError(index, query, "count", fmt.Errorf("status: %s", res.Status()))
+		statusErr := errors.New(res.Status())
+		wrappedErr := fmt.Errorf("%w: %w", errInvalidStatus, statusErr)
+		return 0, indexerrors.NewSearchError(index, query, "count", wrappedErr)
 	}
 
 	var result struct {
@@ -115,7 +123,7 @@ func (sm *SearchManager) Count(ctx context.Context, index string, query interfac
 	}
 	decodeErr := json.NewDecoder(res.Body).Decode(&result)
 	if decodeErr != nil {
-		return 0, fmt.Errorf("failed to decode response: %w", decodeErr)
+		return 0, fmt.Errorf("%w: %w", errFailedDecode, decodeErr)
 	}
 
 	sm.logger.Info("Count completed", "index", index, "count", result.Count)
@@ -129,7 +137,7 @@ func (sm *SearchManager) Aggregate(ctx context.Context, index string, aggs inter
 		"aggs": aggs,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal aggregation: %w", err)
+		return nil, fmt.Errorf("%w: %w", errFailedMarshalAggs, err)
 	}
 
 	req := esapi.SearchRequest{
@@ -144,13 +152,15 @@ func (sm *SearchManager) Aggregate(ctx context.Context, index string, aggs inter
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, indexerrors.NewSearchError(index, aggs, "aggregate", fmt.Errorf("status: %s", res.Status()))
+		statusErr := errors.New(res.Status())
+		wrappedErr := fmt.Errorf("%w: %w", errInvalidStatus, statusErr)
+		return nil, indexerrors.NewSearchError(index, aggs, "aggregate", wrappedErr)
 	}
 
 	var result map[string]interface{}
 	decodeErr := json.NewDecoder(res.Body).Decode(&result)
 	if decodeErr != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", decodeErr)
+		return nil, fmt.Errorf("%w: %w", errFailedDecode, decodeErr)
 	}
 
 	aggregations, isMap := result["aggregations"].(map[string]interface{})
