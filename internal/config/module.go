@@ -13,6 +13,17 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// defaultRetryMaxWait is the default maximum wait time between retries
+	defaultRetryMaxWait = 30 * time.Second
+
+	// defaultRetryInitialWait is the default initial wait time between retries
+	defaultRetryInitialWait = 1 * time.Second
+
+	// defaultMaxRetries is the default number of retries for failed requests
+	defaultMaxRetries = 3
+)
+
 // InitializeConfig sets up the configuration for the application.
 // It handles loading configuration from files and environment variables,
 // setting default values, and validating the configuration.
@@ -120,9 +131,9 @@ func New() (*Config, error) {
 				MaxRetries  int           `yaml:"max_retries"`
 			}{
 				Enabled:     true,
-				InitialWait: time.Second,
-				MaxWait:     time.Second * 30,
-				MaxRetries:  3,
+				InitialWait: defaultRetryInitialWait,
+				MaxWait:     defaultRetryMaxWait,
+				MaxRetries:  defaultMaxRetries,
 			},
 		},
 		Log: LogConfig{
@@ -152,3 +163,23 @@ var Module = fx.Options(
 		NewHTTPTransport, // Provides HTTP transport configuration
 	),
 )
+
+// ProvideConfig provides the configuration with default values.
+func ProvideConfig() (*Config, error) {
+	cfg := &Config{
+		Elasticsearch: ElasticsearchConfig{
+			Retry: struct {
+				Enabled     bool          `yaml:"enabled"`
+				InitialWait time.Duration `yaml:"initial_wait"`
+				MaxWait     time.Duration `yaml:"max_wait"`
+				MaxRetries  int           `yaml:"max_retries"`
+			}{
+				Enabled:     true,
+				InitialWait: defaultRetryInitialWait,
+				MaxWait:     defaultRetryMaxWait,
+				MaxRetries:  defaultMaxRetries,
+			},
+		},
+	}
+	return cfg, nil
+}
