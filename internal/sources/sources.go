@@ -20,6 +20,10 @@ type Config struct {
 	Metadata  map[string]string `yaml:"metadata,omitempty"`
 	// Time specifies the scheduled times for crawling in 24-hour format (HH:MM)
 	Time []string `yaml:"time,omitempty"`
+	// ArticleIndex specifies the Elasticsearch index name for articles from this source
+	ArticleIndex string `yaml:"article_index,omitempty"`
+	// Index specifies the Elasticsearch index name for general content from this source
+	Index string `yaml:"index,omitempty"`
 }
 
 // SelectorConfig defines the CSS selectors used for content extraction.
