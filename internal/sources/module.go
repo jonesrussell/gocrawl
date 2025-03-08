@@ -1,6 +1,5 @@
 // Package sources manages the configuration and lifecycle of web content sources for GoCrawl.
-// It handles source configuration loading, validation, and crawling operations through a
-// YAML-based configuration system.
+// It handles source configuration loading and validation through a YAML-based configuration system.
 package sources
 
 import (
@@ -20,12 +19,10 @@ import (
 // and integrates with the main application's dependency graph.
 var Module = fx.Module("sources",
 	fx.Provide(
-		// Provide the sources configuration without crawler dependency.
+		// Provide the sources configuration.
 		// This constructor loads the sources from YAML and sets up the logger.
-		// It is designed to be called early in the application lifecycle,
-		// before the crawler is available.
 		func(logger logger.Interface) (*Sources, error) {
-			sources, err := Load("sources.yml")
+			sources, err := LoadFromFile("sources.yml")
 			if err != nil {
 				return nil, err
 			}
@@ -35,8 +32,6 @@ var Module = fx.Module("sources",
 		// Provide individual source configs for group injection.
 		// This allows other parts of the application to receive individual
 		// source configurations tagged with the "sources" group.
-		// This is useful for components that need to work with specific sources
-		// or need to process sources independently.
 		fx.Annotate(
 			func(s *Sources) []Config {
 				return s.Sources

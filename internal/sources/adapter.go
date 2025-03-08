@@ -6,6 +6,13 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 )
 
+// IndexManager defines the interface for managing source indices.
+type IndexManager interface {
+	// EnsureIndex ensures that an index exists with the given name.
+	// If the index doesn't exist, it will be created with default mappings.
+	EnsureIndex(ctx context.Context, indexName string) error
+}
+
 // IndexManagerAdapter adapts api.IndexManager to sources.IndexManager
 type IndexManagerAdapter struct {
 	manager api.IndexManager
