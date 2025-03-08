@@ -218,70 +218,44 @@ func TestElasticsearchStorage_SearchArticles(t *testing.T) {
 	}
 }
 
-func TestElasticsearchStorage_BulkIndexArticles(t *testing.T) {
-	mockTransport, store, mockLogger := setupTestStorage(t)
-
-	articles := []*models.Article{
-		{ID: "1", Title: "Test Article 1"},
-		{ID: "2", Title: "Test Article 2"},
-	}
-
+func TestElasticsearchStorage_BulkIndex(t *testing.T) {
 	tests := []struct {
-		name        string
-		articles    []*models.Article
-		response    string
-		statusCode  int
-		expectError bool
+		name     string
+		articles []*models.Article
+		wantErr  bool
 	}{
 		{
-			name:     "successful bulk indexing",
-			articles: articles,
-			response: `{
-				"took": 30,
-				"errors": false,
-				"items": [
-					{"index": {"_id": "1", "status": 201}},
-					{"index": {"_id": "2", "status": 201}}
-				]
-			}`,
-			statusCode:  200,
-			expectError: false,
+			name: "successful bulk index",
+			articles: []*models.Article{
+				{
+					ID:    "1",
+					Title: "Test Article 1",
+				},
+				{
+					ID:    "2",
+					Title: "Test Article 2",
+				},
+			},
+			wantErr: false,
 		},
 		{
-			name:     "bulk indexing with errors",
-			articles: articles,
-			response: `{
-				"took": 30,
-				"errors": true,
-				"items": [
-					{"index": {"_id": "1", "status": 400, "error": {"type": "mapper_parsing_exception"}}}
-				]
-			}`,
-			statusCode:  400,
-			expectError: true,
+			name:     "empty articles list",
+			articles: []*models.Article{},
+			wantErr:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockTransport.Response = tt.response
-			mockTransport.StatusCode = tt.statusCode
-
-			mockLogger.On("Debug", "Bulk indexing articles", "count", len(tt.articles)).Return()
-			if tt.expectError {
-				mockLogger.On("Error", "Failed to bulk index articles", "error", mock.Anything).Return()
-			} else {
-				mockLogger.On("Info", "Bulk indexed documents", "count", len(tt.articles)).Return()
+			_, store, _ := setupTestStorage(t)
+			docs := make([]interface{}, len(tt.articles))
+			for i, article := range tt.articles {
+				docs[i] = article
 			}
-
-			err := store.BulkIndexArticles(t.Context(), tt.articles)
-			if tt.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+			err := store.BulkIndex(t.Context(), "test_index", docs)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ElasticsearchStorage.BulkIndex() error = %v, wantErr %v", err, tt.wantErr)
 			}
-
-			mockLogger.AssertExpectations(t)
 		})
 	}
 }

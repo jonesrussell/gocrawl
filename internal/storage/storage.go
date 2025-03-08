@@ -31,7 +31,6 @@ type Interface interface {
 
 	// Bulk operations
 	BulkIndex(ctx context.Context, index string, documents []interface{}) error
-	BulkIndexArticles(ctx context.Context, articles []*models.Article) error
 
 	// Index management
 	CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error
@@ -656,16 +655,7 @@ func mustMarshal(v interface{}) []byte {
 	return data
 }
 
-// BulkIndexArticles indexes multiple articles in bulk
-func (s *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
-	docs := make([]interface{}, len(articles))
-	for i, article := range articles {
-		docs[i] = article
-	}
-	return s.BulkIndex(ctx, s.opts.IndexName, docs)
-}
-
-// SearchArticles searches for articles
+// SearchArticles implements Interface
 func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{

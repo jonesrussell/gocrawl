@@ -13,11 +13,12 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/indexing/client"
 	indexerrors "github.com/jonesrussell/gocrawl/internal/indexing/errors"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
 var (
-	errInvalidHits        = errors.New("invalid response format: missing hits")
-	errInvalidHitsList    = errors.New("invalid response format: missing hits list")
+	errInvalidHits        = storage.ErrInvalidHits
+	errInvalidHitsList    = storage.ErrInvalidHitsArray
 	errInvalidAggregation = errors.New("invalid response format: missing aggregations")
 )
 

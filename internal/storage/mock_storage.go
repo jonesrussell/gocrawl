@@ -116,12 +116,6 @@ func (m *MockStorage) ScrollSearch(
 	return result, args.Error(1)
 }
 
-// BulkIndexArticles implements Interface
-func (m *MockStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
-	args := m.Called(ctx, articles)
-	return args.Error(0)
-}
-
 // SearchArticles implements Interface
 func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
 	args := m.Called(ctx, query, size)

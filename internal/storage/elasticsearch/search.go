@@ -5,13 +5,20 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/indexing/client"
-	"github.com/jonesrussell/gocrawl/internal/indexing/errors"
+	indexerrors "github.com/jonesrussell/gocrawl/internal/indexing/errors"
+)
+
+var (
+	errInvalidHitsFormat     = errors.New("invalid response format: missing hits")
+	errInvalidHitsListFormat = errors.New("invalid response format: missing hits list")
+	errInvalidAggregations   = errors.New("invalid response format: missing aggregations")
 )
 
 // SearchManager implements the api.SearchManager interface using Elasticsearch.
@@ -42,36 +49,37 @@ func (sm *SearchManager) Search(ctx context.Context, index string, query interfa
 
 	res, err := req.Do(ctx, sm.client.Client())
 	if err != nil {
-		return nil, errors.NewSearchError(index, query, "search", err)
+		return nil, indexerrors.NewSearchError(index, query, "search", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, errors.NewSearchError(index, query, "search", fmt.Errorf("status: %s", res.Status()))
+		return nil, indexerrors.NewSearchError(index, query, "search", fmt.Errorf("status: %s", res.Status()))
 	}
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	decodeErr := json.NewDecoder(res.Body).Decode(&result)
+	if decodeErr != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", decodeErr)
 	}
 
-	hits, ok := result["hits"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid response format: missing hits")
+	hits, isMap := result["hits"].(map[string]interface{})
+	if !isMap {
+		return nil, errInvalidHitsFormat
 	}
 
-	hitsList, ok := hits["hits"].([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid response format: missing hits list")
+	hitsList, isList := hits["hits"].([]interface{})
+	if !isList {
+		return nil, errInvalidHitsListFormat
 	}
 
 	var docs []interface{}
 	for _, hit := range hitsList {
-		hitMap, ok := hit.(map[string]interface{})
-		if !ok {
+		hitMap, isValidMap := hit.(map[string]interface{})
+		if !isValidMap {
 			continue
 		}
-		if source, ok := hitMap["_source"]; ok {
+		if source, hasSource := hitMap["_source"]; hasSource {
 			docs = append(docs, source)
 		}
 	}
@@ -94,19 +102,20 @@ func (sm *SearchManager) Count(ctx context.Context, index string, query interfac
 
 	res, err := req.Do(ctx, sm.client.Client())
 	if err != nil {
-		return 0, errors.NewSearchError(index, query, "count", err)
+		return 0, indexerrors.NewSearchError(index, query, "count", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return 0, errors.NewSearchError(index, query, "count", fmt.Errorf("status: %s", res.Status()))
+		return 0, indexerrors.NewSearchError(index, query, "count", fmt.Errorf("status: %s", res.Status()))
 	}
 
 	var result struct {
 		Count int64 `json:"count"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("failed to decode response: %w", err)
+	decodeErr := json.NewDecoder(res.Body).Decode(&result)
+	if decodeErr != nil {
+		return 0, fmt.Errorf("failed to decode response: %w", decodeErr)
 	}
 
 	sm.logger.Info("Count completed", "index", index, "count", result.Count)
@@ -130,22 +139,23 @@ func (sm *SearchManager) Aggregate(ctx context.Context, index string, aggs inter
 
 	res, err := req.Do(ctx, sm.client.Client())
 	if err != nil {
-		return nil, errors.NewSearchError(index, aggs, "aggregate", err)
+		return nil, indexerrors.NewSearchError(index, aggs, "aggregate", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, errors.NewSearchError(index, aggs, "aggregate", fmt.Errorf("status: %s", res.Status()))
+		return nil, indexerrors.NewSearchError(index, aggs, "aggregate", fmt.Errorf("status: %s", res.Status()))
 	}
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	decodeErr := json.NewDecoder(res.Body).Decode(&result)
+	if decodeErr != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", decodeErr)
 	}
 
-	aggregations, ok := result["aggregations"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid response format: missing aggregations")
+	aggregations, isMap := result["aggregations"].(map[string]interface{})
+	if !isMap {
+		return nil, errInvalidAggregations
 	}
 
 	sm.logger.Info("Aggregation completed", "index", index)
