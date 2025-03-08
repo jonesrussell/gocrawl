@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
@@ -19,7 +19,7 @@ type Result struct {
 // Service represents the search service
 type Service struct {
 	ESClient *elasticsearch.Client
-	Logger   logger.Interface
+	Logger   common.Logger
 	Config   *config.Config
 	Options  storage.Options
 	Storage  storage.Interface
@@ -29,7 +29,7 @@ type Service struct {
 func NewSearchService(
 	esClient *elasticsearch.Client,
 	cfg *config.Config,
-	log logger.Interface,
+	log common.Logger,
 ) *Service {
 	opts := storage.NewOptionsFromConfig(cfg)
 	return &Service{

@@ -57,6 +57,14 @@ linters-settings:
             desc: "Use github.com/google/uuid instead, satori's package is not maintained"
           - pkg: "github.com/gofrs/uuid$"
             desc: "Use github.com/gofrs/uuid/v5 or later, it was not a go module before v5"
+      # Add a new rule for logger interface
+      logger:
+        deny:
+          - pkg: "github.com/jonesrussell/gocrawl/internal/logger.Interface"
+            desc: "Use common.Logger type alias instead of logger.Interface directly"
+        files:
+          - "!internal/logger/*"  # Exclude the logger package itself
+          - "!internal/common/*"  # Exclude the common package where the alias is defined
 
   errcheck:
     # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.

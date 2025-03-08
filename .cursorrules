@@ -5,6 +5,10 @@ Code Organization & Structure
 - Avoid type stuttering in package names (e.g., use `Config` not `CollectorConfig`)
 - Use descriptive variable names to avoid shadowing
 - Avoid global state where possible
+- Keep function complexity below 30 (cyclop max-complexity)
+- Keep package average complexity below 10 (cyclop package-average)
+- Limit function length to 100 lines or 50 statements (funlen)
+- Use canonical import paths
 
 Dependency Injection & Interfaces
 - Use fx.In and fx.Out for dependency injection
@@ -12,18 +16,27 @@ Dependency Injection & Interfaces
 - For module-specific interfaces, define them in module.go
 - For interfaces used across multiple packages, define them in the consuming package
 - Avoid interface stuttering (e.g., use `Logger` instead of `CollectorLogger`)
+- Use common.Logger instead of logger.Interface directly
+- Define New* constructors only in module.go files
 
 Error Handling
 - Prefer errors.New over fmt.Errorf for simple error messages
 - Check error return values
 - Use descriptive error variable names to avoid shadowing
 - Wrap errors with context when appropriate
+- Always check type assertion errors
+- Check SQL Row and Statement closures
+- Include context in error handling where available
 
 Testing
 - Use require for error assertions
 - Avoid allocations with (*os.File).WriteString
 - Avoid shadow declarations
 - Test each module independently
+- Write testable examples with expected output
+- Use t.Parallel() appropriately in tests
+- Place tests in a separate _test package
+- Use testify consistently for assertions
 
 Dependencies
 - Use go 1.24
@@ -34,8 +47,23 @@ Dependencies
   github.com/spf13/cobra
   go.uber.org/fx
   go.uber.org/zap
+- Avoid deprecated packages:
+  - Use google.golang.org/protobuf instead of github.com/golang/protobuf
+  - Use github.com/google/uuid instead of github.com/satori/go.uuid
+  - Use github.com/gofrs/uuid/v5+ instead of github.com/gofrs/uuid
 
 Documentation
 - Provide brief explanations of code updates
 - Document interface requirements
 - Include examples for complex patterns
+- End comments with periods (except for noinspection/TODO comments)
+- Document magic numbers with constants
+- Include context in logging calls where available
+
+Style & Best Practices
+- Use named returns sparingly and document when used
+- Ensure exhaustive switch statements and map initializations
+- Include context in HTTP requests
+- Close response bodies in HTTP clients
+- Use standard library variables where available
+- Avoid magic numbers in code
