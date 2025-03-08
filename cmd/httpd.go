@@ -5,6 +5,8 @@ package cmd
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,31 +30,6 @@ type ServerParams struct {
 	Logger logger.Interface
 }
 
-// startServer initializes and manages the HTTP server lifecycle.
-// It:
-// - Starts the server in a goroutine to handle incoming requests
-// - Handles graceful shutdown when the application stops
-// - Logs server events and errors
-func startServer(lc fx.Lifecycle, p ServerParams) {
-	lc.Append(fx.Hook{
-		OnStart: func(_ context.Context) error {
-			// Start the server in a goroutine to allow for graceful shutdown
-			go func() {
-				p.Logger.Info("HTTP server started", "address", p.Server.Addr)
-				if err := p.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					p.Logger.Error("HTTP server failed", "error", err)
-				}
-			}()
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			// Gracefully shut down the server when the application stops
-			p.Logger.Info("Shutting down HTTP server...")
-			return p.Server.Shutdown(ctx)
-		},
-	})
-}
-
 // httpdCmd represents the HTTP server command that provides a REST API
 // for searching content in Elasticsearch.
 var httpdCmd = &cobra.Command{
@@ -60,35 +37,77 @@ var httpdCmd = &cobra.Command{
 	Short: "Start the HTTP server for search",
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
-	Run: func(cmd *cobra.Command, _ []string) {
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		// Set up signal handling for graceful shutdown
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+		// Create channels for error handling and completion
+		errChan := make(chan error, 1)
+		doneChan := make(chan struct{})
+
 		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
 			common.Module,
 			api.Module,
-			fx.Invoke(startServer),
+			fx.Invoke(func(lc fx.Lifecycle, p ServerParams) {
+				lc.Append(fx.Hook{
+					OnStart: func(context.Context) error {
+						// Start the server in a goroutine
+						go func() {
+							p.Logger.Info("HTTP server started", "address", p.Server.Addr)
+							if err := p.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+								p.Logger.Error("HTTP server failed", "error", err)
+								errChan <- err
+								return
+							}
+							close(doneChan)
+						}()
+						return nil
+					},
+					OnStop: func(ctx context.Context) error {
+						p.Logger.Info("Shutting down HTTP server...")
+						return p.Server.Shutdown(ctx)
+					},
+				})
+			}),
 		)
 
 		// Start the application and handle any startup errors
 		if err := app.Start(cmd.Context()); err != nil {
-			common.PrintErrorf("Error starting application: %v", err)
-			os.Exit(1)
+			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		// Set up signal handling for graceful shutdown
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		sig := <-sigChan
-		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+		// Wait for either:
+		// - A signal interrupt (SIGINT/SIGTERM)
+		// - Context cancellation
+		// - Server error
+		// - Server shutdown
+		var serverErr error
+		select {
+		case sig := <-sigChan:
+			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+		case <-cmd.Context().Done():
+			common.PrintInfof("\nContext cancelled, initiating shutdown...")
+		case serverErr = <-errChan:
+			// Error already logged in OnStart hook
+		case <-doneChan:
+			// Server shut down cleanly
+		}
 
 		// Create a context with timeout for graceful shutdown
-		ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultShutdownTimeout)
-		defer func() {
-			cancel()
-			if err := app.Stop(ctx); err != nil {
-				common.PrintErrorf("Error during shutdown: %v", err)
-				os.Exit(1)
+		stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultShutdownTimeout)
+		defer stopCancel()
+
+		// Stop the application and handle any shutdown errors
+		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+			common.PrintErrorf("Error during shutdown: %v", err)
+			if serverErr == nil {
+				serverErr = err
 			}
-		}()
+		}
+
+		return serverErr
 	},
 }
 
