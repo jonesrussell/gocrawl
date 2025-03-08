@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -71,55 +73,75 @@ Example:
 // The function uses a deferred shutdown sequence to ensure proper cleanup
 // regardless of how the command exits.
 func runList(cmd *cobra.Command, _ []string) {
-	// Initialize variables for logger and exit code management
-	var logger common.Logger
-	var exitCode int
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Create channels for error handling and completion
+	errChan := make(chan error, 1)
+	doneChan := make(chan struct{})
 
 	// Initialize the Fx application with required modules
-	// This sets up dependency injection and manages the application lifecycle
 	app := fx.New(
 		common.Module,
-		fx.Invoke(func(s common.Storage, l common.Logger) {
-			logger = l
-			params := &listParams{
-				ctx:     cmd.Context(),
-				storage: s,
-				logger:  l,
-			}
-			if err := executeList(params); err != nil {
-				l.Error("Error executing list", "error", err)
-				exitCode = 1
-			}
+		fx.Invoke(func(lc fx.Lifecycle, s common.Storage, l common.Logger) {
+			lc.Append(fx.Hook{
+				OnStart: func(context.Context) error {
+					params := &listParams{
+						ctx:     cmd.Context(),
+						storage: s,
+						logger:  l,
+					}
+					if err := executeList(params); err != nil {
+						l.Error("Error executing list", "error", err)
+						errChan <- err
+						return err
+					}
+					close(doneChan)
+					return nil
+				},
+				OnStop: func(context.Context) error {
+					return nil
+				},
+			})
 		}),
 	)
 
-	// Set up context with timeout for graceful shutdown
-	// This ensures the application doesn't hang indefinitely during shutdown
-	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
-	defer func() {
-		// Attempt to stop the application gracefully
-		// Only log non-cancellation errors to avoid noise from normal shutdown
-		if err := app.Stop(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			if logger != nil {
-				logger.Error("Error stopping application", "error", err)
-				exitCode = 1
-			}
-		}
-		// Clean up the context after stopping the application
-		cancel()
-		// Exit with error code if any operation failed
-		if exitCode != 0 {
-			os.Exit(exitCode)
-		}
-	}()
-
 	// Start the application and handle any startup errors
-	if err := app.Start(ctx); err != nil {
-		if logger != nil {
-			logger.Error("Error starting application", "error", err)
-		}
-		exitCode = 1
-		return
+	if err := app.Start(cmd.Context()); err != nil {
+		common.PrintErrorf("Error starting application: %v", err)
+		os.Exit(1)
+	}
+
+	// Wait for either:
+	// - A signal interrupt (SIGINT/SIGTERM)
+	// - Context cancellation
+	// - List completion
+	// - List error
+	var listErr error
+	select {
+	case sig := <-sigChan:
+		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+	case <-cmd.Context().Done():
+		common.PrintInfof("\nContext cancelled, initiating shutdown...")
+	case listErr = <-errChan:
+		// Error already printed in executeList
+	case <-doneChan:
+		// Success message already printed in executeList
+	}
+
+	// Create a context with timeout for graceful shutdown
+	stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
+	defer stopCancel()
+
+	// Stop the application and handle any shutdown errors
+	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+		common.PrintErrorf("Error stopping application: %v", err)
+		os.Exit(1)
+	}
+
+	if listErr != nil {
+		os.Exit(1)
 	}
 }
 

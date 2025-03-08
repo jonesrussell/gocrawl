@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -80,55 +82,86 @@ func validateDeleteArgs(_ *cobra.Command, args []string) error {
 
 // runDelete executes the delete command and removes the specified indices.
 // It:
+// - Sets up signal handling for graceful shutdown
+// - Creates channels for error handling and completion
 // - Initializes the Fx application with required modules
-// - Sets up context with timeout for graceful shutdown
 // - Handles application lifecycle and error cases
 // - Manages the deletion process
 func runDelete(cmd *cobra.Command, args []string) {
 	force, _ := cmd.Flags().GetBool("force")
-	var exitCode int
+
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Create channels for error handling and completion
+	errChan := make(chan error, 1)
+	doneChan := make(chan struct{})
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
-		fx.Invoke(func(storage common.Storage, sources common.Sources, l logger.Interface) {
-			params := &deleteParams{
-				ctx:     cmd.Context(),
-				storage: storage,
-				sources: sources,
-				logger:  l,
-				indices: args,
-				force:   force,
-			}
-			if err := executeDelete(params); err != nil {
-				l.Error("Error executing delete", "error", err)
-				exitCode = 1
-			}
+		fx.Invoke(func(lc fx.Lifecycle, storage common.Storage, sources common.Sources, l logger.Interface) {
+			lc.Append(fx.Hook{
+				OnStart: func(context.Context) error {
+					params := &deleteParams{
+						ctx:     cmd.Context(),
+						storage: storage,
+						sources: sources,
+						logger:  l,
+						indices: args,
+						force:   force,
+					}
+					if err := executeDelete(params); err != nil {
+						l.Error("Error executing delete", "error", err)
+						errChan <- err
+						return err
+					}
+					close(doneChan)
+					return nil
+				},
+				OnStop: func(context.Context) error {
+					return nil
+				},
+			})
 		}),
 	)
 
-	// Set up context with timeout for graceful shutdown
-	ctx, cancel := context.WithTimeout(cmd.Context(), common.DefaultStartupTimeout)
-	defer func() {
-		cancel()
-		if err := app.Stop(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			if log != nil {
-				log.Error("Error stopping application", "error", err)
-				exitCode = 1
-			}
-		}
-		if exitCode != 0 {
-			os.Exit(exitCode)
-		}
-	}()
-
 	// Start the application and handle any startup errors
-	if err := app.Start(ctx); err != nil {
-		if log != nil {
-			log.Error("Error starting application", "error", err)
-		}
-		exitCode = 1
-		return
+	if err := app.Start(cmd.Context()); err != nil {
+		common.PrintErrorf("Error starting application: %v", err)
+		os.Exit(1)
+	}
+
+	// Wait for either:
+	// - A signal interrupt (SIGINT/SIGTERM)
+	// - Context cancellation
+	// - Delete completion
+	// - Delete error
+	var deleteErr error
+	select {
+	case sig := <-sigChan:
+		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+	case <-cmd.Context().Done():
+		common.PrintInfof("\nContext cancelled, initiating shutdown...")
+	case deleteErr = <-errChan:
+		// Error already printed in executeDelete
+	case <-doneChan:
+		// Success message already printed in executeDelete
+	}
+
+	// Create a context with timeout for graceful shutdown
+	stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
+	defer stopCancel()
+
+	// Stop the application and handle any shutdown errors
+	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+		common.PrintErrorf("Error stopping application: %v", err)
+		os.Exit(1)
+	}
+
+	if deleteErr != nil {
+		os.Exit(1)
 	}
 }
 
