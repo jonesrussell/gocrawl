@@ -103,6 +103,9 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 		} else {
 			serverCfg.Address = defaultPort
 		}
+	} else if !strings.Contains(serverCfg.Address, ":") {
+		// If address is just a port number without colon prefix
+		serverCfg.Address = ":" + serverCfg.Address
 	}
 
 	server := &http.Server{

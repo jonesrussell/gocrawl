@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -180,8 +181,26 @@ func New() (Interface, error) {
 	viper.SetDefault("app.environment", "development")
 	viper.SetDefault("crawler.source_file", "sources.yml")
 
-	// Enable automatic environment variable binding
+	// Enable environment variable binding
+	viper.SetEnvPrefix("")
 	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Map environment variables
+	if err := bindEnvs(map[string]string{
+		"elasticsearch.username":        "ELASTIC_USERNAME",
+		"elasticsearch.password":        "ELASTIC_PASSWORD",
+		"elasticsearch.api_key":         "ELASTIC_API_KEY",
+		"elasticsearch.tls.skip_verify": "ELASTIC_SKIP_TLS",
+		"elasticsearch.tls.certificate": "ELASTIC_CERT_PATH",
+		"elasticsearch.tls.key":         "ELASTIC_KEY_PATH",
+		"elasticsearch.tls.ca":          "ELASTIC_CA_PATH",
+		"server.address":                "GOCRAWL_PORT",
+		"app.environment":               "APP_ENV",
+		"log.level":                     "LOG_LEVEL",
+	}); err != nil {
+		return nil, fmt.Errorf("failed to bind environment variables: %w", err)
+	}
 
 	// Read configuration file
 	if err := viper.ReadInConfig(); err != nil {

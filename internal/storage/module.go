@@ -57,15 +57,33 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client,
 		return nil, errors.New("elasticsearch addresses are required")
 	}
 
+	log.Debug("Elasticsearch configuration",
+		"addresses", opts.Addresses,
+		"hasUsername", opts.Username != "",
+		"hasPassword", opts.Password != "",
+		"hasAPIKey", opts.APIKey != "",
+		"skipTLS", opts.SkipTLS)
+
 	cfg := es.Config{
 		Addresses: opts.Addresses,
-		Username:  opts.Username,
-		Password:  opts.Password,
+	}
+
+	// Configure authentication - prefer API key over username/password
+	if opts.APIKey != "" {
+		cfg.APIKey = opts.APIKey
+		log.Debug("Using API key authentication")
+	} else if opts.Username != "" && opts.Password != "" {
+		cfg.Username = opts.Username
+		cfg.Password = opts.Password
+		log.Debug("Using username/password authentication")
+	} else {
+		log.Debug("No authentication credentials provided")
 	}
 
 	// Configure TLS if needed
-	if opts.SkipTLS {
+	if opts.Transport != nil {
 		cfg.Transport = opts.Transport
+		log.Debug("Using custom transport with TLS configuration")
 	}
 
 	client, err := es.NewClient(cfg)
@@ -81,7 +99,7 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client,
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, errors.New("failed to connect to Elasticsearch")
+		return nil, fmt.Errorf("failed to connect to Elasticsearch: %s", res.String())
 	}
 
 	log.Info("Successfully connected to Elasticsearch", "addresses", opts.Addresses)
