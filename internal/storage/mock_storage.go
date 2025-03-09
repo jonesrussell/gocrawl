@@ -59,15 +59,12 @@ func (m *MockStorage) BulkIndex(ctx context.Context, index string, documents []i
 	return args.Error(0)
 }
 
-// Search implements Storage
-func (m *MockStorage) Search(ctx context.Context, query string, size int) ([]models.Article, error) {
-	args := m.Called(ctx, query, size)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	result, ok := args.Get(0).([]models.Article)
-	if !ok {
-		return nil, ErrMockTypeAssertion
+// Search implements Interface
+func (m *MockStorage) Search(ctx context.Context, index string, query interface{}) ([]interface{}, error) {
+	args := m.Called(ctx, index, query)
+	result, ok := args.Get(0).([]interface{})
+	if !ok && args.Get(0) != nil {
+		return nil, errors.New("invalid type assertion for Search result")
 	}
 	return result, args.Error(1)
 }
@@ -235,6 +232,22 @@ func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64
 	result, ok := args.Get(0).(int64)
 	if !ok && args.Get(0) != nil {
 		return 0, errors.New("invalid type assertion for GetIndexDocCount result")
+	}
+	return result, args.Error(1)
+}
+
+// Aggregate implements Interface
+func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error) {
+	args := m.Called(ctx, index, aggs)
+	return args.Get(0), args.Error(1)
+}
+
+// Count implements Interface
+func (m *MockStorage) Count(ctx context.Context, index string, query interface{}) (int64, error) {
+	args := m.Called(ctx, index, query)
+	result, ok := args.Get(0).(int64)
+	if !ok && args.Get(0) != nil {
+		return 0, errors.New("invalid type assertion for Count result")
 	}
 	return result, args.Error(1)
 }

@@ -49,6 +49,12 @@ type Interface interface {
 	Close() error
 	Ping(ctx context.Context) error
 	TestConnection(ctx context.Context) error
+
+	// New operations
+	Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error)
+
+	// Count operation
+	Count(ctx context.Context, index string, query interface{}) (int64, error)
 }
 
 // Error definitions
@@ -153,29 +159,22 @@ func (s *ElasticsearchStorage) prepareBulkIndexRequest(
 	return nil
 }
 
-// Search performs a search query against the specified index
-func (s *ElasticsearchStorage) Search(
-	ctx context.Context,
-	index string,
-	query string,
-	size int,
-) ([]map[string]interface{}, error) {
-	searchQuery := map[string]interface{}{
-		"query": map[string]interface{}{
-			"match": map[string]interface{}{
-				"content": query,
-			},
-		},
-		"size": size,
+// Search performs a search query
+func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query interface{}) ([]interface{}, error) {
+	if s.ESClient == nil {
+		return nil, errors.New("elasticsearch client is not initialized")
 	}
 
-	res, searchErr := s.ESClient.Search(
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	res, err := s.ESClient.Search(
 		s.ESClient.Search.WithContext(ctx),
 		s.ESClient.Search.WithIndex(index),
-		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(searchQuery))),
+		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(query))),
 	)
-	if searchErr != nil {
-		return nil, fmt.Errorf("failed to execute search: %w", searchErr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute search: %w", err)
 	}
 	defer res.Body.Close()
 
@@ -183,12 +182,12 @@ func (s *ElasticsearchStorage) Search(
 		return nil, fmt.Errorf("search request failed: %s", res.String())
 	}
 
-	var searchResult map[string]interface{}
-	if decodeErr := json.NewDecoder(res.Body).Decode(&searchResult); decodeErr != nil {
-		return nil, fmt.Errorf("error decoding search response: %w", decodeErr)
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("error decoding search response: %w", err)
 	}
 
-	hits, exists := searchResult["hits"].(map[string]interface{})
+	hits, exists := result["hits"].(map[string]interface{})
 	if !exists {
 		return nil, errors.New("invalid search response format")
 	}
@@ -198,7 +197,7 @@ func (s *ElasticsearchStorage) Search(
 		return nil, errors.New("invalid hits format in search response")
 	}
 
-	results := make([]map[string]interface{}, 0, len(hitsList))
+	results := make([]interface{}, 0, len(hitsList))
 	for _, hit := range hitsList {
 		hitData, isMap := hit.(map[string]interface{})
 		if !isMap {
@@ -679,4 +678,91 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 	}
 
 	return articles, nil
+}
+
+// Aggregate performs an aggregation query
+func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error) {
+	if s.ESClient == nil {
+		return nil, errors.New("elasticsearch client is not initialized")
+	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	query := map[string]interface{}{
+		"size": 0, // We don't need hits for aggregations
+		"aggs": aggs,
+	}
+
+	res, err := s.ESClient.Search(
+		s.ESClient.Search.WithContext(ctx),
+		s.ESClient.Search.WithIndex(index),
+		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(query))),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute aggregation: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("aggregation request failed: %s", res.String())
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("error decoding aggregation response: %w", err)
+	}
+
+	aggregations, exists := result["aggregations"].(map[string]interface{})
+	if !exists {
+		return nil, errors.New("invalid aggregation response format")
+	}
+
+	return aggregations, nil
+}
+
+// Count returns the number of documents matching a query
+func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query interface{}) (int64, error) {
+	if s.ESClient == nil {
+		return 0, errors.New("elasticsearch client is not initialized")
+	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	// Extract just the query part if it's a map
+	var queryBody interface{} = query
+	if queryMap, ok := query.(map[string]interface{}); ok {
+		if q, exists := queryMap["query"]; exists {
+			queryBody = map[string]interface{}{
+				"query": q,
+			}
+		}
+	}
+
+	res, err := s.ESClient.Count(
+		s.ESClient.Count.WithContext(ctx),
+		s.ESClient.Count.WithIndex(index),
+		s.ESClient.Count.WithBody(bytes.NewReader(mustMarshal(queryBody))),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute count: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return 0, fmt.Errorf("count request failed: %s", res.String())
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("error decoding count response: %w", err)
+	}
+
+	count, ok := result["count"].(float64)
+	if !ok {
+		return 0, errors.New("invalid count response format")
+	}
+
+	return int64(count), nil
 }

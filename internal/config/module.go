@@ -23,26 +23,6 @@ const (
 	defaultMaxRetries = 3
 )
 
-// Interface defines the configuration contract for the application.
-// It provides access to configuration values while allowing different
-// implementations (e.g., file-based, environment-based, or mock for testing).
-type Interface interface {
-	// GetCrawlerConfig returns the crawler-specific configuration
-	GetCrawlerConfig() *CrawlerConfig
-
-	// GetElasticsearchConfig returns the Elasticsearch-specific configuration
-	GetElasticsearchConfig() *ElasticsearchConfig
-
-	// GetLogConfig returns the logging-specific configuration
-	GetLogConfig() *LogConfig
-
-	// GetAppConfig returns the application-specific configuration
-	GetAppConfig() *AppConfig
-
-	// GetSources returns the list of configured sources
-	GetSources() []Source
-}
-
 // config implements the Interface and holds the actual configuration values
 type config struct {
 	App           AppConfig           `yaml:"app"`
@@ -50,6 +30,7 @@ type config struct {
 	Elasticsearch ElasticsearchConfig `yaml:"elasticsearch"`
 	Log           LogConfig           `yaml:"log"`
 	Sources       []Source            `yaml:"sources"`
+	Server        ServerConfig        `yaml:"server"`
 }
 
 // Ensure config implements Interface
@@ -78,6 +59,11 @@ func (c *config) GetAppConfig() *AppConfig {
 // GetSources implements Interface
 func (c *config) GetSources() []Source {
 	return c.Sources
+}
+
+// GetServerConfig implements Interface
+func (c *config) GetServerConfig() *ServerConfig {
+	return &c.Server
 }
 
 // InitializeConfig sets up the configuration for the application.
@@ -225,6 +211,12 @@ func New() (Interface, error) {
 			Level: viper.GetString("log.level"),
 			Debug: viper.GetBool("log.debug"),
 		},
+		Server: ServerConfig{
+			Address:      viper.GetString("server.address"),
+			ReadTimeout:  viper.GetDuration("server.read_timeout"),
+			WriteTimeout: viper.GetDuration("server.write_timeout"),
+			IdleTimeout:  viper.GetDuration("server.idle_timeout"),
+		},
 	}
 
 	// Validate the configuration before returning
@@ -251,6 +243,12 @@ func ProvideConfig() (*Config, error) {
 				MaxWait:     defaultRetryMaxWait,
 				MaxRetries:  defaultMaxRetries,
 			},
+		},
+		Server: ServerConfig{
+			Address:      ":8080",
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 30 * time.Second,
+			IdleTimeout:  60 * time.Second,
 		},
 	}
 	return cfg, nil

@@ -17,6 +17,16 @@ var Module = fx.Module("storage",
 		ProvideElasticsearchClient,
 		NewElasticsearchStorage,
 		ProvideIndexManager,
+		fx.Annotate(
+			func(s Interface) (api.SearchManager, error) {
+				sm, ok := s.(api.SearchManager)
+				if !ok {
+					return nil, fmt.Errorf("storage implementation does not satisfy api.SearchManager interface")
+				}
+				return sm, nil
+			},
+			fx.As(new(api.SearchManager)),
+		),
 	),
 )
 

@@ -174,6 +174,18 @@ type SourceSelectors struct {
 	Article ArticleSelectors `yaml:"article"`
 }
 
+// ServerConfig holds server-specific configuration settings.
+type ServerConfig struct {
+	// Address is the address to listen on (e.g., ":8080")
+	Address string `yaml:"address"`
+	// ReadTimeout is the maximum duration for reading the entire request
+	ReadTimeout time.Duration `yaml:"read_timeout"`
+	// WriteTimeout is the maximum duration before timing out writes of the response
+	WriteTimeout time.Duration `yaml:"write_timeout"`
+	// IdleTimeout is the maximum amount of time to wait for the next request
+	IdleTimeout time.Duration `yaml:"idle_timeout"`
+}
+
 // Config represents the complete application configuration.
 // It combines all configuration components into a single structure.
 type Config struct {
@@ -187,6 +199,8 @@ type Config struct {
 	Log LogConfig `yaml:"log"`
 	// Sources contains the list of news sources to crawl
 	Sources []Source `yaml:"sources"`
+	// Server contains server-specific settings
+	Server ServerConfig `yaml:"server"`
 }
 
 // GetCrawlerConfig implements Interface
@@ -212,6 +226,11 @@ func (c *Config) GetAppConfig() *AppConfig {
 // GetSources implements Interface
 func (c *Config) GetSources() []Source {
 	return c.Sources
+}
+
+// GetServerConfig implements Interface
+func (c *Config) GetServerConfig() *ServerConfig {
+	return &c.Server
 }
 
 // Ensure Config implements Interface

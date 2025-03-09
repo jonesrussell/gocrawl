@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
@@ -28,7 +29,7 @@ type SearchResponse struct {
 }
 
 // StartHTTPServer starts the HTTP server for search requests
-func StartHTTPServer(log logger.Interface, searchManager SearchManager) (*http.Server, error) {
+func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, error) {
 	log.Info("StartHTTPServer function called")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
@@ -62,8 +63,14 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager) (*http.S
 			return
 		}
 
-		// Get the total count
-		total, err := searchManager.Count(r.Context(), req.Index, query)
+		// Get the total count using a wrapped query
+		total, err := searchManager.Count(r.Context(), req.Index, map[string]interface{}{
+			"query": map[string]interface{}{
+				"match": map[string]interface{}{
+					"content": req.Query,
+				},
+			},
+		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -82,8 +89,17 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager) (*http.S
 		}
 	})
 
+	serverCfg := cfg.GetServerConfig()
+	if serverCfg.Address == "" {
+		serverCfg.Address = ":8080" // Default to port 8080 if not specified
+	}
+
 	server := &http.Server{
+		Addr:              serverCfg.Address,
 		Handler:           mux,
+		ReadTimeout:       serverCfg.ReadTimeout,
+		WriteTimeout:      serverCfg.WriteTimeout,
+		IdleTimeout:       serverCfg.IdleTimeout,
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 

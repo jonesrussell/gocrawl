@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -32,6 +34,40 @@ func (m *mockSearchManager) Count(ctx context.Context, index string, query inter
 func (m *mockSearchManager) Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error) {
 	args := m.Called(ctx, index, aggs)
 	return args.Get(0), args.Error(1)
+}
+
+type mockConfig struct {
+	mock.Mock
+}
+
+func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig {
+	args := m.Called()
+	return args.Get(0).(*config.CrawlerConfig)
+}
+
+func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
+	args := m.Called()
+	return args.Get(0).(*config.ElasticsearchConfig)
+}
+
+func (m *mockConfig) GetLogConfig() *config.LogConfig {
+	args := m.Called()
+	return args.Get(0).(*config.LogConfig)
+}
+
+func (m *mockConfig) GetAppConfig() *config.AppConfig {
+	args := m.Called()
+	return args.Get(0).(*config.AppConfig)
+}
+
+func (m *mockConfig) GetSources() []config.Source {
+	args := m.Called()
+	return args.Get(0).([]config.Source)
+}
+
+func (m *mockConfig) GetServerConfig() *config.ServerConfig {
+	args := m.Called()
+	return args.Get(0).(*config.ServerConfig)
 }
 
 func TestStartHTTPServer(t *testing.T) {
@@ -81,6 +117,15 @@ func TestStartHTTPServer(t *testing.T) {
 			// Create mock search manager
 			mockSearch := new(mockSearchManager)
 
+			// Create mock config
+			mockCfg := new(mockConfig)
+			mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+				Address:      ":8080",
+				ReadTimeout:  10 * time.Second,
+				WriteTimeout: 30 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			})
+
 			// Set up expected query
 			expectedQuery := map[string]interface{}{
 				"query": map[string]interface{}{
@@ -96,7 +141,7 @@ func TestStartHTTPServer(t *testing.T) {
 			mockSearch.On("Count", mock.Anything, tt.index, expectedQuery).Return(tt.mockCount, nil)
 
 			// Start the server
-			server, err := api.StartHTTPServer(mockLogger, mockSearch)
+			server, err := api.StartHTTPServer(mockLogger, mockSearch, mockCfg)
 			require.NoError(t, err)
 			require.NotNil(t, server)
 
