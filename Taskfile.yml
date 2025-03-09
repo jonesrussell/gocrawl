@@ -34,6 +34,13 @@ tasks:
       - go run main.go indices list
     ignore_error: true
 
+  job:
+    desc: "Run the job scheduler for automated crawling based on sources.yml schedules"
+    cmds:
+      - go run main.go job
+    ignore_error: true
+    interactive: true
+
   lint:
     desc: "Lint the Go code"
     cmds:
