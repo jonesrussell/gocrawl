@@ -13,7 +13,6 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -90,7 +89,6 @@ func runList(cmd *cobra.Command, _ []string) error {
 			),
 		),
 		fx.Options(
-			config.Module,
 			sources.Module,
 		),
 		fx.Invoke(func(lc fx.Lifecycle, s *sources.Sources, l common.Logger) {

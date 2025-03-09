@@ -1,7 +1,6 @@
 package sources_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -81,34 +80,6 @@ func (m *MockLogger) Printf(format string, args ...interface{}) {
 func (m *MockLogger) Sync() error {
 	m.syncCalled = true
 	return m.syncErr
-}
-
-type mockCrawler struct {
-	startCalled bool
-	startURL    string
-	startErr    error
-}
-
-func (m *mockCrawler) Start(_ context.Context, url string) error {
-	m.startCalled = true
-	m.startURL = url
-	return m.startErr
-}
-
-func (m *mockCrawler) Stop() {
-	m.startCalled = false
-}
-
-type mockIndexManager struct {
-	ensureIndexCalled bool
-	ensureIndexName   string
-	ensureIndexErr    error
-}
-
-func (m *mockIndexManager) EnsureIndex(_ context.Context, name string) error {
-	m.ensureIndexCalled = true
-	m.ensureIndexName = name
-	return m.ensureIndexErr
 }
 
 func TestLoadFromFile(t *testing.T) {

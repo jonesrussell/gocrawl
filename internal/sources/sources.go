@@ -3,6 +3,7 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -80,8 +81,8 @@ func LoadFromFile(path string) (*Sources, error) {
 	}
 
 	var sources Sources
-	if err := yaml.Unmarshal(data, &sources); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal sources: %w", err)
+	if unmarshalErr := yaml.Unmarshal(data, &sources); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal sources: %w", unmarshalErr)
 	}
 
 	return &sources, nil
@@ -115,23 +116,23 @@ func (s *Sources) FindByName(name string) (*Config, error) {
 //   - error: Any validation errors found
 func (s *Sources) Validate(source *Config) error {
 	if source == nil {
-		return fmt.Errorf("source configuration is nil")
+		return errors.New("source configuration is nil")
 	}
 
 	if source.Name == "" {
-		return fmt.Errorf("source name is required")
+		return errors.New("source name is required")
 	}
 
 	if source.URL == "" {
-		return fmt.Errorf("source URL is required")
+		return errors.New("source URL is required")
 	}
 
 	if source.RateLimit == "" {
-		return fmt.Errorf("rate limit is required")
+		return errors.New("rate limit is required")
 	}
 
 	if source.MaxDepth <= 0 {
-		return fmt.Errorf("max depth must be greater than 0")
+		return errors.New("max depth must be greater than 0")
 	}
 
 	return nil

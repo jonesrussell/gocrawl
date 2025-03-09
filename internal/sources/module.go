@@ -18,7 +18,7 @@ var Module = fx.Module("sources",
 type Params struct {
 	fx.In
 
-	Config *config.Config
+	Config config.Interface
 }
 
 // Result contains the components provided by the sources module.
@@ -30,7 +30,7 @@ type Result struct {
 
 // provideSourceConfig creates a new Sources instance from configuration.
 func provideSourceConfig(p Params) (Result, error) {
-	sources, err := LoadFromFile(p.Config.Crawler.SourceFile)
+	sources, err := LoadFromFile(p.Config.GetCrawlerConfig().SourceFile)
 	if err != nil {
 		return Result{}, err
 	}
