@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -20,12 +19,11 @@ func TestCrawler_Stop(t *testing.T) {
 		Logger: mockLogger,
 	}
 
-	ctx := context.Background()
-	err := c.Stop(ctx)
+	err := c.Stop(t.Context())
 	require.NoError(t, err)
 }
 
-func TestCrawler_SetCollector(t *testing.T) {
+func TestCrawler_SetCollector(_ *testing.T) {
 	c := &crawler.Crawler{}
 	collector := &colly.Collector{}
 	c.SetCollector(collector)
@@ -34,25 +32,18 @@ func TestCrawler_SetCollector(t *testing.T) {
 
 func TestCrawler_Start(t *testing.T) {
 	tests := []struct {
-		name      string
-		baseURL   string
-		setupMock func(*colly.Collector)
-		wantErr   bool
+		name    string
+		baseURL string
+		wantErr bool
 	}{
 		{
 			name:    "empty base URL",
 			baseURL: "",
-			setupMock: func(_ *colly.Collector) {
-				// No setup needed for empty URL test
-			},
 			wantErr: true,
 		},
 		{
 			name:    "valid URL",
 			baseURL: "http://example.com",
-			setupMock: func(c *colly.Collector) {
-				// Setup any collector mocks if needed
-			},
 			wantErr: false,
 		},
 	}
@@ -64,11 +55,9 @@ func TestCrawler_Start(t *testing.T) {
 				Logger: mockLogger,
 			}
 			collector := colly.NewCollector()
-			tt.setupMock(collector)
 			c.SetCollector(collector)
 
-			ctx := context.Background()
-			err := c.Start(ctx, tt.baseURL)
+			err := c.Start(t.Context(), tt.baseURL)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -86,7 +75,7 @@ func TestCrawler_Start_ContextCancellation(t *testing.T) {
 	collector := colly.NewCollector()
 	c.SetCollector(collector)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
@@ -97,9 +86,9 @@ func TestCrawler_Start_ContextCancellation(t *testing.T) {
 	require.Equal(t, context.Canceled, err)
 }
 
-func TestCrawler_Subscribe(t *testing.T) {
+func TestCrawler_Subscribe(_ *testing.T) {
 	c := &crawler.Crawler{}
-	handler := func(ctx context.Context, content *events.Content) error {
+	handler := func(_ context.Context, _ *events.Content) error {
 		return nil
 	}
 	c.Subscribe(handler)
@@ -137,7 +126,7 @@ func TestCrawler_SetRateLimit(t *testing.T) {
 	}
 }
 
-func TestCrawler_SetMaxDepth(t *testing.T) {
+func TestCrawler_SetMaxDepth(_ *testing.T) {
 	c := &crawler.Crawler{}
 	c.SetMaxDepth(5)
 	// We can't test the private collector field directly
@@ -148,28 +137,4 @@ func TestCrawler_GetIndexManager(t *testing.T) {
 	// We can't set the private field directly, but we can test the getter
 	result := c.GetIndexManager()
 	require.Nil(t, result) // Should be nil since we didn't set it
-}
-
-type mockIndexManager struct {
-	mock.Mock
-}
-
-func (m *mockIndexManager) EnsureIndex(ctx context.Context, name string, mapping interface{}) error {
-	args := m.Called(ctx, name, mapping)
-	return args.Error(0)
-}
-
-func (m *mockIndexManager) DeleteIndex(ctx context.Context, name string) error {
-	args := m.Called(ctx, name)
-	return args.Error(0)
-}
-
-func (m *mockIndexManager) IndexExists(ctx context.Context, name string) (bool, error) {
-	args := m.Called(ctx, name)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *mockIndexManager) UpdateMapping(ctx context.Context, name string, mapping interface{}) error {
-	args := m.Called(ctx, name, mapping)
-	return args.Error(0)
 }

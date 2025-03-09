@@ -10,7 +10,7 @@ type debugLogger struct {
 }
 
 // Write implements io.Writer.
-func (d *debugLogger) Write(p []byte) (n int, err error) {
+func (d *debugLogger) Write(p []byte) (int, error) {
 	d.logger.Debug(string(p))
 	return len(p), nil
 }
