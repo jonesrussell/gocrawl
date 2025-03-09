@@ -113,6 +113,20 @@ func InitializeConfig() (Interface, error) {
 	return &cfg, nil
 }
 
+// Module provides the config module and its dependencies using fx.
+// It sets up the configuration providers that can be used throughout
+// the application for dependency injection.
+//
+// The module provides:
+// - Interface instance via the New constructor
+// - HTTP transport configuration via NewHTTPTransport
+var Module = fx.Options(
+	fx.Provide(
+		New,
+		NewHTTPTransport, // Provides HTTP transport configuration
+	),
+)
+
 // New creates a new Config instance with values from Viper.
 // It handles loading configuration from files, environment variables,
 // and setting up default values. It also performs validation of the
@@ -122,6 +136,28 @@ func InitializeConfig() (Interface, error) {
 //   - Interface: The new configuration instance
 //   - error: Any error that occurred during creation
 func New() (Interface, error) {
+	// Set config defaults if not already configured
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+
+	// Set default values for essential configuration
+	viper.SetDefault("log.level", "info")
+	viper.SetDefault("app.environment", "development")
+	viper.SetDefault("crawler.source_file", "sources.yml")
+
+	// Enable automatic environment variable binding
+	viper.AutomaticEnv()
+
+	// Read configuration file
+	if err := viper.ReadInConfig(); err != nil {
+		var configFileNotFoundError *viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundError) {
+			return nil, fmt.Errorf("config file not found: %w", err)
+		}
+		return nil, fmt.Errorf("error reading config file: %w", err)
+	}
+
 	// Parse and validate the rate limit configuration
 	rateLimit, err := parseRateLimit(viper.GetString("crawler.rate_limit"))
 	if err != nil {
@@ -129,7 +165,7 @@ func New() (Interface, error) {
 	}
 
 	// Create the configuration instance with values from Viper
-	cfg := &Config{
+	cfg := &config{
 		App: AppConfig{
 			Environment: viper.GetString("app.environment"),
 			Name:        viper.GetString("app.name"),
@@ -189,20 +225,6 @@ func New() (Interface, error) {
 
 	return cfg, nil
 }
-
-// Module provides the config module and its dependencies using fx.
-// It sets up the configuration providers that can be used throughout
-// the application for dependency injection.
-//
-// The module provides:
-// - Interface instance via the InitializeConfig constructor
-// - HTTP transport configuration via NewHTTPTransport
-var Module = fx.Options(
-	fx.Provide(
-		InitializeConfig,
-		NewHTTPTransport, // Provides HTTP transport configuration
-	),
-)
 
 // ProvideConfig provides the configuration with default values.
 // This is used internally by InitializeConfig.

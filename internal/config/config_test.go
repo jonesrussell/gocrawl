@@ -16,7 +16,7 @@ func TestNew(t *testing.T) {
 	tests := []struct {
 		name     string
 		setup    func()
-		validate func(*testing.T, *config.Config, error)
+		validate func(*testing.T, config.Interface, error)
 	}{
 		{
 			name: "valid configuration",
@@ -26,22 +26,30 @@ func TestNew(t *testing.T) {
 				viper.AddConfigPath("./testdata")
 				require.NoError(t, viper.ReadInConfig())
 			},
-			validate: func(t *testing.T, cfg *config.Config, err error) {
+			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, cfg)
-				require.Equal(t, "test", cfg.App.Environment)
-				require.Equal(t, "debug", cfg.Log.Level)
-				require.True(t, cfg.Log.Debug)
-				require.Equal(t, "http://test.example.com", cfg.Crawler.BaseURL)
-				require.Equal(t, 5, cfg.Crawler.MaxDepth)
-				require.Equal(t, 2*time.Second, cfg.Crawler.RateLimit)
-				require.Equal(t, 2, cfg.Crawler.Parallelism)
-				require.Equal(t, []string{"http://localhost:9200"}, cfg.Elasticsearch.Addresses)
-				require.Equal(t, "test_user", cfg.Elasticsearch.Username)
-				require.Equal(t, "test_pass", cfg.Elasticsearch.Password)
-				require.Equal(t, "test_apikey", cfg.Elasticsearch.APIKey)
-				require.Equal(t, "test_index", cfg.Elasticsearch.IndexName)
-				require.True(t, cfg.Elasticsearch.TLS.SkipVerify)
+
+				appCfg := cfg.GetAppConfig()
+				require.Equal(t, "test", appCfg.Environment)
+
+				logCfg := cfg.GetLogConfig()
+				require.Equal(t, "debug", logCfg.Level)
+				require.True(t, logCfg.Debug)
+
+				crawlerCfg := cfg.GetCrawlerConfig()
+				require.Equal(t, "http://test.example.com", crawlerCfg.BaseURL)
+				require.Equal(t, 5, crawlerCfg.MaxDepth)
+				require.Equal(t, 2*time.Second, crawlerCfg.RateLimit)
+				require.Equal(t, 2, crawlerCfg.Parallelism)
+
+				elasticCfg := cfg.GetElasticsearchConfig()
+				require.Equal(t, []string{"http://localhost:9200"}, elasticCfg.Addresses)
+				require.Equal(t, "test_user", elasticCfg.Username)
+				require.Equal(t, "test_pass", elasticCfg.Password)
+				require.Equal(t, "test_apikey", elasticCfg.APIKey)
+				require.Equal(t, "test_index", elasticCfg.IndexName)
+				require.True(t, elasticCfg.TLS.SkipVerify)
 			},
 		},
 	}
@@ -118,6 +126,9 @@ func TestValidateConfig(t *testing.T) {
 					MaxDepth:    2,
 					RateLimit:   time.Second,
 					RandomDelay: time.Second,
+				},
+				Log: config.LogConfig{
+					Level: "info",
 				},
 			},
 			wantErr: false,
