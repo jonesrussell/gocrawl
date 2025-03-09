@@ -2,7 +2,6 @@ package sources_test
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 
@@ -112,7 +111,7 @@ func (m *mockIndexManager) EnsureIndex(_ context.Context, name string) error {
 	return m.ensureIndexErr
 }
 
-func TestLoad(t *testing.T) {
+func TestLoadFromFile(t *testing.T) {
 	tests := []struct {
 		name    string
 		content string
@@ -149,7 +148,7 @@ func TestLoad(t *testing.T) {
 			err = tmpfile.Close()
 			require.NoError(t, err)
 
-			s, err := sources.Load(tmpfile.Name())
+			s, err := sources.LoadFromFile(tmpfile.Name())
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -207,74 +206,75 @@ func TestFindByName(t *testing.T) {
 	}
 }
 
-func TestStart(t *testing.T) {
+func TestValidate(t *testing.T) {
 	tests := []struct {
-		name      string
-		source    string
-		mockErr   error
-		wantError bool
+		name    string
+		source  *sources.Config
+		wantErr bool
 	}{
 		{
-			name:      "successful start",
-			source:    "test",
-			mockErr:   nil,
-			wantError: false,
+			name: "valid config",
+			source: &sources.Config{
+				Name:      "test",
+				URL:       "http://example.com",
+				RateLimit: "1s",
+				MaxDepth:  2,
+			},
+			wantErr: false,
 		},
 		{
-			name:      "crawler error",
-			source:    "test",
-			mockErr:   errors.New("crawler error"),
-			wantError: true,
+			name:    "nil config",
+			source:  nil,
+			wantErr: true,
+		},
+		{
+			name: "missing name",
+			source: &sources.Config{
+				URL:       "http://example.com",
+				RateLimit: "1s",
+				MaxDepth:  2,
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing URL",
+			source: &sources.Config{
+				Name:      "test",
+				RateLimit: "1s",
+				MaxDepth:  2,
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing rate limit",
+			source: &sources.Config{
+				Name:     "test",
+				URL:      "http://example.com",
+				MaxDepth: 2,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid max depth",
+			source: &sources.Config{
+				Name:      "test",
+				URL:       "http://example.com",
+				RateLimit: "1s",
+				MaxDepth:  0,
+			},
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-			crawler := &mockCrawler{startErr: tt.mockErr}
-			indexMgr := &mockIndexManager{}
-			mockLogger := &MockLogger{}
-
-			s := &sources.Sources{
-				Sources: []sources.Config{
-					{
-						Name:         "test",
-						URL:          "http://example.com",
-						Index:        "test_index",
-						ArticleIndex: "articles",
-					},
-				},
-				Logger:   mockLogger,
-				Crawler:  crawler,
-				IndexMgr: indexMgr,
-			}
-
-			err := s.Start(ctx, tt.source)
-			if tt.wantError {
+			s := &sources.Sources{}
+			err := s.Validate(tt.source)
+			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
-
 			require.NoError(t, err)
-			require.True(t, crawler.startCalled)
-			require.Equal(t, "http://example.com", crawler.startURL)
-			require.True(t, mockLogger.debugCalled)
-			require.Equal(t, "Source crawl finished", mockLogger.debugMsg)
 		})
 	}
-}
-
-func TestStop(t *testing.T) {
-	crawler := &mockCrawler{}
-	s := &sources.Sources{
-		Crawler: crawler,
-	}
-
-	crawler.startCalled = true
-	s.Stop()
-	require.False(t, crawler.startCalled)
-
-	// Test with nil crawler
-	s = &sources.Sources{}
-	s.Stop() // Should not panic
 }
