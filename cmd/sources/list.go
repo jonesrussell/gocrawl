@@ -190,7 +190,11 @@ func printSources(sources []sources.Config, logger common.Logger) error {
 
 	// Create transformers for consistent formatting
 	labelTransformer := text.Transformer(func(val interface{}) string {
-		return fmt.Sprintf("%-*s", labelFormatterWidth, val.(string)) //nolint:errcheck // Sprintf does not return an error
+		str, ok := val.(string)
+		if !ok {
+			return fmt.Sprintf("%-*s", labelFormatterWidth, "ERROR")
+		}
+		return fmt.Sprintf("%-*s", labelFormatterWidth, str)
 	})
 
 	// Set column configurations to prevent truncation and align content

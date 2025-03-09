@@ -154,7 +154,12 @@ func (s *ElasticsearchStorage) prepareBulkIndexRequest(
 }
 
 // Search performs a search query against the specified index
-func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query string, size int) ([]map[string]interface{}, error) {
+func (s *ElasticsearchStorage) Search(
+	ctx context.Context,
+	index string,
+	query string,
+	size int,
+) ([]map[string]interface{}, error) {
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
 			"match": map[string]interface{}{
@@ -180,7 +185,7 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query s
 
 	var searchResult map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&searchResult); err != nil {
-		return nil, fmt.Errorf("failed to decode search response: %w", err)
+		return nil, fmt.Errorf("error decoding search response: %w", err)
 	}
 
 	hits, ok := searchResult["hits"].(map[string]interface{})
@@ -428,12 +433,12 @@ func (s *ElasticsearchStorage) SearchDocuments(
 
 	documents := make([]map[string]interface{}, 0, len(hitsArray))
 	for _, hit := range hitsArray {
-		hitMap, isHitMap := hit.(map[string]interface{})
-		if !isHitMap {
+		resultMap, isValidMap := hit.(map[string]interface{})
+		if !isValidMap {
 			continue
 		}
 
-		source, hasSource := hitMap["_source"]
+		source, hasSource := resultMap["_source"]
 		if !hasSource {
 			continue
 		}
@@ -663,7 +668,7 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 	}
 
 	if err := json.NewDecoder(res.Body).Decode(&searchResult); err != nil {
-		return nil, fmt.Errorf("failed to decode search response: %w", err)
+		return nil, fmt.Errorf("error decoding search response: %w", err)
 	}
 
 	articles := make([]*models.Article, 0, len(searchResult.Hits.Hits))

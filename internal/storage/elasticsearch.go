@@ -16,7 +16,7 @@ type ElasticsearchStorage struct {
 }
 
 // TestConnection tests the connection to Elasticsearch.
-func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
+func (s *ElasticsearchStorage) TestConnection(_ context.Context) error {
 	res, err := s.ESClient.Info()
 	if err != nil {
 		return fmt.Errorf("failed to connect to Elasticsearch: %w", err)

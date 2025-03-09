@@ -11,22 +11,22 @@ func NewNopLogger() logger.Interface {
 }
 
 // Debug implements logger.Interface
-func (l *NopLogger) Debug(msg string, args ...interface{}) {}
+func (l *NopLogger) Debug(_ string, _ ...interface{}) {}
 
 // Info implements logger.Interface
-func (l *NopLogger) Info(msg string, args ...interface{}) {}
+func (l *NopLogger) Info(_ string, _ ...interface{}) {}
 
 // Warn implements logger.Interface
-func (l *NopLogger) Warn(msg string, args ...interface{}) {}
+func (l *NopLogger) Warn(_ string, _ ...interface{}) {}
 
 // Error implements logger.Interface
-func (l *NopLogger) Error(msg string, args ...interface{}) {}
+func (l *NopLogger) Error(_ string, _ ...interface{}) {}
 
 // Errorf implements logger.Interface
-func (l *NopLogger) Errorf(format string, args ...interface{}) {}
+func (l *NopLogger) Errorf(_ string, _ ...interface{}) {}
 
 // Printf implements logger.Interface
-func (l *NopLogger) Printf(format string, args ...interface{}) {}
+func (l *NopLogger) Printf(_ string, _ ...interface{}) {}
 
 // Sync implements logger.Interface
 func (l *NopLogger) Sync() error {
@@ -34,4 +34,4 @@ func (l *NopLogger) Sync() error {
 }
 
 // Fatal implements logger.Interface
-func (l *NopLogger) Fatal(msg string, args ...interface{}) {}
+func (l *NopLogger) Fatal(_ string, _ ...interface{}) {}
