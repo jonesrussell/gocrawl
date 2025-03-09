@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -15,6 +16,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	defaultPort = ":8080" // Default port matching the one in module.go
 )
 
 type mockSearchManager struct {
@@ -117,17 +122,8 @@ func TestStartHTTPServer(t *testing.T) {
 			// Create mock search manager
 			mockSearch := new(mockSearchManager)
 
-			// Create mock config
-			mockCfg := new(mockConfig)
-			mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
-				Address:      ":8080",
-				ReadTimeout:  10 * time.Second,
-				WriteTimeout: 30 * time.Second,
-				IdleTimeout:  60 * time.Second,
-			})
-
-			// Set up expected query
-			expectedQuery := map[string]interface{}{
+			// Set up expected queries
+			searchQuery := map[string]interface{}{
 				"query": map[string]interface{}{
 					"match": map[string]interface{}{
 						"content": tt.query,
@@ -136,9 +132,25 @@ func TestStartHTTPServer(t *testing.T) {
 				"size": tt.size,
 			}
 
+			countQuery := map[string]interface{}{
+				"query": map[string]interface{}{
+					"match": map[string]interface{}{
+						"content": tt.query,
+					},
+				},
+			}
+
 			// Set up mock expectations
-			mockSearch.On("Search", mock.Anything, tt.index, expectedQuery).Return(tt.mockResults, nil)
-			mockSearch.On("Count", mock.Anything, tt.index, expectedQuery).Return(tt.mockCount, nil)
+			mockSearch.On("Search", mock.Anything, tt.index, searchQuery).Return(tt.mockResults, nil)
+			mockSearch.On("Count", mock.Anything, tt.index, countQuery).Return(tt.mockCount, nil)
+
+			mockCfg := new(mockConfig)
+			mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+				Address:      ":8080",
+				ReadTimeout:  10 * time.Second,
+				WriteTimeout: 30 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			})
 
 			// Start the server
 			server, err := api.StartHTTPServer(mockLogger, mockSearch, mockCfg)
@@ -173,6 +185,85 @@ func TestStartHTTPServer(t *testing.T) {
 			// Verify mock expectations
 			mockLogger.AssertExpectations(t)
 			mockSearch.AssertExpectations(t)
+			mockCfg.AssertExpectations(t)
+		})
+	}
+}
+
+func TestStartHTTPServer_PortConfiguration(t *testing.T) {
+	tests := []struct {
+		name         string
+		configPort   string
+		envPort      string
+		expectedAddr string
+		cleanup      func()
+	}{
+		{
+			name:         "use config port",
+			configPort:   ":3000",
+			expectedAddr: ":3000",
+		},
+		{
+			name:         "use env port when config empty",
+			configPort:   "",
+			envPort:      "4000",
+			expectedAddr: ":4000",
+			cleanup: func() {
+				os.Unsetenv("GOCRAWL_PORT")
+			},
+		},
+		{
+			name:         "use env port with colon",
+			configPort:   "",
+			envPort:      ":5000",
+			expectedAddr: ":5000",
+			cleanup: func() {
+				os.Unsetenv("GOCRAWL_PORT")
+			},
+		},
+		{
+			name:         "use default port when no config or env",
+			configPort:   "",
+			expectedAddr: defaultPort,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.cleanup != nil {
+				defer tt.cleanup()
+			}
+
+			// Set environment variable if specified
+			if tt.envPort != "" {
+				os.Setenv("GOCRAWL_PORT", tt.envPort)
+			}
+
+			// Create mock dependencies
+			mockLogger := logger.NewMockLogger()
+			mockLogger.On("Info", "StartHTTPServer function called").Return()
+
+			mockSearch := new(mockSearchManager)
+
+			mockCfg := new(mockConfig)
+			mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+				Address:      tt.configPort,
+				ReadTimeout:  10 * time.Second,
+				WriteTimeout: 30 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			})
+
+			// Start the server
+			server, err := api.StartHTTPServer(mockLogger, mockSearch, mockCfg)
+			require.NoError(t, err)
+			require.NotNil(t, server)
+
+			// Verify the server address
+			assert.Equal(t, tt.expectedAddr, server.Addr)
+
+			// Verify mock expectations
+			mockLogger.AssertExpectations(t)
+			mockCfg.AssertExpectations(t)
 		})
 	}
 }

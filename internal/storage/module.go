@@ -21,7 +21,7 @@ var Module = fx.Module("storage",
 			func(s Interface) (api.SearchManager, error) {
 				sm, ok := s.(api.SearchManager)
 				if !ok {
-					return nil, fmt.Errorf("storage implementation does not satisfy api.SearchManager interface")
+					return nil, errors.New("storage implementation does not satisfy api.SearchManager interface")
 				}
 				return sm, nil
 			},

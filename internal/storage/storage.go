@@ -183,8 +183,8 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query i
 	}
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error decoding search response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding search response: %w", decodeErr)
 	}
 
 	hits, exists := result["hits"].(map[string]interface{})
@@ -709,8 +709,8 @@ func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs
 	}
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error decoding aggregation response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding aggregation response: %w", decodeErr)
 	}
 
 	aggregations, exists := result["aggregations"].(map[string]interface{})
@@ -755,8 +755,8 @@ func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query in
 	}
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("error decoding count response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return 0, fmt.Errorf("error decoding count response: %w", decodeErr)
 	}
 
 	count, ok := result["count"].(float64)

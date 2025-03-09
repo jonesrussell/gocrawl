@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -13,6 +15,7 @@ import (
 // Constants
 const (
 	readHeaderTimeout = 10 * time.Second // Timeout for reading headers
+	defaultPort       = ":8080"          // Default port if not specified in config or env
 )
 
 // SearchRequest represents the structure of the search request
@@ -91,7 +94,15 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 
 	serverCfg := cfg.GetServerConfig()
 	if serverCfg.Address == "" {
-		serverCfg.Address = ":8080" // Default to port 8080 if not specified
+		// Try to get port from environment variable
+		if port := os.Getenv("GOCRAWL_PORT"); port != "" {
+			if !strings.HasPrefix(port, ":") {
+				port = ":" + port
+			}
+			serverCfg.Address = port
+		} else {
+			serverCfg.Address = defaultPort
+		}
 	}
 
 	server := &http.Server{
