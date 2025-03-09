@@ -341,40 +341,71 @@ func convertSourceConfig(source *sources.Config) *config.Source {
 	}
 }
 
+// initializeCrawl initializes the crawler with the given source
+func initializeCrawl(_ context.Context, p CrawlParams) (*sources.Config, error) {
+	source, findErr := p.Sources.FindByName(sourceName)
+	if findErr != nil {
+		return nil, fmt.Errorf("error finding source: %w", findErr)
+	}
+
+	if err := startCrawl(p); err != nil {
+		return nil, fmt.Errorf("failed to initialize crawler: %w", err)
+	}
+
+	return source, nil
+}
+
+// runCrawl executes the crawl operation in a goroutine
+func runCrawl(ctx context.Context, p CrawlParams, source *sources.Config, errChan chan error) {
+	go func() {
+		p.Logger.Info("Starting crawl", "source", sourceName)
+		if startErr := p.CrawlerInstance.Start(ctx, source.URL); startErr != nil {
+			if !errors.Is(startErr, context.Canceled) {
+				p.Logger.Error("Crawl failed", "error", startErr)
+				errChan <- startErr
+			}
+			close(p.Done)
+			return
+		}
+
+		p.CrawlerInstance.Wait()
+		p.Logger.Info("Crawl completed successfully", "source", sourceName)
+		close(p.Done)
+	}()
+}
+
+// handleShutdown manages the graceful shutdown of the crawler
+func handleShutdown(ctx context.Context, p CrawlParams) error {
+	p.Logger.Info("Stopping crawler...")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-p.Done:
+		p.Logger.Info("Crawl completed, stopping gracefully")
+		if stopErr := p.CrawlerInstance.Stop(ctx); stopErr != nil {
+			p.Logger.Error("Error stopping crawler", "error", stopErr)
+		}
+		return nil
+	default:
+		p.Logger.Info("Forcing crawler to stop")
+		if stopErr := p.CrawlerInstance.Stop(ctx); stopErr != nil {
+			p.Logger.Error("Error stopping crawler", "error", stopErr)
+		}
+		return nil
+	}
+}
+
 // configureCrawlLifecycle configures the lifecycle hooks for crawl management.
 // It sets up the start and stop hooks for the crawl operation.
 func configureCrawlLifecycle(lc fx.Lifecycle, p CrawlParams, errChan chan error) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			// Get source URL for crawling
-			source, findErr := p.Sources.FindByName(sourceName)
-			if findErr != nil {
-				return fmt.Errorf("error finding source: %w", findErr)
+			source, err := initializeCrawl(ctx, p)
+			if err != nil {
+				return err
 			}
 
-			// Initialize the crawler first
-			if err := startCrawl(p); err != nil {
-				return fmt.Errorf("failed to initialize crawler: %w", err)
-			}
-
-			// Start the crawl in a goroutine to not block
-			go func() {
-				p.Logger.Info("Starting crawl", "source", sourceName)
-				if startErr := p.CrawlerInstance.Start(ctx, source.URL); startErr != nil {
-					if !errors.Is(startErr, context.Canceled) {
-						p.Logger.Error("Crawl failed", "error", startErr)
-						errChan <- startErr
-					}
-					close(p.Done)
-					return
-				}
-
-				// Wait for collector to finish its work
-				p.CrawlerInstance.Wait()
-
-				p.Logger.Info("Crawl completed successfully", "source", sourceName)
-				close(p.Done)
-			}()
+			runCrawl(ctx, p, source, errChan)
 
 			// Wait for either error or completion
 			select {
@@ -385,24 +416,7 @@ func configureCrawlLifecycle(lc fx.Lifecycle, p CrawlParams, errChan chan error)
 			}
 		},
 		OnStop: func(ctx context.Context) error {
-			p.Logger.Info("Stopping crawler...")
-			// Use context to ensure we don't block indefinitely during shutdown
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-p.Done:
-				p.Logger.Info("Crawl completed, stopping gracefully")
-				if stopErr := p.CrawlerInstance.Stop(ctx); stopErr != nil {
-					p.Logger.Error("Error stopping crawler", "error", stopErr)
-				}
-				return nil
-			default:
-				p.Logger.Info("Forcing crawler to stop")
-				if stopErr := p.CrawlerInstance.Stop(ctx); stopErr != nil {
-					p.Logger.Error("Error stopping crawler", "error", stopErr)
-				}
-				return nil
-			}
+			return handleShutdown(ctx, p)
 		},
 	})
 }

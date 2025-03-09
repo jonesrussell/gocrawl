@@ -169,13 +169,13 @@ func (s *ElasticsearchStorage) Search(
 		"size": size,
 	}
 
-	res, err := s.ESClient.Search(
+	res, searchErr := s.ESClient.Search(
 		s.ESClient.Search.WithContext(ctx),
 		s.ESClient.Search.WithIndex(index),
 		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(searchQuery))),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute search: %w", err)
+	if searchErr != nil {
+		return nil, fmt.Errorf("failed to execute search: %w", searchErr)
 	}
 	defer res.Body.Close()
 
@@ -184,28 +184,28 @@ func (s *ElasticsearchStorage) Search(
 	}
 
 	var searchResult map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&searchResult); err != nil {
-		return nil, fmt.Errorf("error decoding search response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&searchResult); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding search response: %w", decodeErr)
 	}
 
-	hits, ok := searchResult["hits"].(map[string]interface{})
-	if !ok {
+	hits, exists := searchResult["hits"].(map[string]interface{})
+	if !exists {
 		return nil, errors.New("invalid search response format")
 	}
 
-	hitsList, ok := hits["hits"].([]interface{})
-	if !ok {
+	hitsList, exists := hits["hits"].([]interface{})
+	if !exists {
 		return nil, errors.New("invalid hits format in search response")
 	}
 
 	results := make([]map[string]interface{}, 0, len(hitsList))
 	for _, hit := range hitsList {
-		hitMap, ok := hit.(map[string]interface{})
-		if !ok {
+		hitData, isMap := hit.(map[string]interface{})
+		if !isMap {
 			continue
 		}
-		source, ok := hitMap["_source"].(map[string]interface{})
-		if !ok {
+		source, isMap := hitData["_source"].(map[string]interface{})
+		if !isMap {
 			continue
 		}
 		results = append(results, source)
@@ -642,13 +642,13 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 		"size": size,
 	}
 
-	res, err := s.ESClient.Search(
+	res, searchErr := s.ESClient.Search(
 		s.ESClient.Search.WithContext(ctx),
 		s.ESClient.Search.WithIndex(s.opts.IndexName),
 		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(searchQuery))),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute search: %w", err)
+	if searchErr != nil {
+		return nil, fmt.Errorf("failed to execute search: %w", searchErr)
 	}
 	defer res.Body.Close()
 
@@ -667,8 +667,8 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 		} `json:"hits"`
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(&searchResult); err != nil {
-		return nil, fmt.Errorf("error decoding search response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&searchResult); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding search response: %w", decodeErr)
 	}
 
 	articles := make([]*models.Article, 0, len(searchResult.Hits.Hits))
