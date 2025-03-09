@@ -103,6 +103,11 @@ func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
 func parseLogLevel(logLevelStr string) (zapcore.Level, error) {
 	var logLevel zapcore.Level
 
+	// Default to info level if no level is provided
+	if logLevelStr == "" {
+		return zapcore.InfoLevel, nil
+	}
+
 	switch logLevelStr {
 	case "debug":
 		logLevel = zapcore.DebugLevel
