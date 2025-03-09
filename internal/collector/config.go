@@ -57,6 +57,8 @@ type Params struct {
 	Source *config.Source
 	// Done is a channel that signals when crawling is complete
 	Done chan struct{} `name:"crawlDone"`
+	// AllowedDomains is a list of domains that the collector is allowed to visit
+	AllowedDomains []string
 }
 
 // Result holds the collector instance.
@@ -123,6 +125,8 @@ type Config struct {
 	ArticleProcessor models.ContentProcessor
 	// ContentProcessor handles the processing of general content
 	ContentProcessor models.ContentProcessor
+	// AllowedDomains is a list of domains that the collector is allowed to visit
+	AllowedDomains []string
 }
 
 // NewConfig creates a new collector configuration from the provided parameters.
@@ -146,6 +150,7 @@ func NewConfig(p Params) (*Config, error) {
 		ArticleProcessor: p.ArticleProcessor,
 		ContentProcessor: p.ContentProcessor,
 		Source:           *p.Source, // Dereference the pointer to get the value
+		AllowedDomains:   p.AllowedDomains,
 	}, nil
 }
 

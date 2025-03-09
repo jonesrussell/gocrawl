@@ -54,15 +54,9 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 	c.baseURL = baseURL
 	c.ctx = ctx
 
-	// Configure collector
-	c.collector = colly.NewCollector(
-		colly.AllowedDomains(baseURL),
-		colly.MaxDepth(10),
-		colly.Async(true),
-	)
-
-	if c.Debugger != nil {
-		c.collector.SetDebugger(c.Debugger)
+	// Ensure collector is set
+	if c.collector == nil {
+		return errors.New("collector not initialized")
 	}
 
 	// Set up callbacks

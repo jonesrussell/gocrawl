@@ -45,10 +45,16 @@ func NewSetup(config *Config) *Setup {
 // Returns:
 //   - *colly.Collector: The configured collector instance
 func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
+	// If allowed domains are specified, use those, otherwise restrict to the base domain
+	allowedDomains := s.config.AllowedDomains
+	if len(allowedDomains) == 0 {
+		allowedDomains = []string{domain}
+	}
+
 	return colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(s.config.MaxDepth),
-		colly.AllowedDomains(domain),
+		colly.AllowedDomains(allowedDomains...),
 	)
 }
 

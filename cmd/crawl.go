@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -232,6 +234,25 @@ func startCrawl(p CrawlParams) error {
 		return fmt.Errorf("invalid rate limit: %w", err)
 	}
 
+	// Extract domain from source URL
+	parsedURL, err := url.Parse(source.URL)
+	if err != nil {
+		return fmt.Errorf("invalid source URL: %w", err)
+	}
+
+	// Extract domain from URL, handling both full URLs and path-only URLs
+	var domain string
+	if parsedURL.Host == "" {
+		// If no host in URL, treat the first path segment as the domain
+		parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+		if len(parts) > 0 {
+			domain = parts[0]
+		}
+	} else {
+		// For full URLs, use the host as domain
+		domain = parsedURL.Host
+	}
+
 	// Create and configure the collector
 	collectorResult, err := collector.New(collector.Params{
 		BaseURL:          source.URL,
@@ -246,6 +267,7 @@ func startCrawl(p CrawlParams) error {
 		RandomDelay:      p.Config.Crawler.RandomDelay,
 		Context:          p.Context,
 		Done:             p.Done,
+		AllowedDomains:   []string{domain},
 	})
 	if err != nil {
 		return fmt.Errorf("error creating collector: %w", err)
@@ -324,6 +346,11 @@ func configureCrawlLifecycle(lc fx.Lifecycle, p CrawlParams, errChan chan error)
 				return fmt.Errorf("error finding source: %w", findErr)
 			}
 
+			// Initialize the crawler first
+			if err := startCrawl(p); err != nil {
+				return fmt.Errorf("failed to initialize crawler: %w", err)
+			}
+
 			// Start the crawl in a goroutine to not block
 			go func() {
 				p.Logger.Info("Starting crawl", "source", sourceName)
@@ -340,8 +367,8 @@ func configureCrawlLifecycle(lc fx.Lifecycle, p CrawlParams, errChan chan error)
 
 			// Wait for either error or completion
 			select {
-			case err := <-errChan:
-				return err
+			case channelErr := <-errChan:
+				return channelErr
 			case <-p.Done:
 				return nil
 			}
