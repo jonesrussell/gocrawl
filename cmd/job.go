@@ -28,10 +28,10 @@ type JobParams struct {
 	Logger common.Logger
 
 	// Sources provides access to source configuration
-	Sources *sources.Sources
+	Sources *sources.Sources `optional:"true"`
 
 	// Storage provides data persistence operations
-	Storage common.Storage
+	Storage common.Storage `optional:"true"`
 }
 
 // startJobScheduler initializes and manages the job scheduler lifecycle.
@@ -145,6 +145,10 @@ var jobCmd = &cobra.Command{
 		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
 			common.Module,
+			sources.Module,
+			fx.Provide(
+				func() *cobra.Command { return cmd },
+			),
 			fx.Invoke(func(p JobParams) {
 				startJobScheduler(p, rootPath)
 			}),
