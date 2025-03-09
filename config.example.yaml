@@ -54,3 +54,14 @@ crawler:
   parallelism: 2
   # Additional random delay between requests (helps avoid detection)
   random_delay: 5s
+
+# HTTP server configuration
+server:
+  # Server address and port (":8080" means all interfaces, port 8080)
+  address: ":8080"
+  # Maximum duration for reading the entire request (including body)
+  read_timeout: 10s
+  # Maximum duration for writing the response
+  write_timeout: 30s
+  # Maximum duration for keeping idle connections alive
+  idle_timeout: 60s

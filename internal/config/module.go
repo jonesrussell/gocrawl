@@ -6,8 +6,10 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
@@ -71,6 +73,16 @@ func (c *config) GetServerConfig() *ServerConfig {
 	return &c.Server
 }
 
+// bindEnvs binds environment variables to their viper config keys
+func bindEnvs(bindings map[string]string) error {
+	for k, v := range bindings {
+		if err := viper.BindEnv(k, v); err != nil {
+			return fmt.Errorf("failed to bind env var %s: %w", v, err)
+		}
+	}
+	return nil
+}
+
 // InitializeConfig sets up the configuration for the application.
 // It handles loading configuration from files and environment variables,
 // setting default values, and validating the configuration.
@@ -79,6 +91,12 @@ func (c *config) GetServerConfig() *ServerConfig {
 //   - Interface: The initialized configuration
 //   - error: Any error that occurred during initialization
 func InitializeConfig() (Interface, error) {
+	// Load .env file first, so environment variables are available to Viper
+	if err := godotenv.Load(); err != nil {
+		// Only log a warning as .env file is optional
+		log.Printf("Warning: Error loading .env file: %v", err)
+	}
+
 	// Set config defaults if not already configured
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -88,6 +106,22 @@ func InitializeConfig() (Interface, error) {
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("app.environment", "development")
 	viper.SetDefault("crawler.source_file", "sources.yml")
+
+	// Map environment variables
+	if err := bindEnvs(map[string]string{
+		"elasticsearch.username":        "ELASTIC_USERNAME",
+		"elasticsearch.password":        "ELASTIC_PASSWORD",
+		"elasticsearch.api_key":         "ELASTIC_API_KEY",
+		"elasticsearch.tls.skip_verify": "ELASTIC_SKIP_TLS",
+		"elasticsearch.tls.certificate": "ELASTIC_CERT_PATH",
+		"elasticsearch.tls.key":         "ELASTIC_KEY_PATH",
+		"elasticsearch.tls.ca":          "ELASTIC_CA_PATH",
+		"server.address":                "GOCRAWL_PORT",
+		"app.environment":               "APP_ENV",
+		"log.level":                     "LOG_LEVEL",
+	}); err != nil {
+		return nil, fmt.Errorf("failed to bind environment variables: %w", err)
+	}
 
 	// Enable automatic environment variable binding
 	viper.AutomaticEnv()

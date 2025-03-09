@@ -8,6 +8,7 @@ require (
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/google/uuid v1.6.0
 	github.com/jedib0t/go-pretty/v6 v6.6.7
+	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
