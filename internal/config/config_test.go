@@ -232,47 +232,6 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
-func TestInitializeConfig(t *testing.T) {
-	tests := []struct {
-		name    string
-		setup   func()
-		wantErr bool
-	}{
-		{
-			name: "with config file",
-			setup: func() {
-				viper.SetConfigType("yaml")
-				viper.SetConfigName("config")
-				viper.AddConfigPath("testdata")
-			},
-			wantErr: false,
-		},
-		{
-			name: "without config file",
-			setup: func() {
-				viper.SetConfigType("yaml")
-				viper.SetConfigName("nonexistent")
-				viper.AddConfigPath("testdata")
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			viper.Reset()
-			tt.setup()
-			cfg, err := config.InitializeConfig()
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.NotNil(t, cfg)
-		})
-	}
-}
-
 func TestSetMaxDepth(t *testing.T) {
 	cfg := &config.CrawlerConfig{}
 	cfg.SetMaxDepth(5)

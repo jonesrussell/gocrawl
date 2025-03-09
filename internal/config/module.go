@@ -6,7 +6,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/spf13/viper"
@@ -28,9 +27,6 @@ const (
 // It handles loading configuration from files and environment variables,
 // setting default values, and validating the configuration.
 //
-// Parameters:
-//   - cfgFile: Path to the configuration file (optional)
-//
 // Returns:
 //   - *Config: The initialized configuration
 //   - error: Any error that occurred during initialization
@@ -48,19 +44,25 @@ func InitializeConfig() (*Config, error) {
 	// Enable automatic environment variable binding
 	viper.AutomaticEnv()
 
-	// Attempt to read the config file
+	// Read configuration file
 	if err := viper.ReadInConfig(); err != nil {
-		var configErr *viper.ConfigFileNotFoundError
-		if errors.As(err, &configErr) {
-			// Log to stderr instead of using fmt.Println for better error handling
-			fmt.Fprintf(os.Stderr, "Config file not found; using environment variables\n")
-		} else {
-			// Config file was found but another error was produced
-			return nil, fmt.Errorf("error reading config file: %w", err)
+		var configFileNotFoundError *viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundError) {
+			return nil, fmt.Errorf("config file not found: %w", err)
 		}
+		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
 
-	return New()
+	var cfg Config
+	if err := viper.Unmarshal(&cfg); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	if err := ValidateConfig(&cfg); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	return &cfg, nil
 }
 
 // New creates a new Config instance with values from Viper.
