@@ -19,9 +19,9 @@ type (
 	// data persistence operations across the application.
 	Storage = storage.Interface
 
-	// Config is an alias for the configuration type, providing
+	// Config is an alias for the configuration interface, providing
 	// access to application-wide settings.
-	Config = *config.Config
+	Config = config.Interface
 
 	// Logger is an alias for the logger interface, providing
 	// structured logging capabilities across the application.

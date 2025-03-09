@@ -23,14 +23,62 @@ const (
 	defaultMaxRetries = 3
 )
 
+// Interface defines the configuration contract for the application.
+// It provides access to configuration values while allowing different
+// implementations (e.g., file-based, environment-based, or mock for testing).
+type Interface interface {
+	// GetCrawlerConfig returns the crawler-specific configuration
+	GetCrawlerConfig() *CrawlerConfig
+
+	// GetElasticsearchConfig returns the Elasticsearch-specific configuration
+	GetElasticsearchConfig() *ElasticsearchConfig
+
+	// GetLogConfig returns the logging-specific configuration
+	GetLogConfig() *LogConfig
+
+	// GetAppConfig returns the application-specific configuration
+	GetAppConfig() *AppConfig
+}
+
+// config implements the Interface and holds the actual configuration values
+type config struct {
+	App           AppConfig           `yaml:"app"`
+	Crawler       CrawlerConfig       `yaml:"crawler"`
+	Elasticsearch ElasticsearchConfig `yaml:"elasticsearch"`
+	Log           LogConfig           `yaml:"log"`
+}
+
+// Ensure config implements Interface
+var _ Interface = (*config)(nil)
+
+// GetCrawlerConfig implements Interface
+func (c *config) GetCrawlerConfig() *CrawlerConfig {
+	return &c.Crawler
+}
+
+// GetElasticsearchConfig implements Interface
+func (c *config) GetElasticsearchConfig() *ElasticsearchConfig {
+	return &c.Elasticsearch
+}
+
+// GetLogConfig implements Interface
+func (c *config) GetLogConfig() *LogConfig {
+	return &c.Log
+}
+
+// GetAppConfig implements Interface
+func (c *config) GetAppConfig() *AppConfig {
+	return &c.App
+}
+
 // InitializeConfig sets up the configuration for the application.
 // It handles loading configuration from files and environment variables,
 // setting default values, and validating the configuration.
 //
 // Returns:
-//   - *Config: The initialized configuration
+//   - Interface: The initialized configuration
 //   - error: Any error that occurred during initialization
-func InitializeConfig() (*Config, error) {
+func InitializeConfig() (Interface, error) {
 	// Set config defaults if not already configured
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -53,7 +101,7 @@ func InitializeConfig() (*Config, error) {
 		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
 
-	var cfg Config
+	var cfg config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}
@@ -71,9 +119,9 @@ func InitializeConfig() (*Config, error) {
 // configuration values.
 //
 // Returns:
-//   - *Config: The new configuration instance
+//   - Interface: The new configuration instance
 //   - error: Any error that occurred during creation
-func New() (*Config, error) {
+func New() (Interface, error) {
 	// Parse and validate the rate limit configuration
 	rateLimit, err := parseRateLimit(viper.GetString("crawler.rate_limit"))
 	if err != nil {
@@ -147,7 +195,7 @@ func New() (*Config, error) {
 // the application for dependency injection.
 //
 // The module provides:
-// - Config instance via the InitializeConfig constructor
+// - Interface instance via the InitializeConfig constructor
 // - HTTP transport configuration via NewHTTPTransport
 var Module = fx.Options(
 	fx.Provide(

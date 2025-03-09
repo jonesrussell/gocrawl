@@ -189,6 +189,29 @@ type Config struct {
 	Sources []Source `yaml:"sources"`
 }
 
+// GetCrawlerConfig implements Interface
+func (c *Config) GetCrawlerConfig() *CrawlerConfig {
+	return &c.Crawler
+}
+
+// GetElasticsearchConfig implements Interface
+func (c *Config) GetElasticsearchConfig() *ElasticsearchConfig {
+	return &c.Elasticsearch
+}
+
+// GetLogConfig implements Interface
+func (c *Config) GetLogConfig() *LogConfig {
+	return &c.Log
+}
+
+// GetAppConfig implements Interface
+func (c *Config) GetAppConfig() *AppConfig {
+	return &c.App
+}
+
+// Ensure Config implements Interface
+var _ Interface = (*Config)(nil)
+
 // parseRateLimit parses the rate limit duration from a string.
 // It converts a string duration (e.g., "1s", "500ms") into a time.Duration.
 //
@@ -207,35 +230,6 @@ func parseRateLimit(rateLimitStr string) (time.Duration, error) {
 		return time.Second, errors.New("error parsing duration")
 	}
 	return rateLimit, nil
-}
-
-// ValidateConfig validates the configuration values.
-func ValidateConfig(cfg *Config) error {
-	if cfg == nil {
-		return errors.New("config cannot be nil")
-	}
-
-	if len(cfg.Elasticsearch.Addresses) == 0 {
-		return errors.New("elasticsearch addresses cannot be empty")
-	}
-
-	if cfg.Crawler.Parallelism < 1 {
-		return errors.New("parallelism must be greater than 0")
-	}
-
-	if cfg.Crawler.MaxDepth < 0 {
-		return errors.New("max depth cannot be negative")
-	}
-
-	if cfg.Crawler.RateLimit < 0 {
-		return errors.New("rate limit cannot be negative")
-	}
-
-	if cfg.Crawler.RandomDelay < 0 {
-		return errors.New("random delay cannot be negative")
-	}
-
-	return nil
 }
 
 // NewHTTPTransport creates a new HTTP transport.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -77,15 +78,20 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
-		common.Module,
-		sources.Module,
-		fx.Provide(
-			fx.Annotate(
-				func() context.Context {
-					return cmd.Context()
-				},
-				fx.ResultTags(`name:"commandContext"`),
+		fx.Options(
+			common.Module,
+			fx.Provide(
+				fx.Annotate(
+					func() context.Context {
+						return cmd.Context()
+					},
+					fx.ResultTags(`name:"commandContext"`),
+				),
 			),
+		),
+		fx.Options(
+			config.Module,
+			sources.Module,
 		),
 		fx.Invoke(func(lc fx.Lifecycle, s *sources.Sources, l common.Logger) {
 			lc.Append(fx.Hook{
