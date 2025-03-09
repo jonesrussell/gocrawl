@@ -1,86 +1,102 @@
+// Package sources manages the configuration and lifecycle of web content sources for GoCrawl.
+// It handles source configuration loading and validation through a YAML-based configuration system.
 package sources
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"os"
 
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
-// IndexManager defines the interface for index management
-type IndexManager interface {
-	EnsureIndex(ctx context.Context, indexName string) error
-}
-
-// CrawlerInterface defines the interface for crawler operations
-type CrawlerInterface interface {
-	Start(ctx context.Context, url string) error
-	Stop()
-}
-
-// Config represents a source configuration
+// Config represents a source configuration.
 type Config struct {
-	Name         string   `yaml:"name"`
-	URL          string   `yaml:"url"`
-	ArticleIndex string   `yaml:"article_index"` // Index for articles
-	Index        string   `yaml:"index"`         // Index for non-article content
-	RateLimit    string   `yaml:"rate_limit"`
-	MaxDepth     int      `yaml:"max_depth"`
-	Time         []string `yaml:"time"`
-	Selectors    struct {
-		Article struct {
-			Container     string `yaml:"container,omitempty"`
-			Title         string `yaml:"title"`
-			Body          string `yaml:"body"`
-			Intro         string `yaml:"intro,omitempty"`
-			Byline        string `yaml:"byline,omitempty"`
-			PublishedTime string `yaml:"published_time"`
-			TimeAgo       string `yaml:"time_ago,omitempty"`
-			JsonLd        string `yaml:"json_ld,omitempty"`
-			Section       string `yaml:"section,omitempty"`
-			Keywords      string `yaml:"keywords,omitempty"`
-			Description   string `yaml:"description,omitempty"`
-			OgTitle       string `yaml:"og_title,omitempty"`
-			OgDescription string `yaml:"og_description,omitempty"`
-			OgImage       string `yaml:"og_image,omitempty"`
-			OgUrl         string `yaml:"og_url,omitempty"`
-			Canonical     string `yaml:"canonical,omitempty"`
-			WordCount     string `yaml:"word_count,omitempty"`
-			PublishDate   string `yaml:"publish_date,omitempty"`
-			Category      string `yaml:"category,omitempty"`
-			Tags          string `yaml:"tags,omitempty"`
-			Author        string `yaml:"author,omitempty"`
-			BylineName    string `yaml:"byline_name,omitempty"`
-		} `yaml:"article"`
-	} `yaml:"selectors"`
+	Name      string            `yaml:"name"`
+	URL       string            `yaml:"url"`
+	RateLimit string            `yaml:"rate_limit"`
+	MaxDepth  int               `yaml:"max_depth"`
+	Selectors SelectorConfig    `yaml:"selectors"`
+	Metadata  map[string]string `yaml:"metadata,omitempty"`
+	// Time specifies the scheduled times for crawling in 24-hour format (HH:MM)
+	Time []string `yaml:"time,omitempty"`
+	// ArticleIndex specifies the Elasticsearch index name for articles from this source
+	ArticleIndex string `yaml:"article_index,omitempty"`
+	// Index specifies the Elasticsearch index name for general content from this source
+	Index string `yaml:"index,omitempty"`
 }
 
-// Sources represents the root YAML structure and handles crawling
+// ArticleSelectors defines the CSS selectors used for article content extraction.
+type ArticleSelectors struct {
+	Container     string `yaml:"container"`
+	Title         string `yaml:"title"`
+	Body          string `yaml:"body"`
+	Intro         string `yaml:"intro"`
+	Byline        string `yaml:"byline"`
+	PublishedTime string `yaml:"published_time"`
+	TimeAgo       string `yaml:"time_ago"`
+	JSONLd        string `yaml:"jsonld"`
+	Section       string `yaml:"section"`
+	Keywords      string `yaml:"keywords"`
+	Description   string `yaml:"description"`
+	OgTitle       string `yaml:"og_title"`
+	OgDescription string `yaml:"og_description"`
+	OgImage       string `yaml:"og_image"`
+	OgURL         string `yaml:"og_url"`
+	Canonical     string `yaml:"canonical"`
+	WordCount     string `yaml:"word_count"`
+	PublishDate   string `yaml:"publish_date"`
+	Category      string `yaml:"category"`
+	Tags          string `yaml:"tags"`
+	Author        string `yaml:"author"`
+	BylineName    string `yaml:"byline_name"`
+}
+
+// SelectorConfig defines the CSS selectors used for content extraction.
+type SelectorConfig struct {
+	Title       string           `yaml:"title"`
+	Description string           `yaml:"description"`
+	Content     string           `yaml:"content"`
+	Article     ArticleSelectors `yaml:"article"`
+}
+
+// Sources manages web content source configurations.
 type Sources struct {
-	Sources  []Config         `yaml:"sources"`
-	Crawler  CrawlerInterface `yaml:"-"`
-	Logger   logger.Interface `yaml:"-"`
-	IndexMgr IndexManager     `yaml:"-"`
+	Sources []Config `yaml:"sources"`
 }
 
-// Load loads sources from a YAML file
-func Load(filename string) (*Sources, error) {
-	data, err := os.ReadFile(filename)
+// LoadFromFile loads source configurations from a YAML file.
+// It reads and parses the file, populating the Sources struct with the configuration data.
+//
+// Parameters:
+//   - path: Path to the YAML configuration file
+//
+// Returns:
+//   - *Sources: The loaded sources configuration
+//   - error: Any error that occurred during loading
+func LoadFromFile(path string) (*Sources, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read sources file: %w", err)
 	}
 
 	var sources Sources
-	if err := yaml.Unmarshal(data, &sources); err != nil {
-		return nil, err
+	if unmarshalErr := yaml.Unmarshal(data, &sources); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal sources: %w", unmarshalErr)
 	}
 
 	return &sources, nil
 }
 
-// FindByName finds a source by its name
+// FindByName finds a source by its name.
+// It searches through the sources list for a matching name.
+//
+// Parameters:
+//   - name: The name of the source to find
+//
+// Returns:
+//   - *Config: The found source configuration
+//   - error: Any error that occurred during the search
 func (s *Sources) FindByName(name string) (*Config, error) {
 	for _, source := range s.Sources {
 		if source.Name == name {
@@ -90,57 +106,34 @@ func (s *Sources) FindByName(name string) (*Config, error) {
 	return nil, fmt.Errorf("no source found with name: %s", name)
 }
 
-// SetCrawler sets the crawler instance
-func (s *Sources) SetCrawler(c CrawlerInterface) {
-	s.Crawler = c
-}
-
-// SetIndexManager sets the index manager
-func (s *Sources) SetIndexManager(m IndexManager) {
-	s.IndexMgr = m
-}
-
-// Start starts crawling for the specified source
-func (s *Sources) Start(ctx context.Context, sourceName string) error {
-	if s.Crawler == nil {
-		return fmt.Errorf("crawler is not initialized - call SetCrawler first")
+// Validate checks if a source configuration is valid.
+// It ensures all required fields are present and properly formatted.
+//
+// Parameters:
+//   - source: The source configuration to validate
+//
+// Returns:
+//   - error: Any validation errors found
+func (s *Sources) Validate(source *Config) error {
+	if source == nil {
+		return errors.New("source configuration is nil")
 	}
 
-	if s.IndexMgr == nil {
-		return fmt.Errorf("index manager is not initialized - call SetIndexManager first")
+	if source.Name == "" {
+		return errors.New("source name is required")
 	}
 
-	source, err := s.FindByName(sourceName)
-	if err != nil {
-		return err
+	if source.URL == "" {
+		return errors.New("source URL is required")
 	}
 
-	s.Logger.Info("Starting crawl", "source", source.Name)
-
-	// Ensure article index exists
-	if err := s.IndexMgr.EnsureIndex(ctx, source.ArticleIndex); err != nil {
-		s.Logger.Error("Failed to ensure article index exists", "error", err)
-		return fmt.Errorf("failed to ensure article index exists: %w", err)
+	if source.RateLimit == "" {
+		return errors.New("rate limit is required")
 	}
 
-	// Ensure content index exists
-	if err := s.IndexMgr.EnsureIndex(ctx, source.Index); err != nil {
-		s.Logger.Error("Failed to ensure content index exists", "error", err)
-		return fmt.Errorf("failed to ensure content index exists: %w", err)
+	if source.MaxDepth <= 0 {
+		return errors.New("max depth must be greater than 0")
 	}
-
-	// Start the crawl
-	if err := s.Crawler.Start(ctx, source.URL); err != nil {
-		return fmt.Errorf("error crawling source %s: %w", source.Name, err)
-	}
-	s.Logger.Info("Finished crawl", "source", source.Name)
 
 	return nil
-}
-
-// Stop stops the crawler
-func (s *Sources) Stop() {
-	if s.Crawler != nil {
-		s.Crawler.Stop()
-	}
 }

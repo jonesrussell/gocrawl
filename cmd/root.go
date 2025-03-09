@@ -1,91 +1,59 @@
+// Package cmd implements the command-line interface for GoCrawl.
+// It provides the root command and subcommands for managing web crawling operations.
 package cmd
 
 import (
-	"fmt"
 	"os"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/cmd/indices"
+	"github.com/jonesrussell/gocrawl/cmd/sources"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
-	cfgFile      string
-	globalLogger logger.Interface
-	globalConfig *config.Config
-	rootCmd      = &cobra.Command{
+	// cfgFile holds the path to the configuration file.
+	// It can be set via the --config flag or defaults to config.yaml.
+	cfgFile string
+
+	// rootCmd represents the root command for the GoCrawl CLI.
+	// It serves as the base command that all subcommands are attached to.
+	rootCmd = &cobra.Command{
 		Use:   "gocrawl",
 		Short: "A web crawler that stores content in Elasticsearch",
+		Long: `GoCrawl is a powerful web crawler that efficiently collects and stores web content
+in Elasticsearch. It supports configurable crawling strategies, rate limiting,
+and content processing through a YAML-based configuration system.
+
+The crawler can be configured to:
+- Define multiple content sources with custom crawling rules
+- Process and extract structured data from web pages
+- Store content in Elasticsearch with proper indexing
+- Handle rate limiting and respect robots.txt
+- Process different types of content (articles, general web pages)`,
 	}
 )
 
-// Execute is the entry point for the CLI
+// Execute is the entry point for the CLI application.
+// It runs the root command and handles any errors that occur during execution.
+// If an error occurs, it prints the error message and exits with status code 1.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		globalLogger.Error("Error executing root command", "error", err)
+		common.PrintErrorf("Error executing root command: %v", err)
 		os.Exit(1)
 	}
 }
 
-// Initialize the command
+// init initializes the root command and its subcommands.
+// It sets up:
+// - The persistent --config flag for specifying the configuration file
+// - Adds the indices subcommand for managing Elasticsearch indices
+// - Adds the sources subcommand for managing web content sources
 func init() {
-	cobra.OnInitialize(initConfig, initLogger)
+	// Add the persistent --config flag to all commands
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
-}
 
-// Initialize configuration
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		viper.AddConfigPath(".")
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("config")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
-
-	// Initialize configuration
-	var configErr error
-	globalConfig, configErr = config.NewConfig() // This should be the only place you call NewConfig
-	if configErr != nil {
-		fmt.Fprintln(os.Stderr, "Error creating Config:", configErr)
-		os.Exit(1)
-	}
-}
-
-func initLogger() {
-	env := globalConfig.App.Environment
-	if env == "" {
-		env = "development" // Set a default environment
-	}
-
-	// Log the environment
-	fmt.Fprintln(os.Stderr, "Initializing logger in environment:", env)
-
-	var loggerErr error
-
-	if env == "development" {
-		globalLogger, loggerErr = logger.NewDevelopmentLogger(globalConfig.Log.Level) // Pass log level as string
-	} else {
-		globalLogger, loggerErr = logger.NewProductionLogger(globalConfig.Log.Level) // Pass log level as string
-	}
-
-	if loggerErr != nil {
-		fmt.Fprintln(os.Stderr, "Error creating Logger:", loggerErr)
-		os.Exit(1)
-	}
-}
-
-// Shutdown gracefully shuts down the application
-func Shutdown() error {
-	// Implement shutdown logic if necessary
-	return nil
+	// Add subcommands for managing different aspects of the crawler
+	rootCmd.AddCommand(indices.Command()) // For managing Elasticsearch indices
+	rootCmd.AddCommand(sources.Command()) // For managing web content sources
 }

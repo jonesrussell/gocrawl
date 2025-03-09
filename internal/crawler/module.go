@@ -1,103 +1,81 @@
+// Package crawler provides core crawling functionality.
 package crawler
 
 import (
 	"context"
-	"errors"
 
-	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"go.uber.org/fx"
 )
 
-// Interface defines the methods required for a crawler
+// Interface defines the crawler's capabilities.
 type Interface interface {
-	Start(ctx context.Context, url string) error
-	Stop()
+	// Start begins crawling from the given base URL.
+	Start(ctx context.Context, baseURL string) error
+	// Stop gracefully stops the crawler.
+	Stop(ctx context.Context) error
+	// Subscribe adds a content handler to receive discovered content.
+	Subscribe(handler events.Handler)
+	// SetRateLimit sets the crawler's rate limit.
+	SetRateLimit(duration string) error
+	// SetMaxDepth sets the maximum crawl depth.
+	SetMaxDepth(depth int)
+	// SetCollector sets the collector for the crawler.
+	SetCollector(collector *colly.Collector)
+	// GetIndexManager returns the index manager interface.
+	GetIndexManager() api.IndexManager
+	// Wait blocks until the crawler has finished processing all queued requests.
+	Wait()
 }
 
-func provideCollyDebugger(log logger.Interface) *logger.CollyDebugger {
-	return logger.NewCollyDebugger(log)
-}
+// Module provides the crawler's dependencies.
+var Module = fx.Module("crawler",
+	fx.Provide(
+		provideCollyDebugger,
+		provideEventBus,
+		provideCrawler,
+	),
+)
 
-// Params holds the dependencies for creating a crawler
+// Params defines the crawler's required dependencies.
 type Params struct {
 	fx.In
 
-	Logger           logger.Interface
-	Storage          storage.Interface
-	Debugger         *logger.CollyDebugger
-	Config           *config.Config
-	Source           string `name:"sourceName"`
-	IndexService     storage.IndexServiceInterface
-	ContentProcessor []models.ContentProcessor `group:"processors"`
+	Logger       common.Logger
+	Debugger     debug.Debugger `optional:"true"`
+	IndexManager api.IndexManager
 }
 
-// Result holds the crawler instance
+// Result contains the crawler's provided components.
 type Result struct {
 	fx.Out
 
 	Crawler Interface
 }
 
-// Module provides crawler-related dependencies
-var Module = fx.Module("crawler",
-	fx.Provide(
-		provideCollyDebugger,
-		ProvideCrawler,
-	),
-)
-
-// ProvideCrawler creates a new Crawler instance
-func ProvideCrawler(p Params) (Interface, error) {
-	if p.Logger == nil {
-		return nil, errors.New("logger is required")
-	}
-
-	if p.Config == nil {
-		return nil, errors.New("config is required")
-	}
-
-	if p.Storage == nil {
-		return nil, errors.New("storage is required")
-	}
-
-	if p.IndexService == nil {
-		return nil, errors.New("index service is required")
-	}
-
-	if len(p.ContentProcessor) == 0 {
-		return nil, errors.New("at least one content processor is required")
-	}
-
-	// Log the entire configuration to ensure it's set correctly
-	p.Logger.Debug("Initializing Crawler Configuration", "config", p.Config)
-
-	// Create a new crawler instance
-	crawler := &Crawler{
-		Storage:     p.Storage,
-		Logger:      p.Logger,
-		Debugger:    p.Debugger,
-		IndexName:   p.Config.Crawler.IndexName,
-		articleChan: make(chan *models.Article, DefaultBatchSize),
-		ArticleService: article.NewServiceWithConfig(article.ServiceParams{
-			Logger: p.Logger,
-			Config: p.Config,
-			Source: p.Source,
-		}),
-		IndexService:     p.IndexService,
-		Config:           p.Config,
-		ContentProcessor: p.ContentProcessor[0], // Use the first processor
-	}
-
-	return crawler, nil
+// provideEventBus creates a new event bus instance.
+func provideEventBus() *events.Bus {
+	return events.NewBus()
 }
 
-const (
-	DefaultMaxDepth    = 3
-	DefaultMaxBodySize = 10 * 1024 * 1024 // 10 MB
-	DefaultParallelism = 2
-	DefaultBatchSize   = 100
-)
+// provideCollyDebugger creates a new debugger instance.
+func provideCollyDebugger(logger common.Logger) debug.Debugger {
+	return &debug.LogDebugger{
+		Output: newDebugLogger(logger),
+	}
+}
+
+// provideCrawler creates a new crawler instance.
+func provideCrawler(p Params, bus *events.Bus) (Result, error) {
+	c := &Crawler{
+		Logger:       p.Logger,
+		Debugger:     p.Debugger,
+		bus:          bus,
+		indexManager: p.IndexManager,
+	}
+	return Result{Crawler: c}, nil
+}

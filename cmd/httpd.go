@@ -1,102 +1,123 @@
-/*
-Copyright © 2025 Russell Jones <russell@web.net>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+// Package cmd implements the command-line interface for GoCrawl.
+// This file contains the HTTP server command implementation that provides a REST API
+// for searching content in Elasticsearch.
 package cmd
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
-// httpdCmd represents the httpd command
+// ServerParams holds the parameters required for running the HTTP server.
+// It uses fx.In for dependency injection of required components.
+type ServerParams struct {
+	fx.In
+
+	// Server is the HTTP server instance that handles incoming requests
+	Server *http.Server
+	// Logger provides logging capabilities for the HTTP server
+	Logger logger.Interface
+}
+
+// httpdCmd represents the HTTP server command that provides a REST API
+// for searching content in Elasticsearch.
 var httpdCmd = &cobra.Command{
 	Use:   "httpd",
 	Short: "Start the HTTP server for search",
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
-	Run: func(_ *cobra.Command, _ []string) {
-		// Initialize the Fx application with the HTTP server
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		// Set up signal handling for graceful shutdown
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+		// Create channels for error handling and completion
+		errChan := make(chan error, 1)
+		doneChan := make(chan struct{})
+
+		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
-			fx.Provide(
-				func() *config.Config {
-					return globalConfig // Provide the global config
-				},
-				func() logger.Interface {
-					return globalLogger // Use the global logger
-				},
-			),
+			common.Module,
 			api.Module,
-			storage.Module,
-			fx.Invoke(func(server *http.Server) {
-				// Start the server
-				go func() {
-					if err := server.ListenAndServe(); err != nil {
-						globalLogger.Error("HTTP server failed", "error", err)
-					}
-				}()
-				globalLogger.Info("HTTP server started on :8081")
+			fx.Invoke(func(lc fx.Lifecycle, p ServerParams) {
+				lc.Append(fx.Hook{
+					OnStart: func(context.Context) error {
+						// Start the server in a goroutine
+						go func() {
+							p.Logger.Info("HTTP server started", "address", p.Server.Addr)
+							if err := p.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+								p.Logger.Error("HTTP server failed", "error", err)
+								errChan <- err
+								return
+							}
+							close(doneChan)
+						}()
+						return nil
+					},
+					OnStop: func(ctx context.Context) error {
+						p.Logger.Info("Shutting down HTTP server...")
+						return p.Server.Shutdown(ctx)
+					},
+				})
 			}),
 		)
 
-		// Start the application
-		if err := app.Start(context.Background()); err != nil {
-			globalLogger.Error("Error starting application", "error", err)
-			return
+		// Start the application and handle any startup errors
+		if err := app.Start(cmd.Context()); err != nil {
+			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		// Wait for a termination signal
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		<-sigChan // Block until a signal is received
+		// Wait for either:
+		// - A signal interrupt (SIGINT/SIGTERM)
+		// - Context cancellation
+		// - Server error
+		// - Server shutdown
+		var serverErr error
+		select {
+		case sig := <-sigChan:
+			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+			// Graceful shutdown requested, not an error
+		case <-cmd.Context().Done():
+			common.PrintInfof("\nContext cancelled, initiating shutdown...")
+			// Context cancellation requested, not an error
+		case serverErr = <-errChan:
+			// Error already logged in OnStart hook
+		case <-doneChan:
+			// Server shut down cleanly
+		}
 
-		// Wait for the application to stop
-		defer func() {
-			if err := app.Stop(context.Background()); err != nil {
-				globalLogger.Error("Error stopping application", "error", err)
+		// Create a context with timeout for graceful shutdown
+		stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultShutdownTimeout)
+		defer stopCancel()
+
+		// Stop the application and handle any shutdown errors
+		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+			common.PrintErrorf("Error during shutdown: %v", err)
+			if serverErr == nil && !errors.Is(err, context.Canceled) {
+				serverErr = err
 			}
-		}()
-		globalLogger.Debug("HTTP server stopped")
+		}
+
+		// Only return error for actual failures, not graceful shutdowns
+		if serverErr != nil && !errors.Is(serverErr, context.Canceled) {
+			return serverErr
+		}
+		return nil
 	},
 }
 
+// init initializes the HTTP server command by adding it to the root command.
 func init() {
 	rootCmd.AddCommand(httpdCmd)
-
-	// Here you can define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// httpdCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// httpdCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

@@ -1,135 +1,319 @@
+// Package cmd implements the command-line interface for GoCrawl.
+// This file contains the search command implementation that allows users to search
+// content in Elasticsearch using various parameters.
 package cmd
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/search"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
 // Constants for default values
 const (
-	DefaultSearchSize = 10 // Default number of results to return
+	// DefaultSearchSize defines the default number of search results to return
+	// when no size is specified via command-line flags
+	DefaultSearchSize = 10
+
+	// DefaultContentPreviewLength defines the maximum length for content previews
+	// in search results before truncation
+	DefaultContentPreviewLength = 100
+
+	// DefaultTableWidth defines the maximum width for the content preview column
+	DefaultTableWidth = 160
+
+	// Table column configuration constants
+	columnNumberIndex       = 1
+	columnNumberURL         = 2
+	columnNumberContent     = 3
+	columnWidthIndex        = 4
+	columnWidthURLRatio     = 3 // URL column takes 1/3 of table width
+	columnWidthContentRatio = 3 // Content column takes 2/3 of table width
 )
 
+// SearchParams holds the parameters required for executing a search operation.
+// It uses fx.In for dependency injection of required components.
+type SearchParams struct {
+	fx.In
+
+	// Logger provides logging capabilities for the search operation
+	Logger common.Logger
+	// Config holds the application configuration
+	Config common.Config
+	// SearchManager is the service responsible for executing searches
+	SearchManager api.SearchManager
+	// IndexName specifies which Elasticsearch index to search
+	IndexName string `name:"indexName"`
+	// Query contains the search query string
+	Query string `name:"query"`
+	// ResultSize determines how many results to return
+	ResultSize int `name:"resultSize"`
+}
+
+// Result represents a search result
+type Result struct {
+	URL     string
+	Content string
+}
+
+// searchCmd represents the search command that allows users to search content
+// in Elasticsearch using various parameters.
 var searchCmd = &cobra.Command{
 	Use:   "search",
 	Short: "Search content in Elasticsearch",
-	PreRunE: func(cmd *cobra.Command, _ []string) error {
-		return setupSearchCmd(cmd)
-	},
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		return executeSearchCmd(cmd)
-	},
+	RunE:  runSearch,
 }
 
-// setupSearchCmd handles the setup for the search command
-func setupSearchCmd(cmd *cobra.Command) error {
-	if globalConfig == nil {
-		return errors.New("configuration is required") // Check if cfg is nil
+// runSearch executes the search command with the provided parameters.
+// It handles:
+// - Parameter validation and retrieval
+// - Signal handling for graceful shutdown
+// - Application lifecycle management
+// - Search execution and result display
+func runSearch(cmd *cobra.Command, _ []string) error {
+	// Retrieve and validate the search query
+	queryStr, queryErr := cmd.Flags().GetString("query")
+	if queryErr != nil {
+		return fmt.Errorf("error retrieving query: %w", queryErr)
 	}
 
-	// Use the SetIndexName method to set the index name
+	// Get the index name and result size from flags
 	indexName := cmd.Flag("index").Value.String()
-	globalConfig.Crawler.SetIndexName(indexName) // Set the index name using the method
-
-	return nil
-}
-
-// executeSearchCmd handles the search command execution
-func executeSearchCmd(cmd *cobra.Command) error {
-	query, err := cmd.Flags().GetString("query")
-	if err != nil {
-		globalLogger.Error("Error retrieving query", "error", err)
-		return fmt.Errorf("error retrieving query: %w", err)
+	size, sizeErr := cmd.Flags().GetInt("size")
+	if sizeErr != nil {
+		size = DefaultSearchSize
 	}
 
-	// Initialize fx container
-	app := newSearchFxApp(query)
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start the application
-	if startErr := app.Start(cmd.Context()); startErr != nil {
-		globalLogger.Error("Error starting application", "error", startErr)
-		return fmt.Errorf("error starting application: %w", startErr)
-	}
-	defer func() {
-		if stopErr := app.Stop(cmd.Context()); stopErr != nil {
-			globalLogger.Error("Error stopping application", "error", stopErr)
-		}
-	}()
+	// Create channels for error handling and completion
+	errChan := make(chan error, 1)
+	doneChan := make(chan struct{})
 
-	return nil
-}
-
-// newSearchFxApp initializes the Fx application with dependencies
-func newSearchFxApp(query string) *fx.App {
-	return fx.New(
-		config.Module,
-		logger.Module,
-		fx.Logger(globalLogger),
-		storage.Module,
-		search.Module,
-		fx.Invoke(setupSearchLifecycleHooks),
-		fx.Provide(func() string {
-			return query
+	// Initialize the Fx application with required modules and dependencies
+	app := fx.New(
+		common.Module,
+		fx.Provide(
+			// Provide search parameters with appropriate tags for dependency injection
+			fx.Annotate(
+				func() string { return queryStr },
+				fx.ResultTags(`name:"query"`),
+			),
+			fx.Annotate(
+				func() string { return indexName },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() int { return size },
+				fx.ResultTags(`name:"resultSize"`),
+			),
+		),
+		fx.Invoke(func(lc fx.Lifecycle, p SearchParams) {
+			lc.Append(fx.Hook{
+				OnStart: func(context.Context) error {
+					// Execute the search and handle any errors
+					if err := executeSearch(cmd.Context(), p); err != nil {
+						p.Logger.Error("Error executing search", "error", err)
+						common.PrintErrorf("\nSearch failed: %v", err)
+						errChan <- err
+						return err
+					}
+					close(doneChan)
+					return nil
+				},
+				OnStop: func(context.Context) error {
+					return nil
+				},
+			})
 		}),
 	)
+
+	// Start the application and handle any startup errors
+	if err := app.Start(cmd.Context()); err != nil {
+		return fmt.Errorf("error starting application: %w", err)
+	}
+
+	// Wait for either:
+	// - A signal interrupt (SIGINT/SIGTERM)
+	// - Context cancellation
+	// - Search completion
+	// - Search error
+	var searchErr error
+	select {
+	case sig := <-sigChan:
+		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+	case <-cmd.Context().Done():
+		common.PrintInfof("\nContext cancelled, initiating shutdown...")
+	case searchErr = <-errChan:
+		// Error already printed in executeSearch
+	case <-doneChan:
+		// Success message already printed in executeSearch
+	}
+
+	// Create a context with timeout for graceful shutdown
+	stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
+	defer stopCancel()
+
+	// Stop the application and handle any shutdown errors
+	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+		common.PrintErrorf("Error stopping application: %v", err)
+		return err
+	}
+
+	return searchErr
 }
 
-// setupSearchLifecycleHooks sets up the lifecycle hooks for the Fx application
-func setupSearchLifecycleHooks(lc fx.Lifecycle, deps struct {
-	fx.In
-	Logger    logger.Interface
-	SearchSvc *search.Service
-	Query     string
-}) {
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			deps.Logger.Debug("Starting application...")
-			return runSearchApp(ctx, deps.Logger, deps.SearchSvc, deps.Query)
+// buildSearchQuery constructs the Elasticsearch query from the search parameters
+func buildSearchQuery(size int, query string) map[string]interface{} {
+	return map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"content": query,
+			},
 		},
-		OnStop: func(_ context.Context) error {
-			deps.Logger.Debug("Stopping application...")
-			return nil
-		},
+		"size": size,
+	}
+}
+
+// processSearchResults converts raw Elasticsearch results into Result structs
+func processSearchResults(rawResults []interface{}, logger common.Logger) []Result {
+	results := make([]Result, 0, len(rawResults))
+	for _, raw := range rawResults {
+		hit, ok := raw.(map[string]interface{})
+		if !ok {
+			logger.Error("Invalid hit format", "hit", raw)
+			continue
+		}
+
+		source, ok := hit["_source"].(map[string]interface{})
+		if !ok {
+			logger.Error("Invalid source format", "source", hit["_source"])
+			continue
+		}
+
+		url, _ := source["url"].(string)
+		content, _ := source["content"].(string)
+
+		results = append(results, Result{
+			URL:     url,
+			Content: content,
+		})
+	}
+	return results
+}
+
+// configureResultsTable sets up the table writer with appropriate styling and columns
+func configureResultsTable() table.Writer {
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.SetStyle(table.StyleRounded)
+	t.Style().Options.DrawBorder = true
+	t.Style().Options.SeparateRows = true
+
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: columnNumberIndex, WidthMax: columnWidthIndex},
+		{Number: columnNumberURL, WidthMax: DefaultTableWidth / columnWidthURLRatio},
+		{Number: columnNumberContent, WidthMax: DefaultTableWidth * 2 / columnWidthContentRatio},
 	})
+
+	t.AppendHeader(table.Row{"#", "URL", "Content Preview"})
+	return t
 }
 
-// runSearchApp executes the main logic of the search application
-func runSearchApp(ctx context.Context, log logger.Interface, searchSvc *search.Service, query string) error {
-	// Use the index name from the global configuration
-	indexName := globalConfig.Elasticsearch.IndexName
+// renderSearchResults formats and displays the search results in a table
+func renderSearchResults(results []Result, query string) {
+	t := configureResultsTable()
 
-	results, err := searchSvc.SearchContent(ctx, query, indexName, DefaultSearchSize)
+	for i, result := range results {
+		content := strings.TrimSpace(result.Content)
+		content = strings.ReplaceAll(content, "\n", " ")
+		content = strings.Join(strings.Fields(content), " ")
+		contentPreview := truncateString(content, DefaultContentPreviewLength)
+
+		url := strings.TrimSpace(result.URL)
+		if url == "" {
+			url = "N/A"
+		}
+
+		t.AppendRow(table.Row{
+			i + 1,
+			url,
+			contentPreview,
+		})
+	}
+
+	t.AppendFooter(table.Row{"Total", len(results), fmt.Sprintf("Query: %s", query)})
+
+	common.PrintInfof("\nSearch Results:")
+	t.Render()
+}
+
+// executeSearch performs the actual search operation using the provided parameters.
+func executeSearch(ctx context.Context, p SearchParams) error {
+	p.Logger.Info("Starting search...",
+		"query", p.Query,
+		"index", p.IndexName,
+		"size", p.ResultSize,
+	)
+
+	query := buildSearchQuery(p.ResultSize, p.Query)
+	rawResults, err := p.SearchManager.Search(ctx, p.IndexName, query)
 	if err != nil {
-		log.Error("Search failed", err)
+		p.Logger.Error("Search failed", "error", err)
 		return fmt.Errorf("search failed: %w", err)
 	}
 
-	// Print results using logger
-	for _, result := range results {
-		log.Info(fmt.Sprintf("URL: %s\nContent: %s\n\n", result.URL, result.Content))
+	results := processSearchResults(rawResults, p.Logger)
+
+	p.Logger.Info("Search completed",
+		"query", p.Query,
+		"results", len(results),
+	)
+
+	if len(results) == 0 {
+		common.PrintInfof("No results found for query: %s", p.Query)
+		return nil
 	}
 
+	renderSearchResults(results, p.Query)
 	return nil
 }
 
+// truncateString truncates a string to the specified length and adds ellipsis if needed
+func truncateString(s string, length int) string {
+	if len(s) <= length {
+		return s
+	}
+	return s[:length-3] + "..."
+}
+
+// init initializes the search command by:
+// - Adding it to the root command
+// - Setting up command-line flags
+// - Marking required flags
 func init() {
 	rootCmd.AddCommand(searchCmd)
 
-	// Define flags for the search command in init
+	// Define flags for the search command
 	searchCmd.Flags().StringP("index", "i", "articles", "Index to search")
 	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return")
 	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
 
-	err := searchCmd.MarkFlagRequired("query")
-	if err != nil {
-		globalLogger.Error("Error marking query flag as required", "error", err)
+	// Mark the query flag as required
+	if err := searchCmd.MarkFlagRequired("query"); err != nil {
+		common.PrintErrorf("Error marking query flag as required: %v", err)
+		os.Exit(1)
 	}
 }

@@ -9,7 +9,7 @@ import (
 
 // Options holds configuration options for ElasticsearchStorage
 type Options struct {
-	URL            string
+	Addresses      []string
 	Username       string
 	Password       string
 	APIKey         string
@@ -30,26 +30,27 @@ func DefaultOptions() Options {
 }
 
 // NewOptionsFromConfig creates Options from a config
-func NewOptionsFromConfig(cfg *config.Config) Options {
+func NewOptionsFromConfig(cfg config.Interface) Options {
 	opts := DefaultOptions()
+	esConfig := cfg.GetElasticsearchConfig()
 
 	// Create transport with TLS config if needed
-	if cfg.Elasticsearch.SkipTLS {
+	if esConfig.TLS.SkipVerify {
 		opts.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				//nolint:gosec // We are using the SkipTLS setting from the config
+				//nolint:gosec // We are using the SkipVerify setting from the config
 				InsecureSkipVerify: true,
 			},
 		}
 	}
 
 	// Set values from config
-	opts.URL = cfg.Elasticsearch.URL
-	opts.Username = cfg.Elasticsearch.Username
-	opts.Password = cfg.Elasticsearch.Password
-	opts.APIKey = cfg.Elasticsearch.APIKey
-	opts.IndexName = cfg.Elasticsearch.IndexName
-	opts.SkipTLS = cfg.Elasticsearch.SkipTLS
+	opts.Addresses = esConfig.Addresses
+	opts.Username = esConfig.Username
+	opts.Password = esConfig.Password
+	opts.APIKey = esConfig.APIKey
+	opts.IndexName = esConfig.IndexName
+	opts.SkipTLS = esConfig.TLS.SkipVerify
 
 	return opts
 }

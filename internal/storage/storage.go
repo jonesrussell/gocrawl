@@ -9,10 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"go.uber.org/fx"
 )
 
 // Constants for timeout durations
@@ -20,6 +17,7 @@ const (
 	DefaultBulkIndexTimeout      = 30 * time.Second
 	DefaultIndexTimeout          = 10 * time.Second
 	DefaultTestConnectionTimeout = 5 * time.Second
+	DefaultSearchTimeout         = 10 * time.Second
 )
 
 // Interface defines the storage operations
@@ -27,7 +25,6 @@ type Interface interface {
 	// Document operations
 	IndexDocument(ctx context.Context, index string, id string, document interface{}) error
 	GetDocument(ctx context.Context, index string, id string, document interface{}) error
-	SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error)
 	DeleteDocument(ctx context.Context, index string, id string) error
 
 	// Bulk operations
@@ -39,50 +36,32 @@ type Interface interface {
 	ListIndices(ctx context.Context) ([]string, error)
 	GetMapping(ctx context.Context, index string) (map[string]interface{}, error)
 	UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error
-
-	// Common operations
-	Close() error
-	Ping(ctx context.Context) error
-
-	// Article operations
-	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
-	IndexArticle(ctx context.Context, article *models.Article) error
-	BulkIndexArticles(ctx context.Context, articles []*models.Article) error
-
-	// Index operations
 	IndexExists(ctx context.Context, indexName string) (bool, error)
-	TestConnection(ctx context.Context) error
 
-	// Content operations
-	IndexContent(id string, content *models.Content) error
-	GetContent(id string) (*models.Content, error)
-	SearchContent(query string) ([]*models.Content, error)
-	DeleteContent(id string) error
+	// Search operations
+	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
 
 	// Index health and stats
 	GetIndexHealth(ctx context.Context, index string) (string, error)
 	GetIndexDocCount(ctx context.Context, index string) (int64, error)
+
+	// Common operations
+	Close() error
+	Ping(ctx context.Context) error
+	TestConnection(ctx context.Context) error
+
+	// New operations
+	Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error)
+
+	// Count operation
+	Count(ctx context.Context, index string, query interface{}) (int64, error)
 }
 
-// ElasticsearchStorage struct to hold the Elasticsearch client
-type ElasticsearchStorage struct {
-	ESClient       *elasticsearch.Client
-	Logger         logger.Interface
-	opts           Options
-	mappingService MappingServiceInterface
-}
-
-// Result holds the dependencies for the storage
-type Result struct {
-	fx.Out
-
-	Storage        Interface
-	IndexService   IndexServiceInterface
-	MappingService MappingServiceInterface
-}
-
-// Ensure ElasticsearchStorage implements the Storage interface
-var _ Interface = (*ElasticsearchStorage)(nil)
+// Error definitions
+var (
+	ErrInvalidIndexHealth = errors.New("invalid index health format")
+	ErrInvalidDocCount    = errors.New("invalid index document count format")
+)
 
 // Helper function to create a context with timeout
 func (s *ElasticsearchStorage) createContextWithTimeout(
@@ -103,6 +82,7 @@ func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, 
 
 	body, err := json.Marshal(document)
 	if err != nil {
+		s.Logger.Error("Failed to index document", "error", err)
 		return fmt.Errorf("error marshaling document: %w", err)
 	}
 
@@ -120,30 +100,11 @@ func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, 
 	defer res.Body.Close()
 
 	if res.IsError() {
+		s.Logger.Error("Failed to index document", "error", res.String())
 		return fmt.Errorf("error indexing document: %s", res.String())
 	}
 
 	s.Logger.Info("Document indexed successfully", "index", index, "docID", id)
-	return nil
-}
-
-// TestConnection checks if the Elasticsearch client is working
-func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
-	if s.ESClient == nil {
-		return errors.New("elasticsearch client is nil")
-	}
-
-	// Perform a simple request to test the connection
-	res, err := s.ESClient.Info(s.ESClient.Info.WithContext(ctx))
-	if err != nil {
-		return fmt.Errorf("failed to connect to Elasticsearch: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return fmt.Errorf("error response from Elasticsearch: %s", res.String())
-	}
-
 	return nil
 }
 
@@ -199,53 +160,57 @@ func (s *ElasticsearchStorage) prepareBulkIndexRequest(
 }
 
 // Search performs a search query
-func (s *ElasticsearchStorage) Search(
-	ctx context.Context,
-	index string,
-	query map[string]interface{},
-) ([]map[string]interface{}, error) {
-	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
-	defer cancel()
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(query); err != nil {
-		return nil, fmt.Errorf("error encoding query: %w", err)
+func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query interface{}) ([]interface{}, error) {
+	if s.ESClient == nil {
+		return nil, errors.New("elasticsearch client is not initialized")
 	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
 
 	res, err := s.ESClient.Search(
 		s.ESClient.Search.WithContext(ctx),
 		s.ESClient.Search.WithIndex(index),
-		s.ESClient.Search.WithBody(&buf),
+		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(query))),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("search failed: %w", err)
+		return nil, fmt.Errorf("failed to execute search: %w", err)
 	}
 	defer res.Body.Close()
 
+	if res.IsError() {
+		return nil, fmt.Errorf("search request failed: %s", res.String())
+	}
+
 	var result map[string]interface{}
 	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		return nil, fmt.Errorf("error parsing response: %w", decodeErr)
+		return nil, fmt.Errorf("error decoding search response: %w", decodeErr)
 	}
 
-	hits, err := s.getHitsFromResult(result)
-	if err != nil {
-		return nil, err
+	hits, exists := result["hits"].(map[string]interface{})
+	if !exists {
+		return nil, errors.New("invalid search response format")
 	}
 
-	var documents []map[string]interface{}
-	for _, hit := range hits {
-		hitMap, isMap := hit.(map[string]interface{})
+	hitsList, exists := hits["hits"].([]interface{})
+	if !exists {
+		return nil, errors.New("invalid hits format in search response")
+	}
+
+	results := make([]interface{}, 0, len(hitsList))
+	for _, hit := range hitsList {
+		hitData, isMap := hit.(map[string]interface{})
 		if !isMap {
 			continue
 		}
-		source, isSource := hitMap["_source"].(map[string]interface{})
-		if !isSource {
+		source, isMap := hitData["_source"].(map[string]interface{})
+		if !isMap {
 			continue
 		}
-		documents = append(documents, source)
+		results = append(results, source)
 	}
 
-	return documents, nil
+	return results, nil
 }
 
 // CreateIndex creates a new index with optional mapping
@@ -259,6 +224,7 @@ func (s *ElasticsearchStorage) CreateIndex(
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(mapping); err != nil {
+		s.Logger.Error("Failed to create index", "index", index, "error", err)
 		return fmt.Errorf("error encoding mapping: %w", err)
 	}
 
@@ -268,11 +234,13 @@ func (s *ElasticsearchStorage) CreateIndex(
 		s.ESClient.Indices.Create.WithBody(&buf),
 	)
 	if err != nil {
+		s.Logger.Error("Failed to create index", "index", index, "error", err)
 		return fmt.Errorf("failed to create index: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		s.Logger.Error("Failed to create index", "index", index, "error", res.String())
 		return fmt.Errorf("failed to create index: %s", res.String())
 	}
 
@@ -293,11 +261,13 @@ func (s *ElasticsearchStorage) DeleteIndex(ctx context.Context, index string) er
 		s.ESClient.Indices.Delete.WithContext(ctx),
 	)
 	if err != nil {
+		s.Logger.Error("Failed to delete index", "error", err)
 		return fmt.Errorf("error deleting index: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		s.Logger.Error("Failed to delete index", "error", res.String())
 		return fmt.Errorf("error deleting index: %s", res.String())
 	}
 
@@ -355,11 +325,13 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 		s.ESClient.Delete.WithContext(ctx),
 	)
 	if err != nil {
+		s.Logger.Error("Failed to delete document", "error", err)
 		return fmt.Errorf("error deleting document: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		s.Logger.Error("Failed to delete document", "error", res.String())
 		return fmt.Errorf("error deleting document: %s", res.String())
 	}
 
@@ -381,57 +353,17 @@ func (s *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string
 	return res.StatusCode == http.StatusOK, nil
 }
 
-// BulkIndexArticles indexes multiple articles in bulk
-func (s *ElasticsearchStorage) BulkIndexArticles(ctx context.Context, articles []*models.Article) error {
-	var buf bytes.Buffer
-
-	for _, article := range articles {
-		// Add metadata action
-		meta := map[string]interface{}{
-			"index": map[string]interface{}{
-				"_index": "articles",
-				"_id":    article.ID,
-			},
-		}
-		if err := json.NewEncoder(&buf).Encode(meta); err != nil {
-			return fmt.Errorf("error encoding meta: %w", err)
-		}
-
-		// Add document
-		if err := json.NewEncoder(&buf).Encode(article); err != nil {
-			return fmt.Errorf("error encoding article: %w", err)
-		}
-	}
-
-	s.Logger.Debug("Bulk indexing articles", "count", len(articles))
-
-	res, err := s.ESClient.Bulk(bytes.NewReader(buf.Bytes()),
-		s.ESClient.Bulk.WithContext(ctx), // Ensure context is passed
-		s.ESClient.Bulk.WithRefresh("true"))
-	if err != nil {
-		return fmt.Errorf("bulk indexing failed: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return fmt.Errorf("bulk indexing failed: %s", res.String())
-	}
-
-	s.Logger.Info("Bulk indexed documents", "count", len(articles))
-	return nil
-}
-
 // Close implements Interface
-func (es *ElasticsearchStorage) Close() error {
+func (s *ElasticsearchStorage) Close() error {
 	return nil // Elasticsearch client doesn't need explicit closing
 }
 
 // GetDocument implements Interface
-func (es *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id string, document interface{}) error {
-	res, err := es.ESClient.Get(
+func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id string, document interface{}) error {
+	res, err := s.ESClient.Get(
 		index,
 		id,
-		es.ESClient.Get.WithContext(ctx),
+		s.ESClient.Get.WithContext(ctx),
 	)
 	if err != nil {
 		return fmt.Errorf("error getting document: %w", err)
@@ -442,15 +374,19 @@ func (es *ElasticsearchStorage) GetDocument(ctx context.Context, index string, i
 		return fmt.Errorf("error getting document: %s", res.String())
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(document); err != nil {
-		return fmt.Errorf("error decoding document: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(document); decodeErr != nil {
+		return fmt.Errorf("error decoding document: %w", decodeErr)
 	}
 
 	return nil
 }
 
 // SearchDocuments implements Interface
-func (es *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string, query string) ([]interface{}, error) {
+func (s *ElasticsearchStorage) SearchDocuments(
+	ctx context.Context,
+	index string,
+	query string,
+) ([]map[string]interface{}, error) {
 	// Basic query string query
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
@@ -465,10 +401,10 @@ func (es *ElasticsearchStorage) SearchDocuments(ctx context.Context, index strin
 		return nil, fmt.Errorf("error marshaling search query: %w", err)
 	}
 
-	res, err := es.ESClient.Search(
-		es.ESClient.Search.WithContext(ctx),
-		es.ESClient.Search.WithIndex(index),
-		es.ESClient.Search.WithBody(bytes.NewReader(body)),
+	res, err := s.ESClient.Search(
+		s.ESClient.Search.WithContext(ctx),
+		s.ESClient.Search.WithIndex(index),
+		s.ESClient.Search.WithBody(bytes.NewReader(body)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error searching documents: %w", err)
@@ -480,23 +416,47 @@ func (es *ElasticsearchStorage) SearchDocuments(ctx context.Context, index strin
 	}
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error parsing search response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("error parsing search response: %w", decodeErr)
 	}
 
-	hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
-	documents := make([]interface{}, len(hits))
-	for i, hit := range hits {
-		documents[i] = hit.(map[string]interface{})["_source"]
+	hitsObj, ok := result["hits"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("invalid response format: hits object not found")
+	}
+
+	hitsArray, ok := hitsObj["hits"].([]interface{})
+	if !ok {
+		return nil, errors.New("invalid response format: hits array not found")
+	}
+
+	documents := make([]map[string]interface{}, 0, len(hitsArray))
+	for _, hit := range hitsArray {
+		resultMap, isValidMap := hit.(map[string]interface{})
+		if !isValidMap {
+			continue
+		}
+
+		source, hasSource := resultMap["_source"]
+		if !hasSource {
+			continue
+		}
+
+		sourceMap, isMap := source.(map[string]interface{})
+		if !isMap {
+			continue
+		}
+
+		documents = append(documents, sourceMap)
 	}
 
 	return documents, nil
 }
 
 // Ping implements Interface
-func (es *ElasticsearchStorage) Ping(ctx context.Context) error {
-	res, err := es.ESClient.Ping(
-		es.ESClient.Ping.WithContext(ctx),
+func (s *ElasticsearchStorage) Ping(ctx context.Context) error {
+	res, err := s.ESClient.Ping(
+		s.ESClient.Ping.WithContext(ctx),
 	)
 	if err != nil {
 		return fmt.Errorf("error pinging Elasticsearch: %w", err)
@@ -517,19 +477,22 @@ func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error
 		s.ESClient.Cat.Indices.WithFormat("json"),
 	)
 	if err != nil {
+		s.Logger.Error("Failed to list indices", "error", err)
 		return nil, fmt.Errorf("failed to list indices: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		s.Logger.Error("Failed to list indices", "error", res.String())
 		return nil, fmt.Errorf("error listing indices: %s", res.String())
 	}
 
 	var indices []struct {
 		Index string `json:"index"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&indices); err != nil {
-		return nil, fmt.Errorf("error decoding indices: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&indices); decodeErr != nil {
+		s.Logger.Error("Failed to list indices", "error", decodeErr)
+		return nil, fmt.Errorf("error decoding indices: %w", decodeErr)
 	}
 
 	result := make([]string, len(indices))
@@ -537,6 +500,7 @@ func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error
 		result[i] = idx.Index
 	}
 
+	s.Logger.Info("Retrieved indices list")
 	return result, nil
 }
 
@@ -547,19 +511,23 @@ func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (ma
 		s.ESClient.Indices.GetMapping.WithIndex(index),
 	)
 	if err != nil {
+		s.Logger.Error("Failed to get mapping", "error", err)
 		return nil, fmt.Errorf("failed to get mapping: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		s.Logger.Error("Failed to get mapping", "error", res.String())
 		return nil, fmt.Errorf("error getting mapping: %s", res.String())
 	}
 
 	var mapping map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&mapping); err != nil {
-		return nil, fmt.Errorf("error decoding mapping: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&mapping); decodeErr != nil {
+		s.Logger.Error("Failed to get mapping", "error", decodeErr)
+		return nil, fmt.Errorf("error decoding mapping: %w", decodeErr)
 	}
 
+	s.Logger.Info("Retrieved mapping", "index", index)
 	return mapping, nil
 }
 
@@ -594,24 +562,29 @@ func (s *ElasticsearchStorage) GetIndexHealth(ctx context.Context, index string)
 		s.ESClient.Cluster.Health.WithIndex(index),
 	)
 	if err != nil {
+		s.Logger.Error("Failed to get index health", "error", err)
 		return "", fmt.Errorf("failed to get index health: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		s.Logger.Error("Failed to get index health", "error", res.String())
 		return "", fmt.Errorf("error getting index health: %s", res.String())
 	}
 
 	var health map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&health); err != nil {
-		return "", fmt.Errorf("error decoding index health: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&health); decodeErr != nil {
+		s.Logger.Error("Failed to get index health", "error", decodeErr)
+		return "", fmt.Errorf("error decoding index health: %w", decodeErr)
 	}
 
 	status, ok := health["status"].(string)
 	if !ok {
-		return "", fmt.Errorf("invalid index health format")
+		s.Logger.Error("Failed to get index health", "error", "invalid index health format")
+		return "", ErrInvalidIndexHealth
 	}
 
+	s.Logger.Info("Retrieved index health", "index", index, "health", status)
 	return status, nil
 }
 
@@ -622,23 +595,167 @@ func (s *ElasticsearchStorage) GetIndexDocCount(ctx context.Context, index strin
 		s.ESClient.Count.WithIndex(index),
 	)
 	if err != nil {
+		s.Logger.Error("Failed to get index document count", "error", err)
 		return 0, fmt.Errorf("failed to get index document count: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		s.Logger.Error("Failed to get index document count", "error", res.String())
 		return 0, fmt.Errorf("error getting index document count: %s", res.String())
 	}
 
 	var count map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&count); err != nil {
-		return 0, fmt.Errorf("error decoding index document count: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&count); decodeErr != nil {
+		s.Logger.Error("Failed to get index document count", "error", decodeErr)
+		return 0, fmt.Errorf("error decoding index document count: %w", decodeErr)
 	}
 
 	countValue, ok := count["count"].(float64)
 	if !ok {
-		return 0, fmt.Errorf("invalid index document count format")
+		s.Logger.Error("Failed to get index document count", "error", "invalid index document count format")
+		return 0, ErrInvalidDocCount
 	}
 
+	s.Logger.Info("Retrieved index document count", "index", index, "count", int64(countValue))
 	return int64(countValue), nil
+}
+
+// mustMarshal marshals the given value to JSON or panics if it fails
+func mustMarshal(v interface{}) []byte {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal JSON: %v", err))
+	}
+	return data
+}
+
+// SearchArticles implements Interface
+func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
+	searchQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"content": query,
+			},
+		},
+		"size": size,
+	}
+
+	res, searchErr := s.ESClient.Search(
+		s.ESClient.Search.WithContext(ctx),
+		s.ESClient.Search.WithIndex(s.opts.IndexName),
+		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(searchQuery))),
+	)
+	if searchErr != nil {
+		return nil, fmt.Errorf("failed to execute search: %w", searchErr)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("search request failed: %s", res.String())
+	}
+
+	var searchResult struct {
+		Hits struct {
+			Total struct {
+				Value int64 `json:"value"`
+			} `json:"total"`
+			Hits []struct {
+				Source *models.Article `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if decodeErr := json.NewDecoder(res.Body).Decode(&searchResult); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding search response: %w", decodeErr)
+	}
+
+	articles := make([]*models.Article, 0, len(searchResult.Hits.Hits))
+	for _, hit := range searchResult.Hits.Hits {
+		if hit.Source != nil {
+			articles = append(articles, hit.Source)
+		}
+	}
+
+	return articles, nil
+}
+
+// Aggregate performs an aggregation query
+func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error) {
+	if s.ESClient == nil {
+		return nil, errors.New("elasticsearch client is not initialized")
+	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	query := map[string]interface{}{
+		"size": 0, // We don't need hits for aggregations
+		"aggs": aggs,
+	}
+
+	res, err := s.ESClient.Search(
+		s.ESClient.Search.WithContext(ctx),
+		s.ESClient.Search.WithIndex(index),
+		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(query))),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute aggregation: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("aggregation request failed: %s", res.String())
+	}
+
+	var result map[string]interface{}
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding aggregation response: %w", decodeErr)
+	}
+
+	aggregations, exists := result["aggregations"].(map[string]interface{})
+	if !exists {
+		return nil, errors.New("invalid aggregation response format")
+	}
+
+	return aggregations, nil
+}
+
+// Count returns the number of documents matching a query
+func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query interface{}) (int64, error) {
+	if s.ESClient == nil {
+		return 0, errors.New("elasticsearch client is not initialized")
+	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	// Extract just the query part if it's a map
+	var queryBody = query
+
+	res, err := s.ESClient.Count(
+		s.ESClient.Count.WithContext(ctx),
+		s.ESClient.Count.WithIndex(index),
+		s.ESClient.Count.WithBody(bytes.NewReader(mustMarshal(queryBody))),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute count: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return 0, fmt.Errorf("count request failed: %s", res.String())
+	}
+
+	var result map[string]interface{}
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return 0, fmt.Errorf("error decoding count response: %w", decodeErr)
+	}
+
+	count, ok := result["count"].(float64)
+	if !ok {
+		return 0, errors.New("invalid count response format")
+	}
+
+	return int64(count), nil
 }

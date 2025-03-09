@@ -1,0 +1,67 @@
+app:
+  # Application environment: development, staging, production
+  environment: development
+  # Application name used in logging and metrics
+  name: gocrawl
+  # Semantic version of the application
+  version: 0.1.0
+  # Enable debug mode for additional logging
+  debug: true
+
+# Log level for the application. Options: debug, info, warn, error, fatal, panic
+log:
+  level: debug
+  # Enable debug logging for development
+  debug: true
+
+elasticsearch:
+  # List of Elasticsearch nodes to connect to
+  addresses:
+    - "https://localhost:9200"
+    # Add additional nodes for high availability
+    # - "https://es2.example.com:9200"
+    # - "https://es3.example.com:9200"
+  
+  # Authentication - use either username/password OR api_key
+  username: ""  # Your Elasticsearch username
+  password: ""  # Your Elasticsearch password
+  api_key: ""   # Alternative to username/password
+  
+  # TLS/SSL Configuration
+  tls:
+    enabled: true
+    skip_verify: false  # Set to true only in development
+    # Optional: Path to client certificate for mTLS
+    certificate: ""
+    # Optional: Path to client key for mTLS
+    key: ""
+    # Optional: Path to CA certificate for custom certificate authorities
+    ca: ""
+  
+  # Retry configuration for resilient connections
+  retry:
+    enabled: true
+    initial_wait: 1s    # Initial wait time between retries
+    max_wait: 30s      # Maximum wait time between retries
+    max_retries: 3     # Maximum number of retry attempts
+
+crawler:
+  # Maximum depth to crawl from the starting URL
+  max_depth: 2
+  # Minimum time between requests to the same host
+  rate_limit: 2s
+  # Number of concurrent crawlers
+  parallelism: 2
+  # Additional random delay between requests (helps avoid detection)
+  random_delay: 5s
+
+# HTTP server configuration
+server:
+  # Server address and port (":8080" means all interfaces, port 8080)
+  address: ":8080"
+  # Maximum duration for reading the entire request (including body)
+  read_timeout: 10s
+  # Maximum duration for writing the response
+  write_timeout: 30s
+  # Maximum duration for keeping idle connections alive
+  idle_timeout: 60s

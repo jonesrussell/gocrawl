@@ -1,14 +1,13 @@
 package collector_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,14 +20,14 @@ type ArticleSelectors struct {
 	Byline        string `yaml:"byline,omitempty"`
 	PublishedTime string `yaml:"published_time"`
 	TimeAgo       string `yaml:"time_ago,omitempty"`
-	JsonLd        string `yaml:"json_ld,omitempty"`
+	JSONLD        string `yaml:"json_ld,omitempty"`
 	Section       string `yaml:"section,omitempty"`
 	Keywords      string `yaml:"keywords,omitempty"`
 	Description   string `yaml:"description,omitempty"`
 	OgTitle       string `yaml:"og_title,omitempty"`
 	OgDescription string `yaml:"og_description,omitempty"`
 	OgImage       string `yaml:"og_image,omitempty"`
-	OgUrl         string `yaml:"og_url,omitempty"`
+	OgURL         string `yaml:"og_url,omitempty"`
 	Canonical     string `yaml:"canonical,omitempty"`
 	WordCount     string `yaml:"word_count,omitempty"`
 	PublishDate   string `yaml:"publish_date,omitempty"`
@@ -43,14 +42,24 @@ type Selectors struct {
 	Article ArticleSelectors `yaml:"article"`
 }
 
-// createTestConfig creates a test sources.Config with default selectors
-func createTestConfig() *sources.Config {
-	cfg := &sources.Config{}
-	cfg.Selectors.Article.Title = "h1"
-	cfg.Selectors.Article.Body = ".article-body"
-	cfg.Selectors.Article.PublishedTime = "time"
-	cfg.RateLimit = "1s"
-	return cfg
+// createTestConfig creates a test config.Source with default selectors
+func createTestConfig() *config.Source {
+	return &config.Source{
+		Name:         "test-source",
+		URL:          "http://example.com",
+		ArticleIndex: "test_articles",
+		Index:        "test_content",
+		RateLimit:    time.Second,
+		MaxDepth:     2,
+		Time:         []string{"03:00"},
+		Selectors: config.SourceSelectors{
+			Article: config.ArticleSelectors{
+				Title:         "h1",
+				Body:          ".article-body",
+				PublishedTime: "time",
+			},
+		},
+	}
 }
 
 // TestNew tests the New function of the collector package
@@ -71,9 +80,10 @@ func TestNew(t *testing.T) {
 				Logger:           logger.NewMockLogger(),
 				Parallelism:      2,
 				RandomDelay:      2 * time.Second,
-				Context:          context.Background(),
+				Context:          t.Context(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Source:           createTestConfig(),
+				Done:             make(chan struct{}),
 			},
 			wantErr: false,
 		},
@@ -87,9 +97,10 @@ func TestNew(t *testing.T) {
 				Logger:           logger.NewMockLogger(),
 				Parallelism:      2,
 				RandomDelay:      2 * time.Second,
-				Context:          context.Background(),
+				Context:          t.Context(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Source:           createTestConfig(),
+				Done:             make(chan struct{}),
 			},
 			wantErr:    true,
 			wantErrMsg: "base URL cannot be empty",
@@ -104,9 +115,10 @@ func TestNew(t *testing.T) {
 				Logger:           logger.NewMockLogger(),
 				Parallelism:      2,
 				RandomDelay:      2 * time.Second,
-				Context:          context.Background(),
+				Context:          t.Context(),
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
 				Source:           createTestConfig(),
+				Done:             make(chan struct{}),
 			},
 			wantErr:    true,
 			wantErrMsg: "invalid base URL: not-a-url, must be a valid HTTP/HTTPS URL",
@@ -142,6 +154,42 @@ func TestNew(t *testing.T) {
 			}
 		})
 	}
+
+	// Test for missing logger
+	t.Run("missing logger", func(t *testing.T) {
+		params := collector.Params{
+			BaseURL:          "http://example.com",
+			Logger:           nil,
+			ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
+			Context:          t.Context(),
+			Source:           createTestConfig(),
+			Done:             make(chan struct{}),
+		}
+
+		result, err := collector.New(params)
+
+		require.Error(t, err)
+		require.Equal(t, "logger is required", err.Error())
+		require.Empty(t, result)
+	})
+
+	// Test for missing done channel
+	t.Run("missing done channel", func(t *testing.T) {
+		params := collector.Params{
+			BaseURL:          "http://example.com",
+			Logger:           logger.NewMockLogger(),
+			ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
+			Context:          t.Context(),
+			Source:           createTestConfig(),
+			Done:             nil,
+		}
+
+		result, err := collector.New(params)
+
+		require.Error(t, err)
+		require.Equal(t, "done channel is required", err.Error())
+		require.Empty(t, result)
+	})
 }
 
 // TestCollectorCreation tests the collector creation with different URLs
@@ -177,28 +225,29 @@ func TestCollectorCreation(t *testing.T) {
 					"baseURL", tt.baseURL,
 					"maxDepth", 2,
 					"rateLimit", time.Second,
-					"parallelism", 0,
+					"parallelism", 2,
 				).Return()
 				mockLogger.On("Debug", "Setting up article processing", "tag", "collector/content").Return()
 				mockLogger.On("Debug", "Setting up HTML processing", "tag", "collector/content").Return()
 				mockLogger.On("Debug", "Setting up link following", "tag", "collector/content").Return()
 			}
 
-			// Create test config with rate limit
+			// Create test config
 			cfg := createTestConfig()
-			cfg.RateLimit = "1s"
 
 			params := collector.Params{
-				BaseURL:   tt.baseURL,
-				MaxDepth:  2,
-				RateLimit: time.Second,
+				BaseURL:     tt.baseURL,
+				MaxDepth:    2,
+				RateLimit:   time.Second,
+				Parallelism: 2,
 				Debugger: &logger.CollyDebugger{
 					Logger: mockLogger,
 				},
 				Logger:           mockLogger,
 				ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
-				Context:          context.Background(),
+				Context:          t.Context(),
 				Source:           cfg,
+				Done:             make(chan struct{}),
 			}
 
 			result, err := collector.New(params)
@@ -219,8 +268,9 @@ func TestCollectorCreation(t *testing.T) {
 			BaseURL:          "http://example.com",
 			Logger:           nil,
 			ArticleProcessor: &article.Processor{Logger: logger.NewMockLogger()},
-			Context:          context.Background(),
+			Context:          t.Context(),
 			Source:           createTestConfig(),
+			Done:             make(chan struct{}),
 		}
 
 		result, err := collector.New(params)

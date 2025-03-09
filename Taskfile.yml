@@ -1,19 +1,12 @@
 version: '3'
 
 tasks:
-  
-  crawl:
-    desc: "Run the web crawler for a single source defined in sources.yml"
+  api:
+    desc: "Run the HTTP API server"
     cmds:
-      - echo '' > app.log
-      - go run main.go indices delete --source {{.CLI_ARGS}} --force
-      - go run main.go crawl --source {{.CLI_ARGS}}
-      - go run main.go indices list
-
-  search:
-    desc: "Search crawled content"
-    cmds:
-      - go run main.go search -q "{{.CLI_ARGS}}" -i elliotlake_elliotlaketoday_articles
+      - go run main.go httpd
+    ignore_error: true
+    interactive: true
 
   build:
     desc: "Build the web crawler executable"
@@ -21,12 +14,52 @@ tasks:
       - mkdir -p bin
       - go build -o bin/gocrawl main.go
 
+  crawl:
+    desc: "Run the web crawler for a single source defined in sources.yml"
+    cmds:
+      - echo '' > app.log
+      - go run main.go indices delete --source {{.CLI_ARGS | trim}} --force || true
+      - go run main.go crawl {{.CLI_ARGS | trim}}
+      - go run main.go indices list
+    interactive: true
+
+  help:
+    desc: "Show available commands"
+    cmds:
+      - go run main.go --help
+
+  indices:list:
+    desc: "List all Elasticsearch indices"
+    cmds:
+      - go run main.go indices list
+    ignore_error: true
+
+  job:
+    desc: "Run the job scheduler for automated crawling based on sources.yml schedules"
+    cmds:
+      - go run main.go job
+    ignore_error: true
+    interactive: true
+
   lint:
     desc: "Lint the Go code"
     cmds:
       - go fmt ./...
       - go vet ./...
       - golangci-lint run ./...
+
+  search:
+    desc: "Search crawled content"
+    cmds:
+      - go run main.go search -q "{{.CLI_ARGS}}" -i elliotlake_elliotlaketoday_articles
+    ignore_error: true
+    interactive: true
+
+  sources:list:
+    desc: "List all sources"
+    cmds:
+      - go run main.go sources list
+    ignore_error: true
 
   test:
     desc: "Run the tests"
@@ -43,13 +76,3 @@ tasks:
     generates:
       - coverage/coverage.out
       - coverage/coverage.html
-
-  help:
-    desc: "Show available commands"
-    cmds:
-      - go run main.go --help
-
-  api:
-    desc: "Run the HTTP API server"
-    cmds:
-      - go run main.go httpd

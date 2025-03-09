@@ -18,10 +18,10 @@ type Article struct {
 	OgTitle       string `json:"og_title"`       // Open Graph title
 	OgDescription string `json:"og_description"` // Open Graph description
 	OgImage       string `json:"og_image"`       // Open Graph image URL
-	OgUrl         string `json:"og_url"`         // Open Graph URL
+	OgURL         string `json:"og_url"`         // Open Graph URL
 
 	// Additional metadata
-	CanonicalUrl string    `json:"canonical_url"` // Canonical URL if different from source
+	CanonicalURL string    `json:"canonical_url"` // Canonical URL if different from source
 	WordCount    int       `json:"word_count"`    // Article word count
 	Category     string    `json:"category"`      // Primary category
 	Section      string    `json:"section"`       // Article section

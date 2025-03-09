@@ -1,4 +1,17 @@
+# Environment files
 .env
+.env.*
+!.env.example
+
+# Config files with sensitive data
+config.yaml
+!config.example.yaml
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.ca
 
 http_ca.crt
 
@@ -13,3 +26,4 @@ coverage/coverage.out
 /config.yml
 app.log
 sources.yml
+gocrawl

@@ -2,30 +2,48 @@ package logger
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
+	"strings"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-// Interface holds the methods for the logger
+// Interface defines the interface for logging operations.
+// It provides structured logging capabilities with different log levels and
+// support for additional fields in log messages.
 type Interface interface {
-	Info(msg string, fields ...interface{})
-	Error(msg string, fields ...interface{})
+	// Debug logs a debug message with optional fields.
+	// Used for detailed information useful during development.
 	Debug(msg string, fields ...interface{})
+	// Error logs an error message with optional fields.
+	// Used for error conditions that need immediate attention.
+	Error(msg string, fields ...interface{})
+	// Info logs an informational message with optional fields.
+	// Used for general operational information.
+	Info(msg string, fields ...interface{})
+	// Warn logs a warning message with optional fields.
+	// Used for potentially harmful situations.
 	Warn(msg string, fields ...interface{})
+	// Fatal logs a fatal message and panics.
+	// Used for unrecoverable errors that require immediate termination.
 	Fatal(msg string, fields ...interface{})
+	// Printf logs a formatted message.
+	// Used for formatted string logging.
 	Printf(format string, args ...interface{})
+	// Errorf logs a formatted error message.
+	// Used for formatted error string logging.
 	Errorf(format string, args ...interface{})
+	// Sync flushes any buffered log entries.
+	// Used to ensure all logs are written before shutdown.
 	Sync() error
 }
 
 // CustomLogger wraps the zap.Logger
 type CustomLogger struct {
 	*zap.Logger
-	logFile *os.File
 }
 
 // Ensure CustomLogger implements Interface
@@ -40,29 +58,34 @@ type Params struct {
 	AppEnv string `name:"appEnv"`
 }
 
+const (
+	defaultLogLevel = "info"
+)
+
 // Info logs an info message
 func (c *CustomLogger) Info(msg string, fields ...interface{}) {
-	c.Logger.Info(msg, convertToZapFields(fields)...)
+	c.Logger.Info(msg, ConvertToZapFields(fields)...)
 }
 
 // Error logs an error message
 func (c *CustomLogger) Error(msg string, fields ...interface{}) {
-	c.Logger.Error(msg, convertToZapFields(fields)...)
+	c.Logger.Error(msg, ConvertToZapFields(fields)...)
 }
 
 // Debug logs a debug message
 func (c *CustomLogger) Debug(msg string, fields ...interface{}) {
-	c.Logger.Debug(msg, convertToZapFields(fields)...)
+	c.Logger.Debug(msg, ConvertToZapFields(fields)...)
 }
 
 // Warn logs a warning message
 func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
-	c.Logger.Warn(msg, convertToZapFields(fields)...)
+	c.Logger.Warn(msg, ConvertToZapFields(fields)...)
 }
 
-// Fatal logs a fatal message
+// Fatal logs a fatal message and panics
 func (c *CustomLogger) Fatal(msg string, fields ...interface{}) {
-	c.Logger.Fatal(msg, convertToZapFields(fields)...)
+	c.Logger.Error(msg, ConvertToZapFields(fields)...)
+	panic(msg)
 }
 
 // Printf logs a formatted message
@@ -77,15 +100,7 @@ func (c *CustomLogger) Errorf(format string, args ...interface{}) {
 
 // Sync flushes any buffered log entries
 func (c *CustomLogger) Sync() error {
-	if err := c.Logger.Sync(); err != nil {
-		return err
-	}
-	if c.logFile != nil {
-		if err := c.logFile.Close(); err != nil {
-			return fmt.Errorf("failed to close log file: %w", err)
-		}
-	}
-	return nil
+	return c.Logger.Sync()
 }
 
 // GetZapLogger returns the underlying zap.Logger
@@ -93,8 +108,72 @@ func (c *CustomLogger) GetZapLogger() *zap.Logger {
 	return c.Logger
 }
 
-// convertToZapFields converts variadic key-value pairs to zap.Fields
-func convertToZapFields(fields []interface{}) []zap.Field {
+// ParseLogLevel converts a string log level to a zapcore.Level
+func ParseLogLevel(logLevelStr string) (zapcore.Level, error) {
+	var logLevel zapcore.Level
+
+	switch logLevelStr {
+	case "debug":
+		logLevel = zapcore.DebugLevel
+	case "info":
+		logLevel = zapcore.InfoLevel
+	case "warn":
+		logLevel = zapcore.WarnLevel
+	case "error":
+		logLevel = zapcore.ErrorLevel
+	default:
+		return zapcore.DebugLevel, errors.New("unknown log level")
+	}
+
+	return logLevel, nil
+}
+
+// maskSensitiveData masks sensitive information in the given value
+func maskSensitiveData(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		masked := make(map[string]interface{})
+		for k, val := range v {
+			// Mask sensitive fields
+			if isSensitiveField(k) {
+				masked[k] = "[REDACTED]"
+			} else {
+				masked[k] = maskSensitiveData(val)
+			}
+		}
+		return masked
+	case []interface{}:
+		masked := make([]interface{}, len(v))
+		for i, val := range v {
+			masked[i] = maskSensitiveData(val)
+		}
+		return masked
+	default:
+		return value
+	}
+}
+
+// isSensitiveField checks if a field name indicates sensitive data
+func isSensitiveField(field string) bool {
+	sensitiveFields := []string{
+		"password",
+		"apiKey",
+		"apikey",
+		"token",
+		"secret",
+		"key",
+		"credentials",
+	}
+	for _, s := range sensitiveFields {
+		if strings.Contains(strings.ToLower(field), s) {
+			return true
+		}
+	}
+	return false
+}
+
+// ConvertToZapFields converts variadic key-value pairs to zap.Fields
+func ConvertToZapFields(fields []interface{}) []zap.Field {
 	var zapFields []zap.Field
 
 	// If no fields provided, return empty slice
@@ -108,13 +187,13 @@ func convertToZapFields(fields []interface{}) []zap.Field {
 		key, ok := fields[i].(string)
 		if !ok {
 			// If key is not a string, use it as a value with a generated key
-			zapFields = append(zapFields, zap.Any(fmt.Sprintf("value%d", i), fields[i]))
+			zapFields = append(zapFields, zap.Any(fmt.Sprintf("value%d", i), maskSensitiveData(fields[i])))
 			i-- // Adjust index since we're not consuming the next value
 			continue
 		}
 
 		// Use the next item as value
-		zapFields = append(zapFields, zap.Any(key, fields[i+1]))
+		zapFields = append(zapFields, zap.Any(key, maskSensitiveData(fields[i+1])))
 	}
 
 	// Handle last item if we have an odd number of fields
@@ -123,7 +202,7 @@ func convertToZapFields(fields []interface{}) []zap.Field {
 		if str, ok := last.(string); ok {
 			zapFields = append(zapFields, zap.String("context", str))
 		} else {
-			zapFields = append(zapFields, zap.Any("context", last))
+			zapFields = append(zapFields, zap.Any("context", maskSensitiveData(last)))
 		}
 	}
 

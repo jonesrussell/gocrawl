@@ -2,8 +2,6 @@
 package article
 
 import (
-	"encoding/json"
-	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +11,10 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+)
+
+const (
+	DefaultBodySelector = "article, .article"
 )
 
 // Service defines the interface for article operations
@@ -67,200 +69,132 @@ type JSONLDArticle struct {
 	} `json:"publisher"`
 }
 
-func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
-	var jsonLD JSONLDArticle
-
-	s.Logger.Debug("Extracting article",
-		"component", "article/service",
-		"url", e.Request.URL.String())
-
-	// Extract metadata from JSON-LD first
-	e.ForEach(s.Selectors.JSONLD, func(_ int, el *colly.HTMLElement) {
-		if err := json.Unmarshal([]byte(el.Text), &jsonLD); err != nil {
-			s.Logger.Debug("Failed to parse JSON-LD",
-				"component", "article/service",
-				"error", err)
-		}
-	})
-
-	// Get a copy of the body element for manipulation
-	bodyEl := e.DOM.Find(s.Selectors.Body)
-
-	s.Logger.Debug("Looking for body element",
-		"component", "article/service",
-		"url", e.Request.URL.String(),
-		"selector", s.Selectors.Body,
-		"found", bodyEl.Length() > 0)
-
-	if bodyEl.Length() == 0 {
-		s.Logger.Debug("Body element not found, using full HTML",
-			"component", "article/service",
-			"url", e.Request.URL.String())
-		bodyEl = e.DOM
-	}
-
-	// Debug print HTML structure before cleaning
-	s.Logger.Debug("HTML structure before cleaning",
-		"component", "article/service",
-		"url", e.Request.URL.String(),
-		"structure", bodyEl.Find("*").Map(func(i int, s *goquery.Selection) string {
-			return s.Get(0).Data // Gets just the tag name
-		}))
-
-	// First remove all style and script tags directly
-	bodyEl.Find("style,script").Remove()
-
-	// Then remove other excluded elements
-	for _, excludeSelector := range s.Selectors.Exclude {
-		if sel := bodyEl.Find(excludeSelector); sel.Length() > 0 {
-			s.Logger.Debug("Removing elements",
-				"component", "article/service",
-				"selector", excludeSelector,
-				"count", sel.Length())
-			sel.Remove()
-		}
-	}
-
-	// Debug print HTML structure after cleaning
-	s.Logger.Debug("HTML structure after cleaning",
-		"component", "article/service",
-		"url", e.Request.URL.String(),
-		"structure", bodyEl.Find("*").Map(func(i int, s *goquery.Selection) string {
-			return s.Get(0).Data // Gets just the tag name
-		}))
-
-	// Extract body text after removing excluded elements
-	body := bodyEl.Find(".details-body").Text()
-	if body == "" {
-		body = bodyEl.Text()
-	}
-	if body == "" && jsonLD.ArticleBody != "" {
-		body = jsonLD.ArticleBody // Fallback to JSON-LD body
-	}
-
-	// Get intro/description with fallbacks
-	intro := e.ChildText(s.Selectors.Intro)
-	if intro == "" {
-		intro = e.ChildAttr(s.Selectors.Description, "content")
-	}
-	if intro == "" && jsonLD.Description != "" {
-		intro = jsonLD.Description
-	}
-
-	// Extract title with fallbacks
-	title := e.ChildText(s.Selectors.Title)
-	if title == "" {
-		title = e.ChildAttr(s.Selectors.OGTitle, "content")
-	}
-	if title == "" && jsonLD.Headline != "" {
-		title = jsonLD.Headline
-	}
-	if title == "" && jsonLD.Name != "" {
-		title = jsonLD.Name
-	}
-
-	// Extract author with fallbacks
-	author := e.DOM.Find(s.Selectors.Byline + " " + s.Selectors.Author).Text()
-	if author == "" {
-		author = e.ChildText(s.Selectors.Author)
-	}
-	if author == "" && jsonLD.Author != "" {
-		author = jsonLD.Author
-	}
-	author = s.CleanAuthor(author)
-
-	// Extract byline name
-	bylineName := e.ChildText(s.Selectors.BylineName)
-	if bylineName == "" {
-		bylineName = author // Use author as fallback
-	}
-
-	// Extract category and section
-	category := e.ChildAttr(s.Selectors.Category, "content")
-	if category == "" && jsonLD.Section != "" {
-		category = jsonLD.Section
-	}
-
-	section := e.ChildAttr(s.Selectors.Section, "content")
-	if section == "" && jsonLD.Section != "" {
-		section = jsonLD.Section
-	}
-
-	// Extract word count with fallback to JSON-LD
-	wordCount := 0
-	if s.Selectors.WordCount != "" {
-		wordCountStr := e.ChildText(s.Selectors.WordCount)
-		if count, err := strconv.Atoi(wordCountStr); err == nil {
-			wordCount = count
-		}
-	}
-	if wordCount == 0 && jsonLD.WordCount > 0 {
-		wordCount = jsonLD.WordCount
-	}
-
-	// Extract canonical URL with fallback to JSON-LD
-	canonicalURL := e.ChildAttr(s.Selectors.Canonical, "href")
-	if canonicalURL == "" && jsonLD.URL != "" {
-		canonicalURL = jsonLD.URL
-	}
-	if canonicalURL == "" && jsonLD.MainEntityOfPage.ID != "" {
-		canonicalURL = jsonLD.MainEntityOfPage.ID
-	}
-
-	// Extract image URL with fallback to JSON-LD
-	ogImage := e.ChildAttr(s.Selectors.OGImage, "content")
-	if ogImage == "" && jsonLD.Image != "" {
-		ogImage = jsonLD.Image
-	}
-
-	// Create article with all available fields
+// ExtractMetadata extracts metadata from the HTML element
+func (s *Service) ExtractMetadata(e *colly.HTMLElement) *models.Article {
 	article := &models.Article{
-		ID:            uuid.New().String(),
-		Title:         title,
-		Body:          body,
-		Author:        author,
-		BylineName:    bylineName,
-		Source:        e.Request.URL.String(),
-		Tags:          s.ExtractTags(e, jsonLD),
-		Intro:         intro,
-		Description:   e.ChildAttr(s.Selectors.Description, "content"),
-		OgTitle:       e.ChildAttr(s.Selectors.OGTitle, "content"),
-		OgDescription: e.ChildAttr(s.Selectors.OGDescription, "content"),
-		OgImage:       ogImage,
-		OgUrl:         e.ChildAttr(s.Selectors.OGURL, "content"),
-		CanonicalUrl:  canonicalURL,
-		WordCount:     wordCount,
-		Category:      category,
-		Section:       section,
-		Keywords:      strings.Split(e.ChildAttr(s.Selectors.Keywords, "content"), ","),
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+		ID:        uuid.New().String(),
+		Source:    e.Request.URL.String(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
-	// Parse published date
-	article.PublishedDate = s.ParsePublishedDate(e, jsonLD)
-
-	// Skip empty articles
-	if article.Title == "" && article.Body == "" {
-		s.Logger.Debug("Skipping empty article",
-			"component", "article/service",
-			"url", article.Source)
-		return nil
-	}
-
-	s.Logger.Debug("Extracted article",
-		"component", "article/service",
-		"id", article.ID,
-		"title", article.Title,
-		"url", article.Source,
-		"date", article.PublishedDate,
-		"author", article.Author,
-		"tags", article.Tags,
-		"wordCount", article.WordCount,
-		"category", article.Category,
-		"section", article.Section)
+	// Extract metadata
+	article.Title = s.extractTitle(e)
+	article.Description = s.extractDescription(e)
+	article.PublishedDate = s.parsePublishedTime(e)
+	article.Author = s.extractAuthor(e)
+	article.Section = s.extractSection(e)
+	article.CanonicalURL = s.extractCanonicalURL(e)
 
 	return article
+}
+
+// ExtractContent extracts the main content from the HTML element
+func (s *Service) ExtractContent(e *colly.HTMLElement, article *models.Article) {
+	bodyEl := s.findArticleBody(e)
+	if bodyEl == nil {
+		s.Logger.Debug("No article body found", "url", article.Source)
+		return
+	}
+
+	article.Body = s.cleanAndExtractText(bodyEl)
+	article.WordCount = len(strings.Fields(article.Body))
+}
+
+// ExtractArticle extracts article data from the HTML element
+func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
+	article := s.ExtractMetadata(e)
+	s.ExtractContent(e, article)
+	return article
+}
+
+func (s *Service) extractTitle(e *colly.HTMLElement) string {
+	// Try OpenGraph title first
+	if title := e.ChildAttr(`meta[property="og:title"]`, "content"); title != "" {
+		return title
+	}
+
+	// Try article title
+	if title := e.ChildText(s.Selectors.Title); title != "" {
+		return title
+	}
+
+	// Fallback to page title
+	return e.ChildText("title")
+}
+
+func (s *Service) extractDescription(e *colly.HTMLElement) string {
+	// Try OpenGraph description
+	if desc := e.ChildAttr(`meta[property="og:description"]`, "content"); desc != "" {
+		return desc
+	}
+
+	// Try meta description
+	return e.ChildAttr(s.Selectors.Description, "content")
+}
+
+func (s *Service) extractPublishedTime(e *colly.HTMLElement) string {
+	// Try article published time
+	if time := e.ChildAttr(s.Selectors.PublishedTime, "content"); time != "" {
+		return time
+	}
+
+	// Try meta published time
+	return e.ChildAttr(`meta[property="article:published_time"]`, "content")
+}
+
+func (s *Service) extractAuthor(e *colly.HTMLElement) string {
+	// Try article author
+	if author := e.ChildText(s.Selectors.Byline + " " + s.Selectors.Author); author != "" {
+		return author
+	}
+
+	// Try meta author
+	return e.ChildAttr(s.Selectors.Author, "content")
+}
+
+func (s *Service) extractSection(e *colly.HTMLElement) string {
+	return e.ChildText(s.Selectors.Section)
+}
+
+func (s *Service) extractCanonicalURL(e *colly.HTMLElement) string {
+	return e.ChildAttr("link[rel=canonical]", "href")
+}
+
+func (s *Service) findArticleBody(e *colly.HTMLElement) *goquery.Selection {
+	bodySelector := s.Selectors.Body
+	if bodySelector == "" {
+		bodySelector = DefaultBodySelector
+	}
+	return e.DOM.Find(bodySelector).First()
+}
+
+func (s *Service) cleanAndExtractText(bodyEl *goquery.Selection) string {
+	// Remove unwanted elements
+	bodyEl.Find("script, style, noscript, iframe, form").Remove()
+	return strings.TrimSpace(bodyEl.Text())
+}
+
+func (s *Service) parsePublishedTime(e *colly.HTMLElement) time.Time {
+	timeStr := s.extractPublishedTime(e)
+	if timeStr == "" {
+		return time.Time{}
+	}
+
+	// Try parsing with RFC3339 format first
+	t, err := time.Parse(time.RFC3339, timeStr)
+	if err == nil {
+		return t
+	}
+
+	// Try parsing with RFC3339Nano format
+	t, err = time.Parse(time.RFC3339Nano, timeStr)
+	if err == nil {
+		return t
+	}
+
+	// Return zero time if parsing fails
+	return time.Time{}
 }
 
 // CleanAuthor cleans up the author string

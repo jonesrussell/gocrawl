@@ -77,11 +77,47 @@ func TestExtractArticle(t *testing.T) {
 	selectors := newDefaultSelectors()
 	service := article.NewService(mockLogger, selectors)
 
-	// Set up mock expectations for all debug calls with variable arguments
-	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return()
-	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("bool")).Return()
-	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("[]string")).Return()
-	mockLogger.On("Debug", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int")).Return()
+	// Setup logger expectations
+	mockLogger.On("Debug",
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+	).Return()
+
+	mockLogger.On("Debug",
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("bool"),
+	).Return()
+
+	mockLogger.On("Debug",
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("[]string"),
+	).Return()
+
+	mockLogger.On("Debug",
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("string"),
+		mock.AnythingOfType("int"),
+	).Return()
+
 	mockLogger.On("Debug", "No valid published date found", "dates", mock.AnythingOfType("[]string")).Return()
 	mockLogger.On("Debug", "Successfully parsed date",
 		"source", mock.AnythingOfType("string"),
@@ -120,7 +156,8 @@ func TestExtractArticle(t *testing.T) {
 	require.NotNil(t, article)
 	require.Equal(t, "/mock-url", article.Source)
 	require.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", article.Title)
-	require.Equal(t, "Police were called to house on Milliken Road for report of break-and-enter", strings.TrimSpace(article.Body))
+	expectedBody := "Police were called to house on Milliken Road for report of break-and-enter"
+	require.Equal(t, expectedBody, strings.TrimSpace(article.Body))
 	require.Equal(t, "ElliotLakeToday Staff", article.Author)
 }
 

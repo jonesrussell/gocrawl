@@ -1,60 +1,72 @@
-- Provide a brief explanation of updates made to the code.
-- Use proper dependency injection for better testability.
-- Maintain code readability and structure.
-- Avoid global state where possible.
-- Use go 1.23.
-- Interface definitions:
-  - Define interfaces in the package that uses them, not where they are implemented
-  - For module-specific interfaces, define them in module.go
-  - For interfaces used across multiple packages, define them in the consuming package
-- Use the following dependencies:
-	github.com/elastic/go-elasticsearch/v8 v8.17.0
-	github.com/gocolly/colly/v2 v2.1.0
-	github.com/joho/godotenv v1.5.1
-	github.com/spf13/cobra v1.8.0
-	go.uber.org/fx v1.23.0
-	go.uber.org/zap v1.27.0
+Code Organization & Structure
+- Split large files into smaller, focused modules
+- Keep related functionality together
+- Use consistent naming across related components
+- Avoid type stuttering in package names (e.g., use `Config` not `CollectorConfig`)
+- Use descriptive variable names to avoid shadowing
+- Avoid global state where possible
+- Keep function complexity below 30 (cyclop max-complexity)
+- Keep package average complexity below 10 (cyclop package-average)
+- Limit function length to 100 lines or 50 statements (funlen)
+- Use canonical import paths
 
-- Uber Fx Module structure:
-	cmd/
-			root.go
-			crawl.go
-			search.go
-	internal/
-		app/
-			app.go
-		collector/
-			module.go
-			collector.go
-			collector_test.go
-		config/
-			module.go
-			config.go
-			config_test.go
-		crawler/
-			module.go
-			crawler.go
-			crawler_test.go
-		logger/
-			module.go
-			logger.go
-			logger_test.go
-			colly_debugger.go
-			colly_debugger_test.go
-			mock_colly_debugger.go
-			mock_colly_debugger_test.go
-			mock_custom_logger.go
-			mock_logger.go
-			mock_logger_test.go
-		storage/
-			module.go
-			module_test.go
-			storage.go
-			storage_test.go
-			errors.go
-			errors_test.go
-			mock_storage.go
-			options.go
-			options_test.go
-			scroll.go
-			scroll_test.go
+Dependency Injection & Interfaces
+- Use fx.In and fx.Out for dependency injection
+- Define interfaces in the package that uses them, not where they are implemented
+- For module-specific interfaces, define them in module.go
+- For interfaces used across multiple packages, define them in the consuming package
+- Avoid interface stuttering (e.g., use `Logger` instead of `CollectorLogger`)
+- Use type aliases from common package:
+  - Use common.Logger instead of logger.Interface
+  - Use common.Storage instead of storage.Interface
+  - Use common.Config instead of config.Config
+- Define New* constructors only in module.go files
+
+Error Handling
+- Prefer errors.New over fmt.Errorf for simple error messages
+- Check error return values
+- Use descriptive error variable names to avoid shadowing
+- Wrap errors with context when appropriate
+- Always check type assertion errors
+- Check SQL Row and Statement closures
+- Include context in error handling where available
+
+Testing
+- Use require for error assertions
+- Avoid allocations with (*os.File).WriteString
+- Avoid shadow declarations
+- Test each module independently
+- Write testable examples with expected output
+- Use t.Parallel() appropriately in tests
+- Place tests in a separate _test package
+- Use testify consistently for assertions
+
+Dependencies
+- Use go 1.24
+- Required packages:
+  github.com/elastic/go-elasticsearch/v8
+  github.com/gocolly/colly/v2
+  github.com/joho/godotenv
+  github.com/spf13/cobra
+  go.uber.org/fx
+  go.uber.org/zap
+- Avoid deprecated packages:
+  - Use google.golang.org/protobuf instead of github.com/golang/protobuf
+  - Use github.com/google/uuid instead of github.com/satori/go.uuid
+  - Use github.com/gofrs/uuid/v5+ instead of github.com/gofrs/uuid
+
+Documentation
+- Provide brief explanations of code updates
+- Document interface requirements
+- Include examples for complex patterns
+- End comments with periods (except for noinspection/TODO comments)
+- Document magic numbers with constants
+- Include context in logging calls where available
+
+Style & Best Practices
+- Use named returns sparingly and document when used
+- Ensure exhaustive switch statements and map initializations
+- Include context in HTTP requests
+- Close response bodies in HTTP clients
+- Use standard library variables where available
+- Avoid magic numbers in code

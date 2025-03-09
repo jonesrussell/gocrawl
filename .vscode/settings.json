@@ -1,9 +1,15 @@
 {
-  "go.lintTool": "golangci-lint",
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "editor.defaultFormatter": "golang.go",
   "go.lintFlags": [
-    "-c",
-    ".golangci.yml",
-    "--issues-exit-code=0"
+    "--fast"
   ],
-  "editor.defaultFormatter": "golang.go"
+  "go.lintOnSave": "package",
+  "go.lintTool": "golangci-lint",
+  "go.useLanguageServer": true,
+  "gopls": {
+    "ui.diagnostic.staticcheck": true
+  }
 }

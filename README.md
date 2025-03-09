@@ -99,6 +99,32 @@ Flags:
   -h, --help              Help for search command
 ```
 
+## Configuration
+
+### Server Configuration
+
+The HTTP server can be configured in three ways (in order of precedence):
+
+1. Through `config.yaml`:
+```yaml
+server:
+  address: ":3000"  # Change the port to 3000
+  read_timeout: 10s
+  write_timeout: 30s
+  idle_timeout: 60s
+```
+
+2. Through environment variable:
+```bash
+# Set port to 4000
+GOCRAWL_PORT=4000 go run main.go httpd
+
+# Or with colon prefix
+GOCRAWL_PORT=:4000 go run main.go httpd
+```
+
+3. Default port (8080) if no configuration is provided
+
 ## Tasks
 
 This project uses a `Taskfile.yml` for task automation. Here are the available tasks:

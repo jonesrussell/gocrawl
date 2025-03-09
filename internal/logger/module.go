@@ -1,3 +1,4 @@
+// Package logger provides logging functionality for the application.
 package logger
 
 import (
@@ -13,26 +14,17 @@ import (
 
 // Module provides the logger module and its dependencies
 var Module = fx.Module("logger",
-	fx.Provide(
-		func(cfg *config.Config) Interface { // Provide the logger.Interface
-			var customLogger *CustomLogger
-			var err error
-
-			switch cfg.App.Environment {
-			case "development":
-				customLogger, err = NewDevelopmentLogger(cfg.Log.Level) // Pass log level as string
-			case "production":
-				customLogger, err = NewProductionLogger(cfg.Log.Level) // Pass log level as string
-			default:
-				err = errors.New("unknown environment")
-			}
-			if err != nil {
-				panic(err)
-			}
-			return customLogger
-		},
-	),
+	fx.Provide(provideLogger),
 )
+
+// InitializeLogger creates a new logger based on the configuration
+func InitializeLogger(cfg config.Interface) (Interface, error) {
+	logConfig := cfg.GetLogConfig()
+	if logConfig.Debug {
+		return NewDevelopmentLogger(logConfig.Level)
+	}
+	return NewProductionLogger(logConfig.Level)
+}
 
 // NewDevelopmentLogger initializes a new CustomLogger for development with colored output
 func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
@@ -41,38 +33,36 @@ func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
 		return nil, err
 	}
 
-	// Open log file
-	logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
-	}
-
 	// Development encoder config with colors for console
 	devEncoderConfig := zap.NewDevelopmentEncoderConfig()
 	devEncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
+	// Create file writer
+	fileWriter, _, err := zap.Open("app.log")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	// Create multi-writer for both console and file
+	multiWriter := zapcore.NewMultiWriteSyncer(
+		zapcore.AddSync(os.Stdout),
+		zapcore.AddSync(fileWriter),
+	)
+
 	// Console core with colored output
 	consoleCore := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(devEncoderConfig),
-		zapcore.AddSync(os.Stdout),
+		multiWriter,
 		logLevel,
 	)
 
-	// File core with more detailed output
-	fileCore := zapcore.NewCore(
-		zapcore.NewJSONEncoder(zap.NewDevelopmentEncoderConfig()),
-		zapcore.AddSync(logFile),
-		logLevel,
-	)
-
-	// Combine both cores
-	core := zapcore.NewTee(consoleCore, fileCore)
-	logger := zap.New(core, zap.AddCaller(), zap.Development())
+	// Create logger with both console and file output
+	logger := zap.New(consoleCore, zap.AddCaller(), zap.Development())
 
 	// Log when the logger is created
 	logger.Info("Development logger initialized successfully")
 
-	return &CustomLogger{Logger: logger, logFile: logFile}, nil
+	return &CustomLogger{Logger: logger}, nil
 }
 
 // NewProductionLogger initializes a new CustomLogger for production
@@ -82,37 +72,41 @@ func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
 		return nil, err
 	}
 
-	logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	// Create file writer
+	fileWriter, _, err := zap.Open("app.log")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
 
-	// Use JSON encoder for file logging
-	fileCore := zapcore.NewCore(
-		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-		zapcore.AddSync(logFile),
-		logLevel, // Set log level for file logging directly
-	)
-
-	// Use JSON encoder for console logging as well
-	consoleCore := zapcore.NewCore(
-		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), // Change to JSON
+	// Create multi-writer for both console and file
+	multiWriter := zapcore.NewMultiWriteSyncer(
 		zapcore.AddSync(os.Stdout),
-		logLevel, // Set console log level to match the desired log level
+		zapcore.AddSync(fileWriter),
 	)
 
-	core := zapcore.NewTee(fileCore, consoleCore)
-	logger := zap.New(core)
+	// Use JSON encoder for both console and file logging
+	consoleCore := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		multiWriter,
+		logLevel,
+	)
+
+	logger := zap.New(consoleCore)
 
 	// Log when the logger is created
 	logger.Info("Production logger initialized successfully")
 
-	return &CustomLogger{Logger: logger, logFile: logFile}, nil
+	return &CustomLogger{Logger: logger}, nil
 }
 
 // parseLogLevel converts a string log level to a zapcore.Level
 func parseLogLevel(logLevelStr string) (zapcore.Level, error) {
 	var logLevel zapcore.Level
+
+	// Default to info level if no level is provided
+	if logLevelStr == "" {
+		return zapcore.InfoLevel, nil
+	}
 
 	switch logLevelStr {
 	case "debug":

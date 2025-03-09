@@ -1,19 +1,21 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 )
 
 // Constants
 const (
 	readHeaderTimeout = 10 * time.Second // Timeout for reading headers
+	defaultPort       = ":8080"          // Default port if not specified in config or env
 )
 
 // SearchRequest represents the structure of the search request
@@ -23,8 +25,14 @@ type SearchRequest struct {
 	Size  int    `json:"size"`
 }
 
+// SearchResponse represents the structure of the search response
+type SearchResponse struct {
+	Results []interface{} `json:"results"`
+	Total   int           `json:"total"`
+}
+
 // StartHTTPServer starts the HTTP server for search requests
-func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceInterface) (*http.Server, error) {
+func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, error) {
 	log.Info("StartHTTPServer function called")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
@@ -41,31 +49,79 @@ func StartHTTPServer(log logger.Interface, searchService storage.SearchServiceIn
 			return
 		}
 
-		// Use the search service to perform the search
-		articles, err := searchService.SearchArticles(context.Background(), req.Query, req.Size)
+		// Build the search query
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"match": map[string]interface{}{
+					"content": req.Query,
+				},
+			},
+			"size": req.Size,
+		}
+
+		// Use the search manager to perform the search
+		results, err := searchManager.Search(r.Context(), req.Index, query)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
-		if err = json.NewEncoder(w).Encode(articles); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		// Get the total count using a wrapped query
+		total, err := searchManager.Count(r.Context(), req.Index, map[string]interface{}{
+			"query": map[string]interface{}{
+				"match": map[string]interface{}{
+					"content": req.Query,
+				},
+			},
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Prepare and send the response
+		response := SearchResponse{
+			Results: results,
+			Total:   int(total),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err = json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	})
 
+	serverCfg := cfg.GetServerConfig()
+	if serverCfg.Address == "" {
+		// Try to get port from environment variable
+		if port := os.Getenv("GOCRAWL_PORT"); port != "" {
+			if !strings.HasPrefix(port, ":") {
+				port = ":" + port
+			}
+			serverCfg.Address = port
+		} else {
+			serverCfg.Address = defaultPort
+		}
+	} else if !strings.Contains(serverCfg.Address, ":") {
+		// If address is just a port number without colon prefix
+		serverCfg.Address = ":" + serverCfg.Address
+	}
+
 	server := &http.Server{
-		Addr:              ":8081",
+		Addr:              serverCfg.Address,
 		Handler:           mux,
+		ReadTimeout:       serverCfg.ReadTimeout,
+		WriteTimeout:      serverCfg.WriteTimeout,
+		IdleTimeout:       serverCfg.IdleTimeout,
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
 	return server, nil
 }
 
-// Module is the Fx module for the API
-var Module = fx.Options(
+// Module provides API dependencies
+var Module = fx.Module("api",
 	fx.Provide(
 		StartHTTPServer,
 	),

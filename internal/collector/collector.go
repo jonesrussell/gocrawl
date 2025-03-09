@@ -1,107 +1,70 @@
+// Package collector provides the web page collection functionality for GoCrawl.
+// It manages the actual crawling process using the Colly web scraping framework,
+// handling URL processing, rate limiting, and content extraction.
 package collector
 
 import (
 	"fmt"
 	"net/url"
-	"strings"
-	"time"
-
-	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/config"
 )
 
-// New creates a new collector instance
+// New creates a new collector instance with the specified parameters.
+// It performs the following steps:
+// 1. Validates the input parameters
+// 2. Creates and validates the collector configuration
+// 3. Sets up the collector with the configuration
+// 4. Validates the base URL
+// 5. Creates and configures the base collector
+// 6. Sets up event handlers using the provided completion channel
+//
+// Parameters:
+//   - p: Params containing all required configuration and dependencies
+//
+// Returns:
+//   - Result: Contains the configured collector
+//   - error: Any error that occurred during setup
 func New(p Params) (Result, error) {
+	// Validate input parameters
 	if err := ValidateParams(p); err != nil {
 		return Result{}, err
 	}
 
+	// Create collector configuration from parameters
+	cfg, err := NewConfig(p)
+	if err != nil {
+		return Result{}, fmt.Errorf("failed to create collector config: %w", err)
+	}
+
+	// Validate the configuration
+	if validateErr := cfg.ValidateConfig(); validateErr != nil {
+		return Result{}, fmt.Errorf("invalid collector config: %w", validateErr)
+	}
+
+	// Create and validate collector setup
+	setup := NewSetup(cfg)
+	if urlErr := setup.ValidateURL(); urlErr != nil {
+		return Result{}, urlErr
+	}
+
+	// Parse URL to extract domain for collector configuration
 	parsedURL, err := url.Parse(p.BaseURL)
-	if err != nil || (!strings.HasPrefix(parsedURL.Scheme, "http") && !strings.HasPrefix(parsedURL.Scheme, "https")) {
-		return Result{}, fmt.Errorf("invalid base URL: %s, must be a valid HTTP/HTTPS URL", p.BaseURL)
-	}
-
-	// Extract the domain from the BaseURL
-	domain := parsedURL.Hostname()
-
-	// Create collector with base configuration
-	c := colly.NewCollector(
-		colly.Async(true),
-		colly.MaxDepth(p.MaxDepth),
-		colly.AllowedDomains(domain),
-	)
-
-	// Set rate limiting
-	err = c.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		RandomDelay: p.RandomDelay,
-		Parallelism: p.Parallelism,
-	})
 	if err != nil {
-		return Result{}, fmt.Errorf("failed to set rate limit: %w", err)
+		return Result{}, fmt.Errorf("failed to parse URL: %w", err)
 	}
 
-	if p.Debugger != nil {
-		c.SetDebugger(p.Debugger)
+	// Create base collector with domain restrictions
+	c := setup.CreateBaseCollector(parsedURL.Hostname())
+
+	// Configure collector with all settings
+	if configErr := setup.ConfigureCollector(c); configErr != nil {
+		return Result{}, fmt.Errorf("failed to configure collector: %w", configErr)
 	}
 
-	// Configure logging
-	ConfigureLogging(c, p.Logger)
+	// Use the provided done channel for event handlers
+	handlers := NewHandlers(cfg, p.Done, c)
+	handlers.ConfigureHandlers()
 
-	// Parse rate limit duration
-	rateLimit, err := time.ParseDuration(p.Source.RateLimit)
-	if err != nil {
-		return Result{}, fmt.Errorf("invalid rate limit: %w", err)
-	}
-
-	// Convert sources.Config to config.Source
-	source := config.Source{
-		Name:         p.Source.Name,
-		URL:          p.Source.URL,
-		ArticleIndex: p.Source.ArticleIndex,
-		Index:        p.Source.Index,
-		RateLimit:    rateLimit,
-		MaxDepth:     p.Source.MaxDepth,
-		Time:         p.Source.Time,
-		Selectors: config.SourceSelectors{
-			Article: config.ArticleSelectors{
-				Container:     p.Source.Selectors.Article.Container,
-				Title:         p.Source.Selectors.Article.Title,
-				Body:          p.Source.Selectors.Article.Body,
-				Intro:         p.Source.Selectors.Article.Intro,
-				Byline:        p.Source.Selectors.Article.Byline,
-				PublishedTime: p.Source.Selectors.Article.PublishedTime,
-				TimeAgo:       p.Source.Selectors.Article.TimeAgo,
-				JSONLD:        p.Source.Selectors.Article.JsonLd,
-				Section:       p.Source.Selectors.Article.Section,
-				Keywords:      p.Source.Selectors.Article.Keywords,
-				Description:   p.Source.Selectors.Article.Description,
-				OGTitle:       p.Source.Selectors.Article.OgTitle,
-				OGDescription: p.Source.Selectors.Article.OgDescription,
-				OGImage:       p.Source.Selectors.Article.OgImage,
-				OGURL:         p.Source.Selectors.Article.OgUrl,
-				Canonical:     p.Source.Selectors.Article.Canonical,
-				WordCount:     p.Source.Selectors.Article.WordCount,
-				PublishDate:   p.Source.Selectors.Article.PublishDate,
-				Category:      p.Source.Selectors.Article.Category,
-				Tags:          p.Source.Selectors.Article.Tags,
-				Author:        p.Source.Selectors.Article.Author,
-				BylineName:    p.Source.Selectors.Article.BylineName,
-			},
-		},
-	}
-
-	// Convert Params to ContentParams
-	contentParams := ContentParams{
-		Logger:           p.Logger,
-		Source:           source,
-		ArticleProcessor: p.ArticleProcessor,
-		ContentProcessor: p.ContentProcessor,
-	}
-
-	// Configure content processing
-	configureContentProcessing(c, contentParams)
-
+	// Log successful collector creation with configuration details
 	p.Logger.Debug("Collector created",
 		"baseURL", p.BaseURL,
 		"maxDepth", p.MaxDepth,
@@ -109,5 +72,6 @@ func New(p Params) (Result, error) {
 		"parallelism", p.Parallelism,
 	)
 
+	// Return configured collector
 	return Result{Collector: c}, nil
 }
