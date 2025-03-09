@@ -209,14 +209,32 @@ func parseRateLimit(rateLimitStr string) (time.Duration, error) {
 	return rateLimit, nil
 }
 
-// ValidateConfig validates the configuration.
+// ValidateConfig validates the configuration values.
 func ValidateConfig(cfg *Config) error {
+	if cfg == nil {
+		return errors.New("config cannot be nil")
+	}
+
 	if len(cfg.Elasticsearch.Addresses) == 0 {
-		return ErrMissingElasticURL
+		return errors.New("elasticsearch addresses cannot be empty")
 	}
+
 	if cfg.Crawler.Parallelism < 1 {
-		cfg.Crawler.Parallelism = 1
+		return errors.New("parallelism must be greater than 0")
 	}
+
+	if cfg.Crawler.MaxDepth < 0 {
+		return errors.New("max depth cannot be negative")
+	}
+
+	if cfg.Crawler.RateLimit < 0 {
+		return errors.New("rate limit cannot be negative")
+	}
+
+	if cfg.Crawler.RandomDelay < 0 {
+		return errors.New("random delay cannot be negative")
+	}
+
 	return nil
 }
 

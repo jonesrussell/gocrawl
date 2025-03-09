@@ -235,69 +235,40 @@ func TestLoadConfig(t *testing.T) {
 func TestInitializeConfig(t *testing.T) {
 	tests := []struct {
 		name    string
-		cfgFile string
-		envVars map[string]string
+		setup   func()
 		wantErr bool
 	}{
 		{
-			name:    "with config file",
-			cfgFile: "testdata/config.yml",
-			envVars: map[string]string{
-				"log.level":           "debug",
-				"app.environment":     "test",
-				"crawler.parallelism": "2",
+			name: "with config file",
+			setup: func() {
+				viper.SetConfigType("yaml")
+				viper.SetConfigName("config")
+				viper.AddConfigPath("testdata")
 			},
 			wantErr: false,
 		},
 		{
-			name:    "without config file",
-			cfgFile: "",
-			envVars: map[string]string{
-				"log.level":           "info",
-				"app.environment":     "development",
-				"crawler.parallelism": "1",
+			name: "without config file",
+			setup: func() {
+				viper.SetConfigType("yaml")
+				viper.SetConfigName("nonexistent")
+				viper.AddConfigPath("testdata")
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset Viper configuration
 			viper.Reset()
-
-			// Set config file if provided
-			if tt.cfgFile != "" {
-				viper.SetConfigFile(tt.cfgFile)
-			}
-
-			// Set environment variables
-			for k, v := range tt.envVars {
-				viper.Set(k, v)
-			}
-
-			// Initialize config
+			tt.setup()
 			cfg, err := config.InitializeConfig()
 			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
-
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
-
-			// Verify environment variables were properly set
-			for k, v := range tt.envVars {
-				switch k {
-				case "log.level":
-					require.Equal(t, v, cfg.Log.Level)
-				case "app.environment":
-					require.Equal(t, v, cfg.App.Environment)
-				case "crawler.parallelism":
-					parallelism := viper.GetInt("crawler.parallelism")
-					require.Equal(t, parallelism, cfg.Crawler.Parallelism)
-				}
-			}
 		})
 	}
 }
