@@ -24,7 +24,7 @@ type ServiceParams struct {
 	fx.In
 
 	Logger logger.Interface
-	Config *config.Config
+	Config config.Interface
 	Source string `name:"sourceName"`
 }
 
@@ -44,7 +44,7 @@ var Module = fx.Module("article",
 func NewServiceWithConfig(p ServiceParams) Interface {
 	// Get the source configuration
 	var selectors config.ArticleSelectors
-	for _, source := range p.Config.Sources {
+	for _, source := range p.Config.GetSources() {
 		if source.Name == p.Source {
 			selectors = source.Selectors.Article
 			break

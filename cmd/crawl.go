@@ -64,7 +64,7 @@ type CrawlParams struct {
 	Done chan struct{} `name:"crawlDone"`
 
 	// Config holds the application configuration
-	Config *config.Config
+	Config config.Interface
 
 	// Context provides the context for the crawl operation
 	Context context.Context `name:"crawlContext"`
@@ -269,8 +269,8 @@ func startCrawl(p CrawlParams) error {
 		ArticleProcessor: p.Processors[0], // First processor handles articles
 		ContentProcessor: p.Processors[1], // Second processor handles content
 		Source:           sourceConfig,
-		Parallelism:      p.Config.Crawler.Parallelism,
-		RandomDelay:      p.Config.Crawler.RandomDelay,
+		Parallelism:      p.Config.GetCrawlerConfig().Parallelism,
+		RandomDelay:      p.Config.GetCrawlerConfig().RandomDelay,
 		Context:          p.Context,
 		Done:             p.Done,
 		AllowedDomains:   []string{domain},

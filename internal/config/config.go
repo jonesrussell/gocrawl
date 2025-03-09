@@ -209,6 +209,11 @@ func (c *Config) GetAppConfig() *AppConfig {
 	return &c.App
 }
 
+// GetSources implements Interface
+func (c *Config) GetSources() []Source {
+	return c.Sources
+}
+
 // Ensure Config implements Interface
 var _ Interface = (*Config)(nil)
 

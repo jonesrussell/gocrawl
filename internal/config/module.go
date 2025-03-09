@@ -38,6 +38,9 @@ type Interface interface {
 
 	// GetAppConfig returns the application-specific configuration
 	GetAppConfig() *AppConfig
+
+	// GetSources returns the list of configured sources
+	GetSources() []Source
 }
 
 // config implements the Interface and holds the actual configuration values
@@ -46,6 +49,7 @@ type config struct {
 	Crawler       CrawlerConfig       `yaml:"crawler"`
 	Elasticsearch ElasticsearchConfig `yaml:"elasticsearch"`
 	Log           LogConfig           `yaml:"log"`
+	Sources       []Source            `yaml:"sources"`
 }
 
 // Ensure config implements Interface
@@ -69,6 +73,11 @@ func (c *config) GetLogConfig() *LogConfig {
 // GetAppConfig implements Interface
 func (c *config) GetAppConfig() *AppConfig {
 	return &c.App
+}
+
+// GetSources implements Interface
+func (c *config) GetSources() []Source {
+	return c.Sources
 }
 
 // InitializeConfig sets up the configuration for the application.

@@ -30,11 +30,12 @@ func DefaultOptions() Options {
 }
 
 // NewOptionsFromConfig creates Options from a config
-func NewOptionsFromConfig(cfg *config.Config) Options {
+func NewOptionsFromConfig(cfg config.Interface) Options {
 	opts := DefaultOptions()
+	esConfig := cfg.GetElasticsearchConfig()
 
 	// Create transport with TLS config if needed
-	if cfg.Elasticsearch.TLS.SkipVerify {
+	if esConfig.TLS.SkipVerify {
 		opts.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				//nolint:gosec // We are using the SkipVerify setting from the config
@@ -44,12 +45,12 @@ func NewOptionsFromConfig(cfg *config.Config) Options {
 	}
 
 	// Set values from config
-	opts.Addresses = cfg.Elasticsearch.Addresses
-	opts.Username = cfg.Elasticsearch.Username
-	opts.Password = cfg.Elasticsearch.Password
-	opts.APIKey = cfg.Elasticsearch.APIKey
-	opts.IndexName = cfg.Elasticsearch.IndexName
-	opts.SkipTLS = cfg.Elasticsearch.TLS.SkipVerify
+	opts.Addresses = esConfig.Addresses
+	opts.Username = esConfig.Username
+	opts.Password = esConfig.Password
+	opts.APIKey = esConfig.APIKey
+	opts.IndexName = esConfig.IndexName
+	opts.SkipTLS = esConfig.TLS.SkipVerify
 
 	return opts
 }
