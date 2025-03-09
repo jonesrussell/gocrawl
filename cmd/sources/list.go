@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -30,6 +31,12 @@ This command provides subcommands for listing, adding, and managing content sour
 const (
 	// TableWidth defines the total width of the table output for consistent formatting
 	TableWidth = 160
+
+	// Column width constants
+	sourceColumnWidth   = 80
+	indexesColumnWidth  = 80
+	configColumnWidth   = 25
+	labelFormatterWidth = 8
 )
 
 // listParams holds the parameters required for listing sources.
@@ -173,16 +180,49 @@ func executeList(p *listParams) error {
 func printSources(sources []sources.Config, logger common.Logger) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "URL", "Article Index", "Content Index", "Rate Limit", "Max Depth"})
+
+	// Configure table style
+	t.SetStyle(table.StyleRounded)
+	t.Style().Options.DrawBorder = true
+	t.Style().Options.SeparateColumns = true
+	t.Style().Options.SeparateRows = true
+	t.Style().Options.SeparateHeader = true
+
+	// Create transformers for consistent formatting
+	labelTransformer := text.Transformer(func(val interface{}) string {
+		return fmt.Sprintf("%-*s", labelFormatterWidth, val.(string)) //nolint:errcheck // Sprintf does not return an error
+	})
+
+	// Set column configurations to prevent truncation and align content
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{
+			Name:     "Source",
+			WidthMax: sourceColumnWidth,
+		},
+		{
+			Name:        "Indexes",
+			WidthMax:    indexesColumnWidth,
+			Align:       text.AlignLeft,
+			Transformer: labelTransformer,
+		},
+		{
+			Name:        "Crawl Config",
+			WidthMax:    configColumnWidth,
+			Align:       text.AlignLeft,
+			Transformer: labelTransformer,
+		},
+	})
+
+	t.AppendHeader(table.Row{"Source", "Indexes", "Crawl Config"})
 
 	for _, source := range sources {
+		sourceInfo := fmt.Sprintf("%s\n%s", source.Name, source.URL)
+		indexes := fmt.Sprintf("Articles: %s\nContent:  %s", source.ArticleIndex, source.Index)
+		crawlConfig := fmt.Sprintf("Rate:    %s\nDepth:    %d", source.RateLimit, source.MaxDepth)
 		t.AppendRow([]interface{}{
-			source.Name,
-			source.URL,
-			source.ArticleIndex,
-			source.Index,
-			source.RateLimit,
-			source.MaxDepth,
+			sourceInfo,
+			indexes,
+			crawlConfig,
 		})
 	}
 

@@ -1,3 +1,4 @@
+// Package logger provides logging functionality for the application.
 package logger
 
 import (
@@ -13,14 +14,17 @@ import (
 
 // Module provides the logger module and its dependencies
 var Module = fx.Module("logger",
-	fx.Provide(func(cfg *config.Config) Interface {
-		logger, err := InitializeLogger(cfg)
-		if err != nil {
-			panic(err)
-		}
-		return logger
-	}),
+	fx.Provide(provideLogger),
 )
+
+// InitializeLogger creates a new logger based on the configuration
+func InitializeLogger(cfg config.Interface) (Interface, error) {
+	logConfig := cfg.GetLogConfig()
+	if logConfig.Debug {
+		return NewDevelopmentLogger(logConfig.Level)
+	}
+	return NewProductionLogger(logConfig.Level)
+}
 
 // NewDevelopmentLogger initializes a new CustomLogger for development with colored output
 func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {

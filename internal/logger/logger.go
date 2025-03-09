@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -62,34 +61,6 @@ type Params struct {
 const (
 	defaultLogLevel = "info"
 )
-
-// InitializeLogger sets up the global logger based on the configuration
-func InitializeLogger(cfg *config.Config) (Interface, error) {
-	env := cfg.App.Environment
-	if env == "" {
-		env = "development" // Set a default environment
-	}
-
-	// Ensure we have a valid log level
-	logLevel := cfg.Log.Level
-	if logLevel == "" {
-		logLevel = defaultLogLevel // Set a default log level
-	}
-
-	var customLogger *CustomLogger
-	var err error
-	if env == "development" {
-		customLogger, err = NewDevelopmentLogger(logLevel)
-	} else {
-		customLogger, err = NewProductionLogger(logLevel)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("error initializing logger: %w", err)
-	}
-
-	return customLogger, nil
-}
 
 // Info logs an info message
 func (c *CustomLogger) Info(msg string, fields ...interface{}) {
