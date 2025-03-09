@@ -236,7 +236,7 @@ func TestStartHTTPServer_PortConfiguration(t *testing.T) {
 
 			// Set environment variable if specified
 			if tt.envPort != "" {
-				os.Setenv("GOCRAWL_PORT", tt.envPort)
+				t.Setenv("GOCRAWL_PORT", tt.envPort)
 			}
 
 			// Create mock dependencies

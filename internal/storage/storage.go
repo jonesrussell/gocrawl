@@ -731,14 +731,7 @@ func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query in
 	defer cancel()
 
 	// Extract just the query part if it's a map
-	var queryBody interface{} = query
-	if queryMap, ok := query.(map[string]interface{}); ok {
-		if q, exists := queryMap["query"]; exists {
-			queryBody = map[string]interface{}{
-				"query": q,
-			}
-		}
-	}
+	var queryBody = query
 
 	res, err := s.ESClient.Count(
 		s.ESClient.Count.WithContext(ctx),

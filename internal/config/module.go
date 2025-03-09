@@ -21,6 +21,11 @@ const (
 
 	// defaultMaxRetries is the default number of retries for failed requests
 	defaultMaxRetries = 3
+
+	// Server timeouts
+	DefaultReadTimeout  = 10 * time.Second
+	DefaultWriteTimeout = 30 * time.Second
+	DefaultIdleTimeout  = 60 * time.Second
 )
 
 // config implements the Interface and holds the actual configuration values
@@ -213,9 +218,9 @@ func New() (Interface, error) {
 		},
 		Server: ServerConfig{
 			Address:      viper.GetString("server.address"),
-			ReadTimeout:  viper.GetDuration("server.read_timeout"),
-			WriteTimeout: viper.GetDuration("server.write_timeout"),
-			IdleTimeout:  viper.GetDuration("server.idle_timeout"),
+			ReadTimeout:  DefaultReadTimeout,
+			WriteTimeout: DefaultWriteTimeout,
+			IdleTimeout:  DefaultIdleTimeout,
 		},
 	}
 
@@ -246,9 +251,9 @@ func ProvideConfig() (*Config, error) {
 		},
 		Server: ServerConfig{
 			Address:      ":8080",
-			ReadTimeout:  10 * time.Second,
-			WriteTimeout: 30 * time.Second,
-			IdleTimeout:  60 * time.Second,
+			ReadTimeout:  DefaultReadTimeout,
+			WriteTimeout: DefaultWriteTimeout,
+			IdleTimeout:  DefaultIdleTimeout,
 		},
 	}
 	return cfg, nil
