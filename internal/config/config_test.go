@@ -266,13 +266,18 @@ func TestInitializeConfig(t *testing.T) {
 			// Reset Viper configuration
 			viper.Reset()
 
+			// Set config file if provided
+			if tt.cfgFile != "" {
+				viper.SetConfigFile(tt.cfgFile)
+			}
+
 			// Set environment variables
 			for k, v := range tt.envVars {
 				viper.Set(k, v)
 			}
 
 			// Initialize config
-			cfg, err := config.InitializeConfig(tt.cfgFile)
+			cfg, err := config.InitializeConfig()
 			if tt.wantErr {
 				require.Error(t, err)
 				return

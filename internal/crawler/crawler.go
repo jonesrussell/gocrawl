@@ -75,6 +75,13 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	return nil
 }
 
+// Wait blocks until the crawler has finished processing all queued requests.
+func (c *Crawler) Wait() {
+	if c.collector != nil {
+		c.collector.Wait()
+	}
+}
+
 // Subscribe adds a content handler.
 func (c *Crawler) Subscribe(handler events.Handler) {
 	c.bus.Subscribe(handler)

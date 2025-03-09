@@ -40,6 +40,11 @@ func (m *MockCrawler) GetBaseURL() string {
 	return args.String(0)
 }
 
+// Wait implements crawler.Interface
+func (m *MockCrawler) Wait() {
+	m.Called()
+}
+
 // NewMockCrawler creates a new instance of MockCrawler
 func NewMockCrawler() *MockCrawler {
 	return &MockCrawler{}

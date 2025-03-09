@@ -28,6 +28,8 @@ type Interface interface {
 	SetCollector(collector *colly.Collector)
 	// GetIndexManager returns the index manager interface.
 	GetIndexManager() api.IndexManager
+	// Wait blocks until the crawler has finished processing all queued requests.
+	Wait()
 }
 
 // Module provides the crawler's dependencies.

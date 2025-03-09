@@ -93,6 +93,10 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceName = args[0]
 
+		// Create a parent context that can be cancelled
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
+
 		// Set up signal handling for graceful shutdown
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -121,7 +125,7 @@ Example:
 				),
 				fx.Annotate(
 					func() context.Context {
-						return cmd.Context()
+						return ctx // Use our cancellable context
 					},
 					fx.ResultTags(`name:"crawlContext"`),
 				),
@@ -163,7 +167,7 @@ Example:
 		)
 
 		// Start the application and handle any startup errors
-		if err := app.Start(cmd.Context()); err != nil {
+		if err := app.Start(ctx); err != nil {
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
@@ -176,16 +180,18 @@ Example:
 		select {
 		case sig := <-sigChan:
 			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-		case <-cmd.Context().Done():
+			cancel() // Cancel our context
+		case <-ctx.Done():
 			common.PrintInfof("\nContext cancelled, initiating shutdown...")
 		case crawlErr = <-errChan:
 			// Error already printed in startCrawl
+			cancel() // Cancel our context on error
 		case <-doneChan:
 			// Success message already printed in startCrawl
 		}
 
 		// Create a context with timeout for graceful shutdown
-		stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
 		defer stopCancel()
 
 		// Stop the application and handle any shutdown errors
@@ -359,9 +365,14 @@ func configureCrawlLifecycle(lc fx.Lifecycle, p CrawlParams, errChan chan error)
 						p.Logger.Error("Crawl failed", "error", startErr)
 						errChan <- startErr
 					}
-				} else {
-					p.Logger.Info("Crawl completed successfully", "source", sourceName)
+					close(p.Done)
+					return
 				}
+
+				// Wait for collector to finish its work
+				p.CrawlerInstance.Wait()
+
+				p.Logger.Info("Crawl completed successfully", "source", sourceName)
 				close(p.Done)
 			}()
 

@@ -20,7 +20,8 @@ const (
 	DefaultStartupTimeout = 30 * time.Second
 
 	// DefaultOperationTimeout is the default timeout for general operations.
-	// This duration is used for common operations like API calls or
-	// data processing tasks that should complete in a reasonable time.
-	DefaultOperationTimeout = 5 * time.Second
+	// This duration is used for common operations like API calls,
+	// data processing tasks, or crawler shutdown that should complete
+	// in a reasonable time.
+	DefaultOperationTimeout = 30 * time.Second
 )
