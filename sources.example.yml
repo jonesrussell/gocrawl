@@ -1,38 +1,179 @@
+# Configuration file for web crawling sources
+# Each source defines a website to crawl and how to extract content
+
 sources:
+  # Example of a WordPress-based news site configuration
+  - name: "Example News Site"
+    url: "https://www.example-news.com/news/"
+    # article_index stores raw article data
+    article_index: "example_news_articles"
+    # index stores processed/normalized content
+    index: "example_news_content"
+    # Time between requests to avoid overwhelming the server
+    rate_limit: 1s
+    # How many links deep to follow from the starting URL
+    max_depth: 2
+    # Schedule crawling times in 24-hour format (HH:MM)
+    time:
+      - "11:45"
+      - "23:45"
+    # Detailed selectors for content extraction
+    selectors:
+      article:
+        # Main content container selectors
+        container: ".article-content"
+        title: "meta[property='og:title'],.article-title"
+        body: ".article-body"
+        intro: "meta[property='og:description']"
+        byline: ".article-author"
+        published_time: "meta[property='article:published_time']"
+        time_ago: "time"
+        
+        # Structured data selectors
+        json_ld: "script[type='application/ld+json']"
+        section: "meta[property='article:section']"
+        keywords: "meta[name='keywords']"
+        description: "meta[property='og:description']"
+        
+        # Open Graph metadata selectors
+        og_title: "meta[property='og:title']"
+        og_description: "meta[property='og:description']"
+        og_image: "meta[property='og:image']"
+        og_url: "meta[property='og:url']"
+        og_type: "meta[property='og:type']"
+        og_site_name: "meta[property='og:site_name']"
+        
+        # Additional metadata selectors
+        canonical: "link[rel='canonical']"
+        author: "meta[property='article:author'],.author-name"
+        category: "meta[property='article:section']"
+        
+        # Elements to exclude from content extraction
+        # These patterns help clean up the extracted content
+        exclude: [
+          ".clearfix",              # Layout cleanup elements
+          ".share-buttons",         # Social sharing elements
+          ".advertisement",         # Ad containers
+          "style",                  # Inline styles
+          "script",                 # JavaScript
+          ".comments-section",      # User comments
+          ".related-posts",         # Related content widgets
+          ".sidebar",              # Sidebar content
+          ".navigation",           # Navigation elements
+          ".social-media",         # Social media widgets
+          ".view-counter",         # Analytics elements
+          ".author-bio",          # Author biography sections
+          ".newsletter-signup"     # Newsletter forms
+        ]
+
+  # Example of a custom CMS news site configuration
+  - name: "Local Monitor News"
+    url: "https://www.local-monitor.com/category/local/"
+    article_index: "local_monitor_articles"
+    index: "local_monitor_content"
+    rate_limit: 2s
+    max_depth: 2
+    time:
+      - "11:50"
+      - "23:50"
+    selectors:
+      article:
+        # Basic content selectors
+        title: "h1.article-title"
+        body: ".article-content"
+        intro: ".article-intro"
+        byline: ".article-byline"
+        published_time: "meta[property='article:published_time']"
+        time_ago: "time"
+        
+        # Metadata selectors
+        json_ld: "script[type='application/ld+json']"
+        section: "meta[property='article:section']"
+        keywords: "meta[name='keywords']"
+
+  # Example of a modern news platform configuration
+  - name: "City Today News"
+    url: "https://www.citytoday.com/local-news"
+    article_index: "citytoday_articles"
+    index: "citytoday_content"
+    rate_limit: 1s
+    max_depth: 2
+    time:
+      - "11:55"
+      - "23:55"
+    selectors:
+      article:
+        # Content container and basic selectors
+        container: "div.article-details"
+        title: "h1.details-title"
+        body: "#article-body"
+        intro: ".article-intro"
+        byline: ".article-byline"
+        published_time: "time.timeago"
+        time_ago: "time.timeago"
+        
+        # Metadata and structured data
+        json_ld: "script[type='application/ld+json']"
+        section: "meta[property='article:section']"
+        keywords: "meta[name='keywords']"
+        description: "meta[name='description']"
+        
+        # Open Graph tags
+        og_title: "meta[property='og:title']"
+        og_description: "meta[property='og:description']"
+        og_image: "meta[property='og:image']"
+        og_url: "meta[property='og:url']"
+        
+        # Additional metadata
+        canonical: "link[rel='canonical']"
+        word_count: "script:contains('WordCount')"
+        publish_date: "script:contains('PublishDate')"
+        category: "script:contains('CategoryName')"
+        tags: "script:contains('Tags')"
+        author: "script:contains('AuthorName')"
+        byline_name: "script:contains('BylineName')"
+
   - name: "Fictional News Network"
     url: "https://www.fictionalnewsnetwork.com/latest/"
     index: "fictional_news_articles"
     rate_limit: 2s
     max_depth: 3
     time:
-      - "09:00"
-      - "15:00"
+      - "11:40"
+      - "23:40"
 
   - name: "Imaginary Times"
     url: "https://www.imaginarytimes.com/news/"
     index: "imaginary_times_articles"
     rate_limit: 1s
     max_depth: 2
-    time: "10:00"
+    time:
+      - "11:35"
+      - "23:35"
 
   - name: "Example Daily"
     url: "https://www.exampledaily.com/current-events"
     index: "example_daily_articles"
     rate_limit: 1s
     max_depth: 4
-    time: "11:00"
+    time:
+      - "11:30"
+      - "23:30"
 
   - name: "Sample Gazette"
     url: "https://www.samplegazette.com/world/"
     index: "sample_gazette_articles"
     rate_limit: 3s
     max_depth: 2
-    time: "14:00"
+    time:
+      - "11:25"
+      - "23:25"
 
   - name: "Fable Report"
     url: "https://www.fablereport.com/stories"
     index: "fable_report_articles"
     rate_limit: 2s
     max_depth: 5
-    time: "16:00"
+    time:
+      - "16:00"    # Single daily run at 4 PM
     

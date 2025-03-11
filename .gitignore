@@ -1,30 +1,41 @@
-# Environment files
+# Sensitive Configuration Files
+## Environment Variables
 .env
 .env.*
 !.env.example
 
-# Config files with sensitive data
+## Application Config
+config.yml
 config.yaml
 config.production.yaml
 !config.example.yaml
 
-# Certificates and keys
+## Source Configuration
+sources.yml
+
+# Security Files
+## Certificates and Keys
 *.pem
 *.key
 *.crt
 *.ca
-
 http_ca.crt
 
+# Build and Binary Files
 bin/
-coverage/coverage.html
-coverage/coverage.out
+gocrawl
+
+# IDE and Editor Files
+.idea/
 .idea/.gitignore
 .idea/gocrawl.iml
 .idea/modules.xml
 .idea/vcs.xml
 
-/config.yml
-app.log
-sources.yml
-gocrawl
+# Test and Coverage Reports
+coverage/coverage.html
+coverage/coverage.out
+
+# Temporary and Log Files
+*.bak
+*.log
