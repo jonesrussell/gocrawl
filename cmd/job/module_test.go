@@ -74,13 +74,6 @@ func TestModuleProvides(t *testing.T) {
 				func(t *testing.T) context.Context { return t.Context() },
 				fx.ResultTags(`name:"jobContext"`),
 			),
-			// Provide the crawlDone channel
-			fx.Annotate(
-				func() chan struct{} {
-					return make(chan struct{})
-				},
-				fx.ResultTags(`name:"crawlDone"`),
-			),
 		),
 		fx.Populate(&command),
 	)
@@ -106,13 +99,6 @@ func TestModuleConfiguration(t *testing.T) {
 			fx.Annotate(
 				func(t *testing.T) context.Context { return t.Context() },
 				fx.ResultTags(`name:"jobContext"`),
-			),
-			// Provide the crawlDone channel
-			fx.Annotate(
-				func() chan struct{} {
-					return make(chan struct{})
-				},
-				fx.ResultTags(`name:"crawlDone"`),
 			),
 		),
 		fx.Populate(&command),

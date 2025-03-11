@@ -201,7 +201,7 @@ func checkAndRunJobs(
 	currentTime := now.Format("15:04")
 	log.Info("Checking jobs", "current_time", currentTime)
 
-	for _, source := range sources.Sources {
+	for _, source := range sources.GetSources() {
 		for _, scheduledTime := range source.Time {
 			if currentTime == scheduledTime {
 				log.Info("Running scheduled crawl",
@@ -221,7 +221,7 @@ func startJob(p Params) error {
 
 	// Print loaded schedules
 	p.Logger.Info("Loaded schedules:")
-	for _, source := range p.Sources.Sources {
+	for _, source := range p.Sources.GetSources() {
 		if len(source.Time) > 0 {
 			p.Logger.Info("Source schedule",
 				"name", source.Name,
@@ -279,8 +279,9 @@ var Cmd = &cobra.Command{
 				fx.Annotate(
 					func(sources *sources.Sources) (string, string) {
 						// For job scheduler, we'll use the first source's indices
-						if len(sources.Sources) > 0 {
-							return sources.Sources[0].Index, sources.Sources[0].ArticleIndex
+						if len(sources.GetSources()) > 0 {
+							allSources := sources.GetSources()
+							return allSources[0].Index, allSources[0].ArticleIndex
 						}
 						return "content", "articles" // Default indices if no sources
 					},
@@ -289,8 +290,8 @@ var Cmd = &cobra.Command{
 				fx.Annotate(
 					func(sources *sources.Sources) string {
 						// For job scheduler, we'll use the first source's name
-						if len(sources.Sources) > 0 {
-							return sources.Sources[0].Name
+						if len(sources.GetSources()) > 0 {
+							return sources.GetSources()[0].Name
 						}
 						return "default" // Default source name if no sources
 					},

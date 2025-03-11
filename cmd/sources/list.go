@@ -144,12 +144,13 @@ func runList(cmd *cobra.Command, _ []string) error {
 // - Handles empty results
 // - Displays the sources in a formatted table
 func executeList(p *listParams) error {
-	if len(p.sources.Sources) == 0 {
+	allSources := p.sources.GetSources()
+	if len(allSources) == 0 {
 		p.logger.Info("No sources found")
 		return nil
 	}
 
-	return printSources(p.sources.Sources, p.logger)
+	return printSources(allSources, p.logger)
 }
 
 // printSources formats and displays the sources in a table.

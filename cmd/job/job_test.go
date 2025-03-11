@@ -10,6 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,15 +120,14 @@ func TestJobCommand(t *testing.T) {
 	mockLogger.On("Info", "Starting job scheduler", "root", "job").Return()
 
 	// Create test sources
-	testSources := &sources.Sources{
-		Sources: []sources.Config{
-			{
-				Name: "Test Source",
-				Time: []string{"03:13", "15:13"},
-				URL:  "https://test.com",
-			},
+	testConfigs := []sources.Config{
+		{
+			Name: "Test Source",
+			Time: []string{"03:13", "15:13"},
+			URL:  "https://test.com",
 		},
 	}
+	testSources := testutils.NewTestSources(testConfigs)
 
 	// Create mock config with test sources
 	mockCfg := config.NewMockConfig().WithSources([]config.Source{

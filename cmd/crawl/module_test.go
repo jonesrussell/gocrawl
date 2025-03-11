@@ -9,6 +9,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -26,16 +27,15 @@ func TestModuleProvides(t *testing.T) {
 		},
 	})
 
-	testSources := &sources.Sources{
-		Sources: []sources.Config{
-			{
-				Name:      "Test Source",
-				URL:       "https://test.com",
-				RateLimit: "1s",
-				MaxDepth:  2,
-			},
+	testConfigs := []sources.Config{
+		{
+			Name:      "Test Source",
+			URL:       "https://test.com",
+			RateLimit: "1s",
+			MaxDepth:  2,
 		},
 	}
+	testSources := testutils.NewTestSources(testConfigs)
 
 	var (
 		crawlerInstance crawler.Interface
@@ -62,7 +62,10 @@ func TestModuleProvides(t *testing.T) {
 	// Verify dependencies were provided
 	assert.NotNil(t, crawlerInstance, "Crawler should be provided")
 	assert.NotNil(t, src, "Sources should be provided")
-	assert.Equal(t, "Test Source", src.Sources[0].Name, "Source name should match configuration")
+
+	// Use GetSources() to access the sources
+	sources := src.GetSources()
+	assert.Equal(t, "Test Source", sources[0].Name, "Source name should match configuration")
 }
 
 // TestModuleConfiguration tests the module's configuration behavior
@@ -81,16 +84,15 @@ func TestModuleConfiguration(t *testing.T) {
 			Parallelism: 2,
 		})
 
-	testSources := &sources.Sources{
-		Sources: []sources.Config{
-			{
-				Name:      "Test Source",
-				URL:       "https://test.com",
-				RateLimit: "1s",
-				MaxDepth:  2,
-			},
+	testConfigs := []sources.Config{
+		{
+			Name:      "Test Source",
+			URL:       "https://test.com",
+			RateLimit: "1s",
+			MaxDepth:  2,
 		},
 	}
+	testSources := testutils.NewTestSources(testConfigs)
 
 	var crawlerInstance crawler.Interface
 
