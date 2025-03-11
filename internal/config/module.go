@@ -171,7 +171,19 @@ func setupViper() error {
 	// Set default configuration name and type
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+
+	// Add config search paths in order of priority
+	if cfgFile := os.Getenv("CONFIG_FILE"); cfgFile != "" {
+		// If CONFIG_FILE is set, use it directly
+		viper.SetConfigFile(cfgFile)
+		log.Printf("Using config file from CONFIG_FILE: %s", cfgFile)
+	} else {
+		// Add search paths in order of priority
+		viper.AddConfigPath("/opt/gocrawl/etc") // Production config path
+		viper.AddConfigPath("/etc/gocrawl")     // System config path
+		viper.AddConfigPath("$HOME/.gocrawl")   // User config path
+		viper.AddConfigPath(".")                // Current directory
+	}
 
 	// Set default values
 	viper.SetDefault("log.level", "info")
@@ -189,23 +201,20 @@ func setupViper() error {
 		return fmt.Errorf("failed to bind environment variables: %w", err)
 	}
 
-	// If a specific config file is provided, use it
-	if cfgFile := os.Getenv("CONFIG_FILE"); cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-		log.Printf("Using config file: %s", cfgFile)
-	}
-
 	// Read the configuration file
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError *viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) && os.Getenv("APP_ENV") != envProduction {
-			return fmt.Errorf("config file not found: %w", err)
+		if errors.As(err, &configFileNotFoundError) {
+			if os.Getenv("APP_ENV") == envProduction {
+				return fmt.Errorf("no config file found in production environment: %w", err)
+			}
+			log.Printf("Warning: No config file found, using defaults and environment variables")
+			return nil
 		}
-		if !errors.As(err, &configFileNotFoundError) {
-			return fmt.Errorf("error reading config file: %w", err)
-		}
+		return fmt.Errorf("error reading config file: %w", err)
 	}
 
+	log.Printf("Using config file: %s", viper.ConfigFileUsed())
 	return nil
 }
 

@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/jonesrussell/gocrawl/cmd/indices"
@@ -31,9 +32,17 @@ The crawler can be configured to:
 - Store content in Elasticsearch with proper indexing
 - Handle rate limiting and respect robots.txt
 - Process different types of content (articles, general web pages)`,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Set the config file path in Viper if provided
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			// If config file is provided via flag, use absolute path
 			if cfgFile != "" {
+				if !os.IsPathSeparator(cfgFile[0]) {
+					// Convert relative path to absolute
+					wd, err := os.Getwd()
+					if err != nil {
+						return fmt.Errorf("failed to get working directory: %w", err)
+					}
+					cfgFile = wd + string(os.PathSeparator) + cfgFile
+				}
 				os.Setenv("CONFIG_FILE", cfgFile)
 			}
 			return nil
