@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -98,6 +99,24 @@ func checkAndRunJobs(
 					continue
 				}
 
+				// Create and configure the collector for this source
+				collectorResult, collectorErr := collector.New(collector.Params{
+					BaseURL:   source.URL,
+					MaxDepth:  source.MaxDepth,
+					RateLimit: time.Second, // Default rate limit
+					Logger:    log,
+					Context:   ctx,
+				})
+				if collectorErr != nil {
+					log.Error("Error creating collector",
+						"error", collectorErr,
+						"source", source.Name)
+					continue
+				}
+
+				// Set the collector in the crawler instance
+				c.SetCollector(collectorResult.Collector)
+
 				// Start crawling
 				if err := c.Start(ctx, source.URL); err != nil {
 					log.Error("Error starting crawler",
@@ -120,6 +139,16 @@ func startJob(p Params) error {
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(p.Context)
 	defer cancel()
+
+	// Print loaded schedules
+	p.Logger.Info("Loaded schedules:")
+	for _, source := range p.Sources.Sources {
+		if len(source.Time) > 0 {
+			p.Logger.Info("Source schedule",
+				"name", source.Name,
+				"times", source.Time)
+		}
+	}
 
 	// Start scheduler in background
 	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance)
@@ -156,6 +185,7 @@ var Cmd = &cobra.Command{
 		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
 			common.Module,
+			article.Module,
 			content.Module,
 			collector.Module(),
 			crawler.Module,
