@@ -189,9 +189,10 @@ func setupViper() error {
 		return fmt.Errorf("failed to bind environment variables: %w", err)
 	}
 
-	// If a specific config file is provided via flag, use it
-	if cfgFile := viper.GetString("config"); cfgFile != "" {
+	// If a specific config file is provided, use it
+	if cfgFile := os.Getenv("CONFIG_FILE"); cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
+		log.Printf("Using config file: %s", cfgFile)
 	}
 
 	// Read the configuration file

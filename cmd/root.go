@@ -31,6 +31,13 @@ The crawler can be configured to:
 - Store content in Elasticsearch with proper indexing
 - Handle rate limiting and respect robots.txt
 - Process different types of content (articles, general web pages)`,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Set the config file path in Viper if provided
+			if cfgFile != "" {
+				os.Setenv("CONFIG_FILE", cfgFile)
+			}
+			return nil
+		},
 	}
 )
 
