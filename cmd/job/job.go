@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"errors"
+	"sync/atomic"
+
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -18,6 +21,11 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+)
+
+const (
+	// shutdownTimeoutSeconds is the number of seconds to wait for jobs to complete during shutdown
+	shutdownTimeoutSeconds = 10
 )
 
 // Params holds the dependencies required for the job scheduler.
@@ -47,6 +55,9 @@ type Params struct {
 
 	// Done is a channel that signals when the crawl operation is complete
 	Done chan struct{} `name:"crawlDone"`
+
+	// ActiveJobs tracks the number of currently running jobs
+	ActiveJobs *int32 `optional:"true"`
 }
 
 // runScheduler manages the execution of scheduled jobs.
@@ -58,6 +69,7 @@ func runScheduler(
 	processors []models.ContentProcessor,
 	done chan struct{},
 	cfg config.Interface,
+	activeJobs *int32,
 ) {
 	log.Info("Starting job scheduler")
 
@@ -66,7 +78,7 @@ func runScheduler(
 	defer ticker.Stop()
 
 	// Do initial check
-	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg)
+	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg, activeJobs)
 
 	for {
 		select {
@@ -74,7 +86,7 @@ func runScheduler(
 			log.Info("Job scheduler shutting down")
 			return
 		case t := <-ticker.C:
-			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg)
+			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg, activeJobs)
 		}
 	}
 }
@@ -88,7 +100,11 @@ func executeCrawl(
 	processors []models.ContentProcessor,
 	done chan struct{},
 	cfg config.Interface,
+	activeJobs *int32,
 ) {
+	atomic.AddInt32(activeJobs, 1)
+	defer atomic.AddInt32(activeJobs, -1)
+
 	collectorResult, err := app.SetupCollector(ctx, log, source, processors, done, cfg)
 	if err != nil {
 		log.Error("Error setting up collector",
@@ -125,6 +141,7 @@ func checkAndRunJobs(
 	processors []models.ContentProcessor,
 	done chan struct{},
 	cfg config.Interface,
+	activeJobs *int32,
 ) {
 	if sources == nil {
 		log.Error("Sources configuration is nil")
@@ -145,7 +162,7 @@ func checkAndRunJobs(
 				log.Info("Running scheduled crawl",
 					"source", source.Name,
 					"time", scheduledTime)
-				executeCrawl(ctx, log, c, source, processors, done, cfg)
+				executeCrawl(ctx, log, c, source, processors, done, cfg, activeJobs)
 			}
 		}
 	}
@@ -156,6 +173,12 @@ func startJob(p Params) error {
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(p.Context)
 	defer cancel()
+
+	// Initialize active jobs counter if not provided
+	if p.ActiveJobs == nil {
+		var jobs int32
+		p.ActiveJobs = &jobs
+	}
 
 	// Print loaded schedules
 	p.Logger.Info("Loaded schedules:")
@@ -168,7 +191,7 @@ func startJob(p Params) error {
 	}
 
 	// Start scheduler in background
-	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config)
+	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config, p.ActiveJobs)
 
 	// Wait for interrupt
 	done, cleanup := app.WaitForSignal(ctx, cancel)
@@ -177,6 +200,30 @@ func startJob(p Params) error {
 	p.Logger.Info("Job scheduler running. Press Ctrl+C to stop...")
 	<-done
 
+	// Log graceful shutdown
+	p.Logger.Info("") // Add newline before shutdown messages
+	p.Logger.Info("Starting graceful shutdown...")
+
+	if atomic.LoadInt32(p.ActiveJobs) > 0 {
+		p.Logger.Info("Waiting for in-progress jobs to complete...")
+		common.PrintInfof("Press Ctrl+C again to force immediate shutdown")
+
+		// Give time for any in-progress jobs to complete
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Duration(shutdownTimeoutSeconds)*time.Second)
+		defer shutdownCancel()
+
+		// Wait for any in-progress jobs
+		select {
+		case <-p.Done:
+			p.Logger.Info("All jobs completed successfully")
+		case <-shutdownCtx.Done():
+			p.Logger.Warn("Some jobs may not have completed - graceful shutdown timeout reached")
+		}
+	} else {
+		p.Logger.Info("No active jobs - shutting down immediately")
+	}
+
+	p.Logger.Info("Job scheduler stopped")
 	return nil
 }
 
@@ -196,6 +243,7 @@ var Cmd = &cobra.Command{
 
 		// Initialize the Fx application with required modules and dependencies
 		fxApp := fx.New(
+			fx.NopLogger, // Suppress Fx startup/shutdown logs
 			common.Module,
 			article.Module,
 			content.Module,
@@ -209,6 +257,10 @@ var Cmd = &cobra.Command{
 					fx.ResultTags(`name:"jobContext"`),
 				),
 				provideSources,
+				func() *int32 {
+					var jobs int32
+					return &jobs
+				},
 				fx.Annotate(
 					func(sources *sources.Sources) (string, string) {
 						// For job scheduler, we'll use the first source's indices
@@ -245,6 +297,10 @@ var Cmd = &cobra.Command{
 
 		// Start the application
 		if err := fxApp.Start(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				// Normal shutdown, don't show usage
+				return nil
+			}
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
@@ -252,7 +308,15 @@ var Cmd = &cobra.Command{
 		<-done
 
 		// Perform graceful shutdown
-		return app.GracefulShutdown(fxApp)
+		if err := app.GracefulShutdown(fxApp); err != nil {
+			if errors.Is(err, context.Canceled) {
+				// Normal shutdown, don't show usage
+				return nil
+			}
+			return err
+		}
+
+		return nil
 	},
 }
 

@@ -90,11 +90,10 @@ func WaitForSignal(ctx context.Context, cancel context.CancelFunc) (<-chan struc
 
 	go func() {
 		select {
-		case sig := <-sigChan:
-			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+		case <-sigChan:
 			cancel()
 		case <-ctx.Done():
-			common.PrintInfof("\nContext cancelled, initiating shutdown...")
+			// Context was cancelled externally
 		}
 		close(done)
 	}()
@@ -117,9 +116,16 @@ func GracefulShutdown(app Shutdowner) error {
 	stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
 	defer stopCancel()
 
-	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-		common.PrintErrorf("Error stopping application: %v", err)
-		return err
+	if err := app.Stop(stopCtx); err != nil {
+		if errors.Is(err, context.Canceled) {
+			// Normal shutdown, not an error
+			return nil
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			// Already logged in job command
+			return nil
+		}
+		return fmt.Errorf("shutdown error: %w", err)
 	}
 
 	return nil

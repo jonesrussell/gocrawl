@@ -22,6 +22,17 @@ func PrintErrorf(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 }
 
+// PrintWarnf prints a warning message in yellow.
+// This function provides visual feedback for warning conditions
+// by displaying the message in yellow text.
+//
+// Parameters:
+//   - format: The format string for the warning message
+//   - args: Optional arguments for the format string
+func PrintWarnf(format string, args ...interface{}) {
+	_, _ = fmt.Fprintf(os.Stdout, "%s %s\n", text.FgYellow.Sprint("⚠"), fmt.Sprintf(format, args...))
+}
+
 // PrintSuccessf prints a success message with a green checkmark.
 // This function provides visual feedback for successful operations
 // by prefixing the message with a green checkmark symbol.
