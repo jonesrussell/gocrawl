@@ -59,8 +59,6 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client,
 
 	log.Debug("Elasticsearch configuration",
 		"addresses", opts.Addresses,
-		"hasUsername", opts.Username != "",
-		"hasPassword", opts.Password != "",
 		"hasAPIKey", opts.APIKey != "",
 		"skipTLS", opts.SkipTLS)
 
@@ -68,19 +66,15 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client,
 		Addresses: opts.Addresses,
 	}
 
-	// Configure authentication - prefer API key over username/password
+	// Configure API key authentication
 	if opts.APIKey != "" {
 		cfg.APIKey = opts.APIKey
 		log.Debug("Using API key authentication")
-	} else if opts.Username != "" && opts.Password != "" {
-		cfg.Username = opts.Username
-		cfg.Password = opts.Password
-		log.Debug("Using username/password authentication")
 	} else {
-		log.Debug("No authentication credentials provided")
+		return nil, errors.New("API key authentication is required")
 	}
 
-	// Configure TLS if needed
+	// Configure TLS
 	if opts.Transport != nil {
 		cfg.Transport = opts.Transport
 		log.Debug("Using custom transport with TLS configuration")

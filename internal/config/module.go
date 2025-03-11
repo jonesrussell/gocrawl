@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -29,6 +30,9 @@ const (
 	DefaultReadTimeout  = 10 * time.Second
 	DefaultWriteTimeout = 30 * time.Second
 	DefaultIdleTimeout  = 60 * time.Second
+
+	// Environment types
+	envProduction = "production"
 )
 
 // config implements the Interface and holds the actual configuration values
@@ -162,32 +166,26 @@ var Module = fx.Options(
 	),
 )
 
-// New creates a new Config instance with values from Viper.
-// It handles loading configuration from files, environment variables,
-// and setting up default values. It also performs validation of the
-// configuration values.
-//
-// Returns:
-//   - Interface: The new configuration instance
-//   - error: Any error that occurred during creation
-func New() (Interface, error) {
-	// Set config defaults if not already configured
+// setupViper initializes Viper with default configuration
+func setupViper() error {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 
-	// Set default values for essential configuration
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("app.environment", "development")
 	viper.SetDefault("crawler.source_file", "sources.yml")
 
-	// Enable environment variable binding
 	viper.SetEnvPrefix("")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Map environment variables
-	if err := bindEnvs(map[string]string{
+	return bindEnvs(defaultEnvBindings())
+}
+
+// defaultEnvBindings returns the default environment variable bindings
+func defaultEnvBindings() map[string]string {
+	return map[string]string{
 		"elasticsearch.username":        "ELASTIC_USERNAME",
 		"elasticsearch.password":        "ELASTIC_PASSWORD",
 		"elasticsearch.api_key":         "ELASTIC_API_KEY",
@@ -198,27 +196,17 @@ func New() (Interface, error) {
 		"server.address":                "GOCRAWL_PORT",
 		"app.environment":               "APP_ENV",
 		"log.level":                     "LOG_LEVEL",
-	}); err != nil {
-		return nil, fmt.Errorf("failed to bind environment variables: %w", err)
 	}
+}
 
-	// Read configuration file
-	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError *viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) {
-			return nil, fmt.Errorf("config file not found: %w", err)
-		}
-		return nil, fmt.Errorf("error reading config file: %w", err)
-	}
-
-	// Parse and validate the rate limit configuration
+// createConfig creates a new config instance from Viper settings
+func createConfig() (*config, error) {
 	rateLimit, err := parseRateLimit(viper.GetString("crawler.rate_limit"))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing rate limit: %w", err)
 	}
 
-	// Create the configuration instance with values from Viper
-	cfg := &config{
+	return &config{
 		App: AppConfig{
 			Environment: viper.GetString("app.environment"),
 			Name:        viper.GetString("app.name"),
@@ -270,16 +258,59 @@ func New() (Interface, error) {
 			Debug: viper.GetBool("log.debug"),
 		},
 		Server: ServerConfig{
-			Address:      viper.GetString("server.address"),
+			Address:      fmt.Sprintf(":%s", viper.GetString("server.address")),
 			ReadTimeout:  DefaultReadTimeout,
 			WriteTimeout: DefaultWriteTimeout,
 			IdleTimeout:  DefaultIdleTimeout,
 		},
+	}, nil
+}
+
+// checkRequiredEnvVars ensures all required environment variables are set in production
+func checkRequiredEnvVars() error {
+	if os.Getenv("APP_ENV") != envProduction {
+		return nil
 	}
 
-	// Validate the configuration before returning
-	if validateErr := ValidateConfig(cfg); validateErr != nil {
-		return nil, fmt.Errorf("config validation failed: %w", validateErr)
+	required := []string{"ELASTIC_API_KEY", "GOCRAWL_PORT", "APP_ENV"}
+	for _, envVar := range required {
+		if os.Getenv(envVar) == "" {
+			return fmt.Errorf("required environment variable %s is not set", envVar)
+		}
+	}
+	return nil
+}
+
+// New creates a new Config instance with values from Viper
+func New() (Interface, error) {
+	if os.Getenv("APP_ENV") != envProduction {
+		if err := godotenv.Load(); err != nil {
+			log.Printf("Warning: Error loading .env file: %v", err)
+		}
+	}
+
+	if err := setupViper(); err != nil {
+		return nil, fmt.Errorf("failed to setup viper: %w", err)
+	}
+
+	if err := checkRequiredEnvVars(); err != nil {
+		return nil, err
+	}
+
+	if err := viper.ReadInConfig(); err != nil {
+		var configFileNotFoundError *viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundError) && os.Getenv("APP_ENV") != envProduction {
+			return nil, fmt.Errorf("config file not found: %w", err)
+		}
+	}
+
+	cfg, err := createConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ValidateConfig(cfg); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
 	return cfg, nil
