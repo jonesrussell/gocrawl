@@ -5,6 +5,7 @@
 
 # Config files with sensitive data
 config.yaml
+config.production.yaml
 !config.example.yaml
 
 # Certificates and keys
@@ -27,4 +28,3 @@ coverage/coverage.out
 app.log
 sources.yml
 gocrawl
-config.production.yaml
