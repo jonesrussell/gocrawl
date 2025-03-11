@@ -5,6 +5,7 @@ package collector
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -23,6 +24,8 @@ const (
 	requestTimeoutSeconds = 45
 	// maxRetries is the maximum number of retry attempts for failed requests.
 	maxRetries = 2
+	// maxConnections is the maximum number of concurrent connections.
+	maxConnections = 10
 )
 
 // Setup handles the setup and configuration of the collector.
@@ -72,6 +75,23 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 		colly.AllowedDomains(allowedDomains...),
 		colly.MaxBodySize(maxBodySizeMB*megabyte),
 	)
+
+	// Prevent memory leaks in long-running tasks
+	c.DisableCookies()
+
+	// Configure transport for better performance
+	transport := &http.Transport{
+		DisableKeepAlives:     true, // Prevent descriptor leaks in long-running tasks
+		MaxIdleConns:          maxConnections,
+		MaxIdleConnsPerHost:   maxConnections,
+		MaxConnsPerHost:       maxConnections,
+		IdleConnTimeout:       30 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	// Set custom transport
+	c.WithTransport(transport)
 
 	// Set request timeout
 	c.SetRequestTimeout(time.Duration(requestTimeoutSeconds) * time.Second)
