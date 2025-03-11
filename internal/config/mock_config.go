@@ -5,6 +5,11 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+const (
+	// DefaultMaxDepth is the default maximum depth for crawler configuration.
+	DefaultMaxDepth = 2
+)
+
 // MockConfig is a mock implementation of the Interface for testing.
 type MockConfig struct {
 	mock.Mock
@@ -16,7 +21,7 @@ func NewMockConfig() *MockConfig {
 
 	// Set up default values
 	m.On("GetCrawlerConfig").Return(&CrawlerConfig{
-		MaxDepth:    2,
+		MaxDepth:    DefaultMaxDepth,
 		Parallelism: 1,
 	})
 
