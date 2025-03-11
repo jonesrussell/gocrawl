@@ -134,6 +134,11 @@ func startJob(p Params) error {
 	return nil
 }
 
+// provideSources creates a new Sources instance from the sources.yml file.
+func provideSources() (*sources.Sources, error) {
+	return sources.LoadFromFile("sources.yml")
+}
+
 // Cmd represents the job scheduler command.
 var Cmd = &cobra.Command{
 	Use:   "job",
@@ -161,6 +166,7 @@ var Cmd = &cobra.Command{
 					},
 					fx.ResultTags(`name:"jobContext"`),
 				),
+				provideSources,
 			),
 			fx.Invoke(startJob),
 		)
