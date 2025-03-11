@@ -23,6 +23,12 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// DefaultChannelBufferSize is the default size for buffered channels used for
+	// processing articles and content during crawling.
+	DefaultChannelBufferSize = 100
+)
+
 // Params holds the dependencies required for the job scheduler.
 type Params struct {
 	fx.In
@@ -251,6 +257,19 @@ var Cmd = &cobra.Command{
 					},
 					fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
 				),
+				fx.Annotate(
+					func(sources *sources.Sources) string {
+						// For job scheduler, we'll use the first source's name
+						if len(sources.Sources) > 0 {
+							return sources.Sources[0].Name
+						}
+						return "default" // Default source name if no sources
+					},
+					fx.ResultTags(`name:"sourceName"`),
+				),
+				func() chan *models.Article {
+					return make(chan *models.Article, DefaultChannelBufferSize)
+				},
 			),
 			fx.Invoke(startJob),
 		)
