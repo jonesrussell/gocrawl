@@ -22,10 +22,10 @@ elasticsearch:
 
 crawler:
   max_depth: 2
-  rate_limit: "2s"     # Added quotes to ensure proper string parsing
+  rate_limit: "2s"
   parallelism: 2
-  random_delay: "5s"   # Added quotes to ensure proper string parsing
-  source_file: "sources.yml"  # Added default source file
+  random_delay: "5s"
+  source_file: "sources.yml"
 
 log:
   level: info  # Can be overridden by LOG_LEVEL env var
