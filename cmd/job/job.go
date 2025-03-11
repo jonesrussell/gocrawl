@@ -25,7 +25,7 @@ import (
 
 const (
 	// shutdownTimeoutSeconds is the number of seconds to wait for jobs to complete during shutdown
-	shutdownTimeoutSeconds = 10
+	shutdownTimeoutSeconds = 30
 )
 
 // Params holds the dependencies required for the job scheduler.
@@ -209,7 +209,8 @@ func startJob(p Params) error {
 		common.PrintInfof("Press Ctrl+C again to force immediate shutdown")
 
 		// Give time for any in-progress jobs to complete
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Duration(shutdownTimeoutSeconds)*time.Second)
+		timeout := time.Duration(shutdownTimeoutSeconds) * time.Second
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), timeout)
 		defer shutdownCancel()
 
 		// Wait for any in-progress jobs

@@ -7,8 +7,22 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gocolly/colly/v2"
+)
+
+const (
+	// kilobyte represents 1024 bytes.
+	kilobyte = 1024
+	// megabyte represents 1024 kilobytes.
+	megabyte = 1024 * kilobyte
+	// maxBodySizeMB is the maximum size in megabytes for response bodies.
+	maxBodySizeMB = 10
+	// requestTimeoutSeconds is the number of seconds to wait for a response.
+	requestTimeoutSeconds = 45
+	// maxRetries is the maximum number of retry attempts for failed requests.
+	maxRetries = 2
 )
 
 // Setup handles the setup and configuration of the collector.
@@ -38,6 +52,7 @@ func NewSetup(config *Config) *Setup {
 // - Asynchronous operation
 // - Maximum depth limit
 // - Domain restrictions
+// - Request timeouts and retries
 //
 // Parameters:
 //   - domain: The domain to restrict crawling to
@@ -51,11 +66,69 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 		allowedDomains = []string{domain}
 	}
 
-	return colly.NewCollector(
+	c := colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(s.config.MaxDepth),
 		colly.AllowedDomains(allowedDomains...),
+		colly.MaxBodySize(maxBodySizeMB*megabyte),
 	)
+
+	// Set request timeout
+	c.SetRequestTimeout(time.Duration(requestTimeoutSeconds) * time.Second)
+
+	// Track retry attempts per URL
+	retryCount := make(map[string]int)
+
+	// Configure retries for common errors
+	c.OnError(func(r *colly.Response, err error) {
+		if r == nil {
+			s.config.Logger.Error("Request failed",
+				"error", err,
+				"domain", domain)
+			return
+		}
+
+		url := r.Request.URL.String()
+		count := retryCount[url]
+
+		// Retry on timeout, temporary network errors, and 5xx server errors
+		if (strings.Contains(err.Error(), "timeout") ||
+			strings.Contains(err.Error(), "temporary") ||
+			strings.Contains(err.Error(), "TLS handshake") ||
+			strings.Contains(err.Error(), "connection refused") ||
+			(r.StatusCode >= 500 && r.StatusCode < 600)) && count < maxRetries {
+
+			retryCount[url] = count + 1
+			s.config.Logger.Warn("Retrying request",
+				"url", url,
+				"attempt", count+1,
+				"max_attempts", maxRetries,
+				"status_code", r.StatusCode,
+				"error", err)
+
+			// Add exponential backoff
+			time.Sleep(time.Duration(count+1) * 2 * time.Second)
+
+			retryErr := r.Request.Retry()
+			if retryErr != nil {
+				s.config.Logger.Error("Retry failed",
+					"url", url,
+					"attempt", count+1,
+					"error", retryErr)
+			}
+		} else if count >= maxRetries {
+			s.config.Logger.Error("Max retries exceeded",
+				"url", url,
+				"max_attempts", maxRetries,
+				"error", err)
+		} else {
+			s.config.Logger.Error("Non-retryable error",
+				"url", url,
+				"error", err)
+		}
+	})
+
+	return c
 }
 
 // ConfigureCollector sets up the collector with all necessary settings.
