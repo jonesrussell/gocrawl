@@ -7,6 +7,18 @@ import (
 	"go.uber.org/fx"
 )
 
+// Interface defines the interface for managing web content sources.
+type Interface interface {
+	// FindByName finds a source by its name.
+	FindByName(name string) (*Config, error)
+
+	// Validate checks if a source configuration is valid.
+	Validate(source *Config) error
+
+	// GetSources returns all available sources.
+	GetSources() []Config
+}
+
 // Module provides the sources module and its dependencies.
 var Module = fx.Module("sources",
 	fx.Provide(
@@ -25,7 +37,7 @@ type Params struct {
 type Result struct {
 	fx.Out
 
-	Sources *Sources
+	Sources Interface `name:"sourceManager"`
 }
 
 // provideSourceConfig creates a new Sources instance from configuration.

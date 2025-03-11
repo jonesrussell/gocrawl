@@ -62,7 +62,7 @@ type SelectorConfig struct {
 
 // Sources manages web content source configurations.
 type Sources struct {
-	Sources []Config `yaml:"sources"`
+	sources []Config `yaml:"sources"`
 }
 
 // LoadFromFile loads source configurations from a YAML file.
@@ -80,12 +80,15 @@ func LoadFromFile(path string) (*Sources, error) {
 		return nil, fmt.Errorf("failed to read sources file: %w", err)
 	}
 
-	var sources Sources
-	if unmarshalErr := yaml.Unmarshal(data, &sources); unmarshalErr != nil {
+	// First unmarshal into a temporary struct to handle the YAML structure
+	var temp struct {
+		Sources []Config `yaml:"sources"`
+	}
+	if unmarshalErr := yaml.Unmarshal(data, &temp); unmarshalErr != nil {
 		return nil, fmt.Errorf("failed to unmarshal sources: %w", unmarshalErr)
 	}
 
-	return &sources, nil
+	return &Sources{sources: temp.Sources}, nil
 }
 
 // FindByName finds a source by its name.
@@ -98,12 +101,17 @@ func LoadFromFile(path string) (*Sources, error) {
 //   - *Config: The found source configuration
 //   - error: Any error that occurred during the search
 func (s *Sources) FindByName(name string) (*Config, error) {
-	for _, source := range s.Sources {
+	for _, source := range s.sources {
 		if source.Name == name {
 			return &source, nil
 		}
 	}
 	return nil, fmt.Errorf("no source found with name: %s", name)
+}
+
+// GetSources returns all available sources.
+func (s *Sources) GetSources() []Config {
+	return s.sources
 }
 
 // Validate checks if a source configuration is valid.
@@ -136,4 +144,9 @@ func (s *Sources) Validate(source *Config) error {
 	}
 
 	return nil
+}
+
+// SetSources sets the sources list. This is primarily used for testing.
+func (s *Sources) SetSources(sources []Config) {
+	s.sources = sources
 }
