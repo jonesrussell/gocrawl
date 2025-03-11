@@ -32,7 +32,16 @@ const (
 	tlsTimeoutSeconds = 10
 	// expectContinueTimeoutSeconds is the timeout for expect-continue handshake.
 	expectContinueTimeoutSeconds = 1
+	// backoffMultiplier is the multiplier for exponential backoff.
+	backoffMultiplier = 2
 )
+
+// Logger defines the interface for logging operations
+type Logger interface {
+	Info(msg string, keysAndValues ...interface{})
+	Error(msg string, keysAndValues ...interface{})
+	Warn(msg string, keysAndValues ...interface{})
+}
 
 // Setup handles the setup and configuration of the collector.
 // It manages the creation and configuration of the Colly collector instance,
@@ -56,6 +65,66 @@ func NewSetup(config *Config) *Setup {
 	}
 }
 
+// handleRetry handles retry logic for failed requests
+func (s *Setup) handleRetry(
+	c *colly.Collector,
+	r *colly.Response,
+	err error,
+	url string,
+	count int,
+	retryCount map[string]int,
+) {
+	retryCount[url] = count + 1
+	s.config.Logger.Warn("Retrying request",
+		"url", url,
+		"attempt", count+1,
+		"max_attempts", maxRetries,
+		"status_code", getStatusCode(r),
+		"error", err)
+
+	// Add exponential backoff
+	backoff := time.Duration(count+1) * backoffMultiplier * time.Second
+	time.Sleep(backoff)
+
+	var retryErr error
+	if r != nil {
+		retryErr = r.Request.Retry()
+	} else {
+		retryErr = c.Visit(url)
+	}
+
+	if retryErr != nil {
+		s.config.Logger.Error("Retry failed",
+			"url", url,
+			"attempt", count+1,
+			"error", retryErr)
+	}
+}
+
+// extractURLFromError attempts to extract a URL from an error message
+func extractURLFromError(err error, domain string, logger Logger) (string, bool) {
+	errStr := err.Error()
+	start := strings.Index(errStr, "\"")
+	end := strings.LastIndex(errStr, "\"")
+	if start != -1 && end != -1 && end > start {
+		return errStr[start+1 : end], true
+	}
+	logger.Error("Request failed with nil response",
+		"error", err,
+		"domain", domain)
+	return "", false
+}
+
+// shouldRetry determines if a request should be retried
+func shouldRetry(r *colly.Response, err error, count int) bool {
+	return (strings.Contains(err.Error(), "timeout") ||
+		strings.Contains(err.Error(), "deadline exceeded") ||
+		strings.Contains(err.Error(), "temporary") ||
+		strings.Contains(err.Error(), "TLS handshake") ||
+		strings.Contains(err.Error(), "connection refused") ||
+		(r != nil && r.StatusCode >= 500 && r.StatusCode < 600)) && count < maxRetries
+}
+
 // CreateBaseCollector creates a new collector with base configuration.
 // It sets up the collector with basic settings including:
 // - Asynchronous operation
@@ -69,7 +138,6 @@ func NewSetup(config *Config) *Setup {
 // Returns:
 //   - *colly.Collector: The configured collector instance
 func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
-	// If allowed domains are specified, use those, otherwise restrict to the base domain
 	allowedDomains := s.config.AllowedDomains
 	if len(allowedDomains) == 0 {
 		allowedDomains = []string{domain}
@@ -82,12 +150,10 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 		colly.MaxBodySize(maxBodySizeMB*megabyte),
 	)
 
-	// Prevent memory leaks in long-running tasks
 	c.DisableCookies()
 
-	// Configure transport for better performance
 	transport := &http.Transport{
-		DisableKeepAlives:     true, // Prevent descriptor leaks in long-running tasks
+		DisableKeepAlives:     true,
 		MaxIdleConns:          maxConnections,
 		MaxIdleConnsPerHost:   maxConnections,
 		MaxConnsPerHost:       maxConnections,
@@ -96,56 +162,29 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 		ExpectContinueTimeout: time.Duration(expectContinueTimeoutSeconds) * time.Second,
 	}
 
-	// Set custom transport
 	c.WithTransport(transport)
-
-	// Set request timeout
 	c.SetRequestTimeout(time.Duration(requestTimeoutSeconds) * time.Second)
 
-	// Track retry attempts per URL
 	retryCount := make(map[string]int)
 
-	// Configure retries for common errors
 	c.OnError(func(r *colly.Response, err error) {
-		if r == nil {
-			s.config.Logger.Error("Request failed",
-				"error", err,
-				"domain", domain)
-			return
+		var url string
+		if r != nil {
+			url = r.Request.URL.String()
+		} else if err != nil {
+			var ok bool
+			if url, ok = extractURLFromError(err, domain, s.config.Logger); !ok {
+				return
+			}
 		}
 
-		url := r.Request.URL.String()
 		count := retryCount[url]
-
-		// Retry on timeout, temporary network errors, and 5xx server errors
-		if (strings.Contains(err.Error(), "timeout") ||
-			strings.Contains(err.Error(), "temporary") ||
-			strings.Contains(err.Error(), "TLS handshake") ||
-			strings.Contains(err.Error(), "connection refused") ||
-			(r.StatusCode >= 500 && r.StatusCode < 600)) && count < maxRetries {
-			retryCount[url] = count + 1
-			s.config.Logger.Warn("Retrying request",
-				"url", url,
-				"attempt", count+1,
-				"max_attempts", maxRetries,
-				"status_code", r.StatusCode,
-				"error", err)
-
-			// Add exponential backoff
-			time.Sleep(time.Duration(count+1) * 2 * time.Second)
-
-			retryErr := r.Request.Retry()
-			if retryErr != nil {
-				s.config.Logger.Error("Retry failed",
-					"url", url,
-					"attempt", count+1,
-					"error", retryErr)
-			}
+		if shouldRetry(r, err, count) {
+			s.handleRetry(c, r, err, url, count, retryCount)
 		} else {
-			// Consolidate error logging
 			s.config.Logger.Error("Request error",
 				"url", url,
-				"status_code", r.StatusCode,
+				"status_code", getStatusCode(r),
 				"error", err,
 				"retries", count,
 				"max_retries", maxRetries)
@@ -208,4 +247,12 @@ func (s *Setup) ValidateURL() error {
 		return fmt.Errorf("invalid base URL: %s, must be a valid HTTP/HTTPS URL", s.config.BaseURL)
 	}
 	return nil
+}
+
+// getStatusCode safely returns the status code from a response
+func getStatusCode(r *colly.Response) int {
+	if r != nil {
+		return r.StatusCode
+	}
+	return 0
 }
