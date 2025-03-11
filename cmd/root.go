@@ -6,11 +6,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
+	httpdcmd "github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/indices"
+	jobcmd "github.com/jonesrussell/gocrawl/cmd/job"
+	"github.com/jonesrussell/gocrawl/cmd/search"
 	"github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -68,15 +72,24 @@ func Execute() {
 // init initializes the root command and its subcommands.
 // It sets up:
 // - The persistent --config flag for specifying the configuration file
-// - Adds the indices subcommand for managing Elasticsearch indices
-// - Adds the sources subcommand for managing web content sources
-// - Adds the crawl subcommand for crawling web content
+// - Adds all subcommands for managing different aspects of the crawler:
+//   - indices: For managing Elasticsearch indices
+//   - sources: For managing web content sources
+//   - crawl: For crawling web content
+//   - httpd: For running the HTTP server
+//   - job: For managing scheduled crawl jobs
+//   - search: For searching content in Elasticsearch
 func init() {
 	// Add the persistent --config flag to all commands
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
 
 	// Add subcommands for managing different aspects of the crawler
-	rootCmd.AddCommand(indices.Command())  // For managing Elasticsearch indices
-	rootCmd.AddCommand(sources.Command())  // For managing web content sources
-	rootCmd.AddCommand(crawlcmd.Command()) // For crawling web content
+	rootCmd.AddCommand(
+		indices.Command(),  // For managing Elasticsearch indices
+		sources.Command(),  // For managing web content sources
+		crawlcmd.Command(), // For crawling web content
+		httpdcmd.Command(), // For running the HTTP server
+		jobcmd.Command(),   // For managing scheduled crawl jobs
+		search.Command(),   // For searching content in Elasticsearch
+	)
 }
