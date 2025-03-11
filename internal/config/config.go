@@ -14,6 +14,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Constants for default configuration values
+const (
+	defaultRateLimit = 2 * time.Second
+)
+
 // Error definitions for configuration-related errors
 var (
 	// ErrMissingElasticURL is returned when the Elasticsearch URL is not provided
@@ -238,6 +243,7 @@ var _ Interface = (*Config)(nil)
 
 // parseRateLimit parses the rate limit duration from a string.
 // It converts a string duration (e.g., "1s", "500ms") into a time.Duration.
+// If the rate limit string is empty, it returns the default rate limit.
 //
 // Parameters:
 //   - rateLimitStr: The rate limit as a string
@@ -247,13 +253,9 @@ var _ Interface = (*Config)(nil)
 //   - error: Any error that occurred during parsing
 func parseRateLimit(rateLimitStr string) (time.Duration, error) {
 	if rateLimitStr == "" {
-		return time.Second, errors.New("rate limit cannot be empty")
+		return defaultRateLimit, nil
 	}
-	rateLimit, err := time.ParseDuration(rateLimitStr)
-	if err != nil {
-		return time.Second, errors.New("error parsing duration")
-	}
-	return rateLimit, nil
+	return time.ParseDuration(rateLimitStr)
 }
 
 // NewHTTPTransport creates a new HTTP transport.
