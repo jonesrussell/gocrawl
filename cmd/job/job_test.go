@@ -2,11 +2,13 @@
 package job_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/job"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -142,10 +144,24 @@ func TestJobCommand(t *testing.T) {
 
 	// Create a test app with all necessary dependencies
 	app := fxtest.New(t,
+		job.Module,
 		fx.Provide(
 			func() logger.Interface { return mockLogger },
 			func() *sources.Sources { return testSources },
 			func() config.Interface { return mockCfg },
+			func() crawler.Interface { return &mockCrawler{} },
+			// Provide the jobContext
+			fx.Annotate(
+				func(t *testing.T) context.Context { return t.Context() },
+				fx.ResultTags(`name:"jobContext"`),
+			),
+			// Provide the crawlDone channel
+			fx.Annotate(
+				func() chan struct{} {
+					return make(chan struct{})
+				},
+				fx.ResultTags(`name:"crawlDone"`),
+			),
 		),
 		fx.Invoke(func(p job.Params) {
 			startJobScheduler := func(cmd *cobra.Command, _ []string) {

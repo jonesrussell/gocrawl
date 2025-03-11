@@ -46,37 +46,61 @@ func NewMockConfig() *MockConfig {
 // GetCrawlerConfig implements Interface.
 func (m *MockConfig) GetCrawlerConfig() *CrawlerConfig {
 	args := m.Called()
-	return args.Get(0).(*CrawlerConfig)
+	result, ok := args.Get(0).(*CrawlerConfig)
+	if !ok {
+		return &CrawlerConfig{}
+	}
+	return result
 }
 
 // GetElasticsearchConfig implements Interface.
 func (m *MockConfig) GetElasticsearchConfig() *ElasticsearchConfig {
 	args := m.Called()
-	return args.Get(0).(*ElasticsearchConfig)
+	result, ok := args.Get(0).(*ElasticsearchConfig)
+	if !ok {
+		return &ElasticsearchConfig{}
+	}
+	return result
 }
 
 // GetLogConfig implements Interface.
 func (m *MockConfig) GetLogConfig() *LogConfig {
 	args := m.Called()
-	return args.Get(0).(*LogConfig)
+	result, ok := args.Get(0).(*LogConfig)
+	if !ok {
+		return &LogConfig{}
+	}
+	return result
 }
 
 // GetAppConfig implements Interface.
 func (m *MockConfig) GetAppConfig() *AppConfig {
 	args := m.Called()
-	return args.Get(0).(*AppConfig)
+	result, ok := args.Get(0).(*AppConfig)
+	if !ok {
+		return &AppConfig{}
+	}
+	return result
 }
 
 // GetSources implements Interface.
 func (m *MockConfig) GetSources() []Source {
 	args := m.Called()
-	return args.Get(0).([]Source)
+	result, ok := args.Get(0).([]Source)
+	if !ok {
+		return []Source{}
+	}
+	return result
 }
 
 // GetServerConfig implements Interface.
 func (m *MockConfig) GetServerConfig() *ServerConfig {
 	args := m.Called()
-	return args.Get(0).(*ServerConfig)
+	result, ok := args.Get(0).(*ServerConfig)
+	if !ok {
+		return &ServerConfig{}
+	}
+	return result
 }
 
 // WithSources sets up the mock to return the specified sources.

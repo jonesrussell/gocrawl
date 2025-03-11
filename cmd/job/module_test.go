@@ -34,16 +34,16 @@ func (m *mockCrawler) Subscribe(_ events.Handler)              {}
 // mockLogger is a mock implementation of logger.Interface for testing
 type mockLogger struct{}
 
-func (m *mockLogger) Debug(msg string, args ...interface{})     {}
-func (m *mockLogger) Info(msg string, args ...interface{})      {}
-func (m *mockLogger) Warn(msg string, args ...interface{})      {}
-func (m *mockLogger) Error(msg string, args ...interface{})     {}
-func (m *mockLogger) Fatal(msg string, args ...interface{})     {}
-func (m *mockLogger) Panic(msg string, args ...interface{})     {}
-func (m *mockLogger) With(args ...interface{}) logger.Interface { return m }
-func (m *mockLogger) Errorf(format string, args ...interface{}) {}
-func (m *mockLogger) Printf(format string, args ...interface{}) {}
-func (m *mockLogger) Sync() error                               { return nil }
+func (m *mockLogger) Debug(_ string, _ ...interface{})       {}
+func (m *mockLogger) Info(_ string, _ ...interface{})        {}
+func (m *mockLogger) Warn(_ string, _ ...interface{})        {}
+func (m *mockLogger) Error(_ string, _ ...interface{})       {}
+func (m *mockLogger) Fatal(_ string, _ ...interface{})       {}
+func (m *mockLogger) Panic(_ string, _ ...interface{})       {}
+func (m *mockLogger) With(_ ...interface{}) logger.Interface { return m }
+func (m *mockLogger) Errorf(_ string, _ ...interface{})      {}
+func (m *mockLogger) Printf(_ string, _ ...interface{})      {}
+func (m *mockLogger) Sync() error                            { return nil }
 
 // mockConfig is a mock implementation of config.Interface for testing
 type mockConfig struct{}
@@ -71,9 +71,7 @@ func TestModuleProvides(t *testing.T) {
 			func() crawler.Interface { return &mockCrawler{} },
 			// Provide the jobContext
 			fx.Annotate(
-				func() context.Context {
-					return context.Background()
-				},
+				func(t *testing.T) context.Context { return t.Context() },
 				fx.ResultTags(`name:"jobContext"`),
 			),
 			// Provide the crawlDone channel
@@ -106,9 +104,7 @@ func TestModuleConfiguration(t *testing.T) {
 			func() crawler.Interface { return &mockCrawler{} },
 			// Provide the jobContext
 			fx.Annotate(
-				func() context.Context {
-					return context.Background()
-				},
+				func(t *testing.T) context.Context { return t.Context() },
 				fx.ResultTags(`name:"jobContext"`),
 			),
 			// Provide the crawlDone channel
