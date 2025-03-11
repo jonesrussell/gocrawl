@@ -79,6 +79,11 @@ func validateDeleteArgs(_ *cobra.Command, args []string) error {
 	return nil
 }
 
+// provideSources creates a new Sources instance from the sources.yml file.
+func provideSources() (*sources.Sources, error) {
+	return sources.LoadFromFile("sources.yml")
+}
+
 // runDelete executes the delete command and removes the specified indices.
 // It:
 // - Sets up signal handling for graceful shutdown
@@ -101,6 +106,9 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	app := fx.New(
 		common.Module,
 		Module,
+		fx.Provide(
+			provideSources,
+		),
 		fx.Invoke(func(lc fx.Lifecycle, storage common.Storage, sources *sources.Sources, l common.Logger) {
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
