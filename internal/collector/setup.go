@@ -136,15 +136,14 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 					"attempt", count+1,
 					"error", retryErr)
 			}
-		} else if count >= maxRetries {
-			s.config.Logger.Error("Max retries exceeded",
-				"url", url,
-				"max_attempts", maxRetries,
-				"error", err)
 		} else {
-			s.config.Logger.Error("Non-retryable error",
+			// Consolidate error logging
+			s.config.Logger.Error("Request error",
 				"url", url,
-				"error", err)
+				"status_code", r.StatusCode,
+				"error", err,
+				"retries", count,
+				"max_retries", maxRetries)
 		}
 	})
 
