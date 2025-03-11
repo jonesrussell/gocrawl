@@ -168,19 +168,44 @@ var Module = fx.Options(
 
 // setupViper initializes Viper with default configuration
 func setupViper() error {
+	// Set default configuration name and type
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 
+	// Set default values
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("app.environment", "development")
 	viper.SetDefault("crawler.source_file", "sources.yml")
+	viper.SetDefault("elasticsearch.addresses", []string{"https://es.streetcode.net"})
 
+	// Configure environment variable handling
 	viper.SetEnvPrefix("")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	return bindEnvs(defaultEnvBindings())
+	// Bind environment variables
+	if err := bindEnvs(defaultEnvBindings()); err != nil {
+		return fmt.Errorf("failed to bind environment variables: %w", err)
+	}
+
+	// If a specific config file is provided via flag, use it
+	if cfgFile := viper.GetString("config"); cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	}
+
+	// Read the configuration file
+	if err := viper.ReadInConfig(); err != nil {
+		var configFileNotFoundError *viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundError) && os.Getenv("APP_ENV") != envProduction {
+			return fmt.Errorf("config file not found: %w", err)
+		}
+		if !errors.As(err, &configFileNotFoundError) {
+			return fmt.Errorf("error reading config file: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // defaultEnvBindings returns the default environment variable bindings
@@ -283,34 +308,37 @@ func checkRequiredEnvVars() error {
 
 // New creates a new Config instance with values from Viper
 func New() (Interface, error) {
+	// Load .env file only in development environment
 	if os.Getenv("APP_ENV") != envProduction {
 		if err := godotenv.Load(); err != nil {
 			log.Printf("Warning: Error loading .env file: %v", err)
 		}
 	}
 
-	if err := setupViper(); err != nil {
-		return nil, fmt.Errorf("failed to setup viper: %w", err)
+	// Set up Viper configuration
+	if setupErr := setupViper(); setupErr != nil {
+		return nil, fmt.Errorf("failed to setup viper: %w", setupErr)
 	}
 
-	if err := checkRequiredEnvVars(); err != nil {
-		return nil, err
+	// Check required environment variables in production
+	if envErr := checkRequiredEnvVars(); envErr != nil {
+		return nil, envErr
 	}
 
-	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError *viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) && os.Getenv("APP_ENV") != envProduction {
-			return nil, fmt.Errorf("config file not found: %w", err)
-		}
+	// Create configuration from Viper settings
+	cfg, configErr := createConfig()
+	if configErr != nil {
+		return nil, configErr
 	}
 
-	cfg, err := createConfig()
-	if err != nil {
-		return nil, err
+	// Override Elasticsearch addresses from environment if provided
+	if addresses := viper.GetStringSlice("elasticsearch.addresses"); len(addresses) > 0 {
+		cfg.Elasticsearch.Addresses = addresses
 	}
 
-	if err := ValidateConfig(cfg); err != nil {
-		return nil, fmt.Errorf("config validation failed: %w", err)
+	// Validate the configuration
+	if validateErr := ValidateConfig(cfg); validateErr != nil {
+		return nil, fmt.Errorf("config validation failed: %w", validateErr)
 	}
 
 	return cfg, nil
