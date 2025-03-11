@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
@@ -69,15 +71,29 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client,
 		"addresses", opts.Addresses,
 		"hasAPIKey", opts.APIKey != "")
 
-	// #nosec G402 -- InsecureSkipVerify is intentionally set for development/testing
 	transport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		return nil, errors.New("failed to get default transport")
 	}
 
 	clonedTransport := transport.Clone()
-	clonedTransport.TLSClientConfig = &tls.Config{
-		InsecureSkipVerify: true, // #nosec G402 -- InsecureSkipVerify is intentionally set for development/testing
+
+	// Check if TLS verification should be skipped based on environment variable
+	skipTLS := false
+	if skipTLSStr := os.Getenv("ELASTIC_SKIP_TLS"); skipTLSStr != "" {
+		var err error
+		skipTLS, err = strconv.ParseBool(skipTLSStr)
+		if err != nil {
+			log.Warn("Invalid ELASTIC_SKIP_TLS value, defaulting to false", "value", skipTLSStr)
+		}
+	}
+
+	if skipTLS {
+		// #nosec G402 -- InsecureSkipVerify is controlled by ELASTIC_SKIP_TLS environment variable
+		clonedTransport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+		log.Warn("TLS certificate verification is disabled")
 	}
 
 	cfg := es.Config{
