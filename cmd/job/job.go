@@ -103,16 +103,16 @@ func executeCrawl(ctx context.Context, log common.Logger, c crawler.Interface, s
 		return
 	}
 
-	if err := configureCrawler(c, source, collectorResult); err != nil {
+	if configErr := configureCrawler(c, source, collectorResult); configErr != nil {
 		log.Error("Error configuring crawler",
-			"error", err,
+			"error", configErr,
 			"source", source.Name)
 		return
 	}
 
-	if err := c.Start(ctx, source.URL); err != nil {
+	if startErr := c.Start(ctx, source.URL); startErr != nil {
 		log.Error("Error starting crawler",
-			"error", err,
+			"error", startErr,
 			"source", source.Name)
 		return
 	}
