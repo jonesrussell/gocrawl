@@ -293,12 +293,20 @@ func createConfig() (*config, error) {
 			Debug: viper.GetBool("log.debug"),
 		},
 		Server: ServerConfig{
-			Address:      fmt.Sprintf(":%s", viper.GetString("server.address")),
+			Address:      getServerAddress(),
 			ReadTimeout:  DefaultReadTimeout,
 			WriteTimeout: DefaultWriteTimeout,
 			IdleTimeout:  DefaultIdleTimeout,
 		},
 	}, nil
+}
+
+// getServerAddress returns the server address with port, using default if not set
+func getServerAddress() string {
+	if port := viper.GetString("server.address"); port != "" {
+		return fmt.Sprintf(":%s", port)
+	}
+	return ":8080"
 }
 
 // checkRequiredEnvVars ensures all required environment variables are set in production
@@ -307,7 +315,7 @@ func checkRequiredEnvVars() error {
 		return nil
 	}
 
-	required := []string{"ELASTIC_API_KEY", "GOCRAWL_PORT", "APP_ENV"}
+	required := []string{"ELASTIC_API_KEY", "APP_ENV"}
 	for _, envVar := range required {
 		if os.Getenv(envVar) == "" {
 			return fmt.Errorf("required environment variable %s is not set", envVar)
