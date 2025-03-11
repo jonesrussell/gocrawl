@@ -5,8 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -53,6 +55,9 @@ type Params struct {
 
 	// Processors is a slice of content processors, injected as a group
 	Processors []models.ContentProcessor `group:"processors"`
+
+	// Done is a channel that signals when the crawl operation is complete
+	Done chan struct{} `name:"crawlDone"`
 }
 
 // runScheduler manages the execution of scheduled jobs.
@@ -62,6 +67,8 @@ func runScheduler(
 	sources *sources.Sources,
 	c crawler.Interface,
 	processors []models.ContentProcessor,
+	done chan struct{},
+	cfg config.Interface,
 ) {
 	log.Info("Starting job scheduler")
 
@@ -70,7 +77,7 @@ func runScheduler(
 	defer ticker.Stop()
 
 	// Do initial check
-	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors)
+	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg)
 
 	for {
 		select {
@@ -78,7 +85,7 @@ func runScheduler(
 			log.Info("Job scheduler shutting down")
 			return
 		case t := <-ticker.C:
-			checkAndRunJobs(ctx, log, sources, c, t, processors)
+			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg)
 		}
 	}
 }
@@ -89,10 +96,37 @@ func setupCollector(
 	log common.Logger,
 	source sources.Config,
 	processors []models.ContentProcessor,
+	done chan struct{},
+	cfg config.Interface,
 ) (collector.Result, error) {
 	rateLimit, err := time.ParseDuration(source.RateLimit)
 	if err != nil {
 		return collector.Result{}, fmt.Errorf("invalid rate limit format: %w", err)
+	}
+
+	// Convert source config to the expected type
+	sourceConfig := convertSourceConfig(&source)
+	if sourceConfig == nil {
+		return collector.Result{}, errors.New("source configuration is nil")
+	}
+
+	// Extract domain from source URL
+	parsedURL, err := url.Parse(source.URL)
+	if err != nil {
+		return collector.Result{}, fmt.Errorf("invalid source URL: %w", err)
+	}
+
+	// Extract domain from URL, handling both full URLs and path-only URLs
+	var domain string
+	if parsedURL.Host == "" {
+		// If no host in URL, treat the first path segment as the domain
+		parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+		if len(parts) > 0 {
+			domain = parts[0]
+		}
+	} else {
+		// For full URLs, use the host as domain
+		domain = parsedURL.Host
 	}
 
 	return collector.New(collector.Params{
@@ -103,7 +137,63 @@ func setupCollector(
 		Context:          ctx,
 		ArticleProcessor: processors[0], // First processor handles articles
 		ContentProcessor: processors[1], // Second processor handles content
+		Done:             done,
+		Debugger:         logger.NewCollyDebugger(log),
+		Source:           sourceConfig,
+		Parallelism:      cfg.GetCrawlerConfig().Parallelism,
+		RandomDelay:      cfg.GetCrawlerConfig().RandomDelay,
+		AllowedDomains:   []string{domain},
 	})
+}
+
+// convertSourceConfig converts a sources.Config to a config.Source.
+// It handles the conversion of fields between the two types.
+func convertSourceConfig(source *sources.Config) *config.Source {
+	if source == nil {
+		return nil
+	}
+
+	// Parse the rate limit string into a duration
+	rateLimit, err := config.ParseRateLimit(source.RateLimit)
+	if err != nil {
+		rateLimit = time.Second // Default to 1 second if parsing fails
+	}
+
+	return &config.Source{
+		Name:         source.Name,
+		URL:          source.URL,
+		ArticleIndex: source.ArticleIndex,
+		Index:        source.Index,
+		RateLimit:    rateLimit,
+		MaxDepth:     source.MaxDepth,
+		Time:         source.Time,
+		Selectors: config.SourceSelectors{
+			Article: config.ArticleSelectors{
+				Container:     source.Selectors.Article.Container,
+				Title:         source.Selectors.Article.Title,
+				Body:          source.Selectors.Article.Body,
+				Intro:         source.Selectors.Article.Intro,
+				Byline:        source.Selectors.Article.Byline,
+				PublishedTime: source.Selectors.Article.PublishedTime,
+				TimeAgo:       source.Selectors.Article.TimeAgo,
+				JSONLD:        source.Selectors.Article.JSONLd,
+				Section:       source.Selectors.Article.Section,
+				Keywords:      source.Selectors.Article.Keywords,
+				Description:   source.Selectors.Article.Description,
+				OGTitle:       source.Selectors.Article.OgTitle,
+				OGDescription: source.Selectors.Article.OgDescription,
+				OGImage:       source.Selectors.Article.OgImage,
+				OgURL:         source.Selectors.Article.OgURL,
+				Canonical:     source.Selectors.Article.Canonical,
+				WordCount:     source.Selectors.Article.WordCount,
+				PublishDate:   source.Selectors.Article.PublishDate,
+				Category:      source.Selectors.Article.Category,
+				Tags:          source.Selectors.Article.Tags,
+				Author:        source.Selectors.Article.Author,
+				BylineName:    source.Selectors.Article.BylineName,
+			},
+		},
+	}
 }
 
 // configureCrawler sets up the crawler with the given source configuration.
@@ -123,8 +213,10 @@ func executeCrawl(
 	c crawler.Interface,
 	source sources.Config,
 	processors []models.ContentProcessor,
+	done chan struct{},
+	cfg config.Interface,
 ) {
-	collectorResult, err := setupCollector(ctx, log, source, processors)
+	collectorResult, err := setupCollector(ctx, log, source, processors, done, cfg)
 	if err != nil {
 		log.Error("Error setting up collector",
 			"error", err,
@@ -158,6 +250,8 @@ func checkAndRunJobs(
 	c crawler.Interface,
 	now time.Time,
 	processors []models.ContentProcessor,
+	done chan struct{},
+	cfg config.Interface,
 ) {
 	if sources == nil {
 		log.Error("Sources configuration is nil")
@@ -178,7 +272,7 @@ func checkAndRunJobs(
 				log.Info("Running scheduled crawl",
 					"source", source.Name,
 					"time", scheduledTime)
-				executeCrawl(ctx, log, c, source, processors)
+				executeCrawl(ctx, log, c, source, processors, done, cfg)
 			}
 		}
 	}
@@ -201,7 +295,7 @@ func startJob(p Params) error {
 	}
 
 	// Start scheduler in background
-	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors)
+	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config)
 
 	// Wait for interrupt
 	sigChan := make(chan os.Signal, 1)
@@ -266,6 +360,12 @@ var Cmd = &cobra.Command{
 						return "default" // Default source name if no sources
 					},
 					fx.ResultTags(`name:"sourceName"`),
+				),
+				fx.Annotate(
+					func() chan struct{} {
+						return make(chan struct{})
+					},
+					fx.ResultTags(`name:"crawlDone"`),
 				),
 				func() chan *models.Article {
 					return make(chan *models.Article, DefaultChannelBufferSize)
