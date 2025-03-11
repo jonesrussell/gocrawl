@@ -17,6 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -43,10 +44,19 @@ type Params struct {
 
 	// Context provides the context for the job scheduler
 	Context context.Context `name:"jobContext"`
+
+	// Processors is a slice of content processors, injected as a group
+	Processors []models.ContentProcessor `group:"processors"`
 }
 
 // runScheduler manages the execution of scheduled jobs.
-func runScheduler(ctx context.Context, log common.Logger, sources *sources.Sources, c crawler.Interface) {
+func runScheduler(
+	ctx context.Context,
+	log common.Logger,
+	sources *sources.Sources,
+	c crawler.Interface,
+	processors []models.ContentProcessor,
+) {
 	log.Info("Starting job scheduler")
 
 	// Check every minute
@@ -54,7 +64,7 @@ func runScheduler(ctx context.Context, log common.Logger, sources *sources.Sourc
 	defer ticker.Stop()
 
 	// Do initial check
-	checkAndRunJobs(ctx, log, sources, c, time.Now())
+	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors)
 
 	for {
 		select {
@@ -62,24 +72,31 @@ func runScheduler(ctx context.Context, log common.Logger, sources *sources.Sourc
 			log.Info("Job scheduler shutting down")
 			return
 		case t := <-ticker.C:
-			checkAndRunJobs(ctx, log, sources, c, t)
+			checkAndRunJobs(ctx, log, sources, c, t, processors)
 		}
 	}
 }
 
 // setupCollector creates and configures a new collector for the given source.
-func setupCollector(ctx context.Context, log common.Logger, source sources.Config) (collector.Result, error) {
+func setupCollector(
+	ctx context.Context,
+	log common.Logger,
+	source sources.Config,
+	processors []models.ContentProcessor,
+) (collector.Result, error) {
 	rateLimit, err := time.ParseDuration(source.RateLimit)
 	if err != nil {
 		return collector.Result{}, fmt.Errorf("invalid rate limit format: %w", err)
 	}
 
 	return collector.New(collector.Params{
-		BaseURL:   source.URL,
-		MaxDepth:  source.MaxDepth,
-		RateLimit: rateLimit,
-		Logger:    log,
-		Context:   ctx,
+		BaseURL:          source.URL,
+		MaxDepth:         source.MaxDepth,
+		RateLimit:        rateLimit,
+		Logger:           log,
+		Context:          ctx,
+		ArticleProcessor: processors[0], // First processor handles articles
+		ContentProcessor: processors[1], // Second processor handles content
 	})
 }
 
@@ -94,8 +111,14 @@ func configureCrawler(c crawler.Interface, source sources.Config, collector coll
 }
 
 // executeCrawl performs the crawl operation for a single source.
-func executeCrawl(ctx context.Context, log common.Logger, c crawler.Interface, source sources.Config) {
-	collectorResult, err := setupCollector(ctx, log, source)
+func executeCrawl(
+	ctx context.Context,
+	log common.Logger,
+	c crawler.Interface,
+	source sources.Config,
+	processors []models.ContentProcessor,
+) {
+	collectorResult, err := setupCollector(ctx, log, source, processors)
 	if err != nil {
 		log.Error("Error setting up collector",
 			"error", err,
@@ -128,6 +151,7 @@ func checkAndRunJobs(
 	sources *sources.Sources,
 	c crawler.Interface,
 	now time.Time,
+	processors []models.ContentProcessor,
 ) {
 	if sources == nil {
 		log.Error("Sources configuration is nil")
@@ -148,7 +172,7 @@ func checkAndRunJobs(
 				log.Info("Running scheduled crawl",
 					"source", source.Name,
 					"time", scheduledTime)
-				executeCrawl(ctx, log, c, source)
+				executeCrawl(ctx, log, c, source, processors)
 			}
 		}
 	}
@@ -171,7 +195,7 @@ func startJob(p Params) error {
 	}
 
 	// Start scheduler in background
-	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance)
+	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors)
 
 	// Wait for interrupt
 	sigChan := make(chan os.Signal, 1)
@@ -217,6 +241,16 @@ var Cmd = &cobra.Command{
 					fx.ResultTags(`name:"jobContext"`),
 				),
 				provideSources,
+				fx.Annotate(
+					func(sources *sources.Sources) (string, string) {
+						// For job scheduler, we'll use the first source's indices
+						if len(sources.Sources) > 0 {
+							return sources.Sources[0].Index, sources.Sources[0].ArticleIndex
+						}
+						return "content", "articles" // Default indices if no sources
+					},
+					fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
+				),
 			),
 			fx.Invoke(startJob),
 		)
