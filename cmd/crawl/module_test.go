@@ -4,6 +4,7 @@ package crawl_test
 import (
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -37,7 +38,7 @@ func TestModuleProvides(t *testing.T) {
 	}
 
 	var (
-		crawlerInstance *crawler.Crawler
+		crawlerInstance crawler.Interface
 		src             *sources.Sources
 	)
 
@@ -47,6 +48,7 @@ func TestModuleProvides(t *testing.T) {
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() *sources.Sources { return testSources },
+			func() api.IndexManager { return api.NewMockIndexManager() },
 		),
 		// Provide only crawler module since we're providing sources directly
 		crawler.Module,
@@ -90,7 +92,7 @@ func TestModuleConfiguration(t *testing.T) {
 		},
 	}
 
-	var crawlerInstance *crawler.Crawler
+	var crawlerInstance crawler.Interface
 
 	// Create test app with crawl module
 	app := fxtest.New(t,
@@ -98,6 +100,7 @@ func TestModuleConfiguration(t *testing.T) {
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() *sources.Sources { return testSources },
+			func() api.IndexManager { return api.NewMockIndexManager() },
 		),
 		// Provide only crawler module since we're providing sources directly
 		crawler.Module,
