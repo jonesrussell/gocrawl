@@ -118,6 +118,7 @@ func TestStartHTTPServer(t *testing.T) {
 			// Create mock logger
 			mockLogger := logger.NewMockLogger()
 			mockLogger.On("Info", "StartHTTPServer function called").Return()
+			mockLogger.On("Info", "Server configuration", "address", ":8080").Return()
 
 			// Create mock search manager
 			mockSearch := new(mockSearchManager)
@@ -239,10 +240,12 @@ func TestStartHTTPServer_PortConfiguration(t *testing.T) {
 				t.Setenv("GOCRAWL_PORT", tt.envPort)
 			}
 
-			// Create mock dependencies
+			// Create mock logger
 			mockLogger := logger.NewMockLogger()
 			mockLogger.On("Info", "StartHTTPServer function called").Return()
+			mockLogger.On("Info", "Server configuration", "address", tt.expectedAddr).Return()
 
+			// Create mock search manager
 			mockSearch := new(mockSearchManager)
 
 			mockCfg := new(mockConfig)
