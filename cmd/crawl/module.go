@@ -4,7 +4,6 @@ package crawl
 import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 )
 
@@ -12,5 +11,4 @@ import (
 var Module = fx.Module("crawl",
 	crawler.Module,
 	sources.Module,
-	storage.Module,
 )
