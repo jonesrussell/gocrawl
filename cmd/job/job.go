@@ -3,90 +3,135 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
+	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
+	"go.uber.org/fx"
 )
 
+// Params holds the dependencies required for the job scheduler.
+type Params struct {
+	fx.In
+
+	// Lifecycle manages the application's startup and shutdown hooks
+	Lifecycle fx.Lifecycle
+
+	// Sources provides access to configured crawl sources
+	Sources *sources.Sources
+
+	// CrawlerInstance handles the core crawling functionality
+	CrawlerInstance crawler.Interface
+
+	// Logger provides structured logging capabilities
+	Logger logger.Interface
+
+	// Config holds the application configuration
+	Config config.Interface
+
+	// Context provides the context for the job scheduler
+	Context context.Context `name:"jobContext"`
+}
+
 // runScheduler manages the execution of scheduled jobs.
-func runScheduler(ctx context.Context, logger common.Logger, sources *sources.Sources, rootCmd string) {
-	logger.Info("Starting job scheduler")
+func runScheduler(ctx context.Context, log common.Logger, sources *sources.Sources, c crawler.Interface) {
+	log.Info("Starting job scheduler")
 
 	// Check every minute
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	// Do initial check
-	checkAndRunJobs(logger, sources, rootCmd, time.Now())
+	checkAndRunJobs(ctx, log, sources, c, time.Now())
 
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("Job scheduler shutting down")
+			log.Info("Job scheduler shutting down")
 			return
 		case t := <-ticker.C:
-			checkAndRunJobs(logger, sources, rootCmd, t)
+			checkAndRunJobs(ctx, log, sources, c, t)
 		}
 	}
 }
 
 // checkAndRunJobs evaluates and executes scheduled jobs.
-func checkAndRunJobs(logger common.Logger, sources *sources.Sources, rootCmd string, now time.Time) {
+func checkAndRunJobs(
+	ctx context.Context,
+	log common.Logger,
+	sources *sources.Sources,
+	c crawler.Interface,
+	now time.Time,
+) {
 	if sources == nil {
-		logger.Error("Sources configuration is nil")
+		log.Error("Sources configuration is nil")
 		return
 	}
 
 	currentTime := now.Format("15:04")
-	logger.Info("Checking jobs", "current_time", currentTime)
+	log.Info("Checking jobs", "current_time", currentTime)
 
 	for _, source := range sources.Sources {
 		for _, scheduledTime := range source.Time {
 			if currentTime == scheduledTime {
-				logger.Info("Running scheduled crawl",
+				log.Info("Running scheduled crawl",
 					"source", source.Name,
 					"time", scheduledTime)
 
-				if err := runCrawlCommand(rootCmd, source.Name); err != nil {
-					logger.Error("Error running crawl command",
+				// Configure crawler for this source
+				c.SetMaxDepth(source.MaxDepth)
+				if err := c.SetRateLimit(source.RateLimit); err != nil {
+					log.Error("Error setting rate limit",
 						"error", err,
 						"source", source.Name)
+					continue
 				}
+
+				// Start crawling
+				if err := c.Start(ctx, source.URL); err != nil {
+					log.Error("Error starting crawler",
+						"error", err,
+						"source", source.Name)
+					continue
+				}
+
+				// Wait for crawl to complete
+				c.Wait()
+				log.Info("Crawl completed",
+					"source", source.Name)
 			}
 		}
 	}
 }
 
-// runCrawlCommand executes a crawl command for a specific source.
-func runCrawlCommand(rootCmd, sourceName string) error {
-	cmd := exec.Command(rootCmd, "crawl", sourceName)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
+// startJob initializes and starts the job scheduler.
+func startJob(p Params) error {
+	// Create cancellable context
+	ctx, cancel := context.WithCancel(p.Context)
+	defer cancel()
 
-// loadSources loads the sources configuration from sources.yml
-func loadSources() (*sources.Sources, error) {
-	data, err := os.ReadFile("sources.yml")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read sources.yml: %w", err)
-	}
+	// Start scheduler in background
+	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance)
 
-	var s sources.Sources
-	if err := yaml.Unmarshal(data, &s); err != nil {
-		return nil, fmt.Errorf("failed to parse sources.yml: %w", err)
-	}
+	// Wait for interrupt
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	p.Logger.Info("Job scheduler running. Press Ctrl+C to stop...")
+	<-sigChan
+	p.Logger.Info("Shutting down...")
 
-	return &s, nil
+	return nil
 }
 
 // Cmd represents the job scheduler command.
@@ -94,42 +139,59 @@ var Cmd = &cobra.Command{
 	Use:   "job",
 	Short: "Schedule and run crawl jobs",
 	Long:  `Schedule and run crawl jobs based on the times specified in sources.yml`,
-	Run: func(cmd *cobra.Command, _ []string) {
-		// Initialize logger
-		l, err := logger.NewDevelopmentLogger("info")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Load sources
-		sources, err := loadSources()
-		if err != nil {
-			l.Error("Failed to load sources", "error", err)
-			os.Exit(1)
-		}
-
-		// Print loaded schedules
-		l.Info("Loaded schedules:")
-		for _, source := range sources.Sources {
-			if len(source.Time) > 0 {
-				l.Info("Source schedule", "name", source.Name, "times", source.Time)
-			}
-		}
-
-		// Create cancellable context
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		// Create a parent context that can be cancelled
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Start scheduler in background
-		go runScheduler(ctx, l, sources, cmd.Root().Name())
-
-		// Wait for interrupt
+		// Set up signal handling for graceful shutdown
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		l.Info("Job scheduler running. Press Ctrl+C to stop...")
-		<-sigChan
-		l.Info("Shutting down...")
+
+		// Initialize the Fx application with required modules and dependencies
+		app := fx.New(
+			common.Module,
+			content.Module,
+			collector.Module(),
+			crawler.Module,
+			fx.Provide(
+				fx.Annotate(
+					func() context.Context {
+						return ctx
+					},
+					fx.ResultTags(`name:"jobContext"`),
+				),
+			),
+			fx.Invoke(startJob),
+		)
+
+		// Start the application and handle any startup errors
+		if err := app.Start(ctx); err != nil {
+			return fmt.Errorf("error starting application: %w", err)
+		}
+
+		// Wait for either:
+		// - A signal interrupt (SIGINT/SIGTERM)
+		// - Context cancellation
+		select {
+		case sig := <-sigChan:
+			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+			cancel() // Cancel our context
+		case <-ctx.Done():
+			common.PrintInfof("\nContext cancelled, initiating shutdown...")
+		}
+
+		// Create a context with timeout for graceful shutdown
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+		defer stopCancel()
+
+		// Stop the application and handle any shutdown errors
+		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+			common.PrintErrorf("Error stopping application: %v", err)
+			return err
+		}
+
+		return nil
 	},
 }
 
