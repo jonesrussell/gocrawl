@@ -15,7 +15,7 @@ import (
 // Constants
 const (
 	readHeaderTimeout = 10 * time.Second // Timeout for reading headers
-	defaultPort       = ":8080"          // Default port if not specified in config or env
+	defaultPort       = "8080"           // Default port if not specified in config or env
 )
 
 // SearchRequest represents the structure of the search request
@@ -92,28 +92,30 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 		}
 	})
 
-	serverCfg := cfg.GetServerConfig()
-	if serverCfg.Address == "" {
-		// Try to get port from environment variable
-		if port := os.Getenv("GOCRAWL_PORT"); port != "" {
-			if !strings.HasPrefix(port, ":") {
-				port = ":" + port
-			}
-			serverCfg.Address = port
-		} else {
-			serverCfg.Address = defaultPort
-		}
-	} else if !strings.Contains(serverCfg.Address, ":") {
-		// If address is just a port number without colon prefix
-		serverCfg.Address = ":" + serverCfg.Address
+	// Determine server address with priority:
+	// 1. GOCRAWL_PORT environment variable
+	// 2. Server config from config file
+	// 3. Default port
+	var port string
+	if envPort := os.Getenv("GOCRAWL_PORT"); envPort != "" {
+		port = envPort
+	} else if serverCfg := cfg.GetServerConfig(); serverCfg != nil && serverCfg.Address != "" {
+		port = strings.TrimPrefix(serverCfg.Address, ":")
+	} else {
+		port = defaultPort
 	}
 
+	// Ensure port has colon prefix
+	address := ":" + strings.TrimPrefix(port, ":")
+
+	log.Info("Server configuration", "address", address)
+
 	server := &http.Server{
-		Addr:              serverCfg.Address,
+		Addr:              address,
 		Handler:           mux,
-		ReadTimeout:       serverCfg.ReadTimeout,
-		WriteTimeout:      serverCfg.WriteTimeout,
-		IdleTimeout:       serverCfg.IdleTimeout,
+		ReadTimeout:       cfg.GetServerConfig().ReadTimeout,
+		WriteTimeout:      cfg.GetServerConfig().WriteTimeout,
+		IdleTimeout:       cfg.GetServerConfig().IdleTimeout,
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
