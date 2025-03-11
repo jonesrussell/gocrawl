@@ -3,16 +3,13 @@ package job
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -21,12 +18,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-)
-
-const (
-	// DefaultChannelBufferSize is the default size for buffered channels used for
-	// processing articles and content during crawling.
-	DefaultChannelBufferSize = 100
 )
 
 // Params holds the dependencies required for the job scheduler.
@@ -88,59 +79,6 @@ func runScheduler(
 	}
 }
 
-// setupCollector creates and configures a new collector for the given source.
-func setupCollector(
-	ctx context.Context,
-	log common.Logger,
-	source sources.Config,
-	processors []models.ContentProcessor,
-	done chan struct{},
-	cfg config.Interface,
-) (collector.Result, error) {
-	rateLimit, err := time.ParseDuration(source.RateLimit)
-	if err != nil {
-		return collector.Result{}, fmt.Errorf("invalid rate limit format: %w", err)
-	}
-
-	// Convert source config to the expected type
-	sourceConfig := common.ConvertSourceConfig(&source)
-	if sourceConfig == nil {
-		return collector.Result{}, errors.New("source configuration is nil")
-	}
-
-	// Extract domain from source URL
-	domain, err := common.ExtractDomain(source.URL)
-	if err != nil {
-		return collector.Result{}, fmt.Errorf("error extracting domain: %w", err)
-	}
-
-	return collector.New(collector.Params{
-		BaseURL:          source.URL,
-		MaxDepth:         source.MaxDepth,
-		RateLimit:        rateLimit,
-		Logger:           log,
-		Context:          ctx,
-		ArticleProcessor: processors[0], // First processor handles articles
-		ContentProcessor: processors[1], // Second processor handles content
-		Done:             done,
-		Debugger:         logger.NewCollyDebugger(log),
-		Source:           sourceConfig,
-		Parallelism:      cfg.GetCrawlerConfig().Parallelism,
-		RandomDelay:      cfg.GetCrawlerConfig().RandomDelay,
-		AllowedDomains:   []string{domain},
-	})
-}
-
-// configureCrawler sets up the crawler with the given source configuration.
-func configureCrawler(c crawler.Interface, source sources.Config, collector collector.Result) error {
-	c.SetCollector(collector.Collector)
-	c.SetMaxDepth(source.MaxDepth)
-	if err := c.SetRateLimit(source.RateLimit); err != nil {
-		return fmt.Errorf("error setting rate limit: %w", err)
-	}
-	return nil
-}
-
 // executeCrawl performs the crawl operation for a single source.
 func executeCrawl(
 	ctx context.Context,
@@ -151,7 +89,7 @@ func executeCrawl(
 	done chan struct{},
 	cfg config.Interface,
 ) {
-	collectorResult, err := setupCollector(ctx, log, source, processors, done, cfg)
+	collectorResult, err := app.SetupCollector(ctx, log, source, processors, done, cfg)
 	if err != nil {
 		log.Error("Error setting up collector",
 			"error", err,
@@ -159,7 +97,7 @@ func executeCrawl(
 		return
 	}
 
-	if configErr := configureCrawler(c, source, collectorResult); configErr != nil {
+	if configErr := app.ConfigureCrawler(c, source, collectorResult); configErr != nil {
 		log.Error("Error configuring crawler",
 			"error", configErr,
 			"source", source.Name)
@@ -233,18 +171,13 @@ func startJob(p Params) error {
 	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config)
 
 	// Wait for interrupt
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	done, cleanup := app.WaitForSignal(ctx, cancel)
+	defer cleanup()
+
 	p.Logger.Info("Job scheduler running. Press Ctrl+C to stop...")
-	<-sigChan
-	p.Logger.Info("Shutting down...")
+	<-done
 
 	return nil
-}
-
-// provideSources creates a new Sources instance from the sources.yml file.
-func provideSources() (*sources.Sources, error) {
-	return sources.LoadFromFile("sources.yml")
 }
 
 // Cmd represents the job scheduler command.
@@ -257,12 +190,12 @@ var Cmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Set up signal handling for graceful shutdown
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		// Set up signal handling
+		done, cleanup := app.WaitForSignal(ctx, cancel)
+		defer cleanup()
 
 		// Initialize the Fx application with required modules and dependencies
-		app := fx.New(
+		fxApp := fx.New(
 			common.Module,
 			article.Module,
 			content.Module,
@@ -304,43 +237,31 @@ var Cmd = &cobra.Command{
 					fx.ResultTags(`name:"crawlDone"`),
 				),
 				func() chan *models.Article {
-					return make(chan *models.Article, DefaultChannelBufferSize)
+					return make(chan *models.Article, app.DefaultChannelBufferSize)
 				},
 			),
 			fx.Invoke(startJob),
 		)
 
-		// Start the application and handle any startup errors
-		if err := app.Start(ctx); err != nil {
+		// Start the application
+		if err := fxApp.Start(ctx); err != nil {
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		// Wait for either:
-		// - A signal interrupt (SIGINT/SIGTERM)
-		// - Context cancellation
-		select {
-		case sig := <-sigChan:
-			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-			cancel() // Cancel our context
-		case <-ctx.Done():
-			common.PrintInfof("\nContext cancelled, initiating shutdown...")
-		}
+		// Wait for completion or interruption
+		<-done
 
-		// Create a context with timeout for graceful shutdown
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
-		defer stopCancel()
-
-		// Stop the application and handle any shutdown errors
-		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-			common.PrintErrorf("Error stopping application: %v", err)
-			return err
-		}
-
-		return nil
+		// Perform graceful shutdown
+		return app.GracefulShutdown(fxApp)
 	},
 }
 
 // Command returns the job command.
 func Command() *cobra.Command {
 	return Cmd
+}
+
+// provideSources creates a new Sources instance from the sources.yml file.
+func provideSources() (*sources.Sources, error) {
+	return sources.LoadFromFile("sources.yml")
 }
