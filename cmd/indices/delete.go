@@ -12,7 +12,6 @@ import (
 	"syscall"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -31,7 +30,7 @@ type deleteParams struct {
 	ctx     context.Context
 	storage common.Storage
 	sources *sources.Sources
-	logger  logger.Interface
+	logger  common.Logger
 	// indices contains the list of indices to delete
 	indices []string
 	// force indicates whether to skip the confirmation prompt
@@ -101,8 +100,8 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
-		sources.Module,
-		fx.Invoke(func(lc fx.Lifecycle, storage common.Storage, sources *sources.Sources, l logger.Interface) {
+		Module,
+		fx.Invoke(func(lc fx.Lifecycle, storage common.Storage, sources *sources.Sources, l common.Logger) {
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
 					params := &deleteParams{

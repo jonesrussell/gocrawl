@@ -79,6 +79,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		common.Module,
+		Module,
 		fx.Invoke(func(lc fx.Lifecycle, s common.Storage, l common.Logger) {
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {

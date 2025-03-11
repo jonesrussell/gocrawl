@@ -1,4 +1,5 @@
-package cmd
+// Package crawl implements the crawl command for fetching and processing web content.
+package crawl
 
 import (
 	"context"
@@ -38,10 +39,10 @@ func SetSourceName(name string) {
 	sourceName = name
 }
 
-// CrawlParams holds the dependencies and parameters required for the crawl operation.
+// Params holds the dependencies and parameters required for the crawl operation.
 // It uses fx.In to indicate that these fields should be injected by the fx dependency
 // injection framework.
-type CrawlParams struct {
+type Params struct {
 	fx.In
 
 	// Lifecycle manages the application's startup and shutdown hooks
@@ -70,10 +71,10 @@ type CrawlParams struct {
 	Context context.Context `name:"crawlContext"`
 }
 
-// CrawlCmd represents the crawl command that initiates the crawling process for a
+// Cmd represents the crawl command that initiates the crawling process for a
 // specified source. It reads the source configuration from sources.yml and starts
 // the crawling process with the configured parameters.
-var CrawlCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "crawl [source]",
 	Short: "Crawl a single source defined in sources.yml",
 	Long: `Crawl a single source defined in sources.yml.
@@ -108,15 +109,11 @@ Example:
 		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
 			common.Module,
-			sources.Module,
-			crawler.Module,
 			article.Module,
 			content.Module,
 			collector.Module(),
+			Module,
 			fx.Provide(
-				func() chan struct{} {
-					return doneChan
-				},
 				fx.Annotate(
 					func() chan struct{} {
 						return doneChan
@@ -125,7 +122,7 @@ Example:
 				),
 				fx.Annotate(
 					func() context.Context {
-						return ctx // Use our cancellable context
+						return ctx
 					},
 					fx.ResultTags(`name:"crawlContext"`),
 				),
@@ -136,32 +133,20 @@ Example:
 					fx.ResultTags(`name:"sourceName"`),
 				),
 				fx.Annotate(
-					func(sources *sources.Sources) string {
-						// Get the source configuration
+					func(sources *sources.Sources) (string, string) {
 						source, err := sources.FindByName(sourceName)
 						if err != nil {
-							return "" // Return empty string if source not found
+							return "", ""
 						}
-						return source.Index
+						return source.Index, source.ArticleIndex
 					},
-					fx.ResultTags(`name:"contentIndex"`),
-				),
-				fx.Annotate(
-					func(sources *sources.Sources) string {
-						// Get the source configuration
-						source, err := sources.FindByName(sourceName)
-						if err != nil {
-							return "" // Return empty string if source not found
-						}
-						return source.ArticleIndex
-					},
-					fx.ResultTags(`name:"indexName"`),
+					fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
 				),
 				func() chan *models.Article {
 					return make(chan *models.Article, DefaultChannelBufferSize)
 				},
 			),
-			fx.Invoke(func(lc fx.Lifecycle, p CrawlParams) {
+			fx.Invoke(func(lc fx.Lifecycle, p Params) {
 				configureCrawlLifecycle(lc, p, errChan)
 			}),
 		)
@@ -208,16 +193,16 @@ Example:
 // with the specified source configuration and manages the crawl lifecycle.
 //
 // Parameters:
-//   - p: CrawlParams containing all required dependencies and configuration
+//   - p: Params containing all required dependencies and configuration
 //
 // Returns:
 //   - error: Any error that occurred during setup or initialization
-func StartCrawl(p CrawlParams) error {
+func StartCrawl(p Params) error {
 	return startCrawl(p)
 }
 
 // startCrawl is the internal implementation of StartCrawl
-func startCrawl(p CrawlParams) error {
+func startCrawl(p Params) error {
 	if p.CrawlerInstance == nil {
 		return errors.New("crawler is not initialized")
 	}
@@ -342,7 +327,7 @@ func convertSourceConfig(source *sources.Config) *config.Source {
 }
 
 // initializeCrawl initializes the crawler with the given source
-func initializeCrawl(_ context.Context, p CrawlParams) (*sources.Config, error) {
+func initializeCrawl(_ context.Context, p Params) (*sources.Config, error) {
 	source, findErr := p.Sources.FindByName(sourceName)
 	if findErr != nil {
 		return nil, fmt.Errorf("error finding source: %w", findErr)
@@ -356,7 +341,7 @@ func initializeCrawl(_ context.Context, p CrawlParams) (*sources.Config, error) 
 }
 
 // runCrawl executes the crawl operation in a goroutine
-func runCrawl(ctx context.Context, p CrawlParams, source *sources.Config, errChan chan error) {
+func runCrawl(ctx context.Context, p Params, source *sources.Config, errChan chan error) {
 	go func() {
 		p.Logger.Info("Starting crawl", "source", sourceName)
 		if startErr := p.CrawlerInstance.Start(ctx, source.URL); startErr != nil {
@@ -375,7 +360,7 @@ func runCrawl(ctx context.Context, p CrawlParams, source *sources.Config, errCha
 }
 
 // handleShutdown manages the graceful shutdown of the crawler
-func handleShutdown(ctx context.Context, p CrawlParams) error {
+func handleShutdown(ctx context.Context, p Params) error {
 	p.Logger.Info("Stopping crawler...")
 	select {
 	case <-ctx.Done():
@@ -397,7 +382,7 @@ func handleShutdown(ctx context.Context, p CrawlParams) error {
 
 // configureCrawlLifecycle configures the lifecycle hooks for crawl management.
 // It sets up the start and stop hooks for the crawl operation.
-func configureCrawlLifecycle(lc fx.Lifecycle, p CrawlParams, errChan chan error) {
+func configureCrawlLifecycle(lc fx.Lifecycle, p Params, errChan chan error) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			source, err := initializeCrawl(ctx, p)
@@ -421,6 +406,7 @@ func configureCrawlLifecycle(lc fx.Lifecycle, p CrawlParams, errChan chan error)
 	})
 }
 
-func init() {
-	rootCmd.AddCommand(CrawlCmd)
+// Command returns the crawl command for use in the root command
+func Command() *cobra.Command {
+	return Cmd
 }

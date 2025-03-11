@@ -19,14 +19,6 @@ import (
 	"go.uber.org/fx"
 )
 
-// rootCmd represents the sources command
-var rootCmd = &cobra.Command{
-	Use:   "sources",
-	Short: "Manage content sources",
-	Long: `Manage content sources in GoCrawl.
-This command provides subcommands for listing, adding, and managing content sources.`,
-}
-
 // Constants for table formatting
 const (
 	// TableWidth defines the total width of the table output for consistent formatting
@@ -84,20 +76,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
-		fx.Options(
-			common.Module,
-			fx.Provide(
-				fx.Annotate(
-					func() context.Context {
-						return cmd.Context()
-					},
-					fx.ResultTags(`name:"commandContext"`),
-				),
-			),
-		),
-		fx.Options(
-			sources.Module,
-		),
+		common.Module,
+		Module,
 		fx.Invoke(func(lc fx.Lifecycle, s *sources.Sources, l common.Logger) {
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
@@ -237,8 +217,4 @@ func printSources(sources []sources.Config, logger common.Logger) error {
 
 	t.Render()
 	return nil
-}
-
-func init() {
-	rootCmd.AddCommand(listCommand())
 }

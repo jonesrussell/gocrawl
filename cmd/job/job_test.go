@@ -1,18 +1,22 @@
-package cmd_test
+// Package job_test implements tests for the job scheduler command.
+package job_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/cmd/job"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
+	"go.uber.org/fx/fxtest"
 )
 
-// mockSource represents a simplified version of sources.Source for testing
-type mockSource struct {
-	Time []string
-}
-
+// TestJobScheduling tests the job scheduling functionality
 func TestJobScheduling(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -42,7 +46,7 @@ func TestJobScheduling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := &mockSource{
+			source := &sources.Config{
 				Time: tt.scheduledTimes,
 			}
 
@@ -65,6 +69,7 @@ func TestJobScheduling(t *testing.T) {
 	}
 }
 
+// TestTimeFormatParsing tests the time format parsing functionality
 func TestTimeFormatParsing(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -103,4 +108,67 @@ func TestTimeFormatParsing(t *testing.T) {
 			assert.Equal(t, tt.expectHour, parsedTime.Hour())
 		})
 	}
+}
+
+// TestJobCommand tests the job command functionality
+func TestJobCommand(t *testing.T) {
+	// Create a test logger
+	mockLogger := logger.NewMockLogger()
+	// Only expect the specific Info call that we know will happen
+	mockLogger.On("Info", "Starting job scheduler", "root", "job").Return()
+
+	// Create test sources
+	testSources := &sources.Sources{
+		Sources: []sources.Config{
+			{
+				Name: "Test Source",
+				Time: []string{"03:13", "15:13"},
+				URL:  "https://test.com",
+			},
+		},
+	}
+
+	// Create mock config with test sources
+	mockCfg := config.NewMockConfig().WithSources([]config.Source{
+		{
+			Name: "Test Source",
+			Time: []string{"03:13", "15:13"},
+			URL:  "https://test.com",
+		},
+	})
+
+	// Create a test command
+	cmd := job.Command()
+
+	// Create a test app with all necessary dependencies
+	app := fxtest.New(t,
+		fx.Provide(
+			func() logger.Interface { return mockLogger },
+			func() *sources.Sources { return testSources },
+			func() config.Interface { return mockCfg },
+		),
+		fx.Invoke(func(p job.Params) {
+			startJobScheduler := func(cmd *cobra.Command, _ []string) {
+				rootPath := cmd.Root().Name()
+				p.Logger.Info("Starting job scheduler", "root", rootPath)
+			}
+			cmd.Run = startJobScheduler
+		}),
+	)
+	require.NoError(t, app.Start(t.Context()))
+	defer app.Stop(t.Context())
+
+	// Test command
+	assert.NotNil(t, cmd)
+	assert.Equal(t, "job", cmd.Use)
+	assert.NotEmpty(t, cmd.Short)
+	assert.NotEmpty(t, cmd.Long)
+
+	// Test command execution
+	cmd.SetArgs([]string{})
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	// Verify logger calls
+	mockLogger.AssertExpectations(t)
 }
