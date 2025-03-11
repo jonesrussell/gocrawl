@@ -189,7 +189,7 @@ func setupViper() error {
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("app.environment", "development")
 	viper.SetDefault("crawler.source_file", "sources.yml")
-	viper.SetDefault("elasticsearch.addresses", []string{"https://es.streetcode.net"})
+	viper.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
 
 	// Configure environment variable handling
 	viper.SetEnvPrefix("")
