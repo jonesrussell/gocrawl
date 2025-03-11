@@ -1,7 +1,5 @@
-// Package cmd implements the command-line interface for GoCrawl.
-// This file contains the job scheduler command implementation that manages
-// scheduled crawling tasks based on configuration in sources.yml.
-package cmd
+// Package job implements the job scheduler command for managing scheduled crawling tasks.
+package job
 
 import (
 	"context"
@@ -17,12 +15,9 @@ import (
 	"go.uber.org/fx"
 )
 
-// JobParams defines the parameters for job execution.
-type JobParams struct {
+// Params defines the parameters for job execution.
+type Params struct {
 	fx.In
-
-	// Cmd is the cobra command instance
-	Cmd *cobra.Command
 
 	// Logger provides structured logging capabilities
 	Logger common.Logger
@@ -39,7 +34,7 @@ type JobParams struct {
 // - Creates a cancellable context for managing scheduled jobs
 // - Starts the scheduler in a goroutine
 // - Handles graceful shutdown when the application stops
-func startJobScheduler(p JobParams, rootCmd string) fx.Option {
+func startJobScheduler(p Params, rootCmd string) fx.Option {
 	return fx.Invoke(func(lc fx.Lifecycle) {
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -61,7 +56,7 @@ func startJobScheduler(p JobParams, rootCmd string) fx.Option {
 // - Runs a ticker to check for scheduled jobs every minute
 // - Handles context cancellation for graceful shutdown
 // - Delegates job execution to checkAndRunJobs
-func runScheduler(ctx context.Context, p JobParams, rootCmd string) {
+func runScheduler(ctx context.Context, p Params, rootCmd string) {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -81,7 +76,7 @@ func runScheduler(ctx context.Context, p JobParams, rootCmd string) {
 // - Checks each source's configured schedule times
 // - Executes crawl commands when scheduled times match
 // - Logs job execution and any errors
-func checkAndRunJobs(p JobParams, rootCmd string, now time.Time) {
+func checkAndRunJobs(p Params, rootCmd string, now time.Time) {
 	for _, source := range p.Sources.Sources {
 		for _, t := range source.Time {
 			scheduledTime, parseErr := time.Parse("15:04", t)
@@ -134,8 +129,8 @@ func runCrawlCommand(rootCmd, sourceName string, logger common.Logger) error {
 	return cmd.Run()
 }
 
-// jobCmd represents the job scheduler command that manages scheduled crawling tasks.
-var jobCmd = &cobra.Command{
+// Cmd represents the job scheduler command that manages scheduled crawling tasks.
+var Cmd = &cobra.Command{
 	Use:   "job",
 	Short: "Schedule and run crawl jobs",
 	Long:  `Schedule and run crawl jobs based on the times specified in sources.yml`,
@@ -145,11 +140,11 @@ var jobCmd = &cobra.Command{
 		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
 			common.Module,
-			sources.Module,
+			Module,
 			fx.Provide(
 				func() *cobra.Command { return cmd },
 			),
-			fx.Invoke(func(p JobParams) {
+			fx.Invoke(func(p Params) {
 				startJobScheduler(p, rootPath)
 			}),
 		)
@@ -178,18 +173,7 @@ var jobCmd = &cobra.Command{
 	},
 }
 
-// init initializes the job scheduler command by adding it to the root command.
-func init() {
-	rootCmd.AddCommand(jobCmd)
-}
-
-// NewJobCmd creates a new job command.
-func NewJobCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "job",
-		Short: "Run a job",
-		Long:  "Run a job with the specified configuration",
-	}
-
-	return cmd
+// Command returns the job command for use in the root command
+func Command() *cobra.Command {
+	return Cmd
 }

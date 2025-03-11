@@ -1,7 +1,5 @@
-// Package cmd implements the command-line interface for GoCrawl.
-// This file contains the HTTP server command implementation that provides a REST API
-// for searching content in Elasticsearch.
-package cmd
+// Package httpd implements the HTTP server command for the search API.
+package httpd
 
 import (
 	"context"
@@ -12,16 +10,15 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
-// ServerParams holds the parameters required for running the HTTP server.
+// Params holds the parameters required for running the HTTP server.
 // It uses fx.In for dependency injection of required components.
-type ServerParams struct {
+type Params struct {
 	fx.In
 
 	// Server is the HTTP server instance that handles incoming requests
@@ -30,9 +27,9 @@ type ServerParams struct {
 	Logger logger.Interface
 }
 
-// httpdCmd represents the HTTP server command that provides a REST API
+// Cmd represents the HTTP server command that provides a REST API
 // for searching content in Elasticsearch.
-var httpdCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "httpd",
 	Short: "Start the HTTP server for search",
 	Long: `This command starts an HTTP server that listens for search requests.
@@ -49,8 +46,8 @@ You can send POST requests to /search with a JSON body containing the search par
 		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
 			common.Module,
-			api.Module,
-			fx.Invoke(func(lc fx.Lifecycle, p ServerParams) {
+			Module,
+			fx.Invoke(func(lc fx.Lifecycle, p Params) {
 				lc.Append(fx.Hook{
 					OnStart: func(context.Context) error {
 						// Start the server in a goroutine
@@ -117,7 +114,7 @@ You can send POST requests to /search with a JSON body containing the search par
 	},
 }
 
-// init initializes the HTTP server command by adding it to the root command.
-func init() {
-	rootCmd.AddCommand(httpdCmd)
+// Command returns the httpd command for use in the root command
+func Command() *cobra.Command {
+	return Cmd
 }

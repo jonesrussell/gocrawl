@@ -1,7 +1,5 @@
-// Package cmd implements the command-line interface for GoCrawl.
-// This file contains the search command implementation that allows users to search
-// content in Elasticsearch using various parameters.
-package cmd
+// Package search implements the search command for querying content in Elasticsearch.
+package search
 
 import (
 	"context"
@@ -41,9 +39,9 @@ const (
 	columnWidthContentRatio = 3 // Content column takes 2/3 of table width
 )
 
-// SearchParams holds the parameters required for executing a search operation.
+// Params holds the parameters required for executing a search operation.
 // It uses fx.In for dependency injection of required components.
-type SearchParams struct {
+type Params struct {
 	fx.In
 
 	// Logger provides logging capabilities for the search operation
@@ -66,12 +64,28 @@ type Result struct {
 	Content string
 }
 
-// searchCmd represents the search command that allows users to search content
+// Cmd represents the search command that allows users to search content
 // in Elasticsearch using various parameters.
-var searchCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "search",
 	Short: "Search content in Elasticsearch",
 	RunE:  runSearch,
+}
+
+// Command returns the search command for use in the root command
+func Command() *cobra.Command {
+	// Define flags for the search command
+	Cmd.Flags().StringP("index", "i", "articles", "Index to search")
+	Cmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return")
+	Cmd.Flags().StringP("query", "q", "", "Query string to search for")
+
+	// Mark the query flag as required
+	if err := Cmd.MarkFlagRequired("query"); err != nil {
+		common.PrintErrorf("Error marking query flag as required: %v", err)
+		os.Exit(1)
+	}
+
+	return Cmd
 }
 
 // runSearch executes the search command with the provided parameters.
@@ -105,6 +119,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	// Initialize the Fx application with required modules and dependencies
 	app := fx.New(
 		common.Module,
+		Module,
 		fx.Provide(
 			// Provide search parameters with appropriate tags for dependency injection
 			fx.Annotate(
@@ -120,7 +135,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 				fx.ResultTags(`name:"resultSize"`),
 			),
 		),
-		fx.Invoke(func(lc fx.Lifecycle, p SearchParams) {
+		fx.Invoke(func(lc fx.Lifecycle, p Params) {
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
 					// Execute the search and handle any errors
@@ -261,7 +276,7 @@ func renderSearchResults(results []Result, query string) {
 }
 
 // executeSearch performs the actual search operation using the provided parameters.
-func executeSearch(ctx context.Context, p SearchParams) error {
+func executeSearch(ctx context.Context, p Params) error {
 	p.Logger.Info("Starting search...",
 		"query", p.Query,
 		"index", p.IndexName,
@@ -297,23 +312,4 @@ func truncateString(s string, length int) string {
 		return s
 	}
 	return s[:length-3] + "..."
-}
-
-// init initializes the search command by:
-// - Adding it to the root command
-// - Setting up command-line flags
-// - Marking required flags
-func init() {
-	rootCmd.AddCommand(searchCmd)
-
-	// Define flags for the search command
-	searchCmd.Flags().StringP("index", "i", "articles", "Index to search")
-	searchCmd.Flags().IntP("size", "s", DefaultSearchSize, "Number of results to return")
-	searchCmd.Flags().StringP("query", "q", "", "Query string to search for")
-
-	// Mark the query flag as required
-	if err := searchCmd.MarkFlagRequired("query"); err != nil {
-		common.PrintErrorf("Error marking query flag as required: %v", err)
-		os.Exit(1)
-	}
 }

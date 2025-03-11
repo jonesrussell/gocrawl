@@ -1,4 +1,5 @@
-package cmd_test
+// Package job_test implements tests for the job scheduler command.
+package job_test
 
 import (
 	"testing"
