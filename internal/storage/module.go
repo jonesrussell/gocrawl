@@ -1,8 +1,11 @@
 package storage
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
+	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -59,11 +62,24 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client,
 
 	log.Debug("Elasticsearch configuration",
 		"addresses", opts.Addresses,
-		"hasAPIKey", opts.APIKey != "",
-		"skipTLS", opts.SkipTLS)
+		"hasAPIKey", opts.APIKey != "")
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: true,
+	}
 
 	cfg := es.Config{
 		Addresses: opts.Addresses,
+		Transport: transport,
+		// Client configuration
+		EnableMetrics:       false,
+		EnableDebugLogger:   false,
+		CompressRequestBody: true,
+		DisableRetry:        false,
+		RetryOnStatus:       []int{502, 503, 504},
+		MaxRetries:          3,
+		RetryBackoff:        func(i int) time.Duration { return time.Duration(i) * 100 * time.Millisecond },
 	}
 
 	// Configure API key authentication
@@ -72,12 +88,6 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client,
 		log.Debug("Using API key authentication")
 	} else {
 		return nil, errors.New("API key authentication is required")
-	}
-
-	// Configure TLS
-	if opts.Transport != nil {
-		cfg.Transport = opts.Transport
-		log.Debug("Using custom transport with TLS configuration")
 	}
 
 	client, err := es.NewClient(cfg)

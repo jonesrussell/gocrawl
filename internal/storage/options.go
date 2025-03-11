@@ -16,7 +16,6 @@ type Options struct {
 	ScrollDuration string
 	Transport      http.RoundTripper
 	IndexName      string // Name of the index to use for content
-	SkipTLS        bool   // Whether to skip TLS verification
 }
 
 // DefaultOptions returns default options for ElasticsearchStorage
@@ -25,7 +24,6 @@ func DefaultOptions() Options {
 		ScrollDuration: "5m",
 		Transport:      http.DefaultTransport,
 		IndexName:      "content", // Default index name
-		SkipTLS:        false,     // Default to secure TLS
 	}
 }
 
@@ -36,11 +34,14 @@ func NewOptionsFromConfig(cfg config.Interface) Options {
 
 	// Create transport with TLS config if needed
 	if esConfig.TLS.SkipVerify {
-		opts.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
+		// Clone the default transport to preserve other settings
+		if defaultTransport, ok := http.DefaultTransport.(*http.Transport); ok {
+			transport := defaultTransport.Clone()
+			transport.TLSClientConfig = &tls.Config{
 				//nolint:gosec // We are using the SkipVerify setting from the config
 				InsecureSkipVerify: true,
-			},
+			}
+			opts.Transport = transport
 		}
 	}
 
@@ -50,7 +51,6 @@ func NewOptionsFromConfig(cfg config.Interface) Options {
 	opts.Password = esConfig.Password
 	opts.APIKey = esConfig.APIKey
 	opts.IndexName = esConfig.IndexName
-	opts.SkipTLS = esConfig.TLS.SkipVerify
 
 	return opts
 }
