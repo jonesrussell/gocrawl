@@ -27,3 +27,4 @@ coverage/coverage.out
 app.log
 sources.yml
 gocrawl
+config.production.yaml
