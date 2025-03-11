@@ -67,6 +67,60 @@ func runScheduler(ctx context.Context, log common.Logger, sources *sources.Sourc
 	}
 }
 
+// setupCollector creates and configures a new collector for the given source.
+func setupCollector(ctx context.Context, log common.Logger, source sources.Config) (collector.Result, error) {
+	rateLimit, err := time.ParseDuration(source.RateLimit)
+	if err != nil {
+		return collector.Result{}, fmt.Errorf("invalid rate limit format: %w", err)
+	}
+
+	return collector.New(collector.Params{
+		BaseURL:   source.URL,
+		MaxDepth:  source.MaxDepth,
+		RateLimit: rateLimit,
+		Logger:    log,
+		Context:   ctx,
+	})
+}
+
+// configureCrawler sets up the crawler with the given source configuration.
+func configureCrawler(c crawler.Interface, source sources.Config, collector collector.Result) error {
+	c.SetCollector(collector.Collector)
+	c.SetMaxDepth(source.MaxDepth)
+	if err := c.SetRateLimit(source.RateLimit); err != nil {
+		return fmt.Errorf("error setting rate limit: %w", err)
+	}
+	return nil
+}
+
+// executeCrawl performs the crawl operation for a single source.
+func executeCrawl(ctx context.Context, log common.Logger, c crawler.Interface, source sources.Config) {
+	collectorResult, err := setupCollector(ctx, log, source)
+	if err != nil {
+		log.Error("Error setting up collector",
+			"error", err,
+			"source", source.Name)
+		return
+	}
+
+	if err := configureCrawler(c, source, collectorResult); err != nil {
+		log.Error("Error configuring crawler",
+			"error", err,
+			"source", source.Name)
+		return
+	}
+
+	if err := c.Start(ctx, source.URL); err != nil {
+		log.Error("Error starting crawler",
+			"error", err,
+			"source", source.Name)
+		return
+	}
+
+	c.Wait()
+	log.Info("Crawl completed", "source", source.Name)
+}
+
 // checkAndRunJobs evaluates and executes scheduled jobs.
 func checkAndRunJobs(
 	ctx context.Context,
@@ -80,6 +134,11 @@ func checkAndRunJobs(
 		return
 	}
 
+	if c == nil {
+		log.Error("Crawler instance is nil")
+		return
+	}
+
 	currentTime := now.Format("15:04")
 	log.Info("Checking jobs", "current_time", currentTime)
 
@@ -89,46 +148,7 @@ func checkAndRunJobs(
 				log.Info("Running scheduled crawl",
 					"source", source.Name,
 					"time", scheduledTime)
-
-				// Configure crawler for this source
-				c.SetMaxDepth(source.MaxDepth)
-				if err := c.SetRateLimit(source.RateLimit); err != nil {
-					log.Error("Error setting rate limit",
-						"error", err,
-						"source", source.Name)
-					continue
-				}
-
-				// Create and configure the collector for this source
-				collectorResult, collectorErr := collector.New(collector.Params{
-					BaseURL:   source.URL,
-					MaxDepth:  source.MaxDepth,
-					RateLimit: time.Second, // Default rate limit
-					Logger:    log,
-					Context:   ctx,
-				})
-				if collectorErr != nil {
-					log.Error("Error creating collector",
-						"error", collectorErr,
-						"source", source.Name)
-					continue
-				}
-
-				// Set the collector in the crawler instance
-				c.SetCollector(collectorResult.Collector)
-
-				// Start crawling
-				if err := c.Start(ctx, source.URL); err != nil {
-					log.Error("Error starting crawler",
-						"error", err,
-						"source", source.Name)
-					continue
-				}
-
-				// Wait for crawl to complete
-				c.Wait()
-				log.Info("Crawl completed",
-					"source", source.Name)
+				executeCrawl(ctx, log, c, source)
 			}
 		}
 	}
