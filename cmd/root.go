@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/cmd/indices"
 	"github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -32,23 +33,27 @@ The crawler can be configured to:
 - Store content in Elasticsearch with proper indexing
 - Handle rate limiting and respect robots.txt
 - Process different types of content (articles, general web pages)`,
-		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
-			// If config file is provided via flag, use absolute path
-			if cfgFile != "" {
-				if !os.IsPathSeparator(cfgFile[0]) {
-					// Convert relative path to absolute
-					wd, err := os.Getwd()
-					if err != nil {
-						return fmt.Errorf("failed to get working directory: %w", err)
-					}
-					cfgFile = wd + string(os.PathSeparator) + cfgFile
-				}
-				os.Setenv("CONFIG_FILE", cfgFile)
-			}
-			return nil
-		},
+		PersistentPreRunE: setupConfig,
 	}
 )
+
+// setupConfig handles configuration file setup for all commands.
+// It ensures the config file path is absolute and sets it in the environment.
+func setupConfig(_ *cobra.Command, _ []string) error {
+	// If config file is provided via flag, use absolute path
+	if cfgFile != "" {
+		if !os.IsPathSeparator(cfgFile[0]) {
+			// Convert relative path to absolute
+			wd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+			cfgFile = wd + string(os.PathSeparator) + cfgFile
+		}
+		os.Setenv("CONFIG_FILE", cfgFile)
+	}
+	return nil
+}
 
 // Execute is the entry point for the CLI application.
 // It runs the root command and handles any errors that occur during execution.
@@ -65,11 +70,13 @@ func Execute() {
 // - The persistent --config flag for specifying the configuration file
 // - Adds the indices subcommand for managing Elasticsearch indices
 // - Adds the sources subcommand for managing web content sources
+// - Adds the crawl subcommand for crawling web content
 func init() {
 	// Add the persistent --config flag to all commands
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
 
 	// Add subcommands for managing different aspects of the crawler
-	rootCmd.AddCommand(indices.Command()) // For managing Elasticsearch indices
-	rootCmd.AddCommand(sources.Command()) // For managing web content sources
+	rootCmd.AddCommand(indices.Command())  // For managing Elasticsearch indices
+	rootCmd.AddCommand(sources.Command())  // For managing web content sources
+	rootCmd.AddCommand(crawlcmd.Command()) // For crawling web content
 }
