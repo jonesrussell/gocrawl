@@ -26,6 +26,12 @@ const (
 	maxRetries = 2
 	// maxConnections is the maximum number of concurrent connections.
 	maxConnections = 10
+	// idleTimeoutSeconds is the timeout for idle connections.
+	idleTimeoutSeconds = 30
+	// tlsTimeoutSeconds is the timeout for TLS handshake.
+	tlsTimeoutSeconds = 10
+	// expectContinueTimeoutSeconds is the timeout for expect-continue handshake.
+	expectContinueTimeoutSeconds = 1
 )
 
 // Setup handles the setup and configuration of the collector.
@@ -85,9 +91,9 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 		MaxIdleConns:          maxConnections,
 		MaxIdleConnsPerHost:   maxConnections,
 		MaxConnsPerHost:       maxConnections,
-		IdleConnTimeout:       30 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+		IdleConnTimeout:       time.Duration(idleTimeoutSeconds) * time.Second,
+		TLSHandshakeTimeout:   time.Duration(tlsTimeoutSeconds) * time.Second,
+		ExpectContinueTimeout: time.Duration(expectContinueTimeoutSeconds) * time.Second,
 	}
 
 	// Set custom transport
@@ -117,7 +123,6 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 			strings.Contains(err.Error(), "TLS handshake") ||
 			strings.Contains(err.Error(), "connection refused") ||
 			(r.StatusCode >= 500 && r.StatusCode < 600)) && count < maxRetries {
-
 			retryCount[url] = count + 1
 			s.config.Logger.Warn("Retrying request",
 				"url", url,
