@@ -113,10 +113,23 @@ Example:
 		signalDone, cleanup := app.WaitForSignal(ctx, cancel)
 		defer cleanup()
 
+		// Create the crawler's completion channel
+		crawlerDone := make(chan struct{})
+
 		// Initialize the Fx application with the crawl module
 		fxApp := fx.New(
 			fx.NopLogger,
 			Module,
+			fx.Provide(
+				fx.Annotate(
+					func() context.Context { return ctx },
+					fx.ResultTags(`name:"crawlContext"`),
+				),
+				fx.Annotate(
+					func() chan struct{} { return crawlerDone },
+					fx.ResultTags(`name:"crawlDone"`),
+				),
+			),
 			fx.Invoke(StartCrawl),
 		)
 
@@ -132,11 +145,18 @@ Example:
 		select {
 		case <-signalDone:
 			// Normal completion through signal
-			return nil
+		case <-crawlerDone:
+			// Crawler completed successfully
 		case <-ctx.Done():
 			// Context cancelled
-			return nil
 		}
+
+		// Perform graceful shutdown
+		if shutdownErr := fxApp.Stop(ctx); shutdownErr != nil {
+			return fmt.Errorf("error during shutdown: %w", shutdownErr)
+		}
+
+		return nil
 	},
 }
 

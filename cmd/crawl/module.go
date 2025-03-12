@@ -2,8 +2,6 @@
 package crawl
 
 import (
-	"context"
-
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -37,19 +35,6 @@ var Module = fx.Module("crawl",
 		fx.Annotate(
 			func() chan struct{} { return make(chan struct{}) },
 			fx.ResultTags(`name:"crawlDone"`),
-		),
-		fx.Annotate(
-			func(lc fx.Lifecycle) context.Context {
-				ctx, cancel := context.WithCancel(context.Background())
-				lc.Append(fx.Hook{
-					OnStop: func(context.Context) error {
-						cancel()
-						return nil
-					},
-				})
-				return ctx
-			},
-			fx.ResultTags(`name:"crawlContext"`),
 		),
 		fx.Annotate(
 			func() string { return sourceName },
