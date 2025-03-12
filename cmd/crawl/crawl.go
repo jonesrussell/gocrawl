@@ -71,12 +71,10 @@ func StartCrawl(p Params) error {
 			// Monitor crawl completion in a separate goroutine
 			go func() {
 				p.Crawler.Wait()
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					close(p.Done)
-				}
+				p.Logger.Info("Crawler finished processing all URLs")
+
+				// Signal completion through the Done channel
+				close(p.Done)
 			}()
 
 			return nil
@@ -190,7 +188,14 @@ Example:
 		}
 
 		// Wait for completion or cancellation
-		<-done
+		select {
+		case <-done:
+			// Normal completion through signal
+			log.Info("Received shutdown signal")
+		case <-ctx.Done():
+			// Context cancelled
+			log.Info("Context cancelled")
+		}
 
 		// Perform graceful shutdown
 		if shutdownErr := app.GracefulShutdown(fxApp); shutdownErr != nil {
