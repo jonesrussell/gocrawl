@@ -34,6 +34,21 @@ tasks:
       - go run main.go indices list
     ignore_error: true
 
+  indices:delete:
+    desc: "Delete one or more Elasticsearch indices"
+    cmds:
+      - |
+        if [ "{{.SOURCE}}" != "" ]; then
+          go run main.go indices delete --source "{{.SOURCE}}" {{if .FORCE}}--force{{end}}
+        else
+          go run main.go indices delete {{.CLI_ARGS}}
+        fi
+    ignore_error: true
+    interactive: true
+    vars:
+      SOURCE: '{{.SOURCE | default ""}}'
+      FORCE: '{{.FORCE | default "false"}}'
+
   job:
     desc: "Run the job scheduler for automated crawling based on sources.yml schedules"
     cmds:

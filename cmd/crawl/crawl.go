@@ -18,12 +18,13 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 // sourceName holds the name of the source being crawled, populated from command line arguments.
 var sourceName string
 
-// SetSourceName sets the source name for testing purposes
+// SetSourceName sets the source name for testing purposes.
 func SetSourceName(name string) {
 	sourceName = name
 }
@@ -32,58 +33,61 @@ func SetSourceName(name string) {
 type Params struct {
 	fx.In
 
-	// Lifecycle manages the application's startup and shutdown hooks
-	Lifecycle fx.Lifecycle
-
-	// Sources provides access to configured crawl sources
-	Sources *sources.Sources
-
-	// CrawlerInstance handles the core crawling functionality
-	CrawlerInstance crawler.Interface
-
-	// Processors is a slice of content processors, injected as a group
+	Lifecycle  fx.Lifecycle
+	Sources    sources.Interface `name:"sourceManager"`
+	Crawler    crawler.Interface
+	Logger     logger.Interface
+	Config     config.Interface
+	Done       chan struct{}             `name:"crawlDone"`
+	Context    context.Context           `name:"crawlContext"`
 	Processors []models.ContentProcessor `group:"processors"`
-
-	// Logger provides structured logging capabilities
-	Logger logger.Interface
-
-	// Done is a channel that signals when the crawl operation is complete
-	Done chan struct{} `name:"crawlDone"`
-
-	// Config holds the application configuration
-	Config config.Interface
-
-	// Context provides the context for the crawl operation
-	Context context.Context `name:"crawlContext"`
 }
 
 // StartCrawl initializes and starts the crawling process.
 func StartCrawl(p Params) error {
-	return startCrawl(p)
-}
-
-// startCrawl is the internal implementation of StartCrawl
-func startCrawl(p Params) error {
-	if p.CrawlerInstance == nil {
-		return errors.New("crawler is not initialized")
+	source, findErr := p.Sources.FindByName(sourceName)
+	if findErr != nil {
+		return fmt.Errorf("error finding source: %w", findErr)
 	}
 
-	// Get the source configuration first
-	source, err := p.Sources.FindByName(sourceName)
-	if err != nil {
-		return fmt.Errorf("error finding source: %w", err)
-	}
+	// Register lifecycle hooks
+	p.Lifecycle.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			collectorResult, setupErr := app.SetupCollector(ctx, p.Logger, *source, p.Processors, p.Done, p.Config)
+			if setupErr != nil {
+				return fmt.Errorf("error setting up collector: %w", setupErr)
+			}
 
-	// Set up the collector
-	collectorResult, err := app.SetupCollector(p.Context, p.Logger, *source, p.Processors, p.Done, p.Config)
-	if err != nil {
-		return fmt.Errorf("error setting up collector: %w", err)
-	}
+			if configErr := app.ConfigureCrawler(p.Crawler, *source, collectorResult); configErr != nil {
+				return fmt.Errorf("error configuring crawler: %w", configErr)
+			}
 
-	// Configure the crawler
-	if err := app.ConfigureCrawler(p.CrawlerInstance, *source, collectorResult); err != nil {
-		return fmt.Errorf("error configuring crawler: %w", err)
-	}
+			p.Logger.Info("Starting crawl", "source", source.Name)
+			if startErr := p.Crawler.Start(ctx, source.URL); startErr != nil {
+				return fmt.Errorf("error starting crawler: %w", startErr)
+			}
+
+			// Monitor crawl completion in a separate goroutine
+			go func() {
+				p.Crawler.Wait()
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					close(p.Done)
+				}
+			}()
+
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			p.Logger.Info("Stopping crawler")
+			if stopErr := p.Crawler.Stop(ctx); stopErr != nil {
+				return fmt.Errorf("error stopping crawler: %w", stopErr)
+			}
+			return nil
+		},
+	})
 
 	return nil
 }
@@ -109,66 +113,83 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceName = args[0]
 
-		// Create a parent context that can be cancelled
+		// Create a cancellable context and set up signal handling
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Set up signal handling
 		done, cleanup := app.WaitForSignal(ctx, cancel)
 		defer cleanup()
 
-		// Initialize the Fx application with required modules and dependencies
+		// Create a logger for the command
+		log, logErr := zap.NewProduction()
+		if logErr != nil {
+			return fmt.Errorf("error creating logger: %w", logErr)
+		}
+		defer func() {
+			if syncErr := log.Sync(); syncErr != nil {
+				// We can't return an error here since we're in a defer,
+				// but we can at least try to log it
+				log.Error("Failed to sync logger", zap.Error(syncErr))
+			}
+		}()
+
+		// Initialize the Fx application with required modules
 		fxApp := fx.New(
+			fx.NopLogger,
 			common.Module,
 			article.Module,
 			content.Module,
 			collector.Module(),
-			Module,
+			crawler.Module,
+			sources.Module,
 			fx.Provide(
 				fx.Annotate(
-					func() chan struct{} {
-						return make(chan struct{})
-					},
+					func() chan struct{} { return make(chan struct{}) },
 					fx.ResultTags(`name:"crawlDone"`),
 				),
 				fx.Annotate(
-					func() context.Context {
-						return ctx
-					},
+					func() context.Context { return ctx },
 					fx.ResultTags(`name:"crawlContext"`),
 				),
 				fx.Annotate(
-					func() string {
-						return sourceName
-					},
+					func() string { return sourceName },
 					fx.ResultTags(`name:"sourceName"`),
 				),
 				fx.Annotate(
-					func(sources *sources.Sources) (string, string) {
-						source, err := sources.FindByName(sourceName)
-						if err != nil {
+					func(sources sources.Interface) (string, string) {
+						src, srcErr := sources.FindByName(sourceName)
+						if srcErr != nil {
 							return "", ""
 						}
-						return source.Index, source.ArticleIndex
+						return src.Index, src.ArticleIndex
 					},
+					fx.ParamTags(`name:"sourceManager"`),
 					fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
 				),
 				func() chan *models.Article {
 					return make(chan *models.Article, app.DefaultChannelBufferSize)
 				},
 			),
+			fx.Invoke(StartCrawl),
 		)
 
 		// Start the application
-		if err := fxApp.Start(ctx); err != nil {
-			return fmt.Errorf("error starting application: %w", err)
+		if startErr := fxApp.Start(ctx); startErr != nil {
+			if errors.Is(startErr, context.Canceled) {
+				return nil
+			}
+			return fmt.Errorf("error starting application: %w", startErr)
 		}
 
-		// Wait for completion or interruption
+		// Wait for completion or cancellation
 		<-done
 
 		// Perform graceful shutdown
-		return app.GracefulShutdown(fxApp)
+		if shutdownErr := app.GracefulShutdown(fxApp); shutdownErr != nil {
+			log.Error("Error during shutdown", zap.Error(shutdownErr))
+		}
+
+		return nil
 	},
 }
 

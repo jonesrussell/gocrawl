@@ -52,4 +52,5 @@ var Module = fx.Module("common",
 	config.Module,
 	logger.Module,
 	storage.Module,
+	sources.Module,
 )

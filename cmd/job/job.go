@@ -36,7 +36,7 @@ type Params struct {
 	Lifecycle fx.Lifecycle
 
 	// Sources provides access to configured crawl sources
-	Sources *sources.Sources
+	Sources sources.Interface `name:"sourceManager"`
 
 	// CrawlerInstance handles the core crawling functionality
 	CrawlerInstance crawler.Interface
@@ -64,7 +64,7 @@ type Params struct {
 func runScheduler(
 	ctx context.Context,
 	log common.Logger,
-	sources *sources.Sources,
+	sources sources.Interface,
 	c crawler.Interface,
 	processors []models.ContentProcessor,
 	done chan struct{},
@@ -135,7 +135,7 @@ func executeCrawl(
 func checkAndRunJobs(
 	ctx context.Context,
 	log common.Logger,
-	sources *sources.Sources,
+	sources sources.Interface,
 	c crawler.Interface,
 	now time.Time,
 	processors []models.ContentProcessor,
@@ -250,6 +250,7 @@ var Cmd = &cobra.Command{
 			content.Module,
 			collector.Module(),
 			crawler.Module,
+			sources.Module,
 			fx.Provide(
 				fx.Annotate(
 					func() context.Context {
@@ -257,13 +258,12 @@ var Cmd = &cobra.Command{
 					},
 					fx.ResultTags(`name:"jobContext"`),
 				),
-				provideSources,
 				func() *int32 {
 					var jobs int32
 					return &jobs
 				},
 				fx.Annotate(
-					func(sources *sources.Sources) (string, string) {
+					func(sources sources.Interface) (string, string) {
 						// For job scheduler, we'll use the first source's indices
 						if len(sources.GetSources()) > 0 {
 							allSources := sources.GetSources()
@@ -271,16 +271,18 @@ var Cmd = &cobra.Command{
 						}
 						return "content", "articles" // Default indices if no sources
 					},
+					fx.ParamTags(`name:"sourceManager"`),
 					fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
 				),
 				fx.Annotate(
-					func(sources *sources.Sources) string {
+					func(sources sources.Interface) string {
 						// For job scheduler, we'll use the first source's name
 						if len(sources.GetSources()) > 0 {
 							return sources.GetSources()[0].Name
 						}
 						return "default" // Default source name if no sources
 					},
+					fx.ParamTags(`name:"sourceManager"`),
 					fx.ResultTags(`name:"sourceName"`),
 				),
 				fx.Annotate(
@@ -324,9 +326,4 @@ var Cmd = &cobra.Command{
 // Command returns the job command.
 func Command() *cobra.Command {
 	return Cmd
-}
-
-// provideSources creates a new Sources instance from the sources.yml file.
-func provideSources() (*sources.Sources, error) {
-	return sources.LoadFromFile("sources.yml")
 }

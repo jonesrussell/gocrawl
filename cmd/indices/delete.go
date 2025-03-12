@@ -22,19 +22,13 @@ import (
 var deleteSourceName string
 
 // deleteParams holds the parameters required for deleting indices.
-// It contains the context, storage interface, sources configuration, logger,
-// and command-specific parameters needed for the delete operation.
 type deleteParams struct {
-	fx.In
-
 	ctx     context.Context
 	storage common.Storage
-	sources *sources.Sources
+	sources sources.Interface
 	logger  common.Logger
-	// indices contains the list of indices to delete
 	indices []string
-	// force indicates whether to skip the confirmation prompt
-	force bool
+	force   bool
 }
 
 // deleteCommand creates and returns the delete command that removes indices.
@@ -79,11 +73,6 @@ func validateDeleteArgs(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-// provideSources creates a new Sources instance from the sources.yml file.
-func provideSources() (*sources.Sources, error) {
-	return sources.LoadFromFile("sources.yml")
-}
-
 // runDelete executes the delete command and removes the specified indices.
 // It:
 // - Sets up signal handling for graceful shutdown
@@ -104,24 +93,27 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
-		common.Module,
+		fx.NopLogger, // Suppress Fx startup/shutdown logs
 		Module,
-		fx.Provide(
-			provideSources,
-		),
-		fx.Invoke(func(lc fx.Lifecycle, storage common.Storage, sources *sources.Sources, l common.Logger) {
-			lc.Append(fx.Hook{
+		fx.Invoke(func(p struct {
+			fx.In
+			Storage common.Storage
+			Sources sources.Interface `name:"sourceManager"`
+			Logger  common.Logger
+			LC      fx.Lifecycle
+		}) {
+			p.LC.Append(fx.Hook{
 				OnStart: func(context.Context) error {
 					params := &deleteParams{
 						ctx:     cmd.Context(),
-						storage: storage,
-						sources: sources,
-						logger:  l,
+						storage: p.Storage,
+						sources: p.Sources,
+						logger:  p.Logger,
 						indices: args,
 						force:   force,
 					}
 					if err := executeDelete(params); err != nil {
-						l.Error("Error executing delete", "error", err)
+						p.Logger.Error("Error executing delete", "error", err)
 						errChan <- err
 						return err
 					}
