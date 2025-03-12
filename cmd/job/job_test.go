@@ -139,9 +139,12 @@ func TestJobCommand(t *testing.T) {
 	app := fxtest.New(t,
 		fx.Provide(
 			// Override the sources provider
-			func() (*sources.Sources, error) {
-				return testSources, nil
-			},
+			fx.Annotate(
+				func() sources.Interface {
+					return testSources
+				},
+				fx.ResultTags(`name:"sourceManager"`),
+			),
 			// Mock dependencies
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
