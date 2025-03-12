@@ -65,15 +65,20 @@ func runList(cmd *cobra.Command, _ []string) error {
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		fx.NopLogger,
-		fx.Supply(cmd.Context()),
-		fx.Provide(
-			func() context.Context { return cmd.Context() },
-		),
-		sources.Module,
-		fx.Invoke(func(lc fx.Lifecycle, p listParams) {
-			lc.Append(fx.Hook{
+		Module,
+		fx.Invoke(func(p struct {
+			fx.In
+			Sources sources.Interface `name:"sourceManager"`
+			Logger  common.Logger
+			LC      fx.Lifecycle
+		}) {
+			p.LC.Append(fx.Hook{
 				OnStart: func(context.Context) error {
-					if err := executeList(p); err != nil {
+					params := &listParams{
+						SourceManager: p.Sources,
+						Logger:        p.Logger,
+					}
+					if err := executeList(*params); err != nil {
 						p.Logger.Error("Error executing list", "error", err)
 						errChan <- err
 						return err
