@@ -2,11 +2,11 @@
 package sources
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/sources"
+	s "github.com/jonesrussell/gocrawl/internal/sources"
 	"go.uber.org/fx"
 )
 
 // Module provides the sources command dependencies
-var Module = fx.Module("sources",
-	sources.Module,
+var Module = fx.Module("sourcesCmd",
+	s.Module,
 )
