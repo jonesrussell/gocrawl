@@ -26,20 +26,10 @@ const (
 )
 
 // listParams holds the parameters required for listing indices.
-// It uses fx.In to enable dependency injection of required components.
-// This struct is used internally by the executeList function to manage
-// dependencies and maintain clean separation of concerns.
 type listParams struct {
-	fx.In
-
-	// ctx is the context for managing timeouts and cancellation
-	ctx context.Context
-
-	// storage provides access to Elasticsearch operations
+	ctx     context.Context
 	storage common.Storage
-
-	// logger is used for structured logging throughout the command
-	logger common.Logger
+	logger  common.Logger
 }
 
 // listCommand creates and returns the list command that displays all indices.
@@ -78,18 +68,23 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
-		common.Module,
+		fx.NopLogger, // Suppress Fx startup/shutdown logs
 		Module,
-		fx.Invoke(func(lc fx.Lifecycle, s common.Storage, l common.Logger) {
-			lc.Append(fx.Hook{
+		fx.Invoke(func(p struct {
+			fx.In
+			Storage common.Storage
+			Logger  common.Logger
+			LC      fx.Lifecycle
+		}) {
+			p.LC.Append(fx.Hook{
 				OnStart: func(context.Context) error {
 					params := &listParams{
 						ctx:     cmd.Context(),
-						storage: s,
-						logger:  l,
+						storage: p.Storage,
+						logger:  p.Logger,
 					}
 					if err := executeList(params); err != nil {
-						l.Error("Error executing list", "error", err)
+						p.Logger.Error("Error executing list", "error", err)
 						errChan <- err
 						return err
 					}
