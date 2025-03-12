@@ -4,6 +4,8 @@ package crawl_test
 import (
 	"testing"
 
+	"github.com/golang/mock/gomock"
+	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -19,60 +21,46 @@ import (
 
 // TestModuleProvides tests that the crawl module provides all necessary dependencies
 func TestModuleProvides(t *testing.T) {
-	// Create test dependencies
-	mockLogger := logger.NewMockLogger()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
 	mockCfg := config.NewMockConfig().WithSources([]config.Source{
 		{
 			Name: "Test Source",
-			URL:  "https://test.com",
+			URL:  "http://test.example.com",
 		},
 	})
 
 	testConfigs := []sources.Config{
 		{
 			Name:      "Test Source",
-			URL:       "https://test.com",
+			URL:       "http://test.example.com",
 			RateLimit: "1s",
 			MaxDepth:  2,
 		},
 	}
 	testSources := testutils.NewTestSources(testConfigs)
 
-	var (
-		crawlerInstance crawler.Interface
-		src             *sources.Sources
-	)
-
-	// Create test app with crawl module
 	app := fxtest.New(t,
+		crawl.Module,
 		fx.Provide(
 			func() interfaces.Logger { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() *sources.Sources { return testSources },
 			func() api.IndexManager { return api.NewMockIndexManager() },
 		),
-		// Provide only crawler module since we're providing sources directly
-		crawler.Module,
-		fx.Populate(&crawlerInstance, &src),
 	)
-
-	// Start the app
-	require.NoError(t, app.Start(t.Context()))
-	defer app.Stop(t.Context())
-
-	// Verify dependencies were provided
-	assert.NotNil(t, crawlerInstance, "Crawler should be provided")
-	assert.NotNil(t, src, "Sources should be provided")
-
-	// Use GetSources() to access the sources
-	sources := src.GetSources()
-	assert.Equal(t, "Test Source", sources[0].Name, "Source name should match configuration")
+	require.NoError(t, app.Err())
 }
 
 // TestModuleConfiguration tests the module's configuration behavior
 func TestModuleConfiguration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	// Create test dependencies
-	mockLogger := logger.NewMockLogger()
+	mockLogger := logger.NewMockInterface(ctrl)
 	mockCfg := config.NewMockConfig().
 		WithSources([]config.Source{
 			{

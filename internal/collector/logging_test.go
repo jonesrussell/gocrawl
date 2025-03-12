@@ -1,47 +1,61 @@
 package collector_test
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/stretchr/testify/mock"
 )
 
-// TestConfigureLogging tests the ConfigureLogging function
 func TestConfigureLogging(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
 	c := colly.NewCollector()
-	testLogger := logger.NewMockLogger()
 
-	// Set up mock expectations for all logging events
-	testLogger.On("Debug", "Requesting URL", "url", "http://invalid.example.com").Return()
-	testLogger.On("Error", "Error occurred", "url", "http://invalid.example.com", "error", mock.Anything).Return()
+	// Create test server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("OK"))
+	}))
+	defer ts.Close()
 
-	// Call the ConfigureLogging function
-	collector.ConfigureLogging(c, testLogger)
+	// Test request logging
+	mockLogger.EXPECT().Debug("Requesting URL",
+		"url", ts.URL,
+	).Times(1)
 
-	// Create a channel to signal when the error occurs
-	errorChan := make(chan bool)
-	c.OnError(func(_ *colly.Response, _ error) {
-		errorChan <- true
-	})
+	// Test response logging
+	mockLogger.EXPECT().Debug("Received response",
+		"url", ts.URL,
+		"status", 200,
+	).Times(1)
 
-	// Trigger a request to see if logging works
-	go c.Visit("http://invalid.example.com")
+	// Test error logging
+	mockLogger.EXPECT().Error("Error occurred",
+		"url", "http://localhost:1",
+		"error", "Get \"http://localhost:1\": dial tcp [::1]:1: connect: connection refused",
+	).Times(1)
 
-	// Wait for the error to occur or timeout
-	select {
-	case <-errorChan:
-		// Error occurred as expected
-	case <-time.After(5 * time.Second):
-		t.Fatal("Timeout waiting for error")
-	}
+	// Configure logging
+	collector.ConfigureLogging(c, mockLogger)
 
-	// Give a small delay to ensure all logging is complete
-	time.Sleep(100 * time.Millisecond)
+	// Visit test server to trigger request and response callbacks
+	c.Visit(ts.URL)
 
-	// Verify that the expected log messages were received
-	testLogger.AssertExpectations(t)
+	// Visit with error to trigger error callback
+	c.Visit("http://localhost:1")
+}
+
+type testError struct {
+	msg string
+}
+
+func (e *testError) Error() string {
+	return e.msg
 }

@@ -10,69 +10,221 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
+	"go.uber.org/fx/fxtest"
 )
 
 const (
 	defaultPort = ":8080" // Default port matching the one in module.go
 )
 
+// mockSearchManager implements api.SearchManager for testing
 type mockSearchManager struct {
-	mock.Mock
+	ctrl     *gomock.Controller
+	recorder *mockSearchManagerMockRecorder
+}
+
+type mockSearchManagerMockRecorder struct {
+	mock *mockSearchManager
+}
+
+func NewMockSearchManager(ctrl *gomock.Controller) *mockSearchManager {
+	mock := &mockSearchManager{ctrl: ctrl}
+	mock.recorder = &mockSearchManagerMockRecorder{mock}
+	return mock
+}
+
+func (m *mockSearchManager) EXPECT() *mockSearchManagerMockRecorder {
+	return m.recorder
 }
 
 func (m *mockSearchManager) Search(ctx context.Context, index string, query any) ([]any, error) {
-	args := m.Called(ctx, index, query)
-	return args.Get(0).([]any), args.Error(1)
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Search", ctx, index, query)
+	ret0, _ := ret[0].([]any)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (m *mockSearchManagerMockRecorder) Search(ctx, index, query interface{}) *gomock.Call {
+	m.mock.ctrl.T.Helper()
+	return m.mock.ctrl.RecordCallWithMethodType(m.mock, "Search", nil, ctx, index, query)
 }
 
 func (m *mockSearchManager) Count(ctx context.Context, index string, query any) (int64, error) {
-	args := m.Called(ctx, index, query)
-	return args.Get(0).(int64), args.Error(1)
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Count", ctx, index, query)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (m *mockSearchManagerMockRecorder) Count(ctx, index, query interface{}) *gomock.Call {
+	m.mock.ctrl.T.Helper()
+	return m.mock.ctrl.RecordCallWithMethodType(m.mock, "Count", nil, ctx, index, query)
 }
 
 func (m *mockSearchManager) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
-	args := m.Called(ctx, index, aggs)
-	return args.Get(0), args.Error(1)
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Aggregate", ctx, index, aggs)
+	ret1, _ := ret[1].(error)
+	return ret[0], ret1
 }
 
+func (m *mockSearchManagerMockRecorder) Aggregate(ctx, index, aggs interface{}) *gomock.Call {
+	m.mock.ctrl.T.Helper()
+	return m.mock.ctrl.RecordCallWithMethodType(m.mock, "Aggregate", nil, ctx, index, aggs)
+}
+
+// mockConfig implements config.Interface for testing
 type mockConfig struct {
-	mock.Mock
+	ctrl     *gomock.Controller
+	recorder *mockConfigMockRecorder
 }
 
-func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig {
-	args := m.Called()
-	return args.Get(0).(*config.CrawlerConfig)
+type mockConfigMockRecorder struct {
+	mock *mockConfig
 }
 
-func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
-	args := m.Called()
-	return args.Get(0).(*config.ElasticsearchConfig)
+func NewMockConfig(ctrl *gomock.Controller) *mockConfig {
+	mock := &mockConfig{ctrl: ctrl}
+	mock.recorder = &mockConfigMockRecorder{mock}
+	return mock
 }
 
-func (m *mockConfig) GetLogConfig() *config.LogConfig {
-	args := m.Called()
-	return args.Get(0).(*config.LogConfig)
-}
-
-func (m *mockConfig) GetAppConfig() *config.AppConfig {
-	args := m.Called()
-	return args.Get(0).(*config.AppConfig)
-}
-
-func (m *mockConfig) GetSources() []config.Source {
-	args := m.Called()
-	return args.Get(0).([]config.Source)
+func (m *mockConfig) EXPECT() *mockConfigMockRecorder {
+	return m.recorder
 }
 
 func (m *mockConfig) GetServerConfig() *config.ServerConfig {
-	args := m.Called()
-	return args.Get(0).(*config.ServerConfig)
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServerConfig")
+	ret0, _ := ret[0].(*config.ServerConfig)
+	return ret0
+}
+
+func (m *mockConfigMockRecorder) GetServerConfig() *gomock.Call {
+	m.mock.ctrl.T.Helper()
+	return m.mock.ctrl.RecordCallWithMethodType(m.mock, "GetServerConfig", nil)
+}
+
+func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetElasticsearchConfig")
+	ret0, _ := ret[0].(*config.ElasticsearchConfig)
+	return ret0
+}
+
+func (m *mockConfigMockRecorder) GetElasticsearchConfig() *gomock.Call {
+	m.mock.ctrl.T.Helper()
+	return m.mock.ctrl.RecordCallWithMethodType(m.mock, "GetElasticsearchConfig", nil)
+}
+
+func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCrawlerConfig")
+	ret0, _ := ret[0].(*config.CrawlerConfig)
+	return ret0
+}
+
+func (m *mockConfigMockRecorder) GetCrawlerConfig() *gomock.Call {
+	m.mock.ctrl.T.Helper()
+	return m.mock.ctrl.RecordCallWithMethodType(m.mock, "GetCrawlerConfig", nil)
+}
+
+func (m *mockConfig) GetLogConfig() *config.LogConfig {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLogConfig")
+	ret0, _ := ret[0].(*config.LogConfig)
+	return ret0
+}
+
+func (m *mockConfigMockRecorder) GetLogConfig() *gomock.Call {
+	m.mock.ctrl.T.Helper()
+	return m.mock.ctrl.RecordCallWithMethodType(m.mock, "GetLogConfig", nil)
+}
+
+func (m *mockConfig) GetAppConfig() *config.AppConfig {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAppConfig")
+	ret0, _ := ret[0].(*config.AppConfig)
+	return ret0
+}
+
+func (m *mockConfigMockRecorder) GetAppConfig() *gomock.Call {
+	m.mock.ctrl.T.Helper()
+	return m.mock.ctrl.RecordCallWithMethodType(m.mock, "GetAppConfig", nil)
+}
+
+func (m *mockConfig) GetSources() []config.Source {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSources")
+	ret0, _ := ret[0].([]config.Source)
+	return ret0
+}
+
+func (m *mockConfigMockRecorder) GetSources() *gomock.Call {
+	m.mock.ctrl.T.Helper()
+	return m.mock.ctrl.RecordCallWithMethodType(m.mock, "GetSources", nil)
+}
+
+func TestModule(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
+	mockCfg := NewMockConfig(ctrl)
+
+	// Set up expectations for required config methods
+	mockCfg.EXPECT().GetElasticsearchConfig().Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		Username:  "elastic",
+		Password:  "changeme",
+	}).AnyTimes()
+
+	app := fxtest.New(t,
+		fx.Provide(
+			func() logger.Interface { return mockLogger },
+			func() config.Interface { return mockCfg },
+		),
+		api.Module,
+	)
+	require.NoError(t, app.Err())
+}
+
+func TestModuleProvides(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
+	mockCfg := NewMockConfig(ctrl)
+
+	// Set up expectations for required config methods
+	mockCfg.EXPECT().GetElasticsearchConfig().Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		Username:  "elastic",
+		Password:  "changeme",
+	}).AnyTimes()
+
+	var searchManager api.SearchManager
+
+	app := fxtest.New(t,
+		api.Module,
+		fx.Provide(
+			func() logger.Interface { return mockLogger },
+			func() config.Interface { return mockCfg },
+		),
+		fx.Populate(&searchManager),
+	)
+	defer app.RequireStart().RequireStop()
+
+	require.NotNil(t, searchManager)
 }
 
 func TestStartHTTPServer(t *testing.T) {
@@ -115,13 +267,16 @@ func TestStartHTTPServer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
 			// Create mock logger
-			mockLogger := logger.NewMockLogger()
-			mockLogger.On("Info", "StartHTTPServer function called").Return()
-			mockLogger.On("Info", "Server configuration", "address", ":8080").Return()
+			mockLogger := logger.NewMockInterface(ctrl)
+			mockLogger.EXPECT().Info("StartHTTPServer function called").Times(1)
+			mockLogger.EXPECT().Info("Server configuration", "address", ":8080").Times(1)
 
 			// Create mock search manager
-			mockSearch := new(mockSearchManager)
+			mockSearch := NewMockSearchManager(ctrl)
 
 			// Set up expected queries
 			searchQuery := map[string]any{
@@ -142,16 +297,16 @@ func TestStartHTTPServer(t *testing.T) {
 			}
 
 			// Set up mock expectations
-			mockSearch.On("Search", mock.Anything, tt.index, searchQuery).Return(tt.mockResults, nil)
-			mockSearch.On("Count", mock.Anything, tt.index, countQuery).Return(tt.mockCount, nil)
+			mockSearch.EXPECT().Search(gomock.Any(), tt.index, searchQuery).Return(tt.mockResults, nil).Times(1)
+			mockSearch.EXPECT().Count(gomock.Any(), tt.index, countQuery).Return(tt.mockCount, nil).Times(1)
 
-			mockCfg := new(mockConfig)
-			mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+			mockCfg := NewMockConfig(ctrl)
+			mockCfg.EXPECT().GetServerConfig().Return(&config.ServerConfig{
 				Address:      ":8080",
 				ReadTimeout:  10 * time.Second,
 				WriteTimeout: 30 * time.Second,
 				IdleTimeout:  60 * time.Second,
-			})
+			}).Times(1)
 
 			// Start the server
 			server, err := api.StartHTTPServer(mockLogger, mockSearch, mockCfg)
@@ -182,11 +337,6 @@ func TestStartHTTPServer(t *testing.T) {
 
 			assert.Equal(t, tt.mockResults, response.Results)
 			assert.Equal(t, int(tt.mockCount), response.Total)
-
-			// Verify mock expectations
-			mockLogger.AssertExpectations(t)
-			mockSearch.AssertExpectations(t)
-			mockCfg.AssertExpectations(t)
 		})
 	}
 }
@@ -240,21 +390,24 @@ func TestStartHTTPServer_PortConfiguration(t *testing.T) {
 				t.Setenv("GOCRAWL_PORT", tt.envPort)
 			}
 
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
 			// Create mock logger
-			mockLogger := logger.NewMockLogger()
-			mockLogger.On("Info", "StartHTTPServer function called").Return()
-			mockLogger.On("Info", "Server configuration", "address", tt.expectedAddr).Return()
+			mockLogger := logger.NewMockInterface(ctrl)
+			mockLogger.EXPECT().Info("StartHTTPServer function called").Times(1)
+			mockLogger.EXPECT().Info("Server configuration", "address", tt.expectedAddr).Times(1)
 
 			// Create mock search manager
-			mockSearch := new(mockSearchManager)
+			mockSearch := NewMockSearchManager(ctrl)
 
-			mockCfg := new(mockConfig)
-			mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+			mockCfg := NewMockConfig(ctrl)
+			mockCfg.EXPECT().GetServerConfig().Return(&config.ServerConfig{
 				Address:      tt.configPort,
 				ReadTimeout:  10 * time.Second,
 				WriteTimeout: 30 * time.Second,
 				IdleTimeout:  60 * time.Second,
-			})
+			}).Times(1)
 
 			// Start the server
 			server, err := api.StartHTTPServer(mockLogger, mockSearch, mockCfg)
@@ -263,10 +416,6 @@ func TestStartHTTPServer_PortConfiguration(t *testing.T) {
 
 			// Verify the server address
 			assert.Equal(t, tt.expectedAddr, server.Addr)
-
-			// Verify mock expectations
-			mockLogger.AssertExpectations(t)
-			mockCfg.AssertExpectations(t)
 		})
 	}
 }

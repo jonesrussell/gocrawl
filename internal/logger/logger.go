@@ -12,6 +12,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+//go:generate mockgen -destination=mock_logger.go -package=logger github.com/jonesrussell/gocrawl/internal/logger Interface
+
 // Interface defines the interface for logging operations.
 // It provides structured logging capabilities with different log levels and
 // support for additional fields in log messages.

@@ -2,6 +2,7 @@
 package content
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -17,6 +18,9 @@ type Interface interface {
 	ExtractContent(e *colly.HTMLElement) *models.Content
 	ExtractMetadata(e *colly.HTMLElement) map[string]any
 	DetermineContentType(url string, metadata map[string]any, jsonLDType string) string
+	Process(ctx context.Context, input string) string
+	ProcessBatch(ctx context.Context, input []string) []string
+	ProcessWithMetadata(ctx context.Context, input string, metadata map[string]string) string
 }
 
 // Service implements the Interface
@@ -245,4 +249,29 @@ func cleanBody(e *colly.HTMLElement) string {
 
 	// Get the cleaned text
 	return bodyEl.Text()
+}
+
+// Process processes a single string content
+func (s *Service) Process(ctx context.Context, input string) string {
+	return strings.TrimSpace(input)
+}
+
+// ProcessBatch processes a batch of strings
+func (s *Service) ProcessBatch(ctx context.Context, input []string) []string {
+	result := make([]string, len(input))
+	for i, str := range input {
+		result[i] = s.Process(ctx, str)
+	}
+	return result
+}
+
+// ProcessWithMetadata processes content with additional metadata
+func (s *Service) ProcessWithMetadata(ctx context.Context, input string, metadata map[string]string) string {
+	if metadata != nil {
+		s.Logger.Debug("Processing content with metadata",
+			"source", metadata["source"],
+			"type", metadata["type"],
+		)
+	}
+	return s.Process(ctx, input)
 }

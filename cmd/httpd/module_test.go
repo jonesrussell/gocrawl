@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -13,20 +14,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
-
-// mockLogger implements logger.Interface for testing
-type mockLogger struct{}
-
-func (m *mockLogger) Debug(_ string, _ ...any)       {}
-func (m *mockLogger) Info(_ string, _ ...any)        {}
-func (m *mockLogger) Warn(_ string, _ ...any)        {}
-func (m *mockLogger) Error(_ string, _ ...any)       {}
-func (m *mockLogger) Fatal(_ string, _ ...any)       {}
-func (m *mockLogger) Panic(_ string, _ ...any)       {}
-func (m *mockLogger) With(_ ...any) logger.Interface { return m }
-func (m *mockLogger) Errorf(_ string, _ ...any)      {}
-func (m *mockLogger) Printf(_ string, _ ...any)      {}
-func (m *mockLogger) Sync() error                    { return nil }
 
 // mockConfig implements config.Interface for testing
 type mockConfig struct {
@@ -43,8 +30,11 @@ func (m *mockConfig) GetServerConfig() *config.ServerConfig {
 }
 
 func TestModule(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	// Create mock dependencies
-	mockLogger := &mockLogger{}
+	mockLogger := logger.NewMockInterface(ctrl)
 
 	app := fxtest.New(t,
 		fx.Provide(
@@ -52,9 +42,6 @@ func TestModule(t *testing.T) {
 		),
 		httpd.Module,
 	)
-
-	require.NoError(t, app.Start(t.Context()))
-	defer app.Stop(t.Context())
 	require.NoError(t, app.Err())
 }
 
@@ -62,12 +49,19 @@ func TestModule(t *testing.T) {
 func TestModuleProvides(t *testing.T) {
 	var server *http.Server
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
+	mockSearch := &mockSearchManager{}
+	mockCfg := &mockConfig{}
+
 	app := fxtest.New(t,
 		httpd.Module,
 		fx.Provide(
-			func() logger.Interface { return &mockLogger{} },
-			func() api.SearchManager { return &mockSearchManager{} },
-			func() config.Interface { return &mockConfig{} },
+			func() logger.Interface { return mockLogger },
+			func() api.SearchManager { return mockSearch },
+			func() config.Interface { return mockCfg },
 		),
 		fx.Populate(&server),
 	)

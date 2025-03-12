@@ -6,6 +6,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/gocolly/colly/v2 v2.1.0
+	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/joho/godotenv v1.5.1
