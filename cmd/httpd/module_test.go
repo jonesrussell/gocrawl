@@ -3,9 +3,11 @@ package httpd_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -13,8 +15,31 @@ import (
 )
 
 // mockLogger implements logger.Interface for testing
-type mockLogger struct {
-	logger.Interface
+type mockLogger struct{}
+
+func (m *mockLogger) Debug(_ string, _ ...interface{})       {}
+func (m *mockLogger) Info(_ string, _ ...interface{})        {}
+func (m *mockLogger) Warn(_ string, _ ...interface{})        {}
+func (m *mockLogger) Error(_ string, _ ...interface{})       {}
+func (m *mockLogger) Fatal(_ string, _ ...interface{})       {}
+func (m *mockLogger) Panic(_ string, _ ...interface{})       {}
+func (m *mockLogger) With(_ ...interface{}) logger.Interface { return m }
+func (m *mockLogger) Errorf(_ string, _ ...interface{})      {}
+func (m *mockLogger) Printf(_ string, _ ...interface{})      {}
+func (m *mockLogger) Sync() error                            { return nil }
+
+// mockConfig implements config.Interface for testing
+type mockConfig struct {
+	config.Interface
+}
+
+func (m *mockConfig) GetServerConfig() *config.ServerConfig {
+	return &config.ServerConfig{
+		Address:      ":8080",
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
 }
 
 func TestModule(t *testing.T) {
@@ -42,6 +67,7 @@ func TestModuleProvides(t *testing.T) {
 		fx.Provide(
 			func() logger.Interface { return &mockLogger{} },
 			func() api.SearchManager { return &mockSearchManager{} },
+			func() config.Interface { return &mockConfig{} },
 		),
 		fx.Populate(&server),
 	)
