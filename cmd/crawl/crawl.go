@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
@@ -16,6 +16,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -136,12 +137,19 @@ Example:
 		// Initialize the Fx application with required modules
 		fxApp := fx.New(
 			fx.NopLogger,
-			common.Module,
+			// Core dependencies
+			config.Module,
+			logger.Module,
+			storage.Module,
+			sources.Module,
+			api.Module,
+
+			// Feature modules
 			article.Module,
 			content.Module,
 			collector.Module(),
 			crawler.Module,
-			sources.Module,
+
 			fx.Provide(
 				fx.Annotate(
 					func() chan struct{} { return make(chan struct{}) },
