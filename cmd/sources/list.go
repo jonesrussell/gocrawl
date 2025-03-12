@@ -31,16 +31,16 @@ const (
 	labelFormatterWidth = 8
 )
 
-// listParams holds the parameters required for listing sources.
-type listParams struct {
+// ListParams holds the parameters required for listing sources.
+type ListParams struct {
 	fx.In
 
 	SourceManager sources.Interface `name:"sourceManager"`
 	Logger        common.Logger
 }
 
-// listCommand creates and returns the list command that displays all sources.
-func listCommand() *cobra.Command {
+// ListCommand creates and returns the list command that displays all sources.
+func ListCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all configured content sources",
@@ -48,12 +48,12 @@ func listCommand() *cobra.Command {
 
 Example:
   gocrawl sources list`,
-		RunE: runList,
+		RunE: RunList,
 	}
 }
 
-// runList executes the list command and displays all sources.
-func runList(cmd *cobra.Command, _ []string) error {
+// RunList executes the list command and displays all sources.
+func RunList(cmd *cobra.Command, _ []string) error {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -74,11 +74,11 @@ func runList(cmd *cobra.Command, _ []string) error {
 		}) {
 			p.LC.Append(fx.Hook{
 				OnStart: func(context.Context) error {
-					params := &listParams{
+					params := &ListParams{
 						SourceManager: p.Sources,
 						Logger:        p.Logger,
 					}
-					if err := executeList(*params); err != nil {
+					if err := ExecuteList(*params); err != nil {
 						p.Logger.Error("Error executing list", "error", err)
 						errChan <- err
 						return err
@@ -110,9 +110,9 @@ func runList(cmd *cobra.Command, _ []string) error {
 	case <-cmd.Context().Done():
 		common.PrintInfof("Context cancelled, initiating shutdown...")
 	case listErr = <-errChan:
-		// Error already logged in executeList
+		// Error already logged in ExecuteList
 	case <-doneChan:
-		// Success message already printed in executeList
+		// Success message already printed in ExecuteList
 	}
 
 	// Create a context with timeout for graceful shutdown
@@ -130,19 +130,19 @@ func runList(cmd *cobra.Command, _ []string) error {
 	return listErr
 }
 
-// executeList retrieves and displays the list of sources.
-func executeList(p listParams) error {
-	allSources := p.SourceManager.GetSources()
+// ExecuteList retrieves and displays the list of sources.
+func ExecuteList(params ListParams) error {
+	allSources := params.SourceManager.GetSources()
 	if len(allSources) == 0 {
-		p.Logger.Info("No sources found")
+		params.Logger.Info("No sources found")
 		return nil
 	}
 
-	return printSources(allSources, p.Logger)
+	return PrintSources(allSources, params.Logger)
 }
 
-// printSources formats and displays the sources in a table.
-func printSources(sources []sources.Config, logger common.Logger) error {
+// PrintSources formats and displays the sources in a table.
+func PrintSources(sources []sources.Config, logger common.Logger) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 
