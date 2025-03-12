@@ -6,20 +6,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 // sourceName holds the name of the source being crawled, populated from command line arguments.
@@ -119,66 +113,10 @@ Example:
 		signalDone, cleanup := app.WaitForSignal(ctx, cancel)
 		defer cleanup()
 
-		// Create a logger for the command
-		log, logErr := zap.NewProduction()
-		if logErr != nil {
-			return fmt.Errorf("error creating logger: %w", logErr)
-		}
-		defer func() {
-			if syncErr := log.Sync(); syncErr != nil {
-				// We can't return an error here since we're in a defer,
-				// but we can at least try to log it
-				log.Error("Failed to sync logger", zap.Error(syncErr))
-			}
-		}()
-
-		// Create the crawler's completion channel
-		crawlerDone := make(chan struct{})
-
-		// Initialize the Fx application with required modules
+		// Initialize the Fx application with the crawl module
 		fxApp := fx.New(
 			fx.NopLogger,
-			// Core dependencies
-			config.Module,
-			logger.Module,
-			storage.Module,
-			sources.Module,
-			api.Module,
-
-			// Feature modules
-			article.Module,
-			content.Module,
-			collector.Module(),
-			crawler.Module,
-
-			fx.Provide(
-				fx.Annotate(
-					func() chan struct{} { return crawlerDone },
-					fx.ResultTags(`name:"crawlDone"`),
-				),
-				fx.Annotate(
-					func() context.Context { return ctx },
-					fx.ResultTags(`name:"crawlContext"`),
-				),
-				fx.Annotate(
-					func() string { return sourceName },
-					fx.ResultTags(`name:"sourceName"`),
-				),
-				fx.Annotate(
-					func(sources sources.Interface) (string, string) {
-						src, srcErr := sources.FindByName(sourceName)
-						if srcErr != nil {
-							return "", ""
-						}
-						return src.Index, src.ArticleIndex
-					},
-					fx.ParamTags(`name:"sourceManager"`),
-					fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
-				),
-				func() chan *models.Article {
-					return make(chan *models.Article, app.DefaultChannelBufferSize)
-				},
-			),
+			Module,
 			fx.Invoke(StartCrawl),
 		)
 
@@ -193,19 +131,12 @@ Example:
 		// Wait for completion or cancellation
 		select {
 		case <-signalDone:
-			log.Info("Received interrupt signal")
-		case <-crawlerDone:
-			log.Info("Crawler completed successfully")
+			// Normal completion through signal
+			return nil
 		case <-ctx.Done():
-			log.Info("Context cancelled")
+			// Context cancelled
+			return nil
 		}
-
-		// Perform graceful shutdown
-		if shutdownErr := app.GracefulShutdown(fxApp); shutdownErr != nil {
-			log.Error("Error during shutdown", zap.Error(shutdownErr))
-		}
-
-		return nil
 	},
 }
 
