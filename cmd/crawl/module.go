@@ -33,10 +33,6 @@ var Module = fx.Module("crawl",
 
 	fx.Provide(
 		fx.Annotate(
-			func() chan struct{} { return make(chan struct{}) },
-			fx.ResultTags(`name:"crawlDone"`),
-		),
-		fx.Annotate(
 			func() string { return sourceName },
 			fx.ResultTags(`name:"sourceName"`),
 		),
