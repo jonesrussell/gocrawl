@@ -116,7 +116,7 @@ Example:
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		done, cleanup := app.WaitForSignal(ctx, cancel)
+		signalDone, cleanup := app.WaitForSignal(ctx, cancel)
 		defer cleanup()
 
 		// Create a logger for the command
@@ -131,6 +131,9 @@ Example:
 				log.Error("Failed to sync logger", zap.Error(syncErr))
 			}
 		}()
+
+		// Create the crawler's completion channel
+		crawlerDone := make(chan struct{})
 
 		// Initialize the Fx application with required modules
 		fxApp := fx.New(
@@ -150,7 +153,7 @@ Example:
 
 			fx.Provide(
 				fx.Annotate(
-					func() chan struct{} { return make(chan struct{}) },
+					func() chan struct{} { return crawlerDone },
 					fx.ResultTags(`name:"crawlDone"`),
 				),
 				fx.Annotate(
@@ -189,11 +192,11 @@ Example:
 
 		// Wait for completion or cancellation
 		select {
-		case <-done:
-			// Normal completion through signal
-			log.Info("Received shutdown signal")
+		case <-signalDone:
+			log.Info("Received interrupt signal")
+		case <-crawlerDone:
+			log.Info("Crawler completed successfully")
 		case <-ctx.Done():
-			// Context cancelled
 			log.Info("Context cancelled")
 		}
 
