@@ -86,7 +86,6 @@ func (c *CustomLogger) Warn(msg string, fields ...any) {
 
 // Fatal logs a fatal message and executes the fatal hook
 func (c *CustomLogger) Fatal(msg string, fields ...any) {
-	c.Logger.Fatal(msg, ConvertToZapFields(fields)...)
 	if c.fatalHook != nil {
 		entry := zapcore.Entry{
 			Level:   zapcore.FatalLevel,
@@ -94,6 +93,7 @@ func (c *CustomLogger) Fatal(msg string, fields ...any) {
 		}
 		_ = c.fatalHook(entry)
 	}
+	c.Logger.Fatal(msg, ConvertToZapFields(fields)...)
 }
 
 // Printf logs a formatted message
