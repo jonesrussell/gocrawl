@@ -205,8 +205,8 @@ func resolveIndices(p *deleteParams) error {
 		if err != nil {
 			return err
 		}
-		// Use the source name as the index name
-		p.indices = []string{source.Name}
+		// Use both content and article indices
+		p.indices = []string{source.Index, source.ArticleIndex}
 	}
 	return nil
 }
@@ -271,14 +271,12 @@ func confirmDeletion(indices []string) bool {
 // It:
 // - Deletes each index from Elasticsearch
 // - Logs successful deletions
-// - Reports success to the user
 func deleteIndices(p *deleteParams, indices []string) error {
 	for _, index := range indices {
 		if err := p.storage.DeleteIndex(p.ctx, index); err != nil {
 			return err
 		}
 		p.logger.Info("Deleted index", "index", index)
-		common.PrintSuccessf("Successfully deleted index '%s'", index)
 	}
 	return nil
 }
