@@ -3,30 +3,30 @@ package job
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
+
+	"errors"
+	"sync/atomic"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
 const (
-	// DefaultChannelBufferSize is the default size for buffered channels used for
-	// processing articles and content during crawling.
-	DefaultChannelBufferSize = 100
+	// shutdownTimeoutSeconds is the number of seconds to wait for jobs to complete during shutdown
+	shutdownTimeoutSeconds = 30
 )
 
 // Params holds the dependencies required for the job scheduler.
@@ -37,7 +37,7 @@ type Params struct {
 	Lifecycle fx.Lifecycle
 
 	// Sources provides access to configured crawl sources
-	Sources *sources.Sources
+	Sources sources.Interface `name:"sourceManager"`
 
 	// CrawlerInstance handles the core crawling functionality
 	CrawlerInstance crawler.Interface
@@ -56,17 +56,21 @@ type Params struct {
 
 	// Done is a channel that signals when the crawl operation is complete
 	Done chan struct{} `name:"crawlDone"`
+
+	// ActiveJobs tracks the number of currently running jobs
+	ActiveJobs *int32 `optional:"true"`
 }
 
 // runScheduler manages the execution of scheduled jobs.
 func runScheduler(
 	ctx context.Context,
 	log common.Logger,
-	sources *sources.Sources,
+	sources sources.Interface,
 	c crawler.Interface,
 	processors []models.ContentProcessor,
 	done chan struct{},
 	cfg config.Interface,
+	activeJobs *int32,
 ) {
 	log.Info("Starting job scheduler")
 
@@ -75,7 +79,7 @@ func runScheduler(
 	defer ticker.Stop()
 
 	// Do initial check
-	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg)
+	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg, activeJobs)
 
 	for {
 		select {
@@ -83,62 +87,9 @@ func runScheduler(
 			log.Info("Job scheduler shutting down")
 			return
 		case t := <-ticker.C:
-			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg)
+			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg, activeJobs)
 		}
 	}
-}
-
-// setupCollector creates and configures a new collector for the given source.
-func setupCollector(
-	ctx context.Context,
-	log common.Logger,
-	source sources.Config,
-	processors []models.ContentProcessor,
-	done chan struct{},
-	cfg config.Interface,
-) (collector.Result, error) {
-	rateLimit, err := time.ParseDuration(source.RateLimit)
-	if err != nil {
-		return collector.Result{}, fmt.Errorf("invalid rate limit format: %w", err)
-	}
-
-	// Convert source config to the expected type
-	sourceConfig := common.ConvertSourceConfig(&source)
-	if sourceConfig == nil {
-		return collector.Result{}, errors.New("source configuration is nil")
-	}
-
-	// Extract domain from source URL
-	domain, err := common.ExtractDomain(source.URL)
-	if err != nil {
-		return collector.Result{}, fmt.Errorf("error extracting domain: %w", err)
-	}
-
-	return collector.New(collector.Params{
-		BaseURL:          source.URL,
-		MaxDepth:         source.MaxDepth,
-		RateLimit:        rateLimit,
-		Logger:           log,
-		Context:          ctx,
-		ArticleProcessor: processors[0], // First processor handles articles
-		ContentProcessor: processors[1], // Second processor handles content
-		Done:             done,
-		Debugger:         logger.NewCollyDebugger(log),
-		Source:           sourceConfig,
-		Parallelism:      cfg.GetCrawlerConfig().Parallelism,
-		RandomDelay:      cfg.GetCrawlerConfig().RandomDelay,
-		AllowedDomains:   []string{domain},
-	})
-}
-
-// configureCrawler sets up the crawler with the given source configuration.
-func configureCrawler(c crawler.Interface, source sources.Config, collector collector.Result) error {
-	c.SetCollector(collector.Collector)
-	c.SetMaxDepth(source.MaxDepth)
-	if err := c.SetRateLimit(source.RateLimit); err != nil {
-		return fmt.Errorf("error setting rate limit: %w", err)
-	}
-	return nil
 }
 
 // executeCrawl performs the crawl operation for a single source.
@@ -150,8 +101,12 @@ func executeCrawl(
 	processors []models.ContentProcessor,
 	done chan struct{},
 	cfg config.Interface,
+	activeJobs *int32,
 ) {
-	collectorResult, err := setupCollector(ctx, log, source, processors, done, cfg)
+	atomic.AddInt32(activeJobs, 1)
+	defer atomic.AddInt32(activeJobs, -1)
+
+	collectorResult, err := app.SetupCollector(ctx, log, source, processors, done, cfg)
 	if err != nil {
 		log.Error("Error setting up collector",
 			"error", err,
@@ -159,7 +114,7 @@ func executeCrawl(
 		return
 	}
 
-	if configErr := configureCrawler(c, source, collectorResult); configErr != nil {
+	if configErr := app.ConfigureCrawler(c, source, collectorResult); configErr != nil {
 		log.Error("Error configuring crawler",
 			"error", configErr,
 			"source", source.Name)
@@ -181,12 +136,13 @@ func executeCrawl(
 func checkAndRunJobs(
 	ctx context.Context,
 	log common.Logger,
-	sources *sources.Sources,
+	sources sources.Interface,
 	c crawler.Interface,
 	now time.Time,
 	processors []models.ContentProcessor,
 	done chan struct{},
 	cfg config.Interface,
+	activeJobs *int32,
 ) {
 	if sources == nil {
 		log.Error("Sources configuration is nil")
@@ -201,13 +157,13 @@ func checkAndRunJobs(
 	currentTime := now.Format("15:04")
 	log.Info("Checking jobs", "current_time", currentTime)
 
-	for _, source := range sources.Sources {
+	for _, source := range sources.GetSources() {
 		for _, scheduledTime := range source.Time {
 			if currentTime == scheduledTime {
 				log.Info("Running scheduled crawl",
 					"source", source.Name,
 					"time", scheduledTime)
-				executeCrawl(ctx, log, c, source, processors, done, cfg)
+				executeCrawl(ctx, log, c, source, processors, done, cfg, activeJobs)
 			}
 		}
 	}
@@ -219,9 +175,15 @@ func startJob(p Params) error {
 	ctx, cancel := context.WithCancel(p.Context)
 	defer cancel()
 
+	// Initialize active jobs counter if not provided
+	if p.ActiveJobs == nil {
+		var jobs int32
+		p.ActiveJobs = &jobs
+	}
+
 	// Print loaded schedules
 	p.Logger.Info("Loaded schedules:")
-	for _, source := range p.Sources.Sources {
+	for _, source := range p.Sources.GetSources() {
 		if len(source.Time) > 0 {
 			p.Logger.Info("Source schedule",
 				"name", source.Name,
@@ -230,21 +192,41 @@ func startJob(p Params) error {
 	}
 
 	// Start scheduler in background
-	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config)
+	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config, p.ActiveJobs)
 
 	// Wait for interrupt
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	done, cleanup := app.WaitForSignal(ctx, cancel)
+	defer cleanup()
+
 	p.Logger.Info("Job scheduler running. Press Ctrl+C to stop...")
-	<-sigChan
-	p.Logger.Info("Shutting down...")
+	<-done
 
+	// Log graceful shutdown
+	p.Logger.Info("") // Add newline before shutdown messages
+	p.Logger.Info("Starting graceful shutdown...")
+
+	if atomic.LoadInt32(p.ActiveJobs) > 0 {
+		p.Logger.Info("Waiting for in-progress jobs to complete...")
+		common.PrintInfof("Press Ctrl+C again to force immediate shutdown")
+
+		// Give time for any in-progress jobs to complete
+		timeout := time.Duration(shutdownTimeoutSeconds) * time.Second
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), timeout)
+		defer shutdownCancel()
+
+		// Wait for any in-progress jobs
+		select {
+		case <-p.Done:
+			p.Logger.Info("All jobs completed successfully")
+		case <-shutdownCtx.Done():
+			p.Logger.Warn("Some jobs may not have completed - graceful shutdown timeout reached")
+		}
+	} else {
+		p.Logger.Info("No active jobs - shutting down immediately")
+	}
+
+	p.Logger.Info("Job scheduler stopped")
 	return nil
-}
-
-// provideSources creates a new Sources instance from the sources.yml file.
-func provideSources() (*sources.Sources, error) {
-	return sources.LoadFromFile("sources.yml")
 }
 
 // Cmd represents the job scheduler command.
@@ -257,17 +239,25 @@ var Cmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Set up signal handling for graceful shutdown
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		// Set up signal handling
+		done, cleanup := app.WaitForSignal(ctx, cancel)
+		defer cleanup()
 
 		// Initialize the Fx application with required modules and dependencies
-		app := fx.New(
-			common.Module,
+		fxApp := fx.New(
+			fx.NopLogger, // Suppress Fx startup/shutdown logs
+			// Core dependencies
+			config.Module,
+			sources.Module,
+			storage.Module,
+			logger.Module,
+
+			// Feature modules
 			article.Module,
 			content.Module,
 			collector.Module(),
 			crawler.Module,
+
 			fx.Provide(
 				fx.Annotate(
 					func() context.Context {
@@ -275,25 +265,31 @@ var Cmd = &cobra.Command{
 					},
 					fx.ResultTags(`name:"jobContext"`),
 				),
-				provideSources,
+				func() *int32 {
+					var jobs int32
+					return &jobs
+				},
 				fx.Annotate(
-					func(sources *sources.Sources) (string, string) {
+					func(sources sources.Interface) (string, string) {
 						// For job scheduler, we'll use the first source's indices
-						if len(sources.Sources) > 0 {
-							return sources.Sources[0].Index, sources.Sources[0].ArticleIndex
+						if len(sources.GetSources()) > 0 {
+							allSources := sources.GetSources()
+							return allSources[0].Index, allSources[0].ArticleIndex
 						}
 						return "content", "articles" // Default indices if no sources
 					},
+					fx.ParamTags(`name:"sourceManager"`),
 					fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
 				),
 				fx.Annotate(
-					func(sources *sources.Sources) string {
+					func(sources sources.Interface) string {
 						// For job scheduler, we'll use the first source's name
-						if len(sources.Sources) > 0 {
-							return sources.Sources[0].Name
+						if len(sources.GetSources()) > 0 {
+							return sources.GetSources()[0].Name
 						}
 						return "default" // Default source name if no sources
 					},
+					fx.ParamTags(`name:"sourceManager"`),
 					fx.ResultTags(`name:"sourceName"`),
 				),
 				fx.Annotate(
@@ -303,35 +299,30 @@ var Cmd = &cobra.Command{
 					fx.ResultTags(`name:"crawlDone"`),
 				),
 				func() chan *models.Article {
-					return make(chan *models.Article, DefaultChannelBufferSize)
+					return make(chan *models.Article, app.DefaultChannelBufferSize)
 				},
 			),
 			fx.Invoke(startJob),
 		)
 
-		// Start the application and handle any startup errors
-		if err := app.Start(ctx); err != nil {
+		// Start the application
+		if err := fxApp.Start(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				// Normal shutdown, don't show usage
+				return nil
+			}
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		// Wait for either:
-		// - A signal interrupt (SIGINT/SIGTERM)
-		// - Context cancellation
-		select {
-		case sig := <-sigChan:
-			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-			cancel() // Cancel our context
-		case <-ctx.Done():
-			common.PrintInfof("\nContext cancelled, initiating shutdown...")
-		}
+		// Wait for completion or interruption
+		<-done
 
-		// Create a context with timeout for graceful shutdown
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
-		defer stopCancel()
-
-		// Stop the application and handle any shutdown errors
-		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-			common.PrintErrorf("Error stopping application: %v", err)
+		// Perform graceful shutdown
+		if err := app.GracefulShutdown(fxApp); err != nil {
+			if errors.Is(err, context.Canceled) {
+				// Normal shutdown, don't show usage
+				return nil
+			}
 			return err
 		}
 

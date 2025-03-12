@@ -4,6 +4,7 @@ package job
 import (
 	"context"
 
+	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -26,7 +27,7 @@ var Module = fx.Module("job",
 			fx.ResultTags(`name:"jobContext"`),
 		),
 		func() chan *models.Article {
-			return make(chan *models.Article, DefaultChannelBufferSize)
+			return make(chan *models.Article, app.DefaultChannelBufferSize)
 		},
 	),
 )

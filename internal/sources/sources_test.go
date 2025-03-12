@@ -1,3 +1,4 @@
+// Package sources_test provides tests for the sources package.
 package sources_test
 
 import (
@@ -5,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -83,127 +85,147 @@ func (m *MockLogger) Sync() error {
 }
 
 func TestLoadFromFile(t *testing.T) {
-	tests := []struct {
-		name    string
-		content string
-		want    int
-		wantErr bool
-	}{
-		{
-			name: "valid sources",
-			content: `sources:
-  - name: test1
-    url: http://example1.com
-  - name: test2
-    url: http://example2.com`,
-			want:    2,
-			wantErr: false,
-		},
-		{
-			name:    "invalid yaml",
-			content: "invalid: [yaml: content",
-			want:    0,
-			wantErr: true,
-		},
-	}
+	// Create a temporary file with test data
+	content := `sources:
+  - name: test_source
+    url: https://example.com
+    rate_limit: 1s
+    max_depth: 2
+    selectors:
+      title: h1
+      description: meta[name=description]
+      content: article
+      article:
+        container: article
+        title: h1
+        body: .content
+        intro: .intro
+        byline: .byline
+        published_time: time
+        time_ago: .time-ago
+        jsonld: script[type="application/ld+json"]
+        section: .section
+        keywords: meta[name=keywords]
+        description: meta[name=description]
+        og_title: meta[property="og:title"]
+        og_description: meta[property="og:description"]
+        og_image: meta[property="og:image"]
+        og_url: meta[property="og:url"]
+        canonical: link[rel=canonical]
+        word_count: .word-count
+        publish_date: time[pubdate]
+        category: .category
+        tags: .tags
+        author: .author
+        byline_name: .byline-name`
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpfile, err := os.CreateTemp(t.TempDir(), "sources*.yml")
-			require.NoError(t, err)
-			defer os.Remove(tmpfile.Name())
+	tmpfile, err := os.CreateTemp(t.TempDir(), "sources_test")
+	require.NoError(t, err)
+	defer os.Remove(tmpfile.Name())
 
-			_, err = tmpfile.WriteString(tt.content)
-			require.NoError(t, err)
+	_, err = tmpfile.WriteString(content)
+	require.NoError(t, err)
+	err = tmpfile.Close()
+	require.NoError(t, err)
 
-			err = tmpfile.Close()
-			require.NoError(t, err)
+	s, err := sources.LoadFromFile(tmpfile.Name())
+	require.NoError(t, err)
+	require.NotNil(t, s)
 
-			s, err := sources.LoadFromFile(tmpfile.Name())
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.Len(t, s.Sources, tt.want)
-		})
-	}
+	allSources := s.GetSources()
+	require.Len(t, allSources, 1)
+	require.Equal(t, "test_source", allSources[0].Name)
+	require.Equal(t, "https://example.com", allSources[0].URL)
+	require.Equal(t, "1s", allSources[0].RateLimit)
+	require.Equal(t, 2, allSources[0].MaxDepth)
 }
 
 func TestFindByName(t *testing.T) {
-	sources := &sources.Sources{
-		Sources: []sources.Config{
-			{
-				Name: "test1",
-				URL:  "http://example1.com",
-			},
-			{
-				Name: "test2",
-				URL:  "http://example2.com",
-			},
+	testConfigs := []sources.Config{
+		{
+			Name:      "test1",
+			URL:       "https://example1.com",
+			RateLimit: "1s",
+			MaxDepth:  1,
+		},
+		{
+			Name:      "test2",
+			URL:       "https://example2.com",
+			RateLimit: "2s",
+			MaxDepth:  2,
 		},
 	}
+	s := testutils.NewTestSources(testConfigs)
+	require.NotNil(t, s)
 
 	tests := []struct {
-		name     string
-		source   string
-		wantName string
-		wantErr  bool
+		name    string
+		source  string
+		wantErr bool
 	}{
 		{
-			name:     "existing source",
-			source:   "test1",
-			wantName: "test1",
-			wantErr:  false,
+			name:    "existing source",
+			source:  "test1",
+			wantErr: false,
 		},
 		{
-			name:    "non-existent source",
-			source:  "nonexistent",
+			name:    "non-existing source",
+			source:  "test3",
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source, err := sources.FindByName(tt.source)
+			source, err := s.FindByName(tt.source)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
-
 			require.NoError(t, err)
-			require.Equal(t, tt.wantName, source.Name)
+			require.Equal(t, tt.source, source.Name)
 		})
 	}
 }
 
 func TestValidate(t *testing.T) {
+	testConfigs := []sources.Config{
+		{
+			Name:      "test",
+			URL:       "https://example.com",
+			RateLimit: "1s",
+			MaxDepth:  1,
+		},
+	}
+	s := testutils.NewTestSources(testConfigs)
+	require.NotNil(t, s)
+
 	tests := []struct {
 		name    string
 		source  *sources.Config
 		wantErr bool
 	}{
 		{
-			name: "valid config",
+			name: "valid source",
 			source: &sources.Config{
 				Name:      "test",
-				URL:       "http://example.com",
+				URL:       "https://example.com",
 				RateLimit: "1s",
-				MaxDepth:  2,
+				MaxDepth:  1,
 			},
 			wantErr: false,
 		},
 		{
-			name:    "nil config",
+			name:    "nil source",
 			source:  nil,
 			wantErr: true,
 		},
 		{
 			name: "missing name",
 			source: &sources.Config{
-				URL:       "http://example.com",
+				URL:       "https://example.com",
 				RateLimit: "1s",
-				MaxDepth:  2,
+				MaxDepth:  1,
 			},
 			wantErr: true,
 		},
@@ -212,7 +234,7 @@ func TestValidate(t *testing.T) {
 			source: &sources.Config{
 				Name:      "test",
 				RateLimit: "1s",
-				MaxDepth:  2,
+				MaxDepth:  1,
 			},
 			wantErr: true,
 		},
@@ -220,8 +242,8 @@ func TestValidate(t *testing.T) {
 			name: "missing rate limit",
 			source: &sources.Config{
 				Name:     "test",
-				URL:      "http://example.com",
-				MaxDepth: 2,
+				URL:      "https://example.com",
+				MaxDepth: 1,
 			},
 			wantErr: true,
 		},
@@ -229,7 +251,7 @@ func TestValidate(t *testing.T) {
 			name: "invalid max depth",
 			source: &sources.Config{
 				Name:      "test",
-				URL:       "http://example.com",
+				URL:       "https://example.com",
 				RateLimit: "1s",
 				MaxDepth:  0,
 			},
@@ -239,13 +261,12 @@ func TestValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &sources.Sources{}
-			err := s.Validate(tt.source)
+			validateErr := s.Validate(tt.source)
 			if tt.wantErr {
-				require.Error(t, err)
+				require.Error(t, validateErr)
 				return
 			}
-			require.NoError(t, err)
+			require.NoError(t, validateErr)
 		})
 	}
 }

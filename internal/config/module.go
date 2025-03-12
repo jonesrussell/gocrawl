@@ -169,7 +169,6 @@ var Module = fx.Options(
 // setupViper initializes Viper with default configuration
 func setupViper() error {
 	// Set default configuration name and type
-	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 
 	// Add config search paths in order of priority
@@ -178,18 +177,13 @@ func setupViper() error {
 		viper.SetConfigFile(cfgFile)
 		log.Printf("Using config file from CONFIG_FILE: %s", cfgFile)
 	} else {
+		viper.SetConfigName("config")
 		// Add search paths in order of priority
 		viper.AddConfigPath("/opt/gocrawl/etc") // Production config path
 		viper.AddConfigPath("/etc/gocrawl")     // System config path
 		viper.AddConfigPath("$HOME/.gocrawl")   // User config path
 		viper.AddConfigPath(".")                // Current directory
 	}
-
-	// Set default values
-	viper.SetDefault("log.level", "info")
-	viper.SetDefault("app.environment", "development")
-	viper.SetDefault("crawler.source_file", "sources.yml")
-	viper.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
 
 	// Configure environment variable handling
 	viper.SetEnvPrefix("")
@@ -200,6 +194,14 @@ func setupViper() error {
 	if err := bindEnvs(defaultEnvBindings()); err != nil {
 		return fmt.Errorf("failed to bind environment variables: %w", err)
 	}
+
+	// Set default values AFTER binding environment variables
+	if os.Getenv("APP_ENV") == "" {
+		viper.SetDefault("app.environment", "development")
+	}
+	viper.SetDefault("log.level", "info")
+	viper.SetDefault("crawler.source_file", "sources.yml")
+	viper.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
 
 	// Read the configuration file
 	if err := viper.ReadInConfig(); err != nil {

@@ -13,18 +13,25 @@ import (
 )
 
 func TestNew(t *testing.T) {
+	// Save current environment and use t.Setenv for automatic cleanup
+	t.Setenv("APP_ENV", "")
+
+	// Reset Viper after each test
+	defer viper.Reset()
+
 	tests := []struct {
 		name     string
-		setup    func()
+		setup    func(*testing.T)
 		validate func(*testing.T, config.Interface, error)
 	}{
 		{
 			name: "valid configuration",
-			setup: func() {
-				viper.SetConfigType("yaml")
-				viper.SetConfigName("config")
-				viper.AddConfigPath("./testdata")
-				require.NoError(t, viper.ReadInConfig())
+			setup: func(t *testing.T) {
+				// Set test environment
+				t.Setenv("APP_ENV", "test")
+
+				// Set config file location
+				t.Setenv("CONFIG_FILE", "./testdata/config.yml")
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.NoError(t, err)
@@ -56,7 +63,7 @@ func TestNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.setup()
+			tt.setup(t)
 			cfg, err := config.New()
 			tt.validate(t, cfg, err)
 		})

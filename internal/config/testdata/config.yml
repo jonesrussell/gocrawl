@@ -1,13 +1,21 @@
-APP_ENV: "test"
-LOG_LEVEL: "debug"
-APP_DEBUG: true
-CRAWLER_BASE_URL: "http://test.example.com"
-CRAWLER_MAX_DEPTH: 5
-CRAWLER_RATE_LIMIT: "2s"
-CRAWLER_PARALLELISM: 2
-ELASTIC_URL: "http://localhost:9200"
-ELASTIC_USERNAME: "test_user"
-ELASTIC_PASSWORD: "test_pass"
-ELASTIC_API_KEY: "test_apikey"
-ELASTIC_INDEX_NAME: "test_index"
-ELASTIC_SKIP_TLS: false
+app:
+  environment: "test"
+
+log:
+  level: "debug"
+  debug: true
+
+crawler:
+  base_url: "http://test.example.com"
+  max_depth: 5
+  rate_limit: "2s"
+  parallelism: 2
+
+elasticsearch:
+  addresses: ["http://localhost:9200"]
+  username: "test_user"
+  password: "test_pass"
+  api_key: "test_apikey"
+  index_name: "test_index"
+  tls:
+    skip_verify: true

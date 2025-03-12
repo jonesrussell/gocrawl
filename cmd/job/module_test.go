@@ -69,18 +69,6 @@ func TestModuleProvides(t *testing.T) {
 			func() config.Interface { return &mockConfig{} },
 			func() *sources.Sources { return &sources.Sources{} },
 			func() crawler.Interface { return &mockCrawler{} },
-			// Provide the jobContext
-			fx.Annotate(
-				func(t *testing.T) context.Context { return t.Context() },
-				fx.ResultTags(`name:"jobContext"`),
-			),
-			// Provide the crawlDone channel
-			fx.Annotate(
-				func() chan struct{} {
-					return make(chan struct{})
-				},
-				fx.ResultTags(`name:"crawlDone"`),
-			),
 		),
 		fx.Populate(&command),
 	)
@@ -102,18 +90,6 @@ func TestModuleConfiguration(t *testing.T) {
 			func() config.Interface { return &mockConfig{} },
 			func() *sources.Sources { return &sources.Sources{} },
 			func() crawler.Interface { return &mockCrawler{} },
-			// Provide the jobContext
-			fx.Annotate(
-				func(t *testing.T) context.Context { return t.Context() },
-				fx.ResultTags(`name:"jobContext"`),
-			),
-			// Provide the crawlDone channel
-			fx.Annotate(
-				func() chan struct{} {
-					return make(chan struct{})
-				},
-				fx.ResultTags(`name:"crawlDone"`),
-			),
 		),
 		fx.Populate(&command),
 	)

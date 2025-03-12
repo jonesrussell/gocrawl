@@ -21,7 +21,7 @@ These commands help you list, add, remove, and manage your crawler sources.`,
 	}
 
 	// Add subcommands for source management operations
-	cmd.AddCommand(listCommand())
+	cmd.AddCommand(ListCommand())
 
 	return cmd
 }

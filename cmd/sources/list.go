@@ -31,22 +31,16 @@ const (
 	labelFormatterWidth = 8
 )
 
-// listParams holds the parameters required for listing sources.
-// It contains the context, sources instance, and logger needed for
-// the list operation.
-type listParams struct {
+// ListParams holds the parameters required for listing sources.
+type ListParams struct {
 	fx.In
 
-	ctx     context.Context
-	sources *sources.Sources
-	logger  common.Logger
+	SourceManager sources.Interface `name:"sourceManager"`
+	Logger        common.Logger
 }
 
-// listCommand creates and returns the list command that displays all sources.
-// It:
-// - Sets up the command with appropriate usage and description
-// - Configures the command to use runList as its execution function
-func listCommand() *cobra.Command {
+// ListCommand creates and returns the list command that displays all sources.
+func ListCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all configured content sources",
@@ -54,18 +48,12 @@ func listCommand() *cobra.Command {
 
 Example:
   gocrawl sources list`,
-		RunE: runList,
+		RunE: RunList,
 	}
 }
 
-// runList executes the list command and displays all sources.
-// It:
-// - Sets up signal handling for graceful shutdown
-// - Creates channels for error handling and completion
-// - Initializes the Fx application with required modules
-// - Handles application lifecycle and error cases
-// - Displays the sources list in a formatted table
-func runList(cmd *cobra.Command, _ []string) error {
+// RunList executes the list command and displays all sources.
+func RunList(cmd *cobra.Command, _ []string) error {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -76,18 +64,22 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
-		common.Module,
+		fx.NopLogger,
 		Module,
-		fx.Invoke(func(lc fx.Lifecycle, s *sources.Sources, l common.Logger) {
-			lc.Append(fx.Hook{
+		fx.Invoke(func(p struct {
+			fx.In
+			Sources sources.Interface `name:"sourceManager"`
+			Logger  common.Logger
+			LC      fx.Lifecycle
+		}) {
+			p.LC.Append(fx.Hook{
 				OnStart: func(context.Context) error {
-					params := &listParams{
-						ctx:     cmd.Context(),
-						sources: s,
-						logger:  l,
+					params := &ListParams{
+						SourceManager: p.Sources,
+						Logger:        p.Logger,
 					}
-					if err := executeList(params); err != nil {
-						l.Error("Error executing list", "error", err)
+					if err := ExecuteList(*params); err != nil {
+						p.Logger.Error("Error executing list", "error", err)
 						errChan <- err
 						return err
 					}
@@ -114,13 +106,13 @@ func runList(cmd *cobra.Command, _ []string) error {
 	var listErr error
 	select {
 	case sig := <-sigChan:
-		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+		common.PrintInfof("Received signal %v, initiating shutdown...", sig)
 	case <-cmd.Context().Done():
-		common.PrintInfof("\nContext cancelled, initiating shutdown...")
+		common.PrintInfof("Context cancelled, initiating shutdown...")
 	case listErr = <-errChan:
-		// Error already printed in executeList
+		// Error already logged in ExecuteList
 	case <-doneChan:
-		// Success message already printed in executeList
+		// Success message already printed in ExecuteList
 	}
 
 	// Create a context with timeout for graceful shutdown
@@ -138,26 +130,19 @@ func runList(cmd *cobra.Command, _ []string) error {
 	return listErr
 }
 
-// executeList retrieves and displays the list of sources.
-// It:
-// - Gets all sources from the sources instance
-// - Handles empty results
-// - Displays the sources in a formatted table
-func executeList(p *listParams) error {
-	if len(p.sources.Sources) == 0 {
-		p.logger.Info("No sources found")
+// ExecuteList retrieves and displays the list of sources.
+func ExecuteList(params ListParams) error {
+	allSources := params.SourceManager.GetSources()
+	if len(allSources) == 0 {
+		params.Logger.Info("No sources found")
 		return nil
 	}
 
-	return printSources(p.sources.Sources, p.logger)
+	return PrintSources(allSources, params.Logger)
 }
 
-// printSources formats and displays the sources in a table.
-// It:
-// - Creates a new table with appropriate headers
-// - Handles errors gracefully
-// - Renders the table with all source information
-func printSources(sources []sources.Config, logger common.Logger) error {
+// PrintSources formats and displays the sources in a table.
+func PrintSources(sources []sources.Config, logger common.Logger) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 
