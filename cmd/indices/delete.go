@@ -270,13 +270,11 @@ func confirmDeletion(indices []string) bool {
 // deleteIndices performs the actual deletion of the specified indices.
 // It:
 // - Deletes each index from Elasticsearch
-// - Logs successful deletions
 func deleteIndices(p *deleteParams, indices []string) error {
 	for _, index := range indices {
 		if err := p.storage.DeleteIndex(p.ctx, index); err != nil {
 			return err
 		}
-		p.logger.Info("Deleted index", "index", index)
 	}
 	return nil
 }
