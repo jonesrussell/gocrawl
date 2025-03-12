@@ -19,6 +19,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -245,12 +246,18 @@ var Cmd = &cobra.Command{
 		// Initialize the Fx application with required modules and dependencies
 		fxApp := fx.New(
 			fx.NopLogger, // Suppress Fx startup/shutdown logs
-			common.Module,
+			// Core dependencies
+			config.Module,
+			sources.Module,
+			storage.Module,
+			logger.Module,
+
+			// Feature modules
 			article.Module,
 			content.Module,
 			collector.Module(),
 			crawler.Module,
-			sources.Module,
+
 			fx.Provide(
 				fx.Annotate(
 					func() context.Context {
