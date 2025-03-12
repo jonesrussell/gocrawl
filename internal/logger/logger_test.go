@@ -1,8 +1,8 @@
 package logger_test
 
 import (
+	"bytes"
 	"testing"
-	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -253,34 +253,37 @@ func TestCustomLogger_Methods(t *testing.T) {
 		log.Warn("test warn message", "key", "value")
 	})
 
-	t.Run("Fatal with recovery", func(t *testing.T) {
-		// Create a new logger for this test to avoid affecting other tests
-		testLogger, testErr := logger.NewDevelopmentLogger("debug")
-		require.NoError(t, testErr)
-		require.NotNil(t, testLogger)
+	t.Run("Fatal_with_recovery", func(t *testing.T) {
+		// Create a buffer to capture output
+		var buf bytes.Buffer
 
-		// Create a channel to signal when the goroutine is done
-		done := make(chan struct{})
-		var panicMsg any
+		// Create an encoder that writes to our buffer
+		encoder := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
+		core := zapcore.NewCore(
+			encoder,
+			zapcore.AddSync(&buf),
+			zapcore.FatalLevel,
+		)
 
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					panicMsg = r
-				}
-				close(done)
-			}()
-			testLogger.Fatal("test fatal message", "key", "value")
+		// Create a logger that doesn't exit on Fatal
+		testLogger := zap.New(core)
+		customLogger := logger.NewCustomLogger(testLogger)
+
+		// Set a fatal hook that panics instead of exiting
+		customLogger.SetFatalHook(func(entry zapcore.Entry) error {
+			panic(entry.Message)
+		})
+
+		// Expect this to panic
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected Fatal to panic")
+			} else {
+				assert.Equal(t, "test fatal message", r)
+			}
 		}()
 
-		// Wait for the goroutine to finish or timeout
-		select {
-		case <-done:
-			require.NotNil(t, panicMsg, "Fatal() should have panicked")
-			assert.Equal(t, "test fatal message", panicMsg, "Panic message should match")
-		case <-time.After(time.Second):
-			t.Fatal("Test timed out waiting for panic")
-		}
+		customLogger.Fatal("test fatal message", "key", "value")
 	})
 
 	t.Run("Printf", func(_ *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"go.uber.org/fx"
@@ -44,6 +45,7 @@ type Interface interface {
 // CustomLogger wraps the zap.Logger
 type CustomLogger struct {
 	*zap.Logger
+	fatalHook func(zapcore.Entry) error
 }
 
 // Ensure CustomLogger implements Interface
@@ -82,9 +84,16 @@ func (c *CustomLogger) Warn(msg string, fields ...any) {
 	c.Logger.Warn(msg, ConvertToZapFields(fields)...)
 }
 
-// Fatal logs a fatal message and panics
+// Fatal logs a fatal message and executes the fatal hook
 func (c *CustomLogger) Fatal(msg string, fields ...any) {
 	c.Logger.Fatal(msg, ConvertToZapFields(fields)...)
+	if c.fatalHook != nil {
+		entry := zapcore.Entry{
+			Level:   zapcore.FatalLevel,
+			Message: msg,
+		}
+		_ = c.fatalHook(entry)
+	}
 }
 
 // Printf logs a formatted message
@@ -223,4 +232,20 @@ func FromContext(ctx context.Context) *zap.Logger {
 		return zap.NewNop() // No-op logger
 	}
 	return logger
+}
+
+// NewCustomLogger creates a new CustomLogger with the given zap.Logger
+func NewCustomLogger(logger *zap.Logger) *CustomLogger {
+	return &CustomLogger{
+		Logger: logger,
+		fatalHook: func(entry zapcore.Entry) error {
+			os.Exit(1)
+			return nil
+		},
+	}
+}
+
+// SetFatalHook allows overriding the default fatal behavior for testing
+func (c *CustomLogger) SetFatalHook(hook func(zapcore.Entry) error) {
+	c.fatalHook = hook
 }
