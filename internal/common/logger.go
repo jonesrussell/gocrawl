@@ -4,13 +4,13 @@ package common
 
 import (
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 )
 
 // CollyDebugger implements the colly.Debugger interface to provide
 // debug logging for Colly operations using our logger.
 type CollyDebugger struct {
-	logger logger.Interface
+	logger interfaces.Logger
 }
 
 // NewCollyDebugger creates a new Colly debugger that uses the provided logger.
@@ -21,7 +21,7 @@ type CollyDebugger struct {
 //
 // Returns:
 //   - *CollyDebugger: A new debugger instance
-func NewCollyDebugger(logger logger.Interface) *CollyDebugger {
+func NewCollyDebugger(logger interfaces.Logger) *CollyDebugger {
 	return &CollyDebugger{
 		logger: logger,
 	}
@@ -35,18 +35,14 @@ func (d *CollyDebugger) Init() error {
 
 // Event implements the colly.Debugger interface.
 // It logs debug events from Colly using our common logger.
-func (d *CollyDebugger) Event(e interface{}) {
-	d.logger.Debug("Colly event",
-		"event", e,
-	)
+func (d *CollyDebugger) Event(e any) {
+	d.logger.Debug("Colly event", "event", e)
 }
 
 // Error implements the colly.Debugger interface.
 // It logs debug errors from Colly using our common logger.
-func (d *CollyDebugger) Error(e interface{}) {
-	d.logger.Error("Colly debug error",
-		"error", e,
-	)
+func (d *CollyDebugger) Error(e any) {
+	d.logger.Error("Colly error", "error", e)
 }
 
 // Request implements the colly.Debugger interface.

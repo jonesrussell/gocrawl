@@ -27,8 +27,8 @@ func NewElasticsearchIndexManager(client *elasticsearch.Client, logger logger.In
 	}
 }
 
-// EnsureIndex ensures that an index exists with the given mapping.
-func (m *ElasticsearchIndexManager) EnsureIndex(ctx context.Context, name string, mapping interface{}) error {
+// EnsureIndex ensures that an index exists with the specified mapping.
+func (m *ElasticsearchIndexManager) EnsureIndex(ctx context.Context, name string, mapping any) error {
 	exists, err := m.IndexExists(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to check index existence: %w", err)
@@ -102,8 +102,8 @@ func (m *ElasticsearchIndexManager) IndexExists(ctx context.Context, name string
 	return exists, nil
 }
 
-// UpdateMapping updates the mapping of an existing index.
-func (m *ElasticsearchIndexManager) UpdateMapping(ctx context.Context, name string, mapping interface{}) error {
+// UpdateMapping updates the mapping for an existing index.
+func (m *ElasticsearchIndexManager) UpdateMapping(ctx context.Context, name string, mapping any) error {
 	exists, err := m.IndexExists(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to check index existence: %w", err)
