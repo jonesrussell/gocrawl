@@ -20,48 +20,48 @@ func NewMockLogger() *MockLogger {
 }
 
 // Implement the same methods as CustomLogger
-func (m *MockLogger) Info(msg string, args ...interface{}) {
-	m.Called(append([]interface{}{msg}, args...)...)
+func (m *MockLogger) Info(msg string, args ...any) {
+	m.Called(append([]any{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 
-func (m *MockLogger) Error(msg string, args ...interface{}) {
-	m.Called(append([]interface{}{msg}, args...)...)
+func (m *MockLogger) Error(msg string, args ...any) {
+	m.Called(append([]any{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 
-func (m *MockLogger) Debug(msg string, args ...interface{}) {
-	m.Called(append([]interface{}{msg}, args...)...)
+func (m *MockLogger) Debug(msg string, args ...any) {
+	m.Called(append([]any{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 
 // Implement Warn method
-func (m *MockLogger) Warn(msg string, args ...interface{}) {
-	m.Called(append([]interface{}{msg}, args...)...)
+func (m *MockLogger) Warn(msg string, args ...any) {
+	m.Called(append([]any{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 
 // Implement Fatal method
-func (m *MockLogger) Fatal(msg string, args ...interface{}) {
-	m.Called(append([]interface{}{msg}, args...)...)
+func (m *MockLogger) Fatal(msg string, args ...any) {
+	m.Called(append([]any{msg}, args...)...)
 	m.Messages = append(m.Messages, msg)
 }
 
 // Implement Printf method
-func (m *MockLogger) Printf(format string, args ...interface{}) {
-	m.Called(fmt.Sprintf(format, args...))
+func (m *MockLogger) Printf(format string, args ...any) {
+	m.Called(append([]any{format}, args...)...)
 	m.Messages = append(m.Messages, fmt.Sprintf(format, args...))
 }
 
 // Implement Fatalf method
-func (m *MockLogger) Fatalf(format string, args ...interface{}) {
+func (m *MockLogger) Fatalf(format string, args ...any) {
 	m.Called(fmt.Sprintf(format, args...))
 	m.Messages = append(m.Messages, fmt.Sprintf(format, args...))
 }
 
 // Implement Errorf method
-func (m *MockLogger) Errorf(format string, args ...interface{}) {
-	m.Called(fmt.Sprintf(format, args...))
+func (m *MockLogger) Errorf(format string, args ...any) {
+	m.Called(append([]any{format}, args...)...)
 	m.Messages = append(m.Messages, fmt.Sprintf(format, args...))
 }
 

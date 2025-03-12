@@ -18,7 +18,7 @@ import (
 // Parameters:
 //   - format: The format string for the error message
 //   - args: Optional arguments for the format string
-func PrintErrorf(format string, args ...interface{}) {
+func PrintErrorf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 }
 
@@ -29,7 +29,7 @@ func PrintErrorf(format string, args ...interface{}) {
 // Parameters:
 //   - format: The format string for the warning message
 //   - args: Optional arguments for the format string
-func PrintWarnf(format string, args ...interface{}) {
+func PrintWarnf(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stdout, "%s %s\n", text.FgYellow.Sprint("⚠"), fmt.Sprintf(format, args...))
 }
 
@@ -40,7 +40,7 @@ func PrintWarnf(format string, args ...interface{}) {
 // Parameters:
 //   - format: The format string for the success message
 //   - args: Optional arguments for the format string
-func PrintSuccessf(format string, args ...interface{}) {
+func PrintSuccessf(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stdout, "%s %s\n", text.FgGreen.Sprint("✓"), fmt.Sprintf(format, args...))
 }
 
@@ -51,7 +51,7 @@ func PrintSuccessf(format string, args ...interface{}) {
 // Parameters:
 //   - format: The format string for the info message
 //   - args: Optional arguments for the format string
-func PrintInfof(format string, args ...interface{}) {
+func PrintInfof(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stdout, format+"\n", args...)
 }
 
@@ -90,6 +90,6 @@ func PrintDivider(width int) {
 // Parameters:
 //   - format: The format string for the table header
 //   - args: Optional arguments for the format string
-func PrintTableHeaderf(format string, args ...interface{}) {
+func PrintTableHeaderf(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stdout, format+"\n", args...)
 }

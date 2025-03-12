@@ -190,11 +190,11 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	return searchErr
 }
 
-// buildSearchQuery constructs the Elasticsearch query from the search parameters
-func buildSearchQuery(size int, query string) map[string]interface{} {
-	return map[string]interface{}{
-		"query": map[string]interface{}{
-			"match": map[string]interface{}{
+// buildSearchQuery constructs the Elasticsearch query
+func buildSearchQuery(size int, query string) map[string]any {
+	return map[string]any{
+		"query": map[string]any{
+			"match": map[string]any{
 				"content": query,
 			},
 		},
@@ -202,19 +202,19 @@ func buildSearchQuery(size int, query string) map[string]interface{} {
 	}
 }
 
-// processSearchResults converts raw Elasticsearch results into Result structs
-func processSearchResults(rawResults []interface{}, logger common.Logger) []Result {
-	results := make([]Result, 0, len(rawResults))
+// processSearchResults converts raw search results to Result structs
+func processSearchResults(rawResults []any, logger common.Logger) []Result {
+	var results []Result
 	for _, raw := range rawResults {
-		hit, ok := raw.(map[string]interface{})
+		hit, ok := raw.(map[string]any)
 		if !ok {
-			logger.Error("Invalid hit format", "hit", raw)
+			logger.Error("Failed to convert search result to map", "error", "type assertion failed")
 			continue
 		}
 
-		source, ok := hit["_source"].(map[string]interface{})
+		source, ok := hit["_source"].(map[string]any)
 		if !ok {
-			logger.Error("Invalid source format", "source", hit["_source"])
+			logger.Error("Failed to extract _source from hit", "error", "type assertion failed")
 			continue
 		}
 

@@ -15,8 +15,8 @@ import (
 // Interface defines the interface for content operations
 type Interface interface {
 	ExtractContent(e *colly.HTMLElement) *models.Content
-	ExtractMetadata(e *colly.HTMLElement) map[string]interface{}
-	DetermineContentType(url string, metadata map[string]interface{}, jsonLDType string) string
+	ExtractMetadata(e *colly.HTMLElement) map[string]any
+	DetermineContentType(url string, metadata map[string]any, jsonLDType string) string
 }
 
 // Service implements the Interface
@@ -33,12 +33,12 @@ func NewService(logger logger.Interface) Interface {
 }
 
 type JSONLDMetadata struct {
-	DateCreated    string                 `json:"dateCreated"`
-	DateModified   string                 `json:"dateModified"`
-	Description    string                 `json:"description"`
-	Name           string                 `json:"name"`
-	Type           string                 `json:"@type"`
-	AdditionalData map[string]interface{} `json:"additionalData,omitempty"`
+	DateCreated    string         `json:"dateCreated"`
+	DateModified   string         `json:"dateModified"`
+	Description    string         `json:"description"`
+	Name           string         `json:"name"`
+	Type           string         `json:"@type"`
+	AdditionalData map[string]any `json:"additionalData,omitempty"`
 }
 
 // ExtractContent extracts content from an HTML element
@@ -88,7 +88,7 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 }
 
 // DetermineContentType determines the type of content based on URL and metadata
-func (s *Service) DetermineContentType(url string, metadata map[string]interface{}, jsonLDType string) string {
+func (s *Service) DetermineContentType(url string, metadata map[string]any, jsonLDType string) string {
 	// Check JSON-LD type first
 	if jsonLDType != "" {
 		return jsonLDType
@@ -128,8 +128,8 @@ func (s *Service) DetermineContentType(url string, metadata map[string]interface
 }
 
 // ExtractMetadata extracts metadata from various sources in the HTML
-func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]interface{} {
-	metadata := make(map[string]interface{})
+func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
+	metadata := make(map[string]any)
 
 	// Extract OpenGraph metadata first (highest precedence)
 	e.ForEach(`meta[property^="og:"]`, func(_ int, el *colly.HTMLElement) {

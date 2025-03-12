@@ -38,9 +38,9 @@ const (
 
 // Logger defines the interface for logging operations
 type Logger interface {
-	Info(msg string, keysAndValues ...interface{})
-	Error(msg string, keysAndValues ...interface{})
-	Warn(msg string, keysAndValues ...interface{})
+	Info(msg string, keysAndValues ...any)
+	Error(msg string, keysAndValues ...any)
+	Warn(msg string, keysAndValues ...any)
 }
 
 // Setup handles the setup and configuration of the collector.

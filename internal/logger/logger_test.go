@@ -261,7 +261,7 @@ func TestCustomLogger_Methods(t *testing.T) {
 
 		// Create a channel to signal when the goroutine is done
 		done := make(chan struct{})
-		var panicMsg interface{}
+		var panicMsg any
 
 		go func() {
 			defer func() {
@@ -374,32 +374,32 @@ func TestParseLogLevel(t *testing.T) {
 func TestConvertToZapFields(t *testing.T) {
 	tests := []struct {
 		name          string
-		fields        []interface{}
+		fields        []any
 		expectedCount int
 	}{
 		{
 			name:          "empty fields",
-			fields:        []interface{}{},
+			fields:        []any{},
 			expectedCount: 0,
 		},
 		{
 			name:          "single key-value pair",
-			fields:        []interface{}{"key", "value"},
+			fields:        []any{"key", "value"},
 			expectedCount: 1,
 		},
 		{
 			name:          "multiple key-value pairs",
-			fields:        []interface{}{"key1", "value1", "key2", "value2"},
+			fields:        []any{"key1", "value1", "key2", "value2"},
 			expectedCount: 2,
 		},
 		{
 			name:          "odd number of fields",
-			fields:        []interface{}{"key1", "value1", "extra"},
+			fields:        []any{"key1", "value1", "extra"},
 			expectedCount: 2,
 		},
 		{
 			name:          "non-string key",
-			fields:        []interface{}{123, "value"},
+			fields:        []any{123, "value"},
 			expectedCount: 1,
 		},
 	}
@@ -418,27 +418,27 @@ func TestCustomLogger_LoggingWithFields(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		fields []interface{}
+		fields []any
 	}{
 		{
 			name:   "no fields",
-			fields: []interface{}{},
+			fields: []any{},
 		},
 		{
 			name:   "single key-value pair",
-			fields: []interface{}{"key", "value"},
+			fields: []any{"key", "value"},
 		},
 		{
 			name:   "multiple key-value pairs",
-			fields: []interface{}{"key1", "value1", "key2", "value2"},
+			fields: []any{"key1", "value1", "key2", "value2"},
 		},
 		{
 			name:   "odd number of fields",
-			fields: []interface{}{"key1", "value1", "extra"},
+			fields: []any{"key1", "value1", "extra"},
 		},
 		{
 			name:   "non-string key",
-			fields: []interface{}{123, "value"},
+			fields: []any{123, "value"},
 		},
 	}
 

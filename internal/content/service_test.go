@@ -141,42 +141,42 @@ func TestDetermineContentType(t *testing.T) {
 	tests := []struct {
 		name     string
 		url      string
-		metadata map[string]interface{}
+		metadata map[string]any
 		jsonType string
 		expected string
 	}{
 		{
 			name:     "Category URL",
 			url:      "http://example.com/category/news",
-			metadata: map[string]interface{}{},
+			metadata: map[string]any{},
 			jsonType: "",
 			expected: "category",
 		},
 		{
 			name:     "Tag URL",
 			url:      "http://example.com/tag/tech",
-			metadata: map[string]interface{}{},
+			metadata: map[string]any{},
 			jsonType: "",
 			expected: "tag",
 		},
 		{
 			name:     "Author URL",
 			url:      "http://example.com/author/john",
-			metadata: map[string]interface{}{},
+			metadata: map[string]any{},
 			jsonType: "",
 			expected: "author",
 		},
 		{
 			name:     "JSON-LD type takes precedence",
 			url:      "http://example.com/category/news",
-			metadata: map[string]interface{}{},
+			metadata: map[string]any{},
 			jsonType: "Article",
 			expected: "Article",
 		},
 		{
 			name: "Metadata type takes precedence over URL",
 			url:  "http://example.com/category/news",
-			metadata: map[string]interface{}{
+			metadata: map[string]any{
 				"type": "BlogPost",
 			},
 			jsonType: "",

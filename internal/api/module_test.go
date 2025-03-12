@@ -26,17 +26,17 @@ type mockSearchManager struct {
 	mock.Mock
 }
 
-func (m *mockSearchManager) Search(ctx context.Context, index string, query interface{}) ([]interface{}, error) {
+func (m *mockSearchManager) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).([]interface{}), args.Error(1)
+	return args.Get(0).([]any), args.Error(1)
 }
 
-func (m *mockSearchManager) Count(ctx context.Context, index string, query interface{}) (int64, error) {
+func (m *mockSearchManager) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *mockSearchManager) Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error) {
+func (m *mockSearchManager) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
 	args := m.Called(ctx, index, aggs)
 	return args.Get(0), args.Error(1)
 }
@@ -81,7 +81,7 @@ func TestStartHTTPServer(t *testing.T) {
 		query          string
 		index          string
 		size           int
-		mockResults    []interface{}
+		mockResults    []any
 		mockCount      int64
 		expectedStatus int
 		expectError    bool
@@ -91,8 +91,8 @@ func TestStartHTTPServer(t *testing.T) {
 			query: "test query",
 			index: "articles",
 			size:  10,
-			mockResults: []interface{}{
-				map[string]interface{}{
+			mockResults: []any{
+				map[string]any{
 					"id":    "1",
 					"title": "Test Article",
 				},
@@ -106,7 +106,7 @@ func TestStartHTTPServer(t *testing.T) {
 			query:          "nonexistent",
 			index:          "articles",
 			size:           10,
-			mockResults:    []interface{}{},
+			mockResults:    []any{},
 			mockCount:      0,
 			expectedStatus: http.StatusOK,
 			expectError:    false,
@@ -124,18 +124,18 @@ func TestStartHTTPServer(t *testing.T) {
 			mockSearch := new(mockSearchManager)
 
 			// Set up expected queries
-			searchQuery := map[string]interface{}{
-				"query": map[string]interface{}{
-					"match": map[string]interface{}{
+			searchQuery := map[string]any{
+				"query": map[string]any{
+					"match": map[string]any{
 						"content": tt.query,
 					},
 				},
 				"size": tt.size,
 			}
 
-			countQuery := map[string]interface{}{
-				"query": map[string]interface{}{
-					"match": map[string]interface{}{
+			countQuery := map[string]any{
+				"query": map[string]any{
+					"match": map[string]any{
 						"content": tt.query,
 					},
 				},

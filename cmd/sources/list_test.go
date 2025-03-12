@@ -27,8 +27,8 @@ type mockLogger struct {
 	errorMessages []string
 }
 
-func (m *mockLogger) Info(msg string, _ ...interface{}) { m.infoMessages = append(m.infoMessages, msg) }
-func (m *mockLogger) Error(msg string, _ ...interface{}) {
+func (m *mockLogger) Info(msg string, _ ...any) { m.infoMessages = append(m.infoMessages, msg) }
+func (m *mockLogger) Error(msg string, _ ...any) {
 	m.errorMessages = append(m.errorMessages, msg)
 }
 
@@ -62,13 +62,13 @@ func newMockConfig() *mockConfig {
 	}
 }
 
-func (m *mockConfig) GetString(_ string) string                  { return "" }
-func (m *mockConfig) GetStringSlice(_ string) []string           { return nil }
-func (m *mockConfig) GetInt(_ string) int                        { return 0 }
-func (m *mockConfig) GetBool(_ string) bool                      { return false }
-func (m *mockConfig) GetDuration(_ string) time.Duration         { return 0 }
-func (m *mockConfig) UnmarshalKey(_ string, _ interface{}) error { return nil }
-func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig    { return &config.CrawlerConfig{} }
+func (m *mockConfig) GetString(_ string) string               { return "" }
+func (m *mockConfig) GetStringSlice(_ string) []string        { return nil }
+func (m *mockConfig) GetInt(_ string) int                     { return 0 }
+func (m *mockConfig) GetBool(_ string) bool                   { return false }
+func (m *mockConfig) GetDuration(_ string) time.Duration      { return 0 }
+func (m *mockConfig) UnmarshalKey(_ string, _ any) error      { return nil }
+func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig { return &config.CrawlerConfig{} }
 func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 	return &config.ElasticsearchConfig{}
 }

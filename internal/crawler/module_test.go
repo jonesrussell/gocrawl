@@ -9,6 +9,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
@@ -21,7 +22,7 @@ func TestModule(t *testing.T) {
 	app := fxtest.New(t,
 		crawler.Module,
 		fx.Provide(
-			func() logger.Interface { return mockLogger },
+			func() interfaces.Logger { return mockLogger },
 			func() api.IndexManager { return mockIndexManager },
 		),
 		fx.Populate(&c),

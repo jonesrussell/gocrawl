@@ -34,16 +34,16 @@ func (m *mockCrawler) Subscribe(_ events.Handler)              {}
 // mockLogger is a mock implementation of logger.Interface for testing
 type mockLogger struct{}
 
-func (m *mockLogger) Debug(_ string, _ ...interface{})       {}
-func (m *mockLogger) Info(_ string, _ ...interface{})        {}
-func (m *mockLogger) Warn(_ string, _ ...interface{})        {}
-func (m *mockLogger) Error(_ string, _ ...interface{})       {}
-func (m *mockLogger) Fatal(_ string, _ ...interface{})       {}
-func (m *mockLogger) Panic(_ string, _ ...interface{})       {}
-func (m *mockLogger) With(_ ...interface{}) logger.Interface { return m }
-func (m *mockLogger) Errorf(_ string, _ ...interface{})      {}
-func (m *mockLogger) Printf(_ string, _ ...interface{})      {}
-func (m *mockLogger) Sync() error                            { return nil }
+func (m *mockLogger) Debug(_ string, _ ...any)       {}
+func (m *mockLogger) Info(_ string, _ ...any)        {}
+func (m *mockLogger) Warn(_ string, _ ...any)        {}
+func (m *mockLogger) Error(_ string, _ ...any)       {}
+func (m *mockLogger) Fatal(_ string, _ ...any)       {}
+func (m *mockLogger) Panic(_ string, _ ...any)       {}
+func (m *mockLogger) With(_ ...any) logger.Interface { return m }
+func (m *mockLogger) Errorf(_ string, _ ...any)      {}
+func (m *mockLogger) Printf(_ string, _ ...any)      {}
+func (m *mockLogger) Sync() error                    { return nil }
 
 // mockConfig is a mock implementation of config.Interface for testing
 type mockConfig struct{}

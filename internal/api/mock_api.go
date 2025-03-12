@@ -12,7 +12,7 @@ type MockIndexManager struct {
 }
 
 // EnsureIndex implements IndexManager
-func (m *MockIndexManager) EnsureIndex(ctx context.Context, name string, mapping interface{}) error {
+func (m *MockIndexManager) EnsureIndex(ctx context.Context, name string, mapping any) error {
 	args := m.Called(ctx, name, mapping)
 	return args.Error(0)
 }
@@ -30,7 +30,7 @@ func (m *MockIndexManager) IndexExists(ctx context.Context, name string) (bool, 
 }
 
 // UpdateMapping implements IndexManager
-func (m *MockIndexManager) UpdateMapping(ctx context.Context, name string, mapping interface{}) error {
+func (m *MockIndexManager) UpdateMapping(ctx context.Context, name string, mapping any) error {
 	args := m.Called(ctx, name, mapping)
 	return args.Error(0)
 }

@@ -211,7 +211,7 @@ func printIndices(ctx context.Context, indices []string, storage common.Storage,
 		ingestionStatus := getIngestionStatus(healthStatus)
 
 		// Add row to table
-		t.AppendRow([]interface{}{
+		t.AppendRow([]any{
 			index,
 			healthStatus,
 			docCount,
