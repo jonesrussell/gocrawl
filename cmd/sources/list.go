@@ -32,20 +32,14 @@ const (
 )
 
 // listParams holds the parameters required for listing sources.
-// It contains the context, sources instance, and logger needed for
-// the list operation.
 type listParams struct {
 	fx.In
 
-	ctx     context.Context
-	sources *sources.Sources
-	logger  common.Logger
+	SourceManager sources.Interface `name:"sourceManager"`
+	Logger        common.Logger
 }
 
 // listCommand creates and returns the list command that displays all sources.
-// It:
-// - Sets up the command with appropriate usage and description
-// - Configures the command to use runList as its execution function
 func listCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
@@ -59,12 +53,6 @@ Example:
 }
 
 // runList executes the list command and displays all sources.
-// It:
-// - Sets up signal handling for graceful shutdown
-// - Creates channels for error handling and completion
-// - Initializes the Fx application with required modules
-// - Handles application lifecycle and error cases
-// - Displays the sources list in a formatted table
 func runList(cmd *cobra.Command, _ []string) error {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -76,18 +64,13 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	// Initialize the Fx application with required modules
 	app := fx.New(
-		common.Module,
+		fx.NopLogger,
 		Module,
-		fx.Invoke(func(lc fx.Lifecycle, s *sources.Sources, l common.Logger) {
+		fx.Invoke(func(lc fx.Lifecycle, p listParams) {
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
-					params := &listParams{
-						ctx:     cmd.Context(),
-						sources: s,
-						logger:  l,
-					}
-					if err := executeList(params); err != nil {
-						l.Error("Error executing list", "error", err)
+					if err := executeList(p); err != nil {
+						p.Logger.Error("Error executing list", "error", err)
 						errChan <- err
 						return err
 					}
@@ -114,11 +97,11 @@ func runList(cmd *cobra.Command, _ []string) error {
 	var listErr error
 	select {
 	case sig := <-sigChan:
-		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
+		common.PrintInfof("Received signal %v, initiating shutdown...", sig)
 	case <-cmd.Context().Done():
-		common.PrintInfof("\nContext cancelled, initiating shutdown...")
+		common.PrintInfof("Context cancelled, initiating shutdown...")
 	case listErr = <-errChan:
-		// Error already printed in executeList
+		// Error already logged in executeList
 	case <-doneChan:
 		// Success message already printed in executeList
 	}
@@ -139,25 +122,17 @@ func runList(cmd *cobra.Command, _ []string) error {
 }
 
 // executeList retrieves and displays the list of sources.
-// It:
-// - Gets all sources from the sources instance
-// - Handles empty results
-// - Displays the sources in a formatted table
-func executeList(p *listParams) error {
-	allSources := p.sources.GetSources()
+func executeList(p listParams) error {
+	allSources := p.SourceManager.GetSources()
 	if len(allSources) == 0 {
-		p.logger.Info("No sources found")
+		p.Logger.Info("No sources found")
 		return nil
 	}
 
-	return printSources(allSources, p.logger)
+	return printSources(allSources, p.Logger)
 }
 
 // printSources formats and displays the sources in a table.
-// It:
-// - Creates a new table with appropriate headers
-// - Handles errors gracefully
-// - Renders the table with all source information
 func printSources(sources []sources.Config, logger common.Logger) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
