@@ -176,55 +176,132 @@ func (m *mockConfigMockRecorder) GetSources() *gomock.Call {
 
 func TestModule(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Cleanup(func() { ctrl.Finish() })
 
 	mockLogger := logger.NewMockInterface(ctrl)
 	mockCfg := NewMockConfig(ctrl)
+	mockSearch := NewMockSearchManager(ctrl)
 
-	// Set up expectations for required config methods
-	mockCfg.EXPECT().GetElasticsearchConfig().Return(&config.ElasticsearchConfig{
+	// Set up server config expectations first
+	serverConfig := &config.ServerConfig{
+		Address:      ":8080",
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+	mockCfg.EXPECT().GetServerConfig().Return(serverConfig).MinTimes(1)
+
+	// Set up elasticsearch config expectations
+	esConfig := &config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		Username:  "elastic",
 		Password:  "changeme",
-	}).AnyTimes()
+	}
+	mockCfg.EXPECT().GetElasticsearchConfig().Return(esConfig).AnyTimes()
+
+	// Set up app config expectations
+	appConfig := &config.AppConfig{
+		Name:    "gocrawl",
+		Version: "1.0.0",
+	}
+	mockCfg.EXPECT().GetAppConfig().Return(appConfig).AnyTimes()
+
+	// Set up logger expectations
+	mockLogger.EXPECT().Info("StartHTTPServer function called").MinTimes(1)
+	mockLogger.EXPECT().Info("Server configuration", "address", ":8080").MinTimes(1)
+	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Debug(gomock.Any()).AnyTimes()
+
+	// Set up search manager expectations
+	searchQuery := map[string]any{
+		"query": map[string]any{
+			"match": map[string]any{
+				"content": gomock.Any(),
+			},
+		},
+		"size": gomock.Any(),
+	}
+	countQuery := map[string]any{
+		"query": map[string]any{
+			"match": map[string]any{
+				"content": gomock.Any(),
+			},
+		},
+	}
+	mockSearch.EXPECT().Search(gomock.Any(), gomock.Any(), searchQuery).Return([]any{}, nil).AnyTimes()
+	mockSearch.EXPECT().Count(gomock.Any(), gomock.Any(), countQuery).Return(int64(0), nil).AnyTimes()
+	mockSearch.EXPECT().Aggregate(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+
+	var server *http.Server
 
 	app := fxtest.New(t,
 		fx.Provide(
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
+			func() api.SearchManager { return mockSearch },
 		),
 		api.Module,
+		fx.Invoke(func(s *http.Server) error {
+			server = s
+			return nil
+		}),
 	)
+
 	require.NoError(t, app.Err())
+	app.RequireStart()
+	t.Cleanup(func() { app.RequireStop() })
+
+	require.NotNil(t, server)
+	require.Equal(t, ":8080", server.Addr)
 }
 
 func TestModuleProvides(t *testing.T) {
+	// Set up test controller
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Cleanup(func() { ctrl.Finish() })
 
+	// Create server config that will be used multiple times
+	serverCfg := &config.ServerConfig{
+		Address:      ":8080",
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Set up mocks with minimal required expectations
 	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger.EXPECT().Info("StartHTTPServer function called").Times(1)
+	mockLogger.EXPECT().Info("Server configuration", "address", ":8080").Times(1)
+
 	mockCfg := NewMockConfig(ctrl)
+	mockCfg.EXPECT().GetServerConfig().Return(serverCfg).Times(2) // Called twice: once for address, once for timeouts
 
-	// Set up expectations for required config methods
-	mockCfg.EXPECT().GetElasticsearchConfig().Return(&config.ElasticsearchConfig{
-		Addresses: []string{"http://localhost:9200"},
-		Username:  "elastic",
-		Password:  "changeme",
-	}).AnyTimes()
-
-	var searchManager api.SearchManager
-
+	// Set up test app with minimal dependencies
+	var server *http.Server
 	app := fxtest.New(t,
-		api.Module,
 		fx.Provide(
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 		),
-		fx.Populate(&searchManager),
+		api.Module,
+		fx.Invoke(func(s *http.Server) error {
+			server = s
+			return nil
+		}),
 	)
-	defer app.RequireStart().RequireStop()
 
-	require.NotNil(t, searchManager)
+	// Start and verify app
+	require.NoError(t, app.Err())
+	app.RequireStart()
+	t.Cleanup(func() { app.RequireStop() })
+
+	// Verify server configuration
+	require.NotNil(t, server, "HTTP server should be initialized")
+	assert.Equal(t, ":8080", server.Addr, "Server should listen on port 8080")
+	assert.Equal(t, serverCfg.ReadTimeout, server.ReadTimeout, "Read timeout should match config")
+	assert.Equal(t, serverCfg.WriteTimeout, server.WriteTimeout, "Write timeout should match config")
+	assert.Equal(t, serverCfg.IdleTimeout, server.IdleTimeout, "Idle timeout should match config")
 }
 
 func TestStartHTTPServer(t *testing.T) {
@@ -268,7 +345,7 @@ func TestStartHTTPServer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			t.Cleanup(func() { ctrl.Finish() })
 
 			// Create mock logger
 			mockLogger := logger.NewMockInterface(ctrl)
@@ -382,7 +459,7 @@ func TestStartHTTPServer_PortConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.cleanup != nil {
-				defer tt.cleanup()
+				t.Cleanup(tt.cleanup)
 			}
 
 			// Set environment variable if specified
@@ -391,7 +468,7 @@ func TestStartHTTPServer_PortConfiguration(t *testing.T) {
 			}
 
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			t.Cleanup(func() { ctrl.Finish() })
 
 			// Create mock logger
 			mockLogger := logger.NewMockInterface(ctrl)

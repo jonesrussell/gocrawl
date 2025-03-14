@@ -43,14 +43,25 @@ func TestModuleProvides(t *testing.T) {
 	testSources := testutils.NewTestSources(testConfigs)
 
 	app := fxtest.New(t,
-		crawl.Module,
 		fx.Provide(
 			func() interfaces.Logger { return mockLogger },
-			func() config.Interface { return mockCfg },
 			func() *sources.Sources { return testSources },
-			func() api.IndexManager { return api.NewMockIndexManager() },
 		),
+		fx.Replace(
+			fx.Annotate(
+				func() config.Interface { return mockCfg },
+				fx.As(new(config.Interface)),
+			),
+		),
+		fx.Replace(
+			fx.Annotate(
+				func() api.IndexManager { return nil },
+				fx.As(new(api.IndexManager)),
+			),
+		),
+		crawl.Module,
 	)
+
 	require.NoError(t, app.Err())
 }
 

@@ -18,13 +18,15 @@ import (
 // Error messages used for parameter validation
 const (
 	// errEmptyBaseURL is returned when the base URL is not provided
-	errEmptyBaseURL = "base URL cannot be empty"
+	errEmptyBaseURL = "base URL is required"
 	// errMissingArticleProc is returned when the article processor is not provided
 	errMissingArticleProc = "article processor is required"
 	// errMissingLogger is returned when the logger is not provided
 	errMissingLogger = "logger is required"
 	// errMissingDone is returned when the done channel is not provided
 	errMissingDone = "done channel is required"
+	// errMissingSource is returned when the source configuration is not provided
+	errMissingSource = "source configuration is required"
 )
 
 // Params holds the parameters for creating a Collector.
@@ -97,6 +99,11 @@ func ValidateParams(p Params) error {
 	// Ensure Done channel is provided
 	if p.Done == nil {
 		return errors.New(errMissingDone)
+	}
+
+	// Ensure Source is provided
+	if p.Source == nil {
+		return errors.New(errMissingSource)
 	}
 
 	return nil

@@ -12,6 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// errMissingSource is copied from collector package for testing
+const errMissingSource = "source configuration is required"
+
 // ArticleSelectors represents the article selectors structure
 type ArticleSelectors struct {
 	Container     string `yaml:"container,omitempty"`
@@ -223,11 +226,13 @@ func TestCollectorCreation(t *testing.T) {
 		name    string
 		cfg     *config.Source
 		wantErr bool
+		errMsg  string
 	}{
 		{
 			name:    "nil config",
 			cfg:     nil,
 			wantErr: true,
+			errMsg:  errMissingSource,
 		},
 		{
 			name: "valid config",
@@ -274,19 +279,30 @@ func TestCollectorCreation(t *testing.T) {
 				mockLogger.EXPECT().Debug("Collector extensions configured").AnyTimes()
 			}
 
+			// Set base URL based on config
+			baseURL := "http://example.com"
+			if tt.cfg != nil {
+				baseURL = tt.cfg.URL
+			}
+
 			params := collector.Params{
-				BaseURL:          "http://example.com",
+				BaseURL:          baseURL,
 				Logger:           mockLogger,
 				ArticleProcessor: &article.Processor{Logger: mockLogger},
 				Context:          t.Context(),
 				Source:           tt.cfg,
 				Done:             make(chan struct{}),
+				MaxDepth:         2,
+				RateLimit:        time.Second,
+				Parallelism:      2,
+				RandomDelay:      2 * time.Second,
 			}
 
 			c, err := collector.New(params)
 
 			if tt.wantErr {
 				require.Error(t, err)
+				require.Equal(t, tt.errMsg, err.Error())
 				return
 			}
 

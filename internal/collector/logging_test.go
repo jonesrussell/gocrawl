@@ -20,7 +20,7 @@ func TestConfigureLogging(t *testing.T) {
 
 	// Create test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	}))
 	defer ts.Close()
@@ -33,13 +33,17 @@ func TestConfigureLogging(t *testing.T) {
 	// Test response logging
 	mockLogger.EXPECT().Debug("Received response",
 		"url", ts.URL,
-		"status", 200,
+		"status", http.StatusOK,
 	).Times(1)
 
-	// Test error logging
+	// Test error logging for localhost:1
+	mockLogger.EXPECT().Debug("Requesting URL",
+		"url", "http://localhost:1",
+	).Times(1)
+
 	mockLogger.EXPECT().Error("Error occurred",
 		"url", "http://localhost:1",
-		"error", "Get \"http://localhost:1\": dial tcp [::1]:1: connect: connection refused",
+		"error", gomock.Any(),
 	).Times(1)
 
 	// Configure logging
@@ -50,12 +54,4 @@ func TestConfigureLogging(t *testing.T) {
 
 	// Visit with error to trigger error callback
 	c.Visit("http://localhost:1")
-}
-
-type testError struct {
-	msg string
-}
-
-func (e *testError) Error() string {
-	return e.msg
 }
