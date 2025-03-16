@@ -9,11 +9,20 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+)
+
+const (
+	// maxRetries is the maximum number of retries for Elasticsearch connection
+	maxRetries = 3
+	// retryDelay is the delay between retries
+	retryDelay = 5 * time.Second
 )
 
 // Params holds the parameters required for running the HTTP server.
@@ -25,6 +34,8 @@ type Params struct {
 	Server *http.Server
 	// Logger provides logging capabilities for the HTTP server
 	Logger logger.Interface
+	// Storage provides access to Elasticsearch
+	Storage storage.Interface
 }
 
 // Cmd represents the HTTP server command that provides a REST API
@@ -49,7 +60,22 @@ You can send POST requests to /search with a JSON body containing the search par
 			Module,
 			fx.Invoke(func(lc fx.Lifecycle, p Params) {
 				lc.Append(fx.Hook{
-					OnStart: func(context.Context) error {
+					OnStart: func(ctx context.Context) error {
+						// Test Elasticsearch connection with retries
+						for i := range maxRetries {
+							// Try to perform a simple search to verify connection
+							_, err := p.Storage.Search(ctx, "", nil)
+							if err == nil {
+								break
+							}
+							if i < maxRetries-1 {
+								p.Logger.Warn("Failed to connect to Elasticsearch, retrying...", "error", err, "attempt", i+1)
+								time.Sleep(retryDelay)
+								continue
+							}
+							return fmt.Errorf("failed to connect to Elasticsearch after %d attempts: %w", maxRetries, err)
+						}
+
 						// Start the server in a goroutine
 						go func() {
 							p.Logger.Info("HTTP server started", "address", p.Server.Addr)
