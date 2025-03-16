@@ -389,7 +389,7 @@ func TestConfigurationPriority(t *testing.T) {
 		os.Clearenv()
 		for _, e := range originalEnv {
 			k, v, _ := strings.Cut(e, "=")
-			os.Setenv(k, v)
+			t.Setenv(k, v)
 		}
 		viper.Reset()
 	}()
@@ -397,6 +397,12 @@ func TestConfigurationPriority(t *testing.T) {
 	// Clear environment and viper config
 	os.Clearenv()
 	viper.Reset()
+
+	// Create empty config file for testing defaults
+	emptyConfig := []byte("---\n")
+	writeErr := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
+	require.NoError(t, writeErr)
+	defer os.Remove("testdata/empty.yml")
 
 	// Test cases for configuration priority
 	tests := []struct {
@@ -431,19 +437,13 @@ func TestConfigurationPriority(t *testing.T) {
 		{
 			name: "default value used when no env or config",
 			envVars: map[string]string{
-				"CONFIG_FILE": "./testdata/empty.yml", // Use an empty config file
+				"CONFIG_FILE": "./testdata/empty.yml",
 			},
-			expectedValue: "info", // Default log level
+			expectedValue: "info",
 			configKey:     "log.level",
 			envKey:        "LOG_LEVEL",
 		},
 	}
-
-	// Create empty config file for testing defaults
-	emptyConfig := []byte("---\n")
-	err := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
-	require.NoError(t, err)
-	defer os.Remove("testdata/empty.yml")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -456,8 +456,8 @@ func TestConfigurationPriority(t *testing.T) {
 			}
 
 			// Initialize config
-			cfg, err := config.New()
-			require.NoError(t, err)
+			cfg, initErr := config.New()
+			require.NoError(t, initErr)
 
 			// Verify value based on the config key
 			var actualValue string
@@ -480,7 +480,7 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 		os.Clearenv()
 		for _, e := range originalEnv {
 			k, v, _ := strings.Cut(e, "=")
-			os.Setenv(k, v)
+			t.Setenv(k, v)
 		}
 		viper.Reset()
 	}()
@@ -491,8 +491,8 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 
 	// Create empty config file for testing
 	emptyConfig := []byte("---\n")
-	err := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
-	require.NoError(t, err)
+	writeErr := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
+	require.NoError(t, writeErr)
 	defer os.Remove("testdata/empty.yml")
 
 	tests := []struct {
@@ -514,7 +514,7 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 			name: "missing API key in production",
 			envVars: map[string]string{
 				"APP_ENV":     "production",
-				"CONFIG_FILE": "./testdata/empty.yml", // Use empty config to avoid default API key
+				"CONFIG_FILE": "./testdata/empty.yml",
 			},
 			expectError: true,
 			errorMsg:    "invalid configuration: API key is required in production",
@@ -532,13 +532,13 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 			}
 
 			// Initialize config
-			cfg, err := config.New()
+			cfg, initErr := config.New()
 
 			if tt.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMsg)
+				require.Error(t, initErr)
+				assert.Contains(t, initErr.Error(), tt.errorMsg)
 			} else {
-				require.NoError(t, err)
+				require.NoError(t, initErr)
 				require.NotNil(t, cfg)
 			}
 		})
