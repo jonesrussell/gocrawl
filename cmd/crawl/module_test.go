@@ -8,11 +8,12 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
+	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -25,7 +26,7 @@ func TestModuleProvides(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockLogger := logger.NewMockInterface(ctrl)
-	mockCfg := config.NewMockConfig().WithSources([]config.Source{
+	mockCfg := configtest.NewMockConfig().WithSources([]config.Source{
 		{
 			Name: "Test Source",
 			URL:  "http://test.example.com",
@@ -40,7 +41,7 @@ func TestModuleProvides(t *testing.T) {
 			MaxDepth:  2,
 		},
 	}
-	testSources := testutils.NewTestSources(testConfigs)
+	testSources := sourcestest.NewTestSources(testConfigs)
 
 	app := fxtest.New(t,
 		fx.Provide(
@@ -72,7 +73,7 @@ func TestModuleConfiguration(t *testing.T) {
 
 	// Create test dependencies
 	mockLogger := logger.NewMockInterface(ctrl)
-	mockCfg := config.NewMockConfig().
+	mockCfg := configtest.NewMockConfig().
 		WithSources([]config.Source{
 			{
 				Name: "Test Source",
@@ -92,7 +93,7 @@ func TestModuleConfiguration(t *testing.T) {
 			MaxDepth:  2,
 		},
 	}
-	testSources := testutils.NewTestSources(testConfigs)
+	testSources := sourcestest.NewTestSources(testConfigs)
 
 	var crawlerInstance crawler.Interface
 
