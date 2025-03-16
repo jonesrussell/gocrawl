@@ -396,7 +396,7 @@ func (m *mockSearchManager) Search(ctx context.Context, index string, query any)
 	return ret0, ret1
 }
 
-func (m *mockSearchManagerMockRecorder) Search(ctx, index, query interface{}) *gomock.Call {
+func (m *mockSearchManagerMockRecorder) Search(ctx, index, query any) *gomock.Call {
 	return m.mock.ctrl.RecordCall(m.mock, "Search", ctx, index, query)
 }
 
@@ -408,7 +408,7 @@ func (m *mockSearchManager) Count(ctx context.Context, index string, query any) 
 	return ret0, ret1
 }
 
-func (m *mockSearchManagerMockRecorder) Count(ctx, index, query interface{}) *gomock.Call {
+func (m *mockSearchManagerMockRecorder) Count(ctx, index, query any) *gomock.Call {
 	return m.mock.ctrl.RecordCall(m.mock, "Count", ctx, index, query)
 }
 
@@ -419,6 +419,6 @@ func (m *mockSearchManager) Aggregate(ctx context.Context, index string, aggs an
 	return ret[0], ret1
 }
 
-func (m *mockSearchManagerMockRecorder) Aggregate(ctx, index, aggs interface{}) *gomock.Call {
+func (m *mockSearchManagerMockRecorder) Aggregate(ctx, index, aggs any) *gomock.Call {
 	return m.mock.ctrl.RecordCall(m.mock, "Aggregate", ctx, index, aggs)
 }

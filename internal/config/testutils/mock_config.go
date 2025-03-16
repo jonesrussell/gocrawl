@@ -6,6 +6,14 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 )
 
+const (
+	defaultMaxDepth     = 3
+	defaultParallelism  = 2
+	defaultReadTimeout  = 15 * time.Second
+	defaultWriteTimeout = 15 * time.Second
+	defaultIdleTimeout  = 60 * time.Second
+)
+
 // MockConfig is a mock implementation of the config.Interface for testing.
 type MockConfig struct {
 	sources       []config.Source
@@ -21,8 +29,8 @@ func NewMockConfig() *MockConfig {
 	return &MockConfig{
 		sources: []config.Source{},
 		crawlerConfig: &config.CrawlerConfig{
-			MaxDepth:    3,
-			Parallelism: 2,
+			MaxDepth:    defaultMaxDepth,
+			Parallelism: defaultParallelism,
 			RateLimit:   time.Second,
 			RandomDelay: time.Second,
 		},
@@ -39,9 +47,9 @@ func NewMockConfig() *MockConfig {
 		},
 		serverConfig: &config.ServerConfig{
 			Address:      ":8080",
-			ReadTimeout:  time.Second * 15,
-			WriteTimeout: time.Second * 15,
-			IdleTimeout:  time.Second * 60,
+			ReadTimeout:  defaultReadTimeout,
+			WriteTimeout: defaultWriteTimeout,
+			IdleTimeout:  defaultIdleTimeout,
 		},
 	}
 }

@@ -1,39 +1,42 @@
-package config
+package config_test
 
-import "time"
+import (
+	"time"
 
-// MockConfig is a mock implementation of the Interface for testing.
+	"github.com/jonesrussell/gocrawl/internal/config"
+)
+
+// MockConfig is a mock implementation of config.Interface for testing.
 type MockConfig struct {
-	sources       []Source
-	crawlerConfig *CrawlerConfig
-	logConfig     *LogConfig
-	appConfig     *AppConfig
-	esConfig      *ElasticsearchConfig
-	serverConfig  *ServerConfig
+	sources             []config.Source
+	crawlerConfig       *config.CrawlerConfig
+	logConfig           *config.LogConfig
+	appConfig           *config.AppConfig
+	elasticsearchConfig *config.ElasticsearchConfig
+	serverConfig        *config.ServerConfig
 }
 
-// NewMockConfig creates a new mock config with default values.
+// NewMockConfig creates a new MockConfig with default values.
 func NewMockConfig() *MockConfig {
 	return &MockConfig{
-		sources: []Source{},
-		crawlerConfig: &CrawlerConfig{
+		sources: []config.Source{},
+		crawlerConfig: &config.CrawlerConfig{
 			MaxDepth:    3,
 			Parallelism: 2,
 			RateLimit:   time.Second,
 			RandomDelay: time.Second,
 		},
-		logConfig: &LogConfig{
+		logConfig: &config.LogConfig{
 			Level: "info",
-			Debug: false,
 		},
-		appConfig: &AppConfig{
-			Environment: "test",
+		appConfig: &config.AppConfig{
+			Name:    "gocrawl",
+			Version: "0.1.0",
 		},
-		esConfig: &ElasticsearchConfig{
+		elasticsearchConfig: &config.ElasticsearchConfig{
 			Addresses: []string{"http://localhost:9200"},
-			IndexName: "test_index",
 		},
-		serverConfig: &ServerConfig{
+		serverConfig: &config.ServerConfig{
 			Address:      ":8080",
 			ReadTimeout:  time.Second * 15,
 			WriteTimeout: time.Second * 15,
@@ -43,70 +46,70 @@ func NewMockConfig() *MockConfig {
 }
 
 // WithSources sets the sources for the mock config.
-func (m *MockConfig) WithSources(sources []Source) *MockConfig {
+func (m *MockConfig) WithSources(sources []config.Source) *MockConfig {
 	m.sources = sources
 	return m
 }
 
 // WithCrawlerConfig sets the crawler config for the mock config.
-func (m *MockConfig) WithCrawlerConfig(cfg *CrawlerConfig) *MockConfig {
+func (m *MockConfig) WithCrawlerConfig(cfg *config.CrawlerConfig) *MockConfig {
 	m.crawlerConfig = cfg
 	return m
 }
 
 // WithLogConfig sets the log config for the mock config.
-func (m *MockConfig) WithLogConfig(cfg *LogConfig) *MockConfig {
+func (m *MockConfig) WithLogConfig(cfg *config.LogConfig) *MockConfig {
 	m.logConfig = cfg
 	return m
 }
 
 // WithAppConfig sets the app config for the mock config.
-func (m *MockConfig) WithAppConfig(cfg *AppConfig) *MockConfig {
+func (m *MockConfig) WithAppConfig(cfg *config.AppConfig) *MockConfig {
 	m.appConfig = cfg
 	return m
 }
 
 // WithElasticsearchConfig sets the elasticsearch config for the mock config.
-func (m *MockConfig) WithElasticsearchConfig(cfg *ElasticsearchConfig) *MockConfig {
-	m.esConfig = cfg
+func (m *MockConfig) WithElasticsearchConfig(cfg *config.ElasticsearchConfig) *MockConfig {
+	m.elasticsearchConfig = cfg
 	return m
 }
 
 // WithServerConfig sets the server config for the mock config.
-func (m *MockConfig) WithServerConfig(cfg *ServerConfig) *MockConfig {
+func (m *MockConfig) WithServerConfig(cfg *config.ServerConfig) *MockConfig {
 	m.serverConfig = cfg
 	return m
 }
 
-// GetSources implements Interface.
-func (m *MockConfig) GetSources() []Source {
+// GetSources returns the configured sources.
+func (m *MockConfig) GetSources() []config.Source {
 	return m.sources
 }
 
-// GetCrawlerConfig implements Interface.
-func (m *MockConfig) GetCrawlerConfig() *CrawlerConfig {
+// GetCrawlerConfig returns the crawler configuration.
+func (m *MockConfig) GetCrawlerConfig() *config.CrawlerConfig {
 	return m.crawlerConfig
 }
 
-// GetLogConfig implements Interface.
-func (m *MockConfig) GetLogConfig() *LogConfig {
+// GetLogConfig returns the logging configuration.
+func (m *MockConfig) GetLogConfig() *config.LogConfig {
 	return m.logConfig
 }
 
-// GetAppConfig implements Interface.
-func (m *MockConfig) GetAppConfig() *AppConfig {
+// GetAppConfig returns the application configuration.
+func (m *MockConfig) GetAppConfig() *config.AppConfig {
 	return m.appConfig
 }
 
-// GetElasticsearchConfig implements Interface.
-func (m *MockConfig) GetElasticsearchConfig() *ElasticsearchConfig {
-	return m.esConfig
+// GetElasticsearchConfig returns the Elasticsearch configuration.
+func (m *MockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
+	return m.elasticsearchConfig
 }
 
-// GetServerConfig implements Interface.
-func (m *MockConfig) GetServerConfig() *ServerConfig {
+// GetServerConfig returns the server configuration.
+func (m *MockConfig) GetServerConfig() *config.ServerConfig {
 	return m.serverConfig
 }
 
-// Ensure MockConfig implements Interface
-var _ Interface = (*MockConfig)(nil)
+// Ensure MockConfig implements config.Interface
+var _ config.Interface = (*MockConfig)(nil)
