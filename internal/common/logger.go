@@ -4,13 +4,13 @@ package common
 
 import (
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // CollyDebugger implements the colly.Debugger interface to provide
 // debug logging for Colly operations using our logger.
 type CollyDebugger struct {
-	logger interfaces.Logger
+	logger logger.Interface
 }
 
 // NewCollyDebugger creates a new Colly debugger that uses the provided logger.
@@ -21,7 +21,7 @@ type CollyDebugger struct {
 //
 // Returns:
 //   - *CollyDebugger: A new debugger instance
-func NewCollyDebugger(logger interfaces.Logger) *CollyDebugger {
+func NewCollyDebugger(logger logger.Interface) *CollyDebugger {
 	return &CollyDebugger{
 		logger: logger,
 	}

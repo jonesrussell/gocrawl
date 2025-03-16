@@ -7,7 +7,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -39,12 +38,12 @@ func TestModule(t *testing.T) {
 	mockCfg := &mockConfig{}
 	mockIndex := &mockIndexManager{}
 
-	// Verify mockLogger implements interfaces.Logger
-	var _ interfaces.Logger = mockLogger
+	// Verify mockLogger implements logger.Interface
+	var _ logger.Interface = mockLogger
 
 	app := fxtest.New(t,
 		fx.Provide(
-			func() interfaces.Logger { return mockLogger },
+			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() api.IndexManager { return mockIndex },
 		),
@@ -61,15 +60,15 @@ func TestModuleProvides(t *testing.T) {
 	mockCfg := &mockConfig{}
 	mockIndex := &mockIndexManager{}
 
-	// Verify mockLogger implements interfaces.Logger
-	var _ interfaces.Logger = mockLogger
+	// Verify mockLogger implements logger.Interface
+	var _ logger.Interface = mockLogger
 
 	var crawlerInstance crawler.Interface
 
 	app := fxtest.New(t,
 		crawler.Module,
 		fx.Provide(
-			func() interfaces.Logger { return mockLogger },
+			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() api.IndexManager { return mockIndex },
 		),

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // testLogger is a simple logger for testing
@@ -26,7 +26,7 @@ func (l *testLogger) Errorf(_ string, _ ...any) {}
 func (l *testLogger) Sync() error               { return nil }
 
 // Ensure testLogger implements interfaces.Logger
-var _ interfaces.Logger = (*testLogger)(nil)
+var _ logger.Interface = (*testLogger)(nil)
 
 func TestNew(t *testing.T) {
 	// Save current environment and use t.Setenv for automatic cleanup
@@ -34,9 +34,6 @@ func TestNew(t *testing.T) {
 
 	// Reset Viper after each test
 	defer viper.Reset()
-
-	// Create test logger
-	log := &testLogger{}
 
 	tests := []struct {
 		name     string
@@ -83,7 +80,7 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup(t)
-			cfg, err := config.New(log)
+			cfg, err := config.New()
 			tt.validate(t, cfg, err)
 		})
 	}

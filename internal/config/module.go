@@ -14,8 +14,6 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
-
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 )
 
 const (
@@ -169,7 +167,7 @@ var Module = fx.Options(
 )
 
 // setupViper initializes Viper with default configuration
-func setupViper(log interfaces.Logger) error {
+func setupViper() error {
 	// Set default configuration name and type
 	viper.SetConfigType("yaml")
 
@@ -177,8 +175,8 @@ func setupViper(log interfaces.Logger) error {
 	if cfgFile := os.Getenv("CONFIG_FILE"); cfgFile != "" {
 		// If CONFIG_FILE is set, use it directly
 		viper.SetConfigFile(cfgFile)
-		// Use structured logging
-		log.Info("Using config file from environment", "config_file", cfgFile)
+		// Use standard logging
+		log.Printf("Using config file from environment: %s", cfgFile)
 	} else {
 		viper.SetConfigName("config")
 		// Add search paths in order of priority
@@ -213,13 +211,13 @@ func setupViper(log interfaces.Logger) error {
 			if os.Getenv("APP_ENV") == envProduction {
 				return fmt.Errorf("no config file found in production environment: %w", err)
 			}
-			log.Warn("No config file found, using defaults and environment variables")
+			log.Printf("Warning: No config file found, using defaults and environment variables")
 			return nil
 		}
 		return fmt.Errorf("error reading config file: %w", err)
 	}
 
-	log.Info("Configuration loaded", "config_file", viper.ConfigFileUsed())
+	log.Printf("Configuration loaded from: %s", viper.ConfigFileUsed())
 	return nil
 }
 
@@ -330,16 +328,16 @@ func checkRequiredEnvVars() error {
 }
 
 // New creates a new Config instance with values from Viper
-func New(log interfaces.Logger) (Interface, error) {
+func New() (Interface, error) {
 	// Load .env file only in development environment
 	if os.Getenv("APP_ENV") != envProduction {
 		if err := godotenv.Load(); err != nil {
-			log.Warn("Error loading .env file", "error", err)
+			log.Printf("Warning: Error loading .env file: %v", err)
 		}
 	}
 
 	// Set up Viper configuration
-	if setupErr := setupViper(log); setupErr != nil {
+	if setupErr := setupViper(); setupErr != nil {
 		return nil, fmt.Errorf("failed to setup viper: %w", setupErr)
 	}
 

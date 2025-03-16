@@ -10,7 +10,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
@@ -45,7 +44,7 @@ func TestModuleProvides(t *testing.T) {
 
 	app := fxtest.New(t,
 		fx.Provide(
-			func() interfaces.Logger { return mockLogger },
+			func() logger.Interface { return mockLogger },
 			func() *sources.Sources { return testSources },
 		),
 		fx.Replace(
@@ -100,7 +99,7 @@ func TestModuleConfiguration(t *testing.T) {
 	// Create test app with crawl module
 	app := fxtest.New(t,
 		fx.Provide(
-			func() interfaces.Logger { return mockLogger },
+			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() *sources.Sources { return testSources },
 			func() api.IndexManager { return api.NewMockIndexManager() },
