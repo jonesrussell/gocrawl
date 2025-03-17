@@ -57,12 +57,6 @@ type Interface interface {
 	Count(ctx context.Context, index string, query any) (int64, error)
 }
 
-// Error definitions
-var (
-	ErrInvalidIndexHealth = errors.New("invalid index health format")
-	ErrInvalidDocCount    = errors.New("invalid index document count format")
-)
-
 // Helper function to create a context with timeout
 func (s *ElasticsearchStorage) createContextWithTimeout(
 	ctx context.Context,
