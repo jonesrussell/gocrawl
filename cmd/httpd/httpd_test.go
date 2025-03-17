@@ -15,6 +15,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
@@ -235,12 +236,12 @@ func TestHTTPCommandServerError(t *testing.T) {
 	)
 
 	// Start should fail with invalid port error
-	err := app.Start(context.Background())
-	assert.Error(t, err)
+	err := app.Start(t.Context())
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to listen on :-1: listen tcp: address -1: invalid port")
 
 	// Cleanup
-	_ = app.Stop(context.Background())
+	_ = app.Stop(t.Context())
 }
 
 func TestCommand(t *testing.T) {
