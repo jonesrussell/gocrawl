@@ -63,8 +63,8 @@ You can send POST requests to /search with a JSON body containing the search par
 					OnStart: func(ctx context.Context) error {
 						// Test Elasticsearch connection with retries
 						for i := range maxRetries {
-							// Try to perform a simple search to verify connection
-							_, err := p.Storage.Search(ctx, "", nil)
+							// Try to test the connection
+							err := p.Storage.TestConnection(ctx)
 							if err == nil {
 								break
 							}
