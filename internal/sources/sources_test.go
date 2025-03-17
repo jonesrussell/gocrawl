@@ -12,70 +12,56 @@ import (
 
 // MockLogger is a mock implementation of logger.Interface
 type MockLogger struct {
-	startCalled        bool
-	startMsg           string
-	startKeysAndValues []interface{}
-	errorCalled        bool
-	errorMsg           string
-	errorKeysAndValues []interface{}
-	debugCalled        bool
-	debugMsg           string
-	debugKeysAndValues []interface{}
-	warnCalled         bool
-	warnMsg            string
-	warnKeysAndValues  []interface{}
-	errorfCalled       bool
-	errorfFormat       string
-	errorfArgs         []interface{}
-	fatalCalled        bool
-	fatalMsg           string
-	fatalKeysAndValues []interface{}
-	printfCalled       bool
-	printfFormat       string
-	printfArgs         []interface{}
+	startMessage       string
+	startKeysAndValues []any
+	errorMessage       string
+	errorKeysAndValues []any
+	debugMessage       string
+	debugKeysAndValues []any
+	warnMessage        string
+	warnKeysAndValues  []any
+	errorfMessage      string
+	errorfArgs         []any
+	fatalMessage       string
+	fatalKeysAndValues []any
+	printfMessage      string
+	printfArgs         []any
 	syncCalled         bool
 	syncErr            error
 }
 
-func (m *MockLogger) Info(msg string, keysAndValues ...interface{}) {
-	m.startCalled = true
-	m.startMsg = msg
+func (m *MockLogger) Info(msg string, keysAndValues ...any) {
+	m.startMessage = msg
 	m.startKeysAndValues = keysAndValues
 }
 
-func (m *MockLogger) Error(msg string, keysAndValues ...interface{}) {
-	m.errorCalled = true
-	m.errorMsg = msg
+func (m *MockLogger) Error(msg string, keysAndValues ...any) {
+	m.errorMessage = msg
 	m.errorKeysAndValues = keysAndValues
 }
 
-func (m *MockLogger) Debug(msg string, keysAndValues ...interface{}) {
-	m.debugCalled = true
-	m.debugMsg = msg
+func (m *MockLogger) Debug(msg string, keysAndValues ...any) {
+	m.debugMessage = msg
 	m.debugKeysAndValues = keysAndValues
 }
 
-func (m *MockLogger) Warn(msg string, keysAndValues ...interface{}) {
-	m.warnCalled = true
-	m.warnMsg = msg
+func (m *MockLogger) Warn(msg string, keysAndValues ...any) {
+	m.warnMessage = msg
 	m.warnKeysAndValues = keysAndValues
 }
 
-func (m *MockLogger) Errorf(format string, args ...interface{}) {
-	m.errorfCalled = true
-	m.errorfFormat = format
+func (m *MockLogger) Errorf(format string, args ...any) {
+	m.errorfMessage = format
 	m.errorfArgs = args
 }
 
-func (m *MockLogger) Fatal(msg string, keysAndValues ...interface{}) {
-	m.fatalCalled = true
-	m.fatalMsg = msg
+func (m *MockLogger) Fatal(msg string, keysAndValues ...any) {
+	m.fatalMessage = msg
 	m.fatalKeysAndValues = keysAndValues
 }
 
-func (m *MockLogger) Printf(format string, args ...interface{}) {
-	m.printfCalled = true
-	m.printfFormat = format
+func (m *MockLogger) Printf(format string, args ...any) {
+	m.printfMessage = format
 	m.printfArgs = args
 }
 

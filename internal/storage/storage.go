@@ -23,23 +23,23 @@ const (
 // Interface defines the storage operations
 type Interface interface {
 	// Document operations
-	IndexDocument(ctx context.Context, index string, id string, document interface{}) error
-	GetDocument(ctx context.Context, index string, id string, document interface{}) error
+	IndexDocument(ctx context.Context, index string, id string, document any) error
+	GetDocument(ctx context.Context, index string, id string, document any) error
 	DeleteDocument(ctx context.Context, index string, id string) error
 
 	// Bulk operations
-	BulkIndex(ctx context.Context, index string, documents []interface{}) error
+	BulkIndex(ctx context.Context, index string, documents []any) error
 
 	// Index management
-	CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error
+	CreateIndex(ctx context.Context, index string, mapping map[string]any) error
 	DeleteIndex(ctx context.Context, index string) error
 	ListIndices(ctx context.Context) ([]string, error)
-	GetMapping(ctx context.Context, index string) (map[string]interface{}, error)
-	UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error
-	IndexExists(ctx context.Context, indexName string) (bool, error)
+	GetMapping(ctx context.Context, index string) (map[string]any, error)
+	UpdateMapping(ctx context.Context, index string, mapping map[string]any) error
+	IndexExists(ctx context.Context, index string) (bool, error)
 
 	// Search operations
-	SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error)
+	Search(ctx context.Context, index string, query any) ([]any, error)
 
 	// Index health and stats
 	GetIndexHealth(ctx context.Context, index string) (string, error)
@@ -51,17 +51,11 @@ type Interface interface {
 	TestConnection(ctx context.Context) error
 
 	// New operations
-	Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error)
+	Aggregate(ctx context.Context, index string, aggs any) (any, error)
 
 	// Count operation
-	Count(ctx context.Context, index string, query interface{}) (int64, error)
+	Count(ctx context.Context, index string, query any) (int64, error)
 }
-
-// Error definitions
-var (
-	ErrInvalidIndexHealth = errors.New("invalid index health format")
-	ErrInvalidDocCount    = errors.New("invalid index document count format")
-)
 
 // Helper function to create a context with timeout
 func (s *ElasticsearchStorage) createContextWithTimeout(
@@ -72,7 +66,7 @@ func (s *ElasticsearchStorage) createContextWithTimeout(
 }
 
 // IndexDocument indexes a document in Elasticsearch
-func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, id string, document interface{}) error {
+func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, id string, document any) error {
 	if s.ESClient == nil {
 		return errors.New("elasticsearch client is not initialized")
 	}
@@ -109,7 +103,7 @@ func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, 
 }
 
 // BulkIndex performs bulk indexing of documents
-func (s *ElasticsearchStorage) BulkIndex(ctx context.Context, index string, documents []interface{}) error {
+func (s *ElasticsearchStorage) BulkIndex(ctx context.Context, index string, documents []any) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultBulkIndexTimeout)
 	defer cancel()
 
@@ -140,11 +134,11 @@ func (s *ElasticsearchStorage) BulkIndex(ctx context.Context, index string, docu
 func (s *ElasticsearchStorage) prepareBulkIndexRequest(
 	buf *bytes.Buffer,
 	index string,
-	documents []interface{},
+	documents []any,
 ) error {
 	for _, doc := range documents {
-		action := map[string]interface{}{
-			"index": map[string]interface{}{
+		action := map[string]any{
+			"index": map[string]any{
 				"_index": index,
 			},
 		}
@@ -160,9 +154,19 @@ func (s *ElasticsearchStorage) prepareBulkIndexRequest(
 }
 
 // Search performs a search query
-func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query interface{}) ([]interface{}, error) {
+func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	if s.ESClient == nil {
 		return nil, errors.New("elasticsearch client is not initialized")
+	}
+
+	// First check if the index exists
+	exists, err := s.IndexExists(ctx, index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		s.Logger.Error("Index not found", "index", index)
+		return nil, fmt.Errorf("%w: %s", ErrIndexNotFound, index)
 	}
 
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
@@ -182,28 +186,28 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query i
 		return nil, fmt.Errorf("search request failed: %s", res.String())
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
 		return nil, fmt.Errorf("error decoding search response: %w", decodeErr)
 	}
 
-	hits, exists := result["hits"].(map[string]interface{})
+	hits, exists := result["hits"].(map[string]any)
 	if !exists {
 		return nil, errors.New("invalid search response format")
 	}
 
-	hitsList, exists := hits["hits"].([]interface{})
+	hitsList, exists := hits["hits"].([]any)
 	if !exists {
 		return nil, errors.New("invalid hits format in search response")
 	}
 
-	results := make([]interface{}, 0, len(hitsList))
+	results := make([]any, 0, len(hitsList))
 	for _, hit := range hitsList {
-		hitData, isMap := hit.(map[string]interface{})
+		hitData, isMap := hit.(map[string]any)
 		if !isMap {
 			continue
 		}
-		source, isMap := hitData["_source"].(map[string]interface{})
+		source, isMap := hitData["_source"].(map[string]any)
 		if !isMap {
 			continue
 		}
@@ -217,7 +221,7 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query i
 func (s *ElasticsearchStorage) CreateIndex(
 	ctx context.Context,
 	index string,
-	mapping map[string]interface{},
+	mapping map[string]any,
 ) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
 	defer cancel()
@@ -280,12 +284,12 @@ func (s *ElasticsearchStorage) UpdateDocument(
 	ctx context.Context,
 	index string,
 	docID string,
-	update map[string]interface{},
+	update map[string]any,
 ) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
 	defer cancel()
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"doc":           update,
 		"doc_as_upsert": true,
 	}
@@ -359,7 +363,7 @@ func (s *ElasticsearchStorage) Close() error {
 }
 
 // GetDocument implements Interface
-func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id string, document interface{}) error {
+func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id string, document any) error {
 	res, err := s.ESClient.Get(
 		index,
 		id,
@@ -386,11 +390,10 @@ func (s *ElasticsearchStorage) SearchDocuments(
 	ctx context.Context,
 	index string,
 	query string,
-) ([]map[string]interface{}, error) {
-	// Basic query string query
-	searchQuery := map[string]interface{}{
-		"query": map[string]interface{}{
-			"query_string": map[string]interface{}{
+) ([]map[string]any, error) {
+	searchQuery := map[string]any{
+		"query": map[string]any{
+			"query_string": map[string]any{
 				"query": query,
 			},
 		},
@@ -415,24 +418,24 @@ func (s *ElasticsearchStorage) SearchDocuments(
 		return nil, fmt.Errorf("error searching documents: %s", res.String())
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
 		return nil, fmt.Errorf("error parsing search response: %w", decodeErr)
 	}
 
-	hitsObj, ok := result["hits"].(map[string]interface{})
+	hitsObj, ok := result["hits"].(map[string]any)
 	if !ok {
 		return nil, errors.New("invalid response format: hits object not found")
 	}
 
-	hitsArray, ok := hitsObj["hits"].([]interface{})
+	hitsArray, ok := hitsObj["hits"].([]any)
 	if !ok {
 		return nil, errors.New("invalid response format: hits array not found")
 	}
 
-	documents := make([]map[string]interface{}, 0, len(hitsArray))
+	documents := make([]map[string]any, 0, len(hitsArray))
 	for _, hit := range hitsArray {
-		resultMap, isValidMap := hit.(map[string]interface{})
+		resultMap, isValidMap := hit.(map[string]any)
 		if !isValidMap {
 			continue
 		}
@@ -442,7 +445,7 @@ func (s *ElasticsearchStorage) SearchDocuments(
 			continue
 		}
 
-		sourceMap, isMap := source.(map[string]interface{})
+		sourceMap, isMap := source.(map[string]any)
 		if !isMap {
 			continue
 		}
@@ -505,7 +508,7 @@ func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error
 }
 
 // GetMapping gets the mapping for an index
-func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (map[string]interface{}, error) {
+func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	res, err := s.ESClient.Indices.GetMapping(
 		s.ESClient.Indices.GetMapping.WithContext(ctx),
 		s.ESClient.Indices.GetMapping.WithIndex(index),
@@ -521,7 +524,7 @@ func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (ma
 		return nil, fmt.Errorf("error getting mapping: %s", res.String())
 	}
 
-	var mapping map[string]interface{}
+	var mapping map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&mapping); decodeErr != nil {
 		s.Logger.Error("Failed to get mapping", "error", decodeErr)
 		return nil, fmt.Errorf("error decoding mapping: %w", decodeErr)
@@ -532,7 +535,7 @@ func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (ma
 }
 
 // UpdateMapping updates the mapping for an index
-func (s *ElasticsearchStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error {
+func (s *ElasticsearchStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]any) error {
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(mapping); err != nil {
 		return fmt.Errorf("error encoding mapping: %w", err)
@@ -572,7 +575,7 @@ func (s *ElasticsearchStorage) GetIndexHealth(ctx context.Context, index string)
 		return "", fmt.Errorf("error getting index health: %s", res.String())
 	}
 
-	var health map[string]interface{}
+	var health map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&health); decodeErr != nil {
 		s.Logger.Error("Failed to get index health", "error", decodeErr)
 		return "", fmt.Errorf("error decoding index health: %w", decodeErr)
@@ -605,7 +608,7 @@ func (s *ElasticsearchStorage) GetIndexDocCount(ctx context.Context, index strin
 		return 0, fmt.Errorf("error getting index document count: %s", res.String())
 	}
 
-	var count map[string]interface{}
+	var count map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&count); decodeErr != nil {
 		s.Logger.Error("Failed to get index document count", "error", decodeErr)
 		return 0, fmt.Errorf("error decoding index document count: %w", decodeErr)
@@ -622,7 +625,7 @@ func (s *ElasticsearchStorage) GetIndexDocCount(ctx context.Context, index strin
 }
 
 // mustMarshal marshals the given value to JSON or panics if it fails
-func mustMarshal(v interface{}) []byte {
+func mustMarshal(v any) []byte {
 	data, err := json.Marshal(v)
 	if err != nil {
 		panic(fmt.Sprintf("failed to marshal JSON: %v", err))
@@ -632,9 +635,9 @@ func mustMarshal(v interface{}) []byte {
 
 // SearchArticles implements Interface
 func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
-	searchQuery := map[string]interface{}{
-		"query": map[string]interface{}{
-			"match": map[string]interface{}{
+	searchQuery := map[string]any{
+		"query": map[string]any{
+			"match": map[string]any{
 				"content": query,
 			},
 		},
@@ -681,7 +684,7 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 }
 
 // Aggregate performs an aggregation query
-func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error) {
+func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
 	if s.ESClient == nil {
 		return nil, errors.New("elasticsearch client is not initialized")
 	}
@@ -689,7 +692,7 @@ func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
 	defer cancel()
 
-	query := map[string]interface{}{
+	query := map[string]any{
 		"size": 0, // We don't need hits for aggregations
 		"aggs": aggs,
 	}
@@ -708,12 +711,12 @@ func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs
 		return nil, fmt.Errorf("aggregation request failed: %s", res.String())
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
 		return nil, fmt.Errorf("error decoding aggregation response: %w", decodeErr)
 	}
 
-	aggregations, exists := result["aggregations"].(map[string]interface{})
+	aggregations, exists := result["aggregations"].(map[string]any)
 	if !exists {
 		return nil, errors.New("invalid aggregation response format")
 	}
@@ -722,7 +725,7 @@ func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs
 }
 
 // Count returns the number of documents matching a query
-func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query interface{}) (int64, error) {
+func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	if s.ESClient == nil {
 		return 0, errors.New("elasticsearch client is not initialized")
 	}
@@ -747,7 +750,7 @@ func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query in
 		return 0, fmt.Errorf("count request failed: %s", res.String())
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
 		return 0, fmt.Errorf("error decoding count response: %w", decodeErr)
 	}

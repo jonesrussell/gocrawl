@@ -154,7 +154,7 @@ func PrintSources(sources []sources.Config, logger common.Logger) error {
 	t.Style().Options.SeparateHeader = true
 
 	// Create transformers for consistent formatting
-	labelTransformer := text.Transformer(func(val interface{}) string {
+	labelTransformer := text.Transformer(func(val any) string {
 		str, ok := val.(string)
 		if !ok {
 			return fmt.Sprintf("%-*s", labelFormatterWidth, "ERROR")
@@ -188,7 +188,7 @@ func PrintSources(sources []sources.Config, logger common.Logger) error {
 		sourceInfo := fmt.Sprintf("%s\n%s", source.Name, source.URL)
 		indexes := fmt.Sprintf("Articles: %s\nContent:  %s", source.ArticleIndex, source.Index)
 		crawlConfig := fmt.Sprintf("Rate:    %s\nDepth:    %d", source.RateLimit, source.MaxDepth)
-		t.AppendRow([]interface{}{
+		t.AppendRow([]any{
 			sourceInfo,
 			indexes,
 			crawlConfig,

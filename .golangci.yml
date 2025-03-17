@@ -268,6 +268,21 @@ linters-settings:
     exclude:
       - "cmd/root\\.go"  # This regex matches the root.go file
 
+  stylecheck:
+    # https://staticcheck.io/docs/options#checks
+    checks: [ "all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022", "-ST1023" ]
+    # Enforce using 'any' instead of 'interface{}'
+    dot-import-whitelist: []
+    http-status-code-whitelist: []
+    initialisms: [ "ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS" ]
+
+  revive:
+    rules:
+      - name: use-any
+        disabled: false
+        severity: warning
+        arguments: []
+
 linters:
   disable-all: true
   enable:

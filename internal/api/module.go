@@ -27,8 +27,8 @@ type SearchRequest struct {
 
 // SearchResponse represents the structure of the search response
 type SearchResponse struct {
-	Results []interface{} `json:"results"`
-	Total   int           `json:"total"`
+	Results []any `json:"results"`
+	Total   int   `json:"total"`
 }
 
 // StartHTTPServer starts the HTTP server for search requests
@@ -50,9 +50,9 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 		}
 
 		// Build the search query
-		query := map[string]interface{}{
-			"query": map[string]interface{}{
-				"match": map[string]interface{}{
+		query := map[string]any{
+			"query": map[string]any{
+				"match": map[string]any{
 					"content": req.Query,
 				},
 			},
@@ -67,9 +67,9 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 		}
 
 		// Get the total count using a wrapped query
-		total, err := searchManager.Count(r.Context(), req.Index, map[string]interface{}{
-			"query": map[string]interface{}{
-				"match": map[string]interface{}{
+		total, err := searchManager.Count(r.Context(), req.Index, map[string]any{
+			"query": map[string]any{
+				"match": map[string]any{
 					"content": req.Query,
 				},
 			},

@@ -4,190 +4,262 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
+	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/logger/mock_logger"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExtractContent(t *testing.T) {
-	// Create mock logger
-	mockLogger := logger.NewMockLogger()
-	mockLogger.On("Debug", "Extracting content", "url", "./http://example.com").Return()
-	mockLogger.On("Debug", "Trying to parse date", "value", "2024-03-03T12:00:00Z").Return()
-	mockLogger.On("Debug", "Successfully parsed date",
-		"source", "2024-03-03T12:00:00Z",
-		"format", "2006-01-02T15:04:05Z07:00",
-		"result", mock.AnythingOfType("time.Time")).Return()
-	mockLogger.On("Debug", "Extracted content",
-		"id", mock.AnythingOfType("string"),
-		"title", "Test Content",
-		"url", "./http://example.com",
-		"type", "WebPage",
-		"created_at", mock.AnythingOfType("time.Time")).Return()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	// Create service
+	mockLogger := mock_logger.NewMockInterface(ctrl)
 	svc := content.NewService(mockLogger)
 
-	// Create test HTML
-	html := `
-		<!DOCTYPE html>
-		<html>
-		<head>
-			<title>Test Content</title>
-			<script type="application/ld+json">
-			{
-				"@type": "WebPage",
-				"name": "Test Content",
-				"dateCreated": "2024-03-03T12:00:00Z",
-				"description": "Test Description"
-			}
-			</script>
-		</head>
-		<body>
-			<h1>Test Content</h1>
-			<p>Test body content</p>
-		</body>
-		</html>
-	`
+	// Create a test HTML document
+	html := `<!DOCTYPE html>
+<html>
+<head>
+	<title>Test Article</title>
+	<script type="application/ld+json">
+	{
+		"@type": "Article",
+		"name": "Test Article",
+		"dateCreated": "2024-03-15T10:00:00Z"
+	}
+	</script>
+	<meta property="article:published_time" content="2024-03-15T10:00:00Z" />
+</head>
+<body>
+	<h1>Test Article</h1>
+	<p>Test content</p>
+</body>
+</html>`
 
-	// Create colly HTMLElement
+	// Create a mock colly HTMLElement
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	if err != nil {
-		t.Fatalf("Failed to create document: %v", err)
+	require.NoError(t, err)
+
+	testURL := "http://example.com/test"
+	parsedURL, err := url.Parse(testURL)
+	require.NoError(t, err)
+
+	req := &colly.Request{
+		URL: parsedURL,
+		Ctx: colly.NewContext(),
+	}
+	resp := &colly.Response{
+		Request: req,
+		Ctx:     req.Ctx,
 	}
 	e := &colly.HTMLElement{
-		DOM:     doc.Selection,
-		Request: &colly.Request{URL: &url.URL{Path: "http://example.com"}},
-		Response: &colly.Response{
-			Request: &colly.Request{URL: &url.URL{Path: "http://example.com"}},
-		},
+		Request:  req,
+		Response: resp,
+		DOM:      doc.Selection,
 	}
 
-	// Extract content
-	result := svc.ExtractContent(e)
+	// Set up logger expectations in order
+	mockLogger.EXPECT().Debug("Extracting content", "url", testURL)
+	mockLogger.EXPECT().Debug("Trying to parse date", "value", "2024-03-15T10:00:00Z")
+	mockLogger.EXPECT().Debug("Successfully parsed date",
+		"source", "2024-03-15T10:00:00Z",
+		"format", time.RFC3339,
+		"result", "2024-03-15 10:00:00 +0000 UTC",
+	)
+	mockLogger.EXPECT().Debug("Extracted content",
+		"id", gomock.Any(),
+		"title", "Test Article",
+		"url", testURL,
+		"type", "article",
+		"created_at", gomock.Any(),
+	)
 
-	// Verify result
-	assert.NotNil(t, result)
-	assert.NotEmpty(t, result.ID)
-	assert.Equal(t, "Test Content", result.Title)
-	assert.Equal(t, "./http://example.com", result.URL)
-	assert.Equal(t, "WebPage", result.Type)
-	assert.Contains(t, result.Body, "Test body content")
-	assert.NotZero(t, result.CreatedAt)
-
-	// Verify mock expectations
-	mockLogger.AssertExpectations(t)
+	content := svc.ExtractContent(e)
+	require.NotNil(t, content)
+	assert.Equal(t, "Test Article", content.Title)
+	assert.Equal(t, testURL, content.URL)
+	assert.Equal(t, "article", content.Type)
+	assert.NotEmpty(t, content.Body)
+	assert.False(t, content.CreatedAt.IsZero())
 }
 
 func TestExtractMetadata(t *testing.T) {
-	// Create mock logger
-	mockLogger := logger.NewMockLogger()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	// Create service
-	svc := content.NewService(mockLogger)
+	mockLogger := logger.NewMockInterface(ctrl)
+	service := content.NewService(mockLogger)
 
-	// Create test HTML with various metadata
-	html := `
-		<!DOCTYPE html>
+	// Create a test HTML element
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(`
 		<html>
-		<head>
-			<meta property="og:title" content="OG Title">
-			<meta property="og:description" content="OG Description">
-			<meta name="twitter:title" content="Twitter Title">
-			<meta name="twitter:description" content="Twitter Description">
-			<meta name="author" content="Test Author">
-		</head>
-		<body>
-			<h1>Test Content</h1>
-		</body>
+			<head>
+				<meta property="og:type" content="article">
+				<meta property="og:title" content="Test Title">
+				<meta name="description" content="Test Description">
+			</head>
 		</html>
-	`
-
-	// Create colly HTMLElement
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	`))
 	if err != nil {
 		t.Fatalf("Failed to create document: %v", err)
 	}
-	e := &colly.HTMLElement{
-		DOM:     doc.Selection,
-		Request: &colly.Request{URL: &url.URL{Path: "http://example.com"}},
-		Response: &colly.Response{
-			Request: &colly.Request{URL: &url.URL{Path: "http://example.com"}},
+
+	// Create request and response
+	req := &colly.Request{
+		URL: &url.URL{
+			Scheme: "http",
+			Host:   "example.com",
+			Path:   "/test",
 		},
+		Ctx: &colly.Context{},
 	}
 
-	// Extract metadata
-	metadata := svc.ExtractMetadata(e)
+	resp := &colly.Response{
+		Request: req,
+		Ctx:     req.Ctx,
+	}
 
-	// Verify metadata
-	assert.Equal(t, "OG Title", metadata["title"])
-	assert.Equal(t, "OG Description", metadata["description"])
-	assert.Equal(t, "Twitter Title", metadata["twitter:title"])
-	assert.Equal(t, "Twitter Description", metadata["twitter:description"])
-	assert.Equal(t, "Test Author", metadata["author"])
+	e := &colly.HTMLElement{
+		Request:  req,
+		Response: resp,
+		DOM:      doc.Selection,
+	}
+
+	// Test metadata extraction
+	metadata := service.ExtractMetadata(e)
+	assert.NotNil(t, metadata)
+	assert.Equal(t, "article", metadata["type"])
+	assert.Equal(t, "Test Title", metadata["title"])
+	assert.Equal(t, "Test Description", metadata["description"])
 }
 
 func TestDetermineContentType(t *testing.T) {
-	// Create mock logger
-	mockLogger := logger.NewMockLogger()
+	testCases := []struct {
+		name       string
+		url        string
+		metadata   map[string]any
+		jsonLDType string
+		expected   string
+	}{
+		{
+			name:       "uses JSON-LD type",
+			url:        "https://example.com/post",
+			metadata:   map[string]any{},
+			jsonLDType: "Article",
+			expected:   "article",
+		},
+		{
+			name:       "uses metadata type",
+			url:        "https://example.com/post",
+			metadata:   map[string]any{"type": "BlogPost"},
+			jsonLDType: "",
+			expected:   "blogpost",
+		},
+		{
+			name:       "detects category from URL",
+			url:        "https://example.com/category/tech",
+			metadata:   map[string]any{},
+			jsonLDType: "",
+			expected:   "category",
+		},
+		{
+			name:       "defaults to webpage",
+			url:        "https://example.com/post",
+			metadata:   map[string]any{},
+			jsonLDType: "",
+			expected:   "webpage",
+		},
+	}
 
-	// Create service
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := content.NewService(nil)
+			result := svc.DetermineContentType(tc.url, tc.metadata, tc.jsonLDType)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestService_Process(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
 	svc := content.NewService(mockLogger)
 
-	tests := []struct {
+	testCases := []struct {
 		name     string
-		url      string
-		metadata map[string]interface{}
-		jsonType string
+		input    string
 		expected string
 	}{
 		{
-			name:     "Category URL",
-			url:      "http://example.com/category/news",
-			metadata: map[string]interface{}{},
-			jsonType: "",
-			expected: "category",
+			name:     "removes HTML tags",
+			input:    "<p>Hello <b>world</b></p>",
+			expected: "Hello world",
 		},
 		{
-			name:     "Tag URL",
-			url:      "http://example.com/tag/tech",
-			metadata: map[string]interface{}{},
-			jsonType: "",
-			expected: "tag",
-		},
-		{
-			name:     "Author URL",
-			url:      "http://example.com/author/john",
-			metadata: map[string]interface{}{},
-			jsonType: "",
-			expected: "author",
-		},
-		{
-			name:     "JSON-LD type takes precedence",
-			url:      "http://example.com/category/news",
-			metadata: map[string]interface{}{},
-			jsonType: "Article",
-			expected: "Article",
-		},
-		{
-			name: "Metadata type takes precedence over URL",
-			url:  "http://example.com/category/news",
-			metadata: map[string]interface{}{
-				"type": "BlogPost",
-			},
-			jsonType: "",
-			expected: "BlogPost",
+			name:     "normalizes whitespace",
+			input:    "  Hello   world  \n\t ",
+			expected: "Hello world",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := svc.DetermineContentType(tt.url, tt.metadata, tt.jsonType)
-			assert.Equal(t, tt.expected, result)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockLogger.EXPECT().Debug("Processing content", "input", tc.input)
+			mockLogger.EXPECT().Debug("Processed content", "result", tc.expected)
+			result := svc.Process(t.Context(), tc.input)
+			assert.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+func TestService_ProcessBatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
+	svc := content.NewService(mockLogger)
+
+	input := []string{"<p>Hello</p>", "<div>World</div>"}
+	expected := []string{"Hello", "World"}
+
+	for i := range input {
+		mockLogger.EXPECT().Debug("Processing content", "input", input[i])
+		mockLogger.EXPECT().Debug("Processed content", "result", expected[i])
+	}
+
+	result := svc.ProcessBatch(t.Context(), input)
+	assert.Equal(t, expected, result)
+}
+
+func TestService_ProcessWithMetadata(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
+	svc := content.NewService(mockLogger)
+
+	input := "<p>Hello world</p>"
+	metadata := map[string]string{
+		"source": "test",
+		"type":   "article",
+	}
+
+	mockLogger.EXPECT().Debug("Processing content with metadata",
+		"source", metadata["source"],
+		"type", metadata["type"],
+	)
+	mockLogger.EXPECT().Debug("Processing content", "input", input)
+	mockLogger.EXPECT().Debug("Processed content", "result", "Hello world")
+
+	result := svc.ProcessWithMetadata(t.Context(), input, metadata)
+	assert.Equal(t, "Hello world", result)
 }

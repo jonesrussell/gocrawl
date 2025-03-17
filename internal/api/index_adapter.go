@@ -18,7 +18,7 @@ func NewIndexManagerAdapter(manager IndexManager) IndexManager {
 }
 
 // EnsureIndex implements IndexManager interface by providing a default mapping
-func (a *IndexManagerAdapter) EnsureIndex(ctx context.Context, indexName string, mapping interface{}) error {
+func (a *IndexManagerAdapter) EnsureIndex(ctx context.Context, indexName string, mapping any) error {
 	// If no mapping is provided, use default mapping
 	if mapping == nil {
 		mapping = getDefaultMapping()
@@ -38,28 +38,28 @@ func (a *IndexManagerAdapter) IndexExists(ctx context.Context, indexName string)
 }
 
 // UpdateMapping implements IndexManager interface
-func (a *IndexManagerAdapter) UpdateMapping(ctx context.Context, indexName string, mapping interface{}) error {
+func (a *IndexManagerAdapter) UpdateMapping(ctx context.Context, indexName string, mapping any) error {
 	return a.manager.UpdateMapping(ctx, indexName, mapping)
 }
 
 // getDefaultMapping returns the default mapping for indices
-func getDefaultMapping() map[string]interface{} {
-	return map[string]interface{}{
-		"mappings": map[string]interface{}{
-			"properties": map[string]interface{}{
-				"title": map[string]interface{}{
+func getDefaultMapping() map[string]any {
+	return map[string]any{
+		"mappings": map[string]any{
+			"properties": map[string]any{
+				"title": map[string]any{
 					"type": "text",
 				},
-				"content": map[string]interface{}{
+				"content": map[string]any{
 					"type": "text",
 				},
-				"url": map[string]interface{}{
+				"url": map[string]any{
 					"type": "keyword",
 				},
-				"source": map[string]interface{}{
+				"source": map[string]any{
 					"type": "keyword",
 				},
-				"created_at": map[string]interface{}{
+				"created_at": map[string]any{
 					"type": "date",
 				},
 			},

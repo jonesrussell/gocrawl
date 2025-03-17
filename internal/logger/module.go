@@ -62,7 +62,7 @@ func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
 	// Log when the logger is created
 	logger.Info("Development logger initialized successfully")
 
-	return &CustomLogger{Logger: logger}, nil
+	return NewCustomLogger(logger), nil
 }
 
 // NewProductionLogger initializes a new CustomLogger for production
@@ -96,7 +96,7 @@ func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
 	// Log when the logger is created
 	logger.Info("Production logger initialized successfully")
 
-	return &CustomLogger{Logger: logger}, nil
+	return NewCustomLogger(logger), nil
 }
 
 // parseLogLevel converts a string log level to a zapcore.Level

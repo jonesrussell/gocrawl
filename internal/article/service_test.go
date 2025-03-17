@@ -8,8 +8,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
@@ -18,9 +18,10 @@ import (
 )
 
 // Helper function to create a mock logger
-func newMockLogger() *logger.MockLogger {
-	mockLogger := &logger.MockLogger{}
-	mockLogger.On("Debug", mock.Anything, mock.Anything).Return() // Set up expectation for Debug call
+func newMockLogger(t *testing.T) *logger.MockInterface {
+	ctrl := gomock.NewController(t)
+	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
 	return mockLogger
 }
 
@@ -73,67 +74,68 @@ const testHTML = `
 `
 
 func TestExtractArticle(t *testing.T) {
-	mockLogger := logger.NewMockLogger()
+	mockLogger := newMockLogger(t)
 	selectors := newDefaultSelectors()
 	service := article.NewService(mockLogger, selectors)
 
 	// Setup logger expectations
-	mockLogger.On("Debug",
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-	).Return()
+	mockLogger.EXPECT().Debug(
+		gomock.AssignableToTypeOf(""),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).AnyTimes()
 
-	mockLogger.On("Debug",
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("bool"),
-	).Return()
+	mockLogger.EXPECT().Debug(
+		gomock.AssignableToTypeOf(""),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).AnyTimes()
 
-	mockLogger.On("Debug",
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("[]string"),
-	).Return()
+	mockLogger.EXPECT().Debug(
+		gomock.AssignableToTypeOf(""),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).AnyTimes()
 
-	mockLogger.On("Debug",
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("string"),
-		mock.AnythingOfType("int"),
-	).Return()
+	mockLogger.EXPECT().Debug(
+		"No valid published date found",
+		"dates",
+		gomock.Any(),
+	).AnyTimes()
 
-	mockLogger.On("Debug", "No valid published date found", "dates", mock.AnythingOfType("[]string")).Return()
-	mockLogger.On("Debug", "Successfully parsed date",
-		"source", mock.AnythingOfType("string"),
-		"format", mock.AnythingOfType("string"),
-		"result", mock.AnythingOfType("time.Time")).Return()
-	mockLogger.On("Debug", "Extracted article",
-		"component", "article/service",
-		"id", mock.AnythingOfType("string"),
-		"title", mock.AnythingOfType("string"),
-		"url", mock.AnythingOfType("string"),
-		"date", mock.AnythingOfType("time.Time"),
-		"author", mock.AnythingOfType("string"),
-		"tags", mock.AnythingOfType("[]string"),
-		"wordCount", mock.AnythingOfType("int"),
-		"category", mock.AnythingOfType("string"),
-		"section", mock.AnythingOfType("string")).Return()
+	mockLogger.EXPECT().Debug(
+		"Successfully parsed date",
+		"source", gomock.Any(),
+		"format", gomock.Any(),
+		"result", gomock.Any(),
+	).AnyTimes()
+
+	mockLogger.EXPECT().Debug(
+		"Extracted article",
+		"component", gomock.Any(),
+		"id", gomock.Any(),
+		"title", gomock.Any(),
+		"url", gomock.Any(),
+		"date", gomock.Any(),
+		"author", gomock.Any(),
+		"tags", gomock.Any(),
+		"wordCount", gomock.Any(),
+		"category", gomock.Any(),
+		"section", gomock.Any(),
+	).AnyTimes()
 
 	// Create a new document from the common HTML string
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(testHTML))
@@ -162,7 +164,7 @@ func TestExtractArticle(t *testing.T) {
 }
 
 func TestCleanAuthor(t *testing.T) {
-	mockLogger := newMockLogger()
+	mockLogger := newMockLogger(t)
 	svc := article.NewService(mockLogger, newDefaultSelectors())
 
 	// Change the author string to match the expected format
@@ -174,22 +176,22 @@ func TestCleanAuthor(t *testing.T) {
 }
 
 func TestParsePublishedDate(t *testing.T) {
-	mockLogger := logger.NewMockLogger()
+	mockLogger := newMockLogger(t)
 	svc := article.NewService(mockLogger, newDefaultSelectors())
 
 	// Set up mock expectations for debug calls
-	mockLogger.On("Debug",
+	mockLogger.EXPECT().Debug(
 		"Trying to parse date",
 		"value", "2025-02-14T15:04:05Z",
-	).Return()
+	).AnyTimes()
 
 	expectedDate, _ := time.Parse(time.RFC3339, "2025-02-14T15:04:05Z")
-	mockLogger.On("Debug",
+	mockLogger.EXPECT().Debug(
 		"Successfully parsed date",
 		"source", "2025-02-14T15:04:05Z",
 		"format", "2006-01-02T15:04:05Z07:00",
 		"result", expectedDate,
-	).Return()
+	).AnyTimes()
 
 	// Create a mock HTML document
 	html := `
@@ -227,15 +229,15 @@ func TestParsePublishedDate(t *testing.T) {
 }
 
 func TestExtractTags(t *testing.T) {
-	mockLogger := logger.NewMockLogger()
+	mockLogger := newMockLogger(t)
 	selectors := config.DefaultArticleSelectors()
 	service := article.NewService(mockLogger, selectors)
 
 	// Set up mock expectations for debug calls
-	mockLogger.On("Debug", "Found JSON-LD keywords", "values", mock.AnythingOfType("[]string")).Return()
-	mockLogger.On("Debug", "Found JSON-LD section", "value", mock.AnythingOfType("string")).Return()
-	mockLogger.On("Debug", "Found meta section", "value", mock.AnythingOfType("string")).Return()
-	mockLogger.On("Debug", "Found meta keywords", "value", mock.AnythingOfType("string")).Return()
+	mockLogger.EXPECT().Debug("Found JSON-LD keywords", "values", gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Debug("Found JSON-LD section", "value", gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Debug("Found meta section", "value", gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Debug("Found meta keywords", "value", gomock.Any()).AnyTimes()
 
 	// Create test HTML with meta tags
 	html := `

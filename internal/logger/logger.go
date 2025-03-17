@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"go.uber.org/fx"
@@ -11,31 +12,33 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+//go:generate mockgen -destination=mock_logger.go -package=logger github.com/jonesrussell/gocrawl/internal/logger Interface
+
 // Interface defines the interface for logging operations.
 // It provides structured logging capabilities with different log levels and
 // support for additional fields in log messages.
 type Interface interface {
 	// Debug logs a debug message with optional fields.
 	// Used for detailed information useful during development.
-	Debug(msg string, fields ...interface{})
+	Debug(msg string, fields ...any)
 	// Error logs an error message with optional fields.
 	// Used for error conditions that need immediate attention.
-	Error(msg string, fields ...interface{})
+	Error(msg string, fields ...any)
 	// Info logs an informational message with optional fields.
 	// Used for general operational information.
-	Info(msg string, fields ...interface{})
+	Info(msg string, fields ...any)
 	// Warn logs a warning message with optional fields.
 	// Used for potentially harmful situations.
-	Warn(msg string, fields ...interface{})
+	Warn(msg string, fields ...any)
 	// Fatal logs a fatal message and panics.
 	// Used for unrecoverable errors that require immediate termination.
-	Fatal(msg string, fields ...interface{})
+	Fatal(msg string, fields ...any)
 	// Printf logs a formatted message.
 	// Used for formatted string logging.
-	Printf(format string, args ...interface{})
+	Printf(format string, args ...any)
 	// Errorf logs a formatted error message.
 	// Used for formatted error string logging.
-	Errorf(format string, args ...interface{})
+	Errorf(format string, args ...any)
 	// Sync flushes any buffered log entries.
 	// Used to ensure all logs are written before shutdown.
 	Sync() error
@@ -44,6 +47,7 @@ type Interface interface {
 // CustomLogger wraps the zap.Logger
 type CustomLogger struct {
 	*zap.Logger
+	fatalHook func(zapcore.Entry) error
 }
 
 // Ensure CustomLogger implements Interface
@@ -63,38 +67,44 @@ const (
 )
 
 // Info logs an info message
-func (c *CustomLogger) Info(msg string, fields ...interface{}) {
+func (c *CustomLogger) Info(msg string, fields ...any) {
 	c.Logger.Info(msg, ConvertToZapFields(fields)...)
 }
 
 // Error logs an error message
-func (c *CustomLogger) Error(msg string, fields ...interface{}) {
+func (c *CustomLogger) Error(msg string, fields ...any) {
 	c.Logger.Error(msg, ConvertToZapFields(fields)...)
 }
 
 // Debug logs a debug message
-func (c *CustomLogger) Debug(msg string, fields ...interface{}) {
+func (c *CustomLogger) Debug(msg string, fields ...any) {
 	c.Logger.Debug(msg, ConvertToZapFields(fields)...)
 }
 
 // Warn logs a warning message
-func (c *CustomLogger) Warn(msg string, fields ...interface{}) {
+func (c *CustomLogger) Warn(msg string, fields ...any) {
 	c.Logger.Warn(msg, ConvertToZapFields(fields)...)
 }
 
-// Fatal logs a fatal message and panics
-func (c *CustomLogger) Fatal(msg string, fields ...interface{}) {
-	c.Logger.Error(msg, ConvertToZapFields(fields)...)
-	panic(msg)
+// Fatal logs a fatal message and executes the fatal hook
+func (c *CustomLogger) Fatal(msg string, fields ...any) {
+	if c.fatalHook != nil {
+		entry := zapcore.Entry{
+			Level:   zapcore.FatalLevel,
+			Message: msg,
+		}
+		_ = c.fatalHook(entry)
+	}
+	c.Logger.Fatal(msg, ConvertToZapFields(fields)...)
 }
 
 // Printf logs a formatted message
-func (c *CustomLogger) Printf(format string, args ...interface{}) {
+func (c *CustomLogger) Printf(format string, args ...any) {
 	c.Logger.Info(fmt.Sprintf(format, args...))
 }
 
 // Errorf logs a formatted error message
-func (c *CustomLogger) Errorf(format string, args ...interface{}) {
+func (c *CustomLogger) Errorf(format string, args ...any) {
 	c.Logger.Error(fmt.Sprintf(format, args...))
 }
 
@@ -129,21 +139,21 @@ func ParseLogLevel(logLevelStr string) (zapcore.Level, error) {
 }
 
 // maskSensitiveData masks sensitive information in the given value
-func maskSensitiveData(value interface{}) interface{} {
+func maskSensitiveData(value any) any {
 	switch v := value.(type) {
-	case map[string]interface{}:
-		masked := make(map[string]interface{})
-		for k, val := range v {
+	case map[string]any:
+		masked := make(map[string]any)
+		for key, val := range v {
 			// Mask sensitive fields
-			if isSensitiveField(k) {
-				masked[k] = "[REDACTED]"
+			if isSensitiveField(key) {
+				masked[key] = "[REDACTED]"
 			} else {
-				masked[k] = maskSensitiveData(val)
+				masked[key] = maskSensitiveData(val)
 			}
 		}
 		return masked
-	case []interface{}:
-		masked := make([]interface{}, len(v))
+	case []any:
+		masked := make([]any, len(v))
 		for i, val := range v {
 			masked[i] = maskSensitiveData(val)
 		}
@@ -173,7 +183,7 @@ func isSensitiveField(field string) bool {
 }
 
 // ConvertToZapFields converts variadic key-value pairs to zap.Fields
-func ConvertToZapFields(fields []interface{}) []zap.Field {
+func ConvertToZapFields(fields []any) []zap.Field {
 	var zapFields []zap.Field
 
 	// If no fields provided, return empty slice
@@ -224,4 +234,20 @@ func FromContext(ctx context.Context) *zap.Logger {
 		return zap.NewNop() // No-op logger
 	}
 	return logger
+}
+
+// NewCustomLogger creates a new CustomLogger with the given zap.Logger
+func NewCustomLogger(logger *zap.Logger) *CustomLogger {
+	return &CustomLogger{
+		Logger: logger,
+		fatalHook: func(entry zapcore.Entry) error {
+			os.Exit(1)
+			return nil
+		},
+	}
+}
+
+// SetFatalHook allows overriding the default fatal behavior for testing
+func (c *CustomLogger) SetFatalHook(hook func(zapcore.Entry) error) {
+	c.fatalHook = hook
 }

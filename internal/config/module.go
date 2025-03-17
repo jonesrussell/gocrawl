@@ -175,7 +175,8 @@ func setupViper() error {
 	if cfgFile := os.Getenv("CONFIG_FILE"); cfgFile != "" {
 		// If CONFIG_FILE is set, use it directly
 		viper.SetConfigFile(cfgFile)
-		log.Printf("Using config file from CONFIG_FILE: %s", cfgFile)
+		// Use standard logging
+		log.Printf("Using config file from environment: %s", cfgFile)
 	} else {
 		viper.SetConfigName("config")
 		// Add search paths in order of priority
@@ -216,7 +217,7 @@ func setupViper() error {
 		return fmt.Errorf("error reading config file: %w", err)
 	}
 
-	log.Printf("Using config file: %s", viper.ConfigFileUsed())
+	log.Printf("Configuration loaded from: %s", viper.ConfigFileUsed())
 	return nil
 }
 
@@ -311,54 +312,29 @@ func getServerAddress() string {
 	return ":8080"
 }
 
-// checkRequiredEnvVars ensures all required environment variables are set in production
-func checkRequiredEnvVars() error {
-	if os.Getenv("APP_ENV") != envProduction {
-		return nil
-	}
-
-	required := []string{"ELASTIC_API_KEY", "APP_ENV"}
-	for _, envVar := range required {
-		if os.Getenv(envVar) == "" {
-			return fmt.Errorf("required environment variable %s is not set", envVar)
-		}
-	}
-	return nil
-}
-
-// New creates a new Config instance with values from Viper
+// New creates a new configuration instance.
+// It loads environment variables from .env file and initializes the configuration.
 func New() (Interface, error) {
-	// Load .env file only in development environment
-	if os.Getenv("APP_ENV") != envProduction {
-		if err := godotenv.Load(); err != nil {
-			log.Printf("Warning: Error loading .env file: %v", err)
-		}
+	// Load .env file first, so environment variables are available to Viper
+	if loadErr := godotenv.Load(); loadErr != nil {
+		// Only log a warning as .env file is optional
+		log.Printf("Warning: Error loading .env file: %v", loadErr)
 	}
 
-	// Set up Viper configuration
+	// Initialize Viper configuration
 	if setupErr := setupViper(); setupErr != nil {
 		return nil, fmt.Errorf("failed to setup viper: %w", setupErr)
-	}
-
-	// Check required environment variables in production
-	if envErr := checkRequiredEnvVars(); envErr != nil {
-		return nil, envErr
 	}
 
 	// Create configuration from Viper settings
 	cfg, configErr := createConfig()
 	if configErr != nil {
-		return nil, configErr
-	}
-
-	// Override Elasticsearch addresses from environment if provided
-	if addresses := viper.GetStringSlice("elasticsearch.addresses"); len(addresses) > 0 {
-		cfg.Elasticsearch.Addresses = addresses
+		return nil, fmt.Errorf("failed to create config: %w", configErr)
 	}
 
 	// Validate the configuration
 	if validateErr := ValidateConfig(cfg); validateErr != nil {
-		return nil, fmt.Errorf("config validation failed: %w", validateErr)
+		return nil, fmt.Errorf("invalid configuration: %w", validateErr)
 	}
 
 	return cfg, nil

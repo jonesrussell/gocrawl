@@ -176,8 +176,8 @@ func newLogger(p ContentParams) *contentLogger {
 // Parameters:
 //   - msg: The message to log
 //   - keysAndValues: Additional key-value pairs to include in the log
-func (l *contentLogger) debug(msg string, keysAndValues ...interface{}) {
-	args := append([]interface{}{"tag", logTag}, keysAndValues...)
+func (l *contentLogger) debug(msg string, keysAndValues ...any) {
+	args := append([]any{"tag", logTag}, keysAndValues...)
 	l.p.Logger.Debug(msg, args...)
 }
 
@@ -186,8 +186,8 @@ func (l *contentLogger) debug(msg string, keysAndValues ...interface{}) {
 // Parameters:
 //   - msg: The message to log
 //   - keysAndValues: Additional key-value pairs to include in the log
-func (l *contentLogger) error(msg string, keysAndValues ...interface{}) {
-	args := append([]interface{}{"tag", logTag}, keysAndValues...)
+func (l *contentLogger) error(msg string, keysAndValues ...any) {
+	args := append([]any{"tag", logTag}, keysAndValues...)
 	l.p.Logger.Error(msg, args...)
 }
 

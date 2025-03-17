@@ -2,10 +2,12 @@
 package content
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -15,8 +17,11 @@ import (
 // Interface defines the interface for content operations
 type Interface interface {
 	ExtractContent(e *colly.HTMLElement) *models.Content
-	ExtractMetadata(e *colly.HTMLElement) map[string]interface{}
-	DetermineContentType(url string, metadata map[string]interface{}, jsonLDType string) string
+	ExtractMetadata(e *colly.HTMLElement) map[string]any
+	DetermineContentType(url string, metadata map[string]any, jsonLDType string) string
+	Process(ctx context.Context, input string) string
+	ProcessBatch(ctx context.Context, input []string) []string
+	ProcessWithMetadata(ctx context.Context, input string, metadata map[string]string) string
 }
 
 // Service implements the Interface
@@ -33,48 +38,87 @@ func NewService(logger logger.Interface) Interface {
 }
 
 type JSONLDMetadata struct {
-	DateCreated    string                 `json:"dateCreated"`
-	DateModified   string                 `json:"dateModified"`
-	Description    string                 `json:"description"`
-	Name           string                 `json:"name"`
-	Type           string                 `json:"@type"`
-	AdditionalData map[string]interface{} `json:"additionalData,omitempty"`
+	DateCreated    string         `json:"dateCreated"`
+	DateModified   string         `json:"dateModified"`
+	Description    string         `json:"description"`
+	Name           string         `json:"name"`
+	Type           string         `json:"@type"`
+	AdditionalData map[string]any `json:"additionalData,omitempty"`
+}
+
+var timeFormats = []string{
+	time.RFC3339,
+	"2006-01-02T15:04:05Z",
+	"2006-01-02T15:04:05.2030000Z",
+	"2006-01-02 15:04:05",
+}
+
+var contentTypePatterns = map[string][]string{
+	"category": {"/category/", "/categories/"},
+	"tag":      {"/tag/", "/tags/"},
+	"author":   {"/author/", "/authors/"},
+	"page":     {"/page/", "/pages/"},
+	"search":   {"/search"},
+	"feed":     {"/feed"},
+	"rss":      {"/rss"},
+	"sitemap":  {"/sitemap"},
+	"system":   {"/wp-json", "/wp-admin"},
 }
 
 // ExtractContent extracts content from an HTML element
 func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
-	var jsonLD JSONLDMetadata
-
 	s.Logger.Debug("Extracting content", "url", e.Request.URL.String())
 
-	// Extract metadata from JSON-LD first
-	e.ForEach(`script[type="application/ld+json"]`, func(_ int, el *colly.HTMLElement) {
-		if err := json.Unmarshal([]byte(el.Text), &jsonLD); err != nil {
-			s.Logger.Debug("Failed to parse JSON-LD", "error", err)
-		}
-	})
+	var jsonLD JSONLDMetadata
+	var parsedDate time.Time
+	var contentType string
 
-	// Extract metadata from meta tags and other sources
+	// Extract metadata
 	metadata := s.ExtractMetadata(e)
 
-	// Determine content type based on URL and page structure
-	contentType := s.DetermineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
-
-	// Create content with basic fields
-	content := &models.Content{
-		ID:        uuid.New().String(),
-		URL:       e.Request.URL.String(),
-		Title:     getFirstNonEmpty(jsonLD.Name, e.ChildText("title"), e.ChildText("h1")),
-		Body:      cleanBody(e),
-		Type:      contentType,
-		Metadata:  metadata,
-		CreatedAt: parseDate([]string{jsonLD.DateCreated, jsonLD.DateModified}, s.Logger),
+	// Parse JSON-LD if available
+	if jsonLDStr := e.DOM.Find("script[type='application/ld+json']").Text(); jsonLDStr != "" {
+		if err := json.Unmarshal([]byte(jsonLDStr), &jsonLD); err != nil {
+			s.Logger.Error("Failed to parse JSON-LD", "error", err)
+		}
 	}
 
-	// Skip empty content
-	if content.Title == "" && content.Body == "" {
-		s.Logger.Debug("Skipping empty content", "url", content.URL)
-		return nil
+	// Try to parse date from various sources
+	dates := []string{
+		jsonLD.DateCreated,
+		jsonLD.DateModified,
+	}
+
+	// Add metadata dates if they exist
+	if publishedTime, ok := metadata["published_time"].(string); ok {
+		dates = append(dates, publishedTime)
+	}
+	if modifiedTime, ok := metadata["modified_time"].(string); ok {
+		dates = append(dates, modifiedTime)
+	}
+
+	for _, dateStr := range dates {
+		if dateStr == "" {
+			continue
+		}
+		parsedDate = s.parseDate(s.Logger, dateStr)
+		if !parsedDate.IsZero() {
+			break
+		}
+	}
+
+	// Determine content type
+	contentType = s.DetermineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
+
+	// Create content object
+	content := &models.Content{
+		ID:        uuid.New().String(),
+		Title:     jsonLD.Name,
+		URL:       e.Request.URL.String(),
+		Type:      contentType,
+		Body:      cleanBody(e),
+		CreatedAt: parsedDate,
+		Metadata:  metadata,
 	}
 
 	s.Logger.Debug("Extracted content",
@@ -82,54 +126,41 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 		"title", content.Title,
 		"url", content.URL,
 		"type", content.Type,
-		"created_at", content.CreatedAt)
+		"created_at", content.CreatedAt,
+	)
 
 	return content
 }
 
-// DetermineContentType determines the type of content based on URL and metadata
-func (s *Service) DetermineContentType(url string, metadata map[string]interface{}, jsonLDType string) string {
-	// Check JSON-LD type first
+// DetermineContentType determines the content type based on URL and metadata
+func (s *Service) DetermineContentType(url string, metadata map[string]any, jsonLDType string) string {
+	// First try JSON-LD type
 	if jsonLDType != "" {
-		return jsonLDType
+		return strings.ToLower(jsonLDType)
 	}
 
-	// Check metadata for content type
-	typeVal, ok := metadata["type"]
-	if ok {
-		if typeStr, isString := typeVal.(string); isString {
-			return typeStr
+	// Then try metadata type
+	if metaType, ok := metadata["type"].(string); ok {
+		return strings.ToLower(metaType)
+	}
+
+	// Try to detect from URL
+	urlLower := strings.ToLower(url)
+	for category, patterns := range contentTypePatterns {
+		for _, pattern := range patterns {
+			if strings.Contains(urlLower, pattern) {
+				return category
+			}
 		}
 	}
 
-	// Check URL patterns
-	switch {
-	case strings.Contains(url, "/category/"), strings.Contains(url, "/categories/"):
-		return "category"
-	case strings.Contains(url, "/tag/"), strings.Contains(url, "/tags/"):
-		return "tag"
-	case strings.Contains(url, "/author/"), strings.Contains(url, "/authors/"):
-		return "author"
-	case strings.Contains(url, "/page/"), strings.Contains(url, "/pages/"):
-		return "page"
-	case strings.Contains(url, "/search"):
-		return "search"
-	case strings.Contains(url, "/feed"):
-		return "feed"
-	case strings.Contains(url, "/rss"):
-		return "rss"
-	case strings.Contains(url, "/sitemap"):
-		return "sitemap"
-	case strings.Contains(url, "/wp-json"), strings.Contains(url, "/wp-admin"):
-		return "system"
-	default:
-		return "webpage"
-	}
+	// Default to webpage
+	return "webpage"
 }
 
 // ExtractMetadata extracts metadata from various sources in the HTML
-func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]interface{} {
-	metadata := make(map[string]interface{})
+func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
+	metadata := make(map[string]any)
 
 	// Extract OpenGraph metadata first (highest precedence)
 	e.ForEach(`meta[property^="og:"]`, func(_ int, el *colly.HTMLElement) {
@@ -169,56 +200,28 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]interface{} {
 	return metadata
 }
 
-// Helper function to get the first non-empty string
-func getFirstNonEmpty(values ...string) string {
-	for _, v := range values {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
+// parseDate attempts to parse a date string using multiple formats
+func (s *Service) parseDate(logger logger.Interface, dateStr string) time.Time {
+	logger.Debug("Trying to parse date", "value", dateStr)
 
-// Helper function to parse dates
-func parseDate(dates []string, logger logger.Interface) time.Time {
-	var parsedDate time.Time
-	timeFormats := []string{
-		time.RFC3339,
-		"2006-01-02T15:04:05Z",
-		"2006-01-02T15:04:05.2030000Z",
-		"2006-01-02 15:04:05",
-	}
-
-	for _, dateStr := range dates {
-		if dateStr == "" {
-			continue
-		}
-		logger.Debug("Trying to parse date", "value", dateStr)
-		for _, format := range timeFormats {
-			t, err := time.Parse(format, dateStr)
-			if err == nil {
-				parsedDate = t
-				logger.Debug("Successfully parsed date",
-					"source", dateStr,
-					"format", format,
-					"result", t)
-				break
-			}
-			logger.Debug("Failed to parse date",
+	for _, format := range timeFormats {
+		t, err := time.Parse(format, dateStr)
+		if err == nil {
+			logger.Debug("Successfully parsed date",
 				"source", dateStr,
 				"format", format,
-				"error", err)
+				"result", t.String(),
+			)
+			return t
 		}
-		if !parsedDate.IsZero() {
-			break
-		}
+		logger.Debug("Failed to parse date",
+			"source", dateStr,
+			"format", format,
+			"error", err.Error(),
+		)
 	}
 
-	if parsedDate.IsZero() {
-		logger.Debug("No valid date found", "dates", dates)
-	}
-
-	return parsedDate
+	return time.Time{}
 }
 
 // cleanBody removes excluded tags and elements from the body content
@@ -245,4 +248,45 @@ func cleanBody(e *colly.HTMLElement) string {
 
 	// Get the cleaned text
 	return bodyEl.Text()
+}
+
+// Process processes a single string content
+func (s *Service) Process(ctx context.Context, input string) string {
+	s.Logger.Debug("Processing content", "input", input)
+
+	// Create a reader from the input string
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(input))
+	if err != nil {
+		s.Logger.Error("Failed to parse HTML", "error", err)
+		return strings.TrimSpace(input)
+	}
+
+	// Get text content without HTML tags
+	text := doc.Text()
+
+	// Clean up whitespace
+	text = strings.Join(strings.Fields(text), " ")
+
+	s.Logger.Debug("Processed content", "result", text)
+	return text
+}
+
+// ProcessBatch processes a batch of strings
+func (s *Service) ProcessBatch(ctx context.Context, input []string) []string {
+	result := make([]string, len(input))
+	for i, str := range input {
+		result[i] = s.Process(ctx, str)
+	}
+	return result
+}
+
+// ProcessWithMetadata processes content with additional metadata
+func (s *Service) ProcessWithMetadata(ctx context.Context, input string, metadata map[string]string) string {
+	if metadata != nil {
+		s.Logger.Debug("Processing content with metadata",
+			"source", metadata["source"],
+			"type", metadata["type"],
+		)
+	}
+	return s.Process(ctx, input)
 }

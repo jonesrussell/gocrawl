@@ -7,9 +7,9 @@ package collector
 // It handles the extraction and processing of article content from web pages.
 type ArticleProcessor interface {
 	// Process handles the processing of an article.
-	// It takes an article interface{} which can be any type representing an article,
+	// It takes an article any which can be any type representing an article,
 	// and returns an error if processing fails.
-	Process(article interface{}) error
+	Process(article any) error
 }
 
 // ContentProcessor defines the interface for processing general web content.

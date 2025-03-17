@@ -35,18 +35,14 @@ func (d *CollyDebugger) Init() error {
 
 // Event implements the colly.Debugger interface.
 // It logs debug events from Colly using our common logger.
-func (d *CollyDebugger) Event(e interface{}) {
-	d.logger.Debug("Colly event",
-		"event", e,
-	)
+func (d *CollyDebugger) Event(e any) {
+	d.logger.Debug("Colly event", "event", e)
 }
 
 // Error implements the colly.Debugger interface.
 // It logs debug errors from Colly using our common logger.
-func (d *CollyDebugger) Error(e interface{}) {
-	d.logger.Error("Colly debug error",
-		"error", e,
-	)
+func (d *CollyDebugger) Error(e any) {
+	d.logger.Error("Colly error", "error", e)
 }
 
 // Request implements the colly.Debugger interface.

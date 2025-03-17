@@ -35,14 +35,14 @@ func (m *MockStorage) Close() error {
 	return args.Error(0)
 }
 
-// IndexDocument mocks the indexing of a document
-func (m *MockStorage) IndexDocument(ctx context.Context, indexName, docID string, document interface{}) error {
+// IndexDocument mocks base method
+func (m *MockStorage) IndexDocument(ctx context.Context, indexName, docID string, document any) error {
 	args := m.Called(ctx, indexName, docID, document)
 	return args.Error(0)
 }
 
-// GetDocument implements Interface
-func (m *MockStorage) GetDocument(ctx context.Context, index string, id string, document interface{}) error {
+// GetDocument mocks base method
+func (m *MockStorage) GetDocument(ctx context.Context, index string, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
@@ -53,24 +53,24 @@ func (m *MockStorage) TestConnection(ctx context.Context) error {
 	return args.Error(0)
 }
 
-// BulkIndex implements Storage
-func (m *MockStorage) BulkIndex(ctx context.Context, index string, documents []interface{}) error {
+// BulkIndex mocks base method
+func (m *MockStorage) BulkIndex(ctx context.Context, index string, documents []any) error {
 	args := m.Called(ctx, index, documents)
 	return args.Error(0)
 }
 
-// Search implements Interface
-func (m *MockStorage) Search(ctx context.Context, index string, query interface{}) ([]interface{}, error) {
+// Search mocks base method
+func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
-	result, ok := args.Get(0).([]interface{})
-	if !ok && args.Get(0) != nil {
-		return nil, errors.New("invalid type assertion for Search result")
+	result, ok := args.Get(0).([]any)
+	if !ok {
+		return nil, errors.New("could not convert result to []any")
 	}
 	return result, args.Error(1)
 }
 
-// CreateIndex implements Storage
-func (m *MockStorage) CreateIndex(ctx context.Context, index string, mapping map[string]interface{}) error {
+// CreateIndex mocks base method
+func (m *MockStorage) CreateIndex(ctx context.Context, index string, mapping map[string]any) error {
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }
@@ -86,7 +86,7 @@ func (m *MockStorage) UpdateDocument(
 	ctx context.Context,
 	index string,
 	docID string,
-	update map[string]interface{},
+	update map[string]any,
 ) error {
 	args := m.Called(ctx, index, docID, update)
 	return args.Error(0)
@@ -102,11 +102,11 @@ func (m *MockStorage) DeleteDocument(ctx context.Context, index string, docID st
 func (m *MockStorage) ScrollSearch(
 	ctx context.Context,
 	index string,
-	query map[string]interface{},
+	query map[string]any,
 	batchSize int,
-) (<-chan map[string]interface{}, error) {
+) (<-chan map[string]any, error) {
 	args := m.Called(ctx, index, query, batchSize)
-	result, ok := args.Get(0).(<-chan map[string]interface{})
+	result, ok := args.Get(0).(<-chan map[string]any)
 	if !ok && args.Get(0) != nil {
 		return nil, ErrMockTypeAssertion
 	}
@@ -153,9 +153,9 @@ func (m *MockStorage) SearchDocuments(
 	ctx context.Context,
 	index string,
 	query string,
-) ([]map[string]interface{}, error) {
+) ([]map[string]any, error) {
 	args := m.Called(ctx, index, query)
-	result, ok := args.Get(0).([]map[string]interface{})
+	result, ok := args.Get(0).([]map[string]any)
 	if !ok && args.Get(0) != nil {
 		return nil, errors.New("invalid type assertion for SearchDocuments result")
 	}
@@ -195,9 +195,9 @@ func (m *MockStorage) DeleteContent(id string) error {
 }
 
 // GetMapping implements Interface
-func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]interface{}, error) {
+func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	args := m.Called(ctx, index)
-	result, ok := args.Get(0).(map[string]interface{})
+	result, ok := args.Get(0).(map[string]any)
 	if !ok && args.Get(0) != nil {
 		return nil, ErrMockTypeAssertion
 	}
@@ -215,7 +215,7 @@ func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
 }
 
 // UpdateMapping implements Interface
-func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]interface{}) error {
+func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]any) error {
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }
@@ -237,13 +237,13 @@ func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64
 }
 
 // Aggregate implements Interface
-func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs interface{}) (interface{}, error) {
+func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
 	args := m.Called(ctx, index, aggs)
 	return args.Get(0), args.Error(1)
 }
 
 // Count implements Interface
-func (m *MockStorage) Count(ctx context.Context, index string, query interface{}) (int64, error) {
+func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
 	result, ok := args.Get(0).(int64)
 	if !ok && args.Get(0) != nil {

@@ -16,6 +16,11 @@ func ValidateConfig(cfg Interface) error {
 		return errors.New("config cannot be nil")
 	}
 
+	app := cfg.GetAppConfig()
+	if app == nil {
+		return errors.New("app config cannot be nil")
+	}
+
 	crawler := cfg.GetCrawlerConfig()
 	if crawler == nil {
 		return errors.New("crawler config cannot be nil")
@@ -40,6 +45,11 @@ func ValidateConfig(cfg Interface) error {
 
 	if len(es.Addresses) == 0 {
 		return errors.New("elasticsearch addresses cannot be empty")
+	}
+
+	// Check for API key in production environment
+	if app.Environment == "production" && es.APIKey == "" {
+		return errors.New("API key is required in production")
 	}
 
 	log := cfg.GetLogConfig()
