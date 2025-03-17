@@ -11,4 +11,6 @@ var (
 	ErrMissingURL = errors.New("elasticsearch URL is required")
 	// ErrInvalidScrollID indicates an invalid or missing scroll ID in response
 	ErrInvalidScrollID = errors.New("invalid scroll ID")
+	// ErrIndexNotFound indicates the requested index does not exist
+	ErrIndexNotFound = errors.New("index not found")
 )

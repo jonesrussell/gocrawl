@@ -165,6 +165,16 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query a
 		return nil, errors.New("elasticsearch client is not initialized")
 	}
 
+	// First check if the index exists
+	exists, err := s.IndexExists(ctx, index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		s.Logger.Error("Index not found", "index", index)
+		return nil, fmt.Errorf("%w: %s", ErrIndexNotFound, index)
+	}
+
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
 	defer cancel()
 
