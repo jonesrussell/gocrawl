@@ -13,10 +13,23 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
+// TimeProvider allows mocking time in tests
+type TimeProvider interface {
+	Now() time.Time
+}
+
+// realTimeProvider provides actual time
+type realTimeProvider struct{}
+
+func (r *realTimeProvider) Now() time.Time {
+	return time.Now()
+}
+
 // SecurityMiddleware provides security features for the API
 type SecurityMiddleware struct {
 	config *config.ServerConfig
 	logger logger.Interface
+	time   TimeProvider
 	// rateLimiter tracks request counts per IP
 	rateLimiter struct {
 		sync.RWMutex
@@ -36,10 +49,16 @@ func NewSecurityMiddleware(cfg *config.ServerConfig, logger logger.Interface) *S
 	m := &SecurityMiddleware{
 		config: cfg,
 		logger: logger,
+		time:   &realTimeProvider{},
 	}
 	m.rateLimiter.clients = make(map[string]*rateLimitInfo)
 	m.rateLimiter.window = time.Minute // Default to 1 minute
 	return m
+}
+
+// SetTimeProvider sets a custom time provider for testing
+func (m *SecurityMiddleware) SetTimeProvider(provider TimeProvider) {
+	m.time = provider
 }
 
 // SetRateLimitWindow sets the rate limit window for testing
@@ -106,7 +125,7 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 	}
 
 	clientIP := c.ClientIP()
-	now := time.Now()
+	now := m.time.Now()
 
 	m.rateLimiter.Lock()
 	defer m.rateLimiter.Unlock()
@@ -215,7 +234,7 @@ func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
 			return
 		case <-ticker.C:
 			m.rateLimiter.Lock()
-			now := time.Now()
+			now := m.time.Now()
 			for ip, info := range m.rateLimiter.clients {
 				if now.Sub(info.lastAccess) > m.rateLimiter.window {
 					delete(m.rateLimiter.clients, ip)

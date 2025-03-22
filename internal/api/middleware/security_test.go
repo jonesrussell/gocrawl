@@ -1,6 +1,7 @@
 package middleware_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,6 +29,19 @@ func (m *mockLogger) Fatal(msg string, fields ...any)   {}
 func (m *mockLogger) Printf(format string, args ...any) {}
 func (m *mockLogger) Errorf(format string, args ...any) {}
 func (m *mockLogger) Sync() error                       { return nil }
+
+// mockTimeProvider implements TimeProvider for testing
+type mockTimeProvider struct {
+	currentTime time.Time
+}
+
+func (m *mockTimeProvider) Now() time.Time {
+	return m.currentTime
+}
+
+func (m *mockTimeProvider) Advance(d time.Duration) {
+	m.currentTime = m.currentTime.Add(d)
+}
 
 func setupTestRouter(t *testing.T, securityConfig *config.ServerConfig) (*gin.Engine, *middleware.SecurityMiddleware) {
 	gin.SetMode(gin.TestMode)
@@ -131,6 +145,7 @@ func TestRateLimiting(t *testing.T) {
 			} `yaml:"tls"`
 		}{
 			Enabled:   true,
+			APIKey:    "test-key",
 			RateLimit: 2, // 2 requests per 5 seconds
 		},
 	}
@@ -138,6 +153,21 @@ func TestRateLimiting(t *testing.T) {
 
 	// Set a shorter window for testing
 	securityMiddleware.SetRateLimitWindow(5 * time.Second)
+
+	// Set up mock time provider
+	mockTime := &mockTimeProvider{currentTime: time.Now()}
+	securityMiddleware.SetTimeProvider(mockTime)
+
+	// Start cleanup goroutine with a context that we can cancel
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start cleanup in a goroutine
+	cleanupDone := make(chan struct{})
+	go func() {
+		securityMiddleware.Cleanup(ctx)
+		close(cleanupDone)
+	}()
 
 	// Make requests from the same IP
 	w := httptest.NewRecorder()
@@ -160,13 +190,24 @@ func TestRateLimiting(t *testing.T) {
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)
 
-	// Wait for rate limit to reset (5 seconds)
-	time.Sleep(5 * time.Second)
+	// Advance time by 5 seconds
+	mockTime.Advance(5 * time.Second)
 
 	// Request should succeed again
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Cancel the context to stop the cleanup goroutine
+	cancel()
+
+	// Wait for cleanup to finish
+	select {
+	case <-cleanupDone:
+		// Cleanup finished successfully
+	case <-time.After(2 * time.Second):
+		t.Fatal("Cleanup goroutine did not finish within timeout")
+	}
 }
 
 func TestCORS(t *testing.T) {

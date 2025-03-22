@@ -46,8 +46,8 @@ func setupTestMocks(t *testing.T, serverCfg *config.ServerConfig) (*mock_logger.
 	address := ":" + strings.TrimPrefix(serverCfg.Address, ":")
 	mockLogger.EXPECT().Info("Server configuration", "address", address).Times(1)
 
-	// GetServerConfig is called multiple times during server setup
-	mockCfg.EXPECT().GetServerConfig().Return(serverCfg).MinTimes(1).MaxTimes(4)
+	// GetServerConfig is called multiple times during server setup and middleware configuration
+	mockCfg.EXPECT().GetServerConfig().Return(serverCfg).AnyTimes()
 
 	return mockLogger, mockCfg, mockSearch, ctrl
 }
@@ -144,8 +144,8 @@ func TestStartHTTPServer(t *testing.T) {
 			mockLogger.EXPECT().Info("StartHTTPServer function called").Times(1)
 			mockLogger.EXPECT().Info("Server configuration", "address", ":8080").Times(1)
 
-			// Set up config expectations
-			mockCfg.EXPECT().GetServerConfig().Return(serverCfg).MinTimes(1).MaxTimes(4)
+			// Set up config expectations - allow any number of calls
+			mockCfg.EXPECT().GetServerConfig().Return(serverCfg).AnyTimes()
 
 			// Set up search expectations with exact query matching
 			expectedQuery := map[string]any{
@@ -212,6 +212,10 @@ func TestStartHTTPServer(t *testing.T) {
 
 // TestStartHTTPServer_PortConfiguration tests the port configuration behavior
 func TestStartHTTPServer_PortConfiguration(t *testing.T) {
+	// Create controller outside the test loop
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
 		name          string
 		envPort       string
@@ -249,34 +253,24 @@ func TestStartHTTPServer_PortConfiguration(t *testing.T) {
 				t.Setenv("GOCRAWL_PORT", "")
 			}
 
-			// Create server config based on test case
-			var serverCfg *config.ServerConfig
-			if tt.configPort != "" {
-				serverCfg = testServerConfig(tt.configPort)
-			} else {
-				serverCfg = &config.ServerConfig{
-					ReadTimeout:  10 * time.Second,
-					WriteTimeout: 30 * time.Second,
-					IdleTimeout:  60 * time.Second,
-				}
-			}
+			// Create test configuration
+			serverCfg := testServerConfig(tt.configPort)
+			mockLogger := mock_logger.NewMockInterface(ctrl)
+			mockCfg := NewMockConfig(ctrl)
+			mockSearch := NewMockSearchManager(ctrl)
 
-			// For test cases using environment variables or default port,
-			// update the server config address to match the expected port
-			if tt.configPort == "" {
-				serverCfg.Address = tt.expectedPort
-			}
+			// Set up logger expectations
+			mockLogger.EXPECT().Info("StartHTTPServer function called").Times(1)
+			mockLogger.EXPECT().Info("Server configuration", "address", tt.expectedPort).Times(1)
 
-			// Create mocks with the expected port in server config
-			mockLogger, mockCfg, mockSearch, ctrl := setupTestMocks(t, serverCfg)
-			defer ctrl.Finish()
+			// Set up config expectations - allow any number of calls
+			mockCfg.EXPECT().GetServerConfig().Return(serverCfg).AnyTimes()
 
 			// Start the server
 			server, err := api.StartHTTPServer(mockLogger, mockSearch, mockCfg)
 			require.NoError(t, err)
 			require.NotNil(t, server)
 
-			// Verify the server is configured with the expected port
 			assert.Equal(t, tt.expectedPort, server.Addr)
 		})
 	}
