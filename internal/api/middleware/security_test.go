@@ -154,8 +154,9 @@ func TestRateLimiting(t *testing.T) {
 	// Set a shorter window for testing
 	securityMiddleware.SetRateLimitWindow(5 * time.Second)
 
-	// Set up mock time provider
-	mockTime := &mockTimeProvider{currentTime: time.Now()}
+	// Set up mock time provider with a fixed start time
+	startTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	mockTime := &mockTimeProvider{currentTime: startTime}
 	securityMiddleware.SetTimeProvider(mockTime)
 
 	// Start cleanup goroutine with a context that we can cancel
@@ -178,30 +179,33 @@ func TestRateLimiting(t *testing.T) {
 
 	// First request should succeed
 	router.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code, "First request should succeed")
 
 	// Second request should succeed
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code, "Second request should succeed")
 
 	// Third request should be rate limited
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+	assert.Equal(t, http.StatusTooManyRequests, w.Code, "Third request should be rate limited")
 
-	// Advance time by 5 seconds
-	mockTime.Advance(5 * time.Second)
+	// Advance time by 5 seconds and 1 millisecond to ensure we're past the window
+	mockTime.Advance(5*time.Second + time.Millisecond)
 
-	// Request should succeed again
+	// Give the cleanup goroutine a chance to run
+	time.Sleep(100 * time.Millisecond)
+
+	// Request should succeed again after window expires
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code, "Request after window should succeed")
 
 	// Cancel the context to stop the cleanup goroutine
 	cancel()
 
-	// Wait for cleanup to finish
+	// Wait for cleanup to finish with a timeout
 	select {
 	case <-cleanupDone:
 		// Cleanup finished successfully

@@ -46,6 +46,10 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 	router.Use(security.Middleware())
 
 	// Define routes
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
 	router.POST("/search", func(c *gin.Context) {
 		var req SearchRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -121,16 +125,18 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 
 	// Configure TLS if enabled
 	if cfg.GetServerConfig().Security.TLS.Enabled {
+		// Validate TLS configuration at startup
+		cert, err := tls.LoadX509KeyPair(
+			cfg.GetServerConfig().Security.TLS.Certificate,
+			cfg.GetServerConfig().Security.TLS.Key,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load TLS certificate: %w", err)
+		}
+
 		server.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-				cert, err := tls.LoadX509KeyPair(
-					cfg.GetServerConfig().Security.TLS.Certificate,
-					cfg.GetServerConfig().Security.TLS.Key,
-				)
-				if err != nil {
-					return nil, fmt.Errorf("failed to load TLS certificate: %w", err)
-				}
 				return &cert, nil
 			},
 		}

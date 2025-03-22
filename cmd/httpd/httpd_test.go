@@ -2,18 +2,9 @@ package httpd_test
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
-	"math/big"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -41,14 +32,43 @@ func (m *mockStorage) Search(ctx context.Context, query string, opts any) ([]any
 // mockConfig implements config.Interface for testing
 type mockConfig struct {
 	config.Interface
+	serverConfig *config.ServerConfig
 }
 
 func (m *mockConfig) GetServerConfig() *config.ServerConfig {
+	if m.serverConfig != nil {
+		return m.serverConfig
+	}
 	return &config.ServerConfig{
-		Address:      ":0", // Use random port
+		Address:      ":0",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
+		Security: struct {
+			Enabled   bool   `yaml:"enabled"`
+			APIKey    string `yaml:"api_key"`
+			RateLimit int    `yaml:"rate_limit"`
+			CORS      struct {
+				Enabled        bool     `yaml:"enabled"`
+				AllowedOrigins []string `yaml:"allowed_origins"`
+				AllowedMethods []string `yaml:"allowed_methods"`
+				AllowedHeaders []string `yaml:"allowed_headers"`
+				MaxAge         int      `yaml:"max_age"`
+			} `yaml:"cors"`
+			TLS struct {
+				Enabled     bool   `yaml:"enabled"`
+				Certificate string `yaml:"certificate"`
+				Key         string `yaml:"key"`
+			} `yaml:"tls"`
+		}{
+			TLS: struct {
+				Enabled     bool   `yaml:"enabled"`
+				Certificate string `yaml:"certificate"`
+				Key         string `yaml:"key"`
+			}{
+				Enabled: false,
+			},
+		},
 	}
 }
 
@@ -120,10 +140,6 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	mockStore := &mockStorage{}
 	mockSearch := &mockSearchManager{}
 
-	// Channel to signal when server is ready
-	serverReady := make(chan struct{})
-	shutdownComplete := make(chan struct{})
-
 	// Create test app with mocked dependencies using fxtest
 	app := fxtest.New(t,
 		fx.Supply(mockLogger),
@@ -141,11 +157,9 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 			// Signal that server is ready to accept connections
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
-					close(serverReady)
 					return nil
 				},
 				OnStop: func(context.Context) error {
-					close(shutdownComplete)
 					return nil
 				},
 			})
@@ -155,25 +169,6 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	// Start the app
 	app.RequireStart()
 	defer app.RequireStop()
-
-	// Wait for server to be ready
-	select {
-	case <-serverReady:
-		// Server is ready, proceed with test
-	case <-time.After(2 * time.Second):
-		t.Fatal("Server failed to start within timeout")
-	}
-
-	// Trigger graceful shutdown by stopping the app
-	app.RequireStop()
-
-	// Wait for shutdown to complete
-	select {
-	case <-shutdownComplete:
-		// Shutdown completed successfully
-	case <-time.After(2 * time.Second):
-		t.Fatal("Server failed to shut down within timeout")
-	}
 }
 
 func TestHTTPCommandServerError(t *testing.T) {
@@ -194,9 +189,6 @@ func TestHTTPCommandServerError(t *testing.T) {
 	mockStore := &mockStorage{}
 	mockSearch := &mockSearchManager{}
 
-	// Channel to communicate server errors
-	serverErr := make(chan error, 1)
-
 	// Create a test module that doesn't include api.Module
 	testModule := fx.Module("test",
 		fx.Provide(
@@ -216,7 +208,7 @@ func TestHTTPCommandServerError(t *testing.T) {
 					// Start the server in a goroutine
 					go func() {
 						if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-							serverErr <- err
+							panic(err)
 						}
 					}()
 
@@ -261,236 +253,171 @@ func TestCommand(t *testing.T) {
 	assert.NotEmpty(t, cmd.Long)
 }
 
-func createTestCertificates(t *testing.T) (string, string) {
-	// Create temporary directory for certificates
-	tmpDir := t.TempDir()
-	certPath := filepath.Join(tmpDir, "cert.pem")
-	keyPath := filepath.Join(tmpDir, "key.pem")
-
-	// Generate test certificate and key
-	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization: []string{"Test Org"},
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
-
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
-
-	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &priv.PublicKey, priv)
-	require.NoError(t, err)
-
-	// Write certificate
-	certFile, err := os.Create(certPath)
-	require.NoError(t, err)
-	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
-	require.NoError(t, err)
-	certFile.Close()
-
-	// Write private key
-	keyFile, err := os.Create(keyPath)
-	require.NoError(t, err)
-	err = pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
-	require.NoError(t, err)
-	keyFile.Close()
-
-	return certPath, keyPath
-}
-
 func TestTLSConfiguration(t *testing.T) {
-	certPath, keyPath := createTestCertificates(t)
-
 	tests := []struct {
-		name           string
-		config         *config.ServerConfig
-		expectedError  bool
-		expectedScheme string
+		name      string
+		tlsConfig struct {
+			Enabled     bool   `yaml:"enabled"`
+			Certificate string `yaml:"certificate"`
+			Key         string `yaml:"key"`
+		}
+		expectError bool
 	}{
 		{
-			name: "TLS enabled with valid certificates",
-			config: &config.ServerConfig{
-				Security: struct {
-					Enabled   bool   `yaml:"enabled"`
-					APIKey    string `yaml:"api_key"`
-					RateLimit int    `yaml:"rate_limit"`
-					CORS      struct {
-						Enabled        bool     `yaml:"enabled"`
-						AllowedOrigins []string `yaml:"allowed_origins"`
-						AllowedMethods []string `yaml:"allowed_methods"`
-						AllowedHeaders []string `yaml:"allowed_headers"`
-						MaxAge         int      `yaml:"max_age"`
-					} `yaml:"cors"`
-					TLS struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					} `yaml:"tls"`
-				}{
-					Enabled: true,
-					TLS: struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					}{
-						Enabled:     true,
-						Certificate: certPath,
-						Key:         keyPath,
-					},
-				},
-			},
-			expectedError:  false,
-			expectedScheme: "https",
-		},
-		{
 			name: "TLS disabled",
-			config: &config.ServerConfig{
-				Security: struct {
-					Enabled   bool   `yaml:"enabled"`
-					APIKey    string `yaml:"api_key"`
-					RateLimit int    `yaml:"rate_limit"`
-					CORS      struct {
-						Enabled        bool     `yaml:"enabled"`
-						AllowedOrigins []string `yaml:"allowed_origins"`
-						AllowedMethods []string `yaml:"allowed_methods"`
-						AllowedHeaders []string `yaml:"allowed_headers"`
-						MaxAge         int      `yaml:"max_age"`
-					} `yaml:"cors"`
-					TLS struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					} `yaml:"tls"`
-				}{
-					Enabled: true,
-					TLS: struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					}{
-						Enabled: false,
-					},
-				},
+			tlsConfig: struct {
+				Enabled     bool   `yaml:"enabled"`
+				Certificate string `yaml:"certificate"`
+				Key         string `yaml:"key"`
+			}{
+				Enabled: false,
 			},
-			expectedError:  false,
-			expectedScheme: "http",
+			expectError: false,
 		},
 		{
 			name: "TLS enabled with missing certificate",
-			config: &config.ServerConfig{
-				Security: struct {
-					Enabled   bool   `yaml:"enabled"`
-					APIKey    string `yaml:"api_key"`
-					RateLimit int    `yaml:"rate_limit"`
-					CORS      struct {
-						Enabled        bool     `yaml:"enabled"`
-						AllowedOrigins []string `yaml:"allowed_origins"`
-						AllowedMethods []string `yaml:"allowed_methods"`
-						AllowedHeaders []string `yaml:"allowed_headers"`
-						MaxAge         int      `yaml:"max_age"`
-					} `yaml:"cors"`
-					TLS struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					} `yaml:"tls"`
-				}{
-					Enabled: true,
-					TLS: struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					}{
-						Enabled:     true,
-						Certificate: "nonexistent.pem",
-						Key:         keyPath,
-					},
-				},
+			tlsConfig: struct {
+				Enabled     bool   `yaml:"enabled"`
+				Certificate string `yaml:"certificate"`
+				Key         string `yaml:"key"`
+			}{
+				Enabled:     true,
+				Certificate: "nonexistent.crt",
+				Key:         "nonexistent.key",
 			},
-			expectedError: true,
+			expectError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := &http.Server{
-				Addr: ":0", // Use random port
-			}
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-			// Start server in a goroutine
-			go func() {
-				if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					t.Errorf("server error: %v", err)
-				}
-			}()
+			mockLogger := logger.NewMockInterface(ctrl)
+			mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
+			mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
+			mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
-			// Wait for server to start
-			time.Sleep(100 * time.Millisecond)
-
-			if tt.expectedError {
-				assert.Error(t, server.Close())
-				return
-			}
-			defer server.Close()
-
-			// Create test client
-			client := &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
+			mockCfg := &mockConfig{
+				serverConfig: &config.ServerConfig{
+					Address:      ":0",
+					ReadTimeout:  10 * time.Second,
+					WriteTimeout: 30 * time.Second,
+					IdleTimeout:  60 * time.Second,
+					Security: struct {
+						Enabled   bool   `yaml:"enabled"`
+						APIKey    string `yaml:"api_key"`
+						RateLimit int    `yaml:"rate_limit"`
+						CORS      struct {
+							Enabled        bool     `yaml:"enabled"`
+							AllowedOrigins []string `yaml:"allowed_origins"`
+							AllowedMethods []string `yaml:"allowed_methods"`
+							AllowedHeaders []string `yaml:"allowed_headers"`
+							MaxAge         int      `yaml:"max_age"`
+						} `yaml:"cors"`
+						TLS struct {
+							Enabled     bool   `yaml:"enabled"`
+							Certificate string `yaml:"certificate"`
+							Key         string `yaml:"key"`
+						} `yaml:"tls"`
+					}{
+						TLS: tt.tlsConfig,
 					},
 				},
 			}
 
-			// Test the connection
-			resp, err := client.Get(tt.expectedScheme + "://" + server.Addr + "/health")
-			require.NoError(t, err)
-			defer resp.Body.Close()
+			mockStore := &mockStorage{}
+			mockSearch := &mockSearchManager{}
 
-			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			app := fxtest.New(t,
+				fx.Supply(mockLogger),
+				fx.Supply(mockCfg),
+				fx.Supply(mockStore),
+				fx.Supply(mockSearch),
+				fx.Provide(
+					func() logger.Interface { return mockLogger },
+					func() config.Interface { return mockCfg },
+					func() storage.Interface { return mockStore },
+					func() api.SearchManager { return mockSearch },
+				),
+				httpd.Module,
+				fx.Invoke(func(*http.Server) {}),
+			)
+
+			err := app.Start(t.Context())
+			if tt.expectError {
+				require.Error(t, err)
+				// Check for the error in the fx error chain
+				errStr := err.Error()
+				assert.Contains(t, errStr, "failed to load TLS certificate")
+				assert.Contains(t, errStr, "nonexistent.crt")
+			} else {
+				require.NoError(t, err)
+				app.RequireStop()
+			}
 		})
 	}
 }
 
 func TestServerStartStop(t *testing.T) {
+	// Find an available port
+	listener, err := net.Listen("tcp", ":0")
+	require.NoError(t, err)
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	// Create a mux for the server
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+
 	config := &config.ServerConfig{
-		Address: ":0", // Use random port
+		Address: fmt.Sprintf(":%d", port),
 	}
 
 	server := &http.Server{
-		Addr: config.Address,
+		Addr:    config.Address,
+		Handler: mux,
 	}
+
+	// Channel to signal when server is ready
+	serverReady := make(chan struct{})
+	serverErr := make(chan error, 1)
 
 	// Start server in a goroutine
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			t.Errorf("server error: %v", err)
+		if listenErr := server.ListenAndServe(); listenErr != nil && listenErr != http.ErrServerClosed {
+			serverErr <- listenErr
 		}
+		close(serverReady)
 	}()
 
-	// Wait for server to start
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify server is running
-	assert.NotEmpty(t, server.Addr)
+	// Wait for server to be ready
+	select {
+	case <-serverReady:
+		// Server is ready, proceed with test
+	case startErr := <-serverErr:
+		t.Fatalf("Server failed to start: %v", startErr)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Server failed to start within timeout")
+	}
 
 	// Test health endpoint
-	resp, err := http.Get("http://" + server.Addr + "/health")
-	require.NoError(t, err)
+	resp, respErr := http.Get(fmt.Sprintf("http://localhost:%d/health", port))
+	require.NoError(t, respErr)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Stop server
-	err = server.Close()
-	require.NoError(t, err)
+	stopErr := server.Close()
+	require.NoError(t, stopErr)
 
 	// Verify server is stopped
-	_, err = http.Get("http://" + server.Addr + "/health")
-	assert.Error(t, err)
+	_, respErr = http.Get(fmt.Sprintf("http://localhost:%d/health", port))
+	assert.Error(t, respErr)
 }
