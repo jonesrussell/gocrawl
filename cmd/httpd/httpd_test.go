@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"errors"
-
 	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -354,7 +352,7 @@ func TestTLSConfiguration(t *testing.T) {
 
 				// Get the root error by unwrapping the fx error chain
 				var fxErr interface{ Unwrap() []error }
-				require.True(t, errors.As(err, &fxErr))
+				require.ErrorAs(t, err, &fxErr)
 
 				chain := fxErr.Unwrap()
 				require.GreaterOrEqual(t, len(chain), 3, "Error chain should contain at least 3 errors")
@@ -441,7 +439,7 @@ func TestServerStartStop(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Stop server gracefully
-	stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	stopCtx, stopCancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer stopCancel()
 	stopErr := server.Shutdown(stopCtx)
 	require.NoError(t, stopErr)
