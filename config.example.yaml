@@ -4,16 +4,44 @@ app:
   # Application name used in logging and metrics
   name: gocrawl
   # Semantic version of the application
-  version: 0.1.0
+  version: 1.0.0
   # Enable debug mode for additional logging
   debug: true
 
-# Log level for the application. Options: debug, info, warn, error, fatal, panic
-log:
-  level: debug
-  # Enable debug logging for development
-  debug: true
+# Server configuration for the HTTP API
+server:
+  # Address to listen on (format: host:port)
+  address: ":8085"
+  # Timeouts for different operations
+  read_timeout: 10s    # Maximum time to read the request
+  write_timeout: 30s   # Maximum time to write the response
+  idle_timeout: 60s    # Maximum time to keep idle connections
+  # Security settings
+  security:
+    enabled: true      # Enable all security features
+    api_key: ""        # API key for authentication (required in production)
+    rate_limit: 60     # Maximum requests per minute per IP
+    # CORS configuration
+    cors:
+      enabled: true
+      allowed_origins:
+        - "*"          # Allow all origins (restrict in production)
+      allowed_methods:
+        - "GET"
+        - "POST"
+        - "OPTIONS"
+      allowed_headers:
+        - "Content-Type"
+        - "Authorization"
+        - "X-API-Key"
+      max_age: 86400   # Cache preflight requests for 24 hours
+    # TLS/SSL configuration
+    tls:
+      enabled: false   # Enable TLS for HTTPS
+      certificate: ""  # Path to SSL certificate file
+      key: ""         # Path to SSL private key file
 
+# Elasticsearch connection settings
 elasticsearch:
   # List of Elasticsearch nodes to connect to
   addresses:
@@ -23,34 +51,42 @@ elasticsearch:
     # - "https://es3.example.com:9200"
   
   # Authentication - use either username/password OR api_key
-  username: ""  # Your Elasticsearch username
-  password: ""  # Your Elasticsearch password
-  api_key: ""   # Alternative to username/password
+  username: ""        # Your Elasticsearch username
+  password: ""        # Your Elasticsearch password
+  api_key: ""         # Alternative to username/password
+  auth_type: "apikey" # Authentication method: "basic" or "apikey"
+  index_name: "gocrawl" # Default index name for articles
   
   # TLS/SSL Configuration
   tls:
     enabled: true
     skip_verify: false  # Set to true only in development
-    # Optional: Path to client certificate for mTLS
-    certificate: ""
-    # Optional: Path to client key for mTLS
-    key: ""
-    # Optional: Path to CA certificate for custom certificate authorities
-    ca: ""
+    certificate: ""     # Path to client certificate for mTLS
+    key: ""            # Path to client key for mTLS
+    ca: ""             # Path to CA certificate for custom certificate authorities
   
   # Retry configuration for resilient connections
   retry:
     enabled: true
     initial_wait: 1s    # Initial wait time between retries
-    max_wait: 30s      # Maximum wait time between retries
-    max_retries: 3     # Maximum number of retry attempts
+    max_wait: 30s       # Maximum wait time between retries
+    max_retries: 3      # Maximum number of retry attempts
 
+# Logging configuration
+log:
+  level: info          # Log level: debug, info, warn, error, fatal, panic
+  debug: true          # Enable debug logging for development
+
+# Crawler configuration
 crawler:
-  # Maximum depth to crawl from the starting URL
-  max_depth: 2
-  # Minimum time between requests to the same host
-  rate_limit: 2s
-  # Number of concurrent crawlers
-  parallelism: 2
-  # Additional random delay between requests (helps avoid detection)
-  random_delay: 5s
+  base_url: ""         # Starting URL for the crawler
+  max_depth: 2         # Maximum depth to crawl from the starting URL
+  rate_limit: 2s       # Minimum time between requests to the same host
+  random_delay: 5s     # Additional random delay between requests
+  parallelism: 2       # Number of concurrent crawlers
+  index_name: "gocrawl" # Index name for articles
+  content_index_name: "gocrawl_content" # Index name for content
+  source_file: "config/sources.yaml"    # Path to sources configuration
+
+# List of sources to crawl
+sources: []
