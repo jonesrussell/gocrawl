@@ -19,11 +19,6 @@ import (
 // sourceName holds the name of the source being crawled, populated from command line arguments.
 var sourceName string
 
-// SetSourceName sets the source name for testing purposes.
-func SetSourceName(name string) {
-	sourceName = name
-}
-
 // Params holds the dependencies and parameters required for the crawl operation.
 type Params struct {
 	fx.In
