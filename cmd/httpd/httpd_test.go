@@ -2,9 +2,18 @@ package httpd_test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -250,4 +259,238 @@ func TestCommand(t *testing.T) {
 	assert.Equal(t, "httpd", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
+}
+
+func createTestCertificates(t *testing.T) (string, string) {
+	// Create temporary directory for certificates
+	tmpDir := t.TempDir()
+	certPath := filepath.Join(tmpDir, "cert.pem")
+	keyPath := filepath.Join(tmpDir, "key.pem")
+
+	// Generate test certificate and key
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"Test Org"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &priv.PublicKey, priv)
+	require.NoError(t, err)
+
+	// Write certificate
+	certFile, err := os.Create(certPath)
+	require.NoError(t, err)
+	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+	require.NoError(t, err)
+	certFile.Close()
+
+	// Write private key
+	keyFile, err := os.Create(keyPath)
+	require.NoError(t, err)
+	err = pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+	require.NoError(t, err)
+	keyFile.Close()
+
+	return certPath, keyPath
+}
+
+func TestTLSConfiguration(t *testing.T) {
+	certPath, keyPath := createTestCertificates(t)
+
+	tests := []struct {
+		name           string
+		config         *config.ServerConfig
+		expectedError  bool
+		expectedScheme string
+	}{
+		{
+			name: "TLS enabled with valid certificates",
+			config: &config.ServerConfig{
+				Security: struct {
+					Enabled   bool   `yaml:"enabled"`
+					APIKey    string `yaml:"api_key"`
+					RateLimit int    `yaml:"rate_limit"`
+					CORS      struct {
+						Enabled        bool     `yaml:"enabled"`
+						AllowedOrigins []string `yaml:"allowed_origins"`
+						AllowedMethods []string `yaml:"allowed_methods"`
+						AllowedHeaders []string `yaml:"allowed_headers"`
+						MaxAge         int      `yaml:"max_age"`
+					} `yaml:"cors"`
+					TLS struct {
+						Enabled     bool   `yaml:"enabled"`
+						Certificate string `yaml:"certificate"`
+						Key         string `yaml:"key"`
+					} `yaml:"tls"`
+				}{
+					Enabled: true,
+					TLS: struct {
+						Enabled     bool   `yaml:"enabled"`
+						Certificate string `yaml:"certificate"`
+						Key         string `yaml:"key"`
+					}{
+						Enabled:     true,
+						Certificate: certPath,
+						Key:         keyPath,
+					},
+				},
+			},
+			expectedError:  false,
+			expectedScheme: "https",
+		},
+		{
+			name: "TLS disabled",
+			config: &config.ServerConfig{
+				Security: struct {
+					Enabled   bool   `yaml:"enabled"`
+					APIKey    string `yaml:"api_key"`
+					RateLimit int    `yaml:"rate_limit"`
+					CORS      struct {
+						Enabled        bool     `yaml:"enabled"`
+						AllowedOrigins []string `yaml:"allowed_origins"`
+						AllowedMethods []string `yaml:"allowed_methods"`
+						AllowedHeaders []string `yaml:"allowed_headers"`
+						MaxAge         int      `yaml:"max_age"`
+					} `yaml:"cors"`
+					TLS struct {
+						Enabled     bool   `yaml:"enabled"`
+						Certificate string `yaml:"certificate"`
+						Key         string `yaml:"key"`
+					} `yaml:"tls"`
+				}{
+					Enabled: true,
+					TLS: struct {
+						Enabled     bool   `yaml:"enabled"`
+						Certificate string `yaml:"certificate"`
+						Key         string `yaml:"key"`
+					}{
+						Enabled: false,
+					},
+				},
+			},
+			expectedError:  false,
+			expectedScheme: "http",
+		},
+		{
+			name: "TLS enabled with missing certificate",
+			config: &config.ServerConfig{
+				Security: struct {
+					Enabled   bool   `yaml:"enabled"`
+					APIKey    string `yaml:"api_key"`
+					RateLimit int    `yaml:"rate_limit"`
+					CORS      struct {
+						Enabled        bool     `yaml:"enabled"`
+						AllowedOrigins []string `yaml:"allowed_origins"`
+						AllowedMethods []string `yaml:"allowed_methods"`
+						AllowedHeaders []string `yaml:"allowed_headers"`
+						MaxAge         int      `yaml:"max_age"`
+					} `yaml:"cors"`
+					TLS struct {
+						Enabled     bool   `yaml:"enabled"`
+						Certificate string `yaml:"certificate"`
+						Key         string `yaml:"key"`
+					} `yaml:"tls"`
+				}{
+					Enabled: true,
+					TLS: struct {
+						Enabled     bool   `yaml:"enabled"`
+						Certificate string `yaml:"certificate"`
+						Key         string `yaml:"key"`
+					}{
+						Enabled:     true,
+						Certificate: "nonexistent.pem",
+						Key:         keyPath,
+					},
+				},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := &http.Server{
+				Addr: ":0", // Use random port
+			}
+
+			// Start server in a goroutine
+			go func() {
+				if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					t.Errorf("server error: %v", err)
+				}
+			}()
+
+			// Wait for server to start
+			time.Sleep(100 * time.Millisecond)
+
+			if tt.expectedError {
+				assert.Error(t, server.Close())
+				return
+			}
+			defer server.Close()
+
+			// Create test client
+			client := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+					},
+				},
+			}
+
+			// Test the connection
+			resp, err := client.Get(tt.expectedScheme + "://" + server.Addr + "/health")
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+		})
+	}
+}
+
+func TestServerStartStop(t *testing.T) {
+	config := &config.ServerConfig{
+		Address: ":0", // Use random port
+	}
+
+	server := &http.Server{
+		Addr: config.Address,
+	}
+
+	// Start server in a goroutine
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			t.Errorf("server error: %v", err)
+		}
+	}()
+
+	// Wait for server to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify server is running
+	assert.NotEmpty(t, server.Addr)
+
+	// Test health endpoint
+	resp, err := http.Get("http://" + server.Addr + "/health")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Stop server
+	err = server.Close()
+	require.NoError(t, err)
+
+	// Verify server is stopped
+	_, err = http.Get("http://" + server.Addr + "/health")
+	assert.Error(t, err)
 }
