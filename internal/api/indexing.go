@@ -5,6 +5,8 @@ import (
 	"context"
 )
 
+//go:generate mockgen -destination=mock_search_manager.go -package=api github.com/jonesrussell/gocrawl/internal/api SearchManager
+
 // IndexManager defines the interface for managing Elasticsearch indices
 type IndexManager interface {
 	// EnsureIndex ensures that an index exists with the given name and mapping

@@ -79,7 +79,13 @@ You can send POST requests to /search with a JSON body containing the search par
 						// Start the server in a goroutine
 						go func() {
 							p.Logger.Info("HTTP server started", "address", p.Server.Addr)
-							if err := p.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+							var err error
+							if p.Server.TLSConfig != nil {
+								err = p.Server.ListenAndServeTLS("", "") // Use GetCertificate callback
+							} else {
+								err = p.Server.ListenAndServe()
+							}
+							if err != nil && err != http.ErrServerClosed {
 								p.Logger.Error("HTTP server failed", "error", err)
 								errChan <- err
 								return

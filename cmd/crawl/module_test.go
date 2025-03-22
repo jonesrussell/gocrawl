@@ -2,10 +2,10 @@
 package crawl_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -23,12 +23,37 @@ import (
 	"go.uber.org/fx/fxtest"
 )
 
+// mockSearchManager implements api.SearchManager for testing
+type mockSearchManager struct {
+	api.SearchManager
+}
+
+func (m *mockSearchManager) Search(ctx context.Context, index string, query any) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *mockSearchManager) Count(ctx context.Context, index string, query any) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockSearchManager) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
+	return nil, nil
+}
+
 // TestModuleProvides tests that the crawl module provides all necessary dependencies
 func TestModuleProvides(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockLogger := logger.NewMockInterface(ctrl)
+	// Set up logger expectations for both single and multi-argument calls
+	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
 	mockCfg := configtest.NewMockConfig().WithSources([]config.Source{
 		{
 			Name: "Test Source",
@@ -46,29 +71,63 @@ func TestModuleProvides(t *testing.T) {
 	}
 	testSources := sourcestest.NewTestSources(testConfigs)
 
-	app := fxtest.New(t,
-		fx.Replace(
+	// Create a test-specific module that excludes config.Module
+	testModule := fx.Module("test",
+		// Core dependencies (excluding config and logger modules)
+		sources.Module,
+		api.Module,
+
+		// Feature modules
+		article.Module,
+		content.Module,
+		collector.Module(),
+		crawler.Module,
+
+		// Provide all required dependencies
+		fx.Provide(
+			// Logger
 			fx.Annotate(
 				func() logger.Interface { return mockLogger },
 				fx.As(new(logger.Interface)),
 			),
-		),
-		fx.Provide(
-			func() *sources.Sources { return testSources },
-		),
-		fx.Replace(
+			// Config
 			fx.Annotate(
 				func() config.Interface { return mockCfg },
 				fx.As(new(config.Interface)),
 			),
-		),
-		fx.Replace(
+			// Index Manager
 			fx.Annotate(
 				func() api.IndexManager { return nil },
 				fx.As(new(api.IndexManager)),
 			),
+			// Search Manager
+			fx.Annotate(
+				func() api.SearchManager { return &mockSearchManager{} },
+				fx.As(new(api.SearchManager)),
+			),
+			// Sources
+			func() *sources.Sources { return testSources },
+			// Named dependencies
+			fx.Annotate(
+				func() string { return "Test Source" },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func(sources sources.Interface) (string, string) {
+					return "test_content", "test_articles"
+				},
+				fx.ParamTags(`name:"sourceManager"`),
+				fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
+			),
+			func() chan *models.Article {
+				return make(chan *models.Article, 100)
+			},
 		),
-		crawl.Module,
+	)
+
+	app := fxtest.New(t,
+		fx.NopLogger,
+		testModule,
 	)
 
 	require.NoError(t, app.Err())
@@ -81,6 +140,14 @@ func TestModuleConfiguration(t *testing.T) {
 
 	// Create test dependencies
 	mockLogger := logger.NewMockInterface(ctrl)
+	// Set up logger expectations for both single and multi-argument calls
+	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
 	mockCfg := configtest.NewMockConfig().
 		WithSources([]config.Source{
 			{
@@ -133,6 +200,11 @@ func TestModuleConfiguration(t *testing.T) {
 			fx.Annotate(
 				func() api.IndexManager { return api.NewMockIndexManager() },
 				fx.As(new(api.IndexManager)),
+			),
+			// Search Manager
+			fx.Annotate(
+				func() api.SearchManager { return &mockSearchManager{} },
+				fx.As(new(api.SearchManager)),
 			),
 			// Sources
 			func() *sources.Sources { return testSources },

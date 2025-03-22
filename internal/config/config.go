@@ -189,6 +189,37 @@ type ServerConfig struct {
 	WriteTimeout time.Duration `yaml:"write_timeout"`
 	// IdleTimeout is the maximum amount of time to wait for the next request
 	IdleTimeout time.Duration `yaml:"idle_timeout"`
+	// Security contains security-related settings
+	Security struct {
+		// Enabled indicates whether security features are enabled
+		Enabled bool `yaml:"enabled"`
+		// APIKey is the API key for authentication
+		APIKey string `yaml:"api_key"`
+		// RateLimit is the maximum number of requests per minute
+		RateLimit int `yaml:"rate_limit"`
+		// CORS contains CORS configuration
+		CORS struct {
+			// Enabled indicates whether CORS is enabled
+			Enabled bool `yaml:"enabled"`
+			// AllowedOrigins is a list of allowed origins
+			AllowedOrigins []string `yaml:"allowed_origins"`
+			// AllowedMethods is a list of allowed HTTP methods
+			AllowedMethods []string `yaml:"allowed_methods"`
+			// AllowedHeaders is a list of allowed headers
+			AllowedHeaders []string `yaml:"allowed_headers"`
+			// MaxAge is the maximum age of preflight requests
+			MaxAge int `yaml:"max_age"`
+		} `yaml:"cors"`
+		// TLS contains TLS configuration
+		TLS struct {
+			// Enabled indicates whether TLS is enabled
+			Enabled bool `yaml:"enabled"`
+			// Certificate is the path to the certificate file
+			Certificate string `yaml:"certificate"`
+			// Key is the path to the private key file
+			Key string `yaml:"key"`
+		} `yaml:"tls"`
+	} `yaml:"security"`
 }
 
 // Config represents the complete application configuration.
