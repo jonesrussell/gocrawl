@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -125,21 +126,32 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 
 	// Configure TLS if enabled
 	if cfg.GetServerConfig().Security.TLS.Enabled {
+		log.Info("TLS is enabled, loading certificates",
+			"certificate", cfg.GetServerConfig().Security.TLS.Certificate,
+			"key", cfg.GetServerConfig().Security.TLS.Key)
+
 		// Validate TLS configuration at startup
 		cert, err := tls.LoadX509KeyPair(
 			cfg.GetServerConfig().Security.TLS.Certificate,
 			cfg.GetServerConfig().Security.TLS.Key,
 		)
 		if err != nil {
+			log.Error("Failed to load TLS certificate", "error", err)
 			return nil, fmt.Errorf("failed to load TLS certificate: %w", err)
 		}
+
+		log.Info("TLS certificate loaded successfully")
 
 		server.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				log.Debug("Getting certificate for client", "server_name", hello.ServerName)
 				return &cert, nil
 			},
 		}
+		log.Info("TLS configuration completed")
+	} else {
+		log.Info("TLS is disabled")
 	}
 
 	return server, nil
@@ -150,4 +162,14 @@ var Module = fx.Module("api",
 	fx.Provide(
 		StartHTTPServer,
 	),
+	fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				return server.Shutdown(ctx)
+			},
+		})
+	}),
 )

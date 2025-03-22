@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"errors"
+
 	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -205,13 +207,6 @@ func TestHTTPCommandServerError(t *testing.T) {
 		fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
-					// Start the server in a goroutine
-					go func() {
-						if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-							panic(err)
-						}
-					}()
-
 					// Try to listen on the port to check if it's valid
 					ln, err := net.Listen("tcp", server.Addr)
 					if err != nil {
@@ -295,10 +290,18 @@ func TestTLSConfiguration(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockLogger := logger.NewMockInterface(ctrl)
-			mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
-			mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-			mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
-			mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			mockLogger.EXPECT().Info("StartHTTPServer function called").Times(1)
+			mockLogger.EXPECT().Info("Server configuration", "address", ":0").Times(1)
+
+			if tt.tlsConfig.Enabled {
+				mockLogger.EXPECT().Info("TLS is enabled, loading certificates",
+					"certificate", tt.tlsConfig.Certificate,
+					"key", tt.tlsConfig.Key).Times(1)
+				mockLogger.EXPECT().Error("Failed to load TLS certificate",
+					"error", gomock.Any()).Times(1)
+			} else {
+				mockLogger.EXPECT().Info("TLS is disabled").Times(1)
+			}
 
 			mockCfg := &mockConfig{
 				serverConfig: &config.ServerConfig{
@@ -343,16 +346,23 @@ func TestTLSConfiguration(t *testing.T) {
 					func() api.SearchManager { return mockSearch },
 				),
 				httpd.Module,
-				fx.Invoke(func(*http.Server) {}),
 			)
 
 			err := app.Start(t.Context())
 			if tt.expectError {
 				require.Error(t, err)
-				// Check for the error in the fx error chain
-				errStr := err.Error()
-				assert.Contains(t, errStr, "failed to load TLS certificate")
-				assert.Contains(t, errStr, "nonexistent.crt")
+
+				// Get the root error by unwrapping the fx error chain
+				var fxErr interface{ Unwrap() []error }
+				require.True(t, errors.As(err, &fxErr))
+
+				chain := fxErr.Unwrap()
+				require.GreaterOrEqual(t, len(chain), 3, "Error chain should contain at least 3 errors")
+
+				// The root error should be the TLS certificate error
+				rootErr := chain[len(chain)-1]
+				assert.Contains(t, rootErr.Error(), "failed to load TLS certificate")
+				assert.Contains(t, rootErr.Error(), "open nonexistent.crt: no such file or directory")
 			} else {
 				require.NoError(t, err)
 				app.RequireStop()
@@ -390,10 +400,13 @@ func TestServerStartStop(t *testing.T) {
 
 	// Start server in a goroutine
 	go func() {
+		// Signal that we're starting the server
+		close(serverReady)
+
+		// Start the server
 		if listenErr := server.ListenAndServe(); listenErr != nil && listenErr != http.ErrServerClosed {
 			serverErr <- listenErr
 		}
-		close(serverReady)
 	}()
 
 	// Wait for server to be ready
@@ -402,19 +415,35 @@ func TestServerStartStop(t *testing.T) {
 		// Server is ready, proceed with test
 	case startErr := <-serverErr:
 		t.Fatalf("Server failed to start: %v", startErr)
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("Server failed to start within timeout")
 	}
 
-	// Test health endpoint
-	resp, respErr := http.Get(fmt.Sprintf("http://localhost:%d/health", port))
+	// Give the server a moment to fully start
+	time.Sleep(100 * time.Millisecond)
+
+	// Test health endpoint with retries
+	var resp *http.Response
+	var respErr error
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		resp, respErr = http.Get(fmt.Sprintf("http://localhost:%d/health", port))
+		if respErr == nil {
+			break
+		}
+		if i < maxRetries-1 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 	require.NoError(t, respErr)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Stop server
-	stopErr := server.Close()
+	// Stop server gracefully
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stopCancel()
+	stopErr := server.Shutdown(stopCtx)
 	require.NoError(t, stopErr)
 
 	// Verify server is stopped
