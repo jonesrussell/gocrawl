@@ -29,19 +29,19 @@ func (m *mockLogger) Printf(format string, args ...any) {}
 func (m *mockLogger) Errorf(format string, args ...any) {}
 func (m *mockLogger) Sync() error                       { return nil }
 
-func setupTestRouter(t *testing.T, securityConfig *config.ServerConfig) *gin.Engine {
+func setupTestRouter(t *testing.T, securityConfig *config.ServerConfig) (*gin.Engine, *middleware.SecurityMiddleware) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
-	middleware := middleware.NewSecurityMiddleware(securityConfig, &mockLogger{})
-	router.Use(middleware.Middleware())
+	securityMiddleware := middleware.NewSecurityMiddleware(securityConfig, &mockLogger{})
+	router.Use(securityMiddleware.Middleware())
 
 	router.POST("/test", func(c *gin.Context) {
 		t.Log("Handling test request")
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	})
 
-	return router
+	return router, securityMiddleware
 }
 
 func TestAPIKeyAuthentication(t *testing.T) {
@@ -95,7 +95,7 @@ func TestAPIKeyAuthentication(t *testing.T) {
 					APIKey:  tt.apiKey,
 				},
 			}
-			router := setupTestRouter(t, cfg)
+			router, _ := setupTestRouter(t, cfg)
 
 			w := httptest.NewRecorder()
 			req, err := http.NewRequest(http.MethodPost, "/test", nil)
@@ -131,10 +131,13 @@ func TestRateLimiting(t *testing.T) {
 			} `yaml:"tls"`
 		}{
 			Enabled:   true,
-			RateLimit: 2, // 2 requests per minute
+			RateLimit: 2, // 2 requests per 5 seconds
 		},
 	}
-	router := setupTestRouter(t, cfg)
+	router, securityMiddleware := setupTestRouter(t, cfg)
+
+	// Set a shorter window for testing
+	securityMiddleware.SetRateLimitWindow(5 * time.Second)
 
 	// Make requests from the same IP
 	w := httptest.NewRecorder()
@@ -157,8 +160,8 @@ func TestRateLimiting(t *testing.T) {
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)
 
-	// Wait for rate limit to reset
-	time.Sleep(time.Minute)
+	// Wait for rate limit to reset (5 seconds)
+	time.Sleep(5 * time.Second)
 
 	// Request should succeed again
 	w = httptest.NewRecorder()
@@ -233,7 +236,7 @@ func TestCORS(t *testing.T) {
 					},
 				},
 			}
-			router := setupTestRouter(t, cfg)
+			router, _ := setupTestRouter(t, cfg)
 
 			w := httptest.NewRecorder()
 			req, err := http.NewRequest(tt.method, "/test", nil)
@@ -280,7 +283,7 @@ func TestSecurityHeaders(t *testing.T) {
 			Enabled: true,
 		},
 	}
-	router := setupTestRouter(t, cfg)
+	router, _ := setupTestRouter(t, cfg)
 
 	w := httptest.NewRecorder()
 	req, err := http.NewRequest(http.MethodPost, "/test", nil)

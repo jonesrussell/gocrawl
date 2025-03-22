@@ -21,6 +21,7 @@ type SecurityMiddleware struct {
 	rateLimiter struct {
 		sync.RWMutex
 		clients map[string]*rateLimitInfo
+		window  time.Duration // Rate limit window
 	}
 }
 
@@ -37,7 +38,15 @@ func NewSecurityMiddleware(cfg *config.ServerConfig, logger logger.Interface) *S
 		logger: logger,
 	}
 	m.rateLimiter.clients = make(map[string]*rateLimitInfo)
+	m.rateLimiter.window = time.Minute // Default to 1 minute
 	return m
+}
+
+// SetRateLimitWindow sets the rate limit window for testing
+func (m *SecurityMiddleware) SetRateLimitWindow(window time.Duration) {
+	m.rateLimiter.Lock()
+	defer m.rateLimiter.Unlock()
+	m.rateLimiter.window = window
 }
 
 // Middleware returns the security middleware function
@@ -112,8 +121,8 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 		return nil
 	}
 
-	// Reset counter if more than a minute has passed
-	if now.Sub(info.lastAccess) > time.Minute {
+	// Reset counter if more than the window has passed
+	if now.Sub(info.lastAccess) > m.rateLimiter.window {
 		info.count = 1
 		info.lastAccess = now
 		return nil
@@ -197,7 +206,7 @@ func (m *SecurityMiddleware) joinStrings(strs []string) string {
 
 // Cleanup removes expired rate limit entries
 func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(m.rateLimiter.window)
 	defer ticker.Stop()
 
 	for {
@@ -208,7 +217,7 @@ func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
 			m.rateLimiter.Lock()
 			now := time.Now()
 			for ip, info := range m.rateLimiter.clients {
-				if now.Sub(info.lastAccess) > time.Minute {
+				if now.Sub(info.lastAccess) > m.rateLimiter.window {
 					delete(m.rateLimiter.clients, ip)
 				}
 			}
