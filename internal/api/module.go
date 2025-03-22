@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/tls"
-	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -35,8 +33,8 @@ type SearchResponse struct {
 	Total   int   `json:"total"`
 }
 
-// setupRouter creates and configures the Gin router with all routes
-func setupRouter(log logger.Interface, searchManager SearchManager, cfg config.Interface) *gin.Engine {
+// SetupRouter creates and configures the Gin router with all routes
+func SetupRouter(log logger.Interface, searchManager SearchManager, cfg config.Interface) *gin.Engine {
 	router := gin.New()
 
 	// Create security middleware
@@ -59,6 +57,12 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 		var req SearchRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+			return
+		}
+
+		// Validate request
+		if strings.TrimSpace(req.Query) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Query cannot be empty"})
 			return
 		}
 
@@ -120,46 +124,12 @@ func getServerAddress(cfg config.Interface) string {
 	return ":" + strings.TrimPrefix(port, ":")
 }
 
-// configureTLS sets up TLS configuration if enabled
-func configureTLS(server *http.Server, cfg config.Interface, log logger.Interface) error {
-	if !cfg.GetServerConfig().Security.TLS.Enabled {
-		log.Info("TLS is disabled")
-		return nil
-	}
-
-	log.Info("TLS is enabled, loading certificates",
-		"certificate", cfg.GetServerConfig().Security.TLS.Certificate,
-		"key", cfg.GetServerConfig().Security.TLS.Key)
-
-	// Validate TLS configuration at startup
-	cert, err := tls.LoadX509KeyPair(
-		cfg.GetServerConfig().Security.TLS.Certificate,
-		cfg.GetServerConfig().Security.TLS.Key,
-	)
-	if err != nil {
-		log.Error("Failed to load TLS certificate", "error", err)
-		return fmt.Errorf("failed to load TLS certificate: %w", err)
-	}
-
-	log.Info("TLS certificate loaded successfully")
-
-	server.TLSConfig = &tls.Config{
-		MinVersion: tls.VersionTLS12,
-		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			log.Debug("Getting certificate for client", "server_name", hello.ServerName)
-			return &cert, nil
-		},
-	}
-	log.Info("TLS configuration completed")
-	return nil
-}
-
 // StartHTTPServer starts the HTTP server for search requests
 func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, error) {
 	log.Info("StartHTTPServer function called")
 
 	// Setup router
-	router := setupRouter(log, searchManager, cfg)
+	router := SetupRouter(log, searchManager, cfg)
 
 	// Get server address
 	address := getServerAddress(cfg)
@@ -175,11 +145,6 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
-	// Configure TLS if enabled
-	if err := configureTLS(server, cfg, log); err != nil {
-		return nil, err
-	}
-
 	return server, nil
 }
 
@@ -188,21 +153,10 @@ var Module = fx.Module("api",
 	fx.Provide(
 		StartHTTPServer,
 	),
-	fx.Invoke(func(lc fx.Lifecycle, server *http.Server, cfg config.Interface) {
+	fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				// Start server in a goroutine
-				go func() {
-					var err error
-					if cfg.GetServerConfig().Security.TLS.Enabled {
-						err = server.ListenAndServeTLS("", "") // Certificates are already loaded
-					} else {
-						err = server.ListenAndServe()
-					}
-					if err != nil && err != http.ErrServerClosed {
-						panic(err)
-					}
-				}()
+				// Server start is handled by the HTTPD module
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {

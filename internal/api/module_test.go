@@ -2,9 +2,10 @@
 package api_test
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -20,32 +21,14 @@ import (
 	"go.uber.org/fx/fxtest"
 )
 
-// waitForServer waits for the server to be ready by retrying the health check
-func waitForServer(url string, maxRetries int) error {
-	for i := 0; i < maxRetries; i++ {
-		resp, err := http.Get(url)
-		if err == nil {
-			resp.Body.Close()
-			return nil
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	return fmt.Errorf("server not ready after %d retries", maxRetries)
-}
-
 // TestModule tests that the API module provides all necessary dependencies
 func TestModule(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockLogger := logger.NewMockInterface(ctrl)
-	// Set up logger expectations for both single and multi-argument calls
 	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	mockSearchManager := api.NewMockSearchManager(ctrl)
 	mockCfg := configtest.NewMockConfig()
@@ -62,53 +45,54 @@ func TestModule(t *testing.T) {
 	require.NoError(t, app.Err())
 }
 
-// TestStartHTTPServer tests the HTTP server startup functionality
-func TestStartHTTPServer(t *testing.T) {
+// TestServerConfiguration tests the server configuration
+func TestServerConfiguration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockLogger := logger.NewMockInterface(ctrl)
-	// Set up logger expectations for both single and multi-argument calls
 	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	mockSearchManager := api.NewMockSearchManager(ctrl)
 	mockCfg := configtest.NewMockConfig()
 
 	tests := []struct {
-		name           string
-		setupMocks     func()
-		expectedStatus int
-		expectedBody   string
+		name         string
+		configPort   int
+		expectedPort int
+		readTimeout  int
+		writeTimeout int
+		idleTimeout  int
 	}{
 		{
-			name: "successful_search",
-			setupMocks: func() {
-				mockSearchManager.EXPECT().
-					Search(gomock.Any(), "articles", gomock.Any()).
-					Return([]any{}, nil)
-				mockSearchManager.EXPECT().
-					Count(gomock.Any(), "articles", gomock.Any()).
-					Return(int64(0), nil)
-			},
-			expectedStatus: http.StatusOK,
-			expectedBody:   `{"total":0,"results":[]}`,
+			name:         "default_configuration",
+			configPort:   8080,
+			expectedPort: 8080,
+			readTimeout:  10,
+			writeTimeout: 30,
+			idleTimeout:  60,
+		},
+		{
+			name:         "custom_configuration",
+			configPort:   8083,
+			expectedPort: 8083,
+			readTimeout:  15,
+			writeTimeout: 45,
+			idleTimeout:  90,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.setupMocks()
-
-			// Configure server to use a fixed port for testing
 			mockCfg.WithServerConfig(&config.ServerConfig{
-				Address: ":8082", // Use fixed port for testing
+				Address:      fmt.Sprintf(":%d", tt.configPort),
+				ReadTimeout:  time.Duration(tt.readTimeout) * time.Second,
+				WriteTimeout: time.Duration(tt.writeTimeout) * time.Second,
+				IdleTimeout:  time.Duration(tt.idleTimeout) * time.Second,
 			})
 
+			var server *http.Server
 			app := fxtest.New(t,
 				fx.Provide(
 					func() logger.Interface { return mockLogger },
@@ -116,94 +100,145 @@ func TestStartHTTPServer(t *testing.T) {
 					func() config.Interface { return mockCfg },
 				),
 				api.Module,
+				fx.Populate(&server),
 			)
 
 			require.NoError(t, app.Start(t.Context()))
 			defer app.Stop(t.Context())
 
-			// Wait for server to be ready
-			require.NoError(t, waitForServer("http://localhost:8082/health", 5))
-
-			// Test health endpoint
-			resp, err := http.Get("http://localhost:8082/health")
-			require.NoError(t, err)
-			defer resp.Body.Close()
-
-			assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-			// Test search endpoint
-			searchBody := `{"query": "test query", "index": "articles", "size": 10}`
-			resp, err = http.Post("http://localhost:8082/search", "application/json", strings.NewReader(searchBody))
-			require.NoError(t, err)
-			defer resp.Body.Close()
-
-			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
-
-			body, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-			assert.JSONEq(t, tt.expectedBody, string(body))
+			// Verify server configuration
+			assert.Equal(t, fmt.Sprintf(":%d", tt.expectedPort), server.Addr)
+			assert.Equal(t, time.Duration(tt.readTimeout)*time.Second, server.ReadTimeout)
+			assert.Equal(t, time.Duration(tt.writeTimeout)*time.Second, server.WriteTimeout)
+			assert.Equal(t, time.Duration(tt.idleTimeout)*time.Second, server.IdleTimeout)
 		})
 	}
 }
 
-// TestStartHTTPServer_PortConfiguration tests the HTTP server port configuration
-func TestStartHTTPServer_PortConfiguration(t *testing.T) {
+// TestSearchHandler tests the search handler functionality
+func TestSearchHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockLogger := logger.NewMockInterface(ctrl)
-	// Set up logger expectations for both single and multi-argument calls
-	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-
 	mockSearchManager := api.NewMockSearchManager(ctrl)
 	mockCfg := configtest.NewMockConfig()
 
 	tests := []struct {
 		name           string
-		configPort     int
-		expectedPort   int
+		request        api.SearchRequest
+		setupMocks     func()
 		expectedStatus int
+		expectedBody   api.SearchResponse
 	}{
 		{
-			name:           "use_config_port",
-			configPort:     8083,
-			expectedPort:   8083,
+			name: "successful_search",
+			request: api.SearchRequest{
+				Query: "test query",
+				Index: "articles",
+				Size:  10,
+			},
+			setupMocks: func() {
+				mockSearchManager.EXPECT().
+					Search(gomock.Any(), "articles", gomock.Any()).
+					Return([]any{"result1", "result2"}, nil)
+				mockSearchManager.EXPECT().
+					Count(gomock.Any(), "articles", gomock.Any()).
+					Return(int64(2), nil)
+			},
 			expectedStatus: http.StatusOK,
+			expectedBody: api.SearchResponse{
+				Results: []any{"result1", "result2"},
+				Total:   2,
+			},
+		},
+		{
+			name: "invalid_request",
+			request: api.SearchRequest{
+				Query: "", // Empty query
+				Index: "articles",
+				Size:  10,
+			},
+			setupMocks: func() {
+				// Set up expectations for any calls that might happen
+				mockSearchManager.EXPECT().
+					Search(gomock.Any(), gomock.Any(), gomock.Any()).
+					AnyTimes()
+				mockSearchManager.EXPECT().
+					Count(gomock.Any(), gomock.Any(), gomock.Any()).
+					AnyTimes()
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   api.SearchResponse{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockCfg.WithServerConfig(&config.ServerConfig{
-				Address: fmt.Sprintf(":%d", tt.configPort),
-			})
+			// Reset mock controller for each test case
+			ctrl.Finish()
+			ctrl = gomock.NewController(t)
+			mockLogger = logger.NewMockInterface(ctrl)
+			mockSearchManager = api.NewMockSearchManager(ctrl)
+			mockCfg = configtest.NewMockConfig()
 
-			app := fxtest.New(t,
-				fx.Provide(
-					func() logger.Interface { return mockLogger },
-					func() api.SearchManager { return mockSearchManager },
-					func() config.Interface { return mockCfg },
-				),
-				api.Module,
-			)
+			tt.setupMocks()
 
-			require.NoError(t, app.Start(t.Context()))
-			defer app.Stop(t.Context())
+			// Create router
+			router := api.SetupRouter(mockLogger, mockSearchManager, mockCfg)
 
-			// Wait for server to be ready
-			require.NoError(t, waitForServer(fmt.Sprintf("http://localhost:%d/health", tt.expectedPort), 5))
-
-			// Test health endpoint
-			resp, err := http.Get(fmt.Sprintf("http://localhost:%d/health", tt.expectedPort))
+			// Create test request
+			body, err := json.Marshal(tt.request)
 			require.NoError(t, err)
-			defer resp.Body.Close()
 
-			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			req := httptest.NewRequest(http.MethodPost, "/search", strings.NewReader(string(body)))
+			req.Header.Set("Content-Type", "application/json")
+
+			// Create response recorder
+			w := httptest.NewRecorder()
+
+			// Handle request
+			router.ServeHTTP(w, req)
+
+			// Verify response
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedStatus == http.StatusOK {
+				var response api.SearchResponse
+				err = json.NewDecoder(w.Body).Decode(&response)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedBody, response)
+			}
 		})
 	}
+}
+
+// TestHealthHandler tests the health check handler
+func TestHealthHandler(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
+	mockSearchManager := api.NewMockSearchManager(ctrl)
+	mockCfg := configtest.NewMockConfig()
+
+	// Create router
+	router := api.SetupRouter(mockLogger, mockSearchManager, mockCfg)
+
+	// Create test request
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+
+	// Create response recorder
+	w := httptest.NewRecorder()
+
+	// Handle request
+	router.ServeHTTP(w, req)
+
+	// Verify response
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]string
+	err := json.NewDecoder(w.Body).Decode(&response)
+	require.NoError(t, err)
+	assert.Equal(t, "ok", response["status"])
 }
