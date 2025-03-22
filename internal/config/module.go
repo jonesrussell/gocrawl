@@ -88,70 +88,6 @@ func bindEnvs(bindings map[string]string) error {
 	return nil
 }
 
-// InitializeConfig sets up the configuration for the application.
-// It handles loading configuration from files and environment variables,
-// setting default values, and validating the configuration.
-//
-// Returns:
-//   - Interface: The initialized configuration
-//   - error: Any error that occurred during initialization
-func InitializeConfig() (Interface, error) {
-	// Load .env file first, so environment variables are available to Viper
-	if err := godotenv.Load(); err != nil {
-		// Only log a warning as .env file is optional
-		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-
-	// Set config defaults if not already configured
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-
-	// Set default values for essential configuration
-	viper.SetDefault("log.level", "info")
-	viper.SetDefault("app.environment", "development")
-	viper.SetDefault("crawler.source_file", "sources.yml")
-
-	// Map environment variables
-	if err := bindEnvs(map[string]string{
-		"elasticsearch.username":        "ELASTIC_USERNAME",
-		"elasticsearch.password":        "ELASTIC_PASSWORD",
-		"elasticsearch.api_key":         "ELASTIC_API_KEY",
-		"elasticsearch.tls.skip_verify": "ELASTIC_SKIP_TLS",
-		"elasticsearch.tls.certificate": "ELASTIC_CERT_PATH",
-		"elasticsearch.tls.key":         "ELASTIC_KEY_PATH",
-		"elasticsearch.tls.ca":          "ELASTIC_CA_PATH",
-		"server.address":                "GOCRAWL_PORT",
-		"app.environment":               "APP_ENV",
-		"log.level":                     "LOG_LEVEL",
-	}); err != nil {
-		return nil, fmt.Errorf("failed to bind environment variables: %w", err)
-	}
-
-	// Enable automatic environment variable binding
-	viper.AutomaticEnv()
-
-	// Read configuration file
-	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError *viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) {
-			return nil, fmt.Errorf("config file not found: %w", err)
-		}
-		return nil, fmt.Errorf("error reading config file: %w", err)
-	}
-
-	var cfg config
-	if err := viper.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("error unmarshaling config: %w", err)
-	}
-
-	if err := ValidateConfig(&cfg); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	return &cfg, nil
-}
-
 // Module provides the config module and its dependencies using fx.
 // It sets up the configuration providers that can be used throughout
 // the application for dependency injection.
@@ -337,32 +273,5 @@ func New() (Interface, error) {
 		return nil, fmt.Errorf("invalid configuration: %w", validateErr)
 	}
 
-	return cfg, nil
-}
-
-// ProvideConfig provides the configuration with default values.
-// This is used internally by InitializeConfig.
-func ProvideConfig() (*Config, error) {
-	cfg := &Config{
-		Elasticsearch: ElasticsearchConfig{
-			Retry: struct {
-				Enabled     bool          `yaml:"enabled"`
-				InitialWait time.Duration `yaml:"initial_wait"`
-				MaxWait     time.Duration `yaml:"max_wait"`
-				MaxRetries  int           `yaml:"max_retries"`
-			}{
-				Enabled:     true,
-				InitialWait: defaultRetryInitialWait,
-				MaxWait:     defaultRetryMaxWait,
-				MaxRetries:  defaultMaxRetries,
-			},
-		},
-		Server: ServerConfig{
-			Address:      ":8080",
-			ReadTimeout:  DefaultReadTimeout,
-			WriteTimeout: DefaultWriteTimeout,
-			IdleTimeout:  DefaultIdleTimeout,
-		},
-	}
 	return cfg, nil
 }
