@@ -35,11 +35,8 @@ type SearchResponse struct {
 	Total   int   `json:"total"`
 }
 
-// StartHTTPServer starts the HTTP server for search requests
-func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, error) {
-	log.Info("StartHTTPServer function called")
-
-	// Create Gin router
+// setupRouter creates and configures the Gin router with all routes
+func setupRouter(log logger.Interface, searchManager SearchManager, cfg config.Interface) *gin.Engine {
 	router := gin.New()
 
 	// Create security middleware
@@ -51,7 +48,14 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	router.POST("/search", func(c *gin.Context) {
+	router.POST("/search", handleSearch(searchManager))
+
+	return router
+}
+
+// handleSearch processes search requests
+func handleSearch(searchManager SearchManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		var req SearchRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -95,12 +99,14 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 		}
 
 		c.JSON(http.StatusOK, response)
-	})
+	}
+}
 
-	// Determine server address with priority:
-	// 1. GOCRAWL_PORT environment variable
-	// 2. Server config from config file
-	// 3. Default port
+// getServerAddress determines the server address with priority:
+// 1. GOCRAWL_PORT environment variable
+// 2. Server config from config file
+// 3. Default port
+func getServerAddress(cfg config.Interface) string {
 	var port string
 	if envPort := os.Getenv("GOCRAWL_PORT"); envPort != "" {
 		port = envPort
@@ -111,10 +117,55 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 	}
 
 	// Ensure port has colon prefix
-	address := ":" + strings.TrimPrefix(port, ":")
+	return ":" + strings.TrimPrefix(port, ":")
+}
 
+// configureTLS sets up TLS configuration if enabled
+func configureTLS(server *http.Server, cfg config.Interface, log logger.Interface) error {
+	if !cfg.GetServerConfig().Security.TLS.Enabled {
+		log.Info("TLS is disabled")
+		return nil
+	}
+
+	log.Info("TLS is enabled, loading certificates",
+		"certificate", cfg.GetServerConfig().Security.TLS.Certificate,
+		"key", cfg.GetServerConfig().Security.TLS.Key)
+
+	// Validate TLS configuration at startup
+	cert, err := tls.LoadX509KeyPair(
+		cfg.GetServerConfig().Security.TLS.Certificate,
+		cfg.GetServerConfig().Security.TLS.Key,
+	)
+	if err != nil {
+		log.Error("Failed to load TLS certificate", "error", err)
+		return fmt.Errorf("failed to load TLS certificate: %w", err)
+	}
+
+	log.Info("TLS certificate loaded successfully")
+
+	server.TLSConfig = &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			log.Debug("Getting certificate for client", "server_name", hello.ServerName)
+			return &cert, nil
+		},
+	}
+	log.Info("TLS configuration completed")
+	return nil
+}
+
+// StartHTTPServer starts the HTTP server for search requests
+func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, error) {
+	log.Info("StartHTTPServer function called")
+
+	// Setup router
+	router := setupRouter(log, searchManager, cfg)
+
+	// Get server address
+	address := getServerAddress(cfg)
 	log.Info("Server configuration", "address", address)
 
+	// Create server
 	server := &http.Server{
 		Addr:              address,
 		Handler:           router,
@@ -125,33 +176,8 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 	}
 
 	// Configure TLS if enabled
-	if cfg.GetServerConfig().Security.TLS.Enabled {
-		log.Info("TLS is enabled, loading certificates",
-			"certificate", cfg.GetServerConfig().Security.TLS.Certificate,
-			"key", cfg.GetServerConfig().Security.TLS.Key)
-
-		// Validate TLS configuration at startup
-		cert, err := tls.LoadX509KeyPair(
-			cfg.GetServerConfig().Security.TLS.Certificate,
-			cfg.GetServerConfig().Security.TLS.Key,
-		)
-		if err != nil {
-			log.Error("Failed to load TLS certificate", "error", err)
-			return nil, fmt.Errorf("failed to load TLS certificate: %w", err)
-		}
-
-		log.Info("TLS certificate loaded successfully")
-
-		server.TLSConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-				log.Debug("Getting certificate for client", "server_name", hello.ServerName)
-				return &cert, nil
-			},
-		}
-		log.Info("TLS configuration completed")
-	} else {
-		log.Info("TLS is disabled")
+	if err := configureTLS(server, cfg, log); err != nil {
+		return nil, err
 	}
 
 	return server, nil
@@ -162,9 +188,21 @@ var Module = fx.Module("api",
 	fx.Provide(
 		StartHTTPServer,
 	),
-	fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
+	fx.Invoke(func(lc fx.Lifecycle, server *http.Server, cfg config.Interface) {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
+				// Start server in a goroutine
+				go func() {
+					var err error
+					if cfg.GetServerConfig().Security.TLS.Enabled {
+						err = server.ListenAndServeTLS("", "") // Certificates are already loaded
+					} else {
+						err = server.ListenAndServe()
+					}
+					if err != nil && err != http.ErrServerClosed {
+						panic(err)
+					}
+				}()
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
