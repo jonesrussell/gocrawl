@@ -1,0 +1,66 @@
+app:
+  environment: development
+  name: gocrawl
+  version: 1.0.0
+
+server:
+  address: ":8080"
+  read_timeout: 10s
+  write_timeout: 30s
+  idle_timeout: 60s
+  security:
+    enabled: true
+    api_key: "" # Set this in production
+    rate_limit: 60 # requests per minute
+    cors:
+      enabled: true
+      allowed_origins:
+        - "*" # Restrict this in production
+      allowed_methods:
+        - "GET"
+        - "POST"
+        - "OPTIONS"
+      allowed_headers:
+        - "Content-Type"
+        - "Authorization"
+        - "X-API-Key"
+      max_age: 86400 # 24 hours
+    tls:
+      enabled: false
+      certificate: "" # Path to certificate file
+      key: "" # Path to private key file
+
+elasticsearch:
+  addresses:
+    - "http://localhost:9200"
+  username: ""
+  password: ""
+  api_key: ""
+  index_name: "gocrawl"
+  tls:
+    enabled: false
+    skip_verify: false
+    certificate: ""
+    key: ""
+    ca: ""
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 30s
+    max_retries: 3
+
+log:
+  level: "info"
+  debug: false
+
+crawler:
+  base_url: ""
+  max_depth: 3
+  rate_limit: 2s
+  random_delay: 1s
+  index_name: "gocrawl"
+  content_index_name: "gocrawl_content"
+  source_file: "config/sources.yaml"
+  parallelism: 1
+
+sources: [] 

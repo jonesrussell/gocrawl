@@ -1,12 +1,15 @@
 package api
 
 import (
-	"encoding/json"
+	"crypto/tls"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
@@ -34,18 +37,19 @@ type SearchResponse struct {
 // StartHTTPServer starts the HTTP server for search requests
 func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, error) {
 	log.Info("StartHTTPServer function called")
-	mux := http.NewServeMux()
-	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
-		var err error
 
-		if r.Method != http.MethodPost {
-			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-			return
-		}
+	// Create Gin router
+	router := gin.New()
 
+	// Create security middleware
+	security := middleware.NewSecurityMiddleware(cfg.GetServerConfig(), log)
+	router.Use(security.Middleware())
+
+	// Define routes
+	router.POST("/search", func(c *gin.Context) {
 		var req SearchRequest
-		if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 			return
 		}
 
@@ -60,14 +64,14 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 		}
 
 		// Use the search manager to perform the search
-		results, err := searchManager.Search(r.Context(), req.Index, query)
+		results, err := searchManager.Search(c.Request.Context(), req.Index, query)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		// Get the total count using a wrapped query
-		total, err := searchManager.Count(r.Context(), req.Index, map[string]any{
+		total, err := searchManager.Count(c.Request.Context(), req.Index, map[string]any{
 			"query": map[string]any{
 				"match": map[string]any{
 					"content": req.Query,
@@ -75,7 +79,7 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 			},
 		})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -85,11 +89,7 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 			Total:   int(total),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err = json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		c.JSON(http.StatusOK, response)
 	})
 
 	// Determine server address with priority:
@@ -112,11 +112,28 @@ func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg conf
 
 	server := &http.Server{
 		Addr:              address,
-		Handler:           mux,
+		Handler:           router,
 		ReadTimeout:       cfg.GetServerConfig().ReadTimeout,
 		WriteTimeout:      cfg.GetServerConfig().WriteTimeout,
 		IdleTimeout:       cfg.GetServerConfig().IdleTimeout,
 		ReadHeaderTimeout: readHeaderTimeout,
+	}
+
+	// Configure TLS if enabled
+	if cfg.GetServerConfig().Security.TLS.Enabled {
+		server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				cert, err := tls.LoadX509KeyPair(
+					cfg.GetServerConfig().Security.TLS.Certificate,
+					cfg.GetServerConfig().Security.TLS.Key,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load TLS certificate: %w", err)
+				}
+				return &cert, nil
+			},
+		}
 	}
 
 	return server, nil
