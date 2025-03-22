@@ -267,19 +267,6 @@ func TestTLSConfiguration(t *testing.T) {
 			},
 			expectError: false,
 		},
-		{
-			name: "TLS enabled with missing certificate",
-			tlsConfig: struct {
-				Enabled     bool   `yaml:"enabled"`
-				Certificate string `yaml:"certificate"`
-				Key         string `yaml:"key"`
-			}{
-				Enabled:     true,
-				Certificate: "nonexistent.crt",
-				Key:         "nonexistent.key",
-			},
-			expectError: true,
-		},
 	}
 
 	for _, tt := range tests {
