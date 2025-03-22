@@ -160,7 +160,7 @@ func TestRateLimiting(t *testing.T) {
 	securityMiddleware.SetTimeProvider(mockTime)
 
 	// Start cleanup goroutine with a context that we can cancel
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Start cleanup in a goroutine
