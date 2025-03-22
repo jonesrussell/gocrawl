@@ -23,6 +23,12 @@ tasks:
       - go run main.go indices list
     interactive: true
 
+  deadcode:
+    desc: "Find unreachable functions in the codebase"
+    cmds:
+      - deadcode -test -generated ./...
+    ignore_error: true
+
   help:
     desc: "Show available commands"
     cmds:

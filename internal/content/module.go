@@ -35,17 +35,3 @@ type Params struct {
 	Logger    logger.Interface
 	IndexName string `name:"contentIndex"`
 }
-
-// Result holds the content processor
-type Result struct {
-	fx.Out
-
-	Processor *Processor `group:"processors"`
-}
-
-// New creates a new content processor with dependencies
-func New(p Params) Result {
-	return Result{
-		Processor: NewProcessor(p.Service, p.Storage, p.Logger, p.IndexName),
-	}
-}
