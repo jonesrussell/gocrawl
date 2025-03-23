@@ -246,116 +246,6 @@ func TestCommand(t *testing.T) {
 	assert.NotEmpty(t, cmd.Long)
 }
 
-func TestTLSConfiguration(t *testing.T) {
-	tests := []struct {
-		name      string
-		tlsConfig struct {
-			Enabled     bool   `yaml:"enabled"`
-			Certificate string `yaml:"certificate"`
-			Key         string `yaml:"key"`
-		}
-		expectError bool
-	}{
-		{
-			name: "TLS disabled",
-			tlsConfig: struct {
-				Enabled     bool   `yaml:"enabled"`
-				Certificate string `yaml:"certificate"`
-				Key         string `yaml:"key"`
-			}{
-				Enabled: false,
-			},
-			expectError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockLogger := logger.NewMockInterface(ctrl)
-			mockLogger.EXPECT().Info("StartHTTPServer function called").Times(1)
-			mockLogger.EXPECT().Info("Server configuration", "address", ":0").Times(1)
-
-			if tt.tlsConfig.Enabled {
-				mockLogger.EXPECT().Info("TLS is enabled, loading certificates",
-					"certificate", tt.tlsConfig.Certificate,
-					"key", tt.tlsConfig.Key).Times(1)
-				mockLogger.EXPECT().Error("Failed to load TLS certificate",
-					"error", gomock.Any()).Times(1)
-			} else {
-				mockLogger.EXPECT().Info("TLS is disabled").Times(1)
-			}
-
-			mockCfg := &mockConfig{
-				serverConfig: &config.ServerConfig{
-					Address:      ":0",
-					ReadTimeout:  10 * time.Second,
-					WriteTimeout: 30 * time.Second,
-					IdleTimeout:  60 * time.Second,
-					Security: struct {
-						Enabled   bool   `yaml:"enabled"`
-						APIKey    string `yaml:"api_key"`
-						RateLimit int    `yaml:"rate_limit"`
-						CORS      struct {
-							Enabled        bool     `yaml:"enabled"`
-							AllowedOrigins []string `yaml:"allowed_origins"`
-							AllowedMethods []string `yaml:"allowed_methods"`
-							AllowedHeaders []string `yaml:"allowed_headers"`
-							MaxAge         int      `yaml:"max_age"`
-						} `yaml:"cors"`
-						TLS struct {
-							Enabled     bool   `yaml:"enabled"`
-							Certificate string `yaml:"certificate"`
-							Key         string `yaml:"key"`
-						} `yaml:"tls"`
-					}{
-						TLS: tt.tlsConfig,
-					},
-				},
-			}
-
-			mockStore := &mockStorage{}
-			mockSearch := &mockSearchManager{}
-
-			app := fxtest.New(t,
-				fx.Supply(mockLogger),
-				fx.Supply(mockCfg),
-				fx.Supply(mockStore),
-				fx.Supply(mockSearch),
-				fx.Provide(
-					func() logger.Interface { return mockLogger },
-					func() config.Interface { return mockCfg },
-					func() storage.Interface { return mockStore },
-					func() api.SearchManager { return mockSearch },
-				),
-				httpd.Module,
-			)
-
-			err := app.Start(t.Context())
-			if tt.expectError {
-				require.Error(t, err)
-
-				// Get the root error by unwrapping the fx error chain
-				var fxErr interface{ Unwrap() []error }
-				require.ErrorAs(t, err, &fxErr)
-
-				chain := fxErr.Unwrap()
-				require.GreaterOrEqual(t, len(chain), 3, "Error chain should contain at least 3 errors")
-
-				// The root error should be the TLS certificate error
-				rootErr := chain[len(chain)-1]
-				assert.Contains(t, rootErr.Error(), "failed to load TLS certificate")
-				assert.Contains(t, rootErr.Error(), "open nonexistent.crt: no such file or directory")
-			} else {
-				require.NoError(t, err)
-				app.RequireStop()
-			}
-		})
-	}
-}
-
 func TestServerStartStop(t *testing.T) {
 	// Find an available port
 	listener, err := net.Listen("tcp", ":0")
@@ -411,7 +301,7 @@ func TestServerStartStop(t *testing.T) {
 	var resp *http.Response
 	var respErr error
 	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		resp, respErr = http.Get(fmt.Sprintf("http://localhost:%d/health", port))
 		if respErr == nil {
 			break

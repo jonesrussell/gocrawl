@@ -3,6 +3,7 @@ package crawl_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -37,7 +38,7 @@ func (m *mockSearchManager) Count(ctx context.Context, index string, query any) 
 }
 
 func (m *mockSearchManager) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
-	return nil, nil
+	return nil, errors.New("aggregate not implemented in mock")
 }
 
 // TestModuleProvides tests that the crawl module provides all necessary dependencies

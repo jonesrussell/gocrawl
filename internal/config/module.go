@@ -33,6 +33,10 @@ const (
 
 	// Environment types
 	envProduction = "production"
+
+	// Default crawler settings
+	defaultMaxDepth    = 3
+	defaultParallelism = 5
 )
 
 // config implements the Interface and holds the actual configuration values
@@ -139,6 +143,8 @@ func setupViper() error {
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("crawler.source_file", "sources.yml")
 	viper.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
+	viper.SetDefault("crawler.max_depth", defaultMaxDepth)
+	viper.SetDefault("crawler.parallelism", defaultParallelism)
 
 	// Read the configuration file
 	if err := viper.ReadInConfig(); err != nil {
@@ -178,6 +184,21 @@ func createConfig() (*config, error) {
 	rateLimit, err := parseRateLimit(viper.GetString("crawler.rate_limit"))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing rate limit: %w", err)
+	}
+
+	// Get retry settings with defaults
+	retryEnabled := viper.GetBool("elasticsearch.retry.enabled")
+	retryInitialWait := viper.GetDuration("elasticsearch.retry.initial_wait")
+	if retryInitialWait == 0 {
+		retryInitialWait = defaultRetryInitialWait
+	}
+	retryMaxWait := viper.GetDuration("elasticsearch.retry.max_wait")
+	if retryMaxWait == 0 {
+		retryMaxWait = defaultRetryMaxWait
+	}
+	retryMaxRetries := viper.GetInt("elasticsearch.retry.max_retries")
+	if retryMaxRetries == 0 {
+		retryMaxRetries = defaultMaxRetries
 	}
 
 	return &config{
@@ -221,10 +242,10 @@ func createConfig() (*config, error) {
 				MaxWait     time.Duration `yaml:"max_wait"`
 				MaxRetries  int           `yaml:"max_retries"`
 			}{
-				Enabled:     viper.GetBool("elasticsearch.retry.enabled"),
-				InitialWait: viper.GetDuration("elasticsearch.retry.initial_wait"),
-				MaxWait:     viper.GetDuration("elasticsearch.retry.max_wait"),
-				MaxRetries:  viper.GetInt("elasticsearch.retry.max_retries"),
+				Enabled:     retryEnabled,
+				InitialWait: retryInitialWait,
+				MaxWait:     retryMaxWait,
+				MaxRetries:  retryMaxRetries,
 			},
 		},
 		Log: LogConfig{
@@ -269,8 +290,8 @@ func New() (Interface, error) {
 	}
 
 	// Validate the configuration
-	if validateErr := ValidateConfig(cfg); validateErr != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", validateErr)
+	if err := ValidateConfig((*Config)(cfg)); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return cfg, nil
