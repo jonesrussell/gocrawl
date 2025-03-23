@@ -10,66 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockLogger is a mock implementation of logger.Interface
-type MockLogger struct {
-	startMessage       string
-	startKeysAndValues []any
-	errorMessage       string
-	errorKeysAndValues []any
-	debugMessage       string
-	debugKeysAndValues []any
-	warnMessage        string
-	warnKeysAndValues  []any
-	errorfMessage      string
-	errorfArgs         []any
-	fatalMessage       string
-	fatalKeysAndValues []any
-	printfMessage      string
-	printfArgs         []any
-	syncCalled         bool
-	syncErr            error
-}
-
-func (m *MockLogger) Info(msg string, keysAndValues ...any) {
-	m.startMessage = msg
-	m.startKeysAndValues = keysAndValues
-}
-
-func (m *MockLogger) Error(msg string, keysAndValues ...any) {
-	m.errorMessage = msg
-	m.errorKeysAndValues = keysAndValues
-}
-
-func (m *MockLogger) Debug(msg string, keysAndValues ...any) {
-	m.debugMessage = msg
-	m.debugKeysAndValues = keysAndValues
-}
-
-func (m *MockLogger) Warn(msg string, keysAndValues ...any) {
-	m.warnMessage = msg
-	m.warnKeysAndValues = keysAndValues
-}
-
-func (m *MockLogger) Errorf(format string, args ...any) {
-	m.errorfMessage = format
-	m.errorfArgs = args
-}
-
-func (m *MockLogger) Fatal(msg string, keysAndValues ...any) {
-	m.fatalMessage = msg
-	m.fatalKeysAndValues = keysAndValues
-}
-
-func (m *MockLogger) Printf(format string, args ...any) {
-	m.printfMessage = format
-	m.printfArgs = args
-}
-
-func (m *MockLogger) Sync() error {
-	m.syncCalled = true
-	return m.syncErr
-}
-
 func TestLoadFromFile(t *testing.T) {
 	// Create a temporary file with test data
 	content := `sources:
