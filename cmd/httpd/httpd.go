@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -17,122 +20,176 @@ import (
 )
 
 const (
-	// maxRetries is the maximum number of retries for Elasticsearch connection
-	maxRetries = 3
-	// retryDelay is the delay between retries
-	retryDelay = 5 * time.Second
+	// shutdownTimeout is the maximum time to wait for graceful shutdown
+	shutdownTimeout = 30 * time.Second
+	// componentShutdownTimeout is the maximum time to wait for individual components
+	componentShutdownTimeout = 2 * time.Second
+	// expectedGoroutines is the expected number of goroutines after cleanup
+	expectedGoroutines = 3 // main + signal handler + fx signal receiver
 )
 
 // Params holds the parameters required for running the HTTP server.
-// It uses fx.In for dependency injection of required components.
 type Params struct {
 	fx.In
-
-	// Server is the HTTP server instance that handles incoming requests
-	Server *http.Server
-	// Logger provides logging capabilities for the HTTP server
-	Logger logger.Interface
-	// Storage provides access to Elasticsearch
+	Server  *http.Server
+	Logger  logger.Interface
 	Storage storage.Interface
 }
 
-// Cmd represents the HTTP server command that provides a REST API
-// for searching content in Elasticsearch.
+// shutdownContext wraps a context with additional shutdown information
+type shutdownContext struct {
+	context.Context
+	log logger.Interface
+}
+
+func newShutdownContext(ctx context.Context, log logger.Interface) *shutdownContext {
+	return &shutdownContext{
+		Context: ctx,
+		log:     log,
+	}
+}
+
+func (sc *shutdownContext) logShutdownProgress(phase string) {
+	sc.log.Debug("Shutdown progress", "phase", phase)
+}
+
+func cleanupGoroutines(log logger.Interface) {
+	count := runtime.NumGoroutine()
+	if count > expectedGoroutines {
+		log.Warn("Some goroutines may not have cleaned up properly",
+			"count", count,
+			"expected", expectedGoroutines,
+		)
+	} else {
+		log.Debug("All goroutines cleaned up",
+			"count", count,
+			"expected", expectedGoroutines,
+		)
+	}
+}
+
+// Cmd represents the HTTP server command
 var Cmd = &cobra.Command{
 	Use:   "httpd",
 	Short: "Start the HTTP server for search",
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		// Create a parent context that can be cancelled
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
+		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
 
-		// Set up signal handling
-		handler := signal.NewServerSignalHandler()
-		cleanup := handler.Setup(ctx)
-		defer cleanup()
-
-		// Create channels for error handling and completion
 		errChan := make(chan error, 1)
 		doneChan := make(chan struct{})
+		var log logger.Interface
 
-		// Initialize the Fx application with required modules and dependencies
 		app := fx.New(
+			fx.Provide(
+				func() context.Context { return ctx },
+			),
 			common.Module,
 			Module,
 			fx.Invoke(func(lc fx.Lifecycle, p Params) {
+				log = p.Logger
 				lc.Append(fx.Hook{
 					OnStart: func(ctx context.Context) error {
-						// Test Elasticsearch connection with retries
-						for i := range maxRetries {
-							// Try to test the connection
-							err := p.Storage.TestConnection(ctx)
-							if err == nil {
-								break
-							}
-							if i < maxRetries-1 {
-								p.Logger.Warn("Failed to connect to Elasticsearch, retrying...", "error", err, "attempt", i+1)
-								time.Sleep(retryDelay)
-								continue
-							}
-							return fmt.Errorf("failed to connect to Elasticsearch after %d attempts: %w", maxRetries, err)
+						if err := p.Storage.TestConnection(ctx); err != nil {
+							return fmt.Errorf("failed to connect to Elasticsearch: %w", err)
 						}
 
-						// Start the server in a goroutine
+						p.Logger.Info("Starting HTTP server...", "address", p.Server.Addr)
 						go func() {
-							p.Logger.Info("HTTP server started", "address", p.Server.Addr)
+							defer close(errChan)
+							defer close(doneChan)
+
 							if err := p.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 								p.Logger.Error("HTTP server failed", "error", err)
 								errChan <- err
 								return
 							}
-							close(doneChan)
 						}()
 						return nil
 					},
 					OnStop: func(ctx context.Context) error {
-						p.Logger.Info("Shutting down HTTP server...")
-						return p.Server.Shutdown(ctx)
+						sc := newShutdownContext(ctx, p.Logger)
+						sc.logShutdownProgress("start")
+
+						shutdownCtx, cancel := context.WithTimeout(sc, componentShutdownTimeout)
+						defer cancel()
+
+						sc.logShutdownProgress("http_server")
+						if err := p.Server.Shutdown(shutdownCtx); err != nil {
+							p.Logger.Error("Error during server shutdown", "error", err)
+							return err
+						}
+
+						sc.logShutdownProgress("storage")
+						if err := p.Storage.Close(); err != nil {
+							p.Logger.Error("Error closing storage connection", "error", err)
+						}
+
+						sc.logShutdownProgress("complete")
+						return nil
 					},
 				})
 			}),
 		)
 
-		// Set up cleanup for graceful shutdown
-		handler.SetCleanup(func() {
-			// Create a context with timeout for graceful shutdown
-			stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
-			defer stopCancel()
-
-			// Stop the application and handle any shutdown errors
-			if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-				common.PrintErrorf("Error during shutdown: %v", err)
-			}
-		})
-
-		// Start the application and handle any startup errors
 		if err := app.Start(ctx); err != nil {
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		// Wait for either:
-		// - A signal interrupt (SIGINT/SIGTERM)
-		// - Context cancellation
-		// - Server error
-		// - Server shutdown
 		var serverErr error
 		select {
 		case serverErr = <-errChan:
-			// Error already logged in OnStart hook
+			log.Debug("Server error received")
+			stopCtx, cancel := context.WithTimeout(cmd.Context(), shutdownTimeout)
+			defer cancel()
+			if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error("Error stopping application", "error", err)
+			}
+			<-app.Done()
 		case <-doneChan:
-			// Server shut down cleanly
+			log.Info("Server stopped normally")
+			stopCtx, cancel := context.WithTimeout(cmd.Context(), shutdownTimeout)
+			defer cancel()
+			if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error("Error stopping application", "error", err)
+			}
+			<-app.Done()
+		case <-ctx.Done():
+			sc := newShutdownContext(cmd.Context(), log)
+			sc.logShutdownProgress("signal_received")
+
+			shutdownCtx, cancel := context.WithTimeout(sc, shutdownTimeout)
+			defer cancel()
+
+			sc.logShutdownProgress("app_stop")
+			if err := app.Stop(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error("Error stopping application", "error", err)
+			}
+
+			select {
+			case <-app.Done():
+				sc.logShutdownProgress("normal_complete")
+			case <-time.After(componentShutdownTimeout):
+				sc.logShutdownProgress("timeout")
+				stop()
+			}
+
+			cleanupGoroutines(log)
+			log.Info("Application shutdown complete")
 		}
 
-		// Only return error for actual failures, not graceful shutdowns
-		if serverErr != nil && !errors.Is(serverErr, context.Canceled) {
-			return serverErr
+		stop()
+
+		if serverErr != nil && !errors.Is(serverErr, context.Canceled) && !errors.Is(serverErr, http.ErrServerClosed) {
+			return fmt.Errorf("server error: %w", serverErr)
 		}
+
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return nil
+		}
+
 		return nil
 	},
 }
