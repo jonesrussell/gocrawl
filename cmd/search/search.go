@@ -3,7 +3,6 @@ package search
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -116,12 +115,8 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	cleanup := handler.Setup(ctx)
 	defer cleanup()
 
-	// Create channels for error handling and completion
-	errChan := make(chan error, 1)
-	doneChan := make(chan struct{})
-
 	// Initialize the Fx application with required modules and dependencies
-	app := fx.New(
+	fxApp := fx.New(
 		common.Module,
 		Module,
 		fx.Provide(
@@ -146,10 +141,8 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 					if err := executeSearch(cmd.Context(), p); err != nil {
 						p.Logger.Error("Error executing search", "error", err)
 						common.PrintErrorf("\nSearch failed: %v", err)
-						errChan <- err
 						return err
 					}
-					close(doneChan)
 					return nil
 				},
 				OnStop: func(context.Context) error {
@@ -159,40 +152,18 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 		}),
 	)
 
-	// Start the application and handle any startup errors
-	if err := app.Start(ctx); err != nil {
+	// Set the fx app for coordinated shutdown
+	handler.SetFXApp(fxApp)
+
+	// Start the application
+	if err := fxApp.Start(ctx); err != nil {
 		return fmt.Errorf("error starting application: %w", err)
-	}
-
-	// Set up cleanup for graceful shutdown
-	handler.SetCleanup(func() {
-		// Create a context with timeout for graceful shutdown
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
-		defer stopCancel()
-
-		// Stop the application and handle any shutdown errors
-		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-			common.PrintErrorf("Error stopping application: %v", err)
-		}
-	})
-
-	// Wait for either:
-	// - A signal interrupt (SIGINT/SIGTERM)
-	// - Context cancellation
-	// - Search completion
-	// - Search error
-	var searchErr error
-	select {
-	case searchErr = <-errChan:
-		// Error already printed in executeSearch
-	case <-doneChan:
-		// Success message already printed in executeSearch
 	}
 
 	// Wait for shutdown signal
 	handler.Wait()
 
-	return searchErr
+	return nil
 }
 
 // buildSearchQuery constructs the Elasticsearch query

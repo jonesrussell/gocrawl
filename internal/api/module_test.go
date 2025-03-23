@@ -31,6 +31,7 @@ func TestModule(t *testing.T) {
 	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	mockSearchManager := api.NewMockSearchManager(ctrl)
+	mockSearchManager.EXPECT().Close().Return(nil).AnyTimes()
 	mockCfg := configtest.NewMockConfig()
 
 	app := fxtest.New(t,
@@ -55,6 +56,7 @@ func TestServerConfiguration(t *testing.T) {
 	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	mockSearchManager := api.NewMockSearchManager(ctrl)
+	mockSearchManager.EXPECT().Close().Return(nil).AnyTimes()
 	mockCfg := configtest.NewMockConfig()
 
 	tests := []struct {
@@ -122,6 +124,7 @@ func TestSearchHandler(t *testing.T) {
 
 	mockLogger := logger.NewMockInterface(ctrl)
 	mockSearchManager := api.NewMockSearchManager(ctrl)
+	mockSearchManager.EXPECT().Close().Return(nil).AnyTimes()
 	mockCfg := configtest.NewMockConfig()
 
 	tests := []struct {
@@ -180,12 +183,13 @@ func TestSearchHandler(t *testing.T) {
 			ctrl = gomock.NewController(t)
 			mockLogger = logger.NewMockInterface(ctrl)
 			mockSearchManager = api.NewMockSearchManager(ctrl)
+			mockSearchManager.EXPECT().Close().Return(nil).AnyTimes()
 			mockCfg = configtest.NewMockConfig()
 
 			tt.setupMocks()
 
 			// Create router
-			router := api.SetupRouter(mockLogger, mockSearchManager, mockCfg)
+			router, _ := api.SetupRouter(mockLogger, mockSearchManager, mockCfg)
 
 			// Create test request
 			body, err := json.Marshal(tt.request)
@@ -220,10 +224,11 @@ func TestHealthHandler(t *testing.T) {
 
 	mockLogger := logger.NewMockInterface(ctrl)
 	mockSearchManager := api.NewMockSearchManager(ctrl)
+	mockSearchManager.EXPECT().Close().Return(nil).AnyTimes()
 	mockCfg := configtest.NewMockConfig()
 
 	// Create router
-	router := api.SetupRouter(mockLogger, mockSearchManager, mockCfg)
+	router, _ := api.SetupRouter(mockLogger, mockSearchManager, mockCfg)
 
 	// Create test request
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)

@@ -2,8 +2,9 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 // Constants
 const (
 	readHeaderTimeout = 10 * time.Second // Timeout for reading headers
-	defaultPort       = "8080"           // Default port if not specified in config or env
 )
 
 // SearchRequest represents the structure of the search request
@@ -34,7 +34,12 @@ type SearchResponse struct {
 }
 
 // SetupRouter creates and configures the Gin router with all routes
-func SetupRouter(log logger.Interface, searchManager SearchManager, cfg config.Interface) *gin.Engine {
+func SetupRouter(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*gin.Engine, *middleware.SecurityMiddleware) {
+	// Set Gin mode based on environment
+	if cfg.GetAppConfig().Environment == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	router := gin.New()
 
 	// Create security middleware
@@ -48,7 +53,7 @@ func SetupRouter(log logger.Interface, searchManager SearchManager, cfg config.I
 
 	router.POST("/search", handleSearch(searchManager))
 
-	return router
+	return router, security
 }
 
 // handleSearch processes search requests
@@ -106,46 +111,32 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 	}
 }
 
-// getServerAddress determines the server address with priority:
-// 1. GOCRAWL_PORT environment variable
-// 2. Server config from config file
-// 3. Default port
-func getServerAddress(cfg config.Interface) string {
-	var port string
-	if envPort := os.Getenv("GOCRAWL_PORT"); envPort != "" {
-		port = envPort
-	} else if serverCfg := cfg.GetServerConfig(); serverCfg != nil && serverCfg.Address != "" {
-		port = strings.TrimPrefix(serverCfg.Address, ":")
-	} else {
-		port = defaultPort
-	}
-
-	// Ensure port has colon prefix
-	return ":" + strings.TrimPrefix(port, ":")
-}
-
 // StartHTTPServer starts the HTTP server for search requests
-func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, error) {
+func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, *middleware.SecurityMiddleware, error) {
 	log.Info("StartHTTPServer function called")
 
 	// Setup router
-	router := SetupRouter(log, searchManager, cfg)
+	router, security := SetupRouter(log, searchManager, cfg)
 
-	// Get server address
-	address := getServerAddress(cfg)
-	log.Info("Server configuration", "address", address)
+	// Get server config
+	serverCfg := cfg.GetServerConfig()
+	if serverCfg == nil {
+		return nil, nil, errors.New("server configuration is required")
+	}
+
+	log.Info("Server configuration", "address", serverCfg.Address)
 
 	// Create server
 	server := &http.Server{
-		Addr:              address,
+		Addr:              serverCfg.Address,
 		Handler:           router,
-		ReadTimeout:       cfg.GetServerConfig().ReadTimeout,
-		WriteTimeout:      cfg.GetServerConfig().WriteTimeout,
-		IdleTimeout:       cfg.GetServerConfig().IdleTimeout,
+		ReadTimeout:       serverCfg.ReadTimeout,
+		WriteTimeout:      serverCfg.WriteTimeout,
+		IdleTimeout:       serverCfg.IdleTimeout,
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
-	return server, nil
+	return server, security, nil
 }
 
 // Module provides API dependencies
@@ -153,14 +144,42 @@ var Module = fx.Module("api",
 	fx.Provide(
 		StartHTTPServer,
 	),
-	fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
+	fx.Invoke(func(lc fx.Lifecycle, ctx context.Context, searchManager SearchManager, security *middleware.SecurityMiddleware) {
+		// Create a context for the cleanup goroutine using the provided context
+		cleanupCtx, cancel := context.WithCancel(ctx)
+
+		// Start the cleanup goroutine
+		go security.Cleanup(cleanupCtx)
+
 		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				// Server start is handled by the HTTPD module
-				return nil
-			},
 			OnStop: func(ctx context.Context) error {
-				return server.Shutdown(ctx)
+				// Create a timeout context for shutdown
+				shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
+				defer shutdownCancel()
+
+				// Cancel the cleanup goroutine context
+				cancel()
+
+				// Wait for cleanup goroutine to finish with timeout
+				cleanupDone := make(chan struct{})
+				go func() {
+					security.WaitCleanup()
+					close(cleanupDone)
+				}()
+
+				select {
+				case <-cleanupDone:
+					// Cleanup completed successfully
+				case <-shutdownCtx.Done():
+					return fmt.Errorf("timeout waiting for cleanup to complete")
+				}
+
+				// Close the search manager
+				if err := searchManager.Close(); err != nil {
+					return fmt.Errorf("error closing search manager: %w", err)
+				}
+
+				return nil
 			},
 		})
 	}),

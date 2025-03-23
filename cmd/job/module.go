@@ -2,30 +2,18 @@
 package job
 
 import (
-	"context"
-
 	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
 // Module provides the job command's dependencies.
 var Module = fx.Module("job",
 	fx.Provide(
-		Command,
-		fx.Annotate(
-			func() chan struct{} {
-				return make(chan struct{})
-			},
-			fx.ResultTags(`name:"crawlDone"`),
-		),
-		fx.Annotate(
-			func(cmd *cobra.Command) context.Context {
-				return cmd.Context()
-			},
-			fx.ResultTags(`name:"jobContext"`),
-		),
+		// Core dependencies
+		func() chan struct{} {
+			return make(chan struct{})
+		},
 		func() chan *models.Article {
 			return make(chan *models.Article, app.DefaultChannelBufferSize)
 		},

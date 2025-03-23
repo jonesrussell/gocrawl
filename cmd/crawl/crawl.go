@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -82,89 +81,67 @@ func StartCrawl(p Params) error {
 	return nil
 }
 
-// Cmd represents the crawl command.
-var Cmd = &cobra.Command{
-	Use:   "crawl [source]",
-	Short: "Crawl a single source defined in sources.yml",
-	Long: `Crawl a single source defined in sources.yml.
+// Command returns the crawl command.
+func Command() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "crawl [source]",
+		Short: "Crawl a single source defined in sources.yml",
+		Long: `Crawl a single source defined in sources.yml.
 The source argument must match a name defined in your sources.yml configuration file.
 
 Example:
   gocrawl crawl example-blog`,
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			const errMsg = "requires exactly one source name from sources.yml\n\n" +
-				"Usage:\n  %s\n\n" +
-				"Run 'gocrawl list' to see available sources"
-			return fmt.Errorf(errMsg, cmd.UseLine())
-		}
-		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		sourceName = args[0]
-
-		// Create a cancellable context
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
-		// Set up signal handling
-		handler := signal.NewSignalHandler()
-		cleanup := handler.Setup(ctx)
-		defer cleanup()
-
-		// Create the crawler's completion channel
-		crawlerDone := make(chan struct{})
-
-		// Initialize the Fx application with the crawl module
-		fxApp := fx.New(
-			fx.NopLogger,
-			Module,
-			fx.Provide(
-				fx.Annotate(
-					func() context.Context { return ctx },
-					fx.ResultTags(`name:"crawlContext"`),
-				),
-				fx.Annotate(
-					func() chan struct{} { return crawlerDone },
-					fx.ResultTags(`name:"crawlDone"`),
-				),
-			),
-			fx.Invoke(StartCrawl),
-		)
-
-		// Start the application
-		if startErr := fxApp.Start(ctx); startErr != nil {
-			if errors.Is(startErr, context.Canceled) {
-				return nil
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				const errMsg = "requires exactly one source name from sources.yml\n\n" +
+					"Usage:\n  %s\n\n" +
+					"Run 'gocrawl list' to see available sources"
+				return fmt.Errorf(errMsg, cmd.UseLine())
 			}
-			return fmt.Errorf("error starting application: %w", startErr)
-		}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sourceName = args[0]
 
-		// Set up cleanup for graceful shutdown
-		handler.SetCleanup(func() {
-			// Create a context with timeout for graceful shutdown
-			stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
-			defer stopCancel()
+			// Create a cancellable context
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
 
-			// Stop the application and handle any shutdown errors
-			if err := fxApp.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-				common.PrintErrorf("Error during shutdown: %v", err)
+			// Set up signal handling
+			handler := signal.NewSignalHandler()
+			cleanup := handler.Setup(ctx)
+			defer cleanup()
+
+			// Initialize the Fx application with the crawl module
+			fxApp := fx.New(
+				fx.NopLogger,
+				Module,
+				fx.Provide(
+					fx.Annotate(
+						func() context.Context { return ctx },
+						fx.ResultTags(`name:"crawlContext"`),
+					),
+				),
+				fx.Invoke(StartCrawl),
+			)
+
+			// Set the fx app for coordinated shutdown
+			handler.SetFXApp(fxApp)
+
+			// Start the application
+			if err := fxApp.Start(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil
+				}
+				return fmt.Errorf("error starting application: %w", err)
 			}
-		})
 
-		// Wait for crawler completion
-		<-crawlerDone
-
-		// Only wait for shutdown signal if there was an error
-		if err := fxApp.Stop(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
+			// Wait for shutdown signal
 			handler.Wait()
-		}
 
-		return nil
-	},
-}
+			return nil
+		},
+	}
 
-// Command returns the crawl command.
-func Command() *cobra.Command {
-	return Cmd
+	return cmd
 }

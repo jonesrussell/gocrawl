@@ -36,6 +36,7 @@ type SecurityMiddleware struct {
 		clients map[string]*rateLimitInfo
 		window  time.Duration // Rate limit window
 	}
+	cleanupWg sync.WaitGroup
 }
 
 // rateLimitInfo tracks rate limiting information for a client
@@ -225,23 +226,59 @@ func (m *SecurityMiddleware) joinStrings(strs []string) string {
 
 // Cleanup removes expired rate limit entries
 func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
+	m.cleanupWg.Add(1)
+	defer m.cleanupWg.Done()
+
 	ticker := time.NewTicker(m.rateLimiter.window)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			m.rateLimiter.Lock()
-			now := m.time.Now()
-			for ip, info := range m.rateLimiter.clients {
-				if now.Sub(info.lastAccess) > m.rateLimiter.window {
-					delete(m.rateLimiter.clients, ip)
+	// Create a done channel for cleanup
+	done := make(chan struct{})
+	defer close(done)
+
+	// Start cleanup goroutine
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				// Clean up any remaining rate limiter entries
+				m.rateLimiter.Lock()
+				m.rateLimiter.clients = make(map[string]*rateLimitInfo)
+				m.rateLimiter.Unlock()
+				return
+			case <-ticker.C:
+				m.rateLimiter.Lock()
+				now := m.time.Now()
+				for ip, info := range m.rateLimiter.clients {
+					if now.Sub(info.lastAccess) > m.rateLimiter.window {
+						delete(m.rateLimiter.clients, ip)
+					}
 				}
+				m.rateLimiter.Unlock()
+			case <-done:
+				return
 			}
-			m.rateLimiter.Unlock()
 		}
+	}()
+
+	// Wait for context cancellation
+	<-ctx.Done()
+}
+
+// WaitCleanup waits for the cleanup goroutine to finish
+func (m *SecurityMiddleware) WaitCleanup() {
+	// Add a timeout to prevent hanging
+	done := make(chan struct{})
+	go func() {
+		m.cleanupWg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Cleanup completed successfully
+	case <-time.After(5 * time.Second):
+		// Timeout waiting for cleanup
 	}
 }
 

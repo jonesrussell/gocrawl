@@ -84,12 +84,8 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	cleanup := handler.Setup(ctx)
 	defer cleanup()
 
-	// Create channels for error handling and completion
-	errChan := make(chan error, 1)
-	doneChan := make(chan struct{})
-
 	// Initialize the Fx application with required modules
-	app := fx.New(
+	fxApp := fx.New(
 		fx.NopLogger, // Suppress Fx startup/shutdown logs
 		Module,
 		fx.Invoke(func(p struct {
@@ -111,10 +107,8 @@ func runDelete(cmd *cobra.Command, args []string) error {
 					}
 					if err := executeDelete(params); err != nil {
 						p.Logger.Error("Error executing delete", "error", err)
-						errChan <- err
 						return err
 					}
-					close(doneChan)
 					return nil
 				},
 				OnStop: func(context.Context) error {
@@ -124,42 +118,18 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		}),
 	)
 
-	// Start the application and handle any startup errors
-	if err := app.Start(ctx); err != nil {
+	// Set the fx app for coordinated shutdown
+	handler.SetFXApp(fxApp)
+
+	// Start the application
+	if err := fxApp.Start(ctx); err != nil {
 		return fmt.Errorf("error starting application: %w", err)
 	}
 
-	// Set up cleanup for graceful shutdown
-	handler.SetCleanup(func() {
-		// Create a context with timeout for graceful shutdown
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
-		defer stopCancel()
+	// Wait for shutdown signal
+	handler.Wait()
 
-		// Stop the application and handle any shutdown errors
-		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-			common.PrintErrorf("Error stopping application: %v", err)
-		}
-	})
-
-	// Wait for either:
-	// - A signal interrupt (SIGINT/SIGTERM)
-	// - Context cancellation
-	// - Delete completion
-	// - Delete error
-	var deleteErr error
-	select {
-	case deleteErr = <-errChan:
-		// Error already printed in executeDelete
-	case <-doneChan:
-		// Success message already printed in executeDelete
-	}
-
-	// Only wait for shutdown signal if there was an error
-	if deleteErr != nil {
-		handler.Wait()
-	}
-
-	return deleteErr
+	return nil
 }
 
 // executeDelete performs the actual deletion of indices.

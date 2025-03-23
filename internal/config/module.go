@@ -30,6 +30,7 @@ const (
 	DefaultReadTimeout  = 10 * time.Second
 	DefaultWriteTimeout = 30 * time.Second
 	DefaultIdleTimeout  = 60 * time.Second
+	DefaultServerPort   = "8080"
 
 	// Environment types
 	envProduction = "production"
@@ -344,8 +345,16 @@ func createServerConfig() ServerConfig {
 		idleTimeout = DefaultIdleTimeout
 	}
 
+	// Get server address with default and ensure proper format
+	address := viper.GetString("server.address")
+	if address == "" {
+		address = ":" + DefaultServerPort
+	} else if !strings.Contains(address, ":") {
+		address = ":" + address
+	}
+
 	return ServerConfig{
-		Address:      viper.GetString("server.address"),
+		Address:      address,
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 		IdleTimeout:  idleTimeout,

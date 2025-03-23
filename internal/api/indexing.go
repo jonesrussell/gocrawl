@@ -47,4 +47,7 @@ type SearchManager interface {
 
 	// Aggregate performs an aggregation query.
 	Aggregate(ctx context.Context, index string, aggs any) (any, error)
+
+	// Close closes any resources held by the search manager.
+	Close() error
 }

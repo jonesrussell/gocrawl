@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -87,8 +88,11 @@ func WaitForSignal(ctx context.Context, cancel context.CancelFunc) (<-chan struc
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	done := make(chan struct{})
+	var wg sync.WaitGroup
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		select {
 		case <-sigChan:
 			cancel()
@@ -101,6 +105,8 @@ func WaitForSignal(ctx context.Context, cancel context.CancelFunc) (<-chan struc
 	cleanup := func() {
 		signal.Stop(sigChan)
 		close(sigChan)
+		// Wait for the signal handling goroutine to finish
+		wg.Wait()
 	}
 
 	return done, cleanup

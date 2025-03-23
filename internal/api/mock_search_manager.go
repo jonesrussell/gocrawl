@@ -49,6 +49,20 @@ func (mr *MockSearchManagerMockRecorder) Aggregate(arg0, arg1, arg2 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Aggregate", reflect.TypeOf((*MockSearchManager)(nil).Aggregate), arg0, arg1, arg2)
 }
 
+// Close mocks base method.
+func (m *MockSearchManager) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockSearchManagerMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockSearchManager)(nil).Close))
+}
+
 // Count mocks base method.
 func (m *MockSearchManager) Count(arg0 context.Context, arg1 string, arg2 interface{}) (int64, error) {
 	m.ctrl.T.Helper()

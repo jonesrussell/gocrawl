@@ -3,10 +3,24 @@ package signal
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
+	"time"
 )
+
+const (
+	// DefaultShutdownTimeout is the default duration to wait for graceful shutdown
+	DefaultShutdownTimeout = 30 * time.Second
+)
+
+// FXApp defines the interface for fx application shutdown
+type FXApp interface {
+	Stop(context.Context) error
+}
 
 // SignalHandler manages signal handling for graceful shutdown.
 type SignalHandler struct {
@@ -18,23 +32,44 @@ type SignalHandler struct {
 	cleanup func()
 	// isServer indicates if this is a server mode handler
 	isServer bool
+	// wg tracks the signal handling goroutine
+	wg sync.WaitGroup
+	// fxApp is the fx application instance
+	fxApp FXApp
+	// shutdownTimeout is the maximum time to wait for graceful shutdown
+	shutdownTimeout time.Duration
+	// fxDoneChan signals when fx app shutdown is complete
+	fxDoneChan chan struct{}
 }
 
 // NewSignalHandler creates a new SignalHandler instance.
 func NewSignalHandler() *SignalHandler {
 	return &SignalHandler{
-		sigChan:  make(chan os.Signal, 1),
-		doneChan: make(chan struct{}),
+		sigChan:         make(chan os.Signal, 1),
+		doneChan:        make(chan struct{}),
+		fxDoneChan:      make(chan struct{}),
+		shutdownTimeout: DefaultShutdownTimeout,
 	}
 }
 
 // NewServerSignalHandler creates a new SignalHandler instance for server mode.
 func NewServerSignalHandler() *SignalHandler {
 	return &SignalHandler{
-		sigChan:  make(chan os.Signal, 1),
-		doneChan: make(chan struct{}),
-		isServer: true,
+		sigChan:         make(chan os.Signal, 1),
+		doneChan:        make(chan struct{}),
+		isServer:        true,
+		shutdownTimeout: DefaultShutdownTimeout,
 	}
+}
+
+// SetShutdownTimeout sets the timeout for graceful shutdown.
+func (h *SignalHandler) SetShutdownTimeout(timeout time.Duration) {
+	h.shutdownTimeout = timeout
+}
+
+// SetFXApp sets the fx application instance for coordinated shutdown.
+func (h *SignalHandler) SetFXApp(app FXApp) {
+	h.fxApp = app
 }
 
 // Setup initializes signal handling for the given context.
@@ -44,24 +79,49 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 	signal.Notify(h.sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// Start signal handling goroutine
+	h.wg.Add(1)
 	go func() {
+		defer h.wg.Done()
 		select {
 		case sig := <-h.sigChan:
 			// Log the received signal
-			os.Stderr.WriteString("\nReceived signal " + sig.String() + ", initiating shutdown...\n")
+			os.Stderr.WriteString(fmt.Sprintf("\nReceived signal %s, initiating shutdown...\n", sig))
+			h.handleShutdown(ctx)
 		case <-ctx.Done():
 			// Context was cancelled
 			os.Stderr.WriteString("\nContext cancelled, initiating shutdown...\n")
+			h.handleShutdown(ctx)
 		}
 		close(h.doneChan)
 	}()
 
 	// Return cleanup function
 	return func() {
+		// Stop receiving signals
 		signal.Stop(h.sigChan)
-		if h.cleanup != nil {
-			h.cleanup()
+		// Wait for the signal handling goroutine to finish
+		h.wg.Wait()
+	}
+}
+
+// handleShutdown coordinates the shutdown sequence between fx and our internal cleanup.
+func (h *SignalHandler) handleShutdown(ctx context.Context) {
+	// Create a timeout context for shutdown
+	shutdownCtx, cancel := context.WithTimeout(ctx, h.shutdownTimeout)
+	defer cancel()
+
+	// If we have an fx app, stop it first
+	if h.fxApp != nil {
+		if err := h.fxApp.Stop(shutdownCtx); err != nil {
+			if !isContextError(err) {
+				os.Stderr.WriteString(fmt.Sprintf("Error during fx shutdown: %v\n", err))
+			}
 		}
+	}
+
+	// Call any registered cleanup functions
+	if h.cleanup != nil {
+		h.cleanup()
 	}
 }
 
@@ -96,4 +156,9 @@ func (h *SignalHandler) IsShuttingDown() bool {
 	default:
 		return false
 	}
+}
+
+// isContextError checks if an error is a context-related error.
+func isContextError(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }

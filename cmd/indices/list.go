@@ -5,7 +5,6 @@ package indices
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -66,12 +65,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 	cleanup := handler.Setup(ctx)
 	defer cleanup()
 
-	// Create channels for error handling and completion
-	errChan := make(chan error, 1)
-	doneChan := make(chan struct{})
-
 	// Initialize the Fx application with required modules
-	app := fx.New(
+	fxApp := fx.New(
 		fx.NopLogger, // Suppress Fx startup/shutdown logs
 		Module,
 		fx.Invoke(func(p struct {
@@ -89,10 +84,8 @@ func runList(cmd *cobra.Command, _ []string) error {
 					}
 					if err := executeList(params); err != nil {
 						p.Logger.Error("Error executing list", "error", err)
-						errChan <- err
 						return err
 					}
-					close(doneChan)
 					return nil
 				},
 				OnStop: func(context.Context) error {
@@ -102,42 +95,18 @@ func runList(cmd *cobra.Command, _ []string) error {
 		}),
 	)
 
-	// Start the application and handle any startup errors
-	if err := app.Start(ctx); err != nil {
+	// Set the fx app for coordinated shutdown
+	handler.SetFXApp(fxApp)
+
+	// Start the application
+	if err := fxApp.Start(ctx); err != nil {
 		return fmt.Errorf("error starting application: %w", err)
 	}
 
-	// Set up cleanup for graceful shutdown
-	handler.SetCleanup(func() {
-		// Create a context with timeout for graceful shutdown
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
-		defer stopCancel()
+	// Wait for shutdown signal
+	handler.Wait()
 
-		// Stop the application and handle any shutdown errors
-		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-			common.PrintErrorf("Error stopping application: %v", err)
-		}
-	})
-
-	// Wait for either:
-	// - A signal interrupt (SIGINT/SIGTERM)
-	// - Context cancellation
-	// - List completion
-	// - List error
-	var listErr error
-	select {
-	case listErr = <-errChan:
-		// Error already printed in executeList
-	case <-doneChan:
-		// Success message already printed in executeList
-	}
-
-	// Only wait for shutdown signal if there was an error
-	if listErr != nil {
-		handler.Wait()
-	}
-
-	return listErr
+	return nil
 }
 
 // executeList retrieves and displays the list of indices.

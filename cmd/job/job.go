@@ -10,17 +10,13 @@ import (
 	"sync/atomic"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -195,146 +191,61 @@ func startJob(p Params) error {
 	// Start scheduler in background
 	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config, p.ActiveJobs)
 
-	// Set up signal handling
-	handler := signal.NewSignalHandler()
-	cleanup := handler.Setup(ctx)
-	defer cleanup()
-
 	p.Logger.Info("Job scheduler running. Press Ctrl+C to stop...")
 
-	// Wait for shutdown signal
-	handler.Wait()
+	// Wait for crawler completion
+	<-p.Done
 
-	// Log graceful shutdown
-	p.Logger.Info("") // Add newline before shutdown messages
-	p.Logger.Info("Starting graceful shutdown...")
-
-	if atomic.LoadInt32(p.ActiveJobs) > 0 {
-		p.Logger.Info("Waiting for in-progress jobs to complete...")
-		common.PrintInfof("Press Ctrl+C again to force immediate shutdown")
-
-		// Give time for any in-progress jobs to complete
-		timeout := time.Duration(shutdownTimeoutSeconds) * time.Second
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), timeout)
-		defer shutdownCancel()
-
-		// Wait for any in-progress jobs
-		select {
-		case <-p.Done:
-			p.Logger.Info("All jobs completed successfully")
-		case <-shutdownCtx.Done():
-			p.Logger.Warn("Some jobs may not have completed - graceful shutdown timeout reached")
-		}
-	} else {
-		p.Logger.Info("No active jobs - shutting down immediately")
-	}
-
-	p.Logger.Info("Job scheduler stopped")
 	return nil
-}
-
-// Cmd represents the job scheduler command.
-var Cmd = &cobra.Command{
-	Use:   "job",
-	Short: "Schedule and run crawl jobs",
-	Long:  `Schedule and run crawl jobs based on the times specified in sources.yml`,
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		// Create a parent context that can be cancelled
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
-		// Initialize the Fx application with required modules and dependencies
-		fxApp := fx.New(
-			fx.NopLogger, // Suppress Fx startup/shutdown logs
-			// Core dependencies
-			config.Module,
-			sources.Module,
-			storage.Module,
-			logger.Module,
-
-			// Feature modules
-			article.Module,
-			content.Module,
-			collector.Module(),
-			crawler.Module,
-
-			fx.Provide(
-				fx.Annotate(
-					func() context.Context {
-						return ctx
-					},
-					fx.ResultTags(`name:"jobContext"`),
-				),
-				func() *int32 {
-					var jobs int32
-					return &jobs
-				},
-				fx.Annotate(
-					func(sources sources.Interface) (string, string) {
-						// For job scheduler, we'll use the first source's indices
-						if len(sources.GetSources()) > 0 {
-							allSources := sources.GetSources()
-							return allSources[0].Index, allSources[0].ArticleIndex
-						}
-						return "content", "articles" // Default indices if no sources
-					},
-					fx.ParamTags(`name:"sourceManager"`),
-					fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
-				),
-				fx.Annotate(
-					func(sources sources.Interface) string {
-						// For job scheduler, we'll use the first source's name
-						if len(sources.GetSources()) > 0 {
-							return sources.GetSources()[0].Name
-						}
-						return "default" // Default source name if no sources
-					},
-					fx.ParamTags(`name:"sourceManager"`),
-					fx.ResultTags(`name:"sourceName"`),
-				),
-				fx.Annotate(
-					func() chan struct{} {
-						return make(chan struct{})
-					},
-					fx.ResultTags(`name:"crawlDone"`),
-				),
-				func() chan *models.Article {
-					return make(chan *models.Article, app.DefaultChannelBufferSize)
-				},
-			),
-			fx.Invoke(startJob),
-		)
-
-		// Start the application
-		if err := fxApp.Start(ctx); err != nil {
-			return fmt.Errorf("error starting application: %w", err)
-		}
-
-		// Set up signal handling
-		handler := signal.NewSignalHandler()
-		cleanup := handler.Setup(ctx)
-		defer cleanup()
-
-		// Set up cleanup for graceful shutdown
-		handler.SetCleanup(func() {
-			// Create a context with timeout for graceful shutdown
-			stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
-			defer stopCancel()
-
-			// Stop the application and handle any shutdown errors
-			if err := fxApp.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-				common.PrintErrorf("Error during shutdown: %v", err)
-			}
-		})
-
-		// Wait for shutdown signal
-		handler.Wait()
-
-		return nil
-	},
 }
 
 // Command returns the job command.
 func Command() *cobra.Command {
-	return Cmd
+	cmd := &cobra.Command{
+		Use:   "job",
+		Short: "Start the job scheduler",
+		Long: `Start the job scheduler to manage and execute scheduled crawling tasks.
+The scheduler will run continuously until interrupted with Ctrl+C.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Create a cancellable context
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
+
+			// Set up signal handling
+			handler := signal.NewSignalHandler()
+			cleanup := handler.Setup(ctx)
+			defer cleanup()
+
+			// Initialize the Fx application with the job module
+			fxApp := fx.New(
+				fx.NopLogger,
+				Module,
+				fx.Provide(
+					fx.Annotate(
+						func() context.Context { return ctx },
+						fx.ResultTags(`name:"jobContext"`),
+					),
+				),
+				fx.Invoke(startJob),
+			)
+
+			// Set the fx app for coordinated shutdown
+			handler.SetFXApp(fxApp)
+
+			// Start the application
+			if err := fxApp.Start(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil
+				}
+				return fmt.Errorf("error starting application: %w", err)
+			}
+
+			// Wait for shutdown signal
+			handler.Wait()
+
+			return nil
+		},
+	}
+
+	return cmd
 }
