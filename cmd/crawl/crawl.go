@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
@@ -93,23 +94,23 @@ func createCloseChannels(p crawlParams) func() {
 	var once sync.Once
 	return func() {
 		once.Do(func() {
-			p.Logger.Debug("Starting channel closure sequence")
+			p.Logger.Debug("Starting channel closure sequence", "goroutines", runtime.NumGoroutine())
 			// First close the article channel to signal no more articles
-			p.Logger.Debug("Closing article channel")
+			p.Logger.Debug("Closing article channel", "goroutines", runtime.NumGoroutine())
 			close(p.ArticleChan)
-			p.Logger.Debug("Article channel closed")
+			p.Logger.Debug("Article channel closed", "goroutines", runtime.NumGoroutine())
 
 			// Then close the Done channel to trigger OnStop hooks
-			p.Logger.Debug("Closing Done channel")
+			p.Logger.Debug("Closing Done channel", "goroutines", runtime.NumGoroutine())
 			close(p.Done)
-			p.Logger.Debug("Done channel closed")
+			p.Logger.Debug("Done channel closed", "goroutines", runtime.NumGoroutine())
 
 			// Finally signal completion to the command
-			p.Logger.Debug("Signaling completion to command")
+			p.Logger.Debug("Signaling completion to command", "goroutines", runtime.NumGoroutine())
 			p.Handler.Complete()
-			p.Logger.Debug("Signal handler completed")
+			p.Logger.Debug("Signal handler completed", "goroutines", runtime.NumGoroutine())
 
-			p.Logger.Debug("Shutdown sequence completed", "source", p.SourceName)
+			p.Logger.Debug("Shutdown sequence completed", "source", p.SourceName, "goroutines", runtime.NumGoroutine())
 		})
 	}
 }
@@ -195,43 +196,60 @@ Example:
 			if err != nil {
 				return fmt.Errorf("error creating logger: %w", err)
 			}
-			log.Info("Starting crawl command", "source", sourceName)
+			log.Info("Starting crawl command", "source", sourceName, "goroutines", runtime.NumGoroutine())
 
 			// Use Cobra's context for proper command lifecycle management
-			ctx := cmd.Context()
+			cmdCtx := cmd.Context()
 			handler := signal.NewSignalHandler(log)
-			cleanup := handler.Setup(ctx)
+			cleanup := handler.Setup(cmdCtx)
 			defer cleanup()
 
-			fxApp := createFXApp(ctx, sourceName, handler)
+			fxApp := createFXApp(cmdCtx, sourceName, handler)
 			handler.SetFXApp(fxApp)
 
 			// Start the application
-			log.Debug("Starting fx application")
-			if err := fxApp.Start(ctx); err != nil {
-				if errors.Is(err, context.Canceled) {
-					log.Debug("Application start cancelled")
+			log.Debug("Starting fx application", "goroutines", runtime.NumGoroutine())
+
+			if errStart := fxApp.Start(cmdCtx); errStart != nil {
+				if errors.Is(errStart, context.Canceled) {
+					log.Debug("Application start cancelled", "goroutines", runtime.NumGoroutine())
 					return nil
 				}
-				return fmt.Errorf("error starting application: %w", err)
+				return fmt.Errorf("error starting application: %w", errStart)
 			}
-			log.Debug("Fx application started successfully")
+
+			log.Debug("Fx application started successfully", "goroutines", runtime.NumGoroutine())
 
 			// Wait for completion or signal
-			log.Debug("Waiting for completion or signal", "handler_state", handler.GetState())
-			handler.Wait()
-			log.Debug("Signal handler wait completed", "handler_state", handler.GetState())
+			log.Debug(
+				"Waiting for completion or signal",
+				"handler_state", handler.GetState(),
+				"goroutines", runtime.NumGoroutine(),
+			)
 
-			// Stop the application
-			log.Debug("Stopping fx application")
-			if err := fxApp.Stop(ctx); err != nil {
-				log.Error("Error stopping application", "error", err)
-				return fmt.Errorf("error stopping application: %w", err)
+			if !handler.Wait() {
+				log.Debug("Context cancelled, initiating shutdown", "goroutines", runtime.NumGoroutine())
+				// Stop the application since context was cancelled
+				if errStop := fxApp.Stop(cmdCtx); errStop != nil {
+					log.Error("Error stopping application", "error", errStop, "goroutines", runtime.NumGoroutine())
+					return fmt.Errorf("error stopping application: %w", errStop)
+				}
+				log.Debug("Fx application stopped successfully", "goroutines", runtime.NumGoroutine())
+				return nil
 			}
-			log.Debug("Fx application stopped successfully")
+
+			log.Debug(
+				"Signal handler wait completed",
+				"handler_state", handler.GetState(),
+				"goroutines", runtime.NumGoroutine(),
+			)
 
 			// Exit the command
-			log.Debug("Command execution complete, exiting", "handler_state", handler.GetState())
+			log.Debug(
+				"Command execution complete, exiting",
+				"handler_state", handler.GetState(),
+				"goroutines", runtime.NumGoroutine(),
+			)
 			return nil
 		},
 	}
