@@ -2,6 +2,7 @@
 package api_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -39,6 +40,7 @@ func TestModule(t *testing.T) {
 			func() logger.Interface { return mockLogger },
 			func() api.SearchManager { return mockSearchManager },
 			func() config.Interface { return mockCfg },
+			func() context.Context { return context.Background() },
 		),
 		api.Module,
 	)
@@ -100,6 +102,7 @@ func TestServerConfiguration(t *testing.T) {
 					func() logger.Interface { return mockLogger },
 					func() api.SearchManager { return mockSearchManager },
 					func() config.Interface { return mockCfg },
+					func() context.Context { return context.Background() },
 				),
 				api.Module,
 				fx.Populate(&server),
