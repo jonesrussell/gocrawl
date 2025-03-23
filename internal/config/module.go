@@ -174,6 +174,7 @@ func defaultEnvBindings() map[string]string {
 		"elasticsearch.tls.key":         "ELASTIC_KEY_PATH",
 		"elasticsearch.tls.ca":          "ELASTIC_CA_PATH",
 		"server.address":                "GOCRAWL_PORT",
+		"server.security.api_key":       "GOCRAWL_API_KEY",
 		"app.environment":               "APP_ENV",
 		"log.level":                     "LOG_LEVEL",
 	}
@@ -257,6 +258,40 @@ func createConfig() (*config, error) {
 			ReadTimeout:  DefaultReadTimeout,
 			WriteTimeout: DefaultWriteTimeout,
 			IdleTimeout:  DefaultIdleTimeout,
+			Security: struct {
+				Enabled   bool   `yaml:"enabled"`
+				APIKey    string `yaml:"api_key"`
+				RateLimit int    `yaml:"rate_limit"`
+				CORS      struct {
+					Enabled        bool     `yaml:"enabled"`
+					AllowedOrigins []string `yaml:"allowed_origins"`
+					AllowedMethods []string `yaml:"allowed_methods"`
+					AllowedHeaders []string `yaml:"allowed_headers"`
+					MaxAge         int      `yaml:"max_age"`
+				} `yaml:"cors"`
+				TLS struct {
+					Enabled     bool   `yaml:"enabled"`
+					Certificate string `yaml:"certificate"`
+					Key         string `yaml:"key"`
+				} `yaml:"tls"`
+			}{
+				Enabled:   true,
+				APIKey:    viper.GetString("server.security.api_key"),
+				RateLimit: 60, // Default rate limit of 60 requests per minute
+				CORS: struct {
+					Enabled        bool     `yaml:"enabled"`
+					AllowedOrigins []string `yaml:"allowed_origins"`
+					AllowedMethods []string `yaml:"allowed_methods"`
+					AllowedHeaders []string `yaml:"allowed_headers"`
+					MaxAge         int      `yaml:"max_age"`
+				}{
+					Enabled:        true,
+					AllowedOrigins: []string{"*"},
+					AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+					AllowedHeaders: []string{"Content-Type", "Authorization", "X-API-Key"},
+					MaxAge:         86400,
+				},
+			},
 		},
 	}, nil
 }
