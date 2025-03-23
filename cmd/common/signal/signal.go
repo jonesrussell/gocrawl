@@ -16,6 +16,8 @@ type SignalHandler struct {
 	doneChan chan struct{}
 	// cleanup is called during shutdown
 	cleanup func()
+	// isServer indicates if this is a server mode handler
+	isServer bool
 }
 
 // NewSignalHandler creates a new SignalHandler instance.
@@ -23,6 +25,15 @@ func NewSignalHandler() *SignalHandler {
 	return &SignalHandler{
 		sigChan:  make(chan os.Signal, 1),
 		doneChan: make(chan struct{}),
+	}
+}
+
+// NewServerSignalHandler creates a new SignalHandler instance for server mode.
+func NewServerSignalHandler() *SignalHandler {
+	return &SignalHandler{
+		sigChan:  make(chan os.Signal, 1),
+		doneChan: make(chan struct{}),
+		isServer: true,
 	}
 }
 
@@ -73,6 +84,16 @@ func (h *SignalHandler) WaitWithTimeout(timeoutCtx context.Context) bool {
 	case <-h.doneChan:
 		return true
 	case <-timeoutCtx.Done():
+		return false
+	}
+}
+
+// IsShuttingDown returns true if a shutdown signal has been received.
+func (h *SignalHandler) IsShuttingDown() bool {
+	select {
+	case <-h.doneChan:
+		return true
+	default:
 		return false
 	}
 }

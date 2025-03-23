@@ -49,7 +49,7 @@ You can send POST requests to /search with a JSON body containing the search par
 		defer cancel()
 
 		// Set up signal handling
-		handler := signal.NewSignalHandler()
+		handler := signal.NewServerSignalHandler()
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
@@ -99,11 +99,6 @@ You can send POST requests to /search with a JSON body containing the search par
 			}),
 		)
 
-		// Start the application and handle any startup errors
-		if err := app.Start(ctx); err != nil {
-			return fmt.Errorf("error starting application: %w", err)
-		}
-
 		// Set up cleanup for graceful shutdown
 		handler.SetCleanup(func() {
 			// Create a context with timeout for graceful shutdown
@@ -115,6 +110,11 @@ You can send POST requests to /search with a JSON body containing the search par
 				common.PrintErrorf("Error during shutdown: %v", err)
 			}
 		})
+
+		// Start the application and handle any startup errors
+		if err := app.Start(ctx); err != nil {
+			return fmt.Errorf("error starting application: %w", err)
+		}
 
 		// Wait for either:
 		// - A signal interrupt (SIGINT/SIGTERM)
@@ -128,9 +128,6 @@ You can send POST requests to /search with a JSON body containing the search par
 		case <-doneChan:
 			// Server shut down cleanly
 		}
-
-		// Wait for shutdown signal
-		handler.Wait()
 
 		// Only return error for actual failures, not graceful shutdowns
 		if serverErr != nil && !errors.Is(serverErr, context.Canceled) {

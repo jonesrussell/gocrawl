@@ -16,28 +16,38 @@ func TestSignalHandler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("handles SIGINT", func(t *testing.T) {
+		t.Parallel()
 		handler := signal.NewSignalHandler()
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
 		// Send SIGINT in a goroutine
+		var err error
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			p, err := os.FindProcess(os.Getpid())
-			require.NoError(t, err)
-			require.NoError(t, p.Signal(syscall.SIGINT))
+			p, findErr := os.FindProcess(os.Getpid())
+			if findErr != nil {
+				err = findErr
+				return
+			}
+			if sigErr := p.Signal(syscall.SIGINT); sigErr != nil {
+				err = sigErr
+				return
+			}
 		}()
 
 		// Wait for signal
 		assert.True(t, handler.Wait())
+		require.NoError(t, err)
 	})
 
 	t.Run("handles context cancellation", func(t *testing.T) {
+		t.Parallel()
 		handler := signal.NewSignalHandler()
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		cleanup := handler.Setup(ctx)
@@ -54,15 +64,16 @@ func TestSignalHandler(t *testing.T) {
 	})
 
 	t.Run("handles timeout", func(t *testing.T) {
+		t.Parallel()
 		handler := signal.NewSignalHandler()
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
 		// Create timeout context
-		timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		timeoutCtx, timeoutCancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer timeoutCancel()
 
 		// Wait with timeout
@@ -70,8 +81,9 @@ func TestSignalHandler(t *testing.T) {
 	})
 
 	t.Run("calls cleanup function", func(t *testing.T) {
+		t.Parallel()
 		handler := signal.NewSignalHandler()
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		cleanupCalled := false
