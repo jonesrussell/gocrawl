@@ -11,23 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 )
-
-// testLogger is a simple logger for testing
-type testLogger struct{}
-
-func (l *testLogger) Debug(_ string, _ ...any)  {}
-func (l *testLogger) Error(_ string, _ ...any)  {}
-func (l *testLogger) Info(_ string, _ ...any)   {}
-func (l *testLogger) Warn(_ string, _ ...any)   {}
-func (l *testLogger) Fatal(_ string, _ ...any)  {}
-func (l *testLogger) Printf(_ string, _ ...any) {}
-func (l *testLogger) Errorf(_ string, _ ...any) {}
-func (l *testLogger) Sync() error               { return nil }
-
-// Ensure testLogger implements interfaces.Logger
-var _ logger.Interface = (*testLogger)(nil)
 
 func TestNew(t *testing.T) {
 	// Save current environment and use t.Setenv for automatic cleanup
