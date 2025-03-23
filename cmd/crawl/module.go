@@ -2,7 +2,6 @@
 package crawl
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common/app"
@@ -23,7 +22,6 @@ var Module = fx.Module("crawl",
 	logger.Module,
 	storage.Module,
 	sources.Module,
-	api.Module,
 
 	// Feature modules
 	article.Module,

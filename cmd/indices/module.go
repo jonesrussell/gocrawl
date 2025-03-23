@@ -2,7 +2,6 @@
 package indices
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -25,7 +24,4 @@ var Module = fx.Module("indices",
 	sources.Module,
 	storage.Module,
 	logger.Module,
-
-	// Additional modules
-	api.Module,
 )
