@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -110,8 +111,8 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
-	// Set up signal handling
-	handler := signal.NewSignalHandler()
+	// Set up signal handling with a no-op logger initially
+	handler := signal.NewSignalHandler(logger.NewNoOp())
 	cleanup := handler.Setup(ctx)
 	defer cleanup()
 

@@ -211,14 +211,14 @@ The scheduler will run continuously until interrupted with Ctrl+C.`,
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			// Set up signal handling
-			handler := signal.NewSignalHandler()
-			cleanup := handler.Setup(ctx)
-			defer cleanup()
+			// Set up signal handling with a no-op logger initially
+			handler := signal.NewSignalHandler(logger.NewNoOp())
+			handler.Setup(ctx)
 
-			// Initialize the Fx application with the job module
+			// Initialize the Fx application
 			fxApp := fx.New(
 				fx.NopLogger,
+				common.Module,
 				Module,
 				fx.Provide(
 					fx.Annotate(
@@ -226,7 +226,15 @@ The scheduler will run continuously until interrupted with Ctrl+C.`,
 						fx.ResultTags(`name:"jobContext"`),
 					),
 				),
-				fx.Invoke(startJob),
+				fx.Invoke(func(p Params) {
+					// Update the signal handler with the real logger
+					handler.SetLogger(p.Logger)
+					if err := startJob(p); err != nil {
+						p.Logger.Error("Error starting job scheduler", "error", err)
+					}
+					// Wait for shutdown signal
+					handler.Wait()
+				}),
 			)
 
 			// Set the fx app for coordinated shutdown
@@ -239,9 +247,6 @@ The scheduler will run continuously until interrupted with Ctrl+C.`,
 				}
 				return fmt.Errorf("error starting application: %w", err)
 			}
-
-			// Wait for shutdown signal
-			handler.Wait()
 
 			return nil
 		},

@@ -4,12 +4,13 @@ package signal
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 const (
@@ -40,15 +41,18 @@ type SignalHandler struct {
 	shutdownTimeout time.Duration
 	// fxDoneChan signals when fx app shutdown is complete
 	fxDoneChan chan struct{}
+	// logger is the application logger
+	logger logger.Interface
 }
 
 // NewSignalHandler creates a new SignalHandler instance.
-func NewSignalHandler() *SignalHandler {
+func NewSignalHandler(logger logger.Interface) *SignalHandler {
 	return &SignalHandler{
 		sigChan:         make(chan os.Signal, 1),
 		doneChan:        make(chan struct{}),
 		fxDoneChan:      make(chan struct{}),
 		shutdownTimeout: DefaultShutdownTimeout,
+		logger:          logger,
 	}
 }
 
@@ -72,6 +76,11 @@ func (h *SignalHandler) SetFXApp(app FXApp) {
 	h.fxApp = app
 }
 
+// SetLogger updates the logger used by the signal handler
+func (h *SignalHandler) SetLogger(logger logger.Interface) {
+	h.logger = logger
+}
+
 // Setup initializes signal handling for the given context.
 // It returns a cleanup function that should be called when the application exits.
 func (h *SignalHandler) Setup(ctx context.Context) func() {
@@ -85,11 +94,11 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 		select {
 		case sig := <-h.sigChan:
 			// Log the received signal
-			os.Stderr.WriteString(fmt.Sprintf("\nReceived signal %s, initiating shutdown...\n", sig))
+			h.logger.Info("Received signal, initiating shutdown...", "signal", sig)
 			h.handleShutdown(ctx)
 		case <-ctx.Done():
 			// Context was cancelled
-			os.Stderr.WriteString("\nContext cancelled, initiating shutdown...\n")
+			h.logger.Info("Context cancelled, initiating shutdown...")
 			h.handleShutdown(ctx)
 		}
 		close(h.doneChan)
@@ -114,7 +123,7 @@ func (h *SignalHandler) handleShutdown(ctx context.Context) {
 	if h.fxApp != nil {
 		if err := h.fxApp.Stop(shutdownCtx); err != nil {
 			if !isContextError(err) {
-				os.Stderr.WriteString(fmt.Sprintf("Error during fx shutdown: %v\n", err))
+				h.logger.Error("Error during fx shutdown", "error", err)
 			}
 		}
 	}

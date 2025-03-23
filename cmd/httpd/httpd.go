@@ -8,7 +8,9 @@ import (
 	"sync"
 	"time"
 
-	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"errors"
+
+	signal "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -49,8 +51,8 @@ You can send POST requests to /search with a JSON body containing the search par
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Set up signal handling
-		handler := signalhandler.NewSignalHandler()
+		// Set up signal handling with a no-op logger initially
+		handler := signal.NewSignalHandler(logger.NewNoOp())
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
@@ -61,12 +63,15 @@ You can send POST requests to /search with a JSON body containing the search par
 
 		// Initialize the Fx application
 		fxApp := fx.New(
+			fx.NopLogger,
 			common.Module,
 			Module,
 			fx.Provide(
 				func() context.Context { return ctx },
 			),
 			fx.Invoke(func(lc fx.Lifecycle, p Params) {
+				// Update the signal handler with the real logger
+				handler.SetLogger(p.Logger)
 				lc.Append(fx.Hook{
 					OnStart: func(ctx context.Context) error {
 						// Test storage connection
@@ -101,13 +106,13 @@ You can send POST requests to /search with a JSON body containing the search par
 						p.Logger.Info("Initiating graceful shutdown...")
 
 						// Create timeout context for shutdown
-						shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
-						defer cancel()
+						shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
+						defer shutdownCancel()
 
 						// Shutdown HTTP server
 						p.Logger.Info("Shutting down HTTP server...")
 						if err := p.Server.Shutdown(shutdownCtx); err != nil {
-							if err != context.Canceled && err != context.DeadlineExceeded {
+							if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 								p.Logger.Error("Error during server shutdown", "error", err)
 								return fmt.Errorf("error during server shutdown: %w", err)
 							}

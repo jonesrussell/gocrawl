@@ -10,6 +10,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -18,6 +19,14 @@ import (
 // deleteSourceName holds the name of the source whose indices should be deleted
 // when the --source flag is used
 var deleteSourceName string
+
+// Params holds the dependencies required for the delete operation.
+type Params struct {
+	fx.In
+	Storage common.Storage
+	Sources sources.Interface `name:"sourceManager"`
+	Logger  common.Logger
+}
 
 // deleteParams holds the parameters required for deleting indices.
 type deleteParams struct {
@@ -79,23 +88,22 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
-	// Set up signal handling
-	handler := signal.NewSignalHandler()
-	cleanup := handler.Setup(ctx)
-	defer cleanup()
+	// Set up signal handling with a no-op logger initially
+	handler := signal.NewSignalHandler(logger.NewNoOp())
+	handler.Setup(ctx)
 
-	// Initialize the Fx application with required modules
+	// Initialize the Fx application
 	fxApp := fx.New(
-		fx.NopLogger, // Suppress Fx startup/shutdown logs
+		fx.NopLogger,
+		common.Module,
 		Module,
-		fx.Invoke(func(p struct {
-			fx.In
-			Storage common.Storage
-			Sources sources.Interface `name:"sourceManager"`
-			Logger  common.Logger
-			LC      fx.Lifecycle
-		}) {
-			p.LC.Append(fx.Hook{
+		fx.Provide(
+			func() context.Context { return ctx },
+		),
+		fx.Invoke(func(lc fx.Lifecycle, p Params) {
+			// Update the signal handler with the real logger
+			handler.SetLogger(p.Logger)
+			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
 					params := &deleteParams{
 						ctx:     ctx,

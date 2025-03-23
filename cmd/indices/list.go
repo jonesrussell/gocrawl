@@ -12,6 +12,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -60,22 +61,23 @@ func runList(cmd *cobra.Command, _ []string) error {
 	ctx, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
-	// Set up signal handling
-	handler := signal.NewSignalHandler()
+	// Set up signal handling with a no-op logger initially
+	handler := signal.NewSignalHandler(logger.NewNoOp())
 	cleanup := handler.Setup(ctx)
 	defer cleanup()
 
 	// Initialize the Fx application with required modules
 	fxApp := fx.New(
 		fx.NopLogger, // Suppress Fx startup/shutdown logs
+		common.Module,
 		Module,
-		fx.Invoke(func(p struct {
-			fx.In
-			Storage common.Storage
-			Logger  common.Logger
-			LC      fx.Lifecycle
-		}) {
-			p.LC.Append(fx.Hook{
+		fx.Provide(
+			func() context.Context { return ctx },
+		),
+		fx.Invoke(func(lc fx.Lifecycle, p Params) {
+			// Update the signal handler with the real logger
+			handler.SetLogger(p.Logger)
+			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
 					params := &listParams{
 						ctx:     ctx,

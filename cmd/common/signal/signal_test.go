@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -18,7 +19,7 @@ import (
 // setupTestHandler creates a signal handler with the given context and cleanup function.
 func setupTestHandler(t *testing.T, ctx context.Context, cleanupFn func()) (*signal.SignalHandler, func()) {
 	t.Helper()
-	handler := signal.NewSignalHandler()
+	handler := signal.NewSignalHandler(logger.NewNoOp())
 	if cleanupFn != nil {
 		handler.SetCleanup(cleanupFn)
 	}
@@ -120,7 +121,7 @@ func TestSignalHandler(t *testing.T) {
 		)
 
 		// Set up the signal handler
-		handler := signal.NewSignalHandler()
+		handler := signal.NewSignalHandler(logger.NewNoOp())
 		handler.SetFXApp(app)
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
@@ -148,7 +149,7 @@ func TestSignalHandler(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
-		handler := signal.NewSignalHandler()
+		handler := signal.NewSignalHandler(logger.NewNoOp())
 		handler.SetShutdownTimeout(5 * time.Second)
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
@@ -192,7 +193,7 @@ func TestSignalHandler(t *testing.T) {
 
 func TestSignalHandler_ShutdownTimeout(t *testing.T) {
 	// Create a signal handler with a short timeout
-	handler := signal.NewSignalHandler()
+	handler := signal.NewSignalHandler(logger.NewNoOp())
 	handler.SetShutdownTimeout(100 * time.Millisecond)
 
 	// Create a context that we'll cancel
@@ -239,7 +240,7 @@ func TestSignalHandler_ShutdownTimeout(t *testing.T) {
 
 func TestSignalHandler_ShutdownTimeoutWithFX(t *testing.T) {
 	// Create a signal handler with a short timeout
-	handler := signal.NewSignalHandler()
+	handler := signal.NewSignalHandler(logger.NewNoOp())
 	handler.SetShutdownTimeout(100 * time.Millisecond)
 
 	// Create a context that we'll cancel
@@ -308,7 +309,7 @@ func TestSignalHandler_ShutdownTimeoutWithFX(t *testing.T) {
 
 func TestSignalHandler_ShutdownTimeoutWithError(t *testing.T) {
 	// Create a signal handler with a short timeout
-	handler := signal.NewSignalHandler()
+	handler := signal.NewSignalHandler(logger.NewNoOp())
 	handler.SetShutdownTimeout(100 * time.Millisecond)
 
 	// Create a context that we'll cancel

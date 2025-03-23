@@ -251,3 +251,20 @@ func NewCustomLogger(logger *zap.Logger) *CustomLogger {
 func (c *CustomLogger) SetFatalHook(hook func(zapcore.Entry) error) {
 	c.fatalHook = hook
 }
+
+// NewNoOp creates a no-op logger that discards all logs
+func NewNoOp() Interface {
+	return &noOpLogger{}
+}
+
+// noOpLogger implements Interface but discards all logs
+type noOpLogger struct{}
+
+func (l *noOpLogger) Debug(msg string, fields ...any)   {}
+func (l *noOpLogger) Info(msg string, fields ...any)    {}
+func (l *noOpLogger) Warn(msg string, fields ...any)    {}
+func (l *noOpLogger) Error(msg string, fields ...any)   {}
+func (l *noOpLogger) Fatal(msg string, fields ...any)   {}
+func (l *noOpLogger) Printf(format string, args ...any) {}
+func (l *noOpLogger) Errorf(format string, args ...any) {}
+func (l *noOpLogger) Sync() error                       { return nil }

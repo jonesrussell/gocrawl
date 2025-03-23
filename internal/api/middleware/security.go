@@ -45,6 +45,11 @@ type rateLimitInfo struct {
 	lastAccess time.Time
 }
 
+// Constants
+const (
+	cleanupTimeout = 5 * time.Second // Timeout for waiting for cleanup to complete
+)
+
 // NewSecurityMiddleware creates a new security middleware instance
 func NewSecurityMiddleware(cfg *config.ServerConfig, logger logger.Interface) *SecurityMiddleware {
 	m := &SecurityMiddleware{
@@ -267,7 +272,6 @@ func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
 
 // WaitCleanup waits for the cleanup goroutine to finish
 func (m *SecurityMiddleware) WaitCleanup() {
-	// Add a timeout to prevent hanging
 	done := make(chan struct{})
 	go func() {
 		m.cleanupWg.Wait()
@@ -277,7 +281,7 @@ func (m *SecurityMiddleware) WaitCleanup() {
 	select {
 	case <-done:
 		// Cleanup completed successfully
-	case <-time.After(5 * time.Second):
+	case <-time.After(cleanupTimeout):
 		// Timeout waiting for cleanup
 	}
 }

@@ -40,7 +40,7 @@ func TestModule(t *testing.T) {
 			func() logger.Interface { return mockLogger },
 			func() api.SearchManager { return mockSearchManager },
 			func() config.Interface { return mockCfg },
-			func() context.Context { return context.Background() },
+			context.Background,
 		),
 		api.Module,
 	)
@@ -102,7 +102,7 @@ func TestServerConfiguration(t *testing.T) {
 					func() logger.Interface { return mockLogger },
 					func() api.SearchManager { return mockSearchManager },
 					func() config.Interface { return mockCfg },
-					func() context.Context { return context.Background() },
+					context.Background,
 				),
 				api.Module,
 				fx.Populate(&server),

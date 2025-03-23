@@ -4,9 +4,7 @@
 package config
 
 import (
-	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -119,36 +117,40 @@ var Module = fx.Options(
 
 // setupViper initializes Viper with default configuration
 func setupViper() error {
-	// Set default configuration name and type
-	viper.SetConfigType("yaml")
-
-	// Add config search paths in order of priority
-	if cfgFile := os.Getenv("CONFIG_FILE"); cfgFile != "" {
-		// If CONFIG_FILE is set, use it directly
+	// Load config file from environment if specified
+	if cfgFile := os.Getenv("GOCRAWL_CONFIG"); cfgFile != "" {
+		fmt.Printf("Using config file from environment: %s\n", cfgFile)
 		viper.SetConfigFile(cfgFile)
-		// Use standard logging
-		log.Printf("Using config file from environment: %s", cfgFile)
 	} else {
+		// Look for config file in current directory
 		viper.SetConfigName("config")
-		// Add search paths in order of priority
-		viper.AddConfigPath("/opt/gocrawl/etc") // Production config path
-		viper.AddConfigPath("/etc/gocrawl")     // System config path
-		viper.AddConfigPath("$HOME/.gocrawl")   // User config path
-		viper.AddConfigPath(".")                // Current directory
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath(".")
+		viper.AddConfigPath("$HOME/.gocrawl")
+		viper.AddConfigPath("/etc/gocrawl")
+	}
+
+	// Load .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Printf("Warning: Error loading .env file: %v\n", err)
+		}
+	}
+
+	// Read config file
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return fmt.Errorf("error reading config file: %w", err)
+		}
+		fmt.Printf("Warning: No config file found, using defaults\n")
+	} else {
+		fmt.Printf("Configuration loaded from: %s\n", viper.ConfigFileUsed())
 	}
 
 	// Configure environment variable handling
 	viper.SetEnvPrefix("")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// Load .env file in development mode
-	if os.Getenv("APP_ENV") != "production" {
-		if err := godotenv.Load(); err != nil {
-			// Only log a warning as .env file is optional
-			log.Printf("Warning: Error loading .env file: %v", err)
-		}
-	}
 
 	// Bind environment variables
 	if err := bindEnvs(defaultEnvBindings()); err != nil {
@@ -165,20 +167,6 @@ func setupViper() error {
 	viper.SetDefault("crawler.max_depth", defaultMaxDepth)
 	viper.SetDefault("crawler.parallelism", defaultParallelism)
 
-	// Read the configuration file
-	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError *viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) {
-			if os.Getenv("APP_ENV") == envProduction {
-				return fmt.Errorf("no config file found in production environment: %w", err)
-			}
-			log.Printf("Warning: No config file found, using defaults and environment variables")
-			return nil
-		}
-		return fmt.Errorf("error reading config file: %w", err)
-	}
-
-	log.Printf("Configuration loaded from: %s", viper.ConfigFileUsed())
 	return nil
 }
 
@@ -408,7 +396,7 @@ func New() (Interface, error) {
 	if os.Getenv("APP_ENV") != envProduction {
 		if loadErr := godotenv.Load(); loadErr != nil {
 			// Only log a warning as .env file is optional
-			log.Printf("Warning: Error loading .env file: %v", loadErr)
+			fmt.Printf("Warning: Error loading .env file: %v", loadErr)
 		}
 	}
 

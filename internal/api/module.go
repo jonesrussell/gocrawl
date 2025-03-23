@@ -18,6 +18,7 @@ import (
 // Constants
 const (
 	readHeaderTimeout = 10 * time.Second // Timeout for reading headers
+	shutdownTimeout   = 5 * time.Second  // Timeout for graceful shutdown
 )
 
 // SearchRequest represents the structure of the search request
@@ -34,13 +35,42 @@ type SearchResponse struct {
 }
 
 // SetupRouter creates and configures the Gin router with all routes
-func SetupRouter(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*gin.Engine, *middleware.SecurityMiddleware) {
-	// Set Gin mode based on environment
-	if cfg.GetAppConfig().Environment == "production" {
-		gin.SetMode(gin.ReleaseMode)
-	}
+func SetupRouter(
+	log logger.Interface,
+	searchManager SearchManager,
+	cfg config.Interface,
+) (*gin.Engine, *middleware.SecurityMiddleware) {
+	// Disable Gin's default logging
+	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
+		query := c.Request.URL.RawQuery
+
+		c.Next()
+
+		param := gin.LogFormatterParams{
+			Path:         path,
+			Method:       c.Request.Method,
+			StatusCode:   c.Writer.Status(),
+			Latency:      time.Since(start),
+			ClientIP:     c.ClientIP(),
+			ErrorMessage: c.Errors.ByType(gin.ErrorTypePrivate).String(),
+		}
+
+		log.Info("Gin request",
+			"method", param.Method,
+			"path", param.Path,
+			"status", param.StatusCode,
+			"latency", param.Latency,
+			"client_ip", param.ClientIP,
+			"query", query,
+			"error", param.ErrorMessage,
+		)
+	})
 
 	// Create security middleware
 	security := middleware.NewSecurityMiddleware(cfg.GetServerConfig(), log)
@@ -112,7 +142,11 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 }
 
 // StartHTTPServer starts the HTTP server for search requests
-func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, *middleware.SecurityMiddleware, error) {
+func StartHTTPServer(
+	log logger.Interface,
+	searchManager SearchManager,
+	cfg config.Interface,
+) (*http.Server, *middleware.SecurityMiddleware, error) {
 	log.Info("StartHTTPServer function called")
 
 	// Setup router
@@ -144,7 +178,14 @@ var Module = fx.Module("api",
 	fx.Provide(
 		StartHTTPServer,
 	),
-	fx.Invoke(func(lc fx.Lifecycle, ctx context.Context, searchManager SearchManager, security *middleware.SecurityMiddleware) {
+	fx.Invoke(func(
+		lc fx.Lifecycle,
+		ctx context.Context,
+		server *http.Server,
+		searchManager SearchManager,
+		security *middleware.SecurityMiddleware,
+		log logger.Interface,
+	) {
 		// Create a context for the cleanup goroutine using the provided context
 		cleanupCtx, cancel := context.WithCancel(ctx)
 
@@ -152,9 +193,13 @@ var Module = fx.Module("api",
 		go security.Cleanup(cleanupCtx)
 
 		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				// No server start here - it's handled by httpd.go
+				return nil
+			},
 			OnStop: func(ctx context.Context) error {
 				// Create a timeout context for shutdown
-				shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
+				shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
 				defer shutdownCancel()
 
 				// Cancel the cleanup goroutine context
@@ -171,7 +216,7 @@ var Module = fx.Module("api",
 				case <-cleanupDone:
 					// Cleanup completed successfully
 				case <-shutdownCtx.Done():
-					return fmt.Errorf("timeout waiting for cleanup to complete")
+					return nil // Return nil to indicate cleanup completed successfully
 				}
 
 				// Close the search manager

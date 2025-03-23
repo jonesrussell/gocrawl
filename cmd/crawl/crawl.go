@@ -107,8 +107,8 @@ Example:
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			// Set up signal handling
-			handler := signal.NewSignalHandler()
+			// Set up signal handling with a no-op logger initially
+			handler := signal.NewSignalHandler(logger.NewNoOp())
 			cleanup := handler.Setup(ctx)
 			defer cleanup()
 
@@ -122,7 +122,50 @@ Example:
 						fx.ResultTags(`name:"crawlContext"`),
 					),
 				),
-				fx.Invoke(StartCrawl),
+				fx.Invoke(func(lc fx.Lifecycle, p Params) {
+					// Update the signal handler with the real logger
+					handler.SetLogger(p.Logger)
+					lc.Append(fx.Hook{
+						OnStart: func(ctx context.Context) error {
+							source, findErr := p.Sources.FindByName(sourceName)
+							if findErr != nil {
+								return fmt.Errorf("error finding source: %w", findErr)
+							}
+
+							collectorResult, setupErr := app.SetupCollector(ctx, p.Logger, *source, p.Processors, p.Done, p.Config)
+							if setupErr != nil {
+								return fmt.Errorf("error setting up collector: %w", setupErr)
+							}
+
+							if configErr := app.ConfigureCrawler(p.Crawler, *source, collectorResult); configErr != nil {
+								return fmt.Errorf("error configuring crawler: %w", configErr)
+							}
+
+							p.Logger.Info("Starting crawl", "source", source.Name)
+							if startErr := p.Crawler.Start(ctx, source.URL); startErr != nil {
+								return fmt.Errorf("error starting crawler: %w", startErr)
+							}
+
+							// Monitor crawl completion in a separate goroutine
+							go func() {
+								p.Crawler.Wait()
+								p.Logger.Info("Crawler finished processing all URLs")
+
+								// Signal completion through the Done channel
+								close(p.Done)
+							}()
+
+							return nil
+						},
+						OnStop: func(ctx context.Context) error {
+							p.Logger.Info("Stopping crawler")
+							if stopErr := p.Crawler.Stop(ctx); stopErr != nil {
+								return fmt.Errorf("error stopping crawler: %w", stopErr)
+							}
+							return nil
+						},
+					})
+				}),
 			)
 
 			// Set the fx app for coordinated shutdown
