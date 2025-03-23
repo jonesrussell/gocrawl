@@ -8,11 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -54,9 +53,14 @@ Example:
 
 // RunList executes the list command and displays all sources.
 func RunList(cmd *cobra.Command, _ []string) error {
-	// Set up signal handling for graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	// Create a cancellable context
+	ctx, cancel := context.WithCancel(cmd.Context())
+	defer cancel()
+
+	// Set up signal handling
+	handler := signal.NewSignalHandler()
+	cleanup := handler.Setup(ctx)
+	defer cleanup()
 
 	// Create channels for error handling and completion
 	errChan := make(chan error, 1)
@@ -94,9 +98,21 @@ func RunList(cmd *cobra.Command, _ []string) error {
 	)
 
 	// Start the application and handle any startup errors
-	if err := app.Start(cmd.Context()); err != nil {
+	if err := app.Start(ctx); err != nil {
 		return fmt.Errorf("error starting application: %w", err)
 	}
+
+	// Set up cleanup for graceful shutdown
+	handler.SetCleanup(func() {
+		// Create a context with timeout for graceful shutdown
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultOperationTimeout)
+		defer stopCancel()
+
+		// Stop the application and handle any shutdown errors
+		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+			common.PrintErrorf("Error stopping application: %v", err)
+		}
+	})
 
 	// Wait for either:
 	// - A signal interrupt (SIGINT/SIGTERM)
@@ -105,26 +121,15 @@ func RunList(cmd *cobra.Command, _ []string) error {
 	// - List error
 	var listErr error
 	select {
-	case sig := <-sigChan:
-		common.PrintInfof("Received signal %v, initiating shutdown...", sig)
-	case <-cmd.Context().Done():
-		common.PrintInfof("Context cancelled, initiating shutdown...")
 	case listErr = <-errChan:
 		// Error already logged in ExecuteList
 	case <-doneChan:
 		// Success message already printed in ExecuteList
 	}
 
-	// Create a context with timeout for graceful shutdown
-	stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
-	defer stopCancel()
-
-	// Stop the application and handle any shutdown errors
-	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-		common.PrintErrorf("Error stopping application: %v", err)
-		if listErr == nil {
-			listErr = err
-		}
+	// Only wait for shutdown signal if there was an error
+	if listErr != nil {
+		handler.Wait()
 	}
 
 	return listErr

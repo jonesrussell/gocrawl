@@ -6,11 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -46,9 +44,14 @@ var Cmd = &cobra.Command{
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		// Set up signal handling for graceful shutdown
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		// Create a parent context that can be cancelled
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
+
+		// Set up signal handling
+		handler := signal.NewSignalHandler()
+		cleanup := handler.Setup(ctx)
+		defer cleanup()
 
 		// Create channels for error handling and completion
 		errChan := make(chan error, 1)
@@ -97,9 +100,21 @@ You can send POST requests to /search with a JSON body containing the search par
 		)
 
 		// Start the application and handle any startup errors
-		if err := app.Start(cmd.Context()); err != nil {
+		if err := app.Start(ctx); err != nil {
 			return fmt.Errorf("error starting application: %w", err)
 		}
+
+		// Set up cleanup for graceful shutdown
+		handler.SetCleanup(func() {
+			// Create a context with timeout for graceful shutdown
+			stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+			defer stopCancel()
+
+			// Stop the application and handle any shutdown errors
+			if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+				common.PrintErrorf("Error during shutdown: %v", err)
+			}
+		})
 
 		// Wait for either:
 		// - A signal interrupt (SIGINT/SIGTERM)
@@ -108,29 +123,14 @@ You can send POST requests to /search with a JSON body containing the search par
 		// - Server shutdown
 		var serverErr error
 		select {
-		case sig := <-sigChan:
-			common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-			// Graceful shutdown requested, not an error
-		case <-cmd.Context().Done():
-			common.PrintInfof("\nContext cancelled, initiating shutdown...")
-			// Context cancellation requested, not an error
 		case serverErr = <-errChan:
 			// Error already logged in OnStart hook
 		case <-doneChan:
 			// Server shut down cleanly
 		}
 
-		// Create a context with timeout for graceful shutdown
-		stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultShutdownTimeout)
-		defer stopCancel()
-
-		// Stop the application and handle any shutdown errors
-		if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-			common.PrintErrorf("Error during shutdown: %v", err)
-			if serverErr == nil && !errors.Is(err, context.Canceled) {
-				serverErr = err
-			}
-		}
+		// Wait for shutdown signal
+		handler.Wait()
 
 		// Only return error for actual failures, not graceful shutdowns
 		if serverErr != nil && !errors.Is(serverErr, context.Canceled) {

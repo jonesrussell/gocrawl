@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -101,11 +103,13 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceName = args[0]
 
-		// Create a cancellable context and set up signal handling
+		// Create a cancellable context
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		signalDone, cleanup := app.WaitForSignal(ctx, cancel)
+		// Set up signal handling
+		handler := signal.NewSignalHandler()
+		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
 		// Create the crawler's completion channel
@@ -136,19 +140,24 @@ Example:
 			return fmt.Errorf("error starting application: %w", startErr)
 		}
 
-		// Wait for completion or cancellation
-		select {
-		case <-signalDone:
-			// Normal completion through signal
-		case <-crawlerDone:
-			// Crawler completed successfully
-		case <-ctx.Done():
-			// Context cancelled
-		}
+		// Set up cleanup for graceful shutdown
+		handler.SetCleanup(func() {
+			// Create a context with timeout for graceful shutdown
+			stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+			defer stopCancel()
 
-		// Perform graceful shutdown
-		if shutdownErr := fxApp.Stop(ctx); shutdownErr != nil {
-			return fmt.Errorf("error during shutdown: %w", shutdownErr)
+			// Stop the application and handle any shutdown errors
+			if err := fxApp.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+				common.PrintErrorf("Error during shutdown: %v", err)
+			}
+		})
+
+		// Wait for crawler completion
+		<-crawlerDone
+
+		// Only wait for shutdown signal if there was an error
+		if err := fxApp.Stop(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
+			handler.Wait()
 		}
 
 		return nil

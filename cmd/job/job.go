@@ -9,6 +9,7 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -194,12 +195,15 @@ func startJob(p Params) error {
 	// Start scheduler in background
 	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config, p.ActiveJobs)
 
-	// Wait for interrupt
-	done, cleanup := app.WaitForSignal(ctx, cancel)
+	// Set up signal handling
+	handler := signal.NewSignalHandler()
+	cleanup := handler.Setup(ctx)
 	defer cleanup()
 
 	p.Logger.Info("Job scheduler running. Press Ctrl+C to stop...")
-	<-done
+
+	// Wait for shutdown signal
+	handler.Wait()
 
 	// Log graceful shutdown
 	p.Logger.Info("") // Add newline before shutdown messages
@@ -238,10 +242,6 @@ var Cmd = &cobra.Command{
 		// Create a parent context that can be cancelled
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
-
-		// Set up signal handling
-		done, cleanup := app.WaitForSignal(ctx, cancel)
-		defer cleanup()
 
 		// Initialize the Fx application with required modules and dependencies
 		fxApp := fx.New(
@@ -307,24 +307,28 @@ var Cmd = &cobra.Command{
 
 		// Start the application
 		if err := fxApp.Start(ctx); err != nil {
-			if errors.Is(err, context.Canceled) {
-				// Normal shutdown, don't show usage
-				return nil
-			}
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		// Wait for completion or interruption
-		<-done
+		// Set up signal handling
+		handler := signal.NewSignalHandler()
+		cleanup := handler.Setup(ctx)
+		defer cleanup()
 
-		// Perform graceful shutdown
-		if err := app.GracefulShutdown(fxApp); err != nil {
-			if errors.Is(err, context.Canceled) {
-				// Normal shutdown, don't show usage
-				return nil
+		// Set up cleanup for graceful shutdown
+		handler.SetCleanup(func() {
+			// Create a context with timeout for graceful shutdown
+			stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+			defer stopCancel()
+
+			// Stop the application and handle any shutdown errors
+			if err := fxApp.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
+				common.PrintErrorf("Error during shutdown: %v", err)
 			}
-			return err
-		}
+		})
+
+		// Wait for shutdown signal
+		handler.Wait()
 
 		return nil
 	},
