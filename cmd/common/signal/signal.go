@@ -31,8 +31,6 @@ type SignalHandler struct {
 	doneChan chan struct{}
 	// cleanup is called during shutdown
 	cleanup func()
-	// isServer indicates if this is a server mode handler
-	isServer bool
 	// wg tracks the signal handling goroutine
 	wg sync.WaitGroup
 	// fxApp is the fx application instance
@@ -43,6 +41,26 @@ type SignalHandler struct {
 	fxDoneChan chan struct{}
 	// logger is the application logger
 	logger logger.Interface
+	// once ensures we only close doneChan once
+	once sync.Once
+	// state tracks the current state of the handler
+	state string
+	// stateMu protects access to state
+	stateMu sync.RWMutex
+}
+
+// GetState returns the current state of the signal handler.
+func (h *SignalHandler) GetState() string {
+	h.stateMu.RLock()
+	defer h.stateMu.RUnlock()
+	return h.state
+}
+
+// setState updates the state of the signal handler.
+func (h *SignalHandler) setState(state string) {
+	h.stateMu.Lock()
+	defer h.stateMu.Unlock()
+	h.state = state
 }
 
 // NewSignalHandler creates a new SignalHandler instance.
@@ -53,16 +71,7 @@ func NewSignalHandler(logger logger.Interface) *SignalHandler {
 		fxDoneChan:      make(chan struct{}),
 		shutdownTimeout: DefaultShutdownTimeout,
 		logger:          logger,
-	}
-}
-
-// NewServerSignalHandler creates a new SignalHandler instance for server mode.
-func NewServerSignalHandler() *SignalHandler {
-	return &SignalHandler{
-		sigChan:         make(chan os.Signal, 1),
-		doneChan:        make(chan struct{}),
-		isServer:        true,
-		shutdownTimeout: DefaultShutdownTimeout,
+		state:           "initialized",
 	}
 }
 
@@ -91,17 +100,20 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 	h.wg.Add(1)
 	go func() {
 		defer h.wg.Done()
+		h.setState("running")
 		select {
 		case sig := <-h.sigChan:
 			// Log the received signal
 			h.logger.Info("Received signal, initiating shutdown...", "signal", sig)
+			h.setState("shutting_down")
 			h.handleShutdown(ctx)
 		case <-ctx.Done():
 			// Context was cancelled
 			h.logger.Info("Context cancelled, initiating shutdown...")
+			h.setState("shutting_down")
 			h.handleShutdown(ctx)
 		}
-		close(h.doneChan)
+		h.signalDone()
 	}()
 
 	// Return cleanup function
@@ -110,6 +122,7 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 		signal.Stop(h.sigChan)
 		// Wait for the signal handling goroutine to finish
 		h.wg.Wait()
+		h.setState("cleaned_up")
 	}
 }
 
@@ -143,6 +156,7 @@ func (h *SignalHandler) SetCleanup(cleanup func()) {
 // It returns true if a signal was received, false if the context was cancelled.
 func (h *SignalHandler) Wait() bool {
 	<-h.doneChan
+	h.setState("completed")
 	return true
 }
 
@@ -151,20 +165,32 @@ func (h *SignalHandler) Wait() bool {
 func (h *SignalHandler) WaitWithTimeout(timeoutCtx context.Context) bool {
 	select {
 	case <-h.doneChan:
+		h.setState("completed")
 		return true
 	case <-timeoutCtx.Done():
+		h.setState("timeout")
 		return false
 	}
 }
 
 // IsShuttingDown returns true if a shutdown signal has been received.
 func (h *SignalHandler) IsShuttingDown() bool {
-	select {
-	case <-h.doneChan:
-		return true
-	default:
-		return false
-	}
+	return h.sigChan != nil
+}
+
+// Complete signals that the operation is complete and should exit.
+func (h *SignalHandler) Complete() {
+	h.setState("completing")
+	h.signalDone()
+}
+
+// signalDone ensures the doneChan is closed exactly once.
+func (h *SignalHandler) signalDone() {
+	h.once.Do(func() {
+		if h.doneChan != nil {
+			close(h.doneChan)
+		}
+	})
 }
 
 // isContextError checks if an error is a context-related error.

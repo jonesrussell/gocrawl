@@ -27,20 +27,14 @@ func setupTestHandler(t *testing.T, ctx context.Context, cleanupFn func()) (*sig
 	return handler, cleanup
 }
 
-// sendSignal sends a signal to the current process. If no signal is provided, SIGINT is used.
-func sendSignal(t *testing.T, sig ...os.Signal) error {
+// sendSignal sends a signal to the current process.
+func sendSignal(t *testing.T) error {
 	t.Helper()
 	p, err := os.FindProcess(os.Getpid())
 	if err != nil {
 		return err
 	}
-	signal := syscall.SIGINT
-	if len(sig) > 0 {
-		if s, ok := sig[0].(syscall.Signal); ok {
-			signal = s
-		}
-	}
-	return p.Signal(signal)
+	return p.Signal(syscall.SIGINT)
 }
 
 func TestSignalHandler(t *testing.T) {

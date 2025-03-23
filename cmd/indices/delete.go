@@ -96,7 +96,6 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	fxApp := fx.New(
 		fx.NopLogger,
 		common.Module,
-		Module,
 		fx.Provide(
 			func() context.Context { return ctx },
 		),
@@ -117,6 +116,8 @@ func runDelete(cmd *cobra.Command, args []string) error {
 						p.Logger.Error("Error executing delete", "error", err)
 						return err
 					}
+					// Signal completion
+					handler.Complete()
 					return nil
 				},
 				OnStop: func(context.Context) error {

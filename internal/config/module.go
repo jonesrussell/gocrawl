@@ -101,6 +101,19 @@ func bindEnvs(bindings map[string]string) error {
 	return nil
 }
 
+// init initializes the config module
+func init() {
+	// Initialize Viper configuration
+	if err := setupViper(); err != nil {
+		panic(fmt.Sprintf("Failed to setup Viper: %v", err))
+	}
+
+	// Bind environment variables
+	if err := bindEnvs(defaultEnvBindings()); err != nil {
+		panic(fmt.Sprintf("Failed to bind environment variables: %v", err))
+	}
+}
+
 // Module provides the config module and its dependencies using fx.
 // It sets up the configuration providers that can be used throughout
 // the application for dependency injection.
@@ -151,11 +164,6 @@ func setupViper() error {
 	viper.SetEnvPrefix("")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// Bind environment variables
-	if err := bindEnvs(defaultEnvBindings()); err != nil {
-		return fmt.Errorf("failed to bind environment variables: %w", err)
-	}
 
 	// Set default values AFTER binding environment variables
 	if os.Getenv("APP_ENV") == "" {
@@ -398,11 +406,6 @@ func New() (Interface, error) {
 			// Only log a warning as .env file is optional
 			fmt.Printf("Warning: Error loading .env file: %v", loadErr)
 		}
-	}
-
-	// Initialize Viper configuration
-	if setupErr := setupViper(); setupErr != nil {
-		return nil, fmt.Errorf("failed to setup viper: %w", setupErr)
 	}
 
 	// Create configuration from Viper settings

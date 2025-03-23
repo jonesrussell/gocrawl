@@ -22,6 +22,8 @@ func provideLogger(cfg config.Interface) (Interface, error) {
 		logLevel = defaultLogLevel // Set a default log level
 	}
 
+	fmt.Printf("Initializing logger with environment: %s, log level: %s, debug: %v\n", env, logLevel, logConfig.Debug)
+
 	var customLogger *CustomLogger
 	var err error
 	if env == "development" {

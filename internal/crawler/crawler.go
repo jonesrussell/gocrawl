@@ -69,9 +69,12 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 }
 
 // Stop gracefully stops the crawler.
-func (c *Crawler) Stop(_ context.Context) error {
+func (c *Crawler) Stop(ctx context.Context) error {
 	c.Logger.Info("Stopping crawler")
-	c.collector.Wait()
+
+	// Wait for collector to finish
+	c.Wait()
+	c.Logger.Info("Crawler stopped successfully")
 	return nil
 }
 
