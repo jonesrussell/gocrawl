@@ -111,5 +111,10 @@ func (m *MockConfig) GetServerConfig() *config.ServerConfig {
 	return m.serverConfig
 }
 
+// GetCommand returns the command being run.
+func (m *MockConfig) GetCommand() string {
+	return "test"
+}
+
 // Ensure MockConfig implements config.Interface
 var _ config.Interface = (*MockConfig)(nil)

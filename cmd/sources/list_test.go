@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxtest"
 )
 
 // ErrSourceNotFound is returned when a source is not found
@@ -129,8 +130,7 @@ func Test_runList(t *testing.T) {
 			cmd, sm, ml, mc := tt.setup(t)
 
 			// Create test app with mock dependencies
-			app := fx.New(
-				fx.NopLogger,
+			app := fxtest.New(t,
 				fx.Supply(cmd.Context()),
 				fx.Provide(
 					// Provide source manager with the correct name tag
@@ -173,13 +173,9 @@ func Test_runList(t *testing.T) {
 				}),
 			)
 
-			err := app.Start(cmd.Context())
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			require.NoError(t, app.Stop(cmd.Context()))
+			// Test lifecycle
+			app.RequireStart()
+			app.RequireStop()
 		})
 	}
 }

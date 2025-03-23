@@ -34,6 +34,8 @@ type AppConfig struct {
 	Name string `yaml:"name"`
 	// Version is the application version
 	Version string `yaml:"version"`
+	// Debug enables debug mode for additional logging
+	Debug bool `yaml:"debug"`
 }
 
 // CrawlerConfig holds crawler-specific configuration settings.
@@ -225,18 +227,20 @@ type ServerConfig struct {
 // Config represents the complete application configuration.
 // It combines all configuration components into a single structure.
 type Config struct {
-	// App contains application-level settings
+	// App contains application-specific settings
 	App AppConfig `yaml:"app"`
-	// Crawler contains crawler-specific settings
-	Crawler CrawlerConfig `yaml:"crawler"`
+	// Log contains logging configuration
+	Log LogConfig `yaml:"log"`
 	// Elasticsearch contains Elasticsearch connection settings
 	Elasticsearch ElasticsearchConfig `yaml:"elasticsearch"`
-	// Log contains logging-related settings
-	Log LogConfig `yaml:"log"`
+	// Server contains HTTP server settings
+	Server ServerConfig `yaml:"server"`
+	// Crawler contains crawler-specific settings
+	Crawler CrawlerConfig `yaml:"crawler"`
 	// Sources contains the list of news sources to crawl
 	Sources []Source `yaml:"sources"`
-	// Server contains server-specific settings
-	Server ServerConfig `yaml:"server"`
+	// Command is the command being run (e.g., "httpd", "job")
+	Command string `yaml:"-"`
 }
 
 // GetCrawlerConfig implements Interface
@@ -267,6 +271,11 @@ func (c *Config) GetSources() []Source {
 // GetServerConfig implements Interface
 func (c *Config) GetServerConfig() *ServerConfig {
 	return &c.Server
+}
+
+// GetCommand implements Interface
+func (c *Config) GetCommand() string {
+	return c.Command
 }
 
 // Ensure Config implements Interface

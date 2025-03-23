@@ -24,6 +24,9 @@ func TestValidateConfig(t *testing.T) {
 				Log: config.LogConfig{
 					Level: "info",
 				},
+				Elasticsearch: config.ElasticsearchConfig{
+					Addresses: []string{"http://localhost:9200"},
+				},
 				Crawler: config.CrawlerConfig{
 					Parallelism: 2,
 					MaxDepth:    2,
