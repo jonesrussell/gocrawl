@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -54,12 +53,11 @@ func (m *ElasticsearchIndexManager) EnsureIndex(ctx context.Context, name string
 	if err != nil {
 		return fmt.Errorf("failed to create index %s: %w", name, err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			m.logger.Error("Error closing response body", "error", closeErr)
 		}
-	}(res.Body)
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("failed to create index %s: status: %s", name, res.Status())
@@ -79,12 +77,11 @@ func (m *ElasticsearchIndexManager) DeleteIndex(ctx context.Context, name string
 	if err != nil {
 		return fmt.Errorf("failed to delete index %s: %w", name, err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			m.logger.Error("Error closing response body", "error", closeErr)
 		}
-	}(res.Body)
+	}()
 
 	if res.IsError() {
 		if res.StatusCode == http.StatusNotFound {
@@ -107,12 +104,11 @@ func (m *ElasticsearchIndexManager) IndexExists(ctx context.Context, name string
 	if err != nil {
 		return false, fmt.Errorf("failed to check if index %s exists: %w", name, err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			m.logger.Error("Error closing response body", "error", closeErr)
 		}
-	}(res.Body)
+	}()
 
 	exists := !res.IsError()
 	return exists, nil
@@ -143,12 +139,11 @@ func (m *ElasticsearchIndexManager) UpdateMapping(ctx context.Context, name stri
 	if err != nil {
 		return fmt.Errorf("failed to update mapping for index %s: %w", name, err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			m.logger.Error("Error closing response body", "error", closeErr)
 		}
-	}(res.Body)
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("failed to update mapping for index %s: status: %s", name, res.Status())

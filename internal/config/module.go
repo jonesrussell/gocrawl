@@ -4,6 +4,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -128,11 +129,52 @@ var Module = fx.Options(
 	),
 )
 
+// Add a simple logger interface
+type logger interface {
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+}
+
+// defaultLogger implements the logger interface using standard logging
+type defaultLogger struct{}
+
+func (l *defaultLogger) Info(msg string, args ...any) {
+	if len(args) > 0 {
+		// Format key-value pairs
+		formattedArgs := make([]any, 0, len(args))
+		for i := 0; i < len(args); i += 2 {
+			if i+1 < len(args) {
+				formattedArgs = append(formattedArgs, args[i], args[i+1])
+			}
+		}
+		os.Stdout.WriteString(fmt.Sprintf("INFO: %s %v\n", msg, formattedArgs))
+	} else {
+		os.Stdout.WriteString(fmt.Sprintf("INFO: %s\n", msg))
+	}
+}
+
+func (l *defaultLogger) Warn(msg string, args ...any) {
+	if len(args) > 0 {
+		// Format key-value pairs
+		formattedArgs := make([]any, 0, len(args))
+		for i := 0; i < len(args); i += 2 {
+			if i+1 < len(args) {
+				formattedArgs = append(formattedArgs, args[i], args[i+1])
+			}
+		}
+		os.Stderr.WriteString(fmt.Sprintf("WARN: %s %v\n", msg, formattedArgs))
+	} else {
+		os.Stderr.WriteString(fmt.Sprintf("WARN: %s\n", msg))
+	}
+}
+
+var defaultLog = &defaultLogger{}
+
 // setupViper initializes Viper with default configuration
 func setupViper() error {
 	// Load config file from environment if specified
 	if cfgFile := os.Getenv("GOCRAWL_CONFIG"); cfgFile != "" {
-		fmt.Printf("Using config file from environment: %s\n", cfgFile)
+		defaultLog.Info("Using config file from environment", "file", cfgFile)
 		viper.SetConfigFile(cfgFile)
 	} else {
 		// Look for config file in current directory
@@ -146,18 +188,19 @@ func setupViper() error {
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Printf("Warning: Error loading .env file: %v\n", err)
+			defaultLog.Warn("Error loading .env file", "error", err)
 		}
 	}
 
 	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFoundError) {
 			return fmt.Errorf("error reading config file: %w", err)
 		}
-		fmt.Printf("Warning: No config file found, using defaults\n")
+		defaultLog.Warn("No config file found, using defaults")
 	} else {
-		fmt.Printf("Configuration loaded from: %s\n", viper.ConfigFileUsed())
+		defaultLog.Info("Configuration loaded from", "file", viper.ConfigFileUsed())
 	}
 
 	// Configure environment variable handling
@@ -404,7 +447,25 @@ func New() (Interface, error) {
 	if os.Getenv("APP_ENV") != envProduction {
 		if loadErr := godotenv.Load(); loadErr != nil {
 			// Only log a warning as .env file is optional
-			fmt.Printf("Warning: Error loading .env file: %v", loadErr)
+			defaultLog.Warn("Error loading .env file", "error", loadErr)
+		}
+	}
+
+	// Create configuration from Viper settings
+	cfg, err := createConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+// NewConfig creates a new config provider
+func NewConfig(log logger) (*ConfigImpl, error) {
+	// Load .env file in development mode
+	if os.Getenv("APP_ENV") != envProduction {
+		if loadErr := godotenv.Load(); loadErr != nil {
+			log.Warn("Error loading .env file", "error", loadErr)
 		}
 	}
 

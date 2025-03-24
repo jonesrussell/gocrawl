@@ -2,39 +2,55 @@ package logger
 
 import (
 	"fmt"
+	"os"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"go.uber.org/zap"
 )
 
-// provideLogger sets up the global logger based on the configuration
-func provideLogger(cfg config.Interface) (Interface, error) {
-	appConfig := cfg.GetAppConfig()
-	logConfig := cfg.GetLogConfig()
+const (
+	envDevelopment = "development"
+	defaultLevel   = "info"
+)
 
-	env := appConfig.Environment
+var logger Interface
+
+// GetLogger returns the global logger instance
+func GetLogger() Interface {
+	return logger
+}
+
+// Initialize logger with environment and log level
+func init() {
+	env := os.Getenv("APP_ENV")
 	if env == "" {
-		env = "development" // Set a default environment
+		env = envDevelopment
 	}
 
-	// Ensure we have a valid log level
-	logLevel := logConfig.Level
-	if logLevel == "" {
-		logLevel = defaultLogLevel // Set a default log level
+	logLevelStr := os.Getenv("LOG_LEVEL")
+	if logLevelStr == "" {
+		logLevelStr = defaultLevel
 	}
 
-	fmt.Printf("Initializing logger with environment: %s, log level: %s, debug: %v\n", env, logLevel, logConfig.Debug)
-
-	var customLogger *CustomLogger
-	var err error
-	if env == "development" {
-		customLogger, err = NewDevelopmentLogger(logLevel)
-	} else {
-		customLogger, err = NewProductionLogger(logLevel)
-	}
-
+	logLevel, err := ParseLogLevel(logLevelStr)
 	if err != nil {
-		return nil, fmt.Errorf("error initializing logger: %w", err)
+		panic(fmt.Sprintf("Failed to parse log level: %v", err))
 	}
 
-	return customLogger, nil
+	config := zap.NewProductionConfig()
+	if env == envDevelopment {
+		config = zap.NewDevelopmentConfig()
+	}
+
+	config.Level = zap.NewAtomicLevelAt(logLevel)
+
+	zapLogger, err := config.Build()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to initialize logger: %v", err))
+	}
+
+	logger = NewCustomLogger(zapLogger)
+	logger.Info("Initializing logger",
+		"environment", env,
+		"log_level", logLevelStr,
+		"debug", env == envDevelopment)
 }

@@ -2,7 +2,6 @@ package logger
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -122,6 +121,11 @@ func (c *CustomLogger) GetZapLogger() *zap.Logger {
 func ParseLogLevel(logLevelStr string) (zapcore.Level, error) {
 	var logLevel zapcore.Level
 
+	// If no level specified, use default
+	if logLevelStr == "" {
+		logLevelStr = defaultLogLevel
+	}
+
 	switch logLevelStr {
 	case "debug":
 		logLevel = zapcore.DebugLevel
@@ -132,7 +136,7 @@ func ParseLogLevel(logLevelStr string) (zapcore.Level, error) {
 	case "error":
 		logLevel = zapcore.ErrorLevel
 	default:
-		return zapcore.DebugLevel, errors.New("unknown log level")
+		return zapcore.DebugLevel, fmt.Errorf("unknown log level: %s", logLevelStr)
 	}
 
 	return logLevel, nil

@@ -15,7 +15,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/stretchr/testify/assert"
@@ -90,11 +89,13 @@ func TestModuleProvides(t *testing.T) {
 			fx.Annotate(
 				func() logger.Interface { return mockLogger },
 				fx.As(new(logger.Interface)),
+				fx.ResultTags(`name:"testLogger"`),
 			),
 			// Config
 			fx.Annotate(
 				func() config.Interface { return mockCfg },
 				fx.As(new(config.Interface)),
+				fx.ResultTags(`name:"testConfig"`),
 			),
 			// Index Manager
 			fx.Annotate(
@@ -113,16 +114,6 @@ func TestModuleProvides(t *testing.T) {
 				func() string { return "Test Source" },
 				fx.ResultTags(`name:"sourceName"`),
 			),
-			fx.Annotate(
-				func(sources sources.Interface) (string, string) {
-					return "test_content", "test_articles"
-				},
-				fx.ParamTags(`name:"sourceManager"`),
-				fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
-			),
-			func() chan *models.Article {
-				return make(chan *models.Article, 100)
-			},
 		),
 	)
 
@@ -191,11 +182,13 @@ func TestModuleConfiguration(t *testing.T) {
 			fx.Annotate(
 				func() logger.Interface { return mockLogger },
 				fx.As(new(logger.Interface)),
+				fx.ResultTags(`name:"testLogger"`),
 			),
 			// Config
 			fx.Annotate(
 				func() config.Interface { return mockCfg },
 				fx.As(new(config.Interface)),
+				fx.ResultTags(`name:"testConfig"`),
 			),
 			// Index Manager
 			fx.Annotate(
@@ -214,16 +207,6 @@ func TestModuleConfiguration(t *testing.T) {
 				func() string { return "Test Source" },
 				fx.ResultTags(`name:"sourceName"`),
 			),
-			fx.Annotate(
-				func(sources sources.Interface) (string, string) {
-					return "test_content", "test_articles"
-				},
-				fx.ParamTags(`name:"sourceManager"`),
-				fx.ResultTags(`name:"contentIndex"`, `name:"indexName"`),
-			),
-			func() chan *models.Article {
-				return make(chan *models.Article, 100)
-			},
 		),
 	)
 

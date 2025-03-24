@@ -10,11 +10,6 @@ import (
 // Module provides the content service and processor
 var Module = fx.Options(
 	fx.Provide(
-		// Provide the content service
-		fx.Annotate(
-			NewService,
-			fx.As(new(Interface)),
-		),
 		// Provide the content processor
 		fx.Annotate(
 			func(p Params) *Processor {

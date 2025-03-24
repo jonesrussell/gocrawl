@@ -48,9 +48,8 @@ func TestLoadFromFile(t *testing.T) {
 	tmpfile, err := os.CreateTemp(t.TempDir(), "sources_test")
 	require.NoError(t, err)
 	defer func(name string) {
-		err := os.Remove(name)
-		if err != nil {
-			
+		if removeErr := os.Remove(name); removeErr != nil {
+			t.Errorf("Error removing test file: %v", removeErr)
 		}
 	}(tmpfile.Name())
 

@@ -3,7 +3,6 @@ package httpd_test
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"testing"
@@ -264,9 +263,8 @@ func TestServerStartStop(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, err := w.Write([]byte("ok"))
-		if err != nil {
-			return
+		if _, writeErr := w.Write([]byte("ok")); writeErr != nil {
+			t.Errorf("Error writing response: %v", writeErr)
 		}
 	})
 
@@ -321,12 +319,11 @@ func TestServerStartStop(t *testing.T) {
 		}
 	}
 	require.NoError(t, respErr)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Errorf("Error closing response body: %v", closeErr)
 		}
-	}(resp.Body)
+	}()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 

@@ -41,7 +41,7 @@ func TestModule(t *testing.T) {
 			func() logger.Interface { return mockLogger },
 			func() api.SearchManager { return mockSearchManager },
 			func() config.Interface { return mockCfg },
-			context.Background,
+			t.Context,
 		),
 		api.Module,
 	)
@@ -103,7 +103,7 @@ func TestServerConfiguration(t *testing.T) {
 					func() logger.Interface { return mockLogger },
 					func() api.SearchManager { return mockSearchManager },
 					func() config.Interface { return mockCfg },
-					context.Background,
+					t.Context,
 				),
 				api.Module,
 				fx.Populate(&server),
@@ -153,6 +153,19 @@ func TestSearchHandler(t *testing.T) {
 				Size:  10,
 			},
 			setupMocks: func() {
+				// Set up expectations for request logging
+				mockLogger.EXPECT().Info(
+					"Gin request",
+					"method", "POST",
+					"path", "/search",
+					"status", 200,
+					"latency", gomock.Any(),
+					"client_ip", "192.0.2.1",
+					"query", "",
+					"error", "",
+				).Times(1)
+
+				// Set up expectations for search
 				mockSearchManager.EXPECT().
 					Search(gomock.Any(), "articles", gomock.Any()).
 					Return([]any{"result1", "result2"}, nil)
@@ -174,6 +187,18 @@ func TestSearchHandler(t *testing.T) {
 				Size:  10,
 			},
 			setupMocks: func() {
+				// Set up expectations for request logging
+				mockLogger.EXPECT().Info(
+					"Gin request",
+					"method", "POST",
+					"path", "/search",
+					"status", 400,
+					"latency", gomock.Any(),
+					"client_ip", "192.0.2.1",
+					"query", "",
+					"error", "",
+				).Times(1)
+
 				// Set up expectations for any calls that might happen
 				mockSearchManager.EXPECT().
 					Search(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -208,6 +233,7 @@ func TestSearchHandler(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/search", strings.NewReader(string(body)))
 			req.Header.Set("Content-Type", "application/json")
+			req.RemoteAddr = "192.0.2.1" // Set client IP for consistent testing
 
 			// Create response recorder
 			w := httptest.NewRecorder()

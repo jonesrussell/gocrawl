@@ -10,7 +10,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -50,6 +49,11 @@ var Module = fx.Module("crawler",
 		provideCollyDebugger,
 		provideEventBus,
 		provideCrawler,
+		// Content service
+		fx.Annotate(
+			content.NewService,
+			fx.As(new(content.Interface)),
+		),
 		// Core dependencies
 		fx.Annotate(
 			func(log common.Logger) chan struct{} {
@@ -58,11 +62,6 @@ var Module = fx.Module("crawler",
 			},
 			fx.ResultTags(`name:"crawlDone"`),
 		),
-		// Article channel type
-		func(log common.Logger) (chan *models.Article, error) {
-			log.Debug("Providing Article channel type")
-			return make(chan *models.Article, app.DefaultChannelBufferSize), nil
-		},
 		// Article channel named instance
 		fx.Annotate(
 			func(ch chan *models.Article) chan *models.Article {

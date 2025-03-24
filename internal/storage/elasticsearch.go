@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"io"
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -22,12 +21,11 @@ func (s *ElasticsearchStorage) TestConnection(_ context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to Elasticsearch: %w", err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
 		}
-	}(res.Body)
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("error response from Elasticsearch: %s", res.String())

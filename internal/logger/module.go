@@ -12,10 +12,17 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Module provides the logger module and its dependencies
-var Module = fx.Module("logger",
-	fx.Provide(provideLogger),
+// Module provides the logger module and its dependencies using fx.
+var Module = fx.Options(
+	fx.Provide(
+		provideLogger,
+	),
 )
+
+// provideLogger creates a new logger instance
+func provideLogger() (Interface, error) {
+	return GetLogger(), nil
+}
 
 // InitializeLogger creates a new logger based on the configuration
 func InitializeLogger(cfg config.Interface) (Interface, error) {

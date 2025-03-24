@@ -144,9 +144,8 @@ func TestLoadConfig(t *testing.T) {
 	err := os.WriteFile("testdata/invalid.yml", invalidYAML, 0644)
 	require.NoError(t, err)
 	defer func() {
-		err := os.Remove("testdata/invalid.yml")
-		if err != nil {
-
+		if removeErr := os.Remove("testdata/invalid.yml"); removeErr != nil {
+			t.Errorf("Error removing test file: %v", removeErr)
 		}
 	}()
 
@@ -299,9 +298,8 @@ func TestConfigurationPriority(t *testing.T) {
 	writeErr := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
 	require.NoError(t, writeErr)
 	defer func() {
-		err := os.Remove("testdata/empty.yml")
-		if err != nil {
-
+		if removeErr := os.Remove("testdata/empty.yml"); removeErr != nil {
+			t.Errorf("Error removing test file: %v", removeErr)
 		}
 	}()
 
@@ -395,9 +393,8 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 	writeErr := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
 	require.NoError(t, writeErr)
 	defer func() {
-		err := os.Remove("testdata/empty.yml")
-		if err != nil {
-
+		if removeErr := os.Remove("testdata/empty.yml"); removeErr != nil {
+			t.Errorf("Error removing test file: %v", removeErr)
 		}
 	}()
 
