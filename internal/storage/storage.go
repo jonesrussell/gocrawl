@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -91,7 +92,12 @@ func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, 
 		s.Logger.Error("Failed to index document", "error", err)
 		return fmt.Errorf("error indexing document: %w", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(res.Body)
 
 	if res.IsError() {
 		s.Logger.Error("Failed to index document", "error", res.String())

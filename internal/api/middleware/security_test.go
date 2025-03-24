@@ -21,14 +21,14 @@ type mockLogger struct {
 	logger.Interface
 }
 
-func (m *mockLogger) Debug(msg string, fields ...any)   {}
-func (m *mockLogger) Error(msg string, fields ...any)   {}
-func (m *mockLogger) Info(msg string, fields ...any)    {}
-func (m *mockLogger) Warn(msg string, fields ...any)    {}
-func (m *mockLogger) Fatal(msg string, fields ...any)   {}
-func (m *mockLogger) Printf(format string, args ...any) {}
-func (m *mockLogger) Errorf(format string, args ...any) {}
-func (m *mockLogger) Sync() error                       { return nil }
+func (m *mockLogger) Debug(string, ...any)  {}
+func (m *mockLogger) Error(string, ...any)  {}
+func (m *mockLogger) Info(string, ...any)   {}
+func (m *mockLogger) Warn(string, ...any)   {}
+func (m *mockLogger) Fatal(string, ...any)  {}
+func (m *mockLogger) Printf(string, ...any) {}
+func (m *mockLogger) Errorf(string, ...any) {}
+func (m *mockLogger) Sync() error           { return nil }
 
 // mockTimeProvider implements TimeProvider for testing
 type mockTimeProvider struct {

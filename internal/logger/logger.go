@@ -260,11 +260,11 @@ func NewNoOp() Interface {
 // noOpLogger implements Interface but discards all logs
 type noOpLogger struct{}
 
-func (l *noOpLogger) Debug(string, ...any)              {}
-func (l *noOpLogger) Info(string, ...any)               {}
-func (l *noOpLogger) Warn(msg string, fields ...any)    {}
-func (l *noOpLogger) Error(msg string, fields ...any)   {}
-func (l *noOpLogger) Fatal(msg string, fields ...any)   {}
-func (l *noOpLogger) Printf(format string, args ...any) {}
-func (l *noOpLogger) Errorf(format string, args ...any) {}
-func (l *noOpLogger) Sync() error                       { return nil }
+func (l *noOpLogger) Debug(string, ...any)  {}
+func (l *noOpLogger) Info(string, ...any)   {}
+func (l *noOpLogger) Warn(string, ...any)   {}
+func (l *noOpLogger) Error(string, ...any)  {}
+func (l *noOpLogger) Fatal(string, ...any)  {}
+func (l *noOpLogger) Printf(string, ...any) {}
+func (l *noOpLogger) Errorf(string, ...any) {}
+func (l *noOpLogger) Sync() error           { return nil }

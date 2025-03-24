@@ -17,7 +17,10 @@ import (
 //   - format: The format string for the error message
 //   - args: Optional arguments for the format string
 func PrintErrorf(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
+	_, err := fmt.Fprintf(os.Stderr, format+"\n", args...)
+	if err != nil {
+		return
+	}
 }
 
 // PrintInfof prints an informational message to stdout with formatting.

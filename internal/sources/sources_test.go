@@ -47,7 +47,12 @@ func TestLoadFromFile(t *testing.T) {
 
 	tmpfile, err := os.CreateTemp(t.TempDir(), "sources_test")
 	require.NoError(t, err)
-	defer os.Remove(tmpfile.Name())
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			
+		}
+	}(tmpfile.Name())
 
 	_, err = tmpfile.WriteString(content)
 	require.NoError(t, err)

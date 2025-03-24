@@ -5,8 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+
+	// #nosec G108 -- Profiling endpoint is intentionally exposed for debugging
+	_ "net/http/pprof"
 	"runtime"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -21,6 +27,17 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
+)
+
+const (
+	// pprofServerReadTimeout is the maximum duration for reading the entire request.
+	pprofServerReadTimeout = 10 * time.Second
+	// pprofServerWriteTimeout is the maximum duration for writing the entire response.
+	pprofServerWriteTimeout = 10 * time.Second
+	// pprofServerIdleTimeout is the maximum duration for keeping idle connections alive.
+	pprofServerIdleTimeout = 120 * time.Second
+	// stackTraceBufferSize is the size of the buffer used for stack traces (64KB).
+	stackTraceBufferSize = 1 << 16
 )
 
 // sourceName holds the name of the source being crawled, populated from command line arguments.
@@ -171,6 +188,112 @@ func createFXApp(ctx context.Context, sourceName string, handler *signal.SignalH
 	)
 }
 
+// formatGoroutineTrace formats a single goroutine trace for logging.
+func formatGoroutineTrace(trace string) (int, string, string) {
+	lines := strings.Split(trace, "\n")
+	if len(lines) == 0 {
+		return 0, "unknown", trace
+	}
+
+	// Extract goroutine ID from the first line
+	id := 0
+	if len(lines) > 0 {
+		parts := strings.Fields(lines[0])
+		if len(parts) > 1 {
+			// Extract number from "goroutine N"
+			_, err := fmt.Sscanf(parts[1], "%d", &id)
+			if err != nil {
+				return 0, "", ""
+			}
+		}
+	}
+
+	// Extract state from the second line
+	state := "unknown"
+	if len(lines) > 1 {
+		parts := strings.Split(lines[1], ":")
+		if len(parts) > 1 {
+			state = strings.TrimSpace(parts[1])
+		}
+	}
+
+	return id, state, trace
+}
+
+// printGoroutines prints the number of active goroutines and their stack traces.
+func printGoroutines(log common.Logger) {
+	count := runtime.NumGoroutine()
+	log.Debug("Active goroutines", "count", count)
+
+	buf := make([]byte, stackTraceBufferSize)
+	n := runtime.Stack(buf, true)
+	if n == 0 {
+		return
+	}
+
+	traces := string(buf[:n])
+	goroutines := strings.Split(traces, "\n\n")
+
+	for _, trace := range goroutines {
+		if trace == "" {
+			continue
+		}
+		id, state, fullTrace := formatGoroutineTrace(trace)
+		log.Debug("Goroutine",
+			"id", id,
+			"state", state,
+			"trace", fullTrace,
+		)
+	}
+}
+
+// setupPprofServer creates and starts a pprof server.
+func setupPprofServer(log common.Logger) (*http.Server, func()) {
+	server := &http.Server{
+		Addr:         "localhost:6060",
+		ReadTimeout:  pprofServerReadTimeout,
+		WriteTimeout: pprofServerWriteTimeout,
+		IdleTimeout:  pprofServerIdleTimeout,
+	}
+
+	// Create a channel to signal server shutdown
+	done := make(chan struct{})
+
+	// Start server in a goroutine
+	go func() {
+		log.Info("Starting pprof server on localhost:6060")
+		if serverErr := server.ListenAndServe(); serverErr != nil && !errors.Is(serverErr, http.ErrServerClosed) {
+			log.Error("pprof server error", "error", serverErr)
+		}
+		close(done)
+	}()
+
+	// Return cleanup function
+	cleanup := func() {
+		log.Debug("Shutting down pprof server")
+		if err := server.Close(); err != nil {
+			log.Error("Error closing pprof server", "error", err)
+		}
+		<-done // Wait for server to finish
+		log.Debug("Pprof server shutdown complete")
+	}
+
+	return server, cleanup
+}
+
+// handleContextCancellation handles the case when the context is cancelled.
+func handleContextCancellation(ctx context.Context, log common.Logger, fxApp *fx.App) error {
+	log.Debug("Context cancelled, initiating shutdown", "goroutines", runtime.NumGoroutine())
+	printGoroutines(log)
+	if errStop := fxApp.Stop(ctx); errStop != nil {
+		log.Error("Error stopping application", "error", errStop, "goroutines", runtime.NumGoroutine())
+		return fmt.Errorf("error stopping application: %w", errStop)
+	}
+	log.Debug("Fx application stopped successfully", "goroutines", runtime.NumGoroutine())
+	printGoroutines(log)
+	return nil
+}
+
 // Command returns the crawl command.
 func Command() *cobra.Command {
 	cmd := &cobra.Command{
@@ -197,6 +320,11 @@ Example:
 				return fmt.Errorf("error creating logger: %w", err)
 			}
 			log.Info("Starting crawl command", "source", sourceName, "goroutines", runtime.NumGoroutine())
+			printGoroutines(log)
+
+			// Start pprof server with cleanup
+			_, pprofCleanup := setupPprofServer(log)
+			defer pprofCleanup()
 
 			// Use Cobra's context for proper command lifecycle management
 			cmdCtx := cmd.Context()
@@ -209,7 +337,6 @@ Example:
 
 			// Start the application
 			log.Debug("Starting fx application", "goroutines", runtime.NumGoroutine())
-
 			if errStart := fxApp.Start(cmdCtx); errStart != nil {
 				if errors.Is(errStart, context.Canceled) {
 					log.Debug("Application start cancelled", "goroutines", runtime.NumGoroutine())
@@ -228,14 +355,7 @@ Example:
 			)
 
 			if !handler.Wait() {
-				log.Debug("Context cancelled, initiating shutdown", "goroutines", runtime.NumGoroutine())
-				// Stop the application since context was cancelled
-				if errStop := fxApp.Stop(cmdCtx); errStop != nil {
-					log.Error("Error stopping application", "error", errStop, "goroutines", runtime.NumGoroutine())
-					return fmt.Errorf("error stopping application: %w", errStop)
-				}
-				log.Debug("Fx application stopped successfully", "goroutines", runtime.NumGoroutine())
-				return nil
+				return handleContextCancellation(cmdCtx, log, fxApp)
 			}
 
 			log.Debug(
@@ -243,6 +363,7 @@ Example:
 				"handler_state", handler.GetState(),
 				"goroutines", runtime.NumGoroutine(),
 			)
+			printGoroutines(log)
 
 			// Exit the command
 			log.Debug(
@@ -250,6 +371,7 @@ Example:
 				"handler_state", handler.GetState(),
 				"goroutines", runtime.NumGoroutine(),
 			)
+			printGoroutines(log)
 			return nil
 		},
 	}

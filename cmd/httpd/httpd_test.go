@@ -3,6 +3,7 @@ package httpd_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"testing"
@@ -210,7 +211,10 @@ func TestHTTPCommandServerError(t *testing.T) {
 					if err != nil {
 						return fmt.Errorf("failed to listen on %s: %w", server.Addr, err)
 					}
-					ln.Close()
+					err = ln.Close()
+					if err != nil {
+						return err
+					}
 					return nil
 				},
 				OnStop: func(ctx context.Context) error {
@@ -251,13 +255,19 @@ func TestServerStartStop(t *testing.T) {
 	listener, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
 	port := listener.Addr().(*net.TCPAddr).Port
-	listener.Close()
+	errListen := listener.Close()
+	if errListen != nil {
+		return
+	}
 
 	// Create a mux for the server
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, err := w.Write([]byte("ok"))
+		if err != nil {
+			return
+		}
 	})
 
 	serverConfig := &config.ServerConfig{
@@ -311,7 +321,12 @@ func TestServerStartStop(t *testing.T) {
 		}
 	}
 	require.NoError(t, respErr)
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(resp.Body)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 

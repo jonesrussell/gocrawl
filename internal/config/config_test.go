@@ -143,7 +143,12 @@ func TestLoadConfig(t *testing.T) {
 	invalidYAML := []byte("invalid: yaml: content")
 	err := os.WriteFile("testdata/invalid.yml", invalidYAML, 0644)
 	require.NoError(t, err)
-	defer os.Remove("testdata/invalid.yml")
+	defer func() {
+		err := os.Remove("testdata/invalid.yml")
+		if err != nil {
+
+		}
+	}()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -293,7 +298,12 @@ func TestConfigurationPriority(t *testing.T) {
 	emptyConfig := []byte("---\n")
 	writeErr := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
 	require.NoError(t, writeErr)
-	defer os.Remove("testdata/empty.yml")
+	defer func() {
+		err := os.Remove("testdata/empty.yml")
+		if err != nil {
+
+		}
+	}()
 
 	// Test cases for configuration priority
 	tests := []struct {
@@ -384,7 +394,12 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 	emptyConfig := []byte("---\n")
 	writeErr := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
 	require.NoError(t, writeErr)
-	defer os.Remove("testdata/empty.yml")
+	defer func() {
+		err := os.Remove("testdata/empty.yml")
+		if err != nil {
+
+		}
+	}()
 
 	tests := []struct {
 		name        string

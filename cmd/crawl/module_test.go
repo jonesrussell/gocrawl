@@ -33,11 +33,11 @@ func (m *mockSearchManager) Search(context.Context, string, any) ([]any, error) 
 	return []any{}, nil
 }
 
-func (m *mockSearchManager) Count(ctx context.Context, index string, query any) (int64, error) {
+func (m *mockSearchManager) Count(context.Context, string, any) (int64, error) {
 	return 0, nil
 }
 
-func (m *mockSearchManager) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
+func (m *mockSearchManager) Aggregate(context.Context, string, any) (any, error) {
 	return nil, errors.New("aggregate not implemented in mock")
 }
 
@@ -236,7 +236,12 @@ func TestModuleConfiguration(t *testing.T) {
 
 	// Start the app
 	require.NoError(t, app.Start(t.Context()))
-	defer app.Stop(t.Context())
+	defer func(app *fxtest.App, ctx context.Context) {
+		err := app.Stop(ctx)
+		if err != nil {
+			t.Errorf("Error stopping app: %v", err)
+		}
+	}(app, t.Context())
 
 	// Verify crawler configuration
 	assert.NotNil(t, crawlerInstance, "Crawler should be provided")

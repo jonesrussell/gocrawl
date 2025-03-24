@@ -14,12 +14,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 )
 
-// Constants for configuration
-const (
-	TimeoutDuration  = 5 * time.Second // Default timeout for operations
-	DefaultRateLimit = time.Second     // Default rate limit for requests
-)
-
 // Crawler represents a web crawler instance.
 type Crawler struct {
 	collector    *colly.Collector

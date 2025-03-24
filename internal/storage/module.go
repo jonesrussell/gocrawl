@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -127,7 +128,12 @@ func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client,
 	if err != nil {
 		return nil, fmt.Errorf("failed to ping Elasticsearch: %w", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			
+		}
+	}(res.Body)
 
 	if res.IsError() {
 		return nil, fmt.Errorf("failed to connect to Elasticsearch: %s", res.String())

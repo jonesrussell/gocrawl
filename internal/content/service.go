@@ -251,7 +251,7 @@ func cleanBody(e *colly.HTMLElement) string {
 }
 
 // Process processes a single string content
-func (s *Service) Process(ctx context.Context, input string) string {
+func (s *Service) Process(_ context.Context, input string) string {
 	s.Logger.Debug("Processing content", "input", input)
 
 	// Create a reader from the input string

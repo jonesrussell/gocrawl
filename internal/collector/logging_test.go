@@ -21,7 +21,10 @@ func TestConfigureLogging(t *testing.T) {
 	// Create test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, err := w.Write([]byte("OK"))
+		if err != nil {
+			return
+		}
 	}))
 	defer ts.Close()
 
@@ -50,8 +53,14 @@ func TestConfigureLogging(t *testing.T) {
 	collector.ConfigureLogging(c, mockLogger)
 
 	// Visit test server to trigger request and response callbacks
-	c.Visit(ts.URL)
+	err := c.Visit(ts.URL)
+	if err != nil {
+		return
+	}
 
 	// Visit with error to trigger error callback
-	c.Visit("http://localhost:1")
+	errVisit := c.Visit("http://localhost:1")
+	if errVisit != nil {
+		return
+	}
 }

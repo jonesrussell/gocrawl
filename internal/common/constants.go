@@ -9,11 +9,6 @@ import "time"
 // throughout the application. These values can be overridden through
 // configuration if needed.
 const (
-	// DefaultShutdownTimeout is the default timeout for graceful shutdown.
-	// This duration allows components to clean up resources and finish
-	// pending operations before the application exits.
-	DefaultShutdownTimeout = 10 * time.Second
-
 	// DefaultOperationTimeout is the default timeout for general operations.
 	// This duration is used for common operations like API calls,
 	// data processing tasks, or crawler shutdown that should complete
