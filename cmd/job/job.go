@@ -21,41 +21,36 @@ import (
 	"go.uber.org/fx"
 )
 
-const (
-	// shutdownTimeoutSeconds is the number of seconds to wait for jobs to complete during shutdown
-	shutdownTimeoutSeconds = 30
-)
-
 // Params holds the dependencies required for the job scheduler.
 type Params struct {
-	fx.In
+	fx.In `json:"fx_._in"`
 
 	// Lifecycle manages the application's startup and shutdown hooks
-	Lifecycle fx.Lifecycle
+	Lifecycle fx.Lifecycle `json:"lifecycle,omitempty"`
 
 	// Sources provides access to configured crawl sources
-	Sources sources.Interface `name:"sourceManager"`
+	Sources sources.Interface `name:"sourceManager" json:"sources,omitempty"`
 
 	// CrawlerInstance handles the core crawling functionality
-	CrawlerInstance crawler.Interface
+	CrawlerInstance crawler.Interface `json:"crawler_instance,omitempty"`
 
 	// Logger provides structured logging capabilities
-	Logger logger.Interface
+	Logger logger.Interface `json:"logger,omitempty"`
 
 	// Config holds the application configuration
-	Config config.Interface
+	Config config.Interface `json:"config,omitempty"`
 
 	// Context provides the context for the job scheduler
-	Context context.Context `name:"jobContext"`
+	Context context.Context `name:"jobContext" json:"context,omitempty"`
 
 	// Processors is a slice of content processors, injected as a group
-	Processors []models.ContentProcessor `group:"processors"`
+	Processors []models.ContentProcessor `group:"processors" json:"processors,omitempty"`
 
 	// Done is a channel that signals when the crawl operation is complete
-	Done chan struct{} `name:"crawlDone"`
+	Done chan struct{} `name:"crawlDone" json:"done,omitempty"`
 
 	// ActiveJobs tracks the number of currently running jobs
-	ActiveJobs *int32 `optional:"true"`
+	ActiveJobs *int32 `optional:"true" json:"active_jobs,omitempty"`
 }
 
 // runScheduler manages the execution of scheduled jobs.

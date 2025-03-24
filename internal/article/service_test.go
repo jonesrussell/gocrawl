@@ -124,7 +124,7 @@ func TestExtractArticle(t *testing.T) {
 	).AnyTimes()
 
 	mockLogger.EXPECT().Debug(
-		"Extracted article",
+		"Extracted articleData",
 		"component", gomock.Any(),
 		"id", gomock.Any(),
 		"title", gomock.Any(),
@@ -152,15 +152,15 @@ func TestExtractArticle(t *testing.T) {
 	}
 
 	// Call the ExtractArticle method
-	article := service.ExtractArticle(e)
+	articleData := service.ExtractArticle(e)
 
-	// Validate the extracted article
-	require.NotNil(t, article)
-	require.Equal(t, "/mock-url", article.Source)
-	require.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", article.Title)
+	// Validate the extracted articleData
+	require.NotNil(t, articleData)
+	require.Equal(t, "/mock-url", articleData.Source)
+	require.Equal(t, "Elliot Lake man arrested after threatening to kill victim and police", articleData.Title)
 	expectedBody := "Police were called to house on Milliken Road for report of break-and-enter"
-	require.Equal(t, expectedBody, strings.TrimSpace(article.Body))
-	require.Equal(t, "ElliotLakeToday Staff", article.Author)
+	require.Equal(t, expectedBody, strings.TrimSpace(articleData.Body))
+	require.Equal(t, "ElliotLakeToday Staff", articleData.Author)
 }
 
 func TestCleanAuthor(t *testing.T) {

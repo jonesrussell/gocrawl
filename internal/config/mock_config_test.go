@@ -1,8 +1,6 @@
 package config_test
 
 import (
-	"time"
-
 	"github.com/jonesrussell/gocrawl/internal/config"
 )
 
@@ -14,35 +12,6 @@ type MockConfig struct {
 	appConfig           *config.AppConfig
 	elasticsearchConfig *config.ElasticsearchConfig
 	serverConfig        *config.ServerConfig
-}
-
-// NewMockConfig creates a new MockConfig with default values.
-func NewMockConfig() *MockConfig {
-	return &MockConfig{
-		sources: []config.Source{},
-		crawlerConfig: &config.CrawlerConfig{
-			MaxDepth:    3,
-			Parallelism: 2,
-			RateLimit:   time.Second,
-			RandomDelay: time.Second,
-		},
-		logConfig: &config.LogConfig{
-			Level: "info",
-		},
-		appConfig: &config.AppConfig{
-			Name:    "gocrawl",
-			Version: "0.1.0",
-		},
-		elasticsearchConfig: &config.ElasticsearchConfig{
-			Addresses: []string{"http://localhost:9200"},
-		},
-		serverConfig: &config.ServerConfig{
-			Address:      ":8080",
-			ReadTimeout:  time.Second * 15,
-			WriteTimeout: time.Second * 15,
-			IdleTimeout:  time.Second * 60,
-		},
-	}
 }
 
 // WithSources sets the sources for the mock config.

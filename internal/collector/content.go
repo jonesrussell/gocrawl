@@ -25,9 +25,6 @@ const (
 
 	// Logging tag for content-related operations
 	logTag = "collector/content"
-
-	// Default CSS selector for finding article content
-	DefaultBodySelector = "article, .article"
 )
 
 // URL patterns used for content classification

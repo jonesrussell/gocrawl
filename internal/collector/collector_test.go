@@ -15,37 +15,6 @@ import (
 // errMissingSource is copied from collector package for testing
 const errMissingSource = "source configuration is required"
 
-// ArticleSelectors represents the article selectors structure
-type ArticleSelectors struct {
-	Container     string `yaml:"container,omitempty"`
-	Title         string `yaml:"title"`
-	Body          string `yaml:"body"`
-	Intro         string `yaml:"intro,omitempty"`
-	Byline        string `yaml:"byline,omitempty"`
-	PublishedTime string `yaml:"published_time"`
-	TimeAgo       string `yaml:"time_ago,omitempty"`
-	JSONLD        string `yaml:"json_ld,omitempty"`
-	Section       string `yaml:"section,omitempty"`
-	Keywords      string `yaml:"keywords,omitempty"`
-	Description   string `yaml:"description,omitempty"`
-	OgTitle       string `yaml:"og_title,omitempty"`
-	OgDescription string `yaml:"og_description,omitempty"`
-	OgImage       string `yaml:"og_image,omitempty"`
-	OgURL         string `yaml:"og_url,omitempty"`
-	Canonical     string `yaml:"canonical,omitempty"`
-	WordCount     string `yaml:"word_count,omitempty"`
-	PublishDate   string `yaml:"publish_date,omitempty"`
-	Category      string `yaml:"category,omitempty"`
-	Tags          string `yaml:"tags,omitempty"`
-	Author        string `yaml:"author,omitempty"`
-	BylineName    string `yaml:"byline_name,omitempty"`
-}
-
-// Selectors represents the selectors structure
-type Selectors struct {
-	Article ArticleSelectors `yaml:"article"`
-}
-
 // createTestConfig creates a test config.Source with default selectors
 func createTestConfig() *config.Source {
 	return &config.Source{

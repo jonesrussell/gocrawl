@@ -54,7 +54,10 @@ func setupConfig(_ *cobra.Command, _ []string) error {
 			}
 			cfgFile = wd + string(os.PathSeparator) + cfgFile
 		}
-		os.Setenv("CONFIG_FILE", cfgFile)
+		err := os.Setenv("CONFIG_FILE", cfgFile)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

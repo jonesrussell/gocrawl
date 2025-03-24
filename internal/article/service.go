@@ -134,12 +134,12 @@ func (s *Service) extractDescription(e *colly.HTMLElement) string {
 }
 
 func (s *Service) extractPublishedTime(e *colly.HTMLElement) string {
-	// Try article published time
-	if time := e.ChildAttr(s.Selectors.PublishedTime, "content"); time != "" {
-		return time
+	// Try article published publishedTime
+	if publishedTime := e.ChildAttr(s.Selectors.PublishedTime, "content"); publishedTime != "" {
+		return publishedTime
 	}
 
-	// Try meta published time
+	// Try meta published publishedTime
 	return e.ChildAttr(`meta[property="article:published_time"]`, "content")
 }
 

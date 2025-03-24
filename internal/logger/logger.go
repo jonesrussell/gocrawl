@@ -260,8 +260,8 @@ func NewNoOp() Interface {
 // noOpLogger implements Interface but discards all logs
 type noOpLogger struct{}
 
-func (l *noOpLogger) Debug(msg string, fields ...any)   {}
-func (l *noOpLogger) Info(msg string, fields ...any)    {}
+func (l *noOpLogger) Debug(string, ...any)              {}
+func (l *noOpLogger) Info(string, ...any)               {}
 func (l *noOpLogger) Warn(msg string, fields ...any)    {}
 func (l *noOpLogger) Error(msg string, fields ...any)   {}
 func (l *noOpLogger) Fatal(msg string, fields ...any)   {}

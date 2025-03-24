@@ -25,7 +25,7 @@ type mockStorage struct {
 	storage.Interface
 }
 
-func (m *mockStorage) Search(ctx context.Context, query string, opts any) ([]any, error) {
+func (m *mockStorage) Search(context.Context, string, any) ([]any, error) {
 	return []any{}, nil
 }
 
@@ -77,11 +77,11 @@ type mockSearchManager struct {
 	api.SearchManager
 }
 
-func (m *mockSearchManager) Search(ctx context.Context, index string, query any) ([]any, error) {
+func (m *mockSearchManager) Search(context.Context, string, any) ([]any, error) {
 	return []any{}, nil
 }
 
-func (m *mockSearchManager) Count(ctx context.Context, index string, query any) (int64, error) {
+func (m *mockSearchManager) Count(context.Context, string, any) (int64, error) {
 	return 0, nil
 }
 
@@ -260,12 +260,12 @@ func TestServerStartStop(t *testing.T) {
 		w.Write([]byte("ok"))
 	})
 
-	config := &config.ServerConfig{
+	serverConfig := &config.ServerConfig{
 		Address: fmt.Sprintf(":%d", port),
 	}
 
 	server := &http.Server{
-		Addr:    config.Address,
+		Addr:    serverConfig.Address,
 		Handler: mux,
 	}
 

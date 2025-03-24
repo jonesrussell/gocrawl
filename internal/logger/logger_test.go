@@ -48,31 +48,31 @@ func TestNewCustomLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logLevel := "info"                                   // Set the desired log level
-			logger, err := logger.NewDevelopmentLogger(logLevel) // Pass log level as string
+			logLevel := "info"                                              // Set the desired log level
+			developmentLogger, err := logger.NewDevelopmentLogger(logLevel) // Pass log level as string
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewDevelopmentLogger() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if logger == nil {
-				t.Error("NewDevelopmentLogger() returned nil logger")
+			if developmentLogger == nil {
+				t.Error("NewDevelopmentLogger() returned nil developmentLogger")
 				return
 			}
 
 			// Test logging methods
-			logger.Info("test info message", "key", "value")
-			logger.Error("test error message", "key", "value")
-			logger.Debug("test debug message", "key", "value")
-			logger.Warn("test warn message", "key", "value")
-			logger.Errorf("test error format %s", "value")
+			developmentLogger.Info("test info message", "key", "value")
+			developmentLogger.Error("test error message", "key", "value")
+			developmentLogger.Debug("test debug message", "key", "value")
+			developmentLogger.Warn("test warn message", "key", "value")
+			developmentLogger.Errorf("test error format %s", "value")
 
 			// Test GetZapLogger
-			if logger.GetZapLogger() == nil {
+			if developmentLogger.GetZapLogger() == nil {
 				t.Error("GetZapLogger() returned nil")
 			}
 
 			// Test Sync
-			if syncErr := logger.Sync(); syncErr != nil {
+			if syncErr := developmentLogger.Sync(); syncErr != nil {
 				// Ignore sync errors as they're expected when writing to console
 				t.Log("Sync() error (expected):", syncErr)
 			}

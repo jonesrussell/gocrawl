@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -109,7 +110,14 @@ func TestServerConfiguration(t *testing.T) {
 			)
 
 			require.NoError(t, app.Start(t.Context()))
-			defer app.Stop(t.Context())
+			defer func(app *fxtest.App, ctx context.Context) {
+				err := app.Stop(ctx)
+				if err != nil {
+					log.Fatal(
+						"Error stopping application",
+						"error", err)
+				}
+			}(app, t.Context())
 
 			// Verify server configuration
 			assert.Equal(t, fmt.Sprintf(":%d", tt.expectedPort), server.Addr)

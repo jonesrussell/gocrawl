@@ -168,22 +168,22 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 	retryCount := make(map[string]int)
 
 	c.OnError(func(r *colly.Response, err error) {
-		var url string
+		var u string
 		if r != nil {
-			url = r.Request.URL.String()
+			u = r.Request.URL.String()
 		} else if err != nil {
 			var ok bool
-			if url, ok = extractURLFromError(err, domain, s.config.Logger); !ok {
+			if u, ok = extractURLFromError(err, domain, s.config.Logger); !ok {
 				return
 			}
 		}
 
-		count := retryCount[url]
+		count := retryCount[u]
 		if shouldRetry(r, err, count) {
-			s.handleRetry(c, r, err, url, count, retryCount)
+			s.handleRetry(c, r, err, u, count, retryCount)
 		} else {
 			s.config.Logger.Error("Request error",
-				"url", url,
+				"u", u,
 				"status_code", getStatusCode(r),
 				"error", err,
 				"retries", count,

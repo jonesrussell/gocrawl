@@ -21,8 +21,6 @@ import (
 
 // Constants for table formatting
 const (
-	// TableWidth defines the total width of the table output for consistent formatting
-	TableWidth = 160
 
 	// Column width constants
 	sourceColumnWidth   = 80

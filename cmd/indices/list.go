@@ -18,11 +18,6 @@ import (
 )
 
 // Constants for table formatting
-const (
-	// TableWidth defines the total width of the table output for consistent formatting.
-	// This ensures that the output remains readable across different terminal sizes.
-	TableWidth = 92
-)
 
 // listParams holds the parameters required for listing indices.
 type listParams struct {

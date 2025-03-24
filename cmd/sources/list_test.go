@@ -99,7 +99,7 @@ func Test_runList(t *testing.T) {
 			setup: func(t *testing.T) (*cobra.Command, *mockSourceManager, *mockLogger, *mockConfig) {
 				cmd := &cobra.Command{}
 				cmd.SetContext(t.Context())
-				sources := []srcs.Config{
+				sourceConfigs := []srcs.Config{
 					{
 						Name:         "Test Source",
 						URL:          "https://test.com",
@@ -109,7 +109,7 @@ func Test_runList(t *testing.T) {
 						MaxDepth:     2,
 					},
 				}
-				return cmd, &mockSourceManager{sources: sources}, &mockLogger{}, newMockConfig()
+				return cmd, &mockSourceManager{sources: sourceConfigs}, &mockLogger{}, newMockConfig()
 			},
 			wantErr: false,
 		},

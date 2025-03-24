@@ -44,8 +44,3 @@ func (m *MockCrawler) GetBaseURL() string {
 func (m *MockCrawler) Wait() {
 	m.Called()
 }
-
-// NewMockCrawler creates a new instance of MockCrawler
-func NewMockCrawler() *MockCrawler {
-	return &MockCrawler{}
-}

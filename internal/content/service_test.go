@@ -34,11 +34,11 @@ func TestExtractContent(t *testing.T) {
 		"dateCreated": "2024-03-15T10:00:00Z"
 	}
 	</script>
-	<meta property="article:published_time" content="2024-03-15T10:00:00Z" />
+	<meta property="article:published_time" contentData="2024-03-15T10:00:00Z" />
 </head>
 <body>
 	<h1>Test Article</h1>
-	<p>Test content</p>
+	<p>Test contentData</p>
 </body>
 </html>`
 
@@ -65,14 +65,14 @@ func TestExtractContent(t *testing.T) {
 	}
 
 	// Set up logger expectations in order
-	mockLogger.EXPECT().Debug("Extracting content", "url", testURL)
+	mockLogger.EXPECT().Debug("Extracting contentData", "url", testURL)
 	mockLogger.EXPECT().Debug("Trying to parse date", "value", "2024-03-15T10:00:00Z")
 	mockLogger.EXPECT().Debug("Successfully parsed date",
 		"source", "2024-03-15T10:00:00Z",
 		"format", time.RFC3339,
 		"result", "2024-03-15 10:00:00 +0000 UTC",
 	)
-	mockLogger.EXPECT().Debug("Extracted content",
+	mockLogger.EXPECT().Debug("Extracted contentData",
 		"id", gomock.Any(),
 		"title", "Test Article",
 		"url", testURL,
@@ -80,13 +80,13 @@ func TestExtractContent(t *testing.T) {
 		"created_at", gomock.Any(),
 	)
 
-	content := svc.ExtractContent(e)
-	require.NotNil(t, content)
-	assert.Equal(t, "Test Article", content.Title)
-	assert.Equal(t, testURL, content.URL)
-	assert.Equal(t, "article", content.Type)
-	assert.NotEmpty(t, content.Body)
-	assert.False(t, content.CreatedAt.IsZero())
+	contentData := svc.ExtractContent(e)
+	require.NotNil(t, contentData)
+	assert.Equal(t, "Test Article", contentData.Title)
+	assert.Equal(t, testURL, contentData.URL)
+	assert.Equal(t, "article", contentData.Type)
+	assert.NotEmpty(t, contentData.Body)
+	assert.False(t, contentData.CreatedAt.IsZero())
 }
 
 func TestExtractMetadata(t *testing.T) {

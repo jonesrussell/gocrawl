@@ -14,11 +14,6 @@ const (
 	// pending operations before the application exits.
 	DefaultShutdownTimeout = 10 * time.Second
 
-	// DefaultStartupTimeout is the default timeout for startup operations.
-	// This duration limits how long the application will wait for
-	// initialization tasks like connecting to databases or loading configs.
-	DefaultStartupTimeout = 30 * time.Second
-
 	// DefaultOperationTimeout is the default timeout for general operations.
 	// This duration is used for common operations like API calls,
 	// data processing tasks, or crawler shutdown that should complete

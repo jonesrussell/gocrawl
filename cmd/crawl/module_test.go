@@ -29,7 +29,7 @@ type mockSearchManager struct {
 	api.SearchManager
 }
 
-func (m *mockSearchManager) Search(ctx context.Context, index string, query any) ([]any, error) {
+func (m *mockSearchManager) Search(context.Context, string, any) ([]any, error) {
 	return []any{}, nil
 }
 

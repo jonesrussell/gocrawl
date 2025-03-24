@@ -5,10 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -82,57 +78,8 @@ func ConfigureCrawler(c interface {
 	return nil
 }
 
-// WaitForSignal waits for interrupt signals and handles graceful shutdown.
-// Returns a cleanup function that should be deferred by the caller.
-func WaitForSignal(ctx context.Context, cancel context.CancelFunc) (<-chan struct{}, func()) {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	done := make(chan struct{})
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		select {
-		case <-sigChan:
-			cancel()
-		case <-ctx.Done():
-			// Context was cancelled externally
-		}
-		close(done)
-	}()
-
-	cleanup := func() {
-		signal.Stop(sigChan)
-		close(sigChan)
-		// Wait for the signal handling goroutine to finish
-		wg.Wait()
-	}
-
-	return done, cleanup
-}
-
 // GracefulShutdown performs a graceful shutdown of the provided fx.App.
 // It creates a timeout context and handles any shutdown errors.
 type Shutdowner interface {
 	Stop(context.Context) error
-}
-
-func GracefulShutdown(app Shutdowner) error {
-	stopCtx, stopCancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
-	defer stopCancel()
-
-	if err := app.Stop(stopCtx); err != nil {
-		if errors.Is(err, context.Canceled) {
-			// Normal shutdown, not an error
-			return nil
-		}
-		if errors.Is(err, context.DeadlineExceeded) {
-			// Already logged in job command
-			return nil
-		}
-		return fmt.Errorf("shutdown error: %w", err)
-	}
-
-	return nil
 }

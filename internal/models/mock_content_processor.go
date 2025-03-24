@@ -14,8 +14,3 @@ type MockContentProcessor struct {
 func (m *MockContentProcessor) Process(e *colly.HTMLElement) {
 	m.Called(e)
 }
-
-// NewMockContentProcessor creates a new instance of MockContentProcessor
-func NewMockContentProcessor() *MockContentProcessor {
-	return &MockContentProcessor{}
-}

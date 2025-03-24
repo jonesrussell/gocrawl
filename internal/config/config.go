@@ -19,12 +19,6 @@ const (
 	defaultRateLimit = 2 * time.Second
 )
 
-// Error definitions for configuration-related errors
-var (
-	// ErrMissingElasticURL is returned when the Elasticsearch URL is not provided
-	ErrMissingElasticURL = errors.New("elasticsearch.addresses is required")
-)
-
 // AppConfig holds application-level configuration settings.
 // It contains basic information about the application instance.
 type AppConfig struct {
