@@ -245,7 +245,11 @@ func (s *ElasticsearchStorage) CreateIndex(
 		s.Logger.Error("Failed to create index", "index", index, "error", err)
 		return fmt.Errorf("failed to create index: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		s.Logger.Error("Failed to create index", "index", index, "error", res.String())
@@ -272,7 +276,11 @@ func (s *ElasticsearchStorage) DeleteIndex(ctx context.Context, index string) er
 		s.Logger.Error("Failed to delete index", "error", err)
 		return fmt.Errorf("error deleting index: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		s.Logger.Error("Failed to delete index", "error", res.String())
@@ -312,7 +320,11 @@ func (s *ElasticsearchStorage) UpdateDocument(
 	if err != nil {
 		return fmt.Errorf("update failed: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("update failed: %s", res.String())
@@ -336,7 +348,11 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 		s.Logger.Error("Failed to delete document", "error", err)
 		return fmt.Errorf("error deleting document: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		s.Logger.Error("Failed to delete document", "error", res.String())
@@ -356,7 +372,11 @@ func (s *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string
 	if err != nil {
 		return false, fmt.Errorf("failed to check index existence: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	return res.StatusCode == http.StatusOK, nil
 }
@@ -376,7 +396,11 @@ func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id
 	if err != nil {
 		return fmt.Errorf("error getting document: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("error getting document: %s", res.String())
@@ -416,7 +440,11 @@ func (s *ElasticsearchStorage) SearchDocuments(
 	if err != nil {
 		return nil, fmt.Errorf("error searching documents: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		return nil, fmt.Errorf("error searching documents: %s", res.String())
@@ -468,7 +496,11 @@ func (s *ElasticsearchStorage) Ping(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error pinging Elasticsearch: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("error pinging Elasticsearch: %s", res.String())
@@ -487,7 +519,11 @@ func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error
 		s.Logger.Error("Failed to list indices", "error", err)
 		return nil, fmt.Errorf("failed to list indices: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		s.Logger.Error("Failed to list indices", "error", res.String())
@@ -521,7 +557,11 @@ func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (ma
 		s.Logger.Error("Failed to get mapping", "error", err)
 		return nil, fmt.Errorf("failed to get mapping: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		s.Logger.Error("Failed to get mapping", "error", res.String())
@@ -553,7 +593,11 @@ func (s *ElasticsearchStorage) UpdateMapping(ctx context.Context, index string, 
 	if err != nil {
 		return fmt.Errorf("failed to update mapping: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("error updating mapping: %s", res.String())
@@ -572,7 +616,11 @@ func (s *ElasticsearchStorage) GetIndexHealth(ctx context.Context, index string)
 		s.Logger.Error("Failed to get index health", "error", err)
 		return "", fmt.Errorf("failed to get index health: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		s.Logger.Error("Failed to get index health", "error", res.String())
@@ -605,7 +653,11 @@ func (s *ElasticsearchStorage) GetIndexDocCount(ctx context.Context, index strin
 		s.Logger.Error("Failed to get index document count", "error", err)
 		return 0, fmt.Errorf("failed to get index document count: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		s.Logger.Error("Failed to get index document count", "error", res.String())
@@ -656,7 +708,11 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 	if searchErr != nil {
 		return nil, fmt.Errorf("failed to execute search: %w", searchErr)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		return nil, fmt.Errorf("search request failed: %s", res.String())
@@ -709,7 +765,11 @@ func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute aggregation: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		return nil, fmt.Errorf("aggregation request failed: %s", res.String())
@@ -748,7 +808,11 @@ func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query an
 	if err != nil {
 		return 0, fmt.Errorf("failed to execute count: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		return 0, fmt.Errorf("count request failed: %s", res.String())
