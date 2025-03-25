@@ -220,13 +220,12 @@ func TestHTTPCommandServerError(t *testing.T) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
 					// Try to listen on the port that's already in use
-					ln, err := net.Listen("tcp", server.Addr)
-					if err != nil {
-						return fmt.Errorf("failed to listen on %s: %w", server.Addr, err)
+					ln, listenErr := net.Listen("tcp", server.Addr)
+					if listenErr != nil {
+						return fmt.Errorf("failed to listen on %s: %w", server.Addr, listenErr)
 					}
-					err = ln.Close()
-					if err != nil {
-						return err
+					if closeErr := ln.Close(); closeErr != nil {
+						return closeErr
 					}
 					return nil
 				},
