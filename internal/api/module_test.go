@@ -233,7 +233,7 @@ func TestSearchHandler(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/search", strings.NewReader(string(body)))
 			req.Header.Set("Content-Type", "application/json")
-			req.RemoteAddr = "192.0.2.1" // Set client IP for consistent testing
+			req.Header.Set("X-Real-IP", "192.0.2.1") // Set client IP using X-Real-IP header
 
 			// Create response recorder
 			w := httptest.NewRecorder()

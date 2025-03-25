@@ -71,13 +71,10 @@ func TestModuleProvides(t *testing.T) {
 	}
 	testSources := sourcestest.NewTestSources(testConfigs)
 
-	// Create a test-specific module that excludes config.Module
+	// Create a test-specific module that excludes config.Module and sources.Module
 	testModule := fx.Module("test",
 		// Core dependencies (excluding config and logger modules)
-		sources.Module,
 		api.Module,
-
-		// Feature modules
 		article.Module,
 		content.Module,
 		collector.Module(),
@@ -85,34 +82,37 @@ func TestModuleProvides(t *testing.T) {
 
 		// Provide all required dependencies
 		fx.Provide(
-			// Logger
+			// Test dependencies
 			fx.Annotate(
-				func() logger.Interface { return mockLogger },
-				fx.As(new(logger.Interface)),
-				fx.ResultTags(`name:"testLogger"`),
-			),
-			// Config
-			fx.Annotate(
-				func() config.Interface { return mockCfg },
-				fx.As(new(config.Interface)),
-				fx.ResultTags(`name:"testConfig"`),
-			),
-			// Index Manager
-			fx.Annotate(
-				func() api.IndexManager { return nil },
-				fx.As(new(api.IndexManager)),
-			),
-			// Search Manager
-			fx.Annotate(
-				func() api.SearchManager { return &mockSearchManager{} },
-				fx.As(new(api.SearchManager)),
-			),
-			// Sources
-			func() *sources.Sources { return testSources },
-			// Named dependencies
-			fx.Annotate(
-				func() string { return "Test Source" },
-				fx.ResultTags(`name:"sourceName"`),
+				func() struct {
+					fx.Out
+					Logger     logger.Interface  `name:"testLogger"`
+					Config     config.Interface  `name:"testConfig"`
+					IndexMgr   api.IndexManager  `name:"testIndexManager"`
+					SearchMgr  api.SearchManager `name:"testSearchManager"`
+					Sources    sources.Interface `name:"sourceManager"`
+					SourceName string            `name:"sourceName"`
+					ArticleSvc article.Interface `name:"testArticleService"`
+				} {
+					return struct {
+						fx.Out
+						Logger     logger.Interface  `name:"testLogger"`
+						Config     config.Interface  `name:"testConfig"`
+						IndexMgr   api.IndexManager  `name:"testIndexManager"`
+						SearchMgr  api.SearchManager `name:"testSearchManager"`
+						Sources    sources.Interface `name:"sourceManager"`
+						SourceName string            `name:"sourceName"`
+						ArticleSvc article.Interface `name:"testArticleService"`
+					}{
+						Logger:     mockLogger,
+						Config:     mockCfg,
+						IndexMgr:   nil,
+						SearchMgr:  &mockSearchManager{},
+						Sources:    testSources,
+						SourceName: "Test Source",
+						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
+					}
+				},
 			),
 		),
 	)
@@ -164,13 +164,10 @@ func TestModuleConfiguration(t *testing.T) {
 
 	var crawlerInstance crawler.Interface
 
-	// Create a test-specific module that excludes config.Module
+	// Create a test-specific module that excludes config.Module and sources.Module
 	testModule := fx.Module("test",
 		// Core dependencies (excluding config and logger modules)
-		sources.Module,
 		api.Module,
-
-		// Feature modules
 		article.Module,
 		content.Module,
 		collector.Module(),
@@ -178,34 +175,37 @@ func TestModuleConfiguration(t *testing.T) {
 
 		// Provide all required dependencies
 		fx.Provide(
-			// Logger
+			// Test dependencies
 			fx.Annotate(
-				func() logger.Interface { return mockLogger },
-				fx.As(new(logger.Interface)),
-				fx.ResultTags(`name:"testLogger"`),
-			),
-			// Config
-			fx.Annotate(
-				func() config.Interface { return mockCfg },
-				fx.As(new(config.Interface)),
-				fx.ResultTags(`name:"testConfig"`),
-			),
-			// Index Manager
-			fx.Annotate(
-				func() api.IndexManager { return api.NewMockIndexManager() },
-				fx.As(new(api.IndexManager)),
-			),
-			// Search Manager
-			fx.Annotate(
-				func() api.SearchManager { return &mockSearchManager{} },
-				fx.As(new(api.SearchManager)),
-			),
-			// Sources
-			func() *sources.Sources { return testSources },
-			// Named dependencies
-			fx.Annotate(
-				func() string { return "Test Source" },
-				fx.ResultTags(`name:"sourceName"`),
+				func() struct {
+					fx.Out
+					Logger     logger.Interface  `name:"testLogger"`
+					Config     config.Interface  `name:"testConfig"`
+					IndexMgr   api.IndexManager  `name:"testIndexManager"`
+					SearchMgr  api.SearchManager `name:"testSearchManager"`
+					Sources    sources.Interface `name:"sourceManager"`
+					SourceName string            `name:"sourceName"`
+					ArticleSvc article.Interface `name:"testArticleService"`
+				} {
+					return struct {
+						fx.Out
+						Logger     logger.Interface  `name:"testLogger"`
+						Config     config.Interface  `name:"testConfig"`
+						IndexMgr   api.IndexManager  `name:"testIndexManager"`
+						SearchMgr  api.SearchManager `name:"testSearchManager"`
+						Sources    sources.Interface `name:"sourceManager"`
+						SourceName string            `name:"sourceName"`
+						ArticleSvc article.Interface `name:"testArticleService"`
+					}{
+						Logger:     mockLogger,
+						Config:     mockCfg,
+						IndexMgr:   api.NewMockIndexManager(),
+						SearchMgr:  &mockSearchManager{},
+						Sources:    testSources,
+						SourceName: "Test Source",
+						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
+					}
+				},
 			),
 		),
 	)

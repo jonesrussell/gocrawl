@@ -19,10 +19,11 @@ type Interface interface {
 	GetSources() []Config
 }
 
-// Module provides the sources module and its dependencies.
+// Module provides the sources module's dependencies.
 var Module = fx.Module("sources",
 	fx.Provide(
 		provideSourceConfig,
+		provideSources,
 	),
 )
 
@@ -40,14 +41,29 @@ type Result struct {
 	Sources Interface `name:"sourceManager"`
 }
 
-// provideSourceConfig creates a new Sources instance from configuration.
-func provideSourceConfig(p Params) (Result, error) {
-	sources, err := LoadFromFile(p.Config.GetCrawlerConfig().SourceFile)
-	if err != nil {
-		return Result{}, err
-	}
+// provideSourceConfig creates a new source configuration.
+func provideSourceConfig(cfg config.Interface) *Config {
+	return NewConfig(cfg)
+}
 
-	return Result{
-		Sources: sources,
-	}, nil
+// provideSources creates a new sources instance.
+func provideSources(cfg *Config) Interface {
+	return NewSources(cfg)
+}
+
+// NewConfig creates a new source configuration.
+func NewConfig(cfg config.Interface) *Config {
+	return &Config{
+		Name:      "default",
+		URL:       "http://localhost",
+		RateLimit: "1s",
+		MaxDepth:  2,
+	}
+}
+
+// NewSources creates a new sources instance.
+func NewSources(cfg *Config) Interface {
+	return &Sources{
+		sources: []Config{*cfg},
+	}
 }

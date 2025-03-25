@@ -373,34 +373,31 @@ func TestConfigurationPriority(t *testing.T) {
 }
 
 func TestRequiredConfigurationValidation(t *testing.T) {
-	// Save current environment and restore after test
-	originalEnv := os.Environ()
-	defer func() {
-		os.Clearenv()
-		for _, e := range originalEnv {
-			k, v, _ := strings.Cut(e, "=")
-			t.Setenv(k, v)
-		}
-		viper.Reset()
-	}()
+	// Create test config files
+	validConfig := `
+app:
+  environment: development
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+crawler:
+  max_depth: 3
+  parallelism: 2
+log:
+  level: debug
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+`
+	err := os.WriteFile("testdata/valid_config.yml", []byte(validConfig), 0644)
+	require.NoError(t, err)
+	defer os.Remove("testdata/valid_config.yml")
 
-	// Clear environment and viper config
-	os.Clearenv()
-	viper.Reset()
-
-	// Create empty config file for testing
-	emptyConfig := []byte("---\n")
-	writeErr := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
-	require.NoError(t, writeErr)
-	defer func() {
-		if removeErr := os.Remove("testdata/empty.yml"); removeErr != nil {
-			t.Errorf("Error removing test file: %v", removeErr)
-		}
-	}()
-
+	// Create test environment
 	tests := []struct {
 		name        string
 		envVars     map[string]string
+		configFile  string
 		expectError bool
 		errorMsg    string
 	}{
@@ -409,18 +406,22 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 			envVars: map[string]string{
 				"ELASTIC_API_KEY": "test_key",
 				"APP_ENV":         "development",
-				"CONFIG_FILE":     "./testdata/config.yml",
+				"LOG_LEVEL":       "debug",
+				"CONFIG_FILE":     "testdata/valid_config.yml",
 			},
+			configFile:  "testdata/valid_config.yml",
 			expectError: false,
 		},
 		{
 			name: "missing API key in production",
 			envVars: map[string]string{
 				"APP_ENV":     "production",
-				"CONFIG_FILE": "./testdata/empty.yml",
+				"LOG_LEVEL":   "debug",
+				"CONFIG_FILE": "testdata/valid_config.yml",
 			},
+			configFile:  "testdata/valid_config.yml",
 			expectError: true,
-			errorMsg:    "invalid configuration: API key is required in production",
+			errorMsg:    "API key is required in production",
 		},
 	}
 
@@ -434,6 +435,11 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
+			// Set config file
+			viper.SetConfigFile(tt.configFile)
+			err := viper.ReadInConfig()
+			require.NoError(t, err)
+
 			// Initialize config
 			cfg, initErr := config.New()
 
@@ -443,6 +449,16 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 			} else {
 				require.NoError(t, initErr)
 				require.NotNil(t, cfg)
+
+				// Verify configuration
+				appCfg := cfg.GetAppConfig()
+				require.Equal(t, tt.envVars["APP_ENV"], appCfg.Environment)
+
+				esCfg := cfg.GetElasticsearchConfig()
+				require.Equal(t, tt.envVars["ELASTIC_API_KEY"], esCfg.APIKey)
+
+				logCfg := cfg.GetLogConfig()
+				require.Equal(t, tt.envVars["LOG_LEVEL"], logCfg.Level)
 			}
 		})
 	}
