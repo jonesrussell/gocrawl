@@ -73,8 +73,22 @@ type mockIndexManager struct {
 // mockStorage implements storage.Interface for testing
 type mockStorage struct {
 	storage.Interface
-	TestConnection func(ctx context.Context) error
-	Close          func() error
+	testConnectionFn func(ctx context.Context) error
+	closeFn          func() error
+}
+
+func (m *mockStorage) TestConnection(ctx context.Context) error {
+	if m.testConnectionFn != nil {
+		return m.testConnectionFn(ctx)
+	}
+	return nil
+}
+
+func (m *mockStorage) Close() error {
+	if m.closeFn != nil {
+		return m.closeFn()
+	}
+	return nil
 }
 
 // TestModule tests that the crawler module provides all necessary dependencies
@@ -161,10 +175,10 @@ func TestModuleProvides(t *testing.T) {
 	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
 	// Mock storage methods
-	mockStore.TestConnection = func(ctx context.Context) error {
+	mockStore.testConnectionFn = func(ctx context.Context) error {
 		return nil
 	}
-	mockStore.Close = func() error {
+	mockStore.closeFn = func() error {
 		return nil
 	}
 

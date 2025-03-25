@@ -160,6 +160,35 @@ func TestParseRateLimit(t *testing.T) {
 }
 
 func TestLoadConfig(t *testing.T) {
+	// Ensure testdata directory exists
+	err := os.MkdirAll("internal/config/testdata", 0755)
+	require.NoError(t, err)
+
+	// Create valid config file for testing
+	validConfig := `
+app:
+  environment: development
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+crawler:
+  max_depth: 3
+  parallelism: 2
+log:
+  level: debug
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: test_key
+`
+	err = os.WriteFile("internal/config/testdata/config.yml", []byte(validConfig), 0644)
+	require.NoError(t, err)
+	defer func() {
+		if removeErr := os.Remove("internal/config/testdata/config.yml"); removeErr != nil {
+			t.Errorf("Error removing test file: %v", removeErr)
+		}
+	}()
+
 	tests := []struct {
 		name    string
 		path    string
@@ -167,27 +196,27 @@ func TestLoadConfig(t *testing.T) {
 	}{
 		{
 			name:    "valid config file",
-			path:    "testdata/config.yml",
+			path:    "internal/config/testdata/config.yml",
 			wantErr: false,
 		},
 		{
 			name:    "non-existent file",
-			path:    "testdata/nonexistent.yml",
+			path:    "internal/config/testdata/nonexistent.yml",
 			wantErr: true,
 		},
 		{
 			name:    "invalid yaml",
-			path:    "testdata/invalid.yml",
+			path:    "internal/config/testdata/invalid.yml",
 			wantErr: true,
 		},
 	}
 
 	// Create invalid YAML file for testing
 	invalidYAML := []byte("invalid: yaml: content")
-	err := os.WriteFile("testdata/invalid.yml", invalidYAML, 0644)
+	err = os.WriteFile("internal/config/testdata/invalid.yml", invalidYAML, 0644)
 	require.NoError(t, err)
 	defer func() {
-		if removeErr := os.Remove("testdata/invalid.yml"); removeErr != nil {
+		if removeErr := os.Remove("internal/config/testdata/invalid.yml"); removeErr != nil {
 			t.Errorf("Error removing test file: %v", removeErr)
 		}
 	}()
@@ -349,7 +378,7 @@ ELASTIC_API_KEY=env_api_key
 	// Create test config files
 	configWithAPIKey := `
 app:
-  environment: development
+  environment: production
   name: gocrawl
   version: 1.0.0
 elasticsearch:
@@ -357,7 +386,7 @@ elasticsearch:
     - http://localhost:9200
   api_key: test_api_key
 log:
-  level: info
+  level: debug
 crawler:
   max_depth: 3
   parallelism: 2
@@ -384,10 +413,10 @@ crawler:
 	cfg, err := config.New()
 	require.NoError(t, err)
 
-	// Verify config file values take precedence
-	require.Equal(t, "test_api_key", cfg.GetElasticsearchConfig().APIKey)
-	require.Equal(t, "development", cfg.GetAppConfig().Environment)
-	require.Equal(t, "info", cfg.GetLogConfig().Level)
+	// Verify environment variables take precedence over config file values
+	require.Equal(t, "env_api_key", cfg.GetElasticsearchConfig().APIKey, "Environment variable ELASTIC_API_KEY should override config file value")
+	require.Equal(t, "development", cfg.GetAppConfig().Environment, "Environment variable APP_ENV should override config file value")
+	require.Equal(t, "info", cfg.GetLogConfig().Level, "Environment variable LOG_LEVEL should override config file value")
 }
 
 func TestRequiredConfigurationValidation(t *testing.T) {

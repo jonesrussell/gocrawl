@@ -185,19 +185,7 @@ func setupViper() error {
 		viper.AddConfigPath("/etc/gocrawl")
 	}
 
-	// Configure environment variable handling first
-	viper.SetEnvPrefix("")
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// Load .env file if it exists
-	if err := godotenv.Load(); err != nil {
-		if !os.IsNotExist(err) {
-			defaultLog.Warn("Error loading .env file", "error", err)
-		}
-	}
-
-	// Read config file
+	// Read config file first
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFoundError) {
@@ -207,6 +195,18 @@ func setupViper() error {
 	} else {
 		defaultLog.Info("Configuration loaded from", "file", viper.ConfigFileUsed())
 	}
+
+	// Load .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		if !os.IsNotExist(err) {
+			defaultLog.Warn("Error loading .env file", "error", err)
+		}
+	}
+
+	// Configure environment variable handling last
+	viper.SetEnvPrefix("")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Set default values only if not already set
 	if !viper.IsSet("app.environment") {
