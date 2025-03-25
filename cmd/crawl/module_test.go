@@ -17,6 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -38,6 +39,32 @@ func (m *mockSearchManager) Count(context.Context, string, any) (int64, error) {
 
 func (m *mockSearchManager) Aggregate(context.Context, string, any) (any, error) {
 	return nil, errors.New("aggregate not implemented in mock")
+}
+
+// mockIndexManager implements api.IndexManager for testing
+type mockIndexManager struct {
+	api.IndexManager
+}
+
+func (m *mockIndexManager) Index(context.Context, string, any) error {
+	return nil
+}
+
+func (m *mockIndexManager) Close() error {
+	return nil
+}
+
+// mockStorage implements storage.Interface for testing
+type mockStorage struct {
+	storage.Interface
+}
+
+func (m *mockStorage) Store(context.Context, string, any) error {
+	return nil
+}
+
+func (m *mockStorage) Close() error {
+	return nil
 }
 
 // TestModuleProvides tests that the crawl module provides all necessary dependencies
@@ -73,23 +100,20 @@ func TestModuleProvides(t *testing.T) {
 
 	// Create a test-specific module that excludes config.Module and sources.Module
 	testModule := fx.Module("test",
-		// Core dependencies (excluding config and logger modules)
-		api.Module,
-		article.Module,
+		// Core dependencies (excluding config, logger, and storage modules)
 		content.Module,
 		collector.Module(),
 		crawler.Module,
 
 		// Provide all required dependencies
 		fx.Provide(
+			func() context.Context { return t.Context() },
 			// Test dependencies
 			fx.Annotate(
 				func() struct {
 					fx.Out
 					Logger     logger.Interface  `name:"testLogger"`
 					Config     config.Interface  `name:"testConfig"`
-					IndexMgr   api.IndexManager  `name:"testIndexManager"`
-					SearchMgr  api.SearchManager `name:"testSearchManager"`
 					Sources    sources.Interface `name:"sourceManager"`
 					SourceName string            `name:"sourceName"`
 					ArticleSvc article.Interface `name:"testArticleService"`
@@ -98,22 +122,25 @@ func TestModuleProvides(t *testing.T) {
 						fx.Out
 						Logger     logger.Interface  `name:"testLogger"`
 						Config     config.Interface  `name:"testConfig"`
-						IndexMgr   api.IndexManager  `name:"testIndexManager"`
-						SearchMgr  api.SearchManager `name:"testSearchManager"`
 						Sources    sources.Interface `name:"sourceManager"`
 						SourceName string            `name:"sourceName"`
 						ArticleSvc article.Interface `name:"testArticleService"`
 					}{
 						Logger:     mockLogger,
 						Config:     mockCfg,
-						IndexMgr:   nil,
-						SearchMgr:  &mockSearchManager{},
 						Sources:    testSources,
 						SourceName: "Test Source",
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
 					}
 				},
 			),
+		),
+
+		// Decorate storage-related dependencies with mocks
+		fx.Decorate(
+			func() storage.Interface { return &mockStorage{} },
+			func() api.IndexManager { return &mockIndexManager{} },
+			func() api.SearchManager { return &mockSearchManager{} },
 		),
 	)
 
@@ -150,6 +177,11 @@ func TestModuleConfiguration(t *testing.T) {
 		WithCrawlerConfig(&config.CrawlerConfig{
 			MaxDepth:    3,
 			Parallelism: 2,
+		}).
+		WithElasticsearchConfig(&config.ElasticsearchConfig{
+			Addresses: []string{"http://localhost:9200"},
+			APIKey:    "test-api-key",
+			IndexName: "test-index",
 		})
 
 	testConfigs := []sources.Config{
@@ -166,23 +198,20 @@ func TestModuleConfiguration(t *testing.T) {
 
 	// Create a test-specific module that excludes config.Module and sources.Module
 	testModule := fx.Module("test",
-		// Core dependencies (excluding config and logger modules)
-		api.Module,
-		article.Module,
+		// Core dependencies (excluding config, logger, and storage modules)
 		content.Module,
 		collector.Module(),
 		crawler.Module,
 
 		// Provide all required dependencies
 		fx.Provide(
+			func() context.Context { return t.Context() },
 			// Test dependencies
 			fx.Annotate(
 				func() struct {
 					fx.Out
 					Logger     logger.Interface  `name:"testLogger"`
 					Config     config.Interface  `name:"testConfig"`
-					IndexMgr   api.IndexManager  `name:"testIndexManager"`
-					SearchMgr  api.SearchManager `name:"testSearchManager"`
 					Sources    sources.Interface `name:"sourceManager"`
 					SourceName string            `name:"sourceName"`
 					ArticleSvc article.Interface `name:"testArticleService"`
@@ -191,22 +220,25 @@ func TestModuleConfiguration(t *testing.T) {
 						fx.Out
 						Logger     logger.Interface  `name:"testLogger"`
 						Config     config.Interface  `name:"testConfig"`
-						IndexMgr   api.IndexManager  `name:"testIndexManager"`
-						SearchMgr  api.SearchManager `name:"testSearchManager"`
 						Sources    sources.Interface `name:"sourceManager"`
 						SourceName string            `name:"sourceName"`
 						ArticleSvc article.Interface `name:"testArticleService"`
 					}{
 						Logger:     mockLogger,
 						Config:     mockCfg,
-						IndexMgr:   api.NewMockIndexManager(),
-						SearchMgr:  &mockSearchManager{},
 						Sources:    testSources,
 						SourceName: "Test Source",
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
 					}
 				},
 			),
+		),
+
+		// Decorate storage-related dependencies with mocks
+		fx.Decorate(
+			func() storage.Interface { return &mockStorage{} },
+			func() api.IndexManager { return &mockIndexManager{} },
+			func() api.SearchManager { return &mockSearchManager{} },
 		),
 	)
 
