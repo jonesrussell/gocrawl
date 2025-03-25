@@ -124,7 +124,11 @@ func (s *ElasticsearchStorage) BulkIndex(ctx context.Context, index string, docu
 	if err != nil {
 		return fmt.Errorf("bulk indexing failed: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.Logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("bulk indexing failed: %s", res.String())
@@ -176,10 +180,15 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query a
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
 	defer cancel()
 
+	body, err := marshalJSON(query)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling search query: %w", err)
+	}
+
 	res, err := s.ESClient.Search(
 		s.ESClient.Search.WithContext(ctx),
 		s.ESClient.Search.WithIndex(index),
-		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(query))),
+		s.ESClient.Search.WithBody(bytes.NewReader(body)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute search: %w", err)
@@ -680,17 +689,21 @@ func (s *ElasticsearchStorage) GetIndexDocCount(ctx context.Context, index strin
 	return int64(countValue), nil
 }
 
-// mustMarshal marshals the given value to JSON or panics if it fails
-func mustMarshal(v any) []byte {
+// marshalJSON marshals the given value to JSON and returns an error if it fails
+func marshalJSON(v any) ([]byte, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
-		panic(fmt.Sprintf("failed to marshal JSON: %v", err))
+		return nil, fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	return data
+	return data, nil
 }
 
 // SearchArticles implements Interface
 func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
+	if s.opts.IndexName == "" {
+		return nil, errors.New("index name is not configured")
+	}
+
 	searchQuery := map[string]any{
 		"query": map[string]any{
 			"match": map[string]any{
@@ -700,10 +713,15 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 		"size": size,
 	}
 
+	body, err := marshalJSON(searchQuery)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling search query: %w", err)
+	}
+
 	res, searchErr := s.ESClient.Search(
 		s.ESClient.Search.WithContext(ctx),
 		s.ESClient.Search.WithIndex(s.opts.IndexName),
-		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(searchQuery))),
+		s.ESClient.Search.WithBody(bytes.NewReader(body)),
 	)
 	if searchErr != nil {
 		return nil, fmt.Errorf("failed to execute search: %w", searchErr)
@@ -757,10 +775,15 @@ func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs
 		"aggs": aggs,
 	}
 
+	body, err := marshalJSON(query)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling aggregation query: %w", err)
+	}
+
 	res, err := s.ESClient.Search(
 		s.ESClient.Search.WithContext(ctx),
 		s.ESClient.Search.WithIndex(index),
-		s.ESClient.Search.WithBody(bytes.NewReader(mustMarshal(query))),
+		s.ESClient.Search.WithBody(bytes.NewReader(body)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute aggregation: %w", err)
@@ -794,16 +817,28 @@ func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query an
 		return 0, errors.New("elasticsearch client is not initialized")
 	}
 
+	// First check if the index exists
+	exists, err := s.IndexExists(ctx, index)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		s.Logger.Error("Index not found", "index", index)
+		return 0, fmt.Errorf("%w: %s", ErrIndexNotFound, index)
+	}
+
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
 	defer cancel()
 
-	// Extract just the query part if it's a map
-	var queryBody = query
+	body, err := marshalJSON(query)
+	if err != nil {
+		return 0, fmt.Errorf("error marshaling count query: %w", err)
+	}
 
 	res, err := s.ESClient.Count(
 		s.ESClient.Count.WithContext(ctx),
 		s.ESClient.Count.WithIndex(index),
-		s.ESClient.Count.WithBody(bytes.NewReader(mustMarshal(queryBody))),
+		s.ESClient.Count.WithBody(bytes.NewReader(body)),
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to execute count: %w", err)
