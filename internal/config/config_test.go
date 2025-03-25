@@ -44,7 +44,11 @@ elasticsearch:
 `
 	writeErr := os.WriteFile("testdata/config.yml", []byte(testConfig), 0644)
 	require.NoError(t, writeErr)
-	defer os.Remove("testdata/config.yml")
+	defer func() {
+		if removeErr := os.Remove("testdata/config.yml"); removeErr != nil {
+			t.Errorf("Error removing config file: %v", removeErr)
+		}
+	}()
 
 	tests := []struct {
 		name     string
@@ -69,9 +73,9 @@ elasticsearch:
 				viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 				// Bind environment variables
-				viper.BindEnv("app.environment", "APP_ENV")
-				viper.BindEnv("log.level", "LOG_LEVEL")
-				viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY")
+				require.NoError(t, viper.BindEnv("app.environment", "APP_ENV"))
+				require.NoError(t, viper.BindEnv("log.level", "LOG_LEVEL"))
+				require.NoError(t, viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY"))
 
 				// Read config file
 				readErr := viper.ReadInConfig()
