@@ -129,52 +129,52 @@ var Module = fx.Options(
 	),
 )
 
-// defaultLogger implements the logger interface using standard logging
-type defaultLogger struct{}
-
-func (l *defaultLogger) Info(msg string, args ...any) {
-	if len(args) > 0 {
-		// Format key-value pairs
-		formattedArgs := make([]any, 0, len(args))
-		for i := 0; i < len(args); i += 2 {
-			if i+1 < len(args) {
-				formattedArgs = append(formattedArgs, args[i], args[i+1])
+// defaultLog implements the logger interface using standard logging
+var defaultLog = struct {
+	Info func(msg string, args ...any)
+	Warn func(msg string, args ...any)
+}{
+	Info: func(msg string, args ...any) {
+		if len(args) > 0 {
+			// Format key-value pairs
+			formattedArgs := make([]any, 0, len(args))
+			for i := 0; i < len(args); i += 2 {
+				if i+1 < len(args) {
+					formattedArgs = append(formattedArgs, args[i], args[i+1])
+				}
+			}
+			_, err := os.Stdout.WriteString(fmt.Sprintf("INFO: %s %v\n", msg, formattedArgs))
+			if err != nil {
+				return
+			}
+		} else {
+			_, err := os.Stdout.WriteString(fmt.Sprintf("INFO: %s\n", msg))
+			if err != nil {
+				return
 			}
 		}
-		_, err := os.Stdout.WriteString(fmt.Sprintf("INFO: %s %v\n", msg, formattedArgs))
-		if err != nil {
-			return
-		}
-	} else {
-		_, err := os.Stdout.WriteString(fmt.Sprintf("INFO: %s\n", msg))
-		if err != nil {
-			return
-		}
-	}
-}
-
-func (l *defaultLogger) Warn(msg string, args ...any) {
-	if len(args) > 0 {
-		// Format key-value pairs
-		formattedArgs := make([]any, 0, len(args))
-		for i := 0; i < len(args); i += 2 {
-			if i+1 < len(args) {
-				formattedArgs = append(formattedArgs, args[i], args[i+1])
+	},
+	Warn: func(msg string, args ...any) {
+		if len(args) > 0 {
+			// Format key-value pairs
+			formattedArgs := make([]any, 0, len(args))
+			for i := 0; i < len(args); i += 2 {
+				if i+1 < len(args) {
+					formattedArgs = append(formattedArgs, args[i], args[i+1])
+				}
+			}
+			_, err := os.Stderr.WriteString(fmt.Sprintf("WARN: %s %v\n", msg, formattedArgs))
+			if err != nil {
+				return
+			}
+		} else {
+			_, err := os.Stderr.WriteString(fmt.Sprintf("WARN: %s\n", msg))
+			if err != nil {
+				return
 			}
 		}
-		_, err := os.Stderr.WriteString(fmt.Sprintf("WARN: %s %v\n", msg, formattedArgs))
-		if err != nil {
-			return
-		}
-	} else {
-		_, err := os.Stderr.WriteString(fmt.Sprintf("WARN: %s\n", msg))
-		if err != nil {
-			return
-		}
-	}
+	},
 }
-
-var defaultLog = &defaultLogger{}
 
 // setupViper initializes Viper with default configuration
 func setupViper() error {

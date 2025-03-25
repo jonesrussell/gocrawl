@@ -199,9 +199,8 @@ func TestHTTPCommandServerError(t *testing.T) {
 	listener, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
 	defer func(listener net.Listener) {
-		err := listener.Close()
-		if err != nil {
-			
+		if closeErr := listener.Close(); closeErr != nil {
+			t.Errorf("Error closing listener: %v", closeErr)
 		}
 	}(listener)
 

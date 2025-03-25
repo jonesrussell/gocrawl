@@ -29,15 +29,15 @@ type mockSearchManager struct {
 	api.SearchManager
 }
 
-func (m *mockSearchManager) Search(context.Context, string, any) ([]any, error) {
+func (m *mockSearchManager) Search(_ context.Context, _ string, _ any) ([]any, error) {
 	return []any{}, nil
 }
 
-func (m *mockSearchManager) Count(context.Context, string, any) (int64, error) {
+func (m *mockSearchManager) Count(_ context.Context, _ string, _ any) (int64, error) {
 	return 0, nil
 }
 
-func (m *mockSearchManager) Aggregate(context.Context, string, any) (any, error) {
+func (m *mockSearchManager) Aggregate(_ context.Context, _ string, _ any) (any, error) {
 	return nil, errors.New("aggregate not implemented in mock")
 }
 
@@ -46,7 +46,7 @@ type mockIndexManager struct {
 	api.IndexManager
 }
 
-func (m *mockIndexManager) Index(context.Context, string, any) error {
+func (m *mockIndexManager) Index(_ context.Context, _ string, _ any) error {
 	return nil
 }
 
@@ -59,7 +59,7 @@ type mockStorage struct {
 	storage.Interface
 }
 
-func (m *mockStorage) Store(context.Context, string, any) error {
+func (m *mockStorage) Store(_ context.Context, _ string, _ any) error {
 	return nil
 }
 
