@@ -17,7 +17,7 @@ const (
 	DefaultBodySelector = "article, .article"
 )
 
-// Service defines the interface for article operations
+// Interface Service defines the interface for article operations
 type Interface interface {
 	ExtractArticle(e *colly.HTMLElement) *models.Article
 	ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string

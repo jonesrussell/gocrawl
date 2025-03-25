@@ -25,7 +25,7 @@ const (
 	// defaultMaxRetries is the default number of retries for failed requests
 	defaultMaxRetries = 3
 
-	// Server timeouts
+	// DefaultReadTimeout Server timeouts
 	DefaultReadTimeout  = 10 * time.Second
 	DefaultWriteTimeout = 30 * time.Second
 	DefaultIdleTimeout  = 60 * time.Second

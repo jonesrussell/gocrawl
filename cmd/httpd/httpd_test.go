@@ -2,6 +2,7 @@ package httpd_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -304,7 +305,7 @@ func TestServerStartStop(t *testing.T) {
 		close(serverReady)
 
 		// Start the server
-		if listenErr := server.ListenAndServe(); listenErr != nil && listenErr != http.ErrServerClosed {
+		if listenErr := server.ListenAndServe(); listenErr != nil && !errors.Is(http.ErrServerClosed, listenErr) {
 			serverErr <- listenErr
 		}
 	}()

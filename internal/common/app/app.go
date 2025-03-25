@@ -78,7 +78,7 @@ func ConfigureCrawler(c interface {
 	return nil
 }
 
-// GracefulShutdown performs a graceful shutdown of the provided fx.App.
+// Shutdowner GracefulShutdown performs a graceful shutdown of the provided fx.App.
 // It creates a timeout context and handles any shutdown errors.
 type Shutdowner interface {
 	Stop(context.Context) error

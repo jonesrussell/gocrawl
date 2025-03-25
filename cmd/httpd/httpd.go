@@ -3,12 +3,11 @@ package httpd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
-
-	"errors"
 
 	signal "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -87,7 +86,7 @@ You can send POST requests to /search with a JSON body containing the search par
 
 						go func() {
 							defer close(state.serverDone)
-							if err := p.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+							if err := p.Server.ListenAndServe(); err != nil && !errors.Is(http.ErrServerClosed, err) {
 								p.Logger.Error("HTTP server failed", "error", err)
 							}
 						}()
