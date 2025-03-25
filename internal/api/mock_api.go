@@ -68,17 +68,3 @@ func (m *MockIndexManager) Search(ctx context.Context, index string, query any) 
 	}
 	return val, nil
 }
-
-// NewMockIndexManager creates a new instance of MockIndexManager with default expectations
-func NewMockIndexManager() *MockIndexManager {
-	m := &MockIndexManager{}
-	// Set up default expectations
-	m.On("EnsureIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	m.On("DeleteIndex", mock.Anything, mock.Anything).Return(nil)
-	m.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-	m.On("UpdateMapping", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	m.On("Aggregate", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-	m.On("Count", mock.Anything, mock.Anything, mock.Anything).Return(int64(0), nil)
-	m.On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{}, nil)
-	return m
-}
