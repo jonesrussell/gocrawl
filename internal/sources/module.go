@@ -47,8 +47,8 @@ type Result struct {
 }
 
 // provideSourceConfig creates a new source configuration.
-func provideSourceConfig(cfg config.Interface) *Config {
-	return NewConfig(cfg)
+func provideSourceConfig(config.Interface) *Config {
+	return NewConfig()
 }
 
 // provideSources creates a new sources instance.
@@ -57,7 +57,7 @@ func provideSources(cfg *Config) Interface {
 }
 
 // NewConfig creates a new source configuration.
-func NewConfig(cfg config.Interface) *Config {
+func NewConfig() *Config {
 	return &Config{
 		Name:      "default",
 		URL:       "http://localhost",

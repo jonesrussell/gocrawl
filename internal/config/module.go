@@ -129,12 +129,6 @@ var Module = fx.Options(
 	),
 )
 
-// Add a simple logger interface
-type logger interface {
-	Info(msg string, args ...any)
-	Warn(msg string, args ...any)
-}
-
 // defaultLogger implements the logger interface using standard logging
 type defaultLogger struct{}
 
@@ -147,9 +141,15 @@ func (l *defaultLogger) Info(msg string, args ...any) {
 				formattedArgs = append(formattedArgs, args[i], args[i+1])
 			}
 		}
-		os.Stdout.WriteString(fmt.Sprintf("INFO: %s %v\n", msg, formattedArgs))
+		_, err := os.Stdout.WriteString(fmt.Sprintf("INFO: %s %v\n", msg, formattedArgs))
+		if err != nil {
+			return
+		}
 	} else {
-		os.Stdout.WriteString(fmt.Sprintf("INFO: %s\n", msg))
+		_, err := os.Stdout.WriteString(fmt.Sprintf("INFO: %s\n", msg))
+		if err != nil {
+			return
+		}
 	}
 }
 
@@ -162,9 +162,15 @@ func (l *defaultLogger) Warn(msg string, args ...any) {
 				formattedArgs = append(formattedArgs, args[i], args[i+1])
 			}
 		}
-		os.Stderr.WriteString(fmt.Sprintf("WARN: %s %v\n", msg, formattedArgs))
+		_, err := os.Stderr.WriteString(fmt.Sprintf("WARN: %s %v\n", msg, formattedArgs))
+		if err != nil {
+			return
+		}
 	} else {
-		os.Stderr.WriteString(fmt.Sprintf("WARN: %s\n", msg))
+		_, err := os.Stderr.WriteString(fmt.Sprintf("WARN: %s\n", msg))
+		if err != nil {
+			return
+		}
 	}
 }
 

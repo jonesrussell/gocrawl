@@ -198,7 +198,12 @@ func TestHTTPCommandServerError(t *testing.T) {
 	// Create a listener to occupy a port
 	listener, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
-	defer listener.Close()
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+			
+		}
+	}(listener)
 
 	// Get the port that's now in use
 	port := listener.Addr().(*net.TCPAddr).Port
