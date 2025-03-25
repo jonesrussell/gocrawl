@@ -414,9 +414,12 @@ crawler:
 	require.NoError(t, err)
 
 	// Verify environment variables take precedence over config file values
-	require.Equal(t, "env_api_key", cfg.GetElasticsearchConfig().APIKey, "Environment variable ELASTIC_API_KEY should override config file value")
-	require.Equal(t, "development", cfg.GetAppConfig().Environment, "Environment variable APP_ENV should override config file value")
-	require.Equal(t, "info", cfg.GetLogConfig().Level, "Environment variable LOG_LEVEL should override config file value")
+	require.Equal(t, "env_api_key", cfg.GetElasticsearchConfig().APIKey,
+		"Environment variable ELASTIC_API_KEY should override config file value")
+	require.Equal(t, "development", cfg.GetAppConfig().Environment,
+		"Environment variable APP_ENV should override config file value")
+	require.Equal(t, "info", cfg.GetLogConfig().Level,
+		"Environment variable LOG_LEVEL should override config file value")
 }
 
 func TestRequiredConfigurationValidation(t *testing.T) {

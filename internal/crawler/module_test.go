@@ -67,7 +67,31 @@ func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 
 // mockIndexManager implements api.IndexManager for testing
 type mockIndexManager struct {
-	api.IndexManager
+	createIndexFn   func(ctx context.Context, index string) error
+	indexExistsFn   func(ctx context.Context, index string) (bool, error)
+	deleteIndexFn   func(ctx context.Context, index string) error
+	ensureIndexFn   func(ctx context.Context, name string, mapping any) error
+	updateMappingFn func(ctx context.Context, name string, mapping any) error
+}
+
+func (m *mockIndexManager) CreateIndex(ctx context.Context, index string) error {
+	return m.createIndexFn(ctx, index)
+}
+
+func (m *mockIndexManager) IndexExists(ctx context.Context, index string) (bool, error) {
+	return m.indexExistsFn(ctx, index)
+}
+
+func (m *mockIndexManager) DeleteIndex(ctx context.Context, index string) error {
+	return m.deleteIndexFn(ctx, index)
+}
+
+func (m *mockIndexManager) EnsureIndex(ctx context.Context, name string, mapping any) error {
+	return m.ensureIndexFn(ctx, name, mapping)
+}
+
+func (m *mockIndexManager) UpdateMapping(ctx context.Context, name string, mapping any) error {
+	return m.updateMappingFn(ctx, name, mapping)
 }
 
 // mockStorage implements storage.Interface for testing
@@ -182,6 +206,25 @@ func TestModuleProvides(t *testing.T) {
 		return nil
 	}
 
+	// Create a mock index manager that implements api.IndexManager
+	mockIndexManager := &mockIndexManager{
+		createIndexFn: func(ctx context.Context, index string) error {
+			return nil
+		},
+		indexExistsFn: func(ctx context.Context, index string) (bool, error) {
+			return true, nil
+		},
+		deleteIndexFn: func(ctx context.Context, index string) error {
+			return nil
+		},
+		ensureIndexFn: func(ctx context.Context, name string, mapping any) error {
+			return nil
+		},
+		updateMappingFn: func(ctx context.Context, name string, mapping any) error {
+			return nil
+		},
+	}
+
 	// Verify mockLogger implements logger.Interface
 	var _ logger.Interface = mockLogger
 
@@ -190,8 +233,6 @@ func TestModuleProvides(t *testing.T) {
 	app := fxtest.New(t,
 		fx.Supply(mockLogger),
 		fx.Supply(mockCfg),
-		fx.Supply(mockStore),
-		fx.Supply(mockSearchManager),
 		fx.Provide(
 			fx.Annotate(
 				func() logger.Interface {
@@ -205,24 +246,17 @@ func TestModuleProvides(t *testing.T) {
 				},
 				fx.ResultTags(`name:"testConfig"`),
 			),
-			fx.Annotate(
-				func() storage.Interface {
-					return mockStore
-				},
-				fx.ResultTags(`name:"testStorage"`),
-			),
-			fx.Annotate(
-				func() api.SearchManager {
-					return mockSearchManager
-				},
-				fx.ResultTags(`name:"testSearchManager"`),
-			),
-			fx.Annotate(
-				func() api.IndexManager {
-					return &mockIndexManager{}
-				},
-				fx.ResultTags(`name:"testIndexManager"`),
-			),
+		),
+		fx.Decorate(
+			func() storage.Interface {
+				return mockStore
+			},
+			func() api.SearchManager {
+				return mockSearchManager
+			},
+			func() api.IndexManager {
+				return mockIndexManager
+			},
 		),
 		crawler.Module,
 		fx.Populate(&crawlerInstance),

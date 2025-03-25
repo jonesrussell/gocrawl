@@ -64,34 +64,18 @@ func TestExtractContent(t *testing.T) {
 		DOM:      doc.Selection,
 	}
 
-	// Set up logger expectations in order
+	// Set up logger expectations
 	mockLogger.EXPECT().Debug("Extracting content", "url", testURL)
 	mockLogger.EXPECT().Debug("Trying to parse date", "value", "2024-03-15T10:00:00Z")
 
-	// Expect attempts with each time format
-	for _, format := range []string{
-		time.RFC3339,
-		"2006-01-02T15:04:05Z",
-		"2006-01-02T15:04:05.2030000Z",
-		"2006-01-02 15:04:05",
-	} {
-		if format == "2006-01-02T15:04:05Z" {
-			mockLogger.EXPECT().Debug("Successfully parsed date",
-				"source", "2024-03-15T10:00:00Z",
-				"format", format,
-				"result", "2024-03-15 10:00:00 +0000 UTC",
-			)
-			break // Stop after successful parse
-		} else {
-			mockLogger.EXPECT().Debug("Failed to parse date",
-				"source", "2024-03-15T10:00:00Z",
-				"format", format,
-				"error", gomock.Any(),
-			)
-		}
-	}
+	// First attempt with RFC3339 succeeds
+	mockLogger.EXPECT().Debug("Successfully parsed date",
+		"source", "2024-03-15T10:00:00Z",
+		"format", time.RFC3339,
+		"result", "2024-03-15 10:00:00 +0000 UTC",
+	)
 
-	// Expect the final content extraction log
+	// Final content extraction log
 	mockLogger.EXPECT().Debug("Extracted content",
 		"id", gomock.Any(),
 		"title", "Test Article",

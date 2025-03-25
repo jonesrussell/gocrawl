@@ -85,6 +85,10 @@ func (m *mockSearchManager) Count(context.Context, string, any) (int64, error) {
 	return 0, nil
 }
 
+func (m *mockSearchManager) Close() error {
+	return nil
+}
+
 func TestHTTPCommand(t *testing.T) {
 	// Create test dependencies
 	ctrl := gomock.NewController(t)
@@ -110,6 +114,7 @@ func TestHTTPCommand(t *testing.T) {
 		fx.Supply(mockStore),
 		fx.Supply(mockSearch),
 		fx.Provide(
+			func() context.Context { return t.Context() },
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() storage.Interface { return mockStore },
@@ -147,6 +152,7 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 		fx.Supply(mockStore),
 		fx.Supply(mockSearch),
 		fx.Provide(
+			func() context.Context { return t.Context() },
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() storage.Interface { return mockStore },
