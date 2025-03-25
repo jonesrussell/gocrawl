@@ -189,6 +189,14 @@ func TestHTTPCommandServerError(t *testing.T) {
 	mockStore := &mockStorage{}
 	mockSearch := &mockSearchManager{}
 
+	// Create a listener to occupy a port
+	listener, err := net.Listen("tcp", ":0")
+	require.NoError(t, err)
+	defer listener.Close()
+
+	// Get the port that's now in use
+	port := listener.Addr().(*net.TCPAddr).Port
+
 	// Create a test module that doesn't include api.Module
 	testModule := fx.Module("test",
 		fx.Provide(
@@ -198,14 +206,14 @@ func TestHTTPCommandServerError(t *testing.T) {
 			func() api.SearchManager { return mockSearch },
 			func() *http.Server {
 				return &http.Server{
-					Addr: ":-1", // Invalid port number
+					Addr: fmt.Sprintf(":%d", port), // Use the port that's already in use
 				}
 			},
 		),
 		fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
-					// Try to listen on the port to check if it's valid
+					// Try to listen on the port that's already in use
 					ln, err := net.Listen("tcp", server.Addr)
 					if err != nil {
 						return fmt.Errorf("failed to listen on %s: %w", server.Addr, err)
@@ -223,7 +231,7 @@ func TestHTTPCommandServerError(t *testing.T) {
 		}),
 	)
 
-	// Create test app with mocked dependencies and invalid server using fxtest
+	// Create test app with mocked dependencies and server using fxtest
 	app := fxtest.New(t,
 		fx.Supply(mockLogger),
 		fx.Supply(mockCfg),
@@ -232,10 +240,10 @@ func TestHTTPCommandServerError(t *testing.T) {
 		testModule,
 	)
 
-	// Start should fail with invalid port error
-	err := app.Start(t.Context())
+	// Start should fail with port in use error
+	err = app.Start(t.Context())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to listen on :-1: listen tcp: address -1: invalid port")
+	assert.Contains(t, err.Error(), fmt.Sprintf("failed to listen on :%d", port))
 
 	// Cleanup
 	_ = app.Stop(t.Context())

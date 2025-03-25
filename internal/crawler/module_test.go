@@ -1,7 +1,9 @@
 package crawler_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -23,14 +25,22 @@ func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig {
 	return &config.CrawlerConfig{
 		MaxDepth:    3,
 		Parallelism: 2,
+		RateLimit:   time.Second,
 	}
 }
 
 func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 	return &config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
-		APIKey:    "test-api-key",
+		APIKey:    "test-api-key", // Required API key
 		IndexName: "test-index",
+		Cloud: struct {
+			ID     string `yaml:"id"`
+			APIKey string `yaml:"api_key"`
+		}{
+			ID:     "test-deployment",
+			APIKey: "test-cloud-key",
+		},
 		TLS: struct {
 			Enabled     bool   `yaml:"enabled"`
 			SkipVerify  bool   `yaml:"skip_verify"`
@@ -40,6 +50,17 @@ func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 		}{
 			Enabled:    true,
 			SkipVerify: true,
+		},
+		Retry: struct {
+			Enabled     bool          `yaml:"enabled"`
+			InitialWait time.Duration `yaml:"initial_wait"`
+			MaxWait     time.Duration `yaml:"max_wait"`
+			MaxRetries  int           `yaml:"max_retries"`
+		}{
+			Enabled:     true,
+			InitialWait: 1 * time.Second,
+			MaxWait:     30 * time.Second,
+			MaxRetries:  3,
 		},
 	}
 }
@@ -52,6 +73,8 @@ type mockIndexManager struct {
 // mockStorage implements storage.Interface for testing
 type mockStorage struct {
 	storage.Interface
+	TestConnection func(ctx context.Context) error
+	Close          func() error
 }
 
 // TestModule tests that the crawler module provides all necessary dependencies
@@ -124,15 +147,26 @@ func TestModuleProvides(t *testing.T) {
 
 	mockLogger := logger.NewMockInterface(ctrl)
 	mockCfg := &mockConfig{}
-	mockIndex := &mockIndexManager{}
+	mockStore := &mockStorage{}
 	mockSearchManager := api.NewMockSearchManager(ctrl)
-	mockStorage := &mockStorage{}
 
 	// Set up debug logging expectations
+	mockLogger.EXPECT().Debug(gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+
+	// Mock storage methods
+	mockStore.TestConnection = func(ctx context.Context) error {
+		return nil
+	}
+	mockStore.Close = func() error {
+		return nil
+	}
 
 	// Verify mockLogger implements logger.Interface
 	var _ logger.Interface = mockLogger
@@ -140,47 +174,49 @@ func TestModuleProvides(t *testing.T) {
 	var crawlerInstance crawler.Interface
 
 	app := fxtest.New(t,
-		crawler.Module,
+		fx.Supply(mockLogger),
+		fx.Supply(mockCfg),
+		fx.Supply(mockStore),
+		fx.Supply(mockSearchManager),
 		fx.Provide(
 			fx.Annotate(
 				func() logger.Interface {
-					mockLogger.Debug("Providing test logger")
 					return mockLogger
 				},
 				fx.ResultTags(`name:"testLogger"`),
 			),
 			fx.Annotate(
 				func() config.Interface {
-					mockLogger.Debug("Providing test config")
 					return mockCfg
 				},
 				fx.ResultTags(`name:"testConfig"`),
 			),
 			fx.Annotate(
-				func() api.IndexManager {
-					mockLogger.Debug("Providing test index manager")
-					return mockIndex
+				func() storage.Interface {
+					return mockStore
 				},
-				fx.ResultTags(`name:"testIndexManager"`),
+				fx.ResultTags(`name:"testStorage"`),
 			),
 			fx.Annotate(
 				func() api.SearchManager {
-					mockLogger.Debug("Providing test search manager")
 					return mockSearchManager
 				},
 				fx.ResultTags(`name:"testSearchManager"`),
 			),
 			fx.Annotate(
-				func() storage.Interface {
-					mockLogger.Debug("Providing test storage")
-					return mockStorage
+				func() api.IndexManager {
+					return &mockIndexManager{}
 				},
-				fx.ResultTags(`name:"testStorage"`),
+				fx.ResultTags(`name:"testIndexManager"`),
 			),
 		),
+		crawler.Module,
 		fx.Populate(&crawlerInstance),
 	)
-	defer app.RequireStart().RequireStop()
+
+	require.NoError(t, app.Err())
+	app.RequireStart()
+	defer app.RequireStop()
 
 	require.NotNil(t, crawlerInstance)
 }

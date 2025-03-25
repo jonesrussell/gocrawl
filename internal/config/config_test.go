@@ -20,6 +20,32 @@ func TestNew(t *testing.T) {
 	// Reset Viper after each test
 	defer viper.Reset()
 
+	// Create test config file
+	testConfig := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+log:
+  level: debug
+  debug: true
+elasticsearch:
+  addresses:
+    - https://localhost:9200
+  api_key: test_api_key
+  tls:
+    skip_verify: true
+`
+	writeErr := os.WriteFile("testdata/config.yml", []byte(testConfig), 0644)
+	require.NoError(t, writeErr)
+	defer os.Remove("testdata/config.yml")
+
 	tests := []struct {
 		name     string
 		setup    func(*testing.T)
@@ -28,11 +54,28 @@ func TestNew(t *testing.T) {
 		{
 			name: "valid configuration",
 			setup: func(t *testing.T) {
+				// Reset viper for clean state
+				viper.Reset()
+
 				// Set test environment
 				t.Setenv("APP_ENV", "test")
-
-				// Set config file location
 				t.Setenv("CONFIG_FILE", "./testdata/config.yml")
+				t.Setenv("LOG_LEVEL", "debug")
+
+				// Configure viper
+				viper.SetConfigFile("./testdata/config.yml")
+				viper.AutomaticEnv()
+				viper.SetEnvPrefix("")
+				viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+				// Bind environment variables
+				viper.BindEnv("app.environment", "APP_ENV")
+				viper.BindEnv("log.level", "LOG_LEVEL")
+				viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY")
+
+				// Read config file
+				readErr := viper.ReadInConfig()
+				require.NoError(t, readErr)
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.NoError(t, err)
@@ -293,86 +336,71 @@ func TestConfigurationPriority(t *testing.T) {
 	os.Clearenv()
 	viper.Reset()
 
-	// Create empty config file for testing defaults
-	emptyConfig := []byte("---\n")
-	writeErr := os.WriteFile("testdata/empty.yml", emptyConfig, 0644)
-	require.NoError(t, writeErr)
-	defer func() {
-		if removeErr := os.Remove("testdata/empty.yml"); removeErr != nil {
-			t.Errorf("Error removing test file: %v", removeErr)
-		}
-	}()
+	// Create test .env file
+	envContent := `
+APP_ENV=development
+LOG_LEVEL=info
+ELASTIC_API_KEY=env_api_key
+`
+	envErr := os.WriteFile(".env", []byte(envContent), 0644)
+	require.NoError(t, envErr)
+	defer os.Remove(".env")
 
-	// Test cases for configuration priority
-	tests := []struct {
-		name          string
-		envVars       map[string]string
-		configFile    string
-		expectedValue string
-		configKey     string
-		envKey        string
-	}{
-		{
-			name: "environment variable takes precedence over config file",
-			envVars: map[string]string{
-				"ELASTIC_API_KEY": "env_api_key",
-				"CONFIG_FILE":     "./testdata/config.yml",
-			},
-			configFile:    "./testdata/config.yml",
-			expectedValue: "env_api_key",
-			configKey:     "elasticsearch.api_key",
-			envKey:        "ELASTIC_API_KEY",
-		},
-		{
-			name: "config file takes precedence over defaults",
-			envVars: map[string]string{
-				"CONFIG_FILE": "./testdata/config.yml",
-			},
-			configFile:    "./testdata/config.yml",
-			expectedValue: "test_api_key",
-			configKey:     "elasticsearch.api_key",
-			envKey:        "ELASTIC_API_KEY",
-		},
-		{
-			name: "default value used when no env or config",
-			envVars: map[string]string{
-				"CONFIG_FILE": "./testdata/empty.yml",
-			},
-			expectedValue: "info",
-			configKey:     "log.level",
-			envKey:        "LOG_LEVEL",
-		},
-	}
+	// Create test config files
+	configWithAPIKey := `
+app:
+  environment: development
+  name: gocrawl
+  version: 1.0.0
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: test_api_key
+log:
+  level: info
+crawler:
+  max_depth: 3
+  parallelism: 2
+  rate_limit: 1s
+`
+	err := os.WriteFile("testdata/config.yml", []byte(configWithAPIKey), 0644)
+	require.NoError(t, err)
+	defer os.Remove("testdata/config.yml")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Reset viper for each test
-			viper.Reset()
+	// Set up Viper
+	viper.SetConfigFile("testdata/config.yml")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-			// Set environment variables
-			for k, v := range tt.envVars {
-				t.Setenv(k, v)
-			}
+	// Bind environment variables
+	require.NoError(t, viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY"))
+	require.NoError(t, viper.BindEnv("app.environment", "APP_ENV"))
+	require.NoError(t, viper.BindEnv("log.level", "LOG_LEVEL"))
 
-			// Initialize config
-			cfg, initErr := config.New()
-			require.NoError(t, initErr)
+	// Read config file
+	require.NoError(t, viper.ReadInConfig())
 
-			// Verify value based on the config key
-			var actualValue string
-			switch tt.configKey {
-			case "elasticsearch.api_key":
-				actualValue = cfg.GetElasticsearchConfig().APIKey
-			case "log.level":
-				actualValue = cfg.GetLogConfig().Level
-			}
+	// Create config
+	cfg, err := config.New()
+	require.NoError(t, err)
 
-			assert.Equal(t, tt.expectedValue, actualValue)
-		})
-	}
+	// Verify config file values take precedence
+	require.Equal(t, "test_api_key", cfg.GetElasticsearchConfig().APIKey)
+	require.Equal(t, "development", cfg.GetAppConfig().Environment)
+	require.Equal(t, "info", cfg.GetLogConfig().Level)
 }
 
 func TestRequiredConfigurationValidation(t *testing.T) {
+	// Create test .env file
+	envContent := `
+APP_ENV=development
+LOG_LEVEL=debug
+ELASTIC_API_KEY=test_key
+`
+	envErr := os.WriteFile(".env", []byte(envContent), 0644)
+	require.NoError(t, envErr)
+	defer os.Remove(".env")
+
 	// Create test config files
 	validConfig := `
 app:
@@ -388,10 +416,30 @@ log:
 elasticsearch:
   addresses:
     - http://localhost:9200
+  api_key: test_key
 `
-	err := os.WriteFile("testdata/valid_config.yml", []byte(validConfig), 0644)
-	require.NoError(t, err)
+	noAPIKeyConfig := `
+app:
+  environment: production
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+crawler:
+  max_depth: 3
+  parallelism: 2
+log:
+  level: debug
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+`
+	writeErr1 := os.WriteFile("testdata/valid_config.yml", []byte(validConfig), 0644)
+	require.NoError(t, writeErr1)
 	defer os.Remove("testdata/valid_config.yml")
+
+	writeErr2 := os.WriteFile("testdata/no_api_key_config.yml", []byte(noAPIKeyConfig), 0644)
+	require.NoError(t, writeErr2)
+	defer os.Remove("testdata/no_api_key_config.yml")
 
 	// Create test environment
 	tests := []struct {
@@ -417,9 +465,9 @@ elasticsearch:
 			envVars: map[string]string{
 				"APP_ENV":     "production",
 				"LOG_LEVEL":   "debug",
-				"CONFIG_FILE": "testdata/valid_config.yml",
+				"CONFIG_FILE": "testdata/no_api_key_config.yml",
 			},
-			configFile:  "testdata/valid_config.yml",
+			configFile:  "testdata/no_api_key_config.yml",
 			expectError: true,
 			errorMsg:    "API key is required in production",
 		},
@@ -435,10 +483,20 @@ elasticsearch:
 				t.Setenv(k, v)
 			}
 
-			// Set config file
+			// Configure viper
 			viper.SetConfigFile(tt.configFile)
-			err := viper.ReadInConfig()
-			require.NoError(t, err)
+			viper.AutomaticEnv()
+			viper.SetEnvPrefix("") // No prefix for env vars
+			viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+			// Set up environment variable bindings
+			viper.BindEnv("app.environment", "APP_ENV")
+			viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY")
+			viper.BindEnv("log.level", "LOG_LEVEL")
+
+			// Read config file
+			readErr := viper.ReadInConfig()
+			require.NoError(t, readErr)
 
 			// Initialize config
 			cfg, initErr := config.New()

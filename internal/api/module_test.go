@@ -264,11 +264,24 @@ func TestHealthHandler(t *testing.T) {
 	mockSearchManager.EXPECT().Close().Return(nil).AnyTimes()
 	mockCfg := configtest.NewMockConfig()
 
+	// Expect the request logging call
+	mockLogger.EXPECT().Info(
+		"Gin request",
+		"method", "GET",
+		"path", "/health",
+		"status", 200,
+		"latency", gomock.Any(),
+		"client_ip", "192.0.2.1",
+		"query", "",
+		"error", "",
+	).Times(1)
+
 	// Create router
 	router, _ := api.SetupRouter(mockLogger, mockSearchManager, mockCfg)
 
 	// Create test request
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("X-Real-IP", "192.0.2.1") // Set client IP using X-Real-IP header
 
 	// Create response recorder
 	w := httptest.NewRecorder()

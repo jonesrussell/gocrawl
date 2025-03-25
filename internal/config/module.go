@@ -185,6 +185,11 @@ func setupViper() error {
 		viper.AddConfigPath("/etc/gocrawl")
 	}
 
+	// Configure environment variable handling first
+	viper.SetEnvPrefix("")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		if !os.IsNotExist(err) {
@@ -203,20 +208,25 @@ func setupViper() error {
 		defaultLog.Info("Configuration loaded from", "file", viper.ConfigFileUsed())
 	}
 
-	// Configure environment variable handling
-	viper.SetEnvPrefix("")
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// Set default values AFTER binding environment variables
-	if os.Getenv("APP_ENV") == "" {
+	// Set default values only if not already set
+	if !viper.IsSet("app.environment") {
 		viper.SetDefault("app.environment", "development")
 	}
-	viper.SetDefault("log.level", "info")
-	viper.SetDefault("crawler.source_file", "sources.yml")
-	viper.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
-	viper.SetDefault("crawler.max_depth", defaultMaxDepth)
-	viper.SetDefault("crawler.parallelism", defaultParallelism)
+	if !viper.IsSet("log.level") {
+		viper.SetDefault("log.level", "info")
+	}
+	if !viper.IsSet("crawler.source_file") {
+		viper.SetDefault("crawler.source_file", "sources.yml")
+	}
+	if !viper.IsSet("elasticsearch.addresses") {
+		viper.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
+	}
+	if !viper.IsSet("crawler.max_depth") {
+		viper.SetDefault("crawler.max_depth", defaultMaxDepth)
+	}
+	if !viper.IsSet("crawler.parallelism") {
+		viper.SetDefault("crawler.parallelism", defaultParallelism)
+	}
 
 	return nil
 }

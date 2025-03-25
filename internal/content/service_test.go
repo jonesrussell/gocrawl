@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
@@ -66,29 +67,38 @@ func TestExtractContent(t *testing.T) {
 	// Set up logger expectations in order
 	mockLogger.EXPECT().Debug("Extracting content", "url", testURL)
 	mockLogger.EXPECT().Debug("Trying to parse date", "value", "2024-03-15T10:00:00Z")
-	mockLogger.EXPECT().Debug("Successfully parsed date",
-		"source", "2024-03-15T10:00:00Z",
-		"format", "2006-01-02T15:04:05Z",
-		"result", "2024-03-15 10:00:00 +0000 UTC",
-	)
-	// Add expectation for failed parse attempts with other formats
-	mockLogger.EXPECT().Debug("Failed to parse date",
-		"source", "2024-03-15T10:00:00Z",
-		"format", "2006-01-02T15:04:05.2030000Z",
-		"error", gomock.Any(),
-	).AnyTimes()
-	mockLogger.EXPECT().Debug("Failed to parse date",
-		"source", "2024-03-15T10:00:00Z",
-		"format", "2006-01-02 15:04:05",
-		"error", gomock.Any(),
-	).AnyTimes()
+
+	// Expect attempts with each time format
+	for _, format := range []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05Z",
+		"2006-01-02T15:04:05.2030000Z",
+		"2006-01-02 15:04:05",
+	} {
+		if format == "2006-01-02T15:04:05Z" {
+			mockLogger.EXPECT().Debug("Successfully parsed date",
+				"source", "2024-03-15T10:00:00Z",
+				"format", format,
+				"result", "2024-03-15 10:00:00 +0000 UTC",
+			)
+			break // Stop after successful parse
+		} else {
+			mockLogger.EXPECT().Debug("Failed to parse date",
+				"source", "2024-03-15T10:00:00Z",
+				"format", format,
+				"error", gomock.Any(),
+			)
+		}
+	}
+
+	// Expect the final content extraction log
 	mockLogger.EXPECT().Debug("Extracted content",
 		"id", gomock.Any(),
 		"title", "Test Article",
 		"url", testURL,
 		"type", "article",
 		"created_at", gomock.Any(),
-	).Times(1)
+	)
 
 	contentData := svc.ExtractContent(e)
 	require.NotNil(t, contentData)
