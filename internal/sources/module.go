@@ -7,6 +7,11 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// DefaultMaxDepth is the default maximum depth for crawling.
+	DefaultMaxDepth = 2
+)
+
 // Interface defines the interface for managing web content sources.
 type Interface interface {
 	// FindByName finds a source by its name.
@@ -57,7 +62,7 @@ func NewConfig(cfg config.Interface) *Config {
 		Name:      "default",
 		URL:       "http://localhost",
 		RateLimit: "1s",
-		MaxDepth:  2,
+		MaxDepth:  DefaultMaxDepth,
 	}
 }
 
