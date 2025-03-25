@@ -373,7 +373,11 @@ ELASTIC_API_KEY=env_api_key
 `
 	envErr := os.WriteFile(".env", []byte(envContent), 0644)
 	require.NoError(t, envErr)
-	defer os.Remove(".env")
+	defer func() {
+		if removeErr := os.Remove(".env"); removeErr != nil {
+			t.Errorf("Error removing .env file: %v", removeErr)
+		}
+	}()
 
 	// Create test config files
 	configWithAPIKey := `
@@ -394,7 +398,11 @@ crawler:
 `
 	err := os.WriteFile("testdata/config.yml", []byte(configWithAPIKey), 0644)
 	require.NoError(t, err)
-	defer os.Remove("testdata/config.yml")
+	defer func() {
+		if removeErr := os.Remove("testdata/config.yml"); removeErr != nil {
+			t.Errorf("Error removing config file: %v", removeErr)
+		}
+	}()
 
 	// Set up Viper
 	viper.SetConfigFile("testdata/config.yml")
@@ -431,7 +439,11 @@ ELASTIC_API_KEY=test_key
 `
 	envErr := os.WriteFile(".env", []byte(envContent), 0644)
 	require.NoError(t, envErr)
-	defer os.Remove(".env")
+	defer func() {
+		if removeErr := os.Remove(".env"); removeErr != nil {
+			t.Errorf("Error removing .env file: %v", removeErr)
+		}
+	}()
 
 	// Create test config files
 	validConfig := `
@@ -467,11 +479,19 @@ elasticsearch:
 `
 	writeErr1 := os.WriteFile("testdata/valid_config.yml", []byte(validConfig), 0644)
 	require.NoError(t, writeErr1)
-	defer os.Remove("testdata/valid_config.yml")
+	defer func() {
+		if removeErr := os.Remove("testdata/valid_config.yml"); removeErr != nil {
+			t.Errorf("Error removing valid config file: %v", removeErr)
+		}
+	}()
 
 	writeErr2 := os.WriteFile("testdata/no_api_key_config.yml", []byte(noAPIKeyConfig), 0644)
 	require.NoError(t, writeErr2)
-	defer os.Remove("testdata/no_api_key_config.yml")
+	defer func() {
+		if removeErr := os.Remove("testdata/no_api_key_config.yml"); removeErr != nil {
+			t.Errorf("Error removing no API key config file: %v", removeErr)
+		}
+	}()
 
 	// Create test environment
 	tests := []struct {
@@ -522,9 +542,9 @@ elasticsearch:
 			viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 			// Set up environment variable bindings
-			viper.BindEnv("app.environment", "APP_ENV")
-			viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY")
-			viper.BindEnv("log.level", "LOG_LEVEL")
+			require.NoError(t, viper.BindEnv("app.environment", "APP_ENV"))
+			require.NoError(t, viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY"))
+			require.NoError(t, viper.BindEnv("log.level", "LOG_LEVEL"))
 
 			// Read config file
 			readErr := viper.ReadInConfig()
