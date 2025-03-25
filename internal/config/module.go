@@ -469,21 +469,3 @@ func New() (Interface, error) {
 
 	return cfg, nil
 }
-
-// NewConfig creates a new config provider
-func NewConfig(log logger) (*ConfigImpl, error) {
-	// Load .env file in development mode
-	if os.Getenv("APP_ENV") != envProduction {
-		if loadErr := godotenv.Load(); loadErr != nil {
-			log.Warn("Error loading .env file", "error", loadErr)
-		}
-	}
-
-	// Create configuration from Viper settings
-	cfg, err := createConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create config: %w", err)
-	}
-
-	return cfg, nil
-}
