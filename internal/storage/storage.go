@@ -186,13 +186,13 @@ func (s *Impl) Search(ctx context.Context, index string, query any) ([]any, erro
 		return nil, fmt.Errorf("error decoding search response: %w", decodeErr)
 	}
 
-	hits, exists := result["hits"].(map[string]any)
-	if !exists {
+	hits, hasHits := result["hits"].(map[string]any)
+	if !hasHits {
 		return nil, errors.New("invalid search response format")
 	}
 
-	hitsList, exists := hits["hits"].([]any)
-	if !exists {
+	hitsList, hasHitsList := hits["hits"].([]any)
+	if !hasHitsList {
 		return nil, errors.New("invalid search response format")
 	}
 
@@ -203,8 +203,8 @@ func (s *Impl) Search(ctx context.Context, index string, query any) ([]any, erro
 			continue
 		}
 
-		source, exists := hitMap["_source"]
-		if !exists {
+		source, hasSource := hitMap["_source"]
+		if !hasSource {
 			continue
 		}
 
@@ -479,7 +479,7 @@ func (s *Impl) SearchDocuments(
 // Ping implements Interface
 func (s *Impl) Ping(ctx context.Context) error {
 	if s.ESClient == nil {
-		return fmt.Errorf("elasticsearch client is nil")
+		return errors.New("elasticsearch client is nil")
 	}
 
 	res, err := s.ESClient.Ping(s.ESClient.Ping.WithContext(ctx))
@@ -850,7 +850,7 @@ func (s *Impl) Count(ctx context.Context, index string, query any) (int64, error
 // TestConnection tests the connection to the storage backend
 func (s *Impl) TestConnection(ctx context.Context) error {
 	if s.ESClient == nil {
-		return fmt.Errorf("storage client is nil")
+		return errors.New("storage client is nil")
 	}
 
 	res, err := s.ESClient.Ping(s.ESClient.Ping.WithContext(ctx))

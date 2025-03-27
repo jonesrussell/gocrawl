@@ -61,12 +61,12 @@ func (m *IndexManager) CreateIndex(ctx context.Context, name string, mapping any
 func (m *IndexManager) EnsureIndex(ctx context.Context, name string, mapping any) error {
 	exists, err := m.IndexExists(ctx, name)
 	if err != nil {
-		return fmt.Errorf("failed to check index existence: %w", err)
+		return fmt.Errorf("failed to check if index exists: %w", err)
 	}
 
 	if !exists {
-		if err := m.CreateIndex(ctx, name, mapping); err != nil {
-			return fmt.Errorf("failed to create index: %w", err)
+		if createErr := m.CreateIndex(ctx, name, mapping); createErr != nil {
+			return fmt.Errorf("failed to create index: %w", createErr)
 		}
 	}
 
