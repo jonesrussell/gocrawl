@@ -33,7 +33,7 @@ var Module = fx.Module("storage",
 			func(s types.Interface) (api.SearchManager, error) {
 				sm, ok := s.(api.SearchManager)
 				if !ok {
-					return nil, fmt.Errorf("storage implementation does not support search operations")
+					return nil, errors.New("storage implementation does not support search operations")
 				}
 				return sm, nil
 			},

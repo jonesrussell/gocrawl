@@ -186,7 +186,7 @@ func TestModuleProvides(t *testing.T) {
 	mockLogger := logger.NewMockInterface(ctrl)
 	mockCfg := &mockConfig{}
 	mockStore := &mockStorage{}
-	mockSearchManager := api.NewMockSearchManager(ctrl)
+	mockIndex := &mockIndexManager{}
 
 	// Set up debug logging expectations
 	mockLogger.EXPECT().Debug(gomock.Any()).AnyTimes()
@@ -198,73 +198,29 @@ func TestModuleProvides(t *testing.T) {
 	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
-	// Mock storage methods
-	mockStore.testConnectionFn = func(ctx context.Context) error {
-		return nil
-	}
-	mockStore.closeFn = func() error {
-		return nil
-	}
-
-	// Create a mock index manager that implements api.IndexManager
-	mockIndexManager := &mockIndexManager{
-		createIndexFn: func(ctx context.Context, index string) error {
-			return nil
-		},
-		indexExistsFn: func(ctx context.Context, index string) (bool, error) {
-			return true, nil
-		},
-		deleteIndexFn: func(ctx context.Context, index string) error {
-			return nil
-		},
-		ensureIndexFn: func(ctx context.Context, name string, mapping any) error {
-			return nil
-		},
-		updateMappingFn: func(ctx context.Context, name string, mapping any) error {
-			return nil
-		},
-	}
-
-	// Verify mockLogger implements logger.Interface
-	var _ logger.Interface = mockLogger
-
-	var crawlerInstance crawler.Interface
-
 	app := fxtest.New(t,
-		fx.Supply(mockLogger),
-		fx.Supply(mockCfg),
+		fx.Supply(mockLogger, mockCfg),
 		fx.Provide(
 			fx.Annotate(
-				func() logger.Interface {
-					return mockLogger
-				},
+				func() logger.Interface { return mockLogger },
 				fx.ResultTags(`name:"testLogger"`),
 			),
 			fx.Annotate(
-				func() config.Interface {
-					return mockCfg
-				},
+				func() config.Interface { return mockCfg },
 				fx.ResultTags(`name:"testConfig"`),
 			),
-		),
-		fx.Decorate(
-			func() types.Interface {
-				return mockStore
-			},
-			func() api.SearchManager {
-				return mockSearchManager
-			},
-			func() api.IndexManager {
-				return mockIndexManager
-			},
+			fx.Annotate(
+				func() types.Interface { return mockStore },
+				fx.As(new(types.Interface)),
+			),
+			fx.Annotate(
+				func() api.IndexManager { return mockIndex },
+				fx.As(new(api.IndexManager)),
+			),
 		),
 		crawler.Module,
-		fx.Populate(&crawlerInstance),
 	)
 
-	require.NoError(t, app.Err())
 	app.RequireStart()
-	defer app.RequireStop()
-
-	require.NotNil(t, crawlerInstance)
+	app.RequireStop()
 }

@@ -10,6 +10,11 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 )
 
+const (
+	// StatusOK represents a successful HTTP response
+	StatusOK = 200
+)
+
 // IndexManager implements the api.IndexManager interface
 type IndexManager struct {
 	client *elasticsearch.Client
@@ -105,7 +110,7 @@ func (m *IndexManager) IndexExists(ctx context.Context, name string) (bool, erro
 		}
 	}()
 
-	return res.StatusCode == 200, nil
+	return res.StatusCode == StatusOK, nil
 }
 
 // UpdateMapping updates the mapping for an existing index

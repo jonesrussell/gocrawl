@@ -12,7 +12,6 @@ import (
 type ElasticsearchStorage struct {
 	ESClient *es.Client
 	Logger   logger.Interface
-	opts     Options
 }
 
 // TestConnection tests the connection to Elasticsearch.
@@ -32,4 +31,27 @@ func (s *ElasticsearchStorage) TestConnection(_ context.Context) error {
 	}
 
 	return nil
+}
+
+// Client implements the storage interface for Elasticsearch
+type Client struct {
+	client *es.Client
+	opts   Options
+}
+
+// NewClient creates a new Elasticsearch client
+func NewClient(opts Options) (*Client, error) {
+	client, err := es.NewClient(es.Config{
+		Addresses: opts.Addresses,
+		Username:  opts.Username,
+		Password:  opts.Password,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error creating elasticsearch client: %w", err)
+	}
+
+	return &Client{
+		client: client,
+		opts:   opts,
+	}, nil
 }

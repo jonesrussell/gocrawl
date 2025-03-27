@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -176,12 +175,7 @@ func (s *Impl) Search(ctx context.Context, index string, query any) ([]any, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute search: %w", err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-
-		}
-	}(res.Body)
+	defer res.Body.Close()
 
 	if res.IsError() {
 		return nil, fmt.Errorf("search request failed: %s", res.String())
@@ -199,23 +193,25 @@ func (s *Impl) Search(ctx context.Context, index string, query any) ([]any, erro
 
 	hitsList, exists := hits["hits"].([]any)
 	if !exists {
-		return nil, errors.New("invalid hits format in search response")
+		return nil, errors.New("invalid search response format")
 	}
 
-	results := make([]any, 0, len(hitsList))
+	var documents []any
 	for _, hit := range hitsList {
-		hitData, isMap := hit.(map[string]any)
-		if !isMap {
+		hitMap, ok := hit.(map[string]any)
+		if !ok {
 			continue
 		}
-		source, isMap := hitData["_source"].(map[string]any)
-		if !isMap {
+
+		source, exists := hitMap["_source"]
+		if !exists {
 			continue
 		}
-		results = append(results, source)
+
+		documents = append(documents, source)
 	}
 
-	return results, nil
+	return documents, nil
 }
 
 // CreateIndex creates a new index with optional mapping
@@ -378,11 +374,6 @@ func (s *Impl) IndexExists(ctx context.Context, indexName string) (bool, error) 
 	return res.StatusCode == http.StatusOK, nil
 }
 
-// Close implements Interface
-func (s *Impl) Close() error {
-	return nil // Elasticsearch client doesn't need explicit closing
-}
-
 // GetDocument implements Interface
 func (s *Impl) GetDocument(ctx context.Context, index string, id string, document any) error {
 	res, err := s.ESClient.Get(
@@ -487,9 +478,11 @@ func (s *Impl) SearchDocuments(
 
 // Ping implements Interface
 func (s *Impl) Ping(ctx context.Context) error {
-	res, err := s.ESClient.Ping(
-		s.ESClient.Ping.WithContext(ctx),
-	)
+	if s.ESClient == nil {
+		return fmt.Errorf("elasticsearch client is nil")
+	}
+
+	res, err := s.ESClient.Ping(s.ESClient.Ping.WithContext(ctx))
 	if err != nil {
 		return fmt.Errorf("error pinging Elasticsearch: %w", err)
 	}
@@ -856,17 +849,18 @@ func (s *Impl) Count(ctx context.Context, index string, query any) (int64, error
 
 // TestConnection tests the connection to the storage backend
 func (s *Impl) TestConnection(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, DefaultTestConnectionTimeout)
-	defer cancel()
+	if s.ESClient == nil {
+		return fmt.Errorf("storage client is nil")
+	}
 
-	res, err := s.ESClient.Info(s.ESClient.Info.WithContext(ctx))
+	res, err := s.ESClient.Ping(s.ESClient.Ping.WithContext(ctx))
 	if err != nil {
-		return fmt.Errorf("failed to get cluster info: %w", err)
+		return fmt.Errorf("error pinging storage: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return fmt.Errorf("cluster info request failed: %s", res.String())
+		return fmt.Errorf("error pinging storage: %s", res.String())
 	}
 
 	return nil

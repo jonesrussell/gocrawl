@@ -30,7 +30,6 @@ type Interface interface {
 	GetIndexDocCount(ctx context.Context, index string) (int64, error)
 
 	// Common operations
-	Close() error
 	Ping(ctx context.Context) error
 	TestConnection(ctx context.Context) error
 
