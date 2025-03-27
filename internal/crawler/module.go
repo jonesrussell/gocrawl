@@ -23,6 +23,9 @@ import (
 const (
 	// articleChannelBufferSize is the buffer size for the article channel.
 	articleChannelBufferSize = 100
+
+	// defaultMaxDepth is the default maximum depth for crawling.
+	defaultMaxDepth = 3
 )
 
 // Interface defines the crawler's capabilities.
@@ -54,6 +57,7 @@ var Module = fx.Module("crawler",
 	fx.Provide(
 		provideCollyDebugger,
 		provideEventBus,
+		provideCollector,
 		provideCrawler,
 		// Content service
 		fx.Annotate(
@@ -138,6 +142,7 @@ type Params struct {
 	Logger       common.Logger
 	Debugger     debug.Debugger `optional:"true"`
 	IndexManager api.IndexManager
+	Sources      sources.Interface `name:"sourceManager"`
 }
 
 // Result contains the crawler's provided components.
@@ -177,13 +182,25 @@ func provideCollyDebugger(logger common.Logger) debug.Debugger {
 	}
 }
 
+// provideCollector creates a new Colly collector instance.
+func provideCollector(logger common.Logger) *colly.Collector {
+	c := colly.NewCollector(
+		colly.MaxDepth(defaultMaxDepth),
+		colly.Async(true),
+		colly.UserAgent("GoCrawl/1.0"),
+	)
+	return c
+}
+
 // provideCrawler creates a new crawler instance.
-func provideCrawler(p Params, bus *events.Bus) (Result, error) {
+func provideCrawler(p Params, bus *events.Bus, collector *colly.Collector) (Result, error) {
 	c := &Crawler{
 		Logger:       p.Logger,
 		Debugger:     p.Debugger,
 		bus:          bus,
 		indexManager: p.IndexManager,
+		sources:      p.Sources,
 	}
+	c.SetCollector(collector)
 	return Result{Crawler: c}, nil
 }

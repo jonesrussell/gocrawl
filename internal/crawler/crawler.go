@@ -12,6 +12,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 )
 
 // Crawler represents a web crawler instance.
@@ -24,16 +25,23 @@ type Crawler struct {
 	ctx          context.Context
 	cancel       context.CancelFunc // To cancel the ongoing crawling process
 	indexManager api.IndexManager
+	sources      sources.Interface
 }
 
 var _ Interface = (*Crawler)(nil)
 
 // Start begins the crawling process at the specified base URL.
-func (c *Crawler) Start(ctx context.Context, baseURL string) error {
-	if baseURL == "" {
-		return errors.New("base URL cannot be empty")
+func (c *Crawler) Start(ctx context.Context, sourceName string) error {
+	// Get the source configuration
+	source, err := c.sources.FindByName(sourceName)
+	if err != nil {
+		return fmt.Errorf("failed to find source %s: %w", sourceName, err)
 	}
-	c.baseURL = baseURL
+
+	if source.URL == "" {
+		return errors.New("source URL cannot be empty")
+	}
+	c.baseURL = source.URL
 	c.ctx, c.cancel = context.WithCancel(ctx) // Use a new context with a cancel function
 
 	// Ensure collector is initialized
@@ -41,14 +49,14 @@ func (c *Crawler) Start(ctx context.Context, baseURL string) error {
 		return errors.New("collector not initialized")
 	}
 
-	c.Logger.Info("Starting crawl", "url", baseURL)
+	c.Logger.Info("Starting crawl", "url", c.baseURL)
 	c.setupCallbacks()
 
 	// Start crawling
-	err := c.collector.Visit(baseURL)
+	err = c.collector.Visit(c.baseURL)
 	if err != nil {
-		c.Logger.Error("Error visiting base URL", "url", baseURL, "error", err)
-		return fmt.Errorf("error starting crawl for base URL %s: %w", baseURL, err)
+		c.Logger.Error("Error visiting base URL", "url", c.baseURL, "error", err)
+		return fmt.Errorf("error starting crawl for base URL %s: %w", c.baseURL, err)
 	}
 
 	// Monitor context for cancellation while waiting

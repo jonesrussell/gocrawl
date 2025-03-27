@@ -12,6 +12,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -41,7 +42,12 @@ var Cmd = &cobra.Command{
 	Long: `This command crawls a website for content and stores it in the configured storage.
 You can specify the source to crawl using the --source flag.`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, _ []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Set the source flag from the argument
+		if err := cmd.Flags().Set("source", args[0]); err != nil {
+			return fmt.Errorf("failed to set source flag: %w", err)
+		}
+
 		// Create a cancellable context
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
@@ -53,11 +59,20 @@ You can specify the source to crawl using the --source flag.`,
 
 		// Initialize the Fx application
 		fxApp := fx.New(
-			fx.NopLogger,
-			common.Module,
 			crawler.Module,
+			storage.Module,
 			fx.Provide(
-				func() context.Context { return ctx },
+				fx.Annotate(
+					func() context.Context { return ctx },
+					fx.ResultTags(`name:"crawlContext"`),
+				),
+				fx.Annotate(
+					func() string {
+						sourceName, _ := cmd.Flags().GetString("source")
+						return sourceName
+					},
+					fx.ResultTags(`name:"sourceName"`),
+				),
 			),
 			fx.Invoke(func(lc fx.Lifecycle, p Dependencies) {
 				// Update the signal handler with the real logger
@@ -107,4 +122,8 @@ You can specify the source to crawl using the --source flag.`,
 // Command returns the crawl command for use in the root command
 func Command() *cobra.Command {
 	return Cmd
+}
+
+func init() {
+	Cmd.Flags().String("source", "", "The source to crawl")
 }

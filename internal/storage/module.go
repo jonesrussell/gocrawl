@@ -46,7 +46,7 @@ var Module = fx.Module("storage",
 func ProvideIndexManager(
 	client *es.Client,
 	logger common.Logger,
-) *IndexManager {
+) api.IndexManager {
 	return NewIndexManager(client, logger)
 }
 
