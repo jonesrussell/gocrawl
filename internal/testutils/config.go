@@ -93,7 +93,7 @@ func NewTestServerConfig() *config.ServerConfig {
 		}{
 			Enabled:   true,
 			APIKey:    "test-key",
-			RateLimit: 100,
+			RateLimit: defaultRateLimit,
 			CORS: struct {
 				Enabled        bool     `yaml:"enabled"`
 				AllowedOrigins []string `yaml:"allowed_origins"`
@@ -105,7 +105,7 @@ func NewTestServerConfig() *config.ServerConfig {
 				AllowedOrigins: []string{"*"},
 				AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 				AllowedHeaders: []string{"Content-Type", "Authorization", "X-API-Key"},
-				MaxAge:         86400,
+				MaxAge:         defaultMaxAge,
 			},
 		},
 	}

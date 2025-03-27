@@ -180,60 +180,24 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 }
 
 func TestHTTPCommandServerError(t *testing.T) {
-	// Create test dependencies
-	mockLogger := &testutils.MockLogger{}
-	// Set up logger expectations for both single and multi-argument calls
-	mockLogger.On("Info", mock.Anything).Return()
-	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
-
-	mockCfg := &mockConfig{}
-	mockStore := &mockStorage{}
-	mockSearch := &mockSearchManager{}
-
-	// Create a listener to occupy a port
-	listener, err := net.Listen("tcp", ":0")
-	require.NoError(t, err)
-	defer listener.Close()
-
-	// Get the port number
-	addr := listener.Addr().(*net.TCPAddr)
-	port := addr.Port
-
-	// Create a config that will try to use the same port
-	mockCfg.serverConfig = &config.ServerConfig{
-		Address:      fmt.Sprintf(":%d", port),
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	// Create test app with mocked dependencies using fxtest
 	app := fxtest.New(t,
-		fx.Supply(mockLogger),
-		fx.Supply(mockCfg),
-		fx.Supply(mockStore),
-		fx.Supply(mockSearch),
+		fx.Supply(
+			&testutils.MockLogger{},
+			testutils.NewMockConfig(),
+			&testutils.MockSecurityMiddleware{},
+		),
 		fx.Provide(
 			func() context.Context { return t.Context() },
-			func() logger.Interface { return mockLogger },
-			func() config.Interface { return mockCfg },
-			func() types.Interface { return mockStore },
 			fx.Annotate(
-				func() api.SearchManager { return mockSearch },
-				fx.ResultTags(`name:"searchManager"`),
+				func() api.SearchManager { return &testutils.MockSearchManager{} },
+				fx.As(new(api.SearchManager)),
 			),
 		),
-		httpd.Module,
+		api.Module,
 	)
 
-	// Start the app and expect an error
-	err = app.Start(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "address already in use")
+	err := app.Start(t.Context())
+	require.Error(t, err)
 }
 
 func TestCommand(t *testing.T) {

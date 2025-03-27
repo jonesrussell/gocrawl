@@ -17,9 +17,15 @@ import (
 )
 
 // Helper function to create a mock logger
-func newMockLogger(t *testing.T) *testutils.MockLogger {
+func newMockLogger() *testutils.MockLogger {
 	mockLogger := &testutils.MockLogger{}
-	mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+	mockLogger.On(
+		"Debug",
+		"Successfully parsed date",
+		"source", "2025-02-14T15:04:05Z",
+		"format", "2006-01-02T15:04:05Z07:00",
+		"result", time.Date(2025, 2, 14, 15, 4, 5, 0, time.UTC),
+	).Return()
 	return mockLogger
 }
 
@@ -72,7 +78,7 @@ const testHTML = `
 `
 
 func TestExtractArticle(t *testing.T) {
-	mockLogger := newMockLogger(t)
+	mockLogger := newMockLogger()
 	selectors := newDefaultSelectors()
 	service := article.NewService(mockLogger, selectors)
 
@@ -134,7 +140,7 @@ func TestExtractArticle(t *testing.T) {
 }
 
 func TestCleanAuthor(t *testing.T) {
-	mockLogger := newMockLogger(t)
+	mockLogger := newMockLogger()
 	svc := article.NewService(mockLogger, newDefaultSelectors())
 
 	// Change the author string to match the expected format
@@ -146,14 +152,20 @@ func TestCleanAuthor(t *testing.T) {
 }
 
 func TestParsePublishedDate(t *testing.T) {
-	mockLogger := newMockLogger(t)
+	mockLogger := newMockLogger()
 	svc := article.NewService(mockLogger, newDefaultSelectors())
 
 	// Set up mock expectations for debug calls
 	mockLogger.On("Debug", "Trying to parse date", "value", "2025-02-14T15:04:05Z").Return()
 
 	expectedDate, _ := time.Parse(time.RFC3339, "2025-02-14T15:04:05Z")
-	mockLogger.On("Debug", "Successfully parsed date", "source", "2025-02-14T15:04:05Z", "format", "2006-01-02T15:04:05Z07:00", "result", expectedDate).Return()
+	mockLogger.On(
+		"Debug",
+		"Successfully parsed date",
+		"source", "2025-02-14T15:04:05Z",
+		"format", "2006-01-02T15:04:05Z07:00",
+		"result", expectedDate,
+	).Return()
 
 	// Create a mock HTML document
 	html := `
@@ -191,7 +203,7 @@ func TestParsePublishedDate(t *testing.T) {
 }
 
 func TestExtractTags(t *testing.T) {
-	mockLogger := newMockLogger(t)
+	mockLogger := newMockLogger()
 	selectors := config.DefaultArticleSelectors()
 	service := article.NewService(mockLogger, selectors)
 

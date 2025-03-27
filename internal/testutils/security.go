@@ -24,7 +24,21 @@ func (m *MockSecurityMiddleware) WaitCleanup() {
 func (m *MockSecurityMiddleware) Middleware() gin.HandlerFunc {
 	args := m.Called()
 	if fn := args.Get(0); fn != nil {
-		return fn.(gin.HandlerFunc)
+		if handler, ok := fn.(gin.HandlerFunc); ok {
+			return handler
+		}
 	}
 	return func(c *gin.Context) { c.Next() }
+}
+
+// GetMiddleware returns the middleware function
+func (m *MockSecurityMiddleware) GetMiddleware() gin.HandlerFunc {
+	args := m.Called()
+	if len(args) == 0 {
+		return nil
+	}
+	if fn, ok := args.Get(0).(gin.HandlerFunc); ok {
+		return fn
+	}
+	return nil
 }

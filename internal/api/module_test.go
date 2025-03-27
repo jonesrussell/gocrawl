@@ -161,7 +161,7 @@ func TestSearchEndpoint(t *testing.T) {
 		req.Header.Set("X-Api-Key", testAPIKey)
 
 		// Send valid requests up to rate limit
-		for i := 0; i < 149; i++ {
+		for i := range 149 {
 			w := httptest.NewRecorder()
 			ts.server.Handler.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code, "Expected OK for request %d", i+1)
