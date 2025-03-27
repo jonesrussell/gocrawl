@@ -51,7 +51,12 @@ func (m *MockCrawler) SetCollector(collector *colly.Collector) {
 // GetIndexManager implements crawler.Interface
 func (m *MockCrawler) GetIndexManager() api.IndexManager {
 	args := m.Called()
-	return args.Get(0).(api.IndexManager)
+	if result := args.Get(0); result != nil {
+		if im, ok := result.(api.IndexManager); ok {
+			return im
+		}
+	}
+	return nil
 }
 
 // Wait implements crawler.Interface
