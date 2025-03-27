@@ -39,6 +39,9 @@ type SecurityMiddleware struct {
 	cleanupWg sync.WaitGroup
 }
 
+// Ensure SecurityMiddleware implements SecurityMiddlewareInterface
+var _ SecurityMiddlewareInterface = (*SecurityMiddleware)(nil)
+
 // rateLimitInfo tracks rate limiting information for a client
 type rateLimitInfo struct {
 	count      int

@@ -119,7 +119,10 @@ func TestHTTPCommand(t *testing.T) {
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() types.Interface { return mockStore },
-			func() api.SearchManager { return mockSearch },
+			fx.Annotate(
+				func() api.SearchManager { return mockSearch },
+				fx.ResultTags(`name:"searchManager"`),
+			),
 		),
 		httpd.Module,
 	)
@@ -157,7 +160,10 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() types.Interface { return mockStore },
-			func() api.SearchManager { return mockSearch },
+			fx.Annotate(
+				func() api.SearchManager { return mockSearch },
+				fx.ResultTags(`name:"searchManager"`),
+			),
 		),
 		httpd.Module,
 		fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
@@ -199,64 +205,43 @@ func TestHTTPCommandServerError(t *testing.T) {
 	// Create a listener to occupy a port
 	listener, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
-	defer func(listener net.Listener) {
-		if closeErr := listener.Close(); closeErr != nil {
-			t.Errorf("Error closing listener: %v", closeErr)
-		}
-	}(listener)
+	defer listener.Close()
 
-	// Get the port that's now in use
-	port := listener.Addr().(*net.TCPAddr).Port
+	// Get the port number
+	addr := listener.Addr().(*net.TCPAddr)
+	port := addr.Port
 
-	// Create a test module that doesn't include api.Module
-	testModule := fx.Module("test",
-		fx.Provide(
-			func() logger.Interface { return mockLogger },
-			func() config.Interface { return mockCfg },
-			func() types.Interface { return mockStore },
-			func() api.SearchManager { return mockSearch },
-			func() *http.Server {
-				return &http.Server{
-					Addr: fmt.Sprintf(":%d", port), // Use the port that's already in use
-				}
-			},
-		),
-		fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					// Try to listen on the port that's already in use
-					ln, listenErr := net.Listen("tcp", server.Addr)
-					if listenErr != nil {
-						return fmt.Errorf("failed to listen on %s: %w", server.Addr, listenErr)
-					}
-					if closeErr := ln.Close(); closeErr != nil {
-						return closeErr
-					}
-					return nil
-				},
-				OnStop: func(ctx context.Context) error {
-					return server.Shutdown(ctx)
-				},
-			})
-		}),
-	)
+	// Create a config that will try to use the same port
+	mockCfg.serverConfig = &config.ServerConfig{
+		Address:      fmt.Sprintf(":%d", port),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
 
-	// Create test app with mocked dependencies and server using fxtest
+	// Create test app with mocked dependencies using fxtest
 	app := fxtest.New(t,
 		fx.Supply(mockLogger),
 		fx.Supply(mockCfg),
 		fx.Supply(mockStore),
 		fx.Supply(mockSearch),
-		testModule,
+		fx.Provide(
+			func() context.Context { return t.Context() },
+			func() logger.Interface { return mockLogger },
+			func() config.Interface { return mockCfg },
+			func() types.Interface { return mockStore },
+			fx.Annotate(
+				func() api.SearchManager { return mockSearch },
+				fx.ResultTags(`name:"searchManager"`),
+			),
+		),
+		httpd.Module,
 	)
 
-	// Start should fail with port in use error
-	err = app.Start(t.Context())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), fmt.Sprintf("failed to listen on :%d", port))
-
-	// Cleanup
-	_ = app.Stop(t.Context())
+	// Start the app and expect an error
+	err = app.Start(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "address already in use")
 }
 
 func TestCommand(t *testing.T) {

@@ -97,6 +97,18 @@ func (m *MockConfig) GetSources() []config.Source {
 
 // GetCrawlerConfig implements config.Interface.
 func (m *MockConfig) GetCrawlerConfig() *config.CrawlerConfig {
+	// If no crawler config is set, return a default one
+	if m.crawlerConfig == nil {
+		m.crawlerConfig = &config.CrawlerConfig{
+			BaseURL:          "http://test.com",
+			MaxDepth:         defaultMaxDepth,
+			RateLimit:        time.Second,
+			RandomDelay:      time.Second,
+			IndexName:        "test_index",
+			ContentIndexName: "test_content",
+			SourceFile:       "", // Empty to prevent loading from file
+		}
+	}
 	return m.crawlerConfig
 }
 

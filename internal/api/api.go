@@ -2,9 +2,7 @@
 package api
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -13,7 +11,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"go.uber.org/fx"
 )
 
 // Constants
@@ -27,7 +24,7 @@ func SetupRouter(
 	log logger.Interface,
 	searchManager SearchManager,
 	cfg config.Interface,
-) (*gin.Engine, *middleware.SecurityMiddleware) {
+) (*gin.Engine, middleware.SecurityMiddlewareInterface) {
 	// Disable Gin's default logging
 	gin.SetMode(gin.ReleaseMode)
 
@@ -139,7 +136,7 @@ func StartHTTPServer(
 	log logger.Interface,
 	searchManager SearchManager,
 	cfg config.Interface,
-) (*http.Server, *middleware.SecurityMiddleware, error) {
+) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
 	log.Info("StartHTTPServer function called")
 
 	// Setup router
@@ -164,56 +161,4 @@ func StartHTTPServer(
 	}
 
 	return server, security, nil
-}
-
-// SetupLifecycle configures the lifecycle hooks for the API server
-func SetupLifecycle(
-	lc fx.Lifecycle,
-	ctx context.Context,
-	server *http.Server,
-	searchManager SearchManager,
-	security *middleware.SecurityMiddleware,
-	log logger.Interface,
-) {
-	// Create a context for the cleanup goroutine using the provided context
-	cleanupCtx, cancel := context.WithCancel(ctx)
-
-	// Start the cleanup goroutine
-	go security.Cleanup(cleanupCtx)
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			// No server start here - it's handled by httpd.go
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			// Create a timeout context for shutdown
-			shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
-			defer shutdownCancel()
-
-			// Cancel the cleanup goroutine context
-			cancel()
-
-			// Wait for cleanup goroutine to finish with timeout
-			cleanupDone := make(chan struct{})
-			go func() {
-				security.WaitCleanup()
-				close(cleanupDone)
-			}()
-
-			select {
-			case <-cleanupDone:
-				// Cleanup completed successfully
-			case <-shutdownCtx.Done():
-				return nil // Return nil to indicate cleanup completed successfully
-			}
-
-			// Close the search manager
-			if err := searchManager.Close(); err != nil {
-				return fmt.Errorf("error closing search manager: %w", err)
-			}
-
-			return nil
-		},
-	})
 }
