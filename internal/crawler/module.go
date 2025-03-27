@@ -19,6 +19,11 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// articleChannelBufferSize is the buffer size for the article channel.
+	articleChannelBufferSize = 100
+)
+
 // Interface defines the crawler's capabilities.
 type Interface interface {
 	// Start begins crawling from the given base URL.
@@ -65,7 +70,7 @@ var Module = fx.Module("crawler",
 		// Article channel named instance
 		fx.Annotate(
 			func() chan *models.Article {
-				return make(chan *models.Article, 100)
+				return make(chan *models.Article, articleChannelBufferSize)
 			},
 			fx.ResultTags(`name:"articleChannel"`),
 		),
