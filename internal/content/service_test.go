@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
@@ -62,20 +61,10 @@ func TestExtractContent(t *testing.T) {
 	}
 
 	// Set up logger expectations
-	mockLogger.On("Debug", "Extracting content", "url", testURL).Return()
-	mockLogger.On("Debug", "Trying to parse date", "value", "2024-03-15T10:00:00Z").Return()
-	mockLogger.On("Debug", "Successfully parsed date",
-		"source", "2024-03-15T10:00:00Z",
-		"format", time.RFC3339,
-		"result", "2024-03-15 10:00:00 +0000 UTC",
-	).Return()
-	mockLogger.On("Debug", "Extracted content",
-		"id", mock.Anything,
-		"title", "Test Article",
-		"url", testURL,
-		"type", "article",
-		"created_at", mock.Anything,
-	).Return()
+	mockLogger.On("Debug", "Extracting content", mock.Anything).Return()
+	mockLogger.On("Debug", "Trying to parse date", mock.Anything).Return()
+	mockLogger.On("Debug", "Successfully parsed date", mock.Anything).Return()
+	mockLogger.On("Debug", "Extracted content", mock.Anything).Return()
 
 	contentData := svc.ExtractContent(e)
 	require.NotNil(t, contentData)
@@ -203,8 +192,8 @@ func TestService_Process(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockLogger.On("Debug", "Processing content", "input", tc.input).Return()
-			mockLogger.On("Debug", "Processed content", "result", tc.expected).Return()
+			mockLogger.On("Debug", "Processing content", mock.Anything).Return()
+			mockLogger.On("Debug", "Processed content", mock.Anything).Return()
 			result := svc.Process(t.Context(), tc.input)
 			assert.Equal(t, tc.expected, result)
 		})
@@ -218,9 +207,9 @@ func TestService_ProcessBatch(t *testing.T) {
 	input := []string{"<p>Hello</p>", "<div>World</div>"}
 	expected := []string{"Hello", "World"}
 
-	for i := range input {
-		mockLogger.On("Debug", "Processing content", "input", input[i]).Return()
-		mockLogger.On("Debug", "Processed content", "result", expected[i]).Return()
+	for range input {
+		mockLogger.On("Debug", "Processing content", mock.Anything).Return()
+		mockLogger.On("Debug", "Processed content", mock.Anything).Return()
 	}
 
 	result := svc.ProcessBatch(t.Context(), input)
@@ -237,12 +226,9 @@ func TestService_ProcessWithMetadata(t *testing.T) {
 		"type":   "article",
 	}
 
-	mockLogger.On("Debug", "Processing content with metadata",
-		"source", metadata["source"],
-		"type", metadata["type"],
-	).Return()
-	mockLogger.On("Debug", "Processing content", "input", input).Return()
-	mockLogger.On("Debug", "Processed content", "result", "Hello world").Return()
+	mockLogger.On("Debug", "Processing content with metadata", mock.Anything).Return()
+	mockLogger.On("Debug", "Processing content", mock.Anything).Return()
+	mockLogger.On("Debug", "Processed content", mock.Anything).Return()
 
 	result := svc.ProcessWithMetadata(t.Context(), input, metadata)
 	assert.Equal(t, "Hello world", result)

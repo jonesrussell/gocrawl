@@ -1,0 +1,24 @@
+sources:
+  - name: test-source
+    url: http://example.com
+    rate_limit: 1s
+    max_depth: 2
+    article_index: test-articles
+    index: test-content
+    time:
+      - published_time
+      - modified_time
+    selectors:
+      article:
+        container: article
+        title: h1
+        body: .content
+        intro: .intro
+        byline: .byline
+        author: .author
+        published_time: time[datetime]
+        time_ago: time.timeago
+        jsonld: script[type="application/ld+json"]
+    metadata:
+      type: article
+      category: news 

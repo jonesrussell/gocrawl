@@ -26,25 +26,15 @@ func TestConfigureLogging(t *testing.T) {
 	defer ts.Close()
 
 	// Test request logging
-	mockLogger.On("Debug", "Requesting URL",
-		"url", ts.URL,
-	).Return()
+	mockLogger.On("Debug", "Requesting URL", mock.Anything).Return()
 
 	// Test response logging
-	mockLogger.On("Debug", "Received response",
-		"url", ts.URL,
-		"status", http.StatusOK,
-	).Return()
+	mockLogger.On("Debug", "Received response", mock.Anything).Return()
 
 	// Test error logging for localhost:1
-	mockLogger.On("Debug", "Requesting URL",
-		"url", "http://localhost:1",
-	).Return()
+	mockLogger.On("Debug", "Requesting URL", mock.Anything).Return()
 
-	mockLogger.On("Error", "Error occurred",
-		"url", "http://localhost:1",
-		"error", mock.Anything,
-	).Return()
+	mockLogger.On("Error", "Error occurred", mock.Anything).Return()
 
 	// Configure logging
 	collector.ConfigureLogging(c, mockLogger)

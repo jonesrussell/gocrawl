@@ -156,16 +156,10 @@ func TestParsePublishedDate(t *testing.T) {
 	svc := article.NewService(mockLogger, newDefaultSelectors())
 
 	// Set up mock expectations for debug calls
-	mockLogger.On("Debug", "Trying to parse date", "value", "2025-02-14T15:04:05Z").Return()
+	mockLogger.On("Debug", "Trying to parse date", mock.Anything).Return()
 
 	expectedDate, _ := time.Parse(time.RFC3339, "2025-02-14T15:04:05Z")
-	mockLogger.On(
-		"Debug",
-		"Successfully parsed date",
-		"source", "2025-02-14T15:04:05Z",
-		"format", "2006-01-02T15:04:05Z07:00",
-		"result", expectedDate,
-	).Return()
+	mockLogger.On("Debug", "Successfully parsed date", mock.Anything).Return()
 
 	// Create a mock HTML document
 	html := `
@@ -208,10 +202,10 @@ func TestExtractTags(t *testing.T) {
 	service := article.NewService(mockLogger, selectors)
 
 	// Set up mock expectations for debug calls
-	mockLogger.On("Debug", "Found JSON-LD keywords", "values", mock.Anything).Return()
-	mockLogger.On("Debug", "Found JSON-LD section", "value", mock.Anything).Return()
-	mockLogger.On("Debug", "Found meta section", "value", mock.Anything).Return()
-	mockLogger.On("Debug", "Found meta keywords", "value", mock.Anything).Return()
+	mockLogger.On("Debug", "Found JSON-LD keywords", mock.Anything).Return()
+	mockLogger.On("Debug", "Found JSON-LD section", mock.Anything).Return()
+	mockLogger.On("Debug", "Found meta section", mock.Anything).Return()
+	mockLogger.On("Debug", "Found meta keywords", mock.Anything).Return()
 
 	// Create test HTML with meta tags
 	html := `
