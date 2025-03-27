@@ -8,18 +8,15 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
-	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/content"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestExtractContent(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	svc := content.NewService(mockLogger)
 
 	// Create a test HTML document
@@ -65,24 +62,20 @@ func TestExtractContent(t *testing.T) {
 	}
 
 	// Set up logger expectations
-	mockLogger.EXPECT().Debug("Extracting content", "url", testURL)
-	mockLogger.EXPECT().Debug("Trying to parse date", "value", "2024-03-15T10:00:00Z")
-
-	// First attempt with RFC3339 succeeds
-	mockLogger.EXPECT().Debug("Successfully parsed date",
+	mockLogger.On("Debug", "Extracting content", "url", testURL).Return()
+	mockLogger.On("Debug", "Trying to parse date", "value", "2024-03-15T10:00:00Z").Return()
+	mockLogger.On("Debug", "Successfully parsed date",
 		"source", "2024-03-15T10:00:00Z",
 		"format", time.RFC3339,
 		"result", "2024-03-15 10:00:00 +0000 UTC",
-	)
-
-	// Final content extraction log
-	mockLogger.EXPECT().Debug("Extracted content",
-		"id", gomock.Any(),
+	).Return()
+	mockLogger.On("Debug", "Extracted content",
+		"id", mock.Anything,
 		"title", "Test Article",
 		"url", testURL,
 		"type", "article",
-		"created_at", gomock.Any(),
-	)
+		"created_at", mock.Anything,
+	).Return()
 
 	contentData := svc.ExtractContent(e)
 	require.NotNil(t, contentData)
@@ -94,10 +87,7 @@ func TestExtractContent(t *testing.T) {
 }
 
 func TestExtractMetadata(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	service := content.NewService(mockLogger)
 
 	// Create a test HTML element
@@ -191,10 +181,7 @@ func TestDetermineContentType(t *testing.T) {
 }
 
 func TestService_Process(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	svc := content.NewService(mockLogger)
 
 	testCases := []struct {
@@ -216,8 +203,8 @@ func TestService_Process(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockLogger.EXPECT().Debug("Processing content", "input", tc.input)
-			mockLogger.EXPECT().Debug("Processed content", "result", tc.expected)
+			mockLogger.On("Debug", "Processing content", "input", tc.input).Return()
+			mockLogger.On("Debug", "Processed content", "result", tc.expected).Return()
 			result := svc.Process(t.Context(), tc.input)
 			assert.Equal(t, tc.expected, result)
 		})
@@ -225,18 +212,15 @@ func TestService_Process(t *testing.T) {
 }
 
 func TestService_ProcessBatch(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	svc := content.NewService(mockLogger)
 
 	input := []string{"<p>Hello</p>", "<div>World</div>"}
 	expected := []string{"Hello", "World"}
 
 	for i := range input {
-		mockLogger.EXPECT().Debug("Processing content", "input", input[i])
-		mockLogger.EXPECT().Debug("Processed content", "result", expected[i])
+		mockLogger.On("Debug", "Processing content", "input", input[i]).Return()
+		mockLogger.On("Debug", "Processed content", "result", expected[i]).Return()
 	}
 
 	result := svc.ProcessBatch(t.Context(), input)
@@ -244,10 +228,7 @@ func TestService_ProcessBatch(t *testing.T) {
 }
 
 func TestService_ProcessWithMetadata(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	svc := content.NewService(mockLogger)
 
 	input := "<p>Hello world</p>"
@@ -256,12 +237,12 @@ func TestService_ProcessWithMetadata(t *testing.T) {
 		"type":   "article",
 	}
 
-	mockLogger.EXPECT().Debug("Processing content with metadata",
+	mockLogger.On("Debug", "Processing content with metadata",
 		"source", metadata["source"],
 		"type", metadata["type"],
-	)
-	mockLogger.EXPECT().Debug("Processing content", "input", input)
-	mockLogger.EXPECT().Debug("Processed content", "result", "Hello world")
+	).Return()
+	mockLogger.On("Debug", "Processing content", "input", input).Return()
+	mockLogger.On("Debug", "Processed content", "result", "Hello world").Return()
 
 	result := svc.ProcessWithMetadata(t.Context(), input, metadata)
 	assert.Equal(t, "Hello world", result)

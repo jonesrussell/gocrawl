@@ -9,13 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -92,17 +93,14 @@ func (m *mockSearchManager) Close() error {
 
 func TestHTTPCommand(t *testing.T) {
 	// Create test dependencies
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	// Set up logger expectations for both single and multi-argument calls
-	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.On("Info", mock.Anything).Return()
+	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := &mockConfig{}
 	mockStore := &mockStorage{}
@@ -133,17 +131,14 @@ func TestHTTPCommand(t *testing.T) {
 
 func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	// Create test dependencies
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	// Set up logger expectations for both single and multi-argument calls
-	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.On("Info", mock.Anything).Return()
+	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := &mockConfig{}
 	mockStore := &mockStorage{}
@@ -186,17 +181,14 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 
 func TestHTTPCommandServerError(t *testing.T) {
 	// Create test dependencies
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	// Set up logger expectations for both single and multi-argument calls
-	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.On("Info", mock.Anything).Return()
+	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := &mockConfig{}
 	mockStore := &mockStorage{}

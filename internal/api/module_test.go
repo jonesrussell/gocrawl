@@ -17,30 +17,46 @@ import (
 	"go.uber.org/fx/fxtest"
 )
 
+const (
+	testAPIKey     = "test-key"
+	healthEndpoint = "/health"
+	searchEndpoint = "/search"
+)
+
+// testServer wraps the test application and server for API tests.
 type testServer struct {
 	app    *fxtest.App
 	server *http.Server
+}
+
+// setupMockSearchManager creates and configures a mock search manager for testing.
+func setupMockSearchManager() *testutils.MockSearchManager {
+	mockSearch := &testutils.MockSearchManager{}
+	mockSearch.On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{}, nil)
+	mockSearch.On("Count", mock.Anything, mock.Anything, mock.Anything).Return(int64(0), nil)
+	mockSearch.On("Aggregate", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	mockSearch.On("Close").Return(nil)
+	return mockSearch
+}
+
+// setupMockLogger creates and configures a mock logger for testing.
+func setupMockLogger() *testutils.MockLogger {
+	mockLog := &testutils.MockLogger{}
+	mockLog.On("Info", "StartHTTPServer function called", mock.Anything).Return()
+	mockLog.On("Info", "Server started", mock.Anything).Return()
+	mockLog.On("Info", "Server stopped", mock.Anything).Return()
+	mockLog.On("Error", mock.Anything, mock.Anything).Return()
+	return mockLog
 }
 
 func setupTest(t *testing.T) *testServer {
 	ts := &testServer{}
 
 	// Create mock dependencies
-	mockLogger := &testutils.MockLogger{}
-	mockSearchManager := &testutils.MockSearchManager{}
+	mockLogger := setupMockLogger()
+	mockSearchManager := setupMockSearchManager()
 	mockConfig := testutils.NewMockConfig()
 	mockSecurityMiddleware := &testutils.MockSecurityMiddleware{}
-
-	// Set up mock expectations
-	mockLogger.On("Info", "StartHTTPServer function called", mock.Anything).Return()
-	mockLogger.On("Info", "Server started", mock.Anything).Return()
-	mockLogger.On("Info", "Server stopped", mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything, mock.Anything).Return()
-
-	mockSearchManager.On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{}, nil)
-	mockSearchManager.On("Count", mock.Anything, mock.Anything, mock.Anything).Return(int64(0), nil)
-	mockSearchManager.On("Aggregate", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-	mockSearchManager.On("Close").Return(nil)
 
 	// Get the server instance
 	var server *http.Server
@@ -51,9 +67,7 @@ func setupTest(t *testing.T) *testServer {
 			mockSecurityMiddleware,
 		),
 		fx.Provide(
-			// Provide context
 			func() context.Context { return t.Context() },
-			// Provide search manager with correct type
 			fx.Annotate(
 				func() api.SearchManager { return mockSearchManager },
 				fx.As(new(api.SearchManager)),
@@ -66,8 +80,6 @@ func setupTest(t *testing.T) *testServer {
 	)
 
 	ts.app = app
-
-	// Start the app
 	app.RequireStart()
 	ts.server = server
 
@@ -80,139 +92,102 @@ func (ts *testServer) cleanup() {
 	}
 }
 
-func TestModuleConstruction(t *testing.T) {
+func TestAPIModuleInitialization(t *testing.T) {
 	ts := setupTest(t)
 	defer ts.cleanup()
 
-	// Verify the app started successfully
-	assert.NotNil(t, ts.app)
-	assert.NotNil(t, ts.server)
+	assert.NotNil(t, ts.app, "Application should be initialized")
+	assert.NotNil(t, ts.server, "HTTP server should be initialized")
 }
 
-func TestHealthHandler(t *testing.T) {
+func TestHealthEndpoint(t *testing.T) {
 	ts := setupTest(t)
 	defer ts.cleanup()
 
-	// Create a test request
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/health", ts.server.Addr), nil)
-	require.NoError(t, err)
+	t.Run("returns ok status", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, healthEndpoint), nil)
+		require.NoError(t, err)
 
-	// Create a response recorder
-	w := httptest.NewRecorder()
-
-	// Send the request
-	ts.server.Handler.ServeHTTP(w, req)
-
-	// Verify the response
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.JSONEq(t, `{"status":"ok"}`, w.Body.String())
-}
-
-func TestSearchHandler(t *testing.T) {
-	ts := setupTest(t)
-	defer ts.cleanup()
-
-	// Create a test request
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
-	require.NoError(t, err)
-
-	// Add API key header
-	req.Header.Set("X-Api-Key", "test-key")
-
-	// Create a response recorder
-	w := httptest.NewRecorder()
-
-	// Send the request
-	ts.server.Handler.ServeHTTP(w, req)
-
-	// Verify the response
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "results")
-}
-
-func TestAPIKeyAuthentication(t *testing.T) {
-	ts := setupTest(t)
-	defer ts.cleanup()
-
-	// Create a test request without API key
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
-	require.NoError(t, err)
-
-	// Create a response recorder
-	w := httptest.NewRecorder()
-
-	// Send the request
-	ts.server.Handler.ServeHTTP(w, req)
-
-	// Verify the response
-	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	assert.Contains(t, w.Body.String(), "unauthorized")
-}
-
-func TestRateLimiting(t *testing.T) {
-	ts := setupTest(t)
-	defer ts.cleanup()
-
-	// Create a test request with API key
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
-	require.NoError(t, err)
-	req.Header.Set("X-Api-Key", "test-key")
-
-	// Create a response recorder
-	w := httptest.NewRecorder()
-
-	// Send multiple requests
-	for i := 0; i < 150; i++ {
+		w := httptest.NewRecorder()
 		ts.server.Handler.ServeHTTP(w, req)
-		if w.Code == http.StatusTooManyRequests {
-			break
-		}
-		w = httptest.NewRecorder()
-	}
 
-	// Verify rate limiting
-	assert.Equal(t, http.StatusTooManyRequests, w.Code)
-	assert.Contains(t, w.Body.String(), "too many requests")
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.JSONEq(t, `{"status":"ok"}`, w.Body.String())
+	})
+
+	t.Run("sets security headers", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, healthEndpoint), nil)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		ts.server.Handler.ServeHTTP(w, req)
+
+		assert.Equal(t, "nosniff", w.Header().Get("X-Content-Type-Options"))
+		assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"))
+		assert.Equal(t, "1; mode=block", w.Header().Get("X-XSS-Protection"))
+	})
 }
 
-func TestCORS(t *testing.T) {
+func TestSearchEndpoint(t *testing.T) {
 	ts := setupTest(t)
 	defer ts.cleanup()
 
-	// Create a test request with CORS headers
-	req, err := http.NewRequest(http.MethodOptions, fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
+	t.Run("requires API key", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), nil)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		ts.server.Handler.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		assert.Contains(t, w.Body.String(), "unauthorized")
+	})
+
+	t.Run("returns search results with valid API key", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), nil)
+		require.NoError(t, err)
+		req.Header.Set("X-Api-Key", testAPIKey)
+
+		w := httptest.NewRecorder()
+		ts.server.Handler.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "results")
+	})
+
+	t.Run("enforces rate limiting", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), nil)
+		require.NoError(t, err)
+		req.Header.Set("X-Api-Key", testAPIKey)
+
+		// Send valid requests up to rate limit
+		for i := 0; i < 149; i++ {
+			w := httptest.NewRecorder()
+			ts.server.Handler.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, "Expected OK for request %d", i+1)
+		}
+
+		// Verify rate limit is triggered
+		w := httptest.NewRecorder()
+		ts.server.Handler.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusTooManyRequests, w.Code)
+		assert.Contains(t, w.Body.String(), "too many requests")
+	})
+}
+
+func TestCORSConfiguration(t *testing.T) {
+	ts := setupTest(t)
+	defer ts.cleanup()
+
+	req, err := http.NewRequest(http.MethodOptions, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), nil)
 	require.NoError(t, err)
 	req.Header.Set("Origin", "http://example.com")
 	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
 
-	// Create a response recorder
 	w := httptest.NewRecorder()
-
-	// Send the request
 	ts.server.Handler.ServeHTTP(w, req)
 
-	// Verify CORS headers
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
 	assert.Contains(t, w.Header().Get("Access-Control-Allow-Methods"), http.MethodGet)
-}
-
-func TestSecurityHeaders(t *testing.T) {
-	ts := setupTest(t)
-	defer ts.cleanup()
-
-	// Create a test request
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/health", ts.server.Addr), nil)
-	require.NoError(t, err)
-
-	// Create a response recorder
-	w := httptest.NewRecorder()
-
-	// Send the request
-	ts.server.Handler.ServeHTTP(w, req)
-
-	// Verify security headers
-	assert.Equal(t, "nosniff", w.Header().Get("X-Content-Type-Options"))
-	assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"))
-	assert.Equal(t, "1; mode=block", w.Header().Get("X-XSS-Protection"))
 }

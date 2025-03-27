@@ -4,11 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,19 +37,18 @@ func createTestConfig() *config.Source {
 }
 
 // Helper function to create a mock logger
-func newMockLogger(t *testing.T) *logger.MockInterface {
-	ctrl := gomock.NewController(t)
-	mockLogger := logger.NewMockInterface(ctrl)
-	mockLogger.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
+func newMockLogger() *testutils.MockLogger {
+	mockLogger := &testutils.MockLogger{}
+	mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything).Return()
 	return mockLogger
 }
 
 // TestNew tests the New function of the collector package
 func TestNew(t *testing.T) {
-	mockLogger := newMockLogger(t)
+	mockLogger := newMockLogger()
 	tests := []struct {
 		name       string
 		params     collector.Params
@@ -114,24 +114,11 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up mock expectations for the logger
 			if !tt.wantErr {
-				mockLogger := tt.params.Logger.(*logger.MockInterface)
-				mockLogger.EXPECT().Debug("Collector created",
-					"baseURL", tt.params.BaseURL,
-					"maxDepth", tt.params.MaxDepth,
-					"rateLimit", tt.params.RateLimit,
-					"parallelism", tt.params.Parallelism,
-					"randomDelay", tt.params.RandomDelay,
-				).AnyTimes()
-
-				mockLogger.EXPECT().Debug("Collector configured",
-					"allowedDomains", gomock.Any(),
-					"disallowedDomains", gomock.Any(),
-					"allowedURLs", gomock.Any(),
-					"disallowedURLs", gomock.Any(),
-				).AnyTimes()
-
-				mockLogger.EXPECT().Debug("Collector callbacks configured").AnyTimes()
-				mockLogger.EXPECT().Debug("Collector extensions configured").AnyTimes()
+				mockLogger := tt.params.Logger.(*testutils.MockLogger)
+				mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+				mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+				mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+				mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
 			}
 
 			// Create the collector
@@ -190,7 +177,7 @@ func TestNew(t *testing.T) {
 
 // TestCollectorCreation tests the collector creation with different URLs
 func TestCollectorCreation(t *testing.T) {
-	mockLogger := newMockLogger(t)
+	mockLogger := newMockLogger()
 	tests := []struct {
 		name    string
 		cfg     *config.Source
@@ -229,23 +216,10 @@ func TestCollectorCreation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up mock expectations for all debug calls
 			if !tt.wantErr {
-				mockLogger.EXPECT().Debug("Collector created",
-					"baseURL", gomock.Any(),
-					"maxDepth", gomock.Any(),
-					"rateLimit", gomock.Any(),
-					"parallelism", gomock.Any(),
-					"randomDelay", gomock.Any(),
-				).AnyTimes()
-
-				mockLogger.EXPECT().Debug("Collector configured",
-					"allowedDomains", gomock.Any(),
-					"disallowedDomains", gomock.Any(),
-					"allowedURLs", gomock.Any(),
-					"disallowedURLs", gomock.Any(),
-				).AnyTimes()
-
-				mockLogger.EXPECT().Debug("Collector callbacks configured").AnyTimes()
-				mockLogger.EXPECT().Debug("Collector extensions configured").AnyTimes()
+				mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+				mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+				mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+				mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
 			}
 
 			// Set base URL based on config

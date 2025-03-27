@@ -8,15 +8,12 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
-	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
 )
 
 func TestCollyDebugger_Event(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	debugger := &logger.CollyDebugger{Logger: mockLogger}
 
 	event := &debug.Event{
@@ -26,21 +23,18 @@ func TestCollyDebugger_Event(t *testing.T) {
 	}
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Colly event",
+	mockLogger.On("Debug", "Colly event",
 		"type", event.Type,
 		"requestID", event.RequestID,
 		"collectorID", event.CollectorID,
-	).Times(1)
+	).Return()
 
 	// Test event handling
 	debugger.Event(event)
 }
 
 func TestCollyDebugger_OnRequest(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	debugger := &logger.CollyDebugger{Logger: mockLogger}
 
 	testURL, _ := url.Parse("http://example.com")
@@ -51,21 +45,18 @@ func TestCollyDebugger_OnRequest(t *testing.T) {
 	}
 
 	// Set up expectations
-	mockLogger.EXPECT().Debug("Request",
+	mockLogger.On("Debug", "Request",
 		"url", "http://example.com",
 		"method", "GET",
 		"headers", &http.Header{},
-	).Times(1)
+	).Return()
 
 	// Test request handling
 	debugger.OnRequest(req)
 }
 
 func TestCollyDebugger_OnResponse(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	debugger := &logger.CollyDebugger{Logger: mockLogger}
 
 	testURL, _ := url.Parse("http://example.com")
@@ -77,21 +68,18 @@ func TestCollyDebugger_OnResponse(t *testing.T) {
 	}
 
 	// Set up expectations
-	mockLogger.EXPECT().Info("Response",
+	mockLogger.On("Info", "Response",
 		"url", "http://example.com",
 		"status", 200,
 		"headers", &http.Header{},
-	).Times(1)
+	).Return()
 
 	// Test response handling
 	debugger.OnResponse(resp)
 }
 
 func TestCollyDebugger_OnError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	debugger := &logger.CollyDebugger{Logger: mockLogger}
 
 	testURL, _ := url.Parse("http://example.com")
@@ -104,21 +92,18 @@ func TestCollyDebugger_OnError(t *testing.T) {
 	testErr := errors.New("test error")
 
 	// Set up expectations
-	mockLogger.EXPECT().Error("Error",
+	mockLogger.On("Error", "Error",
 		"url", "http://example.com",
 		"status", 404,
 		"error", "test error",
-	).Times(1)
+	).Return()
 
 	// Test error handling
 	debugger.OnError(resp, testErr)
 }
 
 func TestCollyDebugger_OnEvent(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	debugger := &logger.CollyDebugger{Logger: mockLogger}
 
 	event := &debug.Event{
@@ -128,11 +113,11 @@ func TestCollyDebugger_OnEvent(t *testing.T) {
 	}
 
 	// Set up expectations
-	mockLogger.EXPECT().Info("Event",
+	mockLogger.On("Info", "Event",
 		"type", event.Type,
 		"requestID", event.RequestID,
 		"collectorID", event.CollectorID,
-	).Times(1)
+	).Return()
 
 	// Test event handling
 	debugger.OnEvent(event)

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/cmd/job"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -15,6 +14,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/stretchr/testify/mock"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
@@ -81,10 +81,58 @@ func (m *mockStorage) Aggregate(context.Context, string, any) (any, error) {
 }
 func (m *mockStorage) Count(context.Context, string, any) (int64, error) { return 0, nil }
 
+// mockLogger implements logger.Interface for testing
+type mockLogger struct {
+	mock.Mock
+}
+
+func (m *mockLogger) Debug(msg string, fields ...any) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) Error(msg string, fields ...any) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) Info(msg string, fields ...any) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) Warn(msg string, fields ...any) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) Fatal(msg string, fields ...any) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) Printf(format string, args ...any) {
+	m.Called(format, args)
+}
+
+func (m *mockLogger) Errorf(format string, args ...any) {
+	m.Called(format, args)
+}
+
+func (m *mockLogger) Sync() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+// Ensure mockLogger implements logger.Interface
+var _ logger.Interface = (*mockLogger)(nil)
+
 func TestModuleProvides(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &mockLogger{}
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Fatal", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Printf", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Errorf", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Sync").Return(nil)
+
 	mockCfg := &mockConfig{
 		appConfig:           &config.AppConfig{},
 		crawlerConfig:       &config.CrawlerConfig{},
@@ -109,9 +157,16 @@ func TestModuleProvides(t *testing.T) {
 }
 
 func TestModuleLifecycle(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &mockLogger{}
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Fatal", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Printf", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Errorf", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Sync").Return(nil)
+
 	mockCfg := &mockConfig{
 		appConfig:           &config.AppConfig{},
 		crawlerConfig:       &config.CrawlerConfig{},
@@ -136,9 +191,16 @@ func TestModuleLifecycle(t *testing.T) {
 }
 
 func TestJobScheduling(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &mockLogger{}
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Fatal", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Printf", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Errorf", mock.Anything, mock.Anything).Return()
+	mockLogger.On("Sync").Return(nil)
+
 	mockCfg := &mockConfig{
 		appConfig:           &config.AppConfig{},
 		crawlerConfig:       &config.CrawlerConfig{},

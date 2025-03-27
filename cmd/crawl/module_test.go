@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
@@ -21,6 +20,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -71,17 +72,14 @@ func (m *mockStorage) Close() error {
 
 // TestModuleProvides tests that the crawl module provides all necessary dependencies
 func TestModuleProvides(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	// Set up logger expectations for both single and multi-argument calls
-	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.On("Info", mock.Anything).Return()
+	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := configtest.NewMockConfig().WithSources([]config.Source{
 		{
@@ -177,18 +175,14 @@ func TestModuleProvides(t *testing.T) {
 
 // TestModuleConfiguration tests the module's configuration behavior
 func TestModuleConfiguration(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	// Create test dependencies
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	// Set up logger expectations for both single and multi-argument calls
-	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.On("Info", mock.Anything).Return()
+	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := configtest.NewMockConfig().
 		WithSources([]config.Source{

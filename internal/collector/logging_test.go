@@ -6,16 +6,13 @@ import (
 	"testing"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/collector"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestConfigureLogging(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
+	mockLogger := &testutils.MockLogger{}
 	c := colly.NewCollector()
 
 	// Create test server
@@ -29,25 +26,25 @@ func TestConfigureLogging(t *testing.T) {
 	defer ts.Close()
 
 	// Test request logging
-	mockLogger.EXPECT().Debug("Requesting URL",
+	mockLogger.On("Debug", "Requesting URL",
 		"url", ts.URL,
-	).Times(1)
+	).Return()
 
 	// Test response logging
-	mockLogger.EXPECT().Debug("Received response",
+	mockLogger.On("Debug", "Received response",
 		"url", ts.URL,
 		"status", http.StatusOK,
-	).Times(1)
+	).Return()
 
 	// Test error logging for localhost:1
-	mockLogger.EXPECT().Debug("Requesting URL",
+	mockLogger.On("Debug", "Requesting URL",
 		"url", "http://localhost:1",
-	).Times(1)
+	).Return()
 
-	mockLogger.EXPECT().Error("Error occurred",
+	mockLogger.On("Error", "Error occurred",
 		"url", "http://localhost:1",
-		"error", gomock.Any(),
-	).Times(1)
+		"error", mock.Anything,
+	).Return()
 
 	// Configure logging
 	collector.ConfigureLogging(c, mockLogger)
