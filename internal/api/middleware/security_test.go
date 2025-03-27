@@ -13,22 +13,22 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/stretchr/testify/mock"
 )
 
-// mockLogger implements logger.Interface for testing
+// mockLogger implements common.Logger for testing
 type mockLogger struct {
-	logger.Interface
+	mock.Mock
 }
 
-func (m *mockLogger) Debug(string, ...any)  {}
-func (m *mockLogger) Error(string, ...any)  {}
-func (m *mockLogger) Info(string, ...any)   {}
-func (m *mockLogger) Warn(string, ...any)   {}
-func (m *mockLogger) Fatal(string, ...any)  {}
-func (m *mockLogger) Printf(string, ...any) {}
-func (m *mockLogger) Errorf(string, ...any) {}
-func (m *mockLogger) Sync() error           { return nil }
+func (m *mockLogger) Info(msg string, fields ...any)    { m.Called(msg, fields) }
+func (m *mockLogger) Error(msg string, fields ...any)   { m.Called(msg, fields) }
+func (m *mockLogger) Debug(msg string, fields ...any)   { m.Called(msg, fields) }
+func (m *mockLogger) Warn(msg string, fields ...any)    { m.Called(msg, fields) }
+func (m *mockLogger) Fatal(msg string, fields ...any)   { m.Called(msg, fields) }
+func (m *mockLogger) Printf(format string, args ...any) { m.Called(format, args) }
+func (m *mockLogger) Errorf(format string, args ...any) { m.Called(format, args) }
+func (m *mockLogger) Sync() error                       { return m.Called().Error(0) }
 
 // mockTimeProvider implements TimeProvider for testing
 type mockTimeProvider struct {

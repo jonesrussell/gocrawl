@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // Constants
@@ -19,9 +19,25 @@ const (
 	shutdownTimeout   = 5 * time.Second  // Timeout for graceful shutdown
 )
 
+// API implements the HTTP API
+type API struct {
+	router *gin.Engine
+	config *config.Config
+	log    common.Logger
+}
+
+// NewAPI creates a new API instance
+func NewAPI(router *gin.Engine, config *config.Config, log common.Logger) *API {
+	return &API{
+		router: router,
+		config: config,
+		log:    log,
+	}
+}
+
 // SetupRouter creates and configures the Gin router with all routes
 func SetupRouter(
-	log logger.Interface,
+	log common.Logger,
 	searchManager SearchManager,
 	cfg config.Interface,
 ) (*gin.Engine, middleware.SecurityMiddlewareInterface) {
@@ -46,8 +62,8 @@ func SetupRouter(
 	return router, security
 }
 
-// loggingMiddleware creates a middleware that logs request details
-func loggingMiddleware(log logger.Interface) gin.HandlerFunc {
+// loggingMiddleware creates a middleware that logs HTTP requests
+func loggingMiddleware(log common.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
@@ -55,23 +71,15 @@ func loggingMiddleware(log logger.Interface) gin.HandlerFunc {
 
 		c.Next()
 
-		param := gin.LogFormatterParams{
-			Path:         path,
-			Method:       c.Request.Method,
-			StatusCode:   c.Writer.Status(),
-			Latency:      time.Since(start),
-			ClientIP:     c.ClientIP(),
-			ErrorMessage: c.Errors.ByType(gin.ErrorTypePrivate).String(),
-		}
+		latency := time.Since(start)
+		statusCode := c.Writer.Status()
 
-		log.Info("Gin request",
-			"method", param.Method,
-			"path", param.Path,
-			"status", param.StatusCode,
-			"latency", param.Latency,
-			"client_ip", param.ClientIP,
+		log.Info("HTTP Request",
+			"method", c.Request.Method,
+			"path", path,
 			"query", query,
-			"error", param.ErrorMessage,
+			"status", statusCode,
+			"latency", latency,
 		)
 	}
 }
@@ -133,7 +141,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 
 // StartHTTPServer starts the HTTP server for search requests
 func StartHTTPServer(
-	log logger.Interface,
+	log common.Logger,
 	searchManager SearchManager,
 	cfg config.Interface,
 ) (*http.Server, middleware.SecurityMiddlewareInterface, error) {

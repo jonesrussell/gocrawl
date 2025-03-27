@@ -3,11 +3,12 @@ package logger
 import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 )
 
 // CollyDebugger implements colly.Debugger interface
 type CollyDebugger struct {
-	Logger Interface
+	Logger types.Logger
 }
 
 // Init implements colly.Debugger
@@ -78,7 +79,7 @@ func (d *CollyDebugger) OnEvent(e *debug.Event) {
 }
 
 // NewCollyDebugger creates a new CollyDebugger instance
-func NewCollyDebugger(log Interface) *CollyDebugger {
+func NewCollyDebugger(log types.Logger) *CollyDebugger {
 	return &CollyDebugger{
 		Logger: log,
 	}

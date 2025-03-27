@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -24,7 +25,7 @@ var Module = fx.Options(
 )
 
 // NewLogger creates a new logger instance based on the provided configuration.
-func NewLogger(cfg common.Config) (common.Logger, error) {
+func NewLogger(cfg config.Interface) (types.Logger, error) {
 	env := cfg.GetAppConfig().Environment
 	if env == "" {
 		env = envDevelopment

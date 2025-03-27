@@ -1,37 +1,39 @@
 package testing
 
-import "github.com/jonesrussell/gocrawl/internal/logger"
+import (
+	"github.com/jonesrussell/gocrawl/internal/common"
+)
 
-// NopLogger is a no-op implementation of logger.Interface
+// NopLogger is a no-op implementation of common.Logger
 type NopLogger struct{}
 
-// NewNopLogger creates a new NopLogger
-func NewNopLogger() logger.Interface {
+// NewNopLogger creates a new no-op logger
+func NewNopLogger() common.Logger {
 	return &NopLogger{}
 }
 
-// Debug implements logger.Interface
-func (l *NopLogger) Debug(_ string, _ ...any) {}
+// Debug implements common.Logger
+func (l *NopLogger) Debug(msg string, fields ...any) {}
 
-// Info implements logger.Interface
-func (l *NopLogger) Info(_ string, _ ...any) {}
+// Info implements common.Logger
+func (l *NopLogger) Info(msg string, fields ...any) {}
 
-// Warn implements logger.Interface
-func (l *NopLogger) Warn(_ string, _ ...any) {}
+// Warn implements common.Logger
+func (l *NopLogger) Warn(msg string, fields ...any) {}
 
-// Error implements logger.Interface
-func (l *NopLogger) Error(_ string, _ ...any) {}
+// Error implements common.Logger
+func (l *NopLogger) Error(msg string, fields ...any) {}
 
-// Errorf implements logger.Interface
-func (l *NopLogger) Errorf(_ string, _ ...any) {}
+// Errorf implements common.Logger
+func (l *NopLogger) Errorf(format string, args ...any) {}
 
-// Printf implements logger.Interface
-func (l *NopLogger) Printf(_ string, _ ...any) {}
+// Printf implements common.Logger
+func (l *NopLogger) Printf(format string, args ...any) {}
 
-// Sync implements logger.Interface
+// Sync implements common.Logger
 func (l *NopLogger) Sync() error {
 	return nil
 }
 
-// Fatal implements logger.Interface
-func (l *NopLogger) Fatal(_ string, _ ...any) {}
+// Fatal implements common.Logger
+func (l *NopLogger) Fatal(msg string, fields ...any) {}

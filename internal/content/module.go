@@ -1,32 +1,26 @@
 package content
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
-// Module provides the content service and processor
-var Module = fx.Options(
+// Module provides the content service module
+var Module = fx.Module("content",
 	fx.Provide(
-		// Provide the content processor
-		fx.Annotate(
-			func(p Params) *Processor {
-				return NewProcessor(p.Service, p.Storage, p.Logger, p.IndexName)
-			},
-			fx.As(new(models.ContentProcessor)),
-			fx.ResultTags(`group:"processors"`),
-		),
+		NewService,
+		NewProcessor,
 	),
 )
 
-// Params holds the parameters for creating a content processor
+// Params defines the parameters for the content service
 type Params struct {
 	fx.In
 
-	Service   Interface
+	Logger    common.Logger
+	Config    *config.Config
 	Storage   types.Interface
-	Logger    logger.Interface
-	IndexName string `name:"contentIndex"`
+	IndexName string
 }

@@ -5,9 +5,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"go.uber.org/fx"
 )
 
@@ -20,7 +21,35 @@ type LifecycleParams struct {
 	Server        *http.Server
 	SearchManager SearchManager
 	Security      middleware.SecurityMiddlewareInterface
-	Log           logger.Interface
+	Log           common.Logger
+}
+
+// Lifecycle manages the API server lifecycle
+type Lifecycle struct {
+	server *http.Server
+	Log    common.Logger
+}
+
+// NewLifecycle creates a new API lifecycle manager
+func NewLifecycle(server *http.Server, log common.Logger) *Lifecycle {
+	return &Lifecycle{
+		server: server,
+		Log:    log,
+	}
+}
+
+// Start starts the API server
+func (l *Lifecycle) Start(ctx context.Context) error {
+	l.Log.Info("Starting API server", "addr", l.server.Addr)
+	return l.server.ListenAndServe()
+}
+
+// Stop gracefully stops the API server
+func (l *Lifecycle) Stop(ctx context.Context) error {
+	l.Log.Info("Stopping API server")
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return l.server.Shutdown(shutdownCtx)
 }
 
 // ConfigureLifecycle configures the lifecycle hooks for the API server

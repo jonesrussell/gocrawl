@@ -13,7 +13,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -40,8 +39,9 @@ type Dependencies struct {
 type Params struct {
 	fx.In
 	Server  *http.Server
-	Logger  logger.Interface
+	Logger  common.Logger
 	Storage types.Interface
+	Config  *config.Config
 }
 
 // serverState tracks the HTTP server's state
@@ -51,6 +51,35 @@ type serverState struct {
 	shutdown bool
 	// serverDone is closed when the server goroutine exits
 	serverDone chan struct{}
+}
+
+// Server implements the HTTP server
+type Server struct {
+	config *config.Config
+	Logger common.Logger
+	server *http.Server
+}
+
+// NewServer creates a new HTTP server instance
+func NewServer(params Params) *Server {
+	return &Server{
+		config: params.Config,
+		Logger: params.Logger,
+	}
+}
+
+// Start starts the HTTP server
+func (s *Server) Start(ctx context.Context) error {
+	s.Logger.Info("Starting HTTP server", "addr", s.config.Server.Address)
+	return s.server.ListenAndServe()
+}
+
+// Stop gracefully stops the HTTP server
+func (s *Server) Stop(ctx context.Context) error {
+	s.Logger.Info("Stopping HTTP server")
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return s.server.Shutdown(shutdownCtx)
 }
 
 // Cmd represents the HTTP server command
@@ -65,7 +94,7 @@ You can send POST requests to /search with a JSON body containing the search par
 		defer cancel()
 
 		// Set up signal handling with a no-op logger initially
-		handler := signal.NewSignalHandler(logger.NewNoOp())
+		handler := signal.NewSignalHandler(common.NewNoOpLogger())
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/common"
 )
 
 const (
@@ -40,7 +40,7 @@ type SignalHandler struct {
 	// fxDoneChan signals when fx app shutdown is complete
 	fxDoneChan chan struct{}
 	// logger is the application logger
-	logger logger.Interface
+	logger common.Logger
 	// once ensures we only close doneChan once
 	once sync.Once
 	// state tracks the current state of the handler
@@ -70,7 +70,7 @@ func (h *SignalHandler) setState(state string) {
 }
 
 // NewSignalHandler creates a new SignalHandler instance.
-func NewSignalHandler(logger logger.Interface) *SignalHandler {
+func NewSignalHandler(logger common.Logger) *SignalHandler {
 	return &SignalHandler{
 		sigChan:         make(chan os.Signal, 1),
 		doneChan:        make(chan struct{}),
@@ -93,7 +93,7 @@ func (h *SignalHandler) SetFXApp(app FXApp) {
 }
 
 // SetLogger updates the logger used by the signal handler
-func (h *SignalHandler) SetLogger(logger logger.Interface) {
+func (h *SignalHandler) SetLogger(logger common.Logger) {
 	h.logger = logger
 }
 

@@ -5,24 +5,35 @@ import (
 	"fmt"
 
 	es "github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 )
 
-// ElasticsearchStorage implements the Interface using Elasticsearch.
+// ElasticsearchStorage implements the storage interface using Elasticsearch
 type ElasticsearchStorage struct {
-	ESClient *es.Client
-	Logger   logger.Interface
+	client *es.Client
+	config *config.Config
+	logger common.Logger
+}
+
+// NewElasticsearchStorage creates a new Elasticsearch storage instance
+func NewElasticsearchStorage(client *es.Client, config *config.Config, logger common.Logger) *ElasticsearchStorage {
+	return &ElasticsearchStorage{
+		client: client,
+		config: config,
+		logger: logger,
+	}
 }
 
 // TestConnection tests the connection to Elasticsearch.
 func (s *ElasticsearchStorage) TestConnection(_ context.Context) error {
-	res, err := s.ESClient.Info()
+	res, err := s.client.Info()
 	if err != nil {
 		return fmt.Errorf("failed to connect to Elasticsearch: %w", err)
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
-			s.Logger.Error("Error closing response body", "error", closeErr)
+			s.logger.Error("Error closing response body", "error", closeErr)
 		}
 	}()
 

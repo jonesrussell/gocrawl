@@ -5,7 +5,7 @@ package collector
 
 import (
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/common"
 )
 
 // ConfigureLogging sets up logging for the collector.
@@ -20,7 +20,7 @@ import (
 // Parameters:
 //   - c: The Colly collector instance to configure
 //   - log: The logger interface to use for logging events
-func ConfigureLogging(c *colly.Collector, log logger.Interface) {
+func ConfigureLogging(c *colly.Collector, log common.Logger) {
 	// Log when a request is about to be made
 	c.OnRequest(func(r *colly.Request) {
 		log.Debug("Requesting URL", "url", r.URL.String())

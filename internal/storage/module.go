@@ -12,7 +12,7 @@ import (
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -25,9 +25,8 @@ const (
 // Module provides the storage module for dependency injection.
 var Module = fx.Module("storage",
 	fx.Provide(
-		NewOptionsFromConfig,
 		ProvideElasticsearchClient,
-		NewStorage,
+		NewElasticsearchStorage,
 		ProvideIndexManager,
 		fx.Annotate(
 			func(s types.Interface) (api.SearchManager, error) {
@@ -42,6 +41,16 @@ var Module = fx.Module("storage",
 	),
 )
 
+// Options defines the options for the storage module
+type Options struct {
+	fx.In
+
+	Config    *config.Config
+	Logger    common.Logger
+	Addresses []string
+	APIKey    string
+}
+
 // ProvideIndexManager creates and returns an IndexManager implementation
 func ProvideIndexManager(
 	client *es.Client,
@@ -51,7 +60,7 @@ func ProvideIndexManager(
 }
 
 // ProvideElasticsearchClient provides the Elasticsearch client
-func ProvideElasticsearchClient(opts Options, log logger.Interface) (*es.Client, error) {
+func ProvideElasticsearchClient(opts Options, log common.Logger) (*es.Client, error) {
 	if len(opts.Addresses) == 0 {
 		return nil, errors.New("elasticsearch addresses are required")
 	}

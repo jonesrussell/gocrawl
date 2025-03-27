@@ -8,8 +8,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	"github.com/google/uuid"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
@@ -27,7 +27,7 @@ type Interface interface {
 
 // Service implements the Service interface
 type Service struct {
-	Logger    logger.Interface
+	Logger    common.Logger
 	Selectors config.ArticleSelectors
 }
 
@@ -35,7 +35,7 @@ type Service struct {
 var _ Interface = (*Service)(nil)
 
 // NewService creates a new Service instance
-func NewService(logger logger.Interface, selectors config.ArticleSelectors) Interface {
+func NewService(logger common.Logger, selectors config.ArticleSelectors) Interface {
 	return &Service{
 		Logger:    logger,
 		Selectors: selectors,
@@ -273,7 +273,7 @@ func (s *Service) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle)
 	return parseDate(datesToTry, s.Logger)
 }
 
-func parseDate(dates []string, logger logger.Interface) time.Time {
+func parseDate(dates []string, logger common.Logger) time.Time {
 	var publishedDate time.Time
 	timeFormats := []string{
 		time.RFC3339,

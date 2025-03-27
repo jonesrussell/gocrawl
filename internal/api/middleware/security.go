@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // TimeProvider allows mocking time in tests
@@ -27,8 +27,8 @@ func (r *realTimeProvider) Now() time.Time {
 
 // SecurityMiddleware provides security features for the API
 type SecurityMiddleware struct {
-	config *config.ServerConfig
-	logger logger.Interface
+	cfg    *config.ServerConfig
+	logger common.Logger
 	time   TimeProvider
 	// rateLimiter tracks request counts per IP
 	rateLimiter struct {
@@ -54,9 +54,9 @@ const (
 )
 
 // NewSecurityMiddleware creates a new security middleware instance
-func NewSecurityMiddleware(cfg *config.ServerConfig, logger logger.Interface) *SecurityMiddleware {
+func NewSecurityMiddleware(cfg *config.ServerConfig, logger common.Logger) *SecurityMiddleware {
 	m := &SecurityMiddleware{
-		config: cfg,
+		cfg:    cfg,
 		logger: logger,
 		time:   &realTimeProvider{},
 	}
@@ -81,7 +81,7 @@ func (m *SecurityMiddleware) SetRateLimitWindow(window time.Duration) {
 func (m *SecurityMiddleware) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Skip security checks if disabled
-		if !m.config.Security.Enabled {
+		if !m.cfg.Security.Enabled {
 			c.Next()
 			return
 		}
@@ -111,7 +111,7 @@ func (m *SecurityMiddleware) Middleware() gin.HandlerFunc {
 
 // authenticate checks for valid API key
 func (m *SecurityMiddleware) authenticate(c *gin.Context) error {
-	if m.config.Security.APIKey == "" {
+	if m.cfg.Security.APIKey == "" {
 		return nil // No API key configured
 	}
 
@@ -120,7 +120,7 @@ func (m *SecurityMiddleware) authenticate(c *gin.Context) error {
 		return ErrMissingAPIKey
 	}
 
-	if apiKey != m.config.Security.APIKey {
+	if apiKey != m.cfg.Security.APIKey {
 		return ErrInvalidAPIKey
 	}
 
@@ -129,7 +129,7 @@ func (m *SecurityMiddleware) authenticate(c *gin.Context) error {
 
 // rateLimit implements rate limiting per IP
 func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
-	if m.config.Security.RateLimit <= 0 {
+	if m.cfg.Security.RateLimit <= 0 {
 		return nil // Rate limiting disabled
 	}
 
@@ -157,7 +157,7 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 	}
 
 	// Check rate limit
-	if info.count >= m.config.Security.RateLimit {
+	if info.count >= m.cfg.Security.RateLimit {
 		return ErrRateLimitExceeded
 	}
 
@@ -168,7 +168,7 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 
 // handleCORS implements CORS handling
 func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
-	if !m.config.Security.CORS.Enabled {
+	if !m.cfg.Security.CORS.Enabled {
 		return nil // CORS disabled
 	}
 
@@ -179,7 +179,7 @@ func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
 
 	// Check if origin is allowed
 	allowed := false
-	for _, allowedOrigin := range m.config.Security.CORS.AllowedOrigins {
+	for _, allowedOrigin := range m.cfg.Security.CORS.AllowedOrigins {
 		if allowedOrigin == "*" || allowedOrigin == origin {
 			allowed = true
 			break
@@ -192,9 +192,9 @@ func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
 
 	// Set CORS headers
 	c.Header("Access-Control-Allow-Origin", origin)
-	c.Header("Access-Control-Allow-Methods", m.joinStrings(m.config.Security.CORS.AllowedMethods))
-	c.Header("Access-Control-Allow-Headers", m.joinStrings(m.config.Security.CORS.AllowedHeaders))
-	c.Header("Access-Control-Max-Age", strconv.Itoa(m.config.Security.CORS.MaxAge))
+	c.Header("Access-Control-Allow-Methods", m.joinStrings(m.cfg.Security.CORS.AllowedMethods))
+	c.Header("Access-Control-Allow-Headers", m.joinStrings(m.cfg.Security.CORS.AllowedHeaders))
+	c.Header("Access-Control-Max-Age", strconv.Itoa(m.cfg.Security.CORS.MaxAge))
 
 	// Handle preflight requests
 	if c.Request.Method == http.MethodOptions {
