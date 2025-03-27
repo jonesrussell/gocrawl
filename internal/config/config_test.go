@@ -32,6 +32,7 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
+  source_file: ./testdata/sources.yml
 log:
   level: debug
   debug: true
@@ -47,6 +48,30 @@ elasticsearch:
 	defer func() {
 		if removeErr := os.Remove("testdata/config.yml"); removeErr != nil {
 			t.Errorf("Error removing config file: %v", removeErr)
+		}
+	}()
+
+	// Create test sources file
+	testSources := `
+sources:
+  - name: test_source
+    url: http://test.example.com
+    rate_limit: 1s
+    max_depth: 2
+    article_index: test_articles
+    index: test_content
+    selectors:
+      article:
+        title: h1
+        content: article
+        author: .author
+        date: .date
+`
+	writeErr = os.WriteFile("testdata/sources.yml", []byte(testSources), 0644)
+	require.NoError(t, writeErr)
+	defer func() {
+		if removeErr := os.Remove("testdata/sources.yml"); removeErr != nil {
+			t.Errorf("Error removing sources file: %v", removeErr)
 		}
 	}()
 
@@ -399,12 +424,37 @@ crawler:
   max_depth: 3
   parallelism: 2
   rate_limit: 1s
+  source_file: ./testdata/sources.yml
 `
 	err := os.WriteFile("testdata/config.yml", []byte(configWithAPIKey), 0644)
 	require.NoError(t, err)
 	defer func() {
 		if removeErr := os.Remove("testdata/config.yml"); removeErr != nil {
 			t.Errorf("Error removing config file: %v", removeErr)
+		}
+	}()
+
+	// Create test sources file
+	testSources := `
+sources:
+  - name: test_source
+    url: http://test.example.com
+    rate_limit: 1s
+    max_depth: 2
+    article_index: test_articles
+    index: test_content
+    selectors:
+      article:
+        title: h1
+        content: article
+        author: .author
+        date: .date
+`
+	err = os.WriteFile("testdata/sources.yml", []byte(testSources), 0644)
+	require.NoError(t, err)
+	defer func() {
+		if removeErr := os.Remove("testdata/sources.yml"); removeErr != nil {
+			t.Errorf("Error removing sources file: %v", removeErr)
 		}
 	}()
 
@@ -459,6 +509,7 @@ app:
 crawler:
   max_depth: 3
   parallelism: 2
+  source_file: ./testdata/sources.yml
 log:
   level: debug
 elasticsearch:
@@ -475,6 +526,7 @@ app:
 crawler:
   max_depth: 3
   parallelism: 2
+  source_file: ./testdata/sources.yml
 log:
   level: debug
 elasticsearch:
@@ -494,6 +546,30 @@ elasticsearch:
 	defer func() {
 		if removeErr := os.Remove("testdata/no_api_key_config.yml"); removeErr != nil {
 			t.Errorf("Error removing no API key config file: %v", removeErr)
+		}
+	}()
+
+	// Create test sources file
+	testSources := `
+sources:
+  - name: test_source
+    url: http://test.example.com
+    rate_limit: 1s
+    max_depth: 2
+    article_index: test_articles
+    index: test_content
+    selectors:
+      article:
+        title: h1
+        content: article
+        author: .author
+        date: .date
+`
+	writeErr3 := os.WriteFile("testdata/sources.yml", []byte(testSources), 0644)
+	require.NoError(t, writeErr3)
+	defer func() {
+		if removeErr := os.Remove("testdata/sources.yml"); removeErr != nil {
+			t.Errorf("Error removing sources file: %v", removeErr)
 		}
 	}()
 
