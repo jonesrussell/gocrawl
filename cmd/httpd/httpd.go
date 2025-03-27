@@ -139,13 +139,6 @@ You can send POST requests to /search with a JSON body containing the search par
 							p.Logger.Warn("Timeout waiting for server goroutine to exit")
 						}
 
-						// Close storage connection
-						p.Logger.Info("Closing storage connection...")
-						if err := p.Storage.Close(); err != nil {
-							p.Logger.Error("Error closing storage connection", "error", err)
-							// Don't return error here as server is already stopped
-						}
-
 						p.Logger.Info("Shutdown complete")
 						return nil
 					},

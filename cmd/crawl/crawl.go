@@ -83,13 +83,6 @@ You can specify the source to crawl using the --source flag.`,
 							return fmt.Errorf("failed to stop crawler: %w", err)
 						}
 
-						// Close storage connection
-						p.Logger.Info("Closing storage connection...")
-						if err := p.Storage.Close(); err != nil {
-							p.Logger.Error("Error closing storage connection", "error", err)
-							// Don't return error here as crawler is already stopped
-						}
-
 						return nil
 					},
 				})
