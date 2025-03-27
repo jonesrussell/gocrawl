@@ -13,6 +13,14 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
+// Sentinel errors for testing
+var (
+	ErrNotImplemented = errors.New("not implemented")
+	ErrNoSources      = errors.New("no sources available")
+	ErrNoResults      = errors.New("no results found")
+	ErrNoAggregation  = errors.New("aggregation not implemented")
+)
+
 // Mock type declarations
 type (
 	// mockConfig implements config.Interface for testing.
@@ -48,136 +56,106 @@ type (
 // This implementation provides basic crawler settings for testing purposes.
 func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig {
 	return &config.CrawlerConfig{
-		MaxDepth:    3,
-		Parallelism: 2,
-		RateLimit:   time.Second,
+		BaseURL:          "http://test.com",
+		MaxDepth:         2,
+		RateLimit:        time.Second,
+		RandomDelay:      time.Second,
+		IndexName:        "test-index",
+		ContentIndexName: "test-content-index",
+		SourceFile:       "sources.yml",
+		Parallelism:      1,
 	}
 }
 
-// GetElasticsearchConfig returns a mock Elasticsearch configuration with test values.
-// This implementation provides a complete set of Elasticsearch settings including
-// connection details, security settings, and retry policies.
+// GetElasticsearchConfig returns a mock Elasticsearch configuration.
 func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 	return &config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
-		APIKey:    "test-api-key",
-		IndexName: "test-index",
-		Cloud: struct {
-			ID     string `yaml:"id"`
-			APIKey string `yaml:"api_key"`
-		}{
-			ID:     "test-deployment",
-			APIKey: "test-cloud-key",
-		},
-		TLS: struct {
-			Enabled     bool   `yaml:"enabled"`
-			SkipVerify  bool   `yaml:"skip_verify"`
-			Certificate string `yaml:"certificate"`
-			Key         string `yaml:"key"`
-			CA          string `yaml:"ca"`
-		}{
-			Enabled:    true,
-			SkipVerify: true,
-		},
-		Retry: struct {
-			Enabled     bool          `yaml:"enabled"`
-			InitialWait time.Duration `yaml:"initial_wait"`
-			MaxWait     time.Duration `yaml:"max_wait"`
-			MaxRetries  int           `yaml:"max_retries"`
-		}{
-			Enabled:     true,
-			InitialWait: 1 * time.Second,
-			MaxWait:     30 * time.Second,
-			MaxRetries:  3,
+		Username:  "test",
+		Password:  "test",
+	}
+}
+
+// GetLogConfig returns a mock logging configuration.
+func (m *mockConfig) GetLogConfig() *config.LogConfig {
+	return &config.LogConfig{
+		Level: "debug",
+	}
+}
+
+// GetAppConfig returns a mock application configuration.
+func (m *mockConfig) GetAppConfig() *config.AppConfig {
+	return &config.AppConfig{
+		Environment: "test",
+		Name:        "test-app",
+		Version:     "1.0.0",
+		Debug:       true,
+	}
+}
+
+// GetSources returns a mock list of sources.
+func (m *mockConfig) GetSources() []config.Source {
+	return []config.Source{
+		{
+			Name:     "test-source",
+			URL:      "http://test.com",
+			MaxDepth: 2,
 		},
 	}
 }
 
-// Search implements a mock search operation that returns an empty result set.
-// This implementation is used for testing the search functionality without
-// requiring a real Elasticsearch connection.
-func (m *mockSearchManager) Search(_ context.Context, _ string, _ any) ([]any, error) {
-	return []any{}, nil
+// GetServerConfig returns a mock server configuration.
+func (m *mockConfig) GetServerConfig() *config.ServerConfig {
+	return &config.ServerConfig{
+		Address:      ":8080",
+		ReadTimeout:  time.Second * 10,
+		WriteTimeout: time.Second * 30,
+		IdleTimeout:  time.Second * 60,
+	}
 }
 
-// Count implements a mock count operation that returns zero.
-// This implementation is used for testing count operations without
-// requiring a real Elasticsearch connection.
+// GetCommand returns a mock command.
+func (m *mockConfig) GetCommand() string {
+	return "test"
+}
+
+// Mock implementations for other interfaces
+func (m *mockSearchManager) Search(_ context.Context, _ string, _ any) ([]any, error) {
+	return nil, ErrNoResults
+}
+
 func (m *mockSearchManager) Count(_ context.Context, _ string, _ any) (int64, error) {
 	return 0, nil
 }
 
-// Aggregate implements a mock aggregate operation that returns an error.
-// This implementation is used for testing error handling in aggregate operations.
 func (m *mockSearchManager) Aggregate(_ context.Context, _ string, _ any) (any, error) {
-	return nil, errors.New("aggregate not implemented in mock")
+	return nil, ErrNoAggregation
 }
 
-// Index implements a mock index operation that always succeeds.
-// This implementation is used for testing index operations without
-// requiring a real Elasticsearch connection.
 func (m *mockIndexManager) Index(_ context.Context, _ string, _ any) error {
 	return nil
 }
 
-// Close implements a mock close operation that always succeeds.
-// This implementation is used for testing cleanup operations.
 func (m *mockIndexManager) Close() error {
 	return nil
 }
 
-// Store implements a mock store operation that always succeeds.
-// This implementation is used for testing storage operations without
-// requiring a real storage backend.
 func (m *mockStorage) Store(_ context.Context, _ string, _ any) error {
 	return nil
 }
 
-// Close implements a mock close operation that always succeeds.
-// This implementation is used for testing cleanup operations.
 func (m *mockStorage) Close() error {
 	return nil
 }
 
-// GetSource returns a mock source configuration for testing.
-// This implementation provides a complete set of source settings including
-// URL, rate limiting, and content selectors.
 func (m *mockSources) GetSource(_ string) (*sources.Config, error) {
-	return &sources.Config{
-		Name:      "test-source",
-		URL:       "http://test.example.com",
-		RateLimit: time.Second,
-		MaxDepth:  2,
-		Selectors: sources.SelectorConfig{
-			Article: sources.ArticleSelectors{
-				Container: "article",
-				Title:     "h1",
-				Body:      "article",
-			},
-		},
-	}, nil
+	return nil, ErrNotImplemented
 }
 
-// ListSources returns a list of mock source configurations for testing.
-// This implementation provides a single test source with complete configuration.
 func (m *mockSources) ListSources() ([]*sources.Config, error) {
-	return []*sources.Config{
-		{
-			Name:      "test-source",
-			URL:       "http://test.example.com",
-			RateLimit: time.Second,
-			MaxDepth:  2,
-			Selectors: sources.SelectorConfig{
-				Article: sources.ArticleSelectors{
-					Container: "article",
-					Title:     "h1",
-					Body:      "article",
-				},
-			},
-		},
-	}, nil
+	return nil, ErrNoSources
 }
 
 func (m *mockContentProcessor) Process(e *colly.HTMLElement) {
-	// No-op implementation for testing
+	// No-op for testing
 }

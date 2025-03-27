@@ -18,10 +18,24 @@ import (
 	"go.uber.org/fx/fxtest"
 )
 
+// TestConfigModule provides a test-specific config module that doesn't try to load files.
+var TestConfigModule = fx.Module("testConfig",
+	fx.Provide(
+		fx.Annotate(
+			func() config.Interface { return &mockConfig{} },
+			fx.ResultTags(`name:"config"`),
+		),
+	),
+)
+
 // setupTestApp creates a new test application with all required dependencies.
 // It provides mock implementations of all interfaces required by the crawler module.
 func setupTestApp(t *testing.T) *fxtest.App {
 	t.Helper()
+
+	// Set environment variables to prevent file loading
+	t.Setenv("APP_ENV", "test")
+	t.Setenv("CONFIG_PATH", "")
 
 	return fxtest.New(t,
 		fx.NopLogger,
@@ -37,12 +51,8 @@ func setupTestApp(t *testing.T) *fxtest.App {
 				fx.ResultTags(`name:"sourceName"`),
 			),
 			fx.Annotate(
-				func() config.Interface { return &mockConfig{} },
-				fx.ResultTags(`name:"config"`),
-			),
-			fx.Annotate(
 				func() sources.Interface { return &mockSources{} },
-				fx.ResultTags(`name:"sourceManager"`),
+				fx.ResultTags(`name:"testSourceManager"`),
 			),
 			fx.Annotate(
 				func() *signal.SignalHandler { return signal.NewSignalHandler(nil) },
@@ -56,9 +66,11 @@ func setupTestApp(t *testing.T) *fxtest.App {
 			),
 			// Provide unnamed interfaces required by the crawler module
 			func() types.Interface { return &mockStorage{} },
-			func() api.IndexManager { return &mockIndexManager{} },
+			fx.Annotate(
+				func() api.IndexManager { return &mockIndexManager{} },
+				fx.ResultTags(`name:"indexManager"`),
+			),
 			func() api.SearchManager { return &mockSearchManager{} },
-			func() config.Interface { return &mockConfig{} },
 		),
 		// Supply done channel
 		fx.Supply(
@@ -76,8 +88,8 @@ func setupTestApp(t *testing.T) *fxtest.App {
 				fx.ResultTags(`group:"processors"`),
 			),
 		),
-		// Include only required modules
-		sources.Module,
+		// Include test config module and crawler module
+		TestConfigModule,
 		crawler.Module,
 		// Verify dependencies
 		fx.Invoke(func(deps crawler.CrawlDeps) {

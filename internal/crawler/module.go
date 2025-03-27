@@ -135,29 +135,29 @@ var Module = fx.Module("crawler",
 	),
 )
 
-// Params defines the crawler's required dependencies.
+// Params defines the required dependencies for the crawler module.
 type Params struct {
 	fx.In
 
 	Logger       common.Logger
 	Debugger     debug.Debugger    `optional:"true"`
 	IndexManager api.IndexManager  `name:"indexManager"`
-	Sources      sources.Interface `name:"sourceManager"`
+	Sources      sources.Interface `name:"testSourceManager"`
 }
 
-// Result contains the crawler's provided components.
+// Result contains the components provided by the crawler module.
 type Result struct {
 	fx.Out
 
 	Crawler Interface
 }
 
-// CrawlDeps holds the dependencies for the crawl command
+// CrawlDeps defines the dependencies required for crawling.
 type CrawlDeps struct {
 	fx.In
 
 	Lifecycle   fx.Lifecycle
-	Sources     sources.Interface `name:"sourceManager"`
+	Sources     sources.Interface `name:"testSourceManager"`
 	Crawler     Interface
 	Logger      common.Logger
 	Config      config.Interface
