@@ -1,0 +1,25 @@
+sources:
+  - name: test1
+    url: https://example1.com
+    rate_limit: 1s
+    max_depth: 1
+    selectors:
+      title: h1
+      description: meta[name=description]
+      content: article
+      article:
+        container: article
+        title: h1
+        body: .content
+  - name: test2
+    url: https://example2.com
+    rate_limit: 2s
+    max_depth: 2
+    selectors:
+      title: h1
+      description: meta[name=description]
+      content: article
+      article:
+        container: article
+        title: h1
+        body: .content 
