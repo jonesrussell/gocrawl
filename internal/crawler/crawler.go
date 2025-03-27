@@ -105,14 +105,9 @@ func (c *Crawler) Subscribe(handler events.Handler) {
 }
 
 // SetRateLimit sets the crawler's rate limit.
-func (c *Crawler) SetRateLimit(duration string) error {
-	d, err := time.ParseDuration(duration)
-	if err != nil {
-		c.Logger.Error("Invalid rate limit duration", "input", duration, "error", err)
-		return fmt.Errorf("invalid rate limit duration: %w", err)
-	}
-	c.Logger.Debug("Setting rate limit", "duration", d)
-	c.collector.SetRequestTimeout(d)
+func (c *Crawler) SetRateLimit(duration time.Duration) error {
+	c.Logger.Debug("Setting rate limit", "duration", duration)
+	c.collector.SetRequestTimeout(duration)
 	return nil
 }
 

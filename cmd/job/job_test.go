@@ -46,7 +46,7 @@ type mockCrawler struct{}
 func (m *mockCrawler) Start(context.Context, string) error { return nil }
 func (m *mockCrawler) Stop(context.Context) error          { return nil }
 func (m *mockCrawler) Subscribe(events.Handler)            {}
-func (m *mockCrawler) SetRateLimit(_ string) error         { return nil }
+func (m *mockCrawler) SetRateLimit(time.Duration) error    { return nil }
 func (m *mockCrawler) SetMaxDepth(_ int)                   {}
 func (m *mockCrawler) SetCollector(_ *colly.Collector)     {}
 func (m *mockCrawler) GetIndexManager() api.IndexManager   { return nil }

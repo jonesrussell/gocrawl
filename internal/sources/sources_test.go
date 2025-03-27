@@ -4,6 +4,7 @@ package sources_test
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
@@ -17,10 +18,12 @@ func TestLoadFromFile(t *testing.T) {
     url: https://example.com
     rate_limit: 1s
     max_depth: 2
+    article_index: articles
+    index: content
+    time:
+      - published_time
+      - time_ago
     selectors:
-      title: h1
-      description: meta[name=description]
-      content: article
       article:
         container: article
         title: h1
@@ -66,7 +69,7 @@ func TestLoadFromFile(t *testing.T) {
 	require.Len(t, allSources, 1)
 	require.Equal(t, "test_source", allSources[0].Name)
 	require.Equal(t, "https://example.com", allSources[0].URL)
-	require.Equal(t, "1s", allSources[0].RateLimit)
+	require.Equal(t, time.Second, allSources[0].RateLimit)
 	require.Equal(t, 2, allSources[0].MaxDepth)
 }
 
@@ -75,13 +78,13 @@ func TestFindByName(t *testing.T) {
 		{
 			Name:      "test1",
 			URL:       "https://example1.com",
-			RateLimit: "1s",
+			RateLimit: time.Second,
 			MaxDepth:  1,
 		},
 		{
 			Name:      "test2",
 			URL:       "https://example2.com",
-			RateLimit: "2s",
+			RateLimit: 2 * time.Second,
 			MaxDepth:  2,
 		},
 	}
@@ -123,7 +126,7 @@ func TestValidate(t *testing.T) {
 		{
 			Name:      "test",
 			URL:       "https://example.com",
-			RateLimit: "1s",
+			RateLimit: time.Second,
 			MaxDepth:  1,
 		},
 	}
@@ -140,7 +143,7 @@ func TestValidate(t *testing.T) {
 			source: &sources.Config{
 				Name:      "test",
 				URL:       "https://example.com",
-				RateLimit: "1s",
+				RateLimit: time.Second,
 				MaxDepth:  1,
 			},
 			wantErr: false,
@@ -154,7 +157,7 @@ func TestValidate(t *testing.T) {
 			name: "missing name",
 			source: &sources.Config{
 				URL:       "https://example.com",
-				RateLimit: "1s",
+				RateLimit: time.Second,
 				MaxDepth:  1,
 			},
 			wantErr: true,
@@ -163,7 +166,7 @@ func TestValidate(t *testing.T) {
 			name: "missing URL",
 			source: &sources.Config{
 				Name:      "test",
-				RateLimit: "1s",
+				RateLimit: time.Second,
 				MaxDepth:  1,
 			},
 			wantErr: true,
@@ -182,7 +185,7 @@ func TestValidate(t *testing.T) {
 			source: &sources.Config{
 				Name:      "test",
 				URL:       "https://example.com",
-				RateLimit: "1s",
+				RateLimit: time.Second,
 				MaxDepth:  0,
 			},
 			wantErr: true,

@@ -1,4 +1,4 @@
-// Package sources_test implements tests for the sources command package.
+// Package sources_test provides tests for the sources command package.
 package sources_test
 
 import (
@@ -11,8 +11,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	srcs "github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -81,10 +81,10 @@ func (m *mockConfig) GetSources() []config.Source           { return m.sources }
 func Test_listCommand(t *testing.T) {
 	t.Parallel()
 	cmd := sources.ListCommand()
-	assert.NotNil(t, cmd)
-	assert.Equal(t, "list", cmd.Use)
-	assert.Equal(t, "List all configured content sources", cmd.Short)
-	assert.Contains(t, cmd.Long, "Display a list of all content sources configured in sources.yml")
+	require.NotNil(t, cmd)
+	require.Equal(t, "list", cmd.Use)
+	require.Equal(t, "List all configured content sources", cmd.Short)
+	require.Contains(t, cmd.Long, "Display a list of all content sources configured in sources.yml")
 }
 
 func Test_runList(t *testing.T) {
@@ -105,7 +105,7 @@ func Test_runList(t *testing.T) {
 						URL:          "https://test.com",
 						Index:        "test_content",
 						ArticleIndex: "test_articles",
-						RateLimit:    "1s",
+						RateLimit:    time.Second,
 						MaxDepth:     2,
 					},
 				}
@@ -196,87 +196,88 @@ func Test_executeList(t *testing.T) {
 					URL:          "https://test.com",
 					Index:        "test_content",
 					ArticleIndex: "test_articles",
-					RateLimit:    "1s",
+					RateLimit:    time.Second,
 					MaxDepth:     2,
 				},
 			},
 			wantErr:      false,
-			wantLogCount: 0,
+			wantLogCount: 1,
 		},
 		{
 			name:         "no sources",
-			sources:      nil,
+			sources:      []srcs.Config{},
 			wantErr:      false,
-			wantLogCount: 1, // "No sources found" message
+			wantLogCount: 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ml := &mockLogger{}
-			params := sources.ListParams{
-				SourceManager: &mockSourceManager{sources: tt.sources},
-				Logger:        ml,
-			}
+			logger := &mockLogger{}
+			sm := &mockSourceManager{sources: tt.sources}
 
-			err := sources.ExecuteList(params)
+			err := sources.ExecuteList(sources.ListParams{
+				SourceManager: sm,
+				Logger:        logger,
+			})
+
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Len(t, ml.infoMessages, tt.wantLogCount)
+				return
 			}
+			require.NoError(t, err)
+			require.Len(t, logger.infoMessages, tt.wantLogCount)
 		})
 	}
 }
 
-func Test_printSources(t *testing.T) {
+func TestFindByName(t *testing.T) {
 	t.Parallel()
+	testConfigs := []srcs.Config{
+		{
+			Name:      "test1",
+			URL:       "https://example1.com",
+			RateLimit: time.Second,
+			MaxDepth:  1,
+		},
+		{
+			Name:      "test2",
+			URL:       "https://example2.com",
+			RateLimit: 2 * time.Second,
+			MaxDepth:  2,
+		},
+	}
+	s := testutils.NewTestSources(testConfigs)
+	require.NotNil(t, s)
+
 	tests := []struct {
 		name    string
-		sources []srcs.Config
+		source  string
 		wantErr bool
 	}{
 		{
-			name: "print multiple sources",
-			sources: []srcs.Config{
-				{
-					Name:         "Test Source 1",
-					URL:          "https://test1.com",
-					Index:        "test1_content",
-					ArticleIndex: "test1_articles",
-					RateLimit:    "1s",
-					MaxDepth:     2,
-				},
-				{
-					Name:         "Test Source 2",
-					URL:          "https://test2.com",
-					Index:        "test2_content",
-					ArticleIndex: "test2_articles",
-					RateLimit:    "2s",
-					MaxDepth:     3,
-				},
-			},
+			name:    "existing source",
+			source:  "test1",
 			wantErr: false,
 		},
 		{
-			name:    "print empty sources",
-			sources: []srcs.Config{},
-			wantErr: false,
+			name:    "non-existing source",
+			source:  "test3",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ml := &mockLogger{}
-			err := sources.PrintSources(tt.sources, ml)
+			source, err := s.FindByName(tt.source)
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+				return
 			}
+			require.NoError(t, err)
+			require.Equal(t, tt.source, source.Name)
 		})
 	}
 }

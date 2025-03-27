@@ -30,11 +30,6 @@ func SetupCollector(
 	done chan struct{},
 	cfg config.Interface,
 ) (collector.Result, error) {
-	rateLimit, err := time.ParseDuration(source.RateLimit)
-	if err != nil {
-		return collector.Result{}, fmt.Errorf("invalid rate limit format: %w", err)
-	}
-
 	// Convert source config to the expected type
 	sourceConfig := common.ConvertSourceConfig(&source)
 	if sourceConfig == nil {
@@ -50,7 +45,7 @@ func SetupCollector(
 	return collector.New(collector.Params{
 		BaseURL:          source.URL,
 		MaxDepth:         source.MaxDepth,
-		RateLimit:        rateLimit,
+		RateLimit:        source.RateLimit,
 		Logger:           log,
 		Context:          ctx,
 		ArticleProcessor: processors[0], // First processor handles articles
@@ -68,7 +63,7 @@ func SetupCollector(
 func ConfigureCrawler(c interface {
 	SetCollector(*colly.Collector)
 	SetMaxDepth(int)
-	SetRateLimit(string) error
+	SetRateLimit(time.Duration) error
 }, source sources.Config, collector collector.Result) error {
 	c.SetCollector(collector.Collector)
 	c.SetMaxDepth(source.MaxDepth)

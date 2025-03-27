@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -91,7 +92,7 @@ func TestModuleProvides(t *testing.T) {
 		{
 			Name:      "Test Source",
 			URL:       "http://test.example.com",
-			RateLimit: "1s",
+			RateLimit: time.Second,
 			MaxDepth:  2,
 		},
 	}
@@ -187,7 +188,7 @@ func TestModuleConfiguration(t *testing.T) {
 		{
 			Name:      "Test Source",
 			URL:       "https://test.com",
-			RateLimit: "1s",
+			RateLimit: time.Second,
 			MaxDepth:  2,
 		},
 	}

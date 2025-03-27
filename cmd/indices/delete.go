@@ -12,6 +12,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -96,6 +97,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	fxApp := fx.New(
 		fx.NopLogger,
 		common.Module,
+		storage.Module,
 		fx.Provide(
 			func() context.Context { return ctx },
 		),

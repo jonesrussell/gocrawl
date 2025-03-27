@@ -5,25 +5,22 @@ package sources
 import (
 	"errors"
 	"fmt"
-	"os"
+	"time"
 
-	"gopkg.in/yaml.v3"
+	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 )
 
 // Config represents a source configuration.
 type Config struct {
-	Name      string            `yaml:"name"`
-	URL       string            `yaml:"url"`
-	RateLimit string            `yaml:"rate_limit"`
-	MaxDepth  int               `yaml:"max_depth"`
-	Selectors SelectorConfig    `yaml:"selectors"`
-	Metadata  map[string]string `yaml:"metadata,omitempty"`
-	// Time specifies the scheduled times for crawling in 24-hour format (HH:MM)
-	Time []string `yaml:"time,omitempty"`
-	// ArticleIndex specifies the Elasticsearch index name for articles from this source
-	ArticleIndex string `yaml:"article_index,omitempty"`
-	// Index specifies the Elasticsearch index name for general content from this source
-	Index string `yaml:"index,omitempty"`
+	Name         string            `yaml:"name"`
+	URL          string            `yaml:"url"`
+	RateLimit    time.Duration     `yaml:"-"`
+	MaxDepth     int               `yaml:"max_depth"`
+	ArticleIndex string            `yaml:"article_index"`
+	Index        string            `yaml:"index"`
+	Time         []string          `yaml:"time,omitempty"`
+	Selectors    SelectorConfig    `yaml:"selectors"`
+	Metadata     map[string]string `yaml:"metadata,omitempty"`
 }
 
 // ArticleSelectors defines the CSS selectors used for article content extraction.
@@ -35,13 +32,13 @@ type ArticleSelectors struct {
 	Byline        string `yaml:"byline"`
 	PublishedTime string `yaml:"published_time"`
 	TimeAgo       string `yaml:"time_ago"`
-	JSONLd        string `yaml:"jsonld"`
+	JSONLD        string `yaml:"jsonld"`
 	Section       string `yaml:"section"`
 	Keywords      string `yaml:"keywords"`
 	Description   string `yaml:"description"`
-	OgTitle       string `yaml:"og_title"`
-	OgDescription string `yaml:"og_description"`
-	OgImage       string `yaml:"og_image"`
+	OGTitle       string `yaml:"og_title"`
+	OGDescription string `yaml:"og_description"`
+	OGImage       string `yaml:"og_image"`
 	OgURL         string `yaml:"og_url"`
 	Canonical     string `yaml:"canonical"`
 	WordCount     string `yaml:"word_count"`
@@ -54,15 +51,12 @@ type ArticleSelectors struct {
 
 // SelectorConfig defines the CSS selectors used for content extraction.
 type SelectorConfig struct {
-	Title       string           `yaml:"title"`
-	Description string           `yaml:"description"`
-	Content     string           `yaml:"content"`
-	Article     ArticleSelectors `yaml:"article"`
+	Article ArticleSelectors `yaml:"article"`
 }
 
 // Sources manages web content source configurations.
 type Sources struct {
-	sources []Config `yaml:"sources"`
+	sources []Config
 }
 
 // LoadFromFile loads source configurations from a YAML file.
@@ -75,20 +69,56 @@ type Sources struct {
 //   - *Sources: The loaded sources configuration
 //   - error: Any error that occurred during loading
 func LoadFromFile(path string) (*Sources, error) {
-	data, err := os.ReadFile(path)
+	loaderConfigs, err := loader.LoadFromFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read sources file: %w", err)
+		return nil, fmt.Errorf("failed to load sources: %w", err)
 	}
 
-	// First unmarshal into a temporary struct to handle the YAML structure
-	var temp struct {
-		Sources []Config `yaml:"sources"`
-	}
-	if unmarshalErr := yaml.Unmarshal(data, &temp); unmarshalErr != nil {
-		return nil, fmt.Errorf("failed to unmarshal sources: %w", unmarshalErr)
+	var configs []Config
+	for _, src := range loaderConfigs {
+		rateLimit, err := time.ParseDuration(src.RateLimit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse rate limit for source %s: %w", src.Name, err)
+		}
+
+		configs = append(configs, Config{
+			Name:         src.Name,
+			URL:          src.URL,
+			RateLimit:    rateLimit,
+			MaxDepth:     src.MaxDepth,
+			ArticleIndex: src.ArticleIndex,
+			Index:        src.Index,
+			Time:         src.Time,
+			Selectors: SelectorConfig{
+				Article: ArticleSelectors{
+					Container:     src.Selectors.Article.Container,
+					Title:         src.Selectors.Article.Title,
+					Body:          src.Selectors.Article.Body,
+					Intro:         src.Selectors.Article.Intro,
+					Byline:        src.Selectors.Article.Byline,
+					PublishedTime: src.Selectors.Article.PublishedTime,
+					TimeAgo:       src.Selectors.Article.TimeAgo,
+					JSONLD:        src.Selectors.Article.JSONLD,
+					Section:       src.Selectors.Article.Section,
+					Keywords:      src.Selectors.Article.Keywords,
+					Description:   src.Selectors.Article.Description,
+					OGTitle:       src.Selectors.Article.OGTitle,
+					OGDescription: src.Selectors.Article.OGDescription,
+					OGImage:       src.Selectors.Article.OGImage,
+					OgURL:         src.Selectors.Article.OgURL,
+					Canonical:     src.Selectors.Article.Canonical,
+					WordCount:     src.Selectors.Article.WordCount,
+					PublishDate:   src.Selectors.Article.PublishDate,
+					Category:      src.Selectors.Article.Category,
+					Tags:          src.Selectors.Article.Tags,
+					Author:        src.Selectors.Article.Author,
+					BylineName:    src.Selectors.Article.BylineName,
+				},
+			},
+		})
 	}
 
-	return &Sources{sources: temp.Sources}, nil
+	return &Sources{sources: configs}, nil
 }
 
 // FindByName finds a source by its name.
@@ -135,7 +165,7 @@ func (s *Sources) Validate(source *Config) error {
 		return errors.New("source URL is required")
 	}
 
-	if source.RateLimit == "" {
+	if source.RateLimit == 0 {
 		return errors.New("rate limit is required")
 	}
 

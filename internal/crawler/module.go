@@ -3,6 +3,7 @@ package crawler
 
 import (
 	"context"
+	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
@@ -33,7 +34,7 @@ type Interface interface {
 	// Subscribe adds a content handler to receive discovered content.
 	Subscribe(handler events.Handler)
 	// SetRateLimit sets the crawler's rate limit.
-	SetRateLimit(duration string) error
+	SetRateLimit(duration time.Duration) error
 	// SetMaxDepth sets the maximum crawl depth.
 	SetMaxDepth(depth int)
 	// SetCollector sets the collector for the crawler.

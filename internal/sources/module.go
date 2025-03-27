@@ -27,8 +27,10 @@ type Interface interface {
 // Module provides the sources module's dependencies.
 var Module = fx.Module("sources",
 	fx.Provide(
-		provideSourceConfig,
-		provideSources,
+		fx.Annotate(
+			provideSources,
+			fx.ResultTags(`name:"sourceManager"`),
+		),
 	),
 )
 
@@ -46,23 +48,61 @@ type Result struct {
 	Sources Interface `name:"sourceManager"`
 }
 
-// provideSourceConfig creates a new source configuration.
-func provideSourceConfig(config.Interface) *Config {
-	return NewConfig()
-}
-
 // provideSources creates a new sources instance.
-func provideSources(cfg *Config) Interface {
-	return NewSources(cfg)
+func provideSources(p Params) Interface {
+	var configs []Config
+	sources := p.Config.GetSources()
+	for _, src := range sources {
+		configs = append(configs, Config{
+			Name:         src.Name,
+			URL:          src.URL,
+			RateLimit:    src.RateLimit,
+			MaxDepth:     src.MaxDepth,
+			ArticleIndex: src.ArticleIndex,
+			Index:        src.Index,
+			Time:         src.Time,
+			Selectors: SelectorConfig{
+				Article: ArticleSelectors{
+					Container:     src.Selectors.Article.Container,
+					Title:         src.Selectors.Article.Title,
+					Body:          src.Selectors.Article.Body,
+					Intro:         src.Selectors.Article.Intro,
+					Byline:        src.Selectors.Article.Byline,
+					PublishedTime: src.Selectors.Article.PublishedTime,
+					TimeAgo:       src.Selectors.Article.TimeAgo,
+					JSONLD:        src.Selectors.Article.JSONLD,
+					Section:       src.Selectors.Article.Section,
+					Keywords:      src.Selectors.Article.Keywords,
+					Description:   src.Selectors.Article.Description,
+					OGTitle:       src.Selectors.Article.OGTitle,
+					OGDescription: src.Selectors.Article.OGDescription,
+					OGImage:       src.Selectors.Article.OGImage,
+					OgURL:         src.Selectors.Article.OgURL,
+					Canonical:     src.Selectors.Article.Canonical,
+					WordCount:     src.Selectors.Article.WordCount,
+					PublishDate:   src.Selectors.Article.PublishDate,
+					Category:      src.Selectors.Article.Category,
+					Tags:          src.Selectors.Article.Tags,
+					Author:        src.Selectors.Article.Author,
+					BylineName:    src.Selectors.Article.BylineName,
+				},
+			},
+		})
+	}
+	if len(configs) == 0 {
+		configs = append(configs, *NewConfig())
+	}
+	return &Sources{
+		sources: configs,
+	}
 }
 
 // NewConfig creates a new source configuration.
 func NewConfig() *Config {
 	return &Config{
-		Name:      "default",
-		URL:       "http://localhost",
-		RateLimit: "1s",
-		MaxDepth:  DefaultMaxDepth,
+		Name:     "default",
+		URL:      "http://localhost",
+		MaxDepth: DefaultMaxDepth,
 	}
 }
 

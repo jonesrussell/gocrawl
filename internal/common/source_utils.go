@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -18,18 +17,12 @@ func ConvertSourceConfig(source *sources.Config) *config.Source {
 		return nil
 	}
 
-	// Parse the rate limit string into a duration
-	rateLimit, err := config.ParseRateLimit(source.RateLimit)
-	if err != nil {
-		rateLimit = time.Second // Default to 1 second if parsing fails
-	}
-
 	return &config.Source{
 		Name:         source.Name,
 		URL:          source.URL,
 		ArticleIndex: source.ArticleIndex,
 		Index:        source.Index,
-		RateLimit:    rateLimit,
+		RateLimit:    source.RateLimit,
 		MaxDepth:     source.MaxDepth,
 		Time:         source.Time,
 		Selectors: config.SourceSelectors{
@@ -41,13 +34,13 @@ func ConvertSourceConfig(source *sources.Config) *config.Source {
 				Byline:        source.Selectors.Article.Byline,
 				PublishedTime: source.Selectors.Article.PublishedTime,
 				TimeAgo:       source.Selectors.Article.TimeAgo,
-				JSONLD:        source.Selectors.Article.JSONLd,
+				JSONLD:        source.Selectors.Article.JSONLD,
 				Section:       source.Selectors.Article.Section,
 				Keywords:      source.Selectors.Article.Keywords,
 				Description:   source.Selectors.Article.Description,
-				OGTitle:       source.Selectors.Article.OgTitle,
-				OGDescription: source.Selectors.Article.OgDescription,
-				OGImage:       source.Selectors.Article.OgImage,
+				OGTitle:       source.Selectors.Article.OGTitle,
+				OGDescription: source.Selectors.Article.OGDescription,
+				OGImage:       source.Selectors.Article.OGImage,
 				OgURL:         source.Selectors.Article.OgURL,
 				Canonical:     source.Selectors.Article.Canonical,
 				WordCount:     source.Selectors.Article.WordCount,

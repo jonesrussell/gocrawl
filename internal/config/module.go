@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
@@ -431,6 +432,57 @@ func createConfig() (*Impl, error) {
 		return nil, err
 	}
 
+	// Load sources from the source file
+	sourcesConfig, err := loader.LoadFromFile(crawlerConfig.SourceFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load sources from %s: %w", crawlerConfig.SourceFile, err)
+	}
+
+	// Convert loader.Config to config.Source
+	var sources []Source
+	for _, src := range sourcesConfig {
+		rateLimit, err := ParseRateLimit(src.RateLimit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse rate limit for source %s: %w", src.Name, err)
+		}
+
+		sources = append(sources, Source{
+			Name:         src.Name,
+			URL:          src.URL,
+			RateLimit:    rateLimit,
+			MaxDepth:     src.MaxDepth,
+			ArticleIndex: src.ArticleIndex,
+			Index:        src.Index,
+			Time:         src.Time,
+			Selectors: SourceSelectors{
+				Article: ArticleSelectors{
+					Container:     src.Selectors.Article.Container,
+					Title:         src.Selectors.Article.Title,
+					Body:          src.Selectors.Article.Body,
+					Intro:         src.Selectors.Article.Intro,
+					Byline:        src.Selectors.Article.Byline,
+					PublishedTime: src.Selectors.Article.PublishedTime,
+					TimeAgo:       src.Selectors.Article.TimeAgo,
+					JSONLD:        src.Selectors.Article.JSONLD,
+					Section:       src.Selectors.Article.Section,
+					Keywords:      src.Selectors.Article.Keywords,
+					Description:   src.Selectors.Article.Description,
+					OGTitle:       src.Selectors.Article.OGTitle,
+					OGDescription: src.Selectors.Article.OGDescription,
+					OGImage:       src.Selectors.Article.OGImage,
+					OgURL:         src.Selectors.Article.OgURL,
+					Canonical:     src.Selectors.Article.Canonical,
+					WordCount:     src.Selectors.Article.WordCount,
+					PublishDate:   src.Selectors.Article.PublishDate,
+					Category:      src.Selectors.Article.Category,
+					Tags:          src.Selectors.Article.Tags,
+					Author:        src.Selectors.Article.Author,
+					BylineName:    src.Selectors.Article.BylineName,
+				},
+			},
+		})
+	}
+
 	// Create the config struct
 	cfg := &Impl{
 		App: AppConfig{
@@ -447,6 +499,7 @@ func createConfig() (*Impl, error) {
 		},
 		Server:  createServerConfig(),
 		Command: command,
+		Sources: sources,
 	}
 
 	// Validate the configuration

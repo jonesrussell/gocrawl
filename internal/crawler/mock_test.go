@@ -146,12 +146,9 @@ func (m *mockSources) GetSource(_ string) (*sources.Config, error) {
 	return &sources.Config{
 		Name:      "test-source",
 		URL:       "http://test.example.com",
-		RateLimit: "1s",
+		RateLimit: time.Second,
 		MaxDepth:  2,
 		Selectors: sources.SelectorConfig{
-			Title:       "h1",
-			Description: "meta[name=description]",
-			Content:     "article",
 			Article: sources.ArticleSelectors{
 				Container: "article",
 				Title:     "h1",
@@ -168,12 +165,9 @@ func (m *mockSources) ListSources() ([]*sources.Config, error) {
 		{
 			Name:      "test-source",
 			URL:       "http://test.example.com",
-			RateLimit: "1s",
+			RateLimit: time.Second,
 			MaxDepth:  2,
 			Selectors: sources.SelectorConfig{
-				Title:       "h1",
-				Description: "meta[name=description]",
-				Content:     "article",
 				Article: sources.ArticleSelectors{
 					Container: "article",
 					Title:     "h1",
