@@ -131,6 +131,8 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 	return func() {
 		// Stop receiving signals
 		signal.Stop(h.sigChan)
+		// Close the shutdown channel to ensure the goroutine exits
+		close(h.shutdown)
 		// Wait for the signal handling goroutine to finish
 		h.wg.Wait()
 		h.setState("cleaned_up")

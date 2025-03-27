@@ -208,9 +208,12 @@ func TestBus_Publish_ContextCancellation(t *testing.T) {
 	bus := events.NewBus()
 	require.NotNil(t, bus)
 
-	// Create a handler that blocks
+	// Create a channel to signal when the handler is done
+	handlerDone := make(chan struct{})
+	// Create a handler that blocks until context is done
 	handler := func(ctx context.Context, content *events.Content) error {
 		<-ctx.Done()
+		close(handlerDone)
 		return ctx.Err()
 	}
 	bus.Subscribe(handler)
@@ -223,10 +226,19 @@ func TestBus_Publish_ContextCancellation(t *testing.T) {
 
 	// Create a cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel the context immediately
 	cancel()
 
 	// Publish content with cancelled context
 	err := bus.Publish(ctx, content)
 	assert.Error(t, err)
 	assert.Equal(t, context.Canceled, err)
+
+	// Wait for handler to finish with a timeout
+	select {
+	case <-handlerDone:
+		// Handler finished successfully
+	case <-time.After(time.Second):
+		t.Fatal("Timeout waiting for handler to finish")
+	}
 }
