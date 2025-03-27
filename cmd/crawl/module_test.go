@@ -112,25 +112,28 @@ func TestModuleProvides(t *testing.T) {
 			fx.Annotate(
 				func() struct {
 					fx.Out
-					Logger     logger.Interface  `name:"testLogger"`
+					Logger     logger.Interface  `name:"logger"`
 					Config     config.Interface  `name:"testConfig"`
-					Sources    sources.Interface `name:"testSources"`
+					Sources    sources.Interface `name:"sourceManager"`
 					SourceName string            `name:"sourceName"`
 					ArticleSvc article.Interface `name:"testArticleService"`
+					IndexMgr   api.IndexManager  `name:"indexManager"`
 				} {
 					return struct {
 						fx.Out
-						Logger     logger.Interface  `name:"testLogger"`
+						Logger     logger.Interface  `name:"logger"`
 						Config     config.Interface  `name:"testConfig"`
-						Sources    sources.Interface `name:"testSources"`
+						Sources    sources.Interface `name:"sourceManager"`
 						SourceName string            `name:"sourceName"`
 						ArticleSvc article.Interface `name:"testArticleService"`
+						IndexMgr   api.IndexManager  `name:"indexManager"`
 					}{
 						Logger:     mockLogger,
 						Config:     mockCfg,
 						Sources:    testSources,
 						SourceName: "Test Source",
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
+						IndexMgr:   &mockIndexManager{},
 					}
 				},
 			),
@@ -139,7 +142,6 @@ func TestModuleProvides(t *testing.T) {
 		// Decorate storage-related dependencies with mocks
 		fx.Decorate(
 			func() types.Interface { return &mockStorage{} },
-			func() api.IndexManager { return &mockIndexManager{} },
 			func() api.SearchManager { return &mockSearchManager{} },
 		),
 	)
@@ -208,21 +210,21 @@ func TestModuleConfiguration(t *testing.T) {
 			fx.Annotate(
 				func() struct {
 					fx.Out
-					Logger     logger.Interface  `name:"testLogger"`
+					Logger     logger.Interface  `name:"logger"`
 					Config     config.Interface  `name:"testConfig"`
-					Sources    sources.Interface `name:"testSources"`
+					Sources    sources.Interface `name:"sourceManager"`
 					SourceName string            `name:"sourceName"`
 					ArticleSvc article.Interface `name:"testArticleService"`
-					IndexMgr   api.IndexManager  `name:"testIndexManager"`
+					IndexMgr   api.IndexManager  `name:"indexManager"`
 				} {
 					return struct {
 						fx.Out
-						Logger     logger.Interface  `name:"testLogger"`
+						Logger     logger.Interface  `name:"logger"`
 						Config     config.Interface  `name:"testConfig"`
-						Sources    sources.Interface `name:"testSources"`
+						Sources    sources.Interface `name:"sourceManager"`
 						SourceName string            `name:"sourceName"`
 						ArticleSvc article.Interface `name:"testArticleService"`
-						IndexMgr   api.IndexManager  `name:"testIndexManager"`
+						IndexMgr   api.IndexManager  `name:"indexManager"`
 					}{
 						Logger:     mockLogger,
 						Config:     mockCfg,

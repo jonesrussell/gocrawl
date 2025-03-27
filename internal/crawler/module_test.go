@@ -9,6 +9,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -24,13 +25,9 @@ func setupTestApp(t *testing.T) *fxtest.App {
 
 	return fxtest.New(t,
 		fx.NopLogger,
-		fx.Supply(
-			fx.Annotate(
-				make(chan struct{}),
-				fx.ResultTags(`name:"done"`),
-			),
-		),
+		// Provide core dependencies
 		fx.Provide(
+			// Named dependencies
 			fx.Annotate(
 				func() context.Context { return t.Context() },
 				fx.ResultTags(`name:"crawlContext"`),
@@ -51,11 +48,27 @@ func setupTestApp(t *testing.T) *fxtest.App {
 				func() *signal.SignalHandler { return signal.NewSignalHandler(nil) },
 				fx.ResultTags(`name:"signalHandler"`),
 			),
+			// Logger provider that replaces the default logger.Module provider
+			fx.Annotate(
+				func() logger.Interface { return logger.NewNoOp() },
+				fx.ResultTags(`name:"logger"`),
+				fx.As(new(logger.Interface)),
+			),
 			// Provide unnamed interfaces required by the crawler module
 			func() types.Interface { return &mockStorage{} },
 			func() api.IndexManager { return &mockIndexManager{} },
 			func() api.SearchManager { return &mockSearchManager{} },
-			// Mock content processors
+			func() config.Interface { return &mockConfig{} },
+		),
+		// Supply done channel
+		fx.Supply(
+			fx.Annotate(
+				make(chan struct{}),
+				fx.ResultTags(`name:"done"`),
+			),
+		),
+		// Mock content processors
+		fx.Provide(
 			fx.Annotate(
 				func() models.ContentProcessor {
 					return &mockContentProcessor{}
@@ -63,7 +76,10 @@ func setupTestApp(t *testing.T) *fxtest.App {
 				fx.ResultTags(`group:"processors"`),
 			),
 		),
+		// Include only required modules
+		sources.Module,
 		crawler.Module,
+		// Verify dependencies
 		fx.Invoke(func(deps crawler.CrawlDeps) {
 			verifyDependencies(t, &deps)
 		}),
