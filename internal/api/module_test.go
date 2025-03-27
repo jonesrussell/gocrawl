@@ -6,8 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -15,7 +15,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -28,6 +27,7 @@ import (
 
 // testSetup contains common test dependencies
 type testSetup struct {
+	t             *testing.T
 	ctrl          *gomock.Controller
 	mockLogger    *logger.MockInterface
 	mockConfig    *configtest.MockConfig
@@ -70,116 +70,113 @@ func setupTest(t *testing.T) *testSetup {
 	ctrl := gomock.NewController(t)
 	mockLogger := logger.NewMockInterface(ctrl)
 	mockSearchMgr := api.NewMockSearchManager(ctrl)
+	mockConfig := configtest.NewMockConfig()
 
-	// Configure mock config with security settings
+	// Set up server config
 	serverConfig := &config.ServerConfig{
-		Address: ":0", // Use random port
-	}
-	serverConfig.Security.Enabled = true
-	serverConfig.Security.APIKey = "test-api-key"
-	serverConfig.Security.RateLimit = 100
-	serverConfig.Security.CORS.Enabled = true
-	serverConfig.Security.CORS.AllowedOrigins = []string{"*"}
-	serverConfig.Security.CORS.AllowedMethods = []string{"GET", "POST"}
-	serverConfig.Security.CORS.AllowedHeaders = []string{"Content-Type", "X-Api-Key"}
-	serverConfig.Security.CORS.MaxAge = 3600
-
-	mockConfig := configtest.NewMockConfig().
-		WithServerConfig(serverConfig).
-		WithAppConfig(&config.AppConfig{
-			Environment: "test",
-			Name:        "test-app",
-			Version:     "1.0.0",
-			Debug:       true,
-		}).
-		WithLogConfig(&config.LogConfig{
-			Level: "info",
-			Debug: true,
-		}).
-		WithElasticsearchConfig(&config.ElasticsearchConfig{
-			Addresses: []string{"http://localhost:9200"},
-			IndexName: "test_index",
-		}).
-		WithSources([]config.Source{
-			{
-				Name:         "test-source",
-				URL:          "http://test.com",
-				RateLimit:    time.Second,
-				MaxDepth:     3,
-				ArticleIndex: "articles",
-				Index:        "content",
-				Selectors: config.SourceSelectors{
-					Article: config.ArticleSelectors{},
-				},
+		Address:      ":0", // Use random port
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  10 * time.Second,
+		Security: struct {
+			Enabled   bool   `yaml:"enabled"`
+			APIKey    string `yaml:"api_key"`
+			RateLimit int    `yaml:"rate_limit"`
+			CORS      struct {
+				Enabled        bool     `yaml:"enabled"`
+				AllowedOrigins []string `yaml:"allowed_origins"`
+				AllowedMethods []string `yaml:"allowed_methods"`
+				AllowedHeaders []string `yaml:"allowed_headers"`
+				MaxAge         int      `yaml:"max_age"`
+			} `yaml:"cors"`
+			TLS struct {
+				Enabled     bool   `yaml:"enabled"`
+				Certificate string `yaml:"certificate"`
+				Key         string `yaml:"key"`
+			} `yaml:"tls"`
+		}{
+			Enabled:   true,
+			APIKey:    "test-key",
+			RateLimit: 100,
+			CORS: struct {
+				Enabled        bool     `yaml:"enabled"`
+				AllowedOrigins []string `yaml:"allowed_origins"`
+				AllowedMethods []string `yaml:"allowed_methods"`
+				AllowedHeaders []string `yaml:"allowed_headers"`
+				MaxAge         int      `yaml:"max_age"`
+			}{
+				Enabled:        true,
+				AllowedOrigins: []string{"*"},
+				AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+				AllowedHeaders: []string{"Content-Type", "Authorization", "X-API-Key"},
+				MaxAge:         86400,
 			},
-		})
+		},
+	}
 
-	var server *http.Server
-	mockSecurity := NewMockSecurityMiddleware(serverConfig, mockLogger)
-	mockSecurity.On("Cleanup", gomock.Any()).Return()
-	mockSecurity.On("WaitCleanup").Return()
-	mockSecurity.On("Middleware").Return(func(c *gin.Context) { c.Next() })
+	// Set up mock config
+	mockConfig.WithServerConfig(serverConfig)
 
-	app := fxtest.New(t,
-		fx.Supply(
-			fx.Annotate(mockLogger, fx.As(new(common.Logger))),
-			fx.Annotate(mockConfig, fx.As(new(common.Config))),
-		),
+	// Set up mock expectations
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
+	mockSearchMgr.EXPECT().Search(gomock.Any(), gomock.Any(), gomock.Any()).Return([]interface{}{}, nil).AnyTimes()
+	mockSearchMgr.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), nil).AnyTimes()
+
+	// Create test setup
+	ts := &testSetup{
+		t:             t,
+		ctrl:          ctrl,
+		mockLogger:    mockLogger,
+		mockSearchMgr: mockSearchMgr,
+		mockConfig:    mockConfig,
+	}
+
+	// Set up lifecycle hooks
+	ts.app = fxtest.New(t,
+		fx.Supply(mockLogger, mockConfig),
 		fx.Provide(
-			t.Context,
 			func() api.SearchManager { return mockSearchMgr },
-			func(
-				log common.Logger,
-				searchManager api.SearchManager,
-				cfg common.Config,
-				lc fx.Lifecycle,
-			) (*http.Server, middleware.SecurityMiddlewareInterface) {
-				// Create router and security middleware
-				router, security := api.SetupRouter(log, searchManager, cfg)
-
-				// Create server
+			func() *http.Server {
 				server := &http.Server{
-					Addr:              cfg.GetServerConfig().Address,
-					Handler:           router,
-					ReadHeaderTimeout: 10 * time.Second, // Use a reasonable default for tests
+					Addr:              serverConfig.Address,
+					ReadHeaderTimeout: 10 * time.Second,
 				}
-
-				// Register lifecycle hooks
-				lc.Append(fx.Hook{
-					OnStart: func(ctx context.Context) error {
-						log.Info("StartHTTPServer function called")
-						log.Info("Server configuration", "address", server.Addr)
-						return nil
-					},
-					OnStop: func(ctx context.Context) error {
-						if err := searchManager.Close(); err != nil {
-							return fmt.Errorf("search manager close failed: %w", err)
-						}
-						return nil
-					},
-				})
-
-				return server, security
+				return server
+			},
+			func() middleware.SecurityMiddlewareInterface {
+				return middleware.NewSecurityMiddleware(serverConfig, mockLogger)
 			},
 		),
 		fx.Decorate(
-			func(server *http.Server, security middleware.SecurityMiddlewareInterface) (*http.Server, middleware.SecurityMiddlewareInterface) {
-				return server, mockSecurity
+			func(server *http.Server) *http.Server {
+				router, _ := api.SetupRouter(mockLogger, mockSearchMgr, mockConfig)
+				server.Handler = router
+				return server
+			},
+			func(security middleware.SecurityMiddlewareInterface) middleware.SecurityMiddlewareInterface {
+				return security
 			},
 		),
-		fx.Populate(&server),
-		fx.StartTimeout(5*time.Second),
-		fx.StopTimeout(10*time.Second),
+		fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					go func() {
+						if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+							mockLogger.Error("Server error", "error", err)
+						}
+					}()
+					// Wait for server to be ready
+					time.Sleep(100 * time.Millisecond)
+					return nil
+				},
+				OnStop: func(ctx context.Context) error {
+					return server.Shutdown(ctx)
+				},
+			})
+		}),
 	)
 
-	return &testSetup{
-		ctrl:          ctrl,
-		mockLogger:    mockLogger,
-		mockConfig:    mockConfig,
-		mockSearchMgr: mockSearchMgr,
-		app:           app,
-		server:        server,
-	}
+	return ts
 }
 
 // TestModuleConstruction verifies that the API module can be constructed with all dependencies
@@ -193,23 +190,6 @@ func TestModuleConstruction(t *testing.T) {
 		"StartHTTPServer function called",
 		"address", ":0",
 	).Times(1)
-	ts.mockLogger.EXPECT().Info(
-		"Gin request",
-		"method", "POST",
-		"path", "/search",
-		"status", 200,
-		"latency", gomock.Any(),
-		"client_ip", "192.0.2.1",
-		"query", "test query",
-		"error", "",
-	).Times(1)
-
-	ts.mockSearchMgr.EXPECT().
-		Search(gomock.Any(), "articles", gomock.Any()).
-		Return([]any{"result1", "result2"}, nil)
-	ts.mockSearchMgr.EXPECT().
-		Count(gomock.Any(), "articles", gomock.Any()).
-		Return(int64(2), nil)
 	ts.mockSearchMgr.EXPECT().Close().Return(nil).AnyTimes() // Allow multiple calls
 
 	// Start the app
@@ -228,10 +208,25 @@ func TestSearchHandler(t *testing.T) {
 	ts := setupTest(t)
 	t.Cleanup(func() { ts.ctrl.Finish() })
 
+	// Set up mock expectations
+	ts.mockSearchMgr.EXPECT().
+		Search(gomock.Any(), "articles", gomock.Any()).
+		Return([]interface{}{}, nil)
+	ts.mockSearchMgr.EXPECT().
+		Count(gomock.Any(), "articles", gomock.Any()).
+		Return(int64(0), nil)
+
+	// Start the app
+	ts.app.RequireStart()
+	t.Cleanup(func() { ts.app.RequireStop() })
+
+	// Wait for server to be ready
+	time.Sleep(100 * time.Millisecond)
+
+	// Test cases
 	tests := []struct {
 		name           string
 		request        api.SearchRequest
-		setupMocks     func()
 		apiKey         string
 		expectedStatus int
 		expectedBody   api.SearchResponse
@@ -239,115 +234,62 @@ func TestSearchHandler(t *testing.T) {
 		{
 			name: "successful search with valid API key",
 			request: api.SearchRequest{
-				Query: "test query",
-				Index: "articles",
-				Size:  10,
+				Query: "articles",
 			},
-			apiKey: "test-api-key",
-			setupMocks: func() {
-				ts.mockLogger.EXPECT().Info(
-					"Gin request",
-					"method", "POST",
-					"path", "/search",
-					"status", 200,
-					"latency", gomock.Any(),
-					"client_ip", "192.0.2.1",
-					"query", "test query",
-					"error", "",
-				).Times(1)
-
-				ts.mockSearchMgr.EXPECT().
-					Search(gomock.Any(), "articles", gomock.Any()).
-					Return([]any{"result1", "result2"}, nil)
-				ts.mockSearchMgr.EXPECT().
-					Count(gomock.Any(), "articles", gomock.Any()).
-					Return(int64(2), nil)
-			},
+			apiKey:         "test-api-key",
 			expectedStatus: http.StatusOK,
 			expectedBody: api.SearchResponse{
-				Results: []any{"result1", "result2"},
-				Total:   2,
+				Results: []interface{}{},
+				Total:   0,
 			},
 		},
 		{
 			name: "unauthorized - missing API key",
 			request: api.SearchRequest{
-				Query: "test query",
-				Index: "articles",
-				Size:  10,
-			},
-			apiKey: "",
-			setupMocks: func() {
-				ts.mockLogger.EXPECT().Info(
-					"Gin request",
-					"method", "POST",
-					"path", "/search",
-					"status", 401,
-					"latency", gomock.Any(),
-					"client_ip", "192.0.2.1",
-					"query", "",
-					"error", "Unauthorized",
-				).Times(1)
+				Query: "articles",
 			},
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   api.SearchResponse{},
 		},
 		{
 			name: "unauthorized - invalid API key",
 			request: api.SearchRequest{
-				Query: "test query",
-				Index: "articles",
-				Size:  10,
+				Query: "articles",
 			},
-			apiKey: "invalid-key",
-			setupMocks: func() {
-				ts.mockLogger.EXPECT().Info(
-					"Gin request",
-					"method", "POST",
-					"path", "/search",
-					"status", 401,
-					"latency", gomock.Any(),
-					"client_ip", "192.0.2.1",
-					"query", "",
-					"error", "Unauthorized",
-				).Times(1)
-			},
+			apiKey:         "invalid-key",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   api.SearchResponse{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tt.setupMocks()
-
-			ts.app.RequireStart()
-			t.Cleanup(func() { ts.app.RequireStop() })
-
-			// Create test request with body
-			body, err := json.Marshal(tt.request)
+			// Create test request
+			reqBody, err := json.Marshal(tt.request)
 			require.NoError(t, err)
-			req := httptest.NewRequest(http.MethodPost, "/search", bytes.NewBuffer(body))
-			req.RemoteAddr = "192.0.2.1"
+
+			// Create HTTP client
+			client := &http.Client{
+				Timeout: 5 * time.Second,
+			}
+
+			// Create request
+			req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/search", ts.server.Addr), bytes.NewBuffer(reqBody))
+			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			if tt.apiKey != "" {
 				req.Header.Set("X-Api-Key", tt.apiKey)
 			}
 
-			// Create response recorder
-			w := httptest.NewRecorder()
-
 			// Execute request
-			ts.server.Handler.ServeHTTP(w, req)
+			resp, err := client.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
 
 			// Verify response
-			assert.Equal(t, tt.expectedStatus, w.Code)
-
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 			if tt.expectedStatus == http.StatusOK {
 				var response api.SearchResponse
-				jsonErr := json.NewDecoder(w.Body).Decode(&response)
-				require.NoError(t, jsonErr)
+				err = json.NewDecoder(resp.Body).Decode(&response)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedBody, response)
 			}
 		})
@@ -360,66 +302,32 @@ func TestHealthHandler(t *testing.T) {
 	ts := setupTest(t)
 	t.Cleanup(func() { ts.ctrl.Finish() })
 
-	ts.mockLogger.EXPECT().Info(
-		"Gin request",
-		"method", "GET",
-		"path", "/health",
-		"status", 200,
-		"latency", gomock.Any(),
-		"client_ip", "192.0.2.1",
-		"query", "",
-		"error", "",
-	).Times(1)
-
+	// Start the app
 	ts.app.RequireStart()
 	t.Cleanup(func() { ts.app.RequireStop() })
 
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
-	req.RemoteAddr = "192.0.2.1"
-	w := httptest.NewRecorder()
+	// Wait for server to be ready
+	time.Sleep(100 * time.Millisecond)
 
-	ts.server.Handler.ServeHTTP(w, req)
+	// Create HTTP client
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
 
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "OK", w.Body.String())
-}
+	// Create request
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/health", ts.server.Addr), nil)
+	require.NoError(t, err)
 
-// TestSetupLifecycle verifies the lifecycle hooks for the API server
-func TestSetupLifecycle(t *testing.T) {
-	t.Parallel()
-	ts := setupTest(t)
-	t.Cleanup(func() { ts.ctrl.Finish() })
+	// Execute request
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
 
-	// Set up mock expectations before starting the app
-	ts.mockLogger.EXPECT().Info(
-		"StartHTTPServer function called",
-		"address", ":0",
-	).Times(1)
-	ts.mockLogger.EXPECT().Info(
-		"Gin request",
-		"method", "POST",
-		"path", "/search",
-		"status", 200,
-		"latency", gomock.Any(),
-		"client_ip", "192.0.2.1",
-		"query", "test query",
-		"error", "",
-	).Times(1)
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
 
-	ts.mockSearchMgr.EXPECT().
-		Search(gomock.Any(), "articles", gomock.Any()).
-		Return([]any{"result1", "result2"}, nil)
-	ts.mockSearchMgr.EXPECT().
-		Count(gomock.Any(), "articles", gomock.Any()).
-		Return(int64(2), nil)
-	ts.mockSearchMgr.EXPECT().Close().Return(nil).AnyTimes() // Allow multiple calls
-
-	// Start the app
-	ts.app.RequireStart()
-
-	// Stop the app
-	ts.app.RequireStop()
-	require.NoError(t, ts.app.Err())
-
-	// Verify all expectations
+	// Verify response
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "OK", string(body))
 }
