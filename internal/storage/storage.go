@@ -10,7 +10,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Constants for timeout durations
@@ -21,45 +24,24 @@ const (
 	DefaultSearchTimeout         = 10 * time.Second
 )
 
-// Interface defines the storage operations
-type Interface interface {
-	// Document operations
-	IndexDocument(ctx context.Context, index string, id string, document any) error
-	GetDocument(ctx context.Context, index string, id string, document any) error
-	DeleteDocument(ctx context.Context, index string, id string) error
+// Impl implements the Interface
+type Impl struct {
+	ESClient *elasticsearch.Client
+	Logger   common.Logger
+	opts     Options
+}
 
-	// Bulk operations
-	BulkIndex(ctx context.Context, index string, documents []any) error
-
-	// Index management
-	CreateIndex(ctx context.Context, index string, mapping map[string]any) error
-	DeleteIndex(ctx context.Context, index string) error
-	ListIndices(ctx context.Context) ([]string, error)
-	GetMapping(ctx context.Context, index string) (map[string]any, error)
-	UpdateMapping(ctx context.Context, index string, mapping map[string]any) error
-	IndexExists(ctx context.Context, index string) (bool, error)
-
-	// Search operations
-	Search(ctx context.Context, index string, query any) ([]any, error)
-
-	// Index health and stats
-	GetIndexHealth(ctx context.Context, index string) (string, error)
-	GetIndexDocCount(ctx context.Context, index string) (int64, error)
-
-	// Common operations
-	Close() error
-	Ping(ctx context.Context) error
-	TestConnection(ctx context.Context) error
-
-	// New operations
-	Aggregate(ctx context.Context, index string, aggs any) (any, error)
-
-	// Count operation
-	Count(ctx context.Context, index string, query any) (int64, error)
+// NewStorage creates a new storage implementation
+func NewStorage(client *elasticsearch.Client, logger common.Logger, opts Options) types.Interface {
+	return &Impl{
+		ESClient: client,
+		Logger:   logger,
+		opts:     opts,
+	}
 }
 
 // Helper function to create a context with timeout
-func (s *ElasticsearchStorage) createContextWithTimeout(
+func (s *Impl) createContextWithTimeout(
 	ctx context.Context,
 	timeout time.Duration,
 ) (context.Context, context.CancelFunc) {
@@ -67,7 +49,7 @@ func (s *ElasticsearchStorage) createContextWithTimeout(
 }
 
 // IndexDocument indexes a document in Elasticsearch
-func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, id string, document any) error {
+func (s *Impl) IndexDocument(ctx context.Context, index string, id string, document any) error {
 	if s.ESClient == nil {
 		return errors.New("elasticsearch client is not initialized")
 	}
@@ -108,7 +90,7 @@ func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, 
 }
 
 // BulkIndex performs bulk indexing of documents
-func (s *ElasticsearchStorage) BulkIndex(ctx context.Context, index string, documents []any) error {
+func (s *Impl) BulkIndex(ctx context.Context, index string, documents []any) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultBulkIndexTimeout)
 	defer cancel()
 
@@ -140,7 +122,7 @@ func (s *ElasticsearchStorage) BulkIndex(ctx context.Context, index string, docu
 }
 
 // prepareBulkIndexRequest prepares the bulk index request
-func (s *ElasticsearchStorage) prepareBulkIndexRequest(
+func (s *Impl) prepareBulkIndexRequest(
 	buf *bytes.Buffer,
 	index string,
 	documents []any,
@@ -163,7 +145,7 @@ func (s *ElasticsearchStorage) prepareBulkIndexRequest(
 }
 
 // Search performs a search query
-func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
+func (s *Impl) Search(ctx context.Context, index string, query any) ([]any, error) {
 	if s.ESClient == nil {
 		return nil, errors.New("elasticsearch client is not initialized")
 	}
@@ -237,7 +219,7 @@ func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query a
 }
 
 // CreateIndex creates a new index with optional mapping
-func (s *ElasticsearchStorage) CreateIndex(
+func (s *Impl) CreateIndex(
 	ctx context.Context,
 	index string,
 	mapping map[string]any,
@@ -276,7 +258,7 @@ func (s *ElasticsearchStorage) CreateIndex(
 }
 
 // DeleteIndex deletes an index
-func (s *ElasticsearchStorage) DeleteIndex(ctx context.Context, index string) error {
+func (s *Impl) DeleteIndex(ctx context.Context, index string) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
 	defer cancel()
 
@@ -307,7 +289,7 @@ func (s *ElasticsearchStorage) DeleteIndex(ctx context.Context, index string) er
 }
 
 // UpdateDocument updates an existing document
-func (s *ElasticsearchStorage) UpdateDocument(
+func (s *Impl) UpdateDocument(
 	ctx context.Context,
 	index string,
 	docID string,
@@ -350,7 +332,7 @@ func (s *ElasticsearchStorage) UpdateDocument(
 }
 
 // DeleteDocument deletes a document
-func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string, docID string) error {
+func (s *Impl) DeleteDocument(ctx context.Context, index string, docID string) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
 	defer cancel()
 
@@ -379,7 +361,7 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 }
 
 // IndexExists checks if the specified index exists
-func (s *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string) (bool, error) {
+func (s *Impl) IndexExists(ctx context.Context, indexName string) (bool, error) {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultTestConnectionTimeout)
 	defer cancel()
 
@@ -397,12 +379,12 @@ func (s *ElasticsearchStorage) IndexExists(ctx context.Context, indexName string
 }
 
 // Close implements Interface
-func (s *ElasticsearchStorage) Close() error {
+func (s *Impl) Close() error {
 	return nil // Elasticsearch client doesn't need explicit closing
 }
 
 // GetDocument implements Interface
-func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id string, document any) error {
+func (s *Impl) GetDocument(ctx context.Context, index string, id string, document any) error {
 	res, err := s.ESClient.Get(
 		index,
 		id,
@@ -429,7 +411,7 @@ func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id
 }
 
 // SearchDocuments implements Interface
-func (s *ElasticsearchStorage) SearchDocuments(
+func (s *Impl) SearchDocuments(
 	ctx context.Context,
 	index string,
 	query string,
@@ -504,7 +486,7 @@ func (s *ElasticsearchStorage) SearchDocuments(
 }
 
 // Ping implements Interface
-func (s *ElasticsearchStorage) Ping(ctx context.Context) error {
+func (s *Impl) Ping(ctx context.Context) error {
 	res, err := s.ESClient.Ping(
 		s.ESClient.Ping.WithContext(ctx),
 	)
@@ -525,7 +507,7 @@ func (s *ElasticsearchStorage) Ping(ctx context.Context) error {
 }
 
 // ListIndices lists all indices in the cluster
-func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error) {
+func (s *Impl) ListIndices(ctx context.Context) ([]string, error) {
 	res, err := s.ESClient.Cat.Indices(
 		s.ESClient.Cat.Indices.WithContext(ctx),
 		s.ESClient.Cat.Indices.WithFormat("json"),
@@ -563,7 +545,7 @@ func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error
 }
 
 // GetMapping gets the mapping for an index
-func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (map[string]any, error) {
+func (s *Impl) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	res, err := s.ESClient.Indices.GetMapping(
 		s.ESClient.Indices.GetMapping.WithContext(ctx),
 		s.ESClient.Indices.GetMapping.WithIndex(index),
@@ -594,7 +576,7 @@ func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (ma
 }
 
 // UpdateMapping updates the mapping for an index
-func (s *ElasticsearchStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]any) error {
+func (s *Impl) UpdateMapping(ctx context.Context, index string, mapping map[string]any) error {
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(mapping); err != nil {
 		return fmt.Errorf("error encoding mapping: %w", err)
@@ -622,7 +604,7 @@ func (s *ElasticsearchStorage) UpdateMapping(ctx context.Context, index string, 
 }
 
 // GetIndexHealth gets the health status of an index
-func (s *ElasticsearchStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
+func (s *Impl) GetIndexHealth(ctx context.Context, index string) (string, error) {
 	res, err := s.ESClient.Cluster.Health(
 		s.ESClient.Cluster.Health.WithContext(ctx),
 		s.ESClient.Cluster.Health.WithIndex(index),
@@ -659,7 +641,7 @@ func (s *ElasticsearchStorage) GetIndexHealth(ctx context.Context, index string)
 }
 
 // GetIndexDocCount gets the document count of an index
-func (s *ElasticsearchStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
+func (s *Impl) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	res, err := s.ESClient.Count(
 		s.ESClient.Count.WithContext(ctx),
 		s.ESClient.Count.WithIndex(index),
@@ -705,7 +687,7 @@ func marshalJSON(v any) ([]byte, error) {
 }
 
 // SearchArticles implements Interface
-func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
+func (s *Impl) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
 	if s.opts.IndexName == "" {
 		return nil, errors.New("index name is not configured")
 	}
@@ -768,7 +750,7 @@ func (s *ElasticsearchStorage) SearchArticles(ctx context.Context, query string,
 }
 
 // Aggregate performs an aggregation query
-func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
+func (s *Impl) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
 	if s.ESClient == nil {
 		return nil, errors.New("elasticsearch client is not initialized")
 	}
@@ -818,7 +800,7 @@ func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs
 }
 
 // Count returns the number of documents matching a query
-func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query any) (int64, error) {
+func (s *Impl) Count(ctx context.Context, index string, query any) (int64, error) {
 	if s.ESClient == nil {
 		return 0, errors.New("elasticsearch client is not initialized")
 	}
@@ -870,4 +852,22 @@ func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query an
 	}
 
 	return int64(count), nil
+}
+
+// TestConnection tests the connection to the storage backend
+func (s *Impl) TestConnection(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, DefaultTestConnectionTimeout)
+	defer cancel()
+
+	res, err := s.ESClient.Info(s.ESClient.Info.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("failed to get cluster info: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("cluster info request failed: %s", res.String())
+	}
+
+	return nil
 }

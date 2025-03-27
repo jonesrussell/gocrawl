@@ -6,19 +6,19 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Processor handles the processing of non-article content
 type Processor struct {
 	service   Interface
-	storage   storage.Interface
+	storage   types.Interface
 	logger    logger.Interface
 	indexName string
 }
 
 // NewProcessor creates a new content processor
-func NewProcessor(service Interface, storage storage.Interface, logger logger.Interface, indexName string) *Processor {
+func NewProcessor(service Interface, storage types.Interface, logger logger.Interface, indexName string) *Processor {
 	return &Processor{
 		service:   service,
 		storage:   storage,

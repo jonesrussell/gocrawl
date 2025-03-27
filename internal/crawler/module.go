@@ -15,7 +15,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -88,7 +88,7 @@ var Module = fx.Module("crawler",
 			func(
 				log common.Logger,
 				articleService article.Interface,
-				storage storage.Interface,
+				storage types.Interface,
 				params struct {
 					fx.In
 					ArticleChan chan *models.Article `name:"articleChannel"`
@@ -111,7 +111,7 @@ var Module = fx.Module("crawler",
 			func(
 				log common.Logger,
 				contentService content.Interface,
-				storage storage.Interface,
+				storage types.Interface,
 				params struct {
 					fx.In
 					IndexName string `name:"contentIndex"`
@@ -150,7 +150,7 @@ type CrawlDeps struct {
 	Crawler     Interface
 	Logger      common.Logger
 	Config      config.Interface
-	Storage     storage.Interface
+	Storage     types.Interface
 	Done        chan struct{}             `name:"crawlDone"`
 	Context     context.Context           `name:"crawlContext"`
 	Processors  []models.ContentProcessor `group:"processors"`

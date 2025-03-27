@@ -1,10 +1,11 @@
 package article
 
 import (
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -13,7 +14,7 @@ type ProcessorParams struct {
 	fx.In
 
 	Logger      logger.Interface
-	Storage     storage.Interface
+	Storage     types.Interface
 	IndexName   string `name:"indexName"`
 	ArticleChan chan *models.Article
 	Service     Interface
@@ -33,8 +34,24 @@ var Module = fx.Module("article",
 	fx.Provide(
 		NewServiceWithConfig,
 		fx.Annotate(
-			NewProcessor,
-			fx.As(new(models.ContentProcessor)),
+			func(
+				log common.Logger,
+				service Interface,
+				storage types.Interface,
+				params struct {
+					fx.In
+					ArticleChan chan *models.Article `name:"articleChannel"`
+					IndexName   string               `name:"indexName"`
+				},
+			) models.ContentProcessor {
+				return &Processor{
+					Logger:         log,
+					ArticleService: service,
+					Storage:        storage,
+					IndexName:      params.IndexName,
+					ArticleChan:    params.ArticleChan,
+				}
+			},
 			fx.ResultTags(`group:"processors"`),
 		),
 	),
@@ -88,15 +105,4 @@ func isEmptySelectors(s config.ArticleSelectors) bool {
 		s.Author == "" &&
 		s.BylineName == "" &&
 		len(s.Exclude) == 0
-}
-
-// NewProcessor creates a new article processor
-func NewProcessor(p ProcessorParams) *Processor {
-	return &Processor{
-		Logger:         p.Logger,
-		ArticleService: p.Service,
-		Storage:        p.Storage,
-		IndexName:      p.IndexName,
-		ArticleChan:    p.ArticleChan,
-	}
 }

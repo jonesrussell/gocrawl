@@ -14,7 +14,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
@@ -52,7 +52,7 @@ func (m *mockCrawler) SetCollector(_ *colly.Collector)     {}
 func (m *mockCrawler) GetIndexManager() api.IndexManager   { return nil }
 func (m *mockCrawler) Wait()                               {}
 
-// mockStorage implements storage.Interface for testing
+// mockStorage implements types.Interface for testing
 type mockStorage struct{}
 
 func (m *mockStorage) IndexDocument(context.Context, string, string, any) error  { return nil }
@@ -98,7 +98,7 @@ func TestModuleProvides(t *testing.T) {
 		fx.Supply(mockLogger, mockCfg),
 		fx.Provide(
 			fx.Annotate(func() crawler.Interface { return &mockCrawler{} }, fx.As(new(crawler.Interface))),
-			fx.Annotate(func() storage.Interface { return &mockStorage{} }, fx.As(new(storage.Interface))),
+			fx.Annotate(func() types.Interface { return &mockStorage{} }, fx.As(new(types.Interface))),
 		),
 		job.Module,
 	)
@@ -125,7 +125,7 @@ func TestModuleLifecycle(t *testing.T) {
 		fx.Supply(mockLogger, mockCfg),
 		fx.Provide(
 			fx.Annotate(func() crawler.Interface { return &mockCrawler{} }, fx.As(new(crawler.Interface))),
-			fx.Annotate(func() storage.Interface { return &mockStorage{} }, fx.As(new(storage.Interface))),
+			fx.Annotate(func() types.Interface { return &mockStorage{} }, fx.As(new(types.Interface))),
 		),
 		job.Module,
 	)
@@ -154,7 +154,7 @@ func TestJobScheduling(t *testing.T) {
 		fx.Supply(mockLogger, mockCfg),
 		fx.Provide(
 			fx.Annotate(func() crawler.Interface { return &mockCrawler{} }, fx.As(new(crawler.Interface))),
-			fx.Annotate(func() storage.Interface { return &mockStorage{} }, fx.As(new(storage.Interface))),
+			fx.Annotate(func() types.Interface { return &mockStorage{} }, fx.As(new(types.Interface))),
 		),
 		job.Module,
 	)

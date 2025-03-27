@@ -18,6 +18,12 @@ type Options struct {
 	IndexName      string // Name of the index to use for content
 }
 
+// StorageOptions holds the configuration options for the storage implementation
+type StorageOptions struct {
+	IndexName string
+	// Add other options as needed
+}
+
 // DefaultOptions returns default options for ElasticsearchStorage
 func DefaultOptions() Options {
 	return Options{

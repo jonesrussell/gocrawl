@@ -43,8 +43,8 @@ const (
 	defaultRateLimitPerMinute = 60
 )
 
-// ConfigImpl implements the Interface and holds the actual configuration values
-type ConfigImpl struct {
+// Impl implements the Interface and holds the actual configuration values
+type Impl struct {
 	App           AppConfig           `yaml:"app"`
 	Crawler       CrawlerConfig       `yaml:"crawler"`
 	Elasticsearch ElasticsearchConfig `yaml:"elasticsearch"`
@@ -54,41 +54,41 @@ type ConfigImpl struct {
 	Command       string              `yaml:"command"`
 }
 
-// Ensure ConfigImpl implements Interface
-var _ Interface = (*ConfigImpl)(nil)
+// Ensure Impl implements Interface
+var _ Interface = (*Impl)(nil)
 
 // GetCrawlerConfig implements Interface
-func (c *ConfigImpl) GetCrawlerConfig() *CrawlerConfig {
+func (c *Impl) GetCrawlerConfig() *CrawlerConfig {
 	return &c.Crawler
 }
 
 // GetElasticsearchConfig implements Interface
-func (c *ConfigImpl) GetElasticsearchConfig() *ElasticsearchConfig {
+func (c *Impl) GetElasticsearchConfig() *ElasticsearchConfig {
 	return &c.Elasticsearch
 }
 
 // GetLogConfig implements Interface
-func (c *ConfigImpl) GetLogConfig() *LogConfig {
+func (c *Impl) GetLogConfig() *LogConfig {
 	return &c.Log
 }
 
 // GetAppConfig implements Interface
-func (c *ConfigImpl) GetAppConfig() *AppConfig {
+func (c *Impl) GetAppConfig() *AppConfig {
 	return &c.App
 }
 
 // GetSources implements Interface
-func (c *ConfigImpl) GetSources() []Source {
+func (c *Impl) GetSources() []Source {
 	return c.Sources
 }
 
 // GetServerConfig implements Interface
-func (c *ConfigImpl) GetServerConfig() *ServerConfig {
+func (c *Impl) GetServerConfig() *ServerConfig {
 	return &c.Server
 }
 
 // GetCommand implements Interface
-func (c *ConfigImpl) GetCommand() string {
+func (c *Impl) GetCommand() string {
 	return c.Command
 }
 
@@ -418,7 +418,7 @@ func createServerConfig() ServerConfig {
 }
 
 // createConfig creates a new config instance from Viper settings
-func createConfig() (*ConfigImpl, error) {
+func createConfig() (*Impl, error) {
 	// Get the command being run from os.Args
 	var command string
 	if len(os.Args) > 1 {
@@ -432,7 +432,7 @@ func createConfig() (*ConfigImpl, error) {
 	}
 
 	// Create the config struct
-	cfg := &ConfigImpl{
+	cfg := &Impl{
 		App: AppConfig{
 			Environment: viper.GetString("app.environment"),
 			Name:        viper.GetString("app.name"),

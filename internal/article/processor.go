@@ -6,14 +6,14 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Processor is responsible for processing articles
 type Processor struct {
 	Logger         logger.Interface
 	ArticleService Interface
-	Storage        storage.Interface
+	Storage        types.Interface
 	IndexName      string
 	ArticleChan    chan *models.Article
 }

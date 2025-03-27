@@ -10,7 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -94,9 +94,9 @@ func (m *mockIndexManager) UpdateMapping(ctx context.Context, name string, mappi
 	return m.updateMappingFn(ctx, name, mapping)
 }
 
-// mockStorage implements storage.Interface for testing
+// mockStorage implements types.Interface for testing
 type mockStorage struct {
-	storage.Interface
+	types.Interface
 	testConnectionFn func(ctx context.Context) error
 	closeFn          func() error
 }
@@ -166,7 +166,7 @@ func TestModule(t *testing.T) {
 				fx.ResultTags(`name:"testSearchManager"`),
 			),
 			fx.Annotate(
-				func() storage.Interface {
+				func() types.Interface {
 					mockLogger.Debug("Providing test storage")
 					return mockStorage
 				},
@@ -248,7 +248,7 @@ func TestModuleProvides(t *testing.T) {
 			),
 		),
 		fx.Decorate(
-			func() storage.Interface {
+			func() types.Interface {
 				return mockStore
 			},
 			func() api.SearchManager {

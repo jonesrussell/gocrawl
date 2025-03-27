@@ -17,7 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -54,9 +54,9 @@ func (m *mockIndexManager) Close() error {
 	return nil
 }
 
-// mockStorage implements storage.Interface for testing
+// mockStorage implements types.Interface for testing
 type mockStorage struct {
-	storage.Interface
+	types.Interface
 }
 
 func (m *mockStorage) Store(_ context.Context, _ string, _ any) error {
@@ -138,7 +138,7 @@ func TestModuleProvides(t *testing.T) {
 
 		// Decorate storage-related dependencies with mocks
 		fx.Decorate(
-			func() storage.Interface { return &mockStorage{} },
+			func() types.Interface { return &mockStorage{} },
 			func() api.IndexManager { return &mockIndexManager{} },
 			func() api.SearchManager { return &mockSearchManager{} },
 		),
@@ -236,7 +236,7 @@ func TestModuleConfiguration(t *testing.T) {
 
 		// Decorate storage-related dependencies with mocks
 		fx.Decorate(
-			func() storage.Interface { return &mockStorage{} },
+			func() types.Interface { return &mockStorage{} },
 			func() api.IndexManager { return &mockIndexManager{} },
 			func() api.SearchManager { return &mockSearchManager{} },
 		),

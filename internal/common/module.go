@@ -7,34 +7,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
-)
-
-// Type aliases for commonly used interfaces and types.
-// These aliases provide a convenient way to reference core types
-// throughout the application while maintaining clear dependencies.
-type (
-	// Storage is an alias for the storage interface, providing
-	// data persistence operations across the application.
-	Storage = storage.Interface
-
-	// Config is an alias for the configuration interface, providing
-	// access to application-wide settings.
-	Config = config.Interface
-
-	// Logger is an alias for the logger interface, providing
-	// structured logging capabilities across the application.
-	Logger = logger.Interface
-
-	// SourceManager is an alias for sources.Interface, providing
-	// source configuration management across the application.
-	SourceManager = sources.Interface
-
-	// SourceConfig is an alias for sources.Config, providing
-	// source configuration data structure across the application.
-	SourceConfig = sources.Config
 )
 
 // Module provides shared dependencies for commands.
@@ -51,6 +25,5 @@ var Module = fx.Module("common",
 	// Core modules used by most commands.
 	config.Module,
 	logger.Module,
-	storage.Module,
 	sources.Module,
 )

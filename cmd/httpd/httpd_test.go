@@ -14,16 +14,16 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
 
-// mockStorage implements storage.Interface for testing
+// mockStorage implements types.Interface for testing
 type mockStorage struct {
-	storage.Interface
+	types.Interface
 }
 
 func (m *mockStorage) Search(context.Context, string, any) ([]any, error) {
@@ -118,7 +118,7 @@ func TestHTTPCommand(t *testing.T) {
 			func() context.Context { return t.Context() },
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
-			func() storage.Interface { return mockStore },
+			func() types.Interface { return mockStore },
 			func() api.SearchManager { return mockSearch },
 		),
 		httpd.Module,
@@ -156,7 +156,7 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 			func() context.Context { return t.Context() },
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
-			func() storage.Interface { return mockStore },
+			func() types.Interface { return mockStore },
 			func() api.SearchManager { return mockSearch },
 		),
 		httpd.Module,
@@ -213,7 +213,7 @@ func TestHTTPCommandServerError(t *testing.T) {
 		fx.Provide(
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
-			func() storage.Interface { return mockStore },
+			func() types.Interface { return mockStore },
 			func() api.SearchManager { return mockSearch },
 			func() *http.Server {
 				return &http.Server{
@@ -305,7 +305,7 @@ func TestServerStartStop(t *testing.T) {
 		close(serverReady)
 
 		// Start the server
-		if listenErr := server.ListenAndServe(); listenErr != nil && !errors.Is(http.ErrServerClosed, listenErr) {
+		if listenErr := server.ListenAndServe(); listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
 			serverErr <- listenErr
 		}
 	}()

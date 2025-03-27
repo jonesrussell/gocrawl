@@ -10,9 +10,11 @@ import (
 	"time"
 
 	signal "github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -22,12 +24,24 @@ const (
 	shutdownTimeout = 30 * time.Second
 )
 
+// Dependencies holds the HTTP server's dependencies
+type Dependencies struct {
+	fx.In
+
+	Lifecycle    fx.Lifecycle
+	Logger       common.Logger
+	Config       config.Interface
+	Storage      types.Interface
+	IndexManager api.IndexManager
+	Context      context.Context `name:"httpdContext"`
+}
+
 // Params holds the parameters required for running the HTTP server.
 type Params struct {
 	fx.In
 	Server  *http.Server
 	Logger  logger.Interface
-	Storage storage.Interface
+	Storage types.Interface
 }
 
 // serverState tracks the HTTP server's state
@@ -86,7 +100,7 @@ You can send POST requests to /search with a JSON body containing the search par
 
 						go func() {
 							defer close(state.serverDone)
-							if err := p.Server.ListenAndServe(); err != nil && !errors.Is(http.ErrServerClosed, err) {
+							if err := p.Server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 								p.Logger.Error("HTTP server failed", "error", err)
 							}
 						}()

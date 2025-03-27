@@ -22,7 +22,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -43,24 +43,25 @@ const (
 // sourceName holds the name of the source being crawled, populated from command line arguments.
 var sourceName string
 
-// crawlParams holds the dependencies for the crawl command.
-type crawlParams struct {
+// Dependencies holds the crawl command's dependencies
+type Dependencies struct {
 	fx.In
+
+	Lifecycle   fx.Lifecycle
 	Sources     sources.Interface `name:"sourceManager"`
 	Crawler     crawler.Interface
 	Logger      common.Logger
 	Config      config.Interface
-	Storage     storage.Interface
+	Storage     types.Interface
 	Done        chan struct{}             `name:"crawlDone"`
 	Context     context.Context           `name:"crawlContext"`
 	Processors  []models.ContentProcessor `group:"processors"`
 	SourceName  string                    `name:"sourceName"`
 	ArticleChan chan *models.Article      `name:"articleChannel"`
-	Handler     *signal.SignalHandler     `name:"signalHandler"`
 }
 
 // setupCrawler initializes and configures the crawler with the given source.
-func setupCrawler(ctx context.Context, p crawlParams, source *sources.Config) error {
+func setupCrawler(ctx context.Context, p Dependencies, source *sources.Config) error {
 	p.Logger.Debug("Setting up collector", "source", source.Name)
 	collectorResult, setupErr := app.SetupCollector(ctx, p.Logger, *source, p.Processors, p.Done, p.Config)
 	if setupErr != nil {
@@ -76,7 +77,7 @@ func setupCrawler(ctx context.Context, p crawlParams, source *sources.Config) er
 }
 
 // startCrawler starts the crawler and monitors its completion.
-func startCrawler(ctx context.Context, p crawlParams, source *sources.Config, closeChannels func()) error {
+func startCrawler(ctx context.Context, p Dependencies, source *sources.Config, closeChannels func()) error {
 	p.Logger.Info("Starting crawl", "source", source.Name, "url", source.URL)
 	if startErr := p.Crawler.Start(ctx, source.URL); startErr != nil {
 		return fmt.Errorf("error starting crawler: %w", startErr)
@@ -93,7 +94,7 @@ func startCrawler(ctx context.Context, p crawlParams, source *sources.Config, cl
 }
 
 // stopCrawler gracefully stops the crawler.
-func stopCrawler(ctx context.Context, p crawlParams) error {
+func stopCrawler(ctx context.Context, p Dependencies) error {
 	p.Logger.Info("Stopping crawler", "source", p.SourceName)
 	if stopErr := p.Crawler.Stop(ctx); stopErr != nil {
 		if errors.Is(stopErr, context.Canceled) {
@@ -107,7 +108,7 @@ func stopCrawler(ctx context.Context, p crawlParams) error {
 }
 
 // createCloseChannels creates a function to safely close all channels.
-func createCloseChannels(p crawlParams) func() {
+func createCloseChannels(p Dependencies) func() {
 	var once sync.Once
 	return func() {
 		once.Do(func() {
@@ -121,11 +122,6 @@ func createCloseChannels(p crawlParams) func() {
 			p.Logger.Debug("Closing Done channel", "goroutines", runtime.NumGoroutine())
 			close(p.Done)
 			p.Logger.Debug("Done channel closed", "goroutines", runtime.NumGoroutine())
-
-			// Finally signal completion to the command
-			p.Logger.Debug("Signaling completion to command", "goroutines", runtime.NumGoroutine())
-			p.Handler.Complete()
-			p.Logger.Debug("Signal handler completed", "goroutines", runtime.NumGoroutine())
 
 			p.Logger.Debug("Shutdown sequence completed", "source", p.SourceName, "goroutines", runtime.NumGoroutine())
 		})
@@ -154,7 +150,7 @@ func createFXApp(ctx context.Context, sourceName string, handler *signal.SignalH
 				fx.ResultTags(`name:"signalHandler"`),
 			),
 		),
-		fx.Invoke(func(lc fx.Lifecycle, p crawlParams) {
+		fx.Invoke(func(lc fx.Lifecycle, p Dependencies) {
 			closeChannels := createCloseChannels(p)
 
 			lc.Append(fx.Hook{
@@ -294,87 +290,83 @@ func handleContextCancellation(ctx context.Context, log common.Logger, fxApp *fx
 	return nil
 }
 
-// Command returns the crawl command.
+// Cmd represents the crawl command
+var Cmd = &cobra.Command{
+	Use:   "crawl",
+	Short: "Crawl a website for content",
+	Long: `This command crawls a website for content and stores it in the configured storage.
+You can specify the source to crawl using the --source flag.`,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		// Create a cancellable context
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
+
+		// Set up signal handling with a no-op logger initially
+		handler := signal.NewSignalHandler(logger.NewNoOp())
+		cleanup := handler.Setup(ctx)
+		defer cleanup()
+
+		// Initialize the Fx application
+		fxApp := fx.New(
+			fx.NopLogger,
+			common.Module,
+			crawler.Module,
+			fx.Provide(
+				func() context.Context { return ctx },
+			),
+			fx.Invoke(func(lc fx.Lifecycle, p Dependencies) {
+				// Update the signal handler with the real logger
+				handler.SetLogger(p.Logger)
+				lc.Append(fx.Hook{
+					OnStart: func(ctx context.Context) error {
+						// Test storage connection
+						if err := p.Storage.TestConnection(ctx); err != nil {
+							return fmt.Errorf("failed to connect to storage: %w", err)
+						}
+
+						// Start crawler
+						p.Logger.Info("Starting crawler...", "source", p.SourceName)
+						if err := p.Crawler.Start(ctx, p.SourceName); err != nil {
+							return fmt.Errorf("failed to start crawler: %w", err)
+						}
+
+						return nil
+					},
+					OnStop: func(ctx context.Context) error {
+						p.Logger.Info("Stopping crawler...")
+						if err := p.Crawler.Stop(ctx); err != nil {
+							return fmt.Errorf("failed to stop crawler: %w", err)
+						}
+
+						// Close storage connection
+						p.Logger.Info("Closing storage connection...")
+						if err := p.Storage.Close(); err != nil {
+							p.Logger.Error("Error closing storage connection", "error", err)
+							// Don't return error here as crawler is already stopped
+						}
+
+						return nil
+					},
+				})
+			}),
+		)
+
+		// Set the fx app for coordinated shutdown
+		handler.SetFXApp(fxApp)
+
+		// Start the application
+		if err := fxApp.Start(ctx); err != nil {
+			return fmt.Errorf("error starting application: %w", err)
+		}
+
+		// Wait for shutdown signal
+		handler.Wait()
+
+		return nil
+	},
+}
+
+// Command returns the crawl command for use in the root command
 func Command() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "crawl [source]",
-		Short: "Crawl a single source defined in sources.yml",
-		Long: `Crawl a single source defined in sources.yml.
-The source argument must match a name defined in your sources.yml configuration file.
-
-Example:
-  gocrawl crawl example-blog`,
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 1 {
-				const errMsg = "requires exactly one source name from sources.yml\n\n" +
-					"Usage:\n  %s\n\n" +
-					"Run 'gocrawl list' to see available sources"
-				return fmt.Errorf(errMsg, cmd.UseLine())
-			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			sourceName = args[0]
-			log, err := logger.NewDevelopmentLogger("debug")
-			if err != nil {
-				return fmt.Errorf("error creating logger: %w", err)
-			}
-			log.Info("Starting crawl command", "source", sourceName, "goroutines", runtime.NumGoroutine())
-			printGoroutines(log)
-
-			// Start pprof server with cleanup
-			_, pprofCleanup := setupPprofServer(log)
-			defer pprofCleanup()
-
-			// Use Cobra's context for proper command lifecycle management
-			cmdCtx := cmd.Context()
-			handler := signal.NewSignalHandler(log)
-			cleanup := handler.Setup(cmdCtx)
-			defer cleanup()
-
-			fxApp := createFXApp(cmdCtx, sourceName, handler)
-			handler.SetFXApp(fxApp)
-
-			// Start the application
-			log.Debug("Starting fx application", "goroutines", runtime.NumGoroutine())
-			if errStart := fxApp.Start(cmdCtx); errStart != nil {
-				if errors.Is(errStart, context.Canceled) {
-					log.Debug("Application start cancelled", "goroutines", runtime.NumGoroutine())
-					return nil
-				}
-				return fmt.Errorf("error starting application: %w", errStart)
-			}
-
-			log.Debug("Fx application started successfully", "goroutines", runtime.NumGoroutine())
-
-			// Wait for completion or signal
-			log.Debug(
-				"Waiting for completion or signal",
-				"handler_state", handler.GetState(),
-				"goroutines", runtime.NumGoroutine(),
-			)
-
-			if !handler.Wait() {
-				return handleContextCancellation(cmdCtx, log, fxApp)
-			}
-
-			log.Debug(
-				"Signal handler wait completed",
-				"handler_state", handler.GetState(),
-				"goroutines", runtime.NumGoroutine(),
-			)
-			printGoroutines(log)
-
-			// Exit the command
-			log.Debug(
-				"Command execution complete, exiting",
-				"handler_state", handler.GetState(),
-				"goroutines", runtime.NumGoroutine(),
-			)
-			printGoroutines(log)
-			return nil
-		},
-	}
-
-	return cmd
+	return Cmd
 }

@@ -3,7 +3,7 @@ package content
 import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -26,7 +26,7 @@ type Params struct {
 	fx.In
 
 	Service   Interface
-	Storage   storage.Interface
+	Storage   types.Interface
 	Logger    logger.Interface
 	IndexName string `name:"contentIndex"`
 }

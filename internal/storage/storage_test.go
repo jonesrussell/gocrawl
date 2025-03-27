@@ -43,7 +43,7 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	s := &storage.ElasticsearchStorage{
+	s := &storage.Impl{
 		ESClient: mockClient,
 		Logger:   testutils.NewNopLogger(),
 	}

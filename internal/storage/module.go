@@ -11,7 +11,9 @@ import (
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -20,18 +22,18 @@ const (
 	DefaultMaxRetries = 3
 )
 
-// Module provides storage dependencies
+// Module provides the storage module for dependency injection.
 var Module = fx.Module("storage",
 	fx.Provide(
 		NewOptionsFromConfig,
 		ProvideElasticsearchClient,
-		NewElasticsearchStorage,
+		NewStorage,
 		ProvideIndexManager,
 		fx.Annotate(
-			func(s Interface) (api.SearchManager, error) {
+			func(s types.Interface) (api.SearchManager, error) {
 				sm, ok := s.(api.SearchManager)
 				if !ok {
-					return nil, errors.New("storage implementation does not satisfy api.SearchManager interface")
+					return nil, fmt.Errorf("storage implementation does not support search operations")
 				}
 				return sm, nil
 			},
@@ -41,24 +43,11 @@ var Module = fx.Module("storage",
 )
 
 // ProvideIndexManager creates and returns an IndexManager implementation
-func ProvideIndexManager(client *es.Client, log logger.Interface) (api.IndexManager, error) {
-	if client == nil {
-		return nil, errors.New("elasticsearch client is required")
-	}
-	return NewElasticsearchIndexManager(client, log), nil
-}
-
-// NewElasticsearchStorage creates a new ElasticsearchStorage instance
-func NewElasticsearchStorage(
+func ProvideIndexManager(
 	client *es.Client,
-	logger logger.Interface,
-	opts Options,
-) Interface {
-	return &ElasticsearchStorage{
-		ESClient: client,
-		Logger:   logger,
-		opts:     opts,
-	}
+	logger common.Logger,
+) *IndexManager {
+	return NewIndexManager(client, logger)
 }
 
 // ProvideElasticsearchClient provides the Elasticsearch client
