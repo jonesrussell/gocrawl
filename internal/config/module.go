@@ -103,17 +103,19 @@ func bindEnvs(bindings map[string]string) error {
 	return nil
 }
 
-// init initializes the config module
-func init() {
+// SetupConfig initializes the configuration system
+func SetupConfig() error {
 	// Initialize Viper configuration
 	if err := setupViper(); err != nil {
-		panic(fmt.Sprintf("Failed to setup Viper: %v", err))
+		return fmt.Errorf("failed to setup Viper: %w", err)
 	}
 
 	// Bind environment variables
 	if err := bindEnvs(defaultEnvBindings()); err != nil {
-		panic(fmt.Sprintf("Failed to bind environment variables: %v", err))
+		return fmt.Errorf("failed to bind environment variables: %w", err)
 	}
+
+	return nil
 }
 
 // Module provides the config module and its dependencies using fx.
@@ -125,7 +127,15 @@ func init() {
 // - HTTP transport configuration via NewHTTPTransport
 var Module = fx.Options(
 	fx.Provide(
-		New,
+		fx.Annotate(
+			func() (Interface, error) {
+				if err := SetupConfig(); err != nil {
+					return nil, err
+				}
+				return New()
+			},
+			fx.As(new(Interface)),
+		),
 		NewHTTPTransport, // Provides HTTP transport configuration
 	),
 )

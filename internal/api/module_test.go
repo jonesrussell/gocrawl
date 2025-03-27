@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -120,22 +121,52 @@ func setupTest(t *testing.T) *testSetup {
 	mockSecurity.On("Middleware").Return(func(c *gin.Context) { c.Next() })
 
 	app := fxtest.New(t,
+		fx.Supply(
+			fx.Annotate(mockLogger, fx.As(new(common.Logger))),
+			fx.Annotate(mockConfig, fx.As(new(common.Config))),
+		),
 		fx.Provide(
 			t.Context,
 			func() api.SearchManager { return mockSearchMgr },
-			func() middleware.SecurityMiddlewareInterface { return mockSecurity },
+			func(
+				log common.Logger,
+				searchManager api.SearchManager,
+				cfg common.Config,
+				lc fx.Lifecycle,
+			) (*http.Server, middleware.SecurityMiddlewareInterface) {
+				// Create router and security middleware
+				router, security := api.SetupRouter(log, searchManager, cfg)
+
+				// Create server
+				server := &http.Server{
+					Addr:              cfg.GetServerConfig().Address,
+					Handler:           router,
+					ReadHeaderTimeout: 10 * time.Second, // Use a reasonable default for tests
+				}
+
+				// Register lifecycle hooks
+				lc.Append(fx.Hook{
+					OnStart: func(ctx context.Context) error {
+						log.Info("StartHTTPServer function called")
+						log.Info("Server configuration", "address", server.Addr)
+						return nil
+					},
+					OnStop: func(ctx context.Context) error {
+						if err := searchManager.Close(); err != nil {
+							return fmt.Errorf("search manager close failed: %w", err)
+						}
+						return nil
+					},
+				})
+
+				return server, security
+			},
 		),
-		fx.Replace(
-			fx.Annotate(
-				func() *logger.MockInterface { return mockLogger },
-				fx.As(new(common.Logger)),
-			),
-			fx.Annotate(
-				func() *configtest.MockConfig { return mockConfig },
-				fx.As(new(common.Config)),
-			),
+		fx.Decorate(
+			func(server *http.Server, security middleware.SecurityMiddlewareInterface) (*http.Server, middleware.SecurityMiddlewareInterface) {
+				return server, mockSecurity
+			},
 		),
-		api.Module, // Include the actual API module
 		fx.Populate(&server),
 		fx.StartTimeout(5*time.Second),
 		fx.StopTimeout(10*time.Second),
@@ -158,9 +189,27 @@ func TestModuleConstruction(t *testing.T) {
 	t.Cleanup(func() { ts.ctrl.Finish() })
 
 	// Set up mock expectations before starting the app
-	ts.mockLogger.EXPECT().Info("StartHTTPServer function called").Times(1)
-	ts.mockLogger.EXPECT().Info("Server configuration", "address", ":0").Times(1)
-	ts.mockLogger.EXPECT().Error("Server error", "error", gomock.Any()).AnyTimes()
+	ts.mockLogger.EXPECT().Info(
+		"StartHTTPServer function called",
+		"address", ":0",
+	).Times(1)
+	ts.mockLogger.EXPECT().Info(
+		"Gin request",
+		"method", "POST",
+		"path", "/search",
+		"status", 200,
+		"latency", gomock.Any(),
+		"client_ip", "192.0.2.1",
+		"query", "test query",
+		"error", "",
+	).Times(1)
+
+	ts.mockSearchMgr.EXPECT().
+		Search(gomock.Any(), "articles", gomock.Any()).
+		Return([]any{"result1", "result2"}, nil)
+	ts.mockSearchMgr.EXPECT().
+		Count(gomock.Any(), "articles", gomock.Any()).
+		Return(int64(2), nil)
 	ts.mockSearchMgr.EXPECT().Close().Return(nil).AnyTimes() // Allow multiple calls
 
 	// Start the app
@@ -342,9 +391,27 @@ func TestSetupLifecycle(t *testing.T) {
 	t.Cleanup(func() { ts.ctrl.Finish() })
 
 	// Set up mock expectations before starting the app
-	ts.mockLogger.EXPECT().Info("StartHTTPServer function called").Times(1)
-	ts.mockLogger.EXPECT().Info("Server configuration", "address", ":0").Times(1)
-	ts.mockLogger.EXPECT().Error("Server error", "error", gomock.Any()).AnyTimes()
+	ts.mockLogger.EXPECT().Info(
+		"StartHTTPServer function called",
+		"address", ":0",
+	).Times(1)
+	ts.mockLogger.EXPECT().Info(
+		"Gin request",
+		"method", "POST",
+		"path", "/search",
+		"status", 200,
+		"latency", gomock.Any(),
+		"client_ip", "192.0.2.1",
+		"query", "test query",
+		"error", "",
+	).Times(1)
+
+	ts.mockSearchMgr.EXPECT().
+		Search(gomock.Any(), "articles", gomock.Any()).
+		Return([]any{"result1", "result2"}, nil)
+	ts.mockSearchMgr.EXPECT().
+		Count(gomock.Any(), "articles", gomock.Any()).
+		Return(int64(2), nil)
 	ts.mockSearchMgr.EXPECT().Close().Return(nil).AnyTimes() // Allow multiple calls
 
 	// Start the app
