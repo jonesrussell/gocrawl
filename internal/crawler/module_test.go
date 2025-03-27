@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -219,6 +220,70 @@ func TestModuleProvides(t *testing.T) {
 			),
 		),
 		crawler.Module,
+	)
+
+	app.RequireStart()
+	app.RequireStop()
+}
+
+// TestAppDependencies tests that all dependencies are properly wired up
+func TestAppDependencies(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := logger.NewMockInterface(ctrl)
+	mockCfg := &mockConfig{}
+	mockStore := &mockStorage{}
+	mockIndex := &mockIndexManager{}
+	mockSearchManager := api.NewMockSearchManager(ctrl)
+
+	// Set up debug logging expectations
+	mockLogger.EXPECT().Debug(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Warn(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Error(gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+
+	app := fxtest.New(t,
+		fx.NopLogger,
+		crawler.Module,
+		fx.Provide(
+			fx.Annotate(
+				func() logger.Interface { return mockLogger },
+				fx.ResultTags(`name:"testLogger"`),
+			),
+			fx.Annotate(
+				func() config.Interface { return mockCfg },
+				fx.ResultTags(`name:"testConfig"`),
+			),
+			fx.Annotate(
+				func() types.Interface { return mockStore },
+				fx.ResultTags(`name:"testStorage"`),
+			),
+			fx.Annotate(
+				func() api.IndexManager { return mockIndex },
+				fx.ResultTags(`name:"testIndexManager"`),
+			),
+			fx.Annotate(
+				func() api.SearchManager { return mockSearchManager },
+				fx.ResultTags(`name:"testSearchManager"`),
+			),
+			func() context.Context { return context.Background() },
+		),
+		fx.Invoke(func(deps crawler.CrawlDeps) {
+			assert.NotNil(t, deps.Logger)
+			assert.NotNil(t, deps.Config)
+			assert.NotNil(t, deps.Storage)
+			assert.NotNil(t, deps.Crawler)
+			assert.NotNil(t, deps.Processors)
+			assert.NotNil(t, deps.Done)
+			assert.NotNil(t, deps.Context)
+		}),
 	)
 
 	app.RequireStart()
