@@ -19,7 +19,7 @@ type CommandDeps struct {
 	fx.In
 
 	Lifecycle   fx.Lifecycle
-	Sources     sources.Interface `name:"sourceManager"`
+	Sources     sources.Interface `name:"testSourceManager"`
 	Crawler     crawler.Interface
 	Logger      common.Logger
 	Config      config.Interface
@@ -28,7 +28,7 @@ type CommandDeps struct {
 	Context     context.Context           `name:"crawlContext"`
 	Processors  []models.ContentProcessor `group:"processors"`
 	SourceName  string                    `name:"sourceName"`
-	ArticleChan chan *models.Article      `name:"articleChannel"`
+	ArticleChan chan *models.Article      `name:"commandArticleChannel"`
 	Handler     *signal.SignalHandler     `name:"signalHandler"`
 }
 
@@ -47,7 +47,7 @@ var Module = fx.Module("crawl",
 			func() chan *models.Article {
 				return make(chan *models.Article, crawler.ArticleChannelBufferSize)
 			},
-			fx.ResultTags(`name:"articleChannel"`),
+			fx.ResultTags(`name:"commandArticleChannel"`),
 		),
 	),
 )

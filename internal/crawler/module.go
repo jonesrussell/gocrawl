@@ -68,7 +68,7 @@ var Module = fx.Module("crawler",
 			func() chan *models.Article {
 				return make(chan *models.Article, ArticleChannelBufferSize)
 			},
-			fx.ResultTags(`name:"articleChannel"`),
+			fx.ResultTags(`name:"crawlerArticleChannel"`),
 		),
 		// Article index name
 		fx.Annotate(
@@ -92,7 +92,7 @@ var Module = fx.Module("crawler",
 				storage types.Interface,
 				params struct {
 					fx.In
-					ArticleChan chan *models.Article `name:"articleChannel"`
+					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 					IndexName   string               `name:"indexName"`
 				},
 			) models.ContentProcessor {
