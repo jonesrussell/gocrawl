@@ -2,11 +2,14 @@
 package crawler_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/require"
@@ -21,27 +24,43 @@ func setupTestApp(t *testing.T) *fxtest.App {
 
 	return fxtest.New(t,
 		fx.NopLogger,
-		fx.Supply(make(chan struct{})),
+		fx.Supply(
+			fx.Annotate(
+				make(chan struct{}),
+				fx.ResultTags(`name:"done"`),
+			),
+		),
 		fx.Provide(
+			fx.Annotate(
+				func() context.Context { return t.Context() },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			fx.Annotate(
+				func() string { return "test-source" },
+				fx.ResultTags(`name:"sourceName"`),
+			),
 			fx.Annotate(
 				func() config.Interface { return &mockConfig{} },
 				fx.ResultTags(`name:"config"`),
 			),
 			fx.Annotate(
-				func() api.SearchManager { return &mockSearchManager{} },
-				fx.ResultTags(`name:"searchManager"`),
-			),
-			fx.Annotate(
-				func() api.IndexManager { return &mockIndexManager{} },
-				fx.ResultTags(`name:"indexManager"`),
-			),
-			fx.Annotate(
-				func() types.Interface { return &mockStorage{} },
-				fx.ResultTags(`name:"storage"`),
-			),
-			fx.Annotate(
 				func() sources.Interface { return &mockSources{} },
-				fx.ResultTags(`name:"sources"`),
+				fx.ResultTags(`name:"sourceManager"`),
+			),
+			fx.Annotate(
+				func() *signal.SignalHandler { return signal.NewSignalHandler(nil) },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
+			// Provide unnamed interfaces required by the crawler module
+			func() types.Interface { return &mockStorage{} },
+			func() api.IndexManager { return &mockIndexManager{} },
+			func() api.SearchManager { return &mockSearchManager{} },
+			// Mock content processors
+			fx.Annotate(
+				func() models.ContentProcessor {
+					return &mockContentProcessor{}
+				},
+				fx.ResultTags(`group:"processors"`),
 			),
 		),
 		crawler.Module,

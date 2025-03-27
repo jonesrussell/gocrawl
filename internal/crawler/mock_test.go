@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -38,6 +39,9 @@ type (
 	mockSources struct {
 		sources.Interface
 	}
+
+	// mockContentProcessor implements models.ContentProcessor for testing
+	mockContentProcessor struct{}
 )
 
 // GetCrawlerConfig returns a mock crawler configuration with test values.
@@ -178,4 +182,8 @@ func (m *mockSources) ListSources() ([]*sources.Config, error) {
 			},
 		},
 	}, nil
+}
+
+func (m *mockContentProcessor) Process(e *colly.HTMLElement) {
+	// No-op implementation for testing
 }

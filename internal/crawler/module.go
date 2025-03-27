@@ -64,8 +64,8 @@ var Module = fx.Module("crawler",
 		),
 		// Article channel named instance
 		fx.Annotate(
-			func(ch chan *models.Article) chan *models.Article {
-				return ch
+			func() chan *models.Article {
+				return make(chan *models.Article, 100)
 			},
 			fx.ResultTags(`name:"articleChannel"`),
 		),
