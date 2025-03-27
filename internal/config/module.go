@@ -441,9 +441,9 @@ func createConfig() (*Impl, error) {
 	// Convert loader.Config to config.Source
 	var sources []Source
 	for _, src := range sourcesConfig {
-		rateLimit, err := ParseRateLimit(src.RateLimit)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse rate limit for source %s: %w", src.Name, err)
+		rateLimit, parseErr := ParseRateLimit(src.RateLimit)
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse rate limit for source %s: %w", src.Name, parseErr)
 		}
 
 		sources = append(sources, Source{

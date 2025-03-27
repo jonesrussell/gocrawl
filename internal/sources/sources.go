@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 )
 
@@ -76,9 +77,9 @@ func LoadFromFile(path string) (*Sources, error) {
 
 	var configs []Config
 	for _, src := range loaderConfigs {
-		rateLimit, err := time.ParseDuration(src.RateLimit)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse rate limit for source %s: %w", src.Name, err)
+		rateLimit, parseErr := time.ParseDuration(src.RateLimit)
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse rate limit for source %s: %w", src.Name, parseErr)
 		}
 
 		configs = append(configs, Config{
@@ -89,32 +90,8 @@ func LoadFromFile(path string) (*Sources, error) {
 			ArticleIndex: src.ArticleIndex,
 			Index:        src.Index,
 			Time:         src.Time,
-			Selectors: SelectorConfig{
-				Article: ArticleSelectors{
-					Container:     src.Selectors.Article.Container,
-					Title:         src.Selectors.Article.Title,
-					Body:          src.Selectors.Article.Body,
-					Intro:         src.Selectors.Article.Intro,
-					Byline:        src.Selectors.Article.Byline,
-					PublishedTime: src.Selectors.Article.PublishedTime,
-					TimeAgo:       src.Selectors.Article.TimeAgo,
-					JSONLD:        src.Selectors.Article.JSONLD,
-					Section:       src.Selectors.Article.Section,
-					Keywords:      src.Selectors.Article.Keywords,
-					Description:   src.Selectors.Article.Description,
-					OGTitle:       src.Selectors.Article.OGTitle,
-					OGDescription: src.Selectors.Article.OGDescription,
-					OGImage:       src.Selectors.Article.OGImage,
-					OgURL:         src.Selectors.Article.OgURL,
-					Canonical:     src.Selectors.Article.Canonical,
-					WordCount:     src.Selectors.Article.WordCount,
-					PublishDate:   src.Selectors.Article.PublishDate,
-					Category:      src.Selectors.Article.Category,
-					Tags:          src.Selectors.Article.Tags,
-					Author:        src.Selectors.Article.Author,
-					BylineName:    src.Selectors.Article.BylineName,
-				},
-			},
+			Selectors:    NewSelectorConfigFromLoader(src),
+			Metadata:     src.Metadata,
 		})
 	}
 
@@ -179,4 +156,102 @@ func (s *Sources) Validate(source *Config) error {
 // SetSources sets the sources list. This is primarily used for testing.
 func (s *Sources) SetSources(sources []Config) {
 	s.sources = sources
+}
+
+// newArticleSelectors creates ArticleSelectors from a source with selectors
+type selectorSource interface {
+	GetArticleSelectors() ArticleSelectors
+}
+
+// articleSelectorsFromLoader creates ArticleSelectors from loader.ArticleSelectors
+func articleSelectorsFromLoader(selectors loader.ArticleSelectors) ArticleSelectors {
+	return ArticleSelectors{
+		Container:     selectors.Container,
+		Title:         selectors.Title,
+		Body:          selectors.Body,
+		Intro:         selectors.Intro,
+		Byline:        selectors.Byline,
+		PublishedTime: selectors.PublishedTime,
+		TimeAgo:       selectors.TimeAgo,
+		JSONLD:        selectors.JSONLD,
+		Section:       selectors.Section,
+		Keywords:      selectors.Keywords,
+		Description:   selectors.Description,
+		OGTitle:       selectors.OGTitle,
+		OGDescription: selectors.OGDescription,
+		OGImage:       selectors.OGImage,
+		OgURL:         selectors.OgURL,
+		Canonical:     selectors.Canonical,
+		WordCount:     selectors.WordCount,
+		PublishDate:   selectors.PublishDate,
+		Category:      selectors.Category,
+		Tags:          selectors.Tags,
+		Author:        selectors.Author,
+		BylineName:    selectors.BylineName,
+	}
+}
+
+// articleSelectorsFromConfig creates ArticleSelectors from config.ArticleSelectors
+func articleSelectorsFromConfig(selectors config.ArticleSelectors) ArticleSelectors {
+	return ArticleSelectors{
+		Container:     selectors.Container,
+		Title:         selectors.Title,
+		Body:          selectors.Body,
+		Intro:         selectors.Intro,
+		Byline:        selectors.Byline,
+		PublishedTime: selectors.PublishedTime,
+		TimeAgo:       selectors.TimeAgo,
+		JSONLD:        selectors.JSONLD,
+		Section:       selectors.Section,
+		Keywords:      selectors.Keywords,
+		Description:   selectors.Description,
+		OGTitle:       selectors.OGTitle,
+		OGDescription: selectors.OGDescription,
+		OGImage:       selectors.OGImage,
+		OgURL:         selectors.OgURL,
+		Canonical:     selectors.Canonical,
+		WordCount:     selectors.WordCount,
+		PublishDate:   selectors.PublishDate,
+		Category:      selectors.Category,
+		Tags:          selectors.Tags,
+		Author:        selectors.Author,
+		BylineName:    selectors.BylineName,
+	}
+}
+
+// loaderConfigWrapper wraps loader.Config to implement selectorSource
+type loaderConfigWrapper struct {
+	loader.Config
+}
+
+func (w loaderConfigWrapper) GetArticleSelectors() ArticleSelectors {
+	return articleSelectorsFromLoader(w.Selectors.Article)
+}
+
+// sourceWrapper wraps config.Source to implement selectorSource
+type sourceWrapper struct {
+	config.Source
+}
+
+func (w sourceWrapper) GetArticleSelectors() ArticleSelectors {
+	return articleSelectorsFromConfig(w.Selectors.Article)
+}
+
+// newArticleSelectors creates ArticleSelectors from a source with selectors
+func newArticleSelectors(src selectorSource) ArticleSelectors {
+	return src.GetArticleSelectors()
+}
+
+// NewSelectorConfigFromLoader creates a new SelectorConfig from a loader source
+func NewSelectorConfigFromLoader(src loader.Config) SelectorConfig {
+	return SelectorConfig{
+		Article: newArticleSelectors(loaderConfigWrapper{src}),
+	}
+}
+
+// NewSelectorConfigFromSource creates a new SelectorConfig from a config source
+func NewSelectorConfigFromSource(src config.Source) SelectorConfig {
+	return SelectorConfig{
+		Article: newArticleSelectors(sourceWrapper{src}),
+	}
 }
