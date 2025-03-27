@@ -114,7 +114,7 @@ func TestModuleProvides(t *testing.T) {
 					fx.Out
 					Logger     logger.Interface  `name:"testLogger"`
 					Config     config.Interface  `name:"testConfig"`
-					Sources    sources.Interface `name:"sourceManager"`
+					Sources    sources.Interface `name:"testSources"`
 					SourceName string            `name:"sourceName"`
 					ArticleSvc article.Interface `name:"testArticleService"`
 				} {
@@ -122,7 +122,7 @@ func TestModuleProvides(t *testing.T) {
 						fx.Out
 						Logger     logger.Interface  `name:"testLogger"`
 						Config     config.Interface  `name:"testConfig"`
-						Sources    sources.Interface `name:"sourceManager"`
+						Sources    sources.Interface `name:"testSources"`
 						SourceName string            `name:"sourceName"`
 						ArticleSvc article.Interface `name:"testArticleService"`
 					}{
@@ -210,7 +210,7 @@ func TestModuleConfiguration(t *testing.T) {
 					fx.Out
 					Logger     logger.Interface  `name:"testLogger"`
 					Config     config.Interface  `name:"testConfig"`
-					Sources    sources.Interface `name:"sourceManager"`
+					Sources    sources.Interface `name:"testSources"`
 					SourceName string            `name:"sourceName"`
 					ArticleSvc article.Interface `name:"testArticleService"`
 					IndexMgr   api.IndexManager  `name:"testIndexManager"`
@@ -219,7 +219,7 @@ func TestModuleConfiguration(t *testing.T) {
 						fx.Out
 						Logger     logger.Interface  `name:"testLogger"`
 						Config     config.Interface  `name:"testConfig"`
-						Sources    sources.Interface `name:"sourceManager"`
+						Sources    sources.Interface `name:"testSources"`
 						SourceName string            `name:"sourceName"`
 						ArticleSvc article.Interface `name:"testArticleService"`
 						IndexMgr   api.IndexManager  `name:"testIndexManager"`

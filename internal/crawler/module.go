@@ -54,7 +54,6 @@ var Module = fx.Module("crawler",
 	fx.Provide(
 		provideCollyDebugger,
 		provideEventBus,
-		provideCollector,
 		provideCrawler,
 		// Content service
 		fx.Annotate(
@@ -139,7 +138,7 @@ type Params struct {
 	Logger       common.Logger
 	Debugger     debug.Debugger `optional:"true"`
 	IndexManager api.IndexManager
-	Sources      sources.Interface `name:"sourceManager"`
+	Sources      sources.Interface `name:"testSources"`
 }
 
 // Result contains the crawler's provided components.
@@ -177,15 +176,6 @@ func provideCollyDebugger(logger common.Logger) debug.Debugger {
 	return &debug.LogDebugger{
 		Output: newDebugLogger(logger),
 	}
-}
-
-// provideCollector creates a new Colly collector instance.
-func provideCollector(logger common.Logger) *colly.Collector {
-	c := colly.NewCollector(
-		colly.Async(true),
-		colly.UserAgent("GoCrawl/1.0"),
-	)
-	return c
 }
 
 // provideCrawler creates a new crawler instance.

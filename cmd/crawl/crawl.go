@@ -3,6 +3,7 @@ package crawl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
@@ -120,11 +121,9 @@ You can specify the source to crawl using the --source flag.`,
 			return fmt.Errorf("error starting application: %w", err)
 		}
 
-		// Wait for shutdown signal
+		// Wait for signal handler to complete
 		if !handler.Wait() {
-			// If we got here, it means we either timed out or the context was cancelled
-			// In either case, we should exit with an error
-			return fmt.Errorf("shutdown timeout or context cancellation")
+			return errors.New("shutdown timeout or context cancellation")
 		}
 
 		// If we got here, it means we received a signal and shutdown was successful

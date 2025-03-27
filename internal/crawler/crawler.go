@@ -54,8 +54,12 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Set the max depth from source configuration
 	c.SetMaxDepth(source.MaxDepth)
 	// Set the rate limit from source configuration
-	if err := c.SetRateLimit(source.RateLimit); err != nil {
-		return fmt.Errorf("failed to set rate limit: %w", err)
+	if limitErr := c.collector.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		RandomDelay: source.RateLimit,
+		Parallelism: 1,
+	}); limitErr != nil {
+		return fmt.Errorf("failed to set rate limit: %w", limitErr)
 	}
 	c.Logger.Info("Starting crawl",
 		"url", c.baseURL,
