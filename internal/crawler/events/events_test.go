@@ -1,4 +1,4 @@
-// Package events_test provides tests for the events package.
+// Package events_test implements tests for the events package.
 package events_test
 
 import (
@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,15 +16,6 @@ func TestBus_Subscribe(t *testing.T) {
 	t.Parallel()
 
 	bus := events.NewBus()
-	require.NotNil(t, bus)
-
-	// Test subscribing a handler
-	handler := func(ctx context.Context, content *events.Content) error {
-		return nil
-	}
-	bus.Subscribe(handler)
-
-	// Verify handler was added
 	content := &events.Content{
 		URL:         "http://test.com",
 		Type:        events.TypeArticle,
@@ -34,8 +24,27 @@ func TestBus_Subscribe(t *testing.T) {
 		RawContent:  "Test Content",
 		Metadata:    map[string]string{"key": "value"},
 	}
-	err := bus.Publish(context.Background(), content)
+	received := make(chan *events.Content, 1)
+
+	bus.Subscribe(func(ctx context.Context, c *events.Content) error {
+		received <- c
+		return nil
+	})
+
+	err := bus.Publish(t.Context(), content)
 	require.NoError(t, err)
+
+	select {
+	case c := <-received:
+		require.Equal(t, content.URL, c.URL)
+		require.Equal(t, content.Type, c.Type)
+		require.Equal(t, content.Title, c.Title)
+		require.Equal(t, content.Description, c.Description)
+		require.Equal(t, content.RawContent, c.RawContent)
+		require.Equal(t, content.Metadata, c.Metadata)
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for content")
+	}
 }
 
 // TestBus_Publish tests the publishing functionality of the event bus.
@@ -43,17 +52,6 @@ func TestBus_Publish(t *testing.T) {
 	t.Parallel()
 
 	bus := events.NewBus()
-	require.NotNil(t, bus)
-
-	// Create a channel to receive published content
-	received := make(chan *events.Content, 1)
-	handler := func(ctx context.Context, content *events.Content) error {
-		received <- content
-		return nil
-	}
-	bus.Subscribe(handler)
-
-	// Create test content
 	content := &events.Content{
 		URL:         "http://test.com",
 		Type:        events.TypeArticle,
@@ -62,183 +60,149 @@ func TestBus_Publish(t *testing.T) {
 		RawContent:  "Test Content",
 		Metadata:    map[string]string{"key": "value"},
 	}
+	received := make(chan *events.Content, 1)
 
-	// Publish content
-	err := bus.Publish(context.Background(), content)
+	bus.Subscribe(func(ctx context.Context, c *events.Content) error {
+		received <- c
+		return nil
+	})
+
+	err := bus.Publish(t.Context(), content)
 	require.NoError(t, err)
 
-	// Wait for content to be received
 	select {
-	case receivedContent := <-received:
-		assert.Equal(t, content.URL, receivedContent.URL)
-		assert.Equal(t, content.Type, receivedContent.Type)
-		assert.Equal(t, content.Title, receivedContent.Title)
-		assert.Equal(t, content.Description, receivedContent.Description)
-		assert.Equal(t, content.RawContent, receivedContent.RawContent)
-		assert.Equal(t, content.Metadata, receivedContent.Metadata)
+	case c := <-received:
+		require.Equal(t, content.URL, c.URL)
+		require.Equal(t, content.Type, c.Type)
+		require.Equal(t, content.Title, c.Title)
+		require.Equal(t, content.Description, c.Description)
+		require.Equal(t, content.RawContent, c.RawContent)
+		require.Equal(t, content.Metadata, c.Metadata)
 	case <-time.After(time.Second):
-		t.Fatal("Timeout waiting for content to be received")
+		t.Fatal("timeout waiting for content")
 	}
 }
 
-// TestBus_Publish_Error tests error handling in the event bus.
+// TestBus_Publish_Error tests error handling when a handler returns an error.
 func TestBus_Publish_Error(t *testing.T) {
 	t.Parallel()
 
 	bus := events.NewBus()
-	require.NotNil(t, bus)
-
-	// Create a handler that returns an error
-	testErr := errors.New("test error")
-	handler := func(ctx context.Context, content *events.Content) error {
-		return testErr
-	}
-	bus.Subscribe(handler)
-
-	// Create test content
 	content := &events.Content{
 		URL:  "http://test.com",
 		Type: events.TypeArticle,
 	}
+	testErr := errors.New("test error")
 
-	// Publish content and verify error is returned
-	err := bus.Publish(context.Background(), content)
-	assert.Error(t, err)
-	assert.Equal(t, testErr, err)
+	bus.Subscribe(func(ctx context.Context, c *events.Content) error {
+		return testErr
+	})
+
+	err := bus.Publish(t.Context(), content)
+	require.Error(t, err)
+	require.Equal(t, testErr, err)
 }
 
-// TestBus_Publish_MultipleHandlers tests publishing to multiple handlers.
+// TestBus_Publish_MultipleHandlers tests that multiple subscribers receive the published content.
 func TestBus_Publish_MultipleHandlers(t *testing.T) {
 	t.Parallel()
 
 	bus := events.NewBus()
-	require.NotNil(t, bus)
-
-	// Create channels to receive published content
-	received1 := make(chan *events.Content, 1)
-	received2 := make(chan *events.Content, 1)
-
-	// Create two handlers
-	handler1 := func(ctx context.Context, content *events.Content) error {
-		received1 <- content
-		return nil
-	}
-	handler2 := func(ctx context.Context, content *events.Content) error {
-		received2 <- content
-		return nil
-	}
-
-	// Subscribe both handlers
-	bus.Subscribe(handler1)
-	bus.Subscribe(handler2)
-
-	// Create test content
 	content := &events.Content{
 		URL:  "http://test.com",
 		Type: events.TypeArticle,
 	}
+	received1 := make(chan *events.Content, 1)
+	received2 := make(chan *events.Content, 1)
 
-	// Publish content
-	err := bus.Publish(context.Background(), content)
+	bus.Subscribe(func(ctx context.Context, c *events.Content) error {
+		received1 <- c
+		return nil
+	})
+
+	bus.Subscribe(func(ctx context.Context, c *events.Content) error {
+		received2 <- c
+		return nil
+	})
+
+	err := bus.Publish(t.Context(), content)
 	require.NoError(t, err)
 
-	// Wait for content to be received by both handlers
 	select {
-	case receivedContent1 := <-received1:
-		assert.Equal(t, content.URL, receivedContent1.URL)
-		assert.Equal(t, content.Type, receivedContent1.Type)
+	case c := <-received1:
+		require.Equal(t, content.URL, c.URL)
+		require.Equal(t, content.Type, c.Type)
 	case <-time.After(time.Second):
-		t.Fatal("Timeout waiting for content to be received by handler1")
+		t.Fatal("timeout waiting for content in first handler")
 	}
 
 	select {
-	case receivedContent2 := <-received2:
-		assert.Equal(t, content.URL, receivedContent2.URL)
-		assert.Equal(t, content.Type, receivedContent2.Type)
+	case c := <-received2:
+		require.Equal(t, content.URL, c.URL)
+		require.Equal(t, content.Type, c.Type)
 	case <-time.After(time.Second):
-		t.Fatal("Timeout waiting for content to be received by handler2")
+		t.Fatal("timeout waiting for content in second handler")
 	}
 }
 
-// TestBus_Publish_Concurrent tests concurrent publishing and subscription.
+// TestBus_Publish_Concurrent tests concurrent publishing to ensure that multiple messages
+// can be handled simultaneously.
 func TestBus_Publish_Concurrent(t *testing.T) {
 	t.Parallel()
 
 	bus := events.NewBus()
-	require.NotNil(t, bus)
-
-	// Create a channel to receive published content
 	received := make(chan *events.Content, 100)
-	handler := func(ctx context.Context, content *events.Content) error {
-		received <- content
+
+	bus.Subscribe(func(ctx context.Context, c *events.Content) error {
+		received <- c
 		return nil
-	}
-	bus.Subscribe(handler)
+	})
 
-	// Create test content
-	content := &events.Content{
-		URL:  "http://test.com",
-		Type: events.TypeArticle,
-	}
-
-	// Publish content concurrently
-	for i := 0; i < 100; i++ {
-		go func() {
-			err := bus.Publish(context.Background(), content)
-			require.NoError(t, err)
-		}()
+	for range 100 {
+		content := &events.Content{
+			URL:  "http://test.com",
+			Type: events.TypeArticle,
+		}
+		err := bus.Publish(t.Context(), content)
+		require.NoError(t, err)
 	}
 
-	// Wait for all content to be received
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		select {
-		case receivedContent := <-received:
-			assert.Equal(t, content.URL, receivedContent.URL)
-			assert.Equal(t, content.Type, receivedContent.Type)
+		case <-received:
 		case <-time.After(time.Second):
-			t.Fatalf("Timeout waiting for content %d to be received", i)
+			t.Fatal("timeout waiting for content")
 		}
 	}
 }
 
-// TestBus_Publish_ContextCancellation tests context cancellation during publishing.
+// TestBus_Publish_ContextCancellation tests that context cancellation is respected during publishing.
 func TestBus_Publish_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
 	bus := events.NewBus()
-	require.NotNil(t, bus)
-
-	// Create a channel to signal when the handler is done
-	handlerDone := make(chan struct{})
-	// Create a handler that blocks until context is done
-	handler := func(ctx context.Context, content *events.Content) error {
-		<-ctx.Done()
-		close(handlerDone)
-		return ctx.Err()
-	}
-	bus.Subscribe(handler)
-
-	// Create test content
 	content := &events.Content{
 		URL:  "http://test.com",
 		Type: events.TypeArticle,
 	}
+	handlerDone := make(chan struct{})
 
-	// Create a cancellable context
-	ctx, cancel := context.WithCancel(context.Background())
-	// Cancel the context immediately
-	cancel()
+	bus.Subscribe(func(ctx context.Context, c *events.Content) error {
+		<-ctx.Done()
+		close(handlerDone)
+		return ctx.Err()
+	})
 
-	// Publish content with cancelled context
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+
 	err := bus.Publish(ctx, content)
-	assert.Error(t, err)
-	assert.Equal(t, context.Canceled, err)
+	require.Error(t, err)
+	require.Equal(t, context.DeadlineExceeded, err)
 
-	// Wait for handler to finish with a timeout
 	select {
 	case <-handlerDone:
-		// Handler finished successfully
 	case <-time.After(time.Second):
-		t.Fatal("Timeout waiting for handler to finish")
+		t.Fatal("timeout waiting for handler to finish")
 	}
 }
