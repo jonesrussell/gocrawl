@@ -157,23 +157,6 @@ func (m *mockSources) ListSources() ([]*sources.Config, error) {
 	}, nil
 }
 
-// mockSignalHandler implements signal.SignalHandler for testing
-type mockSignalHandler struct {
-	*signal.SignalHandler
-}
-
-func (m *mockSignalHandler) Setup(_ context.Context) func() {
-	return func() {}
-}
-
-func (m *mockSignalHandler) SetLogger(_ logger.Interface) {}
-
-func (m *mockSignalHandler) SetFXApp(_ *fx.App) {}
-
-func (m *mockSignalHandler) Wait() bool {
-	return true
-}
-
 // TestModule tests that the crawler module provides all necessary dependencies
 func TestModule(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -345,7 +328,7 @@ func TestAppDependencies(t *testing.T) {
 				func() *signal.SignalHandler { return mockSignalHandler },
 				fx.ResultTags(`name:"signalHandler"`),
 			),
-			context.Background,
+			func() context.Context { return t.Context() },
 		),
 		fx.Invoke(func(deps crawler.CrawlDeps) {
 			assert.NotNil(t, deps.Logger)
