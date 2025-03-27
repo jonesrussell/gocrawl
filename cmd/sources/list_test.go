@@ -187,6 +187,7 @@ func Test_executeList(t *testing.T) {
 		sources      []srcs.Config
 		wantErr      bool
 		wantLogCount int
+		wantLogMsg   string
 	}{
 		{
 			name: "with sources",
@@ -201,33 +202,74 @@ func Test_executeList(t *testing.T) {
 				},
 			},
 			wantErr:      false,
-			wantLogCount: 1,
+			wantLogCount: 0,
+			wantLogMsg:   "",
 		},
 		{
 			name:         "no sources",
-			sources:      []srcs.Config{},
+			sources:      nil,
 			wantErr:      false,
 			wantLogCount: 1,
+			wantLogMsg:   "No sources found",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			logger := &mockLogger{}
+			// Create mock source manager with test sources
 			sm := &mockSourceManager{sources: tt.sources}
+			ml := &mockLogger{}
 
-			err := sources.ExecuteList(sources.ListParams{
-				SourceManager: sm,
-				Logger:        logger,
-			})
+			// Create test app with mock dependencies
+			app := fxtest.New(t,
+				fx.Supply(fx.NopLogger), // Suppress Fx logs
+				fx.Provide(
+					// Provide source manager with the correct name tag
+					fx.Annotate(
+						func() srcs.Interface { return sm },
+						fx.ResultTags(`name:"sourceManager"`),
+					),
+					// Provide mock logger with the correct interface
+					fx.Annotate(
+						func() common.Logger { return ml },
+						fx.As(new(common.Logger)),
+					),
+				),
+				fx.Invoke(func(p struct {
+					fx.In
+					Sources srcs.Interface `name:"sourceManager"`
+					Logger  common.Logger
+					LC      fx.Lifecycle
+				}) {
+					p.LC.Append(fx.Hook{
+						OnStart: func(context.Context) error {
+							params := &sources.ListParams{
+								SourceManager: p.Sources,
+								Logger:        p.Logger,
+							}
+							if err := sources.ExecuteList(*params); err != nil {
+								p.Logger.Error("Error executing list", "error", err)
+								return err
+							}
+							return nil
+						},
+						OnStop: func(context.Context) error {
+							return nil
+						},
+					})
+				}),
+			)
 
-			if tt.wantErr {
-				require.Error(t, err)
-				return
+			// Test lifecycle
+			app.RequireStart()
+			app.RequireStop()
+
+			// Check log messages
+			require.Len(t, ml.infoMessages, tt.wantLogCount)
+			if tt.wantLogCount > 0 {
+				require.Contains(t, ml.infoMessages, tt.wantLogMsg)
 			}
-			require.NoError(t, err)
-			require.Len(t, logger.infoMessages, tt.wantLogCount)
 		})
 	}
 }
