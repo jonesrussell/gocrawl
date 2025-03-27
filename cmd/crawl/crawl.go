@@ -90,6 +90,14 @@ You can specify the source to crawl using the --source flag.`,
 							return fmt.Errorf("failed to start crawler: %w", err)
 						}
 
+						// Wait for crawler to complete
+						go func() {
+							p.Crawler.Wait()
+							p.Logger.Info("Crawler finished processing")
+							// Signal completion to the signal handler
+							handler.RequestShutdown()
+						}()
+
 						return nil
 					},
 					OnStop: func(ctx context.Context) error {
@@ -113,8 +121,13 @@ You can specify the source to crawl using the --source flag.`,
 		}
 
 		// Wait for shutdown signal
-		handler.Wait()
+		if !handler.Wait() {
+			// If we got here, it means we either timed out or the context was cancelled
+			// In either case, we should exit with an error
+			return fmt.Errorf("shutdown timeout or context cancellation")
+		}
 
+		// If we got here, it means we received a signal and shutdown was successful
 		return nil
 	},
 }

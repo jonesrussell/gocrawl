@@ -26,6 +26,7 @@ type Crawler struct {
 	cancel       context.CancelFunc // To cancel the ongoing crawling process
 	indexManager api.IndexManager
 	sources      sources.Interface
+	done         chan struct{} // Signals when crawling is complete
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -43,6 +44,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	}
 	c.baseURL = source.URL
 	c.ctx, c.cancel = context.WithCancel(ctx) // Use a new context with a cancel function
+	c.done = make(chan struct{})              // Initialize done channel
 
 	// Ensure collector is initialized
 	if c.collector == nil {
@@ -71,6 +73,13 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Monitor context for cancellation while waiting
 	go c.monitorContext(c.ctx)
 
+	// Wait for crawling to complete
+	go func() {
+		c.collector.Wait()
+		close(c.done)
+		c.Logger.Info("Crawling completed")
+	}()
+
 	return nil
 }
 
@@ -87,18 +96,11 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	}
 
 	// Wait for the collector or cancellation to complete
-	done := make(chan struct{})
-
-	go func() {
-		c.Wait() // Block until the collector finishes
-		close(done)
-	}()
-
 	select {
 	case <-stopCtx.Done(): // Respect the provided context
 		c.Logger.Warn("Context for Stop was cancelled", "error", stopCtx.Err())
 		return stopCtx.Err()
-	case <-done: // Collector finished successfully
+	case <-c.done: // Collector finished successfully
 		c.Logger.Info("Crawler stopped successfully")
 		return nil
 	}
@@ -106,13 +108,8 @@ func (c *Crawler) Stop(ctx context.Context) error {
 
 // Wait blocks until the crawler has finished processing all queued requests.
 func (c *Crawler) Wait() {
-	if c.collector != nil {
-		select {
-		case <-c.ctx.Done():
-			c.Logger.Debug("Wait cancelled via context", "error", c.ctx.Err())
-		default:
-			c.collector.Wait() // Block until all requests are complete
-		}
+	if c.done != nil {
+		<-c.done
 	}
 }
 

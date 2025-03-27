@@ -47,6 +47,12 @@ type SignalHandler struct {
 	state string
 	// stateMu protects access to state
 	stateMu sync.RWMutex
+	// ctx is the context for the signal handler
+	ctx context.Context
+	// cancel is the cancel function for the signal handler
+	cancel context.CancelFunc
+	// shutdown is a channel to signal shutdown
+	shutdown chan struct{}
 }
 
 // GetState returns the current state of the signal handler.
@@ -72,6 +78,7 @@ func NewSignalHandler(logger logger.Interface) *SignalHandler {
 		shutdownTimeout: DefaultShutdownTimeout,
 		logger:          logger,
 		state:           "initialized",
+		shutdown:        make(chan struct{}),
 	}
 }
 
@@ -93,6 +100,8 @@ func (h *SignalHandler) SetLogger(logger logger.Interface) {
 // Setup initializes signal handling for the given context.
 // It returns a cleanup function that should be called when the application exits.
 func (h *SignalHandler) Setup(ctx context.Context) func() {
+	h.ctx, h.cancel = context.WithCancel(ctx)
+
 	// Notify on SIGINT and SIGTERM
 	signal.Notify(h.sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -107,11 +116,13 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 			h.logger.Info("Received signal, initiating shutdown...", "signal", sig)
 			h.setState("shutting_down")
 			h.handleShutdown(ctx)
-		case <-ctx.Done():
+		case <-h.ctx.Done():
 			// Context was cancelled
 			h.logger.Info("Context cancelled, initiating shutdown...")
 			h.setState("shutting_down")
 			h.handleShutdown(ctx)
+		case <-h.shutdown:
+			h.logger.Info("Shutdown requested")
 		}
 		h.signalDone()
 	}()
@@ -123,6 +134,9 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 		// Wait for the signal handling goroutine to finish
 		h.wg.Wait()
 		h.setState("cleaned_up")
+		if h.cancel != nil {
+			h.cancel()
+		}
 	}
 }
 
@@ -196,4 +210,13 @@ func (h *SignalHandler) signalDone() {
 // isContextError checks if an error is a context-related error.
 func isContextError(err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+// RequestShutdown signals that the application should shut down.
+func (h *SignalHandler) RequestShutdown() {
+	select {
+	case h.shutdown <- struct{}{}:
+	default:
+		// Channel is already closed or full, ignore
+	}
 }
