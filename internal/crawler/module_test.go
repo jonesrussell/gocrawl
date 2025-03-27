@@ -50,7 +50,7 @@ func setupTestApp(t *testing.T) *fxtest.App {
 			),
 			// Logger provider that replaces the default logger.Module provider
 			fx.Annotate(
-				func() logger.Interface { return logger.NewNoOp() },
+				logger.NewNoOp,
 				fx.ResultTags(`name:"logger"`),
 				fx.As(new(logger.Interface)),
 			),

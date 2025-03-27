@@ -10,6 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
@@ -28,7 +29,7 @@ const (
 // Interface defines the crawler's capabilities.
 type Interface interface {
 	// Start begins crawling from the given base URL.
-	Start(ctx context.Context, baseURL string) error
+	Start(ctx context.Context, sourceName string) error
 	// Stop gracefully stops the crawler.
 	Stop(ctx context.Context) error
 	// Subscribe adds a content handler to receive discovered content.
@@ -43,6 +44,8 @@ type Interface interface {
 	GetIndexManager() api.IndexManager
 	// Wait blocks until the crawler has finished processing all queued requests.
 	Wait()
+	// GetMetrics returns the current crawler metrics.
+	GetMetrics() *Metrics
 }
 
 // Module provides the crawler's dependencies.
@@ -52,6 +55,7 @@ var Module = fx.Module("crawler",
 	article.Module,
 	content.Module,
 	fx.Provide(
+		provideCollectorConfig,
 		provideCollyDebugger,
 		provideEventBus,
 		provideCrawler,
@@ -166,6 +170,24 @@ type CrawlDeps struct {
 	Handler     *signal.SignalHandler     `name:"signalHandler"`
 }
 
+// provideCollectorConfig creates a new collector configuration.
+func provideCollectorConfig(cfg config.Interface, logger common.Logger) *collector.Config {
+	crawlerCfg := cfg.GetCrawlerConfig()
+	return &collector.Config{
+		BaseURL:     crawlerCfg.BaseURL,
+		MaxDepth:    crawlerCfg.MaxDepth,
+		RateLimit:   crawlerCfg.RateLimit.String(),
+		Parallelism: 1,
+		RandomDelay: crawlerCfg.RandomDelay,
+		Logger:      logger,
+		Source: config.Source{
+			URL:       crawlerCfg.BaseURL,
+			MaxDepth:  crawlerCfg.MaxDepth,
+			RateLimit: crawlerCfg.RateLimit,
+		},
+	}
+}
+
 // provideEventBus creates a new event bus instance.
 func provideEventBus() *events.Bus {
 	return events.NewBus()
@@ -179,7 +201,7 @@ func provideCollyDebugger(logger common.Logger) debug.Debugger {
 }
 
 // provideCrawler creates a new crawler instance.
-func provideCrawler(p Params, bus *events.Bus, collector *colly.Collector) (Result, error) {
+func provideCrawler(p Params, bus *events.Bus) (Result, error) {
 	c := &Crawler{
 		Logger:       p.Logger,
 		Debugger:     p.Debugger,
@@ -187,6 +209,5 @@ func provideCrawler(p Params, bus *events.Bus, collector *colly.Collector) (Resu
 		indexManager: p.IndexManager,
 		sources:      p.Sources,
 	}
-	c.SetCollector(collector)
 	return Result{Crawler: c}, nil
 }

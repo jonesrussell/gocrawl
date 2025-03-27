@@ -63,3 +63,15 @@ func (m *MockCrawler) GetIndexManager() api.IndexManager {
 func (m *MockCrawler) Wait() {
 	m.Called()
 }
+
+// GetMetrics implements crawler.Interface
+func (m *MockCrawler) GetMetrics() *Metrics {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
+	}
+	if metrics, ok := args.Get(0).(*Metrics); ok {
+		return metrics
+	}
+	return nil
+}

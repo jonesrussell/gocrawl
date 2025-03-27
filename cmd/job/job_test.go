@@ -51,6 +51,7 @@ func (m *mockCrawler) SetMaxDepth(_ int)                   {}
 func (m *mockCrawler) SetCollector(_ *colly.Collector)     {}
 func (m *mockCrawler) GetIndexManager() api.IndexManager   { return nil }
 func (m *mockCrawler) Wait()                               {}
+func (m *mockCrawler) GetMetrics() *crawler.Metrics        { return nil }
 
 // mockStorage implements types.Interface for testing
 type mockStorage struct{}
