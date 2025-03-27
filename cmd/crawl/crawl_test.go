@@ -4,12 +4,16 @@ import (
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
 
-// Since ValidateArgs is not exported, we'll test through the Command's Args function
 func TestCommandValidation(t *testing.T) {
 	t.Parallel()
+
+	rootCmd := &cobra.Command{}
+	cmd := crawl.Command()
+	rootCmd.AddCommand(cmd)
 
 	tests := []struct {
 		name    string
@@ -17,18 +21,18 @@ func TestCommandValidation(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "no args",
+			name:    "no arguments",
 			args:    []string{},
 			wantErr: true,
 		},
 		{
-			name:    "with source name",
+			name:    "valid source name",
 			args:    []string{"test-source"},
 			wantErr: false,
 		},
 		{
-			name:    "too many args",
-			args:    []string{"test-source", "extra-arg"},
+			name:    "too many arguments",
+			args:    []string{"test-source", "extra"},
 			wantErr: true,
 		},
 	}
@@ -36,8 +40,9 @@ func TestCommandValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			cmd := crawl.Command()
-			err := cmd.Args(cmd, tt.args)
+			cmd.SetContext(t.Context())
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
