@@ -12,6 +12,11 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// DefaultShutdownTimeout is the default timeout for graceful shutdown
+	DefaultShutdownTimeout = 5 * time.Second
+)
+
 // LifecycleParams holds the dependencies for SetupLifecycle
 type LifecycleParams struct {
 	fx.In
@@ -67,7 +72,7 @@ func ConfigureLifecycle(p LifecycleParams) {
 		},
 		OnStop: func(ctx context.Context) error {
 			// Create a timeout context for shutdown
-			shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
+			shutdownCtx, shutdownCancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
 			defer shutdownCancel()
 
 			// Cancel the cleanup goroutine context
@@ -95,4 +100,12 @@ func ConfigureLifecycle(p LifecycleParams) {
 			return nil
 		},
 	})
+}
+
+// Shutdown gracefully shuts down the application
+func Shutdown(ctx context.Context, app *fx.App) error {
+	shutdownCtx, cancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
+	defer cancel()
+
+	return app.Stop(shutdownCtx)
 }

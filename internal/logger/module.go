@@ -69,8 +69,6 @@ func NewLogger(cfg config.Interface) (types.Logger, error) {
 	config.EncoderConfig.LevelKey = "level"
 	config.EncoderConfig.MessageKey = "message"
 
-	config.Level = zap.NewAtomicLevelAt(logLevel)
-
 	// Create core based on environment
 	var core zapcore.Core
 	if env == envDevelopment {

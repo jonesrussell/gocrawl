@@ -41,14 +41,19 @@ var Module = fx.Module("storage",
 	),
 )
 
-// Options defines the options for the storage module
-type Options struct {
+// ModuleOptions defines the options for the storage module
+type ModuleOptions struct {
 	fx.In
 
-	Config    *config.Config
-	Logger    common.Logger
-	Addresses []string
-	APIKey    string
+	Config         *config.Config
+	Logger         common.Logger
+	Addresses      []string
+	APIKey         string
+	Username       string
+	Password       string
+	Transport      *http.Transport
+	IndexName      string
+	ScrollDuration time.Duration
 }
 
 // ProvideIndexManager creates and returns an IndexManager implementation
@@ -60,7 +65,7 @@ func ProvideIndexManager(
 }
 
 // ProvideElasticsearchClient provides the Elasticsearch client
-func ProvideElasticsearchClient(opts Options, log common.Logger) (*es.Client, error) {
+func ProvideElasticsearchClient(opts ModuleOptions, log common.Logger) (*es.Client, error) {
 	if len(opts.Addresses) == 0 {
 		return nil, errors.New("elasticsearch addresses are required")
 	}

@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	// shutdownTimeout is the maximum time to wait for graceful shutdown
-	shutdownTimeout = 30 * time.Second
+	// DefaultShutdownTimeout is the default timeout for graceful shutdown
+	DefaultShutdownTimeout = 5 * time.Second
 )
 
 // Dependencies holds the HTTP server's dependencies
@@ -79,6 +79,14 @@ func (s *Server) Stop(ctx context.Context) error {
 	s.Logger.Info("Stopping HTTP server")
 	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	return s.server.Shutdown(shutdownCtx)
+}
+
+// Shutdown gracefully shuts down the HTTP server
+func (s *Server) Shutdown(ctx context.Context) error {
+	shutdownCtx, cancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
+	defer cancel()
+
 	return s.server.Shutdown(shutdownCtx)
 }
 
@@ -148,7 +156,7 @@ You can send POST requests to /search with a JSON body containing the search par
 						p.Logger.Info("Initiating graceful shutdown...")
 
 						// Create timeout context for shutdown
-						shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
+						shutdownCtx, shutdownCancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
 						defer shutdownCancel()
 
 						// Shutdown HTTP server

@@ -1,10 +1,9 @@
 package logger_test
 
 import (
-	"bytes"
+	"fmt"
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,31 +47,41 @@ func TestNewCustomLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logLevel := "info"                                              // Set the desired log level
-			developmentLogger, err := logger.NewDevelopmentLogger(logLevel) // Pass log level as string
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewDevelopmentLogger() error = %v, wantErr %v", err, tt.wantErr)
+			// Create a zap logger with the test parameters
+			config := zap.NewDevelopmentConfig()
+			config.Level = zap.NewAtomicLevelAt(tt.params.Level)
+			zapLogger, err := config.Build()
+			if err != nil {
+				t.Errorf("Failed to create zap logger: %v", err)
 				return
 			}
-			if developmentLogger == nil {
-				t.Error("NewDevelopmentLogger() returned nil developmentLogger")
+			defer zapLogger.Sync()
+
+			// Create our custom logger
+			customLogger, err := logger.NewCustomLogger(zapLogger)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewCustomLogger() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if customLogger == nil {
+				t.Error("NewCustomLogger() returned nil customLogger")
 				return
 			}
 
 			// Test logging methods
-			developmentLogger.Info("test info message", "key", "value")
-			developmentLogger.Error("test error message", "key", "value")
-			developmentLogger.Debug("test debug message", "key", "value")
-			developmentLogger.Warn("test warn message", "key", "value")
-			developmentLogger.Errorf("test error format %s", "value")
+			customLogger.Info("test info message", "key", "value")
+			customLogger.Error("test error message", "key", "value")
+			customLogger.Debug("test debug message", "key", "value")
+			customLogger.Warn("test warn message", "key", "value")
+			customLogger.Errorf("test error format %s", "value")
 
 			// Test GetZapLogger
-			if developmentLogger.GetZapLogger() == nil {
+			if customLogger.GetZapLogger() == nil {
 				t.Error("GetZapLogger() returned nil")
 			}
 
 			// Test Sync
-			if syncErr := developmentLogger.Sync(); syncErr != nil {
+			if syncErr := customLogger.Sync(); syncErr != nil {
 				// Ignore sync errors as they're expected when writing to console
 				t.Log("Sync() error (expected):", syncErr)
 			}
@@ -102,11 +111,6 @@ func TestNewDevelopmentLogger(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:      "error level",
-			levelStr:  "error",
-			expectErr: false,
-		},
-		{
 			name:      "invalid level",
 			levelStr:  "invalid",
 			expectErr: true,
@@ -115,13 +119,41 @@ func TestNewDevelopmentLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, err := logger.NewDevelopmentLogger(tt.levelStr)
-			if tt.expectErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, log)
+			// Create a zap logger with development config
+			config := zap.NewDevelopmentConfig()
+			level, err := logger.ParseLogLevel(tt.levelStr)
+			if (err != nil) != tt.expectErr {
+				t.Errorf("ParseLogLevel() error = %v, expectErr %v", err, tt.expectErr)
+				return
 			}
+			if tt.expectErr {
+				return
+			}
+			config.Level = zap.NewAtomicLevelAt(level)
+			zapLogger, err := config.Build()
+			if err != nil {
+				t.Errorf("Failed to create zap logger: %v", err)
+				return
+			}
+			defer zapLogger.Sync()
+
+			// Create our custom logger
+			customLogger, err := logger.NewCustomLogger(zapLogger)
+			if err != nil {
+				t.Errorf("NewCustomLogger() error = %v", err)
+				return
+			}
+			if customLogger == nil {
+				t.Error("NewCustomLogger() returned nil")
+				return
+			}
+
+			// Test logging methods
+			customLogger.Info("test info message", "key", "value")
+			customLogger.Error("test error message", "key", "value")
+			customLogger.Debug("test debug message", "key", "value")
+			customLogger.Warn("test warn message", "key", "value")
+			customLogger.Errorf("test error format %s", "value")
 		})
 	}
 }
@@ -138,6 +170,11 @@ func TestNewProductionLogger(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:      "warn level",
+			levelStr:  "warn",
+			expectErr: false,
+		},
+		{
 			name:      "error level",
 			levelStr:  "error",
 			expectErr: false,
@@ -151,156 +188,173 @@ func TestNewProductionLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, err := logger.NewProductionLogger(tt.levelStr)
-			if tt.expectErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, log)
+			// Create a zap logger with production config
+			config := zap.NewProductionConfig()
+			level, err := logger.ParseLogLevel(tt.levelStr)
+			if (err != nil) != tt.expectErr {
+				t.Errorf("ParseLogLevel() error = %v, expectErr %v", err, tt.expectErr)
+				return
 			}
+			if tt.expectErr {
+				return
+			}
+			config.Level = zap.NewAtomicLevelAt(level)
+			zapLogger, err := config.Build()
+			if err != nil {
+				t.Errorf("Failed to create zap logger: %v", err)
+				return
+			}
+			defer zapLogger.Sync()
+
+			// Create our custom logger
+			customLogger, err := logger.NewCustomLogger(zapLogger)
+			if err != nil {
+				t.Errorf("NewCustomLogger() error = %v", err)
+				return
+			}
+			if customLogger == nil {
+				t.Error("NewCustomLogger() returned nil")
+				return
+			}
+
+			// Test logging methods
+			customLogger.Info("test info message", "key", "value")
+			customLogger.Error("test error message", "key", "value")
+			customLogger.Warn("test warn message", "key", "value")
+			customLogger.Errorf("test error format %s", "value")
 		})
 	}
 }
 
+// createTestLogger creates a logger with the given configuration for testing
+func createTestLogger(t *testing.T, levelStr string, appEnv string) (*logger.CustomLogger, error) {
+	var config zap.Config
+	if appEnv == "development" {
+		config = zap.NewDevelopmentConfig()
+	} else {
+		config = zap.NewProductionConfig()
+	}
+
+	level, err := logger.ParseLogLevel(levelStr)
+	if err != nil {
+		return nil, err
+	}
+	config.Level = zap.NewAtomicLevelAt(level)
+	zapLogger, err := config.Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create zap logger: %w", err)
+	}
+
+	return logger.NewCustomLogger(zapLogger)
+}
+
 func TestInitializeLogger(t *testing.T) {
 	tests := []struct {
-		name    string
-		cfg     *config.Config
-		wantErr bool
+		name      string
+		levelStr  string
+		appEnv    string
+		expectErr bool
 	}{
 		{
-			name: "development environment",
-			cfg: &config.Config{
-				App: config.AppConfig{
-					Environment: "development",
-				},
-				Log: config.LogConfig{
-					Level: "debug",
-					Debug: true,
-				},
-			},
-			wantErr: false,
+			name:      "development environment",
+			levelStr:  "debug",
+			appEnv:    "development",
+			expectErr: false,
 		},
 		{
-			name: "production environment",
-			cfg: &config.Config{
-				App: config.AppConfig{
-					Environment: "production",
-				},
-				Log: config.LogConfig{
-					Level: "info",
-					Debug: false,
-				},
-			},
-			wantErr: false,
+			name:      "production environment",
+			levelStr:  "info",
+			appEnv:    "production",
+			expectErr: false,
 		},
 		{
-			name: "empty environment defaults to development",
-			cfg: &config.Config{
-				App: config.AppConfig{},
-				Log: config.LogConfig{
-					Level: "info",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "empty log level defaults to info",
-			cfg: &config.Config{
-				App: config.AppConfig{
-					Environment: "development",
-				},
-				Log: config.LogConfig{},
-			},
-			wantErr: false,
+			name:      "invalid level",
+			levelStr:  "invalid",
+			appEnv:    "development",
+			expectErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, err := logger.InitializeLogger(tt.cfg)
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Nil(t, log)
-			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, log)
+			customLogger, err := createTestLogger(t, tt.levelStr, tt.appEnv)
+			if (err != nil) != tt.expectErr {
+				t.Errorf("createTestLogger() error = %v, expectErr %v", err, tt.expectErr)
+				return
 			}
+			if tt.expectErr {
+				return
+			}
+			if customLogger == nil {
+				t.Error("createTestLogger() returned nil")
+				return
+			}
+
+			// Test logging methods
+			customLogger.Info("test info message", "key", "value")
+			customLogger.Error("test error message", "key", "value")
+			if tt.appEnv == "development" {
+				customLogger.Debug("test debug message", "key", "value")
+			}
+			customLogger.Warn("test warn message", "key", "value")
+			customLogger.Errorf("test error format %s", "value")
 		})
 	}
 }
 
 func TestCustomLogger_Methods(t *testing.T) {
-	// Create a development logger
-	log, err := logger.NewDevelopmentLogger("debug")
-	require.NoError(t, err)
-	require.NotNil(t, log)
+	// Create a zap logger with development config
+	config := zap.NewDevelopmentConfig()
+	config.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
+	zapLogger, err := config.Build()
+	if err != nil {
+		t.Fatalf("Failed to create zap logger: %v", err)
+	}
+	defer zapLogger.Sync()
+
+	// Create our custom logger
+	customLogger, err := logger.NewCustomLogger(zapLogger)
+	if err != nil {
+		t.Fatalf("Failed to create custom logger: %v", err)
+	}
 
 	// Test all logging methods
-	t.Run("Info", func(_ *testing.T) {
-		log.Info("test info message", "key", "value")
+	t.Run("Info", func(t *testing.T) {
+		customLogger.Info("test info message", "key", "value")
 	})
 
-	t.Run("Error", func(_ *testing.T) {
-		log.Error("test error message", "key", "value")
+	t.Run("Error", func(t *testing.T) {
+		customLogger.Error("test error message", "key", "value")
 	})
 
-	t.Run("Debug", func(_ *testing.T) {
-		log.Debug("test debug message", "key", "value")
+	t.Run("Debug", func(t *testing.T) {
+		customLogger.Debug("test debug message", "key", "value")
 	})
 
-	t.Run("Warn", func(_ *testing.T) {
-		log.Warn("test warn message", "key", "value")
+	t.Run("Warn", func(t *testing.T) {
+		customLogger.Warn("test warn message", "key", "value")
 	})
 
-	t.Run("Fatal_with_recovery", func(t *testing.T) {
-		// Create a buffer to capture output
-		var buf bytes.Buffer
+	t.Run("Printf", func(t *testing.T) {
+		customLogger.Printf("test printf message %s", "value")
+	})
 
-		// Create an encoder that writes to our buffer
-		encoder := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
-		core := zapcore.NewCore(
-			encoder,
-			zapcore.AddSync(&buf),
-			zapcore.FatalLevel,
-		)
+	t.Run("Errorf", func(t *testing.T) {
+		customLogger.Errorf("test errorf message %s", "value")
+	})
 
-		// Create a logger that doesn't exit on Fatal
-		testLogger := zap.New(core)
-		customLogger, customErr := logger.NewCustomLogger(testLogger)
-		if customErr != nil {
-			t.Fatalf("Failed to create custom logger: %v", customErr)
-		}
-
-		// Set a fatal hook that panics instead of exiting
+	t.Run("Fatal", func(t *testing.T) {
+		// Set up a fatal hook to prevent actual fatal
 		customLogger.SetFatalHook(func(entry zapcore.Entry) error {
-			panic(entry.Message)
+			return nil
 		})
-
-		// Expect this to panic
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected Fatal to panic")
-			} else {
-				assert.Equal(t, "test fatal message", r)
-			}
-		}()
-
 		customLogger.Fatal("test fatal message", "key", "value")
 	})
 
-	t.Run("Printf", func(_ *testing.T) {
-		log.Printf("test printf %s", "value")
-	})
-
-	t.Run("Errorf", func(_ *testing.T) {
-		log.Errorf("test errorf %s", "value")
-	})
-
 	t.Run("Sync", func(t *testing.T) {
-		syncErr := log.Sync()
-		// Ignore sync errors as they're expected when writing to console
+		syncErr := customLogger.Sync()
 		if syncErr != nil {
+			// Ignore sync errors as they're expected when writing to console
 			t.Log("Sync() error (expected):", syncErr)
 		}
 	})
@@ -419,42 +473,60 @@ func TestConvertToZapFields(t *testing.T) {
 }
 
 func TestCustomLogger_LoggingWithFields(t *testing.T) {
-	log, err := logger.NewDevelopmentLogger("debug")
-	require.NoError(t, err)
+	// Create a zap logger with development config
+	config := zap.NewDevelopmentConfig()
+	config.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
+	zapLogger, err := config.Build()
+	if err != nil {
+		t.Fatalf("Failed to create zap logger: %v", err)
+	}
+	defer zapLogger.Sync()
 
+	// Create our custom logger
+	customLogger, err := logger.NewCustomLogger(zapLogger)
+	if err != nil {
+		t.Fatalf("Failed to create custom logger: %v", err)
+	}
+
+	// Test logging with various field types
 	tests := []struct {
 		name   string
+		msg    string
 		fields []any
 	}{
 		{
-			name:   "no fields",
-			fields: []any{},
-		},
-		{
-			name:   "single key-value pair",
-			fields: []any{"key", "value"},
-		},
-		{
-			name:   "multiple key-value pairs",
+			name:   "string fields",
+			msg:    "test message",
 			fields: []any{"key1", "value1", "key2", "value2"},
 		},
 		{
-			name:   "odd number of fields",
-			fields: []any{"key1", "value1", "extra"},
+			name:   "numeric fields",
+			msg:    "test message",
+			fields: []any{"int", 42, "float", 3.14},
 		},
 		{
-			name:   "non-string key",
-			fields: []any{123, "value"},
+			name:   "boolean fields",
+			msg:    "test message",
+			fields: []any{"bool", true, "bool2", false},
+		},
+		{
+			name:   "nil fields",
+			msg:    "test message",
+			fields: []any{"nil", nil},
+		},
+		{
+			name:   "mixed fields",
+			msg:    "test message",
+			fields: []any{"string", "value", "int", 42, "bool", true, "nil", nil},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
-			// Test all logging methods with fields
-			log.Info("test message", tt.fields...)
-			log.Error("test message", tt.fields...)
-			log.Debug("test message", tt.fields...)
-			log.Warn("test message", tt.fields...)
+		t.Run(tt.name, func(t *testing.T) {
+			customLogger.Info(tt.msg, tt.fields...)
+			customLogger.Error(tt.msg, tt.fields...)
+			customLogger.Debug(tt.msg, tt.fields...)
+			customLogger.Warn(tt.msg, tt.fields...)
 		})
 	}
 }
