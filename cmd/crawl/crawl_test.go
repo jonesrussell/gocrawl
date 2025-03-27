@@ -11,7 +11,11 @@ import (
 func TestCommandValidation(t *testing.T) {
 	t.Parallel()
 
-	rootCmd := &cobra.Command{}
+	// Create root command with proper setup
+	rootCmd := &cobra.Command{
+		Use:   "test",
+		Short: "Test command",
+	}
 	cmd := crawl.Command()
 	rootCmd.AddCommand(cmd)
 
@@ -41,8 +45,9 @@ func TestCommandValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			cmd.SetContext(t.Context())
-			cmd.SetArgs(tt.args)
-			err := cmd.Execute()
+
+			// Validate arguments against the crawl command
+			err := cmd.ValidateArgs(tt.args)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

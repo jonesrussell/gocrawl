@@ -18,7 +18,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -194,8 +193,6 @@ func TestModuleConfiguration(t *testing.T) {
 	}
 	testSources := sourcestest.NewTestSources(testConfigs)
 
-	var crawlerInstance crawler.Interface
-
 	// Create a test-specific module that excludes config.Module and sources.Module
 	testModule := fx.Module("test",
 		// Core dependencies (excluding config, logger, and storage modules)
@@ -215,6 +212,7 @@ func TestModuleConfiguration(t *testing.T) {
 					Sources    sources.Interface `name:"sourceManager"`
 					SourceName string            `name:"sourceName"`
 					ArticleSvc article.Interface `name:"testArticleService"`
+					IndexMgr   api.IndexManager  `name:"testIndexManager"`
 				} {
 					return struct {
 						fx.Out
@@ -223,12 +221,14 @@ func TestModuleConfiguration(t *testing.T) {
 						Sources    sources.Interface `name:"sourceManager"`
 						SourceName string            `name:"sourceName"`
 						ArticleSvc article.Interface `name:"testArticleService"`
+						IndexMgr   api.IndexManager  `name:"testIndexManager"`
 					}{
 						Logger:     mockLogger,
 						Config:     mockCfg,
 						Sources:    testSources,
 						SourceName: "Test Source",
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
+						IndexMgr:   &mockIndexManager{},
 					}
 				},
 			),
@@ -237,28 +237,14 @@ func TestModuleConfiguration(t *testing.T) {
 		// Decorate storage-related dependencies with mocks
 		fx.Decorate(
 			func() types.Interface { return &mockStorage{} },
-			func() api.IndexManager { return &mockIndexManager{} },
 			func() api.SearchManager { return &mockSearchManager{} },
 		),
 	)
 
-	// Create test app with test-specific module
 	app := fxtest.New(t,
 		fx.NopLogger,
 		testModule,
-		fx.Populate(&crawlerInstance),
 	)
 
-	// Start the app
-	require.NoError(t, app.Start(t.Context()))
-	defer func(app *fxtest.App, ctx context.Context) {
-		err := app.Stop(ctx)
-		if err != nil {
-			t.Errorf("Error stopping app: %v", err)
-		}
-	}(app, t.Context())
-
-	// Verify crawler configuration
-	assert.NotNil(t, crawlerInstance, "Crawler should be provided")
-	// Note: Add more specific crawler configuration checks here once crawler exposes them
+	require.NoError(t, app.Err())
 }

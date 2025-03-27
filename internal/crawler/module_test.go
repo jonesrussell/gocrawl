@@ -2,14 +2,17 @@ package crawler_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,54 +69,109 @@ func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 	}
 }
 
+// mockSearchManager implements api.SearchManager for testing
+type mockSearchManager struct {
+	api.SearchManager
+}
+
+func (m *mockSearchManager) Search(_ context.Context, _ string, _ any) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *mockSearchManager) Count(_ context.Context, _ string, _ any) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockSearchManager) Aggregate(_ context.Context, _ string, _ any) (any, error) {
+	return nil, errors.New("aggregate not implemented in mock")
+}
+
 // mockIndexManager implements api.IndexManager for testing
 type mockIndexManager struct {
-	createIndexFn   func(ctx context.Context, index string) error
-	indexExistsFn   func(ctx context.Context, index string) (bool, error)
-	deleteIndexFn   func(ctx context.Context, index string) error
-	ensureIndexFn   func(ctx context.Context, name string, mapping any) error
-	updateMappingFn func(ctx context.Context, name string, mapping any) error
+	api.IndexManager
 }
 
-func (m *mockIndexManager) CreateIndex(ctx context.Context, index string) error {
-	return m.createIndexFn(ctx, index)
+func (m *mockIndexManager) Index(_ context.Context, _ string, _ any) error {
+	return nil
 }
 
-func (m *mockIndexManager) IndexExists(ctx context.Context, index string) (bool, error) {
-	return m.indexExistsFn(ctx, index)
-}
-
-func (m *mockIndexManager) DeleteIndex(ctx context.Context, index string) error {
-	return m.deleteIndexFn(ctx, index)
-}
-
-func (m *mockIndexManager) EnsureIndex(ctx context.Context, name string, mapping any) error {
-	return m.ensureIndexFn(ctx, name, mapping)
-}
-
-func (m *mockIndexManager) UpdateMapping(ctx context.Context, name string, mapping any) error {
-	return m.updateMappingFn(ctx, name, mapping)
+func (m *mockIndexManager) Close() error {
+	return nil
 }
 
 // mockStorage implements types.Interface for testing
 type mockStorage struct {
 	types.Interface
-	testConnectionFn func(ctx context.Context) error
-	closeFn          func() error
 }
 
-func (m *mockStorage) TestConnection(ctx context.Context) error {
-	if m.testConnectionFn != nil {
-		return m.testConnectionFn(ctx)
-	}
+func (m *mockStorage) Store(_ context.Context, _ string, _ any) error {
 	return nil
 }
 
 func (m *mockStorage) Close() error {
-	if m.closeFn != nil {
-		return m.closeFn()
-	}
 	return nil
+}
+
+// mockSources implements sources.Interface for testing
+type mockSources struct {
+	sources.Interface
+}
+
+func (m *mockSources) GetSource(_ string) (*sources.Config, error) {
+	return &sources.Config{
+		Name:      "test-source",
+		URL:       "http://test.example.com",
+		RateLimit: "1s",
+		MaxDepth:  2,
+		Selectors: sources.SelectorConfig{
+			Title:       "h1",
+			Description: "meta[name=description]",
+			Content:     "article",
+			Article: sources.ArticleSelectors{
+				Container: "article",
+				Title:     "h1",
+				Body:      "article",
+			},
+		},
+	}, nil
+}
+
+func (m *mockSources) ListSources() ([]*sources.Config, error) {
+	return []*sources.Config{
+		{
+			Name:      "test-source",
+			URL:       "http://test.example.com",
+			RateLimit: "1s",
+			MaxDepth:  2,
+			Selectors: sources.SelectorConfig{
+				Title:       "h1",
+				Description: "meta[name=description]",
+				Content:     "article",
+				Article: sources.ArticleSelectors{
+					Container: "article",
+					Title:     "h1",
+					Body:      "article",
+				},
+			},
+		},
+	}, nil
+}
+
+// mockSignalHandler implements signal.SignalHandler for testing
+type mockSignalHandler struct {
+	*signal.SignalHandler
+}
+
+func (m *mockSignalHandler) Setup(_ context.Context) func() {
+	return func() {}
+}
+
+func (m *mockSignalHandler) SetLogger(_ logger.Interface) {}
+
+func (m *mockSignalHandler) SetFXApp(_ *fx.App) {}
+
+func (m *mockSignalHandler) Wait() bool {
+	return true
 }
 
 // TestModule tests that the crawler module provides all necessary dependencies
@@ -237,7 +295,9 @@ func TestAppDependencies(t *testing.T) {
 	mockCfg := &mockConfig{}
 	mockStore := &mockStorage{}
 	mockIndex := &mockIndexManager{}
-	mockSearchManager := api.NewMockSearchManager(ctrl)
+	mockSearchManager := &mockSearchManager{}
+	mockSources := &mockSources{}
+	mockSignalHandler := signal.NewSignalHandler(mockLogger)
 
 	// Set up debug logging expectations
 	mockLogger.EXPECT().Debug(gomock.Any()).AnyTimes()
@@ -273,7 +333,19 @@ func TestAppDependencies(t *testing.T) {
 				func() api.SearchManager { return mockSearchManager },
 				fx.ResultTags(`name:"testSearchManager"`),
 			),
-			func() context.Context { return context.Background() },
+			fx.Annotate(
+				func() sources.Interface { return mockSources },
+				fx.ResultTags(`name:"sourceManager"`),
+			),
+			fx.Annotate(
+				func() string { return "test-source" },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() *signal.SignalHandler { return mockSignalHandler },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
+			context.Background,
 		),
 		fx.Invoke(func(deps crawler.CrawlDeps) {
 			assert.NotNil(t, deps.Logger)
@@ -283,6 +355,9 @@ func TestAppDependencies(t *testing.T) {
 			assert.NotNil(t, deps.Processors)
 			assert.NotNil(t, deps.Done)
 			assert.NotNil(t, deps.Context)
+			assert.NotNil(t, deps.Sources)
+			assert.NotNil(t, deps.SourceName)
+			assert.NotNil(t, deps.Handler)
 		}),
 	)
 
