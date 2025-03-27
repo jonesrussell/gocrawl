@@ -101,9 +101,7 @@ func TestModuleProvides(t *testing.T) {
 	// Create a test-specific module that excludes config.Module and sources.Module
 	testModule := fx.Module("test",
 		// Core dependencies
-		content.Module,
 		collector.Module(),
-		crawler.Module,
 
 		// Provide all required dependencies
 		fx.Provide(
@@ -139,6 +137,8 @@ func TestModuleProvides(t *testing.T) {
 					Sources    sources.Interface `name:"testSourceManager"`
 					ArticleSvc article.Interface `name:"testArticleService"`
 					IndexMgr   api.IndexManager  `name:"indexManager"`
+					Content    content.Interface
+					Crawler    crawler.Interface
 				} {
 					return struct {
 						fx.Out
@@ -147,12 +147,16 @@ func TestModuleProvides(t *testing.T) {
 						Sources    sources.Interface `name:"testSourceManager"`
 						ArticleSvc article.Interface `name:"testArticleService"`
 						IndexMgr   api.IndexManager  `name:"indexManager"`
+						Content    content.Interface
+						Crawler    crawler.Interface
 					}{
 						Logger:     mockLogger,
 						Config:     mockCfg,
 						Sources:    testSources,
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
 						IndexMgr:   &mockIndexManager{},
+						Content:    content.NewService(mockLogger),
+						Crawler:    testutils.NewMockCrawler(),
 					}
 				},
 			),
@@ -214,9 +218,7 @@ func TestModuleConfiguration(t *testing.T) {
 	// Create a test-specific module that excludes config.Module and sources.Module
 	testModule := fx.Module("test",
 		// Core dependencies
-		content.Module,
 		collector.Module(),
-		crawler.Module,
 
 		// Provide all required dependencies
 		fx.Provide(
@@ -252,6 +254,8 @@ func TestModuleConfiguration(t *testing.T) {
 					Sources    sources.Interface `name:"testSourceManager"`
 					ArticleSvc article.Interface `name:"testArticleService"`
 					IndexMgr   api.IndexManager  `name:"indexManager"`
+					Content    content.Interface
+					Crawler    crawler.Interface
 				} {
 					return struct {
 						fx.Out
@@ -260,12 +264,16 @@ func TestModuleConfiguration(t *testing.T) {
 						Sources    sources.Interface `name:"testSourceManager"`
 						ArticleSvc article.Interface `name:"testArticleService"`
 						IndexMgr   api.IndexManager  `name:"indexManager"`
+						Content    content.Interface
+						Crawler    crawler.Interface
 					}{
 						Logger:     mockLogger,
 						Config:     mockCfg,
 						Sources:    testSources,
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
 						IndexMgr:   &mockIndexManager{},
+						Content:    content.NewService(mockLogger),
+						Crawler:    testutils.NewMockCrawler(),
 					}
 				},
 			),

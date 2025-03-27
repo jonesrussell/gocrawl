@@ -58,11 +58,6 @@ var Module = fx.Module("crawler",
 		provideCollyDebugger,
 		provideEventBus,
 		provideCrawler,
-		// Content service
-		fx.Annotate(
-			content.NewService,
-			fx.As(new(content.Interface)),
-		),
 		// Article channel named instance
 		fx.Annotate(
 			func() chan *models.Article {
