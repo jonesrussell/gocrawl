@@ -176,7 +176,8 @@ func TestBus_Publish_Concurrent(t *testing.T) {
 	}
 }
 
-// TestBus_Publish_ContextCancellation tests that context cancellation is respected during publishing.
+// TestBus_Publish_ContextCancellation tests that context cancellation is respected
+// during publishing.
 func TestBus_Publish_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
