@@ -21,6 +21,14 @@ Dependency Injection & Interfaces
   - Use common.Storage instead of storage.Interface
   - Use common.Config instead of config.Config
 - Define New* constructors only in module.go files
+- When testing fx modules:
+  - Provide all required dependencies with correct names
+  - Use fx.Annotate for named dependencies
+  - Avoid providing dependencies that are already provided by the module
+  - Use fx.NopLogger in tests to reduce noise
+  - Test dependency injection separately from lifecycle
+  - Use test helpers for common dependency setup
+  - Verify dependency injection before testing functionality
 
 Error Handling
 - Prefer errors.New over fmt.Errorf for simple error messages
@@ -40,6 +48,38 @@ Testing
 - Use t.Parallel() appropriately in tests
 - Place tests in a separate _test package
 - Use testify consistently for assertions
+- Follow test naming conventions:
+  - Test[FunctionName] for function tests
+  - Test[TypeName] for type tests
+  - Test[InterfaceName] for interface tests
+- Structure tests with setup, execution, and verification phases
+- Use table-driven tests for multiple test cases
+- Mock external dependencies consistently
+- Use test helpers to reduce code duplication
+- Test both success and failure cases
+- Test edge cases and boundary conditions
+- Use meaningful test data
+- Document test setup and assumptions
+- Keep tests focused and single-purpose
+- Use subtests for related test cases
+- Test public interfaces, not implementation details
+- Use test fixtures for complex test data
+- Clean up resources in test teardown
+- Use test-specific types and interfaces
+- Avoid test interdependence
+- Use meaningful assertion messages
+- Test error conditions explicitly
+- Use test coverage tools appropriately
+- For fx-based tests:
+  - Test module construction separately
+  - Test dependency injection separately
+  - Test lifecycle separately
+  - Use fx.Invoke for verification
+  - Clean up resources in defer
+  - Use fx.Supply for simple dependencies
+  - Use fx.Provide for complex dependencies
+  - Use fx.Annotate for named dependencies
+  - Avoid duplicate dependency providers
 
 Dependencies
 - Use go 1.24
