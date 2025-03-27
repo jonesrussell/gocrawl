@@ -52,7 +52,7 @@ func (l *Lifecycle) Start(ctx context.Context) error {
 // Stop gracefully stops the API server
 func (l *Lifecycle) Stop(ctx context.Context) error {
 	l.Log.Info("Stopping API server")
-	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
 	defer cancel()
 	return l.server.Shutdown(shutdownCtx)
 }

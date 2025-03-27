@@ -227,7 +227,7 @@ func TestNewProductionLogger(t *testing.T) {
 }
 
 // createTestLogger creates a logger with the given configuration for testing
-func createTestLogger(t *testing.T, levelStr string, appEnv string) (*logger.CustomLogger, error) {
+func createTestLogger(levelStr string, appEnv string) (*logger.CustomLogger, error) {
 	var config zap.Config
 	if appEnv == "development" {
 		config = zap.NewDevelopmentConfig()
@@ -277,7 +277,7 @@ func TestInitializeLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			customLogger, err := createTestLogger(t, tt.levelStr, tt.appEnv)
+			customLogger, err := createTestLogger(tt.levelStr, tt.appEnv)
 			if (err != nil) != tt.expectErr {
 				t.Errorf("createTestLogger() error = %v, expectErr %v", err, tt.expectErr)
 				return

@@ -77,7 +77,7 @@ func (s *Server) Start(ctx context.Context) error {
 // Stop gracefully stops the HTTP server
 func (s *Server) Stop(ctx context.Context) error {
 	s.Logger.Info("Stopping HTTP server")
-	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
 	defer cancel()
 	return s.server.Shutdown(shutdownCtx)
 }
