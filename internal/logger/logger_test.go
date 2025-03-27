@@ -267,7 +267,10 @@ func TestCustomLogger_Methods(t *testing.T) {
 
 		// Create a logger that doesn't exit on Fatal
 		testLogger := zap.New(core)
-		customLogger := logger.NewCustomLogger(testLogger)
+		customLogger, err := logger.NewCustomLogger(testLogger)
+		if err != nil {
+			t.Fatalf("Failed to create custom logger: %v", err)
+		}
 
 		// Set a fatal hook that panics instead of exiting
 		customLogger.SetFatalHook(func(entry zapcore.Entry) error {

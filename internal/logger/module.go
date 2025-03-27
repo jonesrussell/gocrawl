@@ -161,7 +161,11 @@ func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
 	// Log when the logger is created
 	logger.Info("Development logger initialized successfully")
 
-	return NewCustomLogger(logger), nil
+	customLogger, err := NewCustomLogger(logger)
+	if err != nil {
+		return nil, err
+	}
+	return customLogger, nil
 }
 
 // NewProductionLogger initializes a new CustomLogger for production
@@ -195,7 +199,11 @@ func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
 	// Log when the logger is created
 	logger.Info("Production logger initialized successfully")
 
-	return NewCustomLogger(logger), nil
+	customLogger, err := NewCustomLogger(logger)
+	if err != nil {
+		return nil, err
+	}
+	return customLogger, nil
 }
 
 // parseLogLevel converts a string log level to a zapcore.Level
@@ -221,4 +229,20 @@ func parseLogLevel(logLevelStr string) (zapcore.Level, error) {
 	}
 
 	return logLevel, nil
+}
+
+func ProvideCustomLogger(logger *zap.Logger) (*CustomLogger, error) {
+	return NewCustomLogger(logger)
+}
+
+func ProvideNoOpLogger() Interface {
+	return NewNoOp()
+}
+
+func ProvideLogger(logger *zap.Logger) (Interface, error) {
+	customLogger, err := NewCustomLogger(logger)
+	if err != nil {
+		return nil, err
+	}
+	return customLogger, nil
 }

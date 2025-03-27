@@ -240,15 +240,46 @@ func FromContext(ctx context.Context) *zap.Logger {
 	return logger
 }
 
-// NewCustomLogger creates a new CustomLogger with the given zap.Logger
-func NewCustomLogger(logger *zap.Logger) *CustomLogger {
+// NewCustomLogger creates a new CustomLogger. If a logger is provided, it will be used.
+// Otherwise, a new logger will be created with default configuration.
+func NewCustomLogger(logger *zap.Logger) (*CustomLogger, error) {
+	if logger != nil {
+		return &CustomLogger{
+			Logger: logger,
+			fatalHook: func(entry zapcore.Entry) error {
+				os.Exit(1)
+				return nil
+			},
+		}, nil
+	}
+
+	config := zap.NewProductionConfig()
+	config.OutputPaths = []string{"stdout"}
+	config.EncoderConfig.TimeKey = "timestamp"
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncoderConfig.StacktraceKey = "" // Remove stacktrace key
+	config.EncoderConfig.LevelKey = "level"
+	config.EncoderConfig.MessageKey = "message"
+	config.EncoderConfig.CallerKey = "" // Remove caller key
+	config.EncoderConfig.NameKey = ""   // Remove name key
+
+	// Disable stacktrace for warnings
+	config.OutputPaths = []string{"stdout"}
+	config.ErrorOutputPaths = []string{"stderr"}
+	config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+
+	newLogger, err := config.Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
 	return &CustomLogger{
-		Logger: logger,
+		Logger: newLogger,
 		fatalHook: func(entry zapcore.Entry) error {
 			os.Exit(1)
 			return nil
 		},
-	}
+	}, nil
 }
 
 // SetFatalHook allows overriding the default fatal behavior for testing

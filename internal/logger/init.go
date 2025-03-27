@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -41,6 +42,15 @@ func init() {
 		config = zap.NewDevelopmentConfig()
 	}
 
+	// Configure encoder to remove stack traces and caller info
+	config.EncoderConfig.StacktraceKey = "" // Remove stacktrace key
+	config.EncoderConfig.CallerKey = ""     // Remove caller key
+	config.EncoderConfig.NameKey = ""       // Remove name key
+	config.EncoderConfig.TimeKey = "timestamp"
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncoderConfig.LevelKey = "level"
+	config.EncoderConfig.MessageKey = "message"
+
 	config.Level = zap.NewAtomicLevelAt(logLevel)
 
 	zapLogger, err := config.Build()
@@ -48,7 +58,11 @@ func init() {
 		panic(fmt.Sprintf("Failed to initialize logger: %v", err))
 	}
 
-	logger = NewCustomLogger(zapLogger)
+	customLogger, err := NewCustomLogger(zapLogger)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create custom logger: %v", err))
+	}
+	logger = customLogger
 	logger.Info("Initializing logger",
 		"environment", env,
 		"log_level", logLevelStr,
