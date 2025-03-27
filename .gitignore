@@ -5,13 +5,13 @@
 !.env.example
 
 ## Application Config
-config.yml
-config.yaml
-config.production.yaml
-!config.example.yaml
+/config.yml
+/config.yaml
+/config.production.yaml
+!/config.example.yaml
 
 ## Source Configuration
-sources.yml
+/sources.yml
 
 # Security Files
 ## Certificates and Keys
