@@ -43,7 +43,7 @@ func (m *MockConfig) GetLogConfig() *config.LogConfig {
 
 func (m *MockConfig) GetCrawlerConfig() *config.CrawlerConfig {
 	return &config.CrawlerConfig{
-		SourceFile:  "testdata/sources.yml",
+		SourceFile:  "internal/api/testdata/sources.yml",
 		MaxDepth:    defaultMaxDepth,
 		RateLimit:   1 * time.Second,
 		RandomDelay: defaultRandomDelay,
@@ -172,6 +172,7 @@ func NewMockConfig() *config.Config {
 			Parallelism:      defaultParallelism,
 			IndexName:        "test-index",
 			ContentIndexName: "test-content-index",
+			SourceFile:       "internal/api/testdata/sources.yml",
 		},
 	}
 	return cfg

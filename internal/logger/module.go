@@ -2,34 +2,41 @@
 package logger
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+const (
+	envDevelopment = "development"
+	defaultLevel   = "info"
+)
+
 // Module provides the logger module and its dependencies using fx.
 var Module = fx.Options(
 	fx.Provide(
-		provideLogger,
+		NewLogger,
 	),
 )
 
-// Impl implements the Interface
-type Impl struct {
-	logger *zap.Logger
-}
+// NewLogger creates a new logger instance based on the provided configuration.
+func NewLogger(cfg common.Config) (common.Logger, error) {
+	env := cfg.GetAppConfig().Environment
+	if env == "" {
+		env = envDevelopment
+	}
 
-// Ensure Impl implements Interface
-var _ Interface = (*Impl)(nil)
+	logConfig := cfg.GetLogConfig()
+	logLevelStr := logConfig.Level
+	if logLevelStr == "" {
+		logLevelStr = defaultLevel
+	}
 
-// NewLogger creates a new logger instance
-func NewLogger(cfg *config.LogConfig) (Interface, error) {
-	logLevel, err := parseLogLevel(cfg.Level)
+	logLevel, err := parseLogLevel(logLevelStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
@@ -46,170 +53,56 @@ func NewLogger(cfg *config.LogConfig) (Interface, error) {
 		zapcore.AddSync(fileWriter),
 	)
 
+	config := zap.NewProductionConfig()
+	if env == envDevelopment {
+		config = zap.NewDevelopmentConfig()
+		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	}
+
+	// Configure encoder
+	config.EncoderConfig.StacktraceKey = "" // Remove stacktrace key
+	config.EncoderConfig.CallerKey = ""     // Remove caller key
+	config.EncoderConfig.NameKey = ""       // Remove name key
+	config.EncoderConfig.TimeKey = "timestamp"
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncoderConfig.LevelKey = "level"
+	config.EncoderConfig.MessageKey = "message"
+
+	config.Level = zap.NewAtomicLevelAt(logLevel)
+
 	// Create core based on environment
 	var core zapcore.Core
-	if cfg.Debug {
-		devEncoderConfig := zap.NewDevelopmentEncoderConfig()
-		devEncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	if env == envDevelopment {
 		core = zapcore.NewCore(
-			zapcore.NewConsoleEncoder(devEncoderConfig),
+			zapcore.NewConsoleEncoder(config.EncoderConfig),
 			multiWriter,
 			logLevel,
 		)
 	} else {
 		core = zapcore.NewCore(
-			zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+			zapcore.NewJSONEncoder(config.EncoderConfig),
 			multiWriter,
 			logLevel,
 		)
 	}
 
 	// Create logger
-	zapLogger := zap.New(core, zap.AddCaller(), zap.Development())
-	return &Impl{
-		logger: zapLogger,
-	}, nil
-}
-
-// Info implements Interface
-func (l *Impl) Info(msg string, fields ...any) {
-	l.logger.Info(msg, ConvertToZapFields(fields)...)
-}
-
-// Error implements Interface
-func (l *Impl) Error(msg string, fields ...any) {
-	l.logger.Error(msg, ConvertToZapFields(fields)...)
-}
-
-// Debug implements Interface
-func (l *Impl) Debug(msg string, fields ...any) {
-	l.logger.Debug(msg, ConvertToZapFields(fields)...)
-}
-
-// Warn implements Interface
-func (l *Impl) Warn(msg string, fields ...any) {
-	l.logger.Warn(msg, ConvertToZapFields(fields)...)
-}
-
-// Fatal implements Interface
-func (l *Impl) Fatal(msg string, fields ...any) {
-	l.logger.Fatal(msg, ConvertToZapFields(fields)...)
-}
-
-// Printf implements Interface
-func (l *Impl) Printf(format string, args ...any) {
-	l.logger.Info(fmt.Sprintf(format, args...))
-}
-
-// Errorf implements Interface
-func (l *Impl) Errorf(format string, args ...any) {
-	l.logger.Error(fmt.Sprintf(format, args...))
-}
-
-// Sync implements Interface
-func (l *Impl) Sync() error {
-	return l.logger.Sync()
-}
-
-// provideLogger creates a new logger instance
-func provideLogger() (Interface, error) {
-	return GetLogger(), nil
-}
-
-// InitializeLogger creates a new logger based on the configuration
-func InitializeLogger(cfg config.Interface) (Interface, error) {
-	logConfig := cfg.GetLogConfig()
-	if logConfig.Debug {
-		return NewDevelopmentLogger(logConfig.Level)
-	}
-	return NewProductionLogger(logConfig.Level)
-}
-
-// NewDevelopmentLogger initializes a new CustomLogger for development with colored output
-func NewDevelopmentLogger(logLevelStr string) (*CustomLogger, error) {
-	logLevel, err := parseLogLevel(logLevelStr)
+	zapLogger := zap.New(core)
+	customLogger, err := NewCustomLogger(zapLogger)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create custom logger: %w", err)
 	}
 
-	// Development encoder config with colors for console
-	devEncoderConfig := zap.NewDevelopmentEncoderConfig()
-	devEncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	customLogger.Info("Initializing logger",
+		"environment", env,
+		"log_level", logLevelStr,
+		"debug", env == envDevelopment)
 
-	// Create file writer
-	fileWriter, _, err := zap.Open("app.log")
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
-	}
-
-	// Create multi-writer for both console and file
-	multiWriter := zapcore.NewMultiWriteSyncer(
-		zapcore.AddSync(os.Stdout),
-		zapcore.AddSync(fileWriter),
-	)
-
-	// Console core with colored output
-	consoleCore := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(devEncoderConfig),
-		multiWriter,
-		logLevel,
-	)
-
-	// Create logger with both console and file output
-	logger := zap.New(consoleCore, zap.AddCaller(), zap.Development())
-
-	// Log when the logger is created
-	logger.Info("Development logger initialized successfully")
-
-	customLogger, err := NewCustomLogger(logger)
-	if err != nil {
-		return nil, err
-	}
-	return customLogger, nil
-}
-
-// NewProductionLogger initializes a new CustomLogger for production
-func NewProductionLogger(logLevelStr string) (*CustomLogger, error) {
-	logLevel, err := parseLogLevel(logLevelStr)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create file writer
-	fileWriter, _, err := zap.Open("app.log")
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
-	}
-
-	// Create multi-writer for both console and file
-	multiWriter := zapcore.NewMultiWriteSyncer(
-		zapcore.AddSync(os.Stdout),
-		zapcore.AddSync(fileWriter),
-	)
-
-	// Use JSON encoder for both console and file logging
-	consoleCore := zapcore.NewCore(
-		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-		multiWriter,
-		logLevel,
-	)
-
-	logger := zap.New(consoleCore)
-
-	// Log when the logger is created
-	logger.Info("Production logger initialized successfully")
-
-	customLogger, err := NewCustomLogger(logger)
-	if err != nil {
-		return nil, err
-	}
 	return customLogger, nil
 }
 
 // parseLogLevel converts a string log level to a zapcore.Level
 func parseLogLevel(logLevelStr string) (zapcore.Level, error) {
-	var logLevel zapcore.Level
-
 	// Default to info level if no level is provided
 	if logLevelStr == "" {
 		return zapcore.InfoLevel, nil
@@ -217,32 +110,14 @@ func parseLogLevel(logLevelStr string) (zapcore.Level, error) {
 
 	switch logLevelStr {
 	case "debug":
-		logLevel = zapcore.DebugLevel
+		return zapcore.DebugLevel, nil
 	case "info":
-		logLevel = zapcore.InfoLevel
+		return zapcore.InfoLevel, nil
 	case "warn":
-		logLevel = zapcore.WarnLevel
+		return zapcore.WarnLevel, nil
 	case "error":
-		logLevel = zapcore.ErrorLevel
+		return zapcore.ErrorLevel, nil
 	default:
-		return zapcore.DebugLevel, errors.New("unknown log level")
+		return zapcore.DebugLevel, fmt.Errorf("unknown log level: %s", logLevelStr)
 	}
-
-	return logLevel, nil
-}
-
-func ProvideCustomLogger(logger *zap.Logger) (*CustomLogger, error) {
-	return NewCustomLogger(logger)
-}
-
-func ProvideNoOpLogger() Interface {
-	return NewNoOp()
-}
-
-func ProvideLogger(logger *zap.Logger) (Interface, error) {
-	customLogger, err := NewCustomLogger(logger)
-	if err != nil {
-		return nil, err
-	}
-	return customLogger, nil
 }
