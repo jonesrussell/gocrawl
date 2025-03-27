@@ -2,7 +2,6 @@
 package crawler_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -66,20 +65,20 @@ func verifyDependencies(t *testing.T, deps *crawler.CrawlDeps) {
 // TestDependencyInjection verifies that all dependencies are properly injected into the CrawlDeps struct.
 func TestDependencyInjection(t *testing.T) {
 	app := setupTestApp(t)
-	require.NoError(t, app.Start(context.Background()))
-	defer app.Stop(context.Background())
+	require.NoError(t, app.Start(t.Context()))
+	defer app.Stop(t.Context())
 }
 
 // TestModuleConstruction verifies that the crawler module can be constructed with all required dependencies.
 func TestModuleConstruction(t *testing.T) {
 	app := setupTestApp(t)
-	require.NoError(t, app.Start(context.Background()))
-	defer app.Stop(context.Background())
+	require.NoError(t, app.Start(t.Context()))
+	defer app.Stop(t.Context())
 }
 
 // TestModuleLifecycle verifies that the crawler module can be started and stopped correctly.
 func TestModuleLifecycle(t *testing.T) {
 	app := setupTestApp(t)
-	require.NoError(t, app.Start(context.Background()))
-	require.NoError(t, app.Stop(context.Background()))
+	require.NoError(t, app.Start(t.Context()))
+	require.NoError(t, app.Stop(t.Context()))
 }
