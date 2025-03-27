@@ -7,34 +7,12 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
-
-// Dependencies holds the crawl command's dependencies
-type Dependencies struct {
-	fx.In
-
-	Lifecycle   fx.Lifecycle
-	Sources     sources.Interface `name:"sourceManager"`
-	Crawler     crawler.Interface
-	Logger      common.Logger
-	Config      config.Interface
-	Storage     types.Interface
-	Done        chan struct{}             `name:"crawlDone"`
-	Context     context.Context           `name:"crawlContext"`
-	Processors  []models.ContentProcessor `group:"processors"`
-	SourceName  string                    `name:"sourceName"`
-	ArticleChan chan *models.Article      `name:"articleChannel"`
-}
 
 // Cmd represents the crawl command
 var Cmd = &cobra.Command{
@@ -74,8 +52,12 @@ You can specify the source to crawl using the --source flag.`,
 					},
 					fx.ResultTags(`name:"sourceName"`),
 				),
+				fx.Annotate(
+					func() *signal.SignalHandler { return handler },
+					fx.ResultTags(`name:"signalHandler"`),
+				),
 			),
-			fx.Invoke(func(lc fx.Lifecycle, p Dependencies) {
+			fx.Invoke(func(lc fx.Lifecycle, p CommandDeps) {
 				// Update the signal handler with the real logger
 				handler.SetLogger(p.Logger)
 				lc.Append(fx.Hook{
@@ -96,7 +78,7 @@ You can specify the source to crawl using the --source flag.`,
 							p.Crawler.Wait()
 							p.Logger.Info("Crawler finished processing")
 							// Signal completion to the signal handler
-							handler.RequestShutdown()
+							p.Handler.RequestShutdown()
 						}()
 
 						return nil

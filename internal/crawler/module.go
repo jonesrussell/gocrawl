@@ -7,7 +7,6 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
-	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -22,8 +21,8 @@ import (
 )
 
 const (
-	// articleChannelBufferSize is the buffer size for the article channel.
-	articleChannelBufferSize = 100
+	// ArticleChannelBufferSize is the buffer size for the article channel.
+	ArticleChannelBufferSize = 100
 )
 
 // Interface defines the crawler's capabilities.
@@ -64,18 +63,10 @@ var Module = fx.Module("crawler",
 			content.NewService,
 			fx.As(new(content.Interface)),
 		),
-		// Core dependencies
-		fx.Annotate(
-			func(log common.Logger) chan struct{} {
-				log.Debug("Providing Done channel")
-				return make(chan struct{})
-			},
-			fx.ResultTags(`name:"crawlDone"`),
-		),
 		// Article channel named instance
 		fx.Annotate(
 			func() chan *models.Article {
-				return make(chan *models.Article, articleChannelBufferSize)
+				return make(chan *models.Article, ArticleChannelBufferSize)
 			},
 			fx.ResultTags(`name:"articleChannel"`),
 		),
@@ -150,24 +141,6 @@ type Result struct {
 	fx.Out
 
 	Crawler Interface
-}
-
-// CrawlDeps defines the dependencies required for crawling.
-type CrawlDeps struct {
-	fx.In
-
-	Lifecycle   fx.Lifecycle
-	Sources     sources.Interface `name:"testSourceManager"`
-	Crawler     Interface
-	Logger      common.Logger
-	Config      config.Interface
-	Storage     types.Interface
-	Done        chan struct{}             `name:"crawlDone"`
-	Context     context.Context           `name:"crawlContext"`
-	Processors  []models.ContentProcessor `group:"processors"`
-	SourceName  string                    `name:"sourceName"`
-	ArticleChan chan *models.Article      `name:"articleChannel"`
-	Handler     *signal.SignalHandler     `name:"signalHandler"`
 }
 
 // provideCollectorConfig creates a new collector configuration.

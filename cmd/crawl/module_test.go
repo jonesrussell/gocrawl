@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -16,6 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -100,14 +102,36 @@ func TestModuleProvides(t *testing.T) {
 
 	// Create a test-specific module that excludes config.Module and sources.Module
 	testModule := fx.Module("test",
-		// Core dependencies (excluding config, logger, and storage modules)
+		// Core dependencies
 		content.Module,
 		collector.Module(),
 		crawler.Module,
 
 		// Provide all required dependencies
 		fx.Provide(
-			func() context.Context { return t.Context() },
+			// Command-specific dependencies
+			fx.Annotate(
+				func() context.Context { return t.Context() },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			fx.Annotate(
+				func() string { return "Test Source" },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() chan struct{} { return make(chan struct{}) },
+				fx.ResultTags(`name:"commandDone"`),
+			),
+			fx.Annotate(
+				func() chan *models.Article {
+					return make(chan *models.Article, crawler.ArticleChannelBufferSize)
+				},
+				fx.ResultTags(`name:"articleChannel"`),
+			),
+			fx.Annotate(
+				func() *signal.SignalHandler { return signal.NewSignalHandler(mockLogger) },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
 			// Test dependencies
 			fx.Annotate(
 				func() struct {
@@ -115,7 +139,6 @@ func TestModuleProvides(t *testing.T) {
 					Logger     logger.Interface  `name:"logger"`
 					Config     config.Interface  `name:"testConfig"`
 					Sources    sources.Interface `name:"sourceManager"`
-					SourceName string            `name:"sourceName"`
 					ArticleSvc article.Interface `name:"testArticleService"`
 					IndexMgr   api.IndexManager  `name:"indexManager"`
 				} {
@@ -124,14 +147,12 @@ func TestModuleProvides(t *testing.T) {
 						Logger     logger.Interface  `name:"logger"`
 						Config     config.Interface  `name:"testConfig"`
 						Sources    sources.Interface `name:"sourceManager"`
-						SourceName string            `name:"sourceName"`
 						ArticleSvc article.Interface `name:"testArticleService"`
 						IndexMgr   api.IndexManager  `name:"indexManager"`
 					}{
 						Logger:     mockLogger,
 						Config:     mockCfg,
 						Sources:    testSources,
-						SourceName: "Test Source",
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
 						IndexMgr:   &mockIndexManager{},
 					}
@@ -198,14 +219,36 @@ func TestModuleConfiguration(t *testing.T) {
 
 	// Create a test-specific module that excludes config.Module and sources.Module
 	testModule := fx.Module("test",
-		// Core dependencies (excluding config, logger, and storage modules)
+		// Core dependencies
 		content.Module,
 		collector.Module(),
 		crawler.Module,
 
 		// Provide all required dependencies
 		fx.Provide(
-			func() context.Context { return t.Context() },
+			// Command-specific dependencies
+			fx.Annotate(
+				func() context.Context { return t.Context() },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			fx.Annotate(
+				func() string { return "Test Source" },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() chan struct{} { return make(chan struct{}) },
+				fx.ResultTags(`name:"commandDone"`),
+			),
+			fx.Annotate(
+				func() chan *models.Article {
+					return make(chan *models.Article, crawler.ArticleChannelBufferSize)
+				},
+				fx.ResultTags(`name:"articleChannel"`),
+			),
+			fx.Annotate(
+				func() *signal.SignalHandler { return signal.NewSignalHandler(mockLogger) },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
 			// Test dependencies
 			fx.Annotate(
 				func() struct {
@@ -213,7 +256,6 @@ func TestModuleConfiguration(t *testing.T) {
 					Logger     logger.Interface  `name:"logger"`
 					Config     config.Interface  `name:"testConfig"`
 					Sources    sources.Interface `name:"sourceManager"`
-					SourceName string            `name:"sourceName"`
 					ArticleSvc article.Interface `name:"testArticleService"`
 					IndexMgr   api.IndexManager  `name:"indexManager"`
 				} {
@@ -222,14 +264,12 @@ func TestModuleConfiguration(t *testing.T) {
 						Logger     logger.Interface  `name:"logger"`
 						Config     config.Interface  `name:"testConfig"`
 						Sources    sources.Interface `name:"sourceManager"`
-						SourceName string            `name:"sourceName"`
 						ArticleSvc article.Interface `name:"testArticleService"`
 						IndexMgr   api.IndexManager  `name:"indexManager"`
 					}{
 						Logger:     mockLogger,
 						Config:     mockCfg,
 						Sources:    testSources,
-						SourceName: "Test Source",
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
 						IndexMgr:   &mockIndexManager{},
 					}

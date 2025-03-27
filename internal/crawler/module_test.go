@@ -2,10 +2,8 @@
 package crawler_test
 
 import (
-	"context"
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -43,20 +41,8 @@ func setupTestApp(t *testing.T) *fxtest.App {
 		fx.Provide(
 			// Named dependencies
 			fx.Annotate(
-				func() context.Context { return t.Context() },
-				fx.ResultTags(`name:"crawlContext"`),
-			),
-			fx.Annotate(
-				func() string { return "test-source" },
-				fx.ResultTags(`name:"sourceName"`),
-			),
-			fx.Annotate(
 				func() sources.Interface { return &mockSources{} },
 				fx.ResultTags(`name:"testSourceManager"`),
-			),
-			fx.Annotate(
-				func() *signal.SignalHandler { return signal.NewSignalHandler(nil) },
-				fx.ResultTags(`name:"signalHandler"`),
 			),
 			// Logger provider that replaces the default logger.Module provider
 			fx.Annotate(
@@ -72,13 +58,6 @@ func setupTestApp(t *testing.T) *fxtest.App {
 			),
 			func() api.SearchManager { return &mockSearchManager{} },
 		),
-		// Supply done channel
-		fx.Supply(
-			fx.Annotate(
-				make(chan struct{}),
-				fx.ResultTags(`name:"done"`),
-			),
-		),
 		// Mock content processors
 		fx.Provide(
 			fx.Annotate(
@@ -92,24 +71,23 @@ func setupTestApp(t *testing.T) *fxtest.App {
 		TestConfigModule,
 		crawler.Module,
 		// Verify dependencies
-		fx.Invoke(func(deps crawler.CrawlDeps) {
-			verifyDependencies(t, &deps)
+		fx.Invoke(func(p crawler.Params) {
+			verifyDependencies(t, &p)
 		}),
 	)
 }
 
-// verifyDependencies checks that all required dependencies are present in the CrawlDeps struct.
-func verifyDependencies(t *testing.T, deps *crawler.CrawlDeps) {
+// verifyDependencies checks that all required dependencies are present in the Params struct.
+func verifyDependencies(t *testing.T, p *crawler.Params) {
 	t.Helper()
 
-	require.NotNil(t, deps)
-	require.NotNil(t, deps.Config)
-	require.NotNil(t, deps.Storage)
-	require.NotNil(t, deps.Sources)
-	require.NotNil(t, deps.ArticleChan)
+	require.NotNil(t, p)
+	require.NotNil(t, p.Logger)
+	require.NotNil(t, p.Sources)
+	require.NotNil(t, p.IndexManager)
 }
 
-// TestDependencyInjection verifies that all dependencies are properly injected into the CrawlDeps struct.
+// TestDependencyInjection verifies that all dependencies are properly injected into the Params struct.
 func TestDependencyInjection(t *testing.T) {
 	app := setupTestApp(t)
 	require.NoError(t, app.Start(t.Context()))
