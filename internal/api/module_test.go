@@ -94,7 +94,7 @@ func TestHealthHandler(t *testing.T) {
 	defer ts.cleanup()
 
 	// Create a test request
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/health", ts.server.Addr), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/health", ts.server.Addr), nil)
 	require.NoError(t, err)
 
 	// Create a response recorder
@@ -105,7 +105,7 @@ func TestHealthHandler(t *testing.T) {
 
 	// Verify the response
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "{\"status\":\"ok\"}", w.Body.String())
+	assert.JSONEq(t, `{"status":"ok"}`, w.Body.String())
 }
 
 func TestSearchHandler(t *testing.T) {
@@ -113,11 +113,11 @@ func TestSearchHandler(t *testing.T) {
 	defer ts.cleanup()
 
 	// Create a test request
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
 	require.NoError(t, err)
 
 	// Add API key header
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-Api-Key", "test-key")
 
 	// Create a response recorder
 	w := httptest.NewRecorder()
@@ -135,7 +135,7 @@ func TestAPIKeyAuthentication(t *testing.T) {
 	defer ts.cleanup()
 
 	// Create a test request without API key
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
 	require.NoError(t, err)
 
 	// Create a response recorder
@@ -154,9 +154,9 @@ func TestRateLimiting(t *testing.T) {
 	defer ts.cleanup()
 
 	// Create a test request with API key
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
 	require.NoError(t, err)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-Api-Key", "test-key")
 
 	// Create a response recorder
 	w := httptest.NewRecorder()
@@ -180,10 +180,10 @@ func TestCORS(t *testing.T) {
 	defer ts.cleanup()
 
 	// Create a test request with CORS headers
-	req, err := http.NewRequest("OPTIONS", fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
+	req, err := http.NewRequest(http.MethodOptions, fmt.Sprintf("http://%s/search", ts.server.Addr), nil)
 	require.NoError(t, err)
 	req.Header.Set("Origin", "http://example.com")
-	req.Header.Set("Access-Control-Request-Method", "GET")
+	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
 
 	// Create a response recorder
 	w := httptest.NewRecorder()
@@ -194,7 +194,7 @@ func TestCORS(t *testing.T) {
 	// Verify CORS headers
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
-	assert.Contains(t, w.Header().Get("Access-Control-Allow-Methods"), "GET")
+	assert.Contains(t, w.Header().Get("Access-Control-Allow-Methods"), http.MethodGet)
 }
 
 func TestSecurityHeaders(t *testing.T) {
@@ -202,7 +202,7 @@ func TestSecurityHeaders(t *testing.T) {
 	defer ts.cleanup()
 
 	// Create a test request
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/health", ts.server.Addr), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/health", ts.server.Addr), nil)
 	require.NoError(t, err)
 
 	// Create a response recorder
