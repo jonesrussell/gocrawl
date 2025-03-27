@@ -49,7 +49,16 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		return errors.New("collector not initialized")
 	}
 
-	c.Logger.Info("Starting crawl", "url", c.baseURL)
+	// Set the max depth from source configuration
+	c.SetMaxDepth(source.MaxDepth)
+	// Set the rate limit from source configuration
+	if err := c.SetRateLimit(source.RateLimit); err != nil {
+		return fmt.Errorf("failed to set rate limit: %w", err)
+	}
+	c.Logger.Info("Starting crawl",
+		"url", c.baseURL,
+		"max_depth", source.MaxDepth,
+		"rate_limit", source.RateLimit)
 	c.setupCallbacks()
 
 	// Start crawling
@@ -115,7 +124,11 @@ func (c *Crawler) Subscribe(handler events.Handler) {
 // SetRateLimit sets the crawler's rate limit.
 func (c *Crawler) SetRateLimit(duration time.Duration) error {
 	c.Logger.Debug("Setting rate limit", "duration", duration)
-	c.collector.SetRequestTimeout(duration)
+	c.collector.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		RandomDelay: duration,
+		Parallelism: 1,
+	})
 	return nil
 }
 
@@ -165,9 +178,12 @@ func (c *Crawler) handleArticle(e *colly.HTMLElement) {
 // handleLink processes discovered links.
 func (c *Crawler) handleLink(e *colly.HTMLElement) {
 	link := e.Attr("href")
+	c.Logger.Debug("Found link", "url", link)
 	err := e.Request.Visit(link)
 	if err != nil {
 		c.Logger.Debug("Failed to visit link", "url", link, "error", err)
+	} else {
+		c.Logger.Debug("Successfully queued link for visit", "url", link)
 	}
 }
 

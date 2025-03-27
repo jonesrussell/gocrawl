@@ -23,9 +23,6 @@ import (
 const (
 	// articleChannelBufferSize is the buffer size for the article channel.
 	articleChannelBufferSize = 100
-
-	// defaultMaxDepth is the default maximum depth for crawling.
-	defaultMaxDepth = 3
 )
 
 // Interface defines the crawler's capabilities.
@@ -185,7 +182,6 @@ func provideCollyDebugger(logger common.Logger) debug.Debugger {
 // provideCollector creates a new Colly collector instance.
 func provideCollector(logger common.Logger) *colly.Collector {
 	c := colly.NewCollector(
-		colly.MaxDepth(defaultMaxDepth),
 		colly.Async(true),
 		colly.UserAgent("GoCrawl/1.0"),
 	)
