@@ -31,7 +31,12 @@ type Service struct {
 var _ Interface = (*Service)(nil)
 
 // NewService creates a new Service instance
-func NewService(logger common.Logger, selectors config.ArticleSelectors, storage types.Interface, indexName string) Interface {
+func NewService(
+	logger common.Logger,
+	selectors config.ArticleSelectors,
+	storage types.Interface,
+	indexName string,
+) Interface {
 	return &Service{
 		Logger:    logger,
 		Selectors: selectors,

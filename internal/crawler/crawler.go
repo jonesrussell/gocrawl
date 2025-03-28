@@ -187,7 +187,9 @@ func (c *Crawler) GetMetrics() *collector.Metrics {
 // monitorContext monitors the context for cancellation.
 func (c *Crawler) monitorContext(ctx context.Context) {
 	<-ctx.Done()
-	c.Stop(ctx)
+	if err := c.Stop(ctx); err != nil {
+		c.Logger.Error("Failed to stop crawler", "error", err)
+	}
 }
 
 // setupCallbacks sets up the crawler's event callbacks.

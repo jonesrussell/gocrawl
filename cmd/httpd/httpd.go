@@ -144,8 +144,8 @@ You can send POST requests to /search with a JSON body containing the search par
 						}()
 
 						// Wait for server to be ready
-						healthCtx, cancel := context.WithTimeout(ctx, api.HealthCheckTimeout)
-						defer cancel()
+						healthCtx, healthCancel := context.WithTimeout(ctx, api.HealthCheckTimeout)
+						defer healthCancel()
 
 						ticker := time.NewTicker(api.HealthCheckInterval)
 						defer ticker.Stop()

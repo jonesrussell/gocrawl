@@ -20,12 +20,18 @@ import (
 const (
 	// DefaultMaxRetries is the default number of times to retry failed requests
 	DefaultMaxRetries = 3
+	// DefaultScrollDuration is the default duration for scroll operations
+	DefaultScrollDuration = 5 * time.Minute
 )
 
 // Module provides the storage module for dependency injection.
 var Module = fx.Module("storage",
 	fx.Provide(
-		func(cfg config.Interface, logger common.Logger) ModuleOptions {
+		func(cfg config.Interface, logger common.Logger) (ModuleOptions, error) {
+			transport, ok := http.DefaultTransport.(*http.Transport)
+			if !ok {
+				return ModuleOptions{}, errors.New("failed to get default transport")
+			}
 			return ModuleOptions{
 				Config:         cfg,
 				Logger:         logger,
@@ -33,10 +39,10 @@ var Module = fx.Module("storage",
 				APIKey:         cfg.GetElasticsearchConfig().APIKey,
 				Username:       cfg.GetElasticsearchConfig().Username,
 				Password:       cfg.GetElasticsearchConfig().Password,
-				Transport:      http.DefaultTransport.(*http.Transport),
+				Transport:      transport,
 				IndexName:      cfg.GetElasticsearchConfig().IndexName,
-				ScrollDuration: 5 * time.Minute,
-			}
+				ScrollDuration: DefaultScrollDuration,
+			}, nil
 		},
 		ProvideElasticsearchClient,
 		NewOptionsFromConfig,

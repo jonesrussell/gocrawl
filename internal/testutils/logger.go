@@ -54,3 +54,8 @@ func (m *MockLogger) Sync() error {
 
 // Ensure MockLogger implements types.Logger
 var _ types.Logger = (*MockLogger)(nil)
+
+// NewMockLogger creates a new mock logger instance.
+func NewMockLogger() *MockLogger {
+	return &MockLogger{}
+}

@@ -2,7 +2,6 @@
 package api_test
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +11,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,7 +38,7 @@ type testServer struct {
 func setupMockSearchManager() *testutils.MockSearchManager {
 	mockSearch := &testutils.MockSearchManager{}
 	mockSearch.On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{
-		map[string]interface{}{
+		map[string]any{
 			"title":   "Test Result",
 			"url":     "https://test.com",
 			"content": "This is a test result",
@@ -71,24 +69,7 @@ func setupTest(t *testing.T) *testServer {
 
 	// Create mock dependencies
 	mockLogger := setupMockLogger()
-	mockConfig := configtest.NewMockConfig().
-		WithServerConfig(&config.ServerConfig{
-			Address: ":8080",
-		}).
-		WithAppConfig(&config.AppConfig{
-			Environment: "test",
-			Name:        "gocrawl",
-			Version:     "1.0.0",
-			Debug:       true,
-		}).
-		WithLogConfig(&config.LogConfig{
-			Level: "debug",
-			Debug: true,
-		}).
-		WithElasticsearchConfig(&config.ElasticsearchConfig{
-			Addresses: []string{"http://localhost:9200"},
-			IndexName: "test-index",
-		})
+	mockConfig := testutils.NewMockConfig()
 	mockSearch := setupMockSearchManager()
 
 	// Store references for test assertions
@@ -102,24 +83,28 @@ func setupTest(t *testing.T) *testServer {
 		fx.NopLogger,
 		fx.Supply(mockConfig),
 		fx.Supply(mockLogger),
-		fx.Supply(context.Background()),
+		fx.Supply(t.Context()),
 		fx.Provide(
 			func() api.SearchManager { return mockSearch },
 		),
 		fx.Replace(
 			fx.Annotate(
-				func(log common.Logger, searchManager api.SearchManager, cfg common.Config) (*http.Server, middleware.SecurityMiddlewareInterface) {
+				func(
+					log common.Logger,
+					searchManager api.SearchManager,
+					cfg common.Config,
+				) (*http.Server, middleware.SecurityMiddlewareInterface) {
 					// Create router and security middleware
 					router, security := api.SetupRouter(log, searchManager, cfg)
 
 					// Create server
-					server := &http.Server{
+					httpServer := &http.Server{
 						Addr:              cfg.GetServerConfig().Address,
 						Handler:           router,
 						ReadHeaderTimeout: api.ReadHeaderTimeout,
 					}
 
-					return server, security
+					return httpServer, security
 				},
 				fx.As(new(*http.Server), new(middleware.SecurityMiddlewareInterface)),
 			),

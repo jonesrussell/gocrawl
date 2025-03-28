@@ -17,8 +17,13 @@ type ContentProcessor struct {
 	indexName string
 }
 
-// NewProcessor creates a new content processor
-func NewProcessor(service Interface, storage types.Interface, logger logger.Interface, indexName string) *ContentProcessor {
+// NewProcessor creates a new content processor instance.
+func NewProcessor(
+	service Interface,
+	storage types.Interface,
+	logger logger.Interface,
+	indexName string,
+) *ContentProcessor {
 	return &ContentProcessor{
 		service:   service,
 		storage:   storage,
