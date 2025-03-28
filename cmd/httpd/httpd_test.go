@@ -31,49 +31,6 @@ func (m *mockStorage) Search(context.Context, string, any) ([]any, error) {
 	return []any{}, nil
 }
 
-// mockConfig implements config.Interface for testing
-type mockConfig struct {
-	config.Interface
-	serverConfig *config.ServerConfig
-}
-
-func (m *mockConfig) GetServerConfig() *config.ServerConfig {
-	if m.serverConfig != nil {
-		return m.serverConfig
-	}
-	return &config.ServerConfig{
-		Address:      ":0",
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		Security: struct {
-			Enabled   bool   `yaml:"enabled"`
-			APIKey    string `yaml:"api_key"`
-			RateLimit int    `yaml:"rate_limit"`
-			CORS      struct {
-				Enabled        bool     `yaml:"enabled"`
-				AllowedOrigins []string `yaml:"allowed_origins"`
-				AllowedMethods []string `yaml:"allowed_methods"`
-				AllowedHeaders []string `yaml:"allowed_headers"`
-				MaxAge         int      `yaml:"max_age"`
-			} `yaml:"cors"`
-			TLS struct {
-				Enabled     bool   `yaml:"enabled"`
-				Certificate string `yaml:"certificate"`
-				Key         string `yaml:"key"`
-			} `yaml:"tls"`
-		}{
-			TLS: struct {
-				Enabled     bool   `yaml:"enabled"`
-				Certificate string `yaml:"certificate"`
-				Key         string `yaml:"key"`
-			}{
-				Enabled: false,
-			},
-		},
-	}
-}
-
 // mockSearchManager implements api.SearchManager for testing
 type mockSearchManager struct {
 	api.SearchManager
@@ -102,7 +59,7 @@ func TestHTTPCommand(t *testing.T) {
 	mockLogger.On("Error", mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := &mockConfig{}
+	mockCfg := testutils.NewMockConfig()
 	mockStore := &mockStorage{}
 	mockSearch := &mockSearchManager{}
 
@@ -117,10 +74,7 @@ func TestHTTPCommand(t *testing.T) {
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() types.Interface { return mockStore },
-			fx.Annotate(
-				func() api.SearchManager { return mockSearch },
-				fx.ResultTags(`name:"searchManager"`),
-			),
+			func() api.SearchManager { return mockSearch },
 		),
 		httpd.Module,
 	)
@@ -140,7 +94,7 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	mockLogger.On("Error", mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := &mockConfig{}
+	mockCfg := testutils.NewMockConfig()
 	mockStore := &mockStorage{}
 	mockSearch := &mockSearchManager{}
 
@@ -155,10 +109,7 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 			func() logger.Interface { return mockLogger },
 			func() config.Interface { return mockCfg },
 			func() types.Interface { return mockStore },
-			fx.Annotate(
-				func() api.SearchManager { return mockSearch },
-				fx.ResultTags(`name:"searchManager"`),
-			),
+			func() api.SearchManager { return mockSearch },
 		),
 		httpd.Module,
 		fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
@@ -188,10 +139,7 @@ func TestHTTPCommandServerError(t *testing.T) {
 		),
 		fx.Provide(
 			func() context.Context { return t.Context() },
-			fx.Annotate(
-				func() api.SearchManager { return &testutils.MockSearchManager{} },
-				fx.As(new(api.SearchManager)),
-			),
+			func() api.SearchManager { return &testutils.MockSearchManager{} },
 		),
 		api.Module,
 	)
