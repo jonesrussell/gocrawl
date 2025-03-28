@@ -81,7 +81,7 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 func (m *CommandTestModule) Module() fx.Option {
 	return fx.Module("test",
 		// Core dependencies
-		collector.Module(),
+		collector.Module,
 
 		// Provide all required dependencies
 		fx.Provide(

@@ -62,67 +62,67 @@ type ContentParams struct {
 	ContentProcessor Processor
 }
 
-// contextManager handles storing and retrieving data from colly context.
+// ContextManager handles storing and retrieving data from colly context.
 // It provides a clean interface for managing context data during the crawling process.
 // The context manager is used to:
 // - Store HTML elements for processing
 // - Track article status
 // - Maintain state between different callbacks
-type contextManager struct {
+type ContextManager struct {
 	// ctx holds the colly context instance
 	ctx *colly.Context
 }
 
-// newContextManager creates a new context manager instance.
+// NewContextManager creates a new context manager instance.
 // It initializes the context manager with the provided colly context.
 //
 // Parameters:
 //   - ctx: The colly context to manage
 //
 // Returns:
-//   - *contextManager: The initialized context manager
-func newContextManager(ctx *colly.Context) *contextManager {
-	return &contextManager{ctx: ctx}
+//   - *ContextManager: The initialized context manager
+func NewContextManager(ctx *colly.Context) *ContextManager {
+	return &ContextManager{ctx: ctx}
 }
 
-// setHTMLElement stores an HTML element in the context.
+// SetHTMLElement stores an HTML element in the context.
 // This is used to make the HTML element available to other callbacks
 // that need to process the content.
 //
 // Parameters:
 //   - e: The HTML element to store
-func (cm *contextManager) setHTMLElement(e *colly.HTMLElement) {
+func (cm *ContextManager) SetHTMLElement(e *colly.HTMLElement) {
 	cm.ctx.Put(htmlElementKey, e)
 }
 
-// getHTMLElement retrieves the stored HTML element from the context.
+// GetHTMLElement retrieves the stored HTML element from the context.
 // It ensures the element exists and is valid before returning it.
 //
 // Returns:
 //   - *colly.HTMLElement: The stored HTML element
 //   - bool: Whether the element was found and is valid
-func (cm *contextManager) getHTMLElement() (*colly.HTMLElement, bool) {
+func (cm *ContextManager) GetHTMLElement() (*colly.HTMLElement, bool) {
 	e, ok := cm.ctx.GetAny(htmlElementKey).(*colly.HTMLElement)
 	return e, ok && e != nil
 }
 
-// markAsArticle marks the current content as an article in the context.
+// MarkAsArticle marks the current content as an article in the context.
 // This is used to indicate that the current page contains article content
 // and should be processed accordingly.
-func (cm *contextManager) markAsArticle() {
+func (cm *ContextManager) MarkAsArticle() {
 	cm.ctx.Put(articleFoundKey, "true")
 }
 
-// isArticle checks if the current content is marked as an article.
+// IsArticle checks if the current content is marked as an article.
 // This is used to determine how the content should be processed.
 //
 // Returns:
 //   - bool: Whether the content is marked as an article
-func (cm *contextManager) isArticle() bool {
+func (cm *ContextManager) IsArticle() bool {
 	return cm.ctx.Get(articleFoundKey) == "true"
 }
 
-// isArticleType checks if the content appears to be an article based on metadata.
+// IsArticleType checks if the content appears to be an article based on metadata.
 // It performs multiple checks in order of reliability:
 // 1. Checks OpenGraph meta type
 // 2. Checks schema.org type
@@ -138,7 +138,7 @@ func (cm *contextManager) isArticle() bool {
 //
 // Returns:
 //   - bool: Whether the content appears to be an article
-func isArticleType(e *colly.HTMLElement) bool {
+func IsArticleType(e *colly.HTMLElement) bool {
 	// Check meta type first as it's most reliable
 	if metaType := e.ChildAttr(`meta[property="og:type"]`, "content"); metaType == "article" {
 		return true
@@ -173,90 +173,194 @@ func isArticleType(e *colly.HTMLElement) bool {
 	return false
 }
 
-// contentLogger wraps logging functionality with consistent tags.
+// ContentLogger wraps logging functionality with consistent tags.
 // It provides a standardized way to log content-related operations
 // with consistent formatting and context.
-type contentLogger struct {
+type ContentLogger struct {
 	// p holds the content parameters including the logger
 	p ContentParams
 }
 
-// newLogger creates a new content logger instance.
+// NewLogger creates a new content logger instance.
 // It initializes the logger with the provided content parameters.
 //
 // Parameters:
 //   - p: The content parameters containing the logger
 //
 // Returns:
-//   - *contentLogger: The initialized logger
-func newLogger(p ContentParams) *contentLogger {
-	return &contentLogger{p: p}
+//   - *ContentLogger: The initialized logger
+func NewLogger(p ContentParams) *ContentLogger {
+	return &ContentLogger{p: p}
 }
 
-// debug logs a debug message with the content tag.
+// Debug logs a debug message with the content tag.
 // It automatically adds the content tag to all log messages
 // for consistent logging across the package.
 //
 // Parameters:
 //   - msg: The message to log
-//   - keysAndValues: Additional key-value pairs to include in the log
-func (l *contentLogger) debug(msg string, keysAndValues ...any) {
-	args := append([]any{"tag", logTag}, keysAndValues...)
-	l.p.Logger.Debug(msg, args...)
+//   - args: Additional arguments for the log message
+func (l *ContentLogger) Debug(msg string, args ...any) {
+	l.p.Logger.Debug(msg, append(args, "tag", logTag)...)
 }
 
-// error logs an error message with the content tag.
+// Error logs an error message with the content tag.
 // It automatically adds the content tag to all log messages
 // for consistent logging across the package.
 //
 // Parameters:
 //   - msg: The message to log
-//   - keysAndValues: Additional key-value pairs to include in the log
-func (l *contentLogger) error(msg string, keysAndValues ...any) {
-	args := append([]any{"tag", logTag}, keysAndValues...)
-	l.p.Logger.Error(msg, args...)
+//   - args: Additional arguments for the log message
+func (l *ContentLogger) Error(msg string, args ...any) {
+	l.p.Logger.Error(msg, append(args, "tag", logTag)...)
 }
 
-// setupArticleProcessing sets up article processing logic for the collector.
-// It configures the collector to detect and process article content.
-// This includes setting up article detection and ensuring proper
-// routing of article content to the appropriate processor.
+// VisitLink attempts to visit a link and handles any errors.
+// The function:
+// 1. Resolves the absolute URL
+// 2. Visits the URL
+// 3. Filters out ignored errors
+//
+// Parameters:
+//   - e: The HTML element containing the link
+//   - link: The link URL to visit
+//   - ignoredErrors: Map of errors that should be ignored
+//
+// Returns:
+//   - error: Any non-ignored error that occurred during the visit
+func VisitLink(e *colly.HTMLElement, link string, ignoredErrors map[string]bool) error {
+	if err := e.Request.Visit(e.Request.AbsoluteURL(link)); err != nil {
+		if !ignoredErrors[err.Error()] {
+			return err
+		}
+	}
+	return nil
+}
+
+// CanProcess checks if there are any content processors available.
+// This is used to determine if content processing should be attempted.
+//
+// Parameters:
+//   - p: The content parameters
+//
+// Returns:
+//   - bool: Whether there are processors available
+func CanProcess(p ContentParams) bool {
+	return p.ArticleProcessor != nil || p.ContentProcessor != nil
+}
+
+// ProcessContent handles the processing of HTML content based on its type.
+// It routes the content to the appropriate processor based on whether it's an article.
+// The function:
+// 1. Determines content type
+// 2. Routes to appropriate processor
+// 3. Handles processing errors
+// 4. Logs processing status
+//
+// Parameters:
+//   - e: The HTML element to process
+//   - r: The response containing the content
+//   - p: The content parameters
+//   - cm: The context manager
+//   - log: The logger for content operations
+func ProcessContent(e *colly.HTMLElement, r *colly.Response, p ContentParams, cm *ContextManager, log *ContentLogger) {
+	url := r.Request.URL.String()
+	title := e.ChildText("title")
+
+	// Double check if it's an article using IsArticleType
+	isArticle := cm.IsArticle() && IsArticleType(e)
+
+	if isArticle {
+		if p.ArticleProcessor == nil {
+			log.Debug("No article processor available", "url", url)
+			return
+		}
+		log.Debug("Processing as article", "url", url, "title", title)
+		if err := p.ArticleProcessor.Process(e); err != nil {
+			log.Error("Failed to process article", "url", url, "error", err)
+			return
+		}
+		return
+	}
+
+	if p.ContentProcessor == nil {
+		log.Debug("No content processor available", "url", url)
+		return
+	}
+	log.Debug("Processing as content", "url", url, "title", title)
+	if err := p.ContentProcessor.Process(e); err != nil {
+		log.Error("Failed to process content", "url", url, "error", err)
+		return
+	}
+}
+
+// setupArticleProcessing configures article processing for the collector.
+// It:
+// 1. Sets up article detection
+// 2. Configures content processing
 //
 // Parameters:
 //   - c: The collector to configure
 //   - log: The logger for content operations
-func setupArticleProcessing(c *colly.Collector, log *contentLogger) {
-	log.debug("Setting up article processing")
+func setupArticleProcessing(c *colly.Collector, log *ContentLogger) {
+	log.Debug("Setting up article processing")
 	setupArticleDetection(c, log)
 }
 
-// processScrapedContent handles the processing of scraped content.
-// It determines the content type and routes it to the appropriate processor.
-// The function:
+// processScrapedContent configures content processing for the collector.
+// It:
 // 1. Checks if processors are available
 // 2. Retrieves the HTML element from context
-// 3. Determines content type (article vs general)
-// 4. Routes to appropriate processor
+// 3. Routes content to appropriate processor
 //
 // Parameters:
 //   - c: The collector to configure
 //   - p: The content parameters
 //   - log: The logger for content operations
-func processScrapedContent(c *colly.Collector, p ContentParams, log *contentLogger) {
+func processScrapedContent(c *colly.Collector, p ContentParams, log *ContentLogger) {
 	c.OnScraped(func(r *colly.Response) {
-		if !canProcess(p) {
-			log.debug("Skipping processing - no processors available", "url", r.Request.URL.String())
+		if !CanProcess(p) {
+			log.Debug("Skipping processing - no processors available", "url", r.Request.URL.String())
 			return
 		}
 
-		cm := newContextManager(r.Ctx)
-		e, ok := cm.getHTMLElement()
+		cm := NewContextManager(r.Request.Ctx)
+		e, ok := cm.GetHTMLElement()
 		if !ok {
-			log.debug("No HTML element found for processing", "url", r.Request.URL.String())
+			log.Debug("No HTML element found for processing", "url", r.Request.URL.String())
 			return
 		}
 
-		processContent(e, r, p, cm, log)
+		ProcessContent(e, r, p, cm, log)
+	})
+}
+
+// setupArticleDetection configures article detection for the collector.
+// It:
+// 1. Checks for article metadata
+// 2. Marks content as article if detected
+//
+// Parameters:
+//   - c: The collector to configure
+//   - log: The logger for content operations
+func setupArticleDetection(c *colly.Collector, log *ContentLogger) {
+	c.OnHTML("html", func(e *colly.HTMLElement) {
+		cm := NewContextManager(e.Request.Ctx)
+
+		// Check if it's an article type
+		if IsArticleType(e) {
+			log.Debug("Found article",
+				"url", e.Request.URL.String(),
+				"meta_type", e.ChildAttr(`meta[property="og:type"]`, "content"),
+				"schema_type", e.ChildAttr(`meta[name="type"]`, "content"))
+			cm.MarkAsArticle()
+			return
+		}
+
+		log.Debug("Content type is not an article",
+			"url", e.Request.URL.String(),
+			"meta_type", e.ChildAttr(`meta[property="og:type"]`, "content"),
+			"schema_type", e.ChildAttr(`meta[name="type"]`, "content"))
 	})
 }
 
@@ -283,7 +387,7 @@ func configureContentProcessing(c *colly.Collector, p ContentParams) {
 		urlAlreadyVisitedError: true,
 	}
 
-	log := newLogger(p)
+	log := NewLogger(p)
 
 	setupLinkFollowing(c, log, ignoredErrors)
 	setupHTMLProcessing(c, log)
@@ -302,144 +406,29 @@ func configureContentProcessing(c *colly.Collector, p ContentParams) {
 //   - c: The collector to configure
 //   - log: The logger for content operations
 //   - ignoredErrors: Map of errors that should be ignored during link following
-func setupLinkFollowing(c *colly.Collector, log *contentLogger, ignoredErrors map[string]bool) {
+func setupLinkFollowing(c *colly.Collector, log *ContentLogger, ignoredErrors map[string]bool) {
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
-		log.debug("Link found", "text", e.Text, "link", link)
+		log.Debug("Link found", "text", e.Text, "link", link)
 
-		if err := visitLink(e, link, ignoredErrors); err != nil {
-			log.error("Failed to visit link", "link", link, "error", err)
+		if err := VisitLink(e, link, ignoredErrors); err != nil {
+			log.Error("Failed to visit link", "link", link, "error", err)
 		}
 	})
 }
 
-// visitLink attempts to visit a link while handling ignored errors.
+// setupHTMLProcessing configures HTML element processing for the collector.
 // It:
-// 1. Converts relative URLs to absolute URLs
-// 2. Attempts to visit the link
-// 3. Filters out ignored errors
-//
-// Parameters:
-//   - e: The HTML element containing the link
-//   - link: The link URL to visit
-//   - ignoredErrors: Map of errors that should be ignored
-//
-// Returns:
-//   - error: Any non-ignored error that occurred during the visit
-func visitLink(e *colly.HTMLElement, link string, ignoredErrors map[string]bool) error {
-	if err := e.Request.Visit(e.Request.AbsoluteURL(link)); err != nil {
-		if !ignoredErrors[err.Error()] {
-			return err
-		}
-	}
-	return nil
-}
-
-// setupHTMLProcessing sets up HTML element processing logic for the collector.
-// It stores the HTML element in the context for later processing.
-// The function:
-// 1. Sets up HTML callback for root element
-// 2. Stores element in context
-// 3. Logs processing status
+// 1. Finds HTML elements
+// 2. Stores them in the context for later processing
 //
 // Parameters:
 //   - c: The collector to configure
 //   - log: The logger for content operations
-func setupHTMLProcessing(c *colly.Collector, log *contentLogger) {
+func setupHTMLProcessing(c *colly.Collector, log *ContentLogger) {
 	c.OnHTML("html", func(e *colly.HTMLElement) {
-		log.debug("Found HTML element", "url", e.Request.URL.String())
-		cm := newContextManager(e.Request.Ctx)
-		cm.setHTMLElement(e)
+		log.Debug("Found HTML element", "url", e.Request.URL.String())
+		cm := NewContextManager(e.Request.Ctx)
+		cm.SetHTMLElement(e)
 	})
-}
-
-// setupArticleDetection sets up article detection logic for the collector.
-// It analyzes the content to determine if it's an article and marks it accordingly.
-// The function:
-// 1. Sets up HTML callback for root element
-// 2. Analyzes content type
-// 3. Marks content as article if appropriate
-// 4. Logs detection results
-//
-// Parameters:
-//   - c: The collector to configure
-//   - log: The logger for content operations
-func setupArticleDetection(c *colly.Collector, log *contentLogger) {
-	c.OnHTML("html", func(e *colly.HTMLElement) {
-		cm := newContextManager(e.Request.Ctx)
-
-		// Check if it's an article type
-		if isArticleType(e) {
-			log.debug("Found article",
-				"url", e.Request.URL.String(),
-				"meta_type", e.ChildAttr(`meta[property="og:type"]`, "content"),
-				"schema_type", e.ChildAttr(`meta[name="type"]`, "content"),
-			)
-			cm.markAsArticle()
-			return
-		}
-
-		log.debug("Content type is not an article",
-			"url", e.Request.URL.String(),
-			"meta_type", e.ChildAttr(`meta[property="og:type"]`, "content"),
-			"schema_type", e.ChildAttr(`meta[name="type"]`, "content"),
-		)
-	})
-}
-
-// canProcess checks if there are any content processors available.
-// This is used to determine if content processing should be attempted.
-//
-// Parameters:
-//   - p: The content parameters
-//
-// Returns:
-//   - bool: Whether there are processors available
-func canProcess(p ContentParams) bool {
-	return p.ArticleProcessor != nil || p.ContentProcessor != nil
-}
-
-// processContent handles the processing of HTML content based on its type.
-// It routes the content to the appropriate processor based on whether it's an article.
-// The function:
-// 1. Determines content type
-// 2. Routes to appropriate processor
-// 3. Handles processing errors
-// 4. Logs processing status
-//
-// Parameters:
-//   - e: The HTML element to process
-//   - r: The response containing the content
-//   - p: The content parameters
-//   - cm: The context manager
-//   - log: The logger for content operations
-func processContent(e *colly.HTMLElement, r *colly.Response, p ContentParams, cm *contextManager, log *contentLogger) {
-	url := r.Request.URL.String()
-	title := e.ChildText("title")
-
-	// Double check if it's an article using isArticleType
-	isArticle := cm.isArticle() && isArticleType(e)
-
-	if isArticle {
-		if p.ArticleProcessor == nil {
-			log.debug("No article processor available", "url", url)
-			return
-		}
-		log.debug("Processing as article", "url", url, "title", title)
-		if err := p.ArticleProcessor.Process(e); err != nil {
-			log.error("Failed to process article", "url", url, "error", err)
-			return
-		}
-		return
-	}
-
-	if p.ContentProcessor == nil {
-		log.debug("No content processor available", "url", url)
-		return
-	}
-	log.debug("Processing as content", "url", url, "title", title)
-	if err := p.ContentProcessor.Process(e); err != nil {
-		log.error("Failed to process content", "url", url, "error", err)
-		return
-	}
 }
