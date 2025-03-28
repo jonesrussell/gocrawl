@@ -21,11 +21,8 @@ var Module = fx.Module("httpd",
 	api.Module,
 	fx.Provide(
 		// Provide a SearchManager implementation
-		fx.Annotate(
-			func(storage types.Interface) api.SearchManager {
-				return &searchManagerWrapper{storage}
-			},
-			fx.ResultTags(`name:"searchManager"`),
-		),
+		func(storage types.Interface) api.SearchManager {
+			return &searchManagerWrapper{storage}
+		},
 	),
 )
