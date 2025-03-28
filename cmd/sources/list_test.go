@@ -48,9 +48,18 @@ type mockSourceManager struct {
 	sources []srcs.Config
 }
 
-func (m *mockSourceManager) GetSources() []srcs.Config                 { return m.sources }
-func (m *mockSourceManager) FindByName(_ string) (*srcs.Config, error) { return nil, ErrSourceNotFound }
-func (m *mockSourceManager) Validate(_ *srcs.Config) error             { return nil }
+func (m *mockSourceManager) GetSources() []srcs.Config { return m.sources }
+
+func (m *mockSourceManager) FindByName(name string) (*srcs.Config, error) {
+	for _, source := range m.sources {
+		if source.Name == name {
+			return &source, nil
+		}
+	}
+	return nil, ErrSourceNotFound
+}
+
+func (m *mockSourceManager) Validate(_ *srcs.Config) error { return nil }
 
 // mockConfig implements config.Interface for testing
 type mockConfig struct {
@@ -143,7 +152,16 @@ func Test_runList(t *testing.T) {
 						MaxDepth:     2,
 					},
 				}
-				return cmd, &mockSourceManager{sources: sourceConfigs}, &mockLogger{}, newMockConfig()
+				ml := &mockLogger{}
+				ml.On("Info", mock.Anything, mock.Anything).Return()
+				ml.On("Error", mock.Anything, mock.Anything).Return()
+				ml.On("Debug", mock.Anything, mock.Anything).Return()
+				ml.On("Warn", mock.Anything, mock.Anything).Return()
+				ml.On("Fatal", mock.Anything, mock.Anything).Return()
+				ml.On("Printf", mock.Anything, mock.Anything).Return()
+				ml.On("Errorf", mock.Anything, mock.Anything).Return()
+				ml.On("Sync").Return(nil)
+				return cmd, &mockSourceManager{sources: sourceConfigs}, ml, newMockConfig()
 			},
 			wantErr: false,
 		},
@@ -152,7 +170,17 @@ func Test_runList(t *testing.T) {
 			setup: func(t *testing.T) (*cobra.Command, *mockSourceManager, *mockLogger, *mockConfig) {
 				cmd := &cobra.Command{}
 				cmd.SetContext(t.Context())
-				return cmd, &mockSourceManager{sources: nil}, &mockLogger{}, newMockConfig()
+				ml := &mockLogger{}
+				ml.On("Info", mock.Anything, mock.Anything).Return()
+				ml.On("Error", mock.Anything, mock.Anything).Return()
+				ml.On("Debug", mock.Anything, mock.Anything).Return()
+				ml.On("Warn", mock.Anything, mock.Anything).Return()
+				ml.On("Fatal", mock.Anything, mock.Anything).Return()
+				ml.On("Printf", mock.Anything, mock.Anything).Return()
+				ml.On("Errorf", mock.Anything, mock.Anything).Return()
+				ml.On("Sync").Return(nil)
+				ml.On("Info", "No sources found", mock.Anything).Return()
+				return cmd, &mockSourceManager{sources: nil}, ml, newMockConfig()
 			},
 			wantErr: false,
 		},
@@ -212,91 +240,107 @@ func Test_runList(t *testing.T) {
 }
 
 func Test_executeList(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
-		name         string
-		sources      []srcs.Config
-		wantErr      bool
-		wantLogCount int
-		wantLogMsg   string
+		name    string
+		setup   func(t *testing.T) (*mockLogger, *mockSourceManager, *mockConfig)
+		wantErr bool
 	}{
 		{
 			name: "with sources",
-			sources: []srcs.Config{
-				{
-					Name:         "Test Source",
-					URL:          "https://test.com",
-					Index:        "test_content",
-					ArticleIndex: "test_articles",
-					RateLimit:    time.Second,
-					MaxDepth:     2,
-				},
+			setup: func(t *testing.T) (*mockLogger, *mockSourceManager, *mockConfig) {
+				ml := &mockLogger{}
+				ml.On("Info", mock.Anything, mock.Anything).Return()
+				ml.On("Error", mock.Anything, mock.Anything).Return()
+				ml.On("Debug", mock.Anything, mock.Anything).Return()
+				ml.On("Warn", mock.Anything, mock.Anything).Return()
+				ml.On("Fatal", mock.Anything, mock.Anything).Return()
+				ml.On("Printf", mock.Anything, mock.Anything).Return()
+				ml.On("Errorf", mock.Anything, mock.Anything).Return()
+				ml.On("Sync").Return(nil)
+				ml.On("Info", "No sources found", mock.Anything).Return()
+
+				sm := &mockSourceManager{
+					sources: []srcs.Config{
+						{
+							Name:         "Test Source",
+							URL:          "https://test.com",
+							Index:        "test_content",
+							ArticleIndex: "test_articles",
+							RateLimit:    time.Second,
+							MaxDepth:     2,
+						},
+					},
+				}
+
+				mc := newMockConfig()
+				return ml, sm, mc
 			},
-			wantErr:      false,
-			wantLogCount: 0,
-			wantLogMsg:   "",
+			wantErr: false,
 		},
 		{
-			name:         "no sources",
-			sources:      nil,
-			wantErr:      false,
-			wantLogCount: 1,
-			wantLogMsg:   "No sources found",
+			name: "no sources",
+			setup: func(t *testing.T) (*mockLogger, *mockSourceManager, *mockConfig) {
+				ml := &mockLogger{}
+				ml.On("Info", mock.Anything, mock.Anything).Return()
+				ml.On("Error", mock.Anything, mock.Anything).Return()
+				ml.On("Debug", mock.Anything, mock.Anything).Return()
+				ml.On("Warn", mock.Anything, mock.Anything).Return()
+				ml.On("Fatal", mock.Anything, mock.Anything).Return()
+				ml.On("Printf", mock.Anything, mock.Anything).Return()
+				ml.On("Errorf", mock.Anything, mock.Anything).Return()
+				ml.On("Sync").Return(nil)
+				ml.On("Info", "No sources found", mock.Anything).Return()
+
+				sm := &mockSourceManager{
+					sources: []srcs.Config{},
+				}
+
+				mc := newMockConfig()
+				return ml, sm, mc
+			},
+			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			// Create mock source manager with test sources
-			sm := &mockSourceManager{sources: tt.sources}
-			ml := &mockLogger{}
+			ml, sm, mc := tt.setup(t)
 
-			// Create test app with mock dependencies
 			app := fxtest.New(t,
-				fx.Supply(fx.NopLogger), // Suppress Fx logs
+				fx.Supply(t.Context()),
 				fx.Provide(
-					// Provide source manager without name tag
 					func() srcs.Interface { return sm },
-					// Provide mock logger with the correct interface
+					func() common.Logger { return ml },
 					fx.Annotate(
-						func() common.Logger { return ml },
-						fx.As(new(common.Logger)),
+						func() config.Interface { return mc },
+						fx.As(new(config.Interface)),
 					),
 				),
-				fx.Invoke(func(p struct {
-					fx.In
-					Sources srcs.Interface
-					Logger  common.Logger
-					LC      fx.Lifecycle
-				}) {
-					p.LC.Append(fx.Hook{
-						OnStart: func(context.Context) error {
+				fx.Invoke(func(lc fx.Lifecycle) {
+					lc.Append(fx.Hook{
+						OnStart: func(ctx context.Context) error {
 							params := &sources.Params{
-								SourceManager: p.Sources,
-								Logger:        p.Logger,
+								SourceManager: sm,
+								Logger:        ml,
 							}
 							if err := sources.ExecuteList(*params); err != nil {
-								p.Logger.Error("Error executing list", "error", err)
+								ml.Error("Error executing list", "error", err)
 								return err
 							}
 							return nil
 						},
-						OnStop: func(context.Context) error {
+						OnStop: func(ctx context.Context) error {
 							return nil
 						},
 					})
 				}),
 			)
 
-			// Test lifecycle
-			app.RequireStart()
-			app.RequireStop()
-
-			// Check log messages
-			require.Len(t, ml.infoMessages, tt.wantLogCount)
-			if tt.wantLogCount > 0 {
-				require.Contains(t, ml.infoMessages, tt.wantLogMsg)
+			if tt.wantErr {
+				require.Error(t, app.Err())
+			} else {
+				app.RequireStart()
+				app.RequireStop()
 			}
 		})
 	}

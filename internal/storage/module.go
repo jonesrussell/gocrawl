@@ -25,27 +25,32 @@ const (
 // Module provides the storage module for dependency injection.
 var Module = fx.Module("storage",
 	fx.Provide(
+		func(cfg config.Interface, logger common.Logger) ModuleOptions {
+			return ModuleOptions{
+				Config:         cfg,
+				Logger:         logger,
+				Addresses:      cfg.GetElasticsearchConfig().Addresses,
+				APIKey:         cfg.GetElasticsearchConfig().APIKey,
+				Username:       cfg.GetElasticsearchConfig().Username,
+				Password:       cfg.GetElasticsearchConfig().Password,
+				Transport:      http.DefaultTransport.(*http.Transport),
+				IndexName:      cfg.GetElasticsearchConfig().IndexName,
+				ScrollDuration: 5 * time.Minute,
+			}
+		},
 		ProvideElasticsearchClient,
-		NewElasticsearchStorage,
-		ProvideIndexManager,
+		NewOptionsFromConfig,
 		fx.Annotate(
-			func(s types.Interface) (api.SearchManager, error) {
-				sm, ok := s.(api.SearchManager)
-				if !ok {
-					return nil, errors.New("storage implementation does not support search operations")
-				}
-				return sm, nil
-			},
-			fx.As(new(api.SearchManager)),
+			NewStorage,
+			fx.As(new(types.Interface)),
 		),
+		ProvideIndexManager,
 	),
 )
 
 // ModuleOptions defines the options for the storage module
 type ModuleOptions struct {
-	fx.In
-
-	Config         *config.Config
+	Config         config.Interface
 	Logger         common.Logger
 	Addresses      []string
 	APIKey         string

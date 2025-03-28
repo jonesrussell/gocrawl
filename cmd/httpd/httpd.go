@@ -32,7 +32,7 @@ type Dependencies struct {
 	Config       config.Interface
 	Storage      types.Interface
 	IndexManager api.IndexManager
-	Context      context.Context `name:"httpdContext"`
+	Context      context.Context
 }
 
 // Params holds the parameters required for running the HTTP server.
@@ -113,8 +113,6 @@ You can send POST requests to /search with a JSON body containing the search par
 
 		// Initialize the Fx application
 		fxApp := fx.New(
-			fx.NopLogger,
-			common.Module,
 			Module,
 			fx.Provide(
 				func() context.Context { return ctx },
@@ -135,14 +133,23 @@ You can send POST requests to /search with a JSON body containing the search par
 						state.started = true
 						state.mu.Unlock()
 
+						// Create error channel to propagate server errors
+						errChan := make(chan error, 1)
 						go func() {
 							defer close(state.serverDone)
 							if err := p.Server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 								p.Logger.Error("HTTP server failed", "error", err)
+								errChan <- fmt.Errorf("HTTP server failed: %w", err)
 							}
 						}()
 
-						return nil
+						// Wait for error or context cancellation
+						select {
+						case err := <-errChan:
+							return err
+						case <-ctx.Done():
+							return ctx.Err()
+						}
 					},
 					OnStop: func(ctx context.Context) error {
 						state.mu.Lock()

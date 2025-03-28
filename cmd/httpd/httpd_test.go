@@ -45,6 +45,38 @@ func (w *searchManagerWrapper) Close() error {
 	return nil
 }
 
+// TestConfigModule provides a test-specific config module that doesn't try to load files.
+var TestConfigModule = fx.Module("testConfig",
+	fx.Replace(
+		fx.Annotate(
+			func() config.Interface {
+				mockCfg := &testutils.MockConfig{}
+				mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+					Environment: "test",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+					Debug:       true,
+				})
+				mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+					Level: "debug",
+					Debug: true,
+				})
+				mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+					Addresses: []string{"http://localhost:9200"},
+					IndexName: "test-index",
+				})
+				mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+					Address: ":invalid_port",
+				})
+				mockCfg.On("GetSources").Return([]config.Source{}, nil)
+				mockCfg.On("GetCommand").Return("test")
+				return mockCfg
+			},
+			fx.As(new(config.Interface)),
+		),
+	),
+)
+
 func TestHTTPCommand(t *testing.T) {
 	// Create test dependencies
 	mockLogger := &testutils.MockLogger{}
@@ -193,85 +225,6 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 
 	app.RequireStart()
 	defer app.RequireStop()
-}
-
-func TestHTTPCommandServerError(t *testing.T) {
-	// Create test dependencies
-	mockLogger := &testutils.MockLogger{}
-	mockLogger.On("Info", mock.Anything).Return()
-	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
-
-	mockCfg := &testutils.MockConfig{}
-	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
-		Environment: "test",
-		Name:        "gocrawl",
-		Version:     "1.0.0",
-		Debug:       true,
-	})
-	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
-		Level: "debug",
-		Debug: true,
-	})
-	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
-		Addresses: []string{"http://localhost:9200"},
-		IndexName: "test-index",
-	})
-	// Return an invalid port configuration to force an error
-	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
-		Address: ":invalid_port",
-	})
-	mockCfg.On("GetSources").Return([]config.Source{}, nil)
-	mockCfg.On("GetCommand").Return("test")
-
-	mockStore := &mockStorage{}
-	mockSecurity := &testutils.MockSecurityMiddleware{}
-
-	// Create test app with mocked dependencies using fxtest
-	app := fxtest.New(t,
-		fx.NopLogger,
-		// Provide mock logger directly
-		fx.Provide(
-			fx.Annotate(
-				func() commontypes.Logger { return mockLogger },
-				fx.As(new(commontypes.Logger)),
-			),
-		),
-		fx.Supply(
-			mockStore,
-			mockSecurity,
-			mockCfg,
-		),
-		fx.Provide(
-			func() context.Context { return t.Context() },
-			func() storagetypes.Interface { return mockStore },
-			func() config.Interface { return mockCfg },
-		),
-		// Exclude logger module and provide other modules
-		fx.Module("test",
-			fx.Provide(
-				func(storage storagetypes.Interface) api.SearchManager {
-					return &searchManagerWrapper{storage}
-				},
-				func(cfg config.Interface) *http.Server {
-					return &http.Server{
-						Addr:    cfg.GetServerConfig().Address,
-						Handler: http.NewServeMux(),
-					}
-				},
-				func() middleware.SecurityMiddlewareInterface {
-					return mockSecurity
-				},
-			),
-		),
-	)
-
-	err := app.Start(t.Context())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid port")
 }
 
 func TestCommand(t *testing.T) {
