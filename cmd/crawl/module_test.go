@@ -3,7 +3,6 @@ package crawl_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -26,36 +25,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
-
-// mockSearchManager implements api.SearchManager for testing
-type mockSearchManager struct {
-	api.SearchManager
-}
-
-func (m *mockSearchManager) Search(_ context.Context, _ string, _ any) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *mockSearchManager) Count(_ context.Context, _ string, _ any) (int64, error) {
-	return 0, nil
-}
-
-func (m *mockSearchManager) Aggregate(_ context.Context, _ string, _ any) (any, error) {
-	return nil, errors.New("aggregate not implemented in mock")
-}
-
-// mockStorage implements types.Interface for testing
-type mockStorage struct {
-	types.Interface
-}
-
-func (m *mockStorage) Store(_ context.Context, _ string, _ any) error {
-	return nil
-}
-
-func (m *mockStorage) Close() error {
-	return nil
-}
 
 // TestModuleProvides tests that the crawl module provides all necessary dependencies
 func TestModuleProvides(t *testing.T) {
@@ -151,8 +120,8 @@ func TestModuleProvides(t *testing.T) {
 
 		// Decorate storage-related dependencies with mocks
 		fx.Decorate(
-			func() types.Interface { return &mockStorage{} },
-			func() api.SearchManager { return &mockSearchManager{} },
+			func() types.Interface { return testutils.NewMockStorage() },
+			func() api.SearchManager { return testutils.NewMockSearchManager() },
 		),
 	)
 
@@ -268,8 +237,8 @@ func TestModuleConfiguration(t *testing.T) {
 
 		// Decorate storage-related dependencies with mocks
 		fx.Decorate(
-			func() types.Interface { return &mockStorage{} },
-			func() api.SearchManager { return &mockSearchManager{} },
+			func() types.Interface { return testutils.NewMockStorage() },
+			func() api.SearchManager { return testutils.NewMockSearchManager() },
 		),
 	)
 

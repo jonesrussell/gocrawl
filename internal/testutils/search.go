@@ -49,3 +49,8 @@ func (m *MockSearchManager) Close() error {
 
 // Ensure MockSearchManager implements api.SearchManager
 var _ api.SearchManager = (*MockSearchManager)(nil)
+
+// NewMockSearchManager creates a new MockSearchManager instance.
+func NewMockSearchManager() *MockSearchManager {
+	return &MockSearchManager{}
+}
