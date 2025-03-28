@@ -13,6 +13,7 @@ import (
 	srcs "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -78,6 +79,59 @@ func (m *mockConfig) GetAppConfig() *config.AppConfig       { return &config.App
 func (m *mockConfig) GetServerConfig() *config.ServerConfig { return &config.ServerConfig{} }
 func (m *mockConfig) GetSources() []config.Source           { return m.sources }
 
+// TestParams holds the dependencies required for the list operation.
+type TestParams struct {
+	fx.In
+	Sources srcs.Interface
+	Logger  common.Logger
+}
+
+// testParams holds the parameters required for listing sources.
+type testParams struct {
+	ctx           context.Context
+	sources       srcs.Interface
+	logger        common.Logger
+	outputFormat  string
+	showMetadata  bool
+	showSelectors bool
+}
+
+// setupTestApp creates a new test application with all required dependencies.
+func setupTestApp(t *testing.T) *fxtest.App {
+	t.Helper()
+
+	// Create mock logger
+	mockLogger := &testutils.MockLogger{}
+	mockLogger.On("Info", mock.Anything).Return()
+	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
+
+	return fxtest.New(t,
+		fx.NopLogger,
+		// Provide core dependencies
+		fx.Provide(
+			// Named dependencies
+			func() srcs.Interface { return &mockSources{} },
+			// Logger provider that replaces the default logger.Module provider
+			fx.Annotate(
+				func() common.Logger { return mockLogger },
+				fx.ResultTags(`name:"logger"`),
+			),
+		),
+		// Include test config module and sources module
+		TestConfigModule,
+		TestCommonModule,
+		sources.Module,
+		// Verify dependencies
+		fx.Invoke(func(p TestParams) {
+			verifyDependencies(t, &p)
+		}),
+	)
+}
+
 func Test_listCommand(t *testing.T) {
 	t.Parallel()
 	cmd := sources.ListCommand()
@@ -133,11 +187,8 @@ func Test_runList(t *testing.T) {
 			app := fxtest.New(t,
 				fx.Supply(cmd.Context()),
 				fx.Provide(
-					// Provide source manager with the correct name tag
-					fx.Annotate(
-						func() srcs.Interface { return sm },
-						fx.ResultTags(`name:"sourceManager"`),
-					),
+					// Provide source manager without name tag
+					func() srcs.Interface { return sm },
 					func() common.Logger { return ml },
 					// Provide config with the correct interface
 					fx.Annotate(
@@ -150,13 +201,13 @@ func Test_runList(t *testing.T) {
 				),
 				fx.Invoke(func(p struct {
 					fx.In
-					Sources srcs.Interface `name:"sourceManager"`
+					Sources srcs.Interface
 					Logger  common.Logger
 					LC      fx.Lifecycle
 				}) {
 					p.LC.Append(fx.Hook{
 						OnStart: func(context.Context) error {
-							params := &sources.ListParams{
+							params := &sources.Params{
 								SourceManager: p.Sources,
 								Logger:        p.Logger,
 							}
@@ -225,11 +276,8 @@ func Test_executeList(t *testing.T) {
 			app := fxtest.New(t,
 				fx.Supply(fx.NopLogger), // Suppress Fx logs
 				fx.Provide(
-					// Provide source manager with the correct name tag
-					fx.Annotate(
-						func() srcs.Interface { return sm },
-						fx.ResultTags(`name:"sourceManager"`),
-					),
+					// Provide source manager without name tag
+					func() srcs.Interface { return sm },
 					// Provide mock logger with the correct interface
 					fx.Annotate(
 						func() common.Logger { return ml },
@@ -238,13 +286,13 @@ func Test_executeList(t *testing.T) {
 				),
 				fx.Invoke(func(p struct {
 					fx.In
-					Sources srcs.Interface `name:"sourceManager"`
+					Sources srcs.Interface
 					Logger  common.Logger
 					LC      fx.Lifecycle
 				}) {
 					p.LC.Append(fx.Hook{
 						OnStart: func(context.Context) error {
-							params := &sources.ListParams{
+							params := &sources.Params{
 								SourceManager: p.Sources,
 								Logger:        p.Logger,
 							}

@@ -29,7 +29,6 @@ var Module = fx.Module("sources",
 	fx.Provide(
 		fx.Annotate(
 			provideSources,
-			fx.ResultTags(`name:"sourceManager"`),
 		),
 	),
 )
@@ -45,7 +44,7 @@ type Params struct {
 type Result struct {
 	fx.Out
 
-	Sources Interface `name:"sourceManager"`
+	Sources Interface
 }
 
 // provideSources creates a new sources instance.

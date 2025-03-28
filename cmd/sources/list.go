@@ -29,12 +29,21 @@ const (
 	labelFormatterWidth = 8
 )
 
-// ListParams holds the parameters required for listing sources.
-type ListParams struct {
+// Params holds the dependencies required for the list operation.
+type Params struct {
 	fx.In
-
-	SourceManager sources.Interface `name:"sourceManager"`
+	SourceManager sources.Interface
 	Logger        common.Logger
+}
+
+// listParams holds the parameters required for listing sources.
+type listParams struct {
+	ctx           context.Context
+	sources       sources.Interface
+	logger        common.Logger
+	outputFormat  string
+	showMetadata  bool
+	showSelectors bool
 }
 
 // ListCommand creates and returns the list command that displays all sources.
@@ -71,7 +80,7 @@ func RunList(cmd *cobra.Command, _ []string) error {
 		Module,
 		fx.Invoke(func(p struct {
 			fx.In
-			Sources sources.Interface `name:"sourceManager"`
+			Sources sources.Interface
 			Logger  common.Logger
 			LC      fx.Lifecycle
 		}) {
@@ -79,7 +88,7 @@ func RunList(cmd *cobra.Command, _ []string) error {
 			handler.SetLogger(p.Logger)
 			p.LC.Append(fx.Hook{
 				OnStart: func(context.Context) error {
-					params := &ListParams{
+					params := &Params{
 						SourceManager: p.Sources,
 						Logger:        p.Logger,
 					}
@@ -137,7 +146,7 @@ func RunList(cmd *cobra.Command, _ []string) error {
 }
 
 // ExecuteList retrieves and displays the list of sources.
-func ExecuteList(params ListParams) error {
+func ExecuteList(params Params) error {
 	allSources := params.SourceManager.GetSources()
 	if len(allSources) == 0 {
 		params.Logger.Info("No sources found")

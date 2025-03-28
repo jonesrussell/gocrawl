@@ -25,7 +25,7 @@ var deleteSourceName string
 type Params struct {
 	fx.In
 	Storage common.Storage
-	Sources sources.Interface `name:"sourceManager"`
+	Sources sources.Interface
 	Logger  common.Logger
 }
 

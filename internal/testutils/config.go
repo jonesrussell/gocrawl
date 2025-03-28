@@ -71,6 +71,26 @@ func (m *MockConfig) GetServerConfig() *config.ServerConfig {
 	return nil
 }
 
+func (m *MockConfig) GetSources() []config.Source {
+	args := m.Called()
+	if sources := args.Get(0); sources != nil {
+		if srcs, ok := sources.([]config.Source); ok {
+			return srcs
+		}
+	}
+	return nil
+}
+
+func (m *MockConfig) GetCommand() string {
+	args := m.Called()
+	if cmd := args.Get(0); cmd != nil {
+		if str, ok := cmd.(string); ok {
+			return str
+		}
+	}
+	return "test"
+}
+
 // NewTestServerConfig creates a new ServerConfig for testing
 func NewTestServerConfig() *config.ServerConfig {
 	return &config.ServerConfig{

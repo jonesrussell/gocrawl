@@ -5,22 +5,55 @@ import (
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 	"go.uber.org/fx/fxtest"
+)
+
+// TestCommonModule provides a test-specific common module that excludes the logger module.
+var TestCommonModule = fx.Module("testCommon",
+	// Suppress fx logging to reduce noise in the application logs.
+	fx.WithLogger(func() fxevent.Logger {
+		return &fxevent.NopLogger
+	}),
+	// Core modules used by most commands, excluding logger and config.
+	sources.Module,
 )
 
 // TestConfigModule provides a test-specific config module that doesn't try to load files.
 var TestConfigModule = fx.Module("testConfig",
 	fx.Provide(
 		fx.Annotate(
-			func() config.Interface { return &mockConfig{} },
+			func() config.Interface {
+				mockCfg := &testutils.MockConfig{}
+				mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+					Environment: "test",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+					Debug:       true,
+				})
+				mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+					Level: "debug",
+					Debug: true,
+				})
+				mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+					Addresses: []string{"http://localhost:9200"},
+					IndexName: "test-index",
+				})
+				mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+				mockCfg.On("GetSources").Return([]config.Source{}, nil)
+				mockCfg.On("GetCommand").Return("test")
+				return mockCfg
+			},
 			fx.ResultTags(`name:"config"`),
 		),
 	),
@@ -35,23 +68,28 @@ func setupTestApp(t *testing.T) *fxtest.App {
 	t.Setenv("APP_ENV", "test")
 	t.Setenv("CONFIG_PATH", "")
 
+	// Create mock logger
+	mockLogger := &testutils.MockLogger{}
+	mockLogger.On("Info", mock.Anything).Return()
+	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
+
 	return fxtest.New(t,
 		fx.NopLogger,
 		// Provide core dependencies
 		fx.Provide(
 			// Named dependencies
-			fx.Annotate(
-				func() sources.Interface { return &mockSources{} },
-				fx.ResultTags(`name:"testSourceManager"`),
-			),
+			func() sources.Interface { return &mockSources{} },
 			// Logger provider that replaces the default logger.Module provider
 			fx.Annotate(
-				logger.NewNoOp,
+				func() common.Logger { return mockLogger },
 				fx.ResultTags(`name:"logger"`),
-				fx.As(new(logger.Interface)),
 			),
 			// Provide unnamed interfaces required by the crawler module
-			func() types.Interface { return &mockStorage{} },
+			func() storagetypes.Interface { return &mockStorage{} },
 			fx.Annotate(
 				func() api.IndexManager { return &mockIndexManager{} },
 				fx.ResultTags(`name:"indexManager"`),
@@ -69,6 +107,7 @@ func setupTestApp(t *testing.T) *fxtest.App {
 		),
 		// Include test config module and crawler module
 		TestConfigModule,
+		TestCommonModule,
 		crawler.Module,
 		// Verify dependencies
 		fx.Invoke(func(p crawler.Params) {

@@ -126,9 +126,9 @@ type Params struct {
 	fx.In
 
 	Logger       common.Logger
-	Debugger     debug.Debugger    `optional:"true"`
-	IndexManager api.IndexManager  `name:"indexManager"`
-	Sources      sources.Interface `name:"testSourceManager"`
+	Debugger     debug.Debugger   `optional:"true"`
+	IndexManager api.IndexManager `name:"indexManager"`
+	Sources      sources.Interface
 }
 
 // Result contains the components provided by the crawler module.

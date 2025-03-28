@@ -10,10 +10,9 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
-	"github.com/jonesrussell/gocrawl/internal/api"
+	commontypes "github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,36 +21,22 @@ import (
 	"go.uber.org/fx/fxtest"
 )
 
-// mockStorage implements types.Interface for testing
+// mockStorage implements storagetypes.Interface for testing
 type mockStorage struct {
-	types.Interface
+	storagetypes.Interface
 }
 
 func (m *mockStorage) Search(context.Context, string, any) ([]any, error) {
 	return []any{}, nil
 }
 
-// mockSearchManager implements api.SearchManager for testing
-type mockSearchManager struct {
-	api.SearchManager
-}
-
-func (m *mockSearchManager) Search(context.Context, string, any) ([]any, error) {
-	return []any{}, nil
-}
-
-func (m *mockSearchManager) Count(context.Context, string, any) (int64, error) {
-	return 0, nil
-}
-
-func (m *mockSearchManager) Close() error {
+func (m *mockStorage) Close() error {
 	return nil
 }
 
 func TestHTTPCommand(t *testing.T) {
 	// Create test dependencies
 	mockLogger := &testutils.MockLogger{}
-	// Set up logger expectations for both single and multi-argument calls
 	mockLogger.On("Info", mock.Anything).Return()
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Warn", mock.Anything).Return()
@@ -59,22 +44,39 @@ func TestHTTPCommand(t *testing.T) {
 	mockLogger.On("Error", mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := testutils.NewMockConfig()
+	mockCfg := &testutils.MockConfig{}
+	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
+	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+		Level: "debug",
+		Debug: true,
+	})
+	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+	mockCfg.On("GetSources").Return([]config.Source{}, nil)
+	mockCfg.On("GetCommand").Return("test")
+
 	mockStore := &mockStorage{}
-	mockSearch := &mockSearchManager{}
+	mockSecurity := &testutils.MockSecurityMiddleware{}
 
 	// Create test app with mocked dependencies using fxtest
 	app := fxtest.New(t,
-		fx.Supply(mockLogger),
-		fx.Supply(mockCfg),
-		fx.Supply(mockStore),
-		fx.Supply(mockSearch),
+		fx.NopLogger,
+		fx.Supply(
+			fx.Annotate(mockLogger, fx.As(new(commontypes.Logger))),
+			mockStore,
+			mockSecurity,
+		),
 		fx.Provide(
 			func() context.Context { return t.Context() },
-			func() logger.Interface { return mockLogger },
-			func() config.Interface { return mockCfg },
-			func() types.Interface { return mockStore },
-			func() api.SearchManager { return mockSearch },
+			func() storagetypes.Interface { return mockStore },
 		),
 		httpd.Module,
 	)
@@ -86,7 +88,6 @@ func TestHTTPCommand(t *testing.T) {
 func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	// Create test dependencies
 	mockLogger := &testutils.MockLogger{}
-	// Set up logger expectations for both single and multi-argument calls
 	mockLogger.On("Info", mock.Anything).Return()
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Warn", mock.Anything).Return()
@@ -94,54 +95,92 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	mockLogger.On("Error", mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := testutils.NewMockConfig()
+	mockCfg := &testutils.MockConfig{}
+	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
+	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+		Level: "debug",
+		Debug: true,
+	})
+	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+	mockCfg.On("GetSources").Return([]config.Source{}, nil)
+	mockCfg.On("GetCommand").Return("test")
+
 	mockStore := &mockStorage{}
-	mockSearch := &mockSearchManager{}
+	mockSecurity := &testutils.MockSecurityMiddleware{}
 
 	// Create test app with mocked dependencies using fxtest
 	app := fxtest.New(t,
-		fx.Supply(mockLogger),
-		fx.Supply(mockCfg),
-		fx.Supply(mockStore),
-		fx.Supply(mockSearch),
+		fx.NopLogger,
+		fx.Supply(
+			fx.Annotate(mockLogger, fx.As(new(commontypes.Logger))),
+			mockStore,
+			mockSecurity,
+		),
 		fx.Provide(
 			func() context.Context { return t.Context() },
-			func() logger.Interface { return mockLogger },
-			func() config.Interface { return mockCfg },
-			func() types.Interface { return mockStore },
-			func() api.SearchManager { return mockSearch },
+			func() storagetypes.Interface { return mockStore },
 		),
 		httpd.Module,
-		fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
-			// Signal that server is ready to accept connections
-			lc.Append(fx.Hook{
-				OnStart: func(context.Context) error {
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					return nil
-				},
-			})
-		}),
 	)
 
-	// Start the app
 	app.RequireStart()
 	defer app.RequireStop()
 }
 
 func TestHTTPCommandServerError(t *testing.T) {
+	// Create test dependencies
+	mockLogger := &testutils.MockLogger{}
+	mockLogger.On("Info", mock.Anything).Return()
+	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything).Return()
+	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything).Return()
+	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
+
+	mockCfg := &testutils.MockConfig{}
+	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
+	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+		Level: "debug",
+		Debug: true,
+	})
+	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+	mockCfg.On("GetSources").Return([]config.Source{}, nil)
+	mockCfg.On("GetCommand").Return("test")
+
+	mockStore := &mockStorage{}
+	mockSecurity := &testutils.MockSecurityMiddleware{}
+
+	// Create test app with mocked dependencies using fxtest
 	app := fxtest.New(t,
+		fx.NopLogger,
 		fx.Supply(
-			&testutils.MockLogger{},
-			testutils.NewMockConfig(),
-			&testutils.MockSecurityMiddleware{},
+			fx.Annotate(mockLogger, fx.As(new(commontypes.Logger))),
+			mockStore,
+			mockSecurity,
 		),
 		fx.Provide(
 			func() context.Context { return t.Context() },
-			func() api.SearchManager { return &testutils.MockSearchManager{} },
+			func() storagetypes.Interface { return mockStore },
 		),
-		api.Module,
+		httpd.Module,
 	)
 
 	err := app.Start(t.Context())

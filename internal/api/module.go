@@ -13,10 +13,14 @@ import (
 )
 
 const (
-	// healthCheckTimeout is the maximum time to wait for the server to become healthy
-	healthCheckTimeout = 5 * time.Second
-	// healthCheckInterval is the time between health check attempts
-	healthCheckInterval = 100 * time.Millisecond
+	// HealthCheckTimeout is the maximum time to wait for the server to become healthy
+	HealthCheckTimeout = 5 * time.Second
+	// HealthCheckInterval is the time between health check attempts
+	HealthCheckInterval = 100 * time.Millisecond
+	// ReadHeaderTimeout is the timeout for reading request headers
+	ReadHeaderTimeout = 10 * time.Second
+	// ShutdownTimeout is the timeout for graceful shutdown
+	ShutdownTimeout = 5 * time.Second
 )
 
 // SearchRequest represents the structure of the search request
@@ -50,7 +54,7 @@ var Module = fx.Module("api",
 			server := &http.Server{
 				Addr:              cfg.GetServerConfig().Address,
 				Handler:           router,
-				ReadHeaderTimeout: readHeaderTimeout,
+				ReadHeaderTimeout: ReadHeaderTimeout,
 			}
 
 			// Register lifecycle hooks
@@ -66,22 +70,22 @@ var Module = fx.Module("api",
 					}()
 
 					// Create a timeout context for health check
-					healthCtx, cancel := context.WithTimeout(ctx, healthCheckTimeout)
+					healthCtx, cancel := context.WithTimeout(ctx, HealthCheckTimeout)
 					defer cancel()
 
 					// Create a ticker for health check attempts
-					ticker := time.NewTicker(healthCheckInterval)
+					ticker := time.NewTicker(HealthCheckInterval)
 					defer ticker.Stop()
 
 					// Try to connect to the health endpoint until successful or timeout
 					for {
 						select {
 						case <-healthCtx.Done():
-							return fmt.Errorf("server failed to become healthy within %v", healthCheckTimeout)
+							return fmt.Errorf("server failed to become healthy within %v", HealthCheckTimeout)
 						case <-ticker.C:
 							// Create a temporary client for health check
 							client := &http.Client{
-								Timeout: healthCheckInterval,
+								Timeout: HealthCheckInterval,
 							}
 
 							// Try to connect to the health endpoint
@@ -100,7 +104,7 @@ var Module = fx.Module("api",
 				},
 				OnStop: func(ctx context.Context) error {
 					// Create a timeout context for shutdown
-					shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
+					shutdownCtx, cancel := context.WithTimeout(ctx, ShutdownTimeout)
 					defer cancel()
 
 					// Shutdown server

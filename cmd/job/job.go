@@ -21,21 +21,17 @@ import (
 	"go.uber.org/fx"
 )
 
-// Params holds the dependencies required for the job scheduler.
+// Params holds the dependencies required for the job operation.
 type Params struct {
-	fx.In `json:"fx_._in"`
+	fx.In
+	Sources sources.Interface `json:"sources,omitempty"`
+	Logger  common.Logger
 
 	// Lifecycle manages the application's startup and shutdown hooks
 	Lifecycle fx.Lifecycle `json:"lifecycle,omitempty"`
 
-	// Sources provides access to configured crawl sources
-	Sources sources.Interface `name:"sourceManager" json:"sources,omitempty"`
-
 	// CrawlerInstance handles the core crawling functionality
 	CrawlerInstance crawler.Interface `json:"crawler_instance,omitempty"`
-
-	// Logger provides structured logging capabilities
-	Logger logger.Interface `json:"logger,omitempty"`
 
 	// Config holds the application configuration
 	Config config.Interface `json:"config,omitempty"`
