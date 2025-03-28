@@ -49,6 +49,7 @@ func newMockLogger() *testutils.MockLogger {
 // TestNew tests the New function of the collector package
 func TestNew(t *testing.T) {
 	mockLogger := newMockLogger()
+	articleProcessor := article.NewService(mockLogger, config.DefaultArticleSelectors(), nil, "test-index")
 	tests := []struct {
 		name       string
 		params     collector.Params
@@ -58,34 +59,44 @@ func TestNew(t *testing.T) {
 		{
 			name: "valid parameters",
 			params: collector.Params{
-				BaseURL:          "http://example.com",
-				MaxDepth:         2,
-				RateLimit:        1 * time.Second,
-				Debugger:         &logger.CollyDebugger{Logger: mockLogger},
-				Logger:           mockLogger,
-				Parallelism:      2,
-				RandomDelay:      2 * time.Second,
-				Context:          t.Context(),
-				ArticleProcessor: &article.Processor{Logger: mockLogger},
-				Source:           createTestConfig(),
-				Done:             make(chan struct{}),
+				BaseURL:     "http://example.com",
+				MaxDepth:    2,
+				RateLimit:   1 * time.Second,
+				Debugger:    &logger.CollyDebugger{Logger: mockLogger},
+				Logger:      mockLogger,
+				Parallelism: 2,
+				RandomDelay: 2 * time.Second,
+				Context:     t.Context(),
+				ArticleProcessor: &article.ArticleProcessor{
+					Logger:         mockLogger,
+					ArticleService: articleProcessor,
+					Storage:        nil,
+					IndexName:      "test-index",
+				},
+				Source: createTestConfig(),
+				Done:   make(chan struct{}),
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty base URL",
 			params: collector.Params{
-				BaseURL:          "",
-				MaxDepth:         2,
-				RateLimit:        1 * time.Second,
-				Debugger:         &logger.CollyDebugger{Logger: mockLogger},
-				Logger:           mockLogger,
-				Parallelism:      2,
-				RandomDelay:      2 * time.Second,
-				Context:          t.Context(),
-				ArticleProcessor: &article.Processor{Logger: mockLogger},
-				Source:           createTestConfig(),
-				Done:             make(chan struct{}),
+				BaseURL:     "",
+				MaxDepth:    2,
+				RateLimit:   1 * time.Second,
+				Debugger:    &logger.CollyDebugger{Logger: mockLogger},
+				Logger:      mockLogger,
+				Parallelism: 2,
+				RandomDelay: 2 * time.Second,
+				Context:     t.Context(),
+				ArticleProcessor: &article.ArticleProcessor{
+					Logger:         mockLogger,
+					ArticleService: articleProcessor,
+					Storage:        nil,
+					IndexName:      "test-index",
+				},
+				Source: createTestConfig(),
+				Done:   make(chan struct{}),
 			},
 			wantErr:    true,
 			wantErrMsg: "base URL is required",
@@ -93,17 +104,22 @@ func TestNew(t *testing.T) {
 		{
 			name: "invalid base URL",
 			params: collector.Params{
-				BaseURL:          "not-a-url",
-				MaxDepth:         2,
-				RateLimit:        1 * time.Second,
-				Debugger:         &logger.CollyDebugger{Logger: mockLogger},
-				Logger:           mockLogger,
-				Parallelism:      2,
-				RandomDelay:      2 * time.Second,
-				Context:          t.Context(),
-				ArticleProcessor: &article.Processor{Logger: mockLogger},
-				Source:           createTestConfig(),
-				Done:             make(chan struct{}),
+				BaseURL:     "not-a-url",
+				MaxDepth:    2,
+				RateLimit:   1 * time.Second,
+				Debugger:    &logger.CollyDebugger{Logger: mockLogger},
+				Logger:      mockLogger,
+				Parallelism: 2,
+				RandomDelay: 2 * time.Second,
+				Context:     t.Context(),
+				ArticleProcessor: &article.ArticleProcessor{
+					Logger:         mockLogger,
+					ArticleService: articleProcessor,
+					Storage:        nil,
+					IndexName:      "test-index",
+				},
+				Source: createTestConfig(),
+				Done:   make(chan struct{}),
 			},
 			wantErr:    true,
 			wantErrMsg: "invalid base URL: not-a-url, must be a valid HTTP/HTTPS URL",
@@ -141,12 +157,17 @@ func TestNew(t *testing.T) {
 	// Test for missing logger
 	t.Run("missing logger", func(t *testing.T) {
 		params := collector.Params{
-			BaseURL:          "http://example.com",
-			Logger:           nil,
-			ArticleProcessor: &article.Processor{Logger: mockLogger},
-			Context:          t.Context(),
-			Source:           createTestConfig(),
-			Done:             make(chan struct{}),
+			BaseURL: "http://example.com",
+			Logger:  nil,
+			ArticleProcessor: &article.ArticleProcessor{
+				Logger:         mockLogger,
+				ArticleService: articleProcessor,
+				Storage:        nil,
+				IndexName:      "test-index",
+			},
+			Context: t.Context(),
+			Source:  createTestConfig(),
+			Done:    make(chan struct{}),
 		}
 
 		result, err := collector.New(params)
@@ -159,12 +180,17 @@ func TestNew(t *testing.T) {
 	// Test for missing done channel
 	t.Run("missing done channel", func(t *testing.T) {
 		params := collector.Params{
-			BaseURL:          "http://example.com",
-			Logger:           mockLogger,
-			ArticleProcessor: &article.Processor{Logger: mockLogger},
-			Context:          t.Context(),
-			Source:           createTestConfig(),
-			Done:             nil,
+			BaseURL: "http://example.com",
+			Logger:  mockLogger,
+			ArticleProcessor: &article.ArticleProcessor{
+				Logger:         mockLogger,
+				ArticleService: articleProcessor,
+				Storage:        nil,
+				IndexName:      "test-index",
+			},
+			Context: t.Context(),
+			Source:  createTestConfig(),
+			Done:    nil,
 		}
 
 		result, err := collector.New(params)
@@ -178,6 +204,7 @@ func TestNew(t *testing.T) {
 // TestCollectorCreation tests the collector creation with different URLs
 func TestCollectorCreation(t *testing.T) {
 	mockLogger := newMockLogger()
+	articleProcessor := article.NewService(mockLogger, config.DefaultArticleSelectors(), nil, "test-index")
 	tests := []struct {
 		name    string
 		cfg     *config.Source
@@ -229,16 +256,21 @@ func TestCollectorCreation(t *testing.T) {
 			}
 
 			params := collector.Params{
-				BaseURL:          baseURL,
-				Logger:           mockLogger,
-				ArticleProcessor: &article.Processor{Logger: mockLogger},
-				Context:          t.Context(),
-				Source:           tt.cfg,
-				Done:             make(chan struct{}),
-				MaxDepth:         2,
-				RateLimit:        time.Second,
-				Parallelism:      2,
-				RandomDelay:      2 * time.Second,
+				BaseURL: baseURL,
+				Logger:  mockLogger,
+				ArticleProcessor: &article.ArticleProcessor{
+					Logger:         mockLogger,
+					ArticleService: articleProcessor,
+					Storage:        nil,
+					IndexName:      "test-index",
+				},
+				Context:     t.Context(),
+				Source:      tt.cfg,
+				Done:        make(chan struct{}),
+				MaxDepth:    2,
+				RateLimit:   time.Second,
+				Parallelism: 2,
+				RandomDelay: 2 * time.Second,
 			}
 
 			c, err := collector.New(params)

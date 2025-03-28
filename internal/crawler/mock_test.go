@@ -48,7 +48,7 @@ type (
 		sources.Interface
 	}
 
-	// mockContentProcessor implements models.ContentProcessor for testing
+	// mockContentProcessor implements collector.Processor for testing
 	mockContentProcessor struct{}
 )
 
@@ -156,6 +156,7 @@ func (m *mockSources) ListSources() ([]*sources.Config, error) {
 	return nil, ErrNoSources
 }
 
-func (m *mockContentProcessor) Process(e *colly.HTMLElement) {
+func (m *mockContentProcessor) Process(e *colly.HTMLElement) error {
 	// No-op for testing
+	return nil
 }

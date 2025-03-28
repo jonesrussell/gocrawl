@@ -14,6 +14,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -44,7 +45,7 @@ type Interface interface {
 	// Wait blocks until the crawler has finished processing all queued requests.
 	Wait()
 	// GetMetrics returns the current crawler metrics.
-	GetMetrics() *Metrics
+	GetMetrics() *collector.Metrics
 }
 
 // Module provides the crawler's dependencies.
@@ -90,9 +91,9 @@ var Module = fx.Module("crawler",
 					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 					IndexName   string               `name:"indexName"`
 				},
-			) models.ContentProcessor {
+			) collector.Processor {
 				log.Debug("Providing article processor")
-				return &article.Processor{
+				return &article.ArticleProcessor{
 					Logger:         log,
 					ArticleService: articleService,
 					Storage:        storage,
@@ -112,7 +113,7 @@ var Module = fx.Module("crawler",
 					fx.In
 					IndexName string `name:"contentIndex"`
 				},
-			) models.ContentProcessor {
+			) collector.Processor {
 				log.Debug("Providing content processor")
 				return content.NewProcessor(contentService, storage, log, params.IndexName)
 			},
@@ -178,4 +179,25 @@ func provideCrawler(p Params, bus *events.Bus) (Result, error) {
 		sources:      p.Sources,
 	}
 	return Result{Crawler: c}, nil
+}
+
+func NewContentProcessor(
+	cfg *config.Config,
+	logger logger.Interface,
+) collector.Processor {
+	service := content.NewService(logger)
+	return content.NewProcessor(service, nil, logger, "content")
+}
+
+func NewArticleProcessor(
+	cfg *config.Config,
+	logger logger.Interface,
+) collector.Processor {
+	service := article.NewService(logger, config.DefaultArticleSelectors(), nil, "articles")
+	return &article.ArticleProcessor{
+		Logger:         logger,
+		ArticleService: service,
+		Storage:        nil,
+		IndexName:      "articles",
+	}
 }

@@ -1,60 +1,148 @@
-# TODO List for Codebase Improvements
+# GoCrawl Cleanup Plan
 
-## Lint Errors to Address
+## High Priority
 
-### 1. Error Return Value Not Checked (errcheck)
-- [ ] Check and handle error return values in the following files:
-  - `internal/storage/mock_storage.go`
-  - `internal/storage/scroll.go`
-  - `cmd/crawl.go`
+### 1. Interface Organization and Naming
+- [x] Move interfaces to consuming packages
+  - [x] Move `ContentProcessor` from `models` to `collector`
+  - [x] Move `Logger` interface from `collector` to `common`
+  - [x] Move `ArticleProcessor` to `article` package
+- [x] Rename interfaces to avoid stuttering
+  - [x] `models.ContentProcessor` → `collector.Processor`
+  - [x] `collector.ArticleProcessor` → `article.Processor`
+  - [x] `collector.ContentProcessor` → `content.Processor`
 
-### 2. Unused Parameters (revive)
-- [ ] Remove or rename unused parameters in the following files:
-  - `internal/app/app.go`
-  - `cmd/crawl.go`
-  - `internal/crawler/crawler_test.go`
+### 2. Dependency Injection
+- [x] Improve fx module organization
+  - [x] Move all fx-related code to `module.go` files
+  - [x] Use `fx.Annotate` for named dependencies
+  - [x] Add proper lifecycle hooks
+  - [x] Add proper error handling in constructors
+- [ ] Add proper dependency validation
+  - [ ] Add validation for required dependencies
+  - [ ] Add validation for optional dependencies
+  - [ ] Add proper error messages
 
-### 3. Magic Numbers (mnd)
-- [ ] Replace magic numbers with named constants in the following files:
-  - `internal/storage/storage.go`
-  - `cmd/crawl.go`
+### 3. Error Handling
+- [ ] Standardize error handling
+  - [ ] Use `errors.New` for simple errors
+  - [ ] Use `fmt.Errorf` with `%w` for wrapped errors
+  - [ ] Add proper error context
+  - [ ] Add proper error types
+- [ ] Improve HTTP client error handling
+  - [ ] Add proper response body closure
+  - [ ] Add proper context handling
+  - [ ] Add proper timeout handling
 
-### 4. Empty Blocks (revive)
-- [ ] Remove or comment on empty blocks in the following files:
-  - `internal/storage/config.go`
+## Medium Priority
 
-### 5. Shadowing Variables (govet)
-- [ ] Rename variables to avoid shadowing in the following files:
-  - `internal/storage/article.go`
-  - `internal/storage/storage.go`
+### 4. Testing
+- [ ] Improve test organization
+  - [ ] Move tests to separate `_test` packages
+  - [ ] Add proper test helpers
+  - [ ] Add proper test fixtures
+  - [ ] Add proper test cleanup
+- [ ] Add proper test coverage
+  - [ ] Add edge case tests
+  - [ ] Add error condition tests
+  - [ ] Add concurrent operation tests
+  - [ ] Add lifecycle event tests
 
-### 6. Global Variables (gochecknoglobals)
-- [ ] Refactor global variables in the following files:
-  - `cmd/root.go`
-  - `internal/logger/module.go`
+### 5. Code Organization
+- [ ] Split large files
+  - [ ] Split `collector.go`
+  - [ ] Split `crawler.go`
+  - [ ] Split `content.go`
+- [ ] Improve package organization
+  - [ ] Move common types to `common`
+  - [ ] Move common interfaces to `common`
+  - [ ] Move common constants to `common`
+  - [ ] Move common utilities to `common`
 
-### 7. Use of `fmt.Println` and `fmt.Printf` (forbidigo)
-- [ ] Replace `fmt.Println` and `fmt.Printf` with logger statements in the following files:
-  - `internal/app/app.go`
-  - `cmd/root.go`
+### 6. Documentation
+- [ ] Improve documentation
+  - [ ] Add package documentation
+  - [ ] Add function documentation
+  - [ ] Add type documentation
+  - [ ] Add interface documentation
+- [ ] Add proper examples
+  - [ ] Add usage examples
+  - [ ] Add test examples
+  - [ ] Add error handling examples
+  - [ ] Add configuration examples
 
-### 8. Package Naming (testpackage)
-- [ ] Rename test files to follow the convention of `*_test.go`:
-  - Change `package logger` to `package logger_test` in relevant test files.
+## Low Priority
 
-### 9. Indentation Errors (revive)
-- [ ] Fix indentation issues in the following files:
-  - `cmd/root.go`
+### 7. Configuration
+- [ ] Improve configuration
+  - [ ] Add proper validation
+  - [ ] Add proper defaults
+  - [ ] Add environment variable support
+  - [ ] Add file support
+- [ ] Add proper configuration types
+  - [ ] Add configuration structs
+  - [ ] Add configuration methods
+  - [ ] Add configuration validation
+  - [ ] Add configuration defaults
 
-### 10. Superfluous Else (revive)
-- [ ] Remove unnecessary `else` statements in the following files:
-  - Various files as indicated by the linter.
+### 8. Logging
+- [ ] Improve logging
+  - [ ] Add proper log levels
+  - [ ] Add proper log fields
+  - [ ] Add proper log context
+  - [ ] Add proper log formatting
+- [ ] Add proper logging configuration
+  - [ ] Add log output configuration
+  - [ ] Add log rotation
+  - [ ] Add log filtering
+  - [ ] Add log formatting
 
-## General Code Quality Improvements
-- [ ] Review and refactor code for readability and maintainability.
-- [ ] Ensure consistent logging practices across the codebase.
-- [ ] Document any significant changes made during the refactoring process.
+### 9. Metrics and Monitoring
+- [ ] Add proper metrics
+  - [ ] Add counter metrics
+  - [ ] Add gauge metrics
+  - [ ] Add histogram metrics
+  - [ ] Add summary metrics
+- [ ] Add proper monitoring
+  - [ ] Add health checks
+  - [ ] Add readiness checks
+  - [ ] Add liveness checks
+  - [ ] Add metrics endpoint
+
+### 10. Security
+- [ ] Improve security
+  - [ ] Add proper TLS configuration
+  - [ ] Add proper authentication
+  - [ ] Add proper authorization
+  - [ ] Add proper rate limiting
+- [ ] Add proper security headers
+  - [ ] Add CORS headers
+  - [ ] Add CSP headers
+  - [ ] Add HSTS headers
+  - [ ] Add XSS headers
+
+## Progress Tracking
+
+### Completed
+- Interface Organization and Naming
+  - Moved interfaces to consuming packages
+  - Renamed interfaces to avoid stuttering
+- Dependency Injection
+  - Improved fx module organization
+  - Added proper lifecycle hooks
+  - Added proper error handling in constructors
+
+### In Progress
+- Dependency Injection
+  - Adding proper dependency validation
+
+### Next Up
+- Error Handling standardization
+- Test organization improvements
 
 ## Notes
-- After addressing the above tasks, run the linter again to ensure all issues are resolved.
-- Consider setting up a CI/CD pipeline to automatically run lint checks on pull requests.
+- Each task should be completed in a separate commit
+- Each commit should include tests
+- Each commit should include documentation updates
+- Each commit should be reviewed before merging
+- Each commit should follow the project's coding standards

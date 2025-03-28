@@ -1,6 +1,7 @@
 package article
 
 import (
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -24,9 +25,11 @@ type ProcessorParams struct {
 type ServiceParams struct {
 	fx.In
 
-	Logger logger.Interface
-	Config config.Interface
-	Source string `name:"sourceName"`
+	Logger    logger.Interface
+	Config    config.Interface
+	Storage   types.Interface
+	Source    string `name:"sourceName"`
+	IndexName string `name:"indexName"`
 }
 
 // Module provides article-related dependencies
@@ -43,8 +46,8 @@ var Module = fx.Module("article",
 					ArticleChan chan *models.Article `name:"articleChannel"`
 					IndexName   string               `name:"indexName"`
 				},
-			) models.ContentProcessor {
-				return &Processor{
+			) collector.Processor {
+				return &ArticleProcessor{
 					Logger:         log,
 					ArticleService: service,
 					Storage:        storage,
@@ -77,7 +80,7 @@ func NewServiceWithConfig(p ServiceParams) Interface {
 			"selectors", selectors)
 	}
 
-	return NewService(p.Logger, selectors)
+	return NewService(p.Logger, selectors, p.Storage, p.IndexName)
 }
 
 // isEmptySelectors checks if the article selectors are empty
@@ -97,12 +100,5 @@ func isEmptySelectors(s config.ArticleSelectors) bool {
 		s.OGDescription == "" &&
 		s.OGImage == "" &&
 		s.OgURL == "" &&
-		s.Canonical == "" &&
-		s.WordCount == "" &&
-		s.PublishDate == "" &&
-		s.Category == "" &&
-		s.Tags == "" &&
-		s.Author == "" &&
-		s.BylineName == "" &&
-		len(s.Exclude) == 0
+		s.Canonical == ""
 }

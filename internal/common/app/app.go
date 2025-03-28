@@ -12,7 +12,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 )
 
@@ -26,7 +25,7 @@ func SetupCollector(
 	ctx context.Context,
 	log common.Logger,
 	source sources.Config,
-	processors []models.ContentProcessor,
+	processors []collector.Processor,
 	done chan struct{},
 	cfg config.Interface,
 ) (collector.Result, error) {

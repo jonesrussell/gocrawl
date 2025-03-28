@@ -10,12 +10,12 @@ import (
 	"sync/atomic"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -40,7 +40,7 @@ type Params struct {
 	Context context.Context `name:"jobContext" json:"context,omitempty"`
 
 	// Processors is a slice of content processors, injected as a group
-	Processors []models.ContentProcessor `group:"processors" json:"processors,omitempty"`
+	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
 
 	// Done is a channel that signals when the crawl operation is complete
 	Done chan struct{} `name:"crawlDone" json:"done,omitempty"`
@@ -55,7 +55,7 @@ func runScheduler(
 	log common.Logger,
 	sources sources.Interface,
 	c crawler.Interface,
-	processors []models.ContentProcessor,
+	processors []collector.Processor,
 	done chan struct{},
 	cfg config.Interface,
 	activeJobs *int32,
@@ -86,7 +86,7 @@ func executeCrawl(
 	log common.Logger,
 	c crawler.Interface,
 	source sources.Config,
-	processors []models.ContentProcessor,
+	processors []collector.Processor,
 	done chan struct{},
 	cfg config.Interface,
 	activeJobs *int32,
@@ -127,7 +127,7 @@ func checkAndRunJobs(
 	sources sources.Interface,
 	c crawler.Interface,
 	now time.Time,
-	processors []models.ContentProcessor,
+	processors []collector.Processor,
 	done chan struct{},
 	cfg config.Interface,
 	activeJobs *int32,
@@ -244,4 +244,24 @@ The scheduler will run continuously until interrupted with Ctrl+C.`,
 	}
 
 	return cmd
+}
+
+type Job struct {
+	// Core dependencies
+	Logger     logger.Interface
+	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
+	// ... existing code ...
+}
+
+// NewJob creates a new job instance.
+func NewJob(
+	logger logger.Interface,
+	processors []collector.Processor,
+	// ... existing code ...
+) *Job {
+	return &Job{
+		Logger:     logger,
+		Processors: processors,
+		// ... existing code ...
+	}
 }

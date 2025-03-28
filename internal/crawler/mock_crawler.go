@@ -6,6 +6,7 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/stretchr/testify/mock"
 )
@@ -65,12 +66,12 @@ func (m *MockCrawler) Wait() {
 }
 
 // GetMetrics implements crawler.Interface
-func (m *MockCrawler) GetMetrics() *Metrics {
+func (m *MockCrawler) GetMetrics() *collector.Metrics {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return nil
 	}
-	if metrics, ok := args.Get(0).(*Metrics); ok {
+	if metrics, ok := args.Get(0).(*collector.Metrics); ok {
 		return metrics
 	}
 	return nil

@@ -161,9 +161,9 @@ type Config struct {
     // Source contains source-specific configuration
     Source config.Source
     // ArticleProcessor handles article processing
-    ArticleProcessor models.ContentProcessor
+    ArticleProcessor collector.Processor
     // ContentProcessor handles content processing
-    ContentProcessor models.ContentProcessor
+    ContentProcessor collector.Processor
 }
 ```
 

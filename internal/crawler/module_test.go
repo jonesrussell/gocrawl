@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
@@ -99,7 +99,7 @@ func setupTestApp(t *testing.T) *fxtest.App {
 		// Mock content processors
 		fx.Provide(
 			fx.Annotate(
-				func() models.ContentProcessor {
+				func() collector.Processor {
 					return &mockContentProcessor{}
 				},
 				fx.ResultTags(`group:"processors"`),

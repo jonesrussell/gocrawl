@@ -32,23 +32,7 @@ type Crawler struct {
 	sources      sources.Interface
 	done         chan struct{}
 	mu           sync.RWMutex
-	metrics      *Metrics
-}
-
-// Metrics holds crawler metrics.
-type Metrics struct {
-	PagesVisited    int64
-	ArticlesFound   int64
-	Errors          int64
-	StartTime       time.Time
-	LastRequestTime time.Time
-}
-
-// NewMetrics creates a new metrics instance.
-func NewMetrics() *Metrics {
-	return &Metrics{
-		StartTime: time.Now(),
-	}
+	metrics      *collector.Metrics
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -72,7 +56,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.baseURL = source.URL
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	c.done = make(chan struct{})
-	c.metrics = NewMetrics()
+	c.metrics = collector.NewMetrics()
 
 	// Ensure collector is initialized
 	if c.collector == nil {
@@ -129,7 +113,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 			"pages_visited", c.metrics.PagesVisited,
 			"articles_found", c.metrics.ArticlesFound,
 			"errors", c.metrics.Errors,
-			"duration", time.Since(c.metrics.StartTime))
+			"duration", time.Since(time.Unix(c.metrics.StartTime, 0)))
 	}()
 
 	return nil
@@ -140,71 +124,47 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.Logger.Info("Stopping crawler")
-
-	stopCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	if c.cancel != nil {
 		c.cancel()
 	}
 
-	select {
-	case <-stopCtx.Done():
-		c.Logger.Warn("Context for Stop was cancelled", "error", stopCtx.Err())
-		return stopCtx.Err()
-	case <-c.done:
-		c.Logger.Info("Crawler stopped successfully")
-		return nil
+	if c.collector != nil {
+		c.collector.Wait()
 	}
+
+	return nil
 }
 
-// Wait blocks until the crawler has finished processing all queued requests.
-func (c *Crawler) Wait() {
-	c.mu.RLock()
-	done := c.done
-	c.mu.RUnlock()
-	if done != nil {
-		<-done
-	}
-}
-
-// Subscribe adds a content handler to the event bus.
+// Subscribe adds a content handler to receive discovered content.
 func (c *Crawler) Subscribe(handler events.Handler) {
 	c.bus.Subscribe(handler)
 }
 
 // SetRateLimit sets the crawler's rate limit.
 func (c *Crawler) SetRateLimit(duration time.Duration) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.Logger.Debug("Setting rate limit", "duration", duration)
-	return c.collector.Limit(&colly.LimitRule{
+	if c.collector == nil {
+		return errors.New("collector not initialized")
+	}
+	if err := c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: duration,
 		Parallelism: 1,
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to set rate limit: %w", err)
+	}
+	return nil
 }
 
 // SetMaxDepth sets the maximum crawl depth.
 func (c *Crawler) SetMaxDepth(depth int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if c.collector != nil {
 		c.collector.MaxDepth = depth
-		c.Logger.Debug("Set maximum crawl depth", "depth", depth)
 	}
 }
 
 // SetCollector sets the collector for the crawler.
 func (c *Crawler) SetCollector(collector *colly.Collector) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	c.collector = collector
-	c.Logger.Debug("Collector has been set")
 }
 
 // GetIndexManager returns the index manager interface.
@@ -212,84 +172,43 @@ func (c *Crawler) GetIndexManager() api.IndexManager {
 	return c.indexManager
 }
 
+// Wait blocks until the crawler has finished processing all queued requests.
+func (c *Crawler) Wait() {
+	if c.collector != nil {
+		c.collector.Wait()
+	}
+}
+
 // GetMetrics returns the current crawler metrics.
-func (c *Crawler) GetMetrics() *Metrics {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+func (c *Crawler) GetMetrics() *collector.Metrics {
 	return c.metrics
 }
 
-// handleArticle processes discovered article content.
-func (c *Crawler) handleArticle(e *colly.HTMLElement) {
-	c.mu.Lock()
-	c.metrics.ArticlesFound++
-	c.mu.Unlock()
-
-	content := &events.Content{
-		URL:  e.Request.URL.String(),
-		Type: events.TypeArticle,
-	}
-
-	// Extract content based on common selectors
-	content.Title = e.ChildText("h1")
-	content.Description = e.ChildText("meta[name=description]")
-	content.RawContent = e.Text
-
-	// Add metadata
-	content.Metadata = map[string]string{
-		"language":   e.Request.Headers.Get("Accept-Language"),
-		"discovered": time.Now().UTC().Format(time.RFC3339),
-		"source_url": c.baseURL,
-	}
-
-	if err := c.bus.Publish(c.ctx, content); err != nil {
-		c.Logger.Error("Failed to publish content to bus", "url", content.URL, "error", err)
-	}
-}
-
-// handleLink processes discovered links.
-func (c *Crawler) handleLink(e *colly.HTMLElement) {
-	link := e.Attr("href")
-	c.Logger.Debug("Found link", "url", link)
-	if err := e.Request.Visit(link); err != nil {
-		c.Logger.Debug("Failed to visit link", "url", link, "error", err)
-	} else {
-		c.Logger.Debug("Successfully queued link for visit", "url", link)
-	}
-}
-
-// handleError processes collector errors.
-func (c *Crawler) handleError(r *colly.Response, err error) {
-	c.mu.Lock()
-	c.metrics.Errors++
-	c.mu.Unlock()
-
-	c.Logger.Error("Crawler encountered an error",
-		"url", r.Request.URL.String(),
-		"status_code", r.StatusCode,
-		"error", err,
-	)
-}
-
-// setupCallbacks sets the callbacks for the collector.
-func (c *Crawler) setupCallbacks() {
-	c.collector.OnHTML("article", c.handleArticle)
-	c.collector.OnHTML("a[href]", c.handleLink)
-	c.collector.OnError(c.handleError)
-	c.collector.OnScraped(func(r *colly.Response) {
-		c.mu.Lock()
-		c.metrics.PagesVisited++
-		c.metrics.LastRequestTime = time.Now()
-		c.mu.Unlock()
-	})
-	c.Logger.Debug("Crawler callbacks set up")
-}
-
-// monitorContext cancels operations if the context ends prematurely.
+// monitorContext monitors the context for cancellation.
 func (c *Crawler) monitorContext(ctx context.Context) {
 	<-ctx.Done()
-	c.Logger.Warn("Crawl cancelled due to context termination", "reason", ctx.Err())
-	if c.cancel != nil {
-		c.cancel()
+	c.Stop(ctx)
+}
+
+// setupCallbacks sets up the crawler's event callbacks.
+func (c *Crawler) setupCallbacks() {
+	if c.collector == nil {
+		return
 	}
+
+	c.collector.OnRequest(func(r *colly.Request) {
+		// No need to update LastRequestTime as it's not part of the metrics struct
+	})
+
+	c.collector.OnResponse(func(r *colly.Response) {
+		c.metrics.PagesVisited++
+	})
+
+	c.collector.OnError(func(r *colly.Response, err error) {
+		c.metrics.Errors++
+		c.Logger.Error("Request error",
+			"url", r.Request.URL.String(),
+			"status_code", r.StatusCode,
+			"error", err)
+	})
 }

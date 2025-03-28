@@ -9,7 +9,6 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
 // Constants for content processing and error handling
@@ -49,9 +48,9 @@ type ContentParams struct {
 	// Source configuration for the collector
 	Source config.Source
 	// Processor for handling article content
-	ArticleProcessor models.ContentProcessor
+	ArticleProcessor Processor
 	// Processor for handling general content
-	ContentProcessor models.ContentProcessor
+	ContentProcessor Processor
 }
 
 // contextManager handles storing and retrieving data from colly context.
@@ -361,7 +360,10 @@ func processContent(e *colly.HTMLElement, r *colly.Response, p ContentParams, cm
 			return
 		}
 		log.debug("Processing as article", "url", url, "title", title)
-		p.ArticleProcessor.Process(e)
+		if err := p.ArticleProcessor.Process(e); err != nil {
+			log.error("Failed to process article", "url", url, "error", err)
+			return
+		}
 		return
 	}
 
@@ -370,5 +372,8 @@ func processContent(e *colly.HTMLElement, r *colly.Response, p ContentParams, cm
 		return
 	}
 	log.debug("Processing as content", "url", url, "title", title)
-	p.ContentProcessor.Process(e)
+	if err := p.ContentProcessor.Process(e); err != nil {
+		log.error("Failed to process content", "url", url, "error", err)
+		return
+	}
 }

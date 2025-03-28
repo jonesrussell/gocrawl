@@ -4,13 +4,13 @@ import (
 	"context"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// Processor handles the processing of non-article content
-type Processor struct {
+// ContentProcessor handles the processing of non-article content
+type ContentProcessor struct {
 	service   Interface
 	storage   types.Interface
 	logger    logger.Interface
@@ -18,8 +18,8 @@ type Processor struct {
 }
 
 // NewProcessor creates a new content processor
-func NewProcessor(service Interface, storage types.Interface, logger logger.Interface, indexName string) *Processor {
-	return &Processor{
+func NewProcessor(service Interface, storage types.Interface, logger logger.Interface, indexName string) *ContentProcessor {
+	return &ContentProcessor{
 		service:   service,
 		storage:   storage,
 		logger:    logger,
@@ -27,8 +27,8 @@ func NewProcessor(service Interface, storage types.Interface, logger logger.Inte
 	}
 }
 
-// Process implements the ContentProcessor interface
-func (p *Processor) Process(e *colly.HTMLElement) {
+// Process implements the collector.Processor interface
+func (p *ContentProcessor) Process(e *colly.HTMLElement) error {
 	p.logger.Debug("Processing content",
 		"component", "content/processor",
 		"url", e.Request.URL.String(),
@@ -39,7 +39,7 @@ func (p *Processor) Process(e *colly.HTMLElement) {
 		p.logger.Debug("No content extracted",
 			"component", "content/processor",
 			"url", e.Request.URL.String())
-		return
+		return nil
 	}
 
 	p.logger.Debug("Content extracted",
@@ -56,7 +56,7 @@ func (p *Processor) Process(e *colly.HTMLElement) {
 			"url", content.URL,
 			"error", err,
 		)
-		return
+		return err
 	}
 
 	p.logger.Debug("Content processed successfully",
@@ -65,7 +65,9 @@ func (p *Processor) Process(e *colly.HTMLElement) {
 		"id", content.ID,
 		"type", content.Type,
 		"index", p.indexName)
+
+	return nil
 }
 
-// Ensure Processor implements models.ContentProcessor
-var _ models.ContentProcessor = (*Processor)(nil)
+// Ensure ContentProcessor implements collector.Processor
+var _ collector.Processor = (*ContentProcessor)(nil)

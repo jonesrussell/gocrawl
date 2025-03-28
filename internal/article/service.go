@@ -2,6 +2,7 @@
 package article
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -11,34 +12,31 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
 	DefaultBodySelector = "article, .article"
 )
 
-// Interface Service defines the interface for article operations
-type Interface interface {
-	ExtractArticle(e *colly.HTMLElement) *models.Article
-	ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string
-	CleanAuthor(author string) string
-	ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time
-}
-
-// Service implements the Service interface
+// Service implements the Interface
 type Service struct {
 	Logger    common.Logger
 	Selectors config.ArticleSelectors
+	Storage   types.Interface
+	IndexName string
 }
 
 // Ensure Service implements Interface
 var _ Interface = (*Service)(nil)
 
 // NewService creates a new Service instance
-func NewService(logger common.Logger, selectors config.ArticleSelectors) Interface {
+func NewService(logger common.Logger, selectors config.ArticleSelectors, storage types.Interface, indexName string) Interface {
 	return &Service{
 		Logger:    logger,
 		Selectors: selectors,
+		Storage:   storage,
+		IndexName: indexName,
 	}
 }
 
@@ -312,4 +310,28 @@ func parseDate(dates []string, logger common.Logger) time.Time {
 	}
 
 	return publishedDate
+}
+
+// Process handles the processing of an article
+func (s *Service) Process(article *models.Article) error {
+	if article == nil {
+		s.Logger.Debug("No article to process",
+			"component", "article/service")
+		return nil
+	}
+
+	s.Logger.Debug("Processing article",
+		"component", "article/service",
+		"source", article.Source)
+
+	// Index the article
+	if err := s.Storage.IndexDocument(context.Background(), s.IndexName, article.ID, article); err != nil {
+		s.Logger.Error("Failed to index article",
+			"component", "article/service",
+			"articleID", article.ID,
+			"error", err)
+		return err
+	}
+
+	return nil
 }

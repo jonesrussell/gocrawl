@@ -2,12 +2,14 @@
 package api_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
@@ -31,7 +33,7 @@ type testServer struct {
 	server        *http.Server
 	logger        common.Logger
 	searchManager api.SearchManager
-	config        common.Config
+	config        config.Interface
 }
 
 // setupMockSearchManager creates and configures a mock search manager for testing.
@@ -98,11 +100,29 @@ func setupTest(t *testing.T) *testServer {
 	var server *http.Server
 	app := fxtest.New(t,
 		fx.NopLogger,
-		fx.Replace(common.Module),
+		fx.Supply(mockConfig),
+		fx.Supply(mockLogger),
+		fx.Supply(context.Background()),
 		fx.Provide(
-			func() common.Logger { return mockLogger },
-			func() common.Config { return mockConfig },
 			func() api.SearchManager { return mockSearch },
+		),
+		fx.Replace(
+			fx.Annotate(
+				func(log common.Logger, searchManager api.SearchManager, cfg common.Config) (*http.Server, middleware.SecurityMiddlewareInterface) {
+					// Create router and security middleware
+					router, security := api.SetupRouter(log, searchManager, cfg)
+
+					// Create server
+					server := &http.Server{
+						Addr:              cfg.GetServerConfig().Address,
+						Handler:           router,
+						ReadHeaderTimeout: api.ReadHeaderTimeout,
+					}
+
+					return server, security
+				},
+				fx.As(new(*http.Server), new(middleware.SecurityMiddlewareInterface)),
+			),
 		),
 		api.Module,
 		fx.Invoke(func(s *http.Server) {

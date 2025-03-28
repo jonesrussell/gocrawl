@@ -12,7 +12,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"go.uber.org/fx"
 )
 
@@ -37,9 +36,9 @@ type Params struct {
 	fx.In
 
 	// ArticleProcessor handles the processing of article content
-	ArticleProcessor models.ContentProcessor
+	ArticleProcessor Processor
 	// ContentProcessor handles the processing of general content
-	ContentProcessor models.ContentProcessor
+	ContentProcessor Processor
 	// BaseURL is the starting URL for crawling
 	BaseURL string
 	// Context provides cancellation and timeout support
@@ -130,9 +129,9 @@ type Config struct {
 	// Source contains source-specific configuration
 	Source config.Source
 	// ArticleProcessor handles the processing of article content
-	ArticleProcessor models.ContentProcessor
+	ArticleProcessor Processor
 	// ContentProcessor handles the processing of general content
-	ContentProcessor models.ContentProcessor
+	ContentProcessor Processor
 	// AllowedDomains is a list of domains that the collector is allowed to visit
 	AllowedDomains []string
 }

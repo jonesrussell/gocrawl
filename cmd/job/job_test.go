@@ -9,6 +9,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/cmd/job"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -51,7 +52,7 @@ func (m *mockCrawler) SetMaxDepth(_ int)                   {}
 func (m *mockCrawler) SetCollector(_ *colly.Collector)     {}
 func (m *mockCrawler) GetIndexManager() api.IndexManager   { return nil }
 func (m *mockCrawler) Wait()                               {}
-func (m *mockCrawler) GetMetrics() *crawler.Metrics        { return nil }
+func (m *mockCrawler) GetMetrics() *collector.Metrics      { return nil }
 
 // mockStorage implements types.Interface for testing
 type mockStorage struct{}

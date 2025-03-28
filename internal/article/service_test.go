@@ -80,7 +80,7 @@ const testHTML = `
 func TestExtractArticle(t *testing.T) {
 	mockLogger := newMockLogger()
 	selectors := newDefaultSelectors()
-	service := article.NewService(mockLogger, selectors)
+	service := article.NewService(mockLogger, selectors, nil, "test-index")
 
 	// Setup logger expectations
 	mockLogger.On("Debug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
@@ -141,7 +141,7 @@ func TestExtractArticle(t *testing.T) {
 
 func TestCleanAuthor(t *testing.T) {
 	mockLogger := newMockLogger()
-	svc := article.NewService(mockLogger, newDefaultSelectors())
+	svc := article.NewService(mockLogger, newDefaultSelectors(), nil, "test-index").(*article.Service)
 
 	// Change the author string to match the expected format
 	author := "ElliotLakeToday Staff" // Simplified for testing
@@ -153,7 +153,7 @@ func TestCleanAuthor(t *testing.T) {
 
 func TestParsePublishedDate(t *testing.T) {
 	mockLogger := newMockLogger()
-	svc := article.NewService(mockLogger, newDefaultSelectors())
+	svc := article.NewService(mockLogger, newDefaultSelectors(), nil, "test-index").(*article.Service)
 
 	// Set up mock expectations for debug calls
 	mockLogger.On("Debug", "Trying to parse date", mock.Anything).Return()
@@ -199,7 +199,7 @@ func TestParsePublishedDate(t *testing.T) {
 func TestExtractTags(t *testing.T) {
 	mockLogger := newMockLogger()
 	selectors := config.DefaultArticleSelectors()
-	service := article.NewService(mockLogger, selectors)
+	service := article.NewService(mockLogger, selectors, nil, "test-index").(*article.Service)
 
 	// Set up mock expectations for debug calls
 	mockLogger.On("Debug", "Found JSON-LD keywords", mock.Anything).Return()

@@ -3,6 +3,18 @@
 // handling URL processing, rate limiting, and content extraction.
 package collector
 
+import (
+	"github.com/gocolly/colly/v2"
+)
+
+// Processor defines the interface for processing content during crawling.
+// It handles the extraction and processing of content from web pages.
+type Processor interface {
+	// Process handles the processing of web content.
+	// It takes a colly.HTMLElement and returns an error if processing fails.
+	Process(e *colly.HTMLElement) error
+}
+
 // ArticleProcessor defines the interface for processing articles during crawling.
 // It handles the extraction and processing of article content from web pages.
 type ArticleProcessor interface {

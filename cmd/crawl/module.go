@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -24,12 +25,12 @@ type CommandDeps struct {
 	Logger      common.Logger
 	Config      config.Interface
 	Storage     types.Interface
-	Done        chan struct{}             `name:"commandDone"`
-	Context     context.Context           `name:"crawlContext"`
-	Processors  []models.ContentProcessor `group:"processors"`
-	SourceName  string                    `name:"sourceName"`
-	ArticleChan chan *models.Article      `name:"commandArticleChannel"`
-	Handler     *signal.SignalHandler     `name:"signalHandler"`
+	Done        chan struct{}         `name:"commandDone"`
+	Context     context.Context       `name:"crawlContext"`
+	Processors  []collector.Processor `group:"processors"`
+	SourceName  string                `name:"sourceName"`
+	ArticleChan chan *models.Article  `name:"commandArticleChannel"`
+	Handler     *signal.SignalHandler `name:"signalHandler"`
 }
 
 // Module provides the crawl command's dependencies.
@@ -51,3 +52,27 @@ var Module = fx.Module("crawl",
 		),
 	),
 )
+
+type Params struct {
+	fx.In
+	Sources sources.Interface `json:"sources,omitempty"`
+	Logger  common.Logger
+
+	// Lifecycle manages the application's startup and shutdown hooks
+	Lifecycle fx.Lifecycle `json:"lifecycle,omitempty"`
+
+	// CrawlerInstance handles the core crawling functionality
+	CrawlerInstance crawler.Interface `json:"crawler_instance,omitempty"`
+
+	// Config holds the application configuration
+	Config config.Interface `json:"config,omitempty"`
+
+	// Context provides the context for the crawl operation
+	Context context.Context `name:"crawlContext" json:"context,omitempty"`
+
+	// Processors is a slice of content processors, injected as a group
+	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
+
+	// Done is a channel that signals when the crawl operation is complete
+	Done chan struct{} `name:"crawlDone" json:"done,omitempty"`
+}

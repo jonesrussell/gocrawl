@@ -6,6 +6,7 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 )
@@ -48,6 +49,6 @@ func (m *MockCrawler) GetIndexManager() api.IndexManager {
 func (m *MockCrawler) Wait() {
 }
 
-func (m *MockCrawler) GetMetrics() *crawler.Metrics {
-	return &crawler.Metrics{}
+func (m *MockCrawler) GetMetrics() *collector.Metrics {
+	return &collector.Metrics{}
 }
