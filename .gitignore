@@ -39,3 +39,4 @@ coverage/coverage.out
 # Temporary and Log Files
 *.bak
 *.log
+coverage.out
