@@ -44,19 +44,6 @@ func (m *mockSearchManager) Aggregate(_ context.Context, _ string, _ any) (any, 
 	return nil, errors.New("aggregate not implemented in mock")
 }
 
-// mockIndexManager implements api.IndexManager for testing
-type mockIndexManager struct {
-	api.IndexManager
-}
-
-func (m *mockIndexManager) Index(_ context.Context, _ string, _ any) error {
-	return nil
-}
-
-func (m *mockIndexManager) Close() error {
-	return nil
-}
-
 // mockStorage implements types.Interface for testing
 type mockStorage struct {
 	types.Interface
@@ -154,7 +141,7 @@ func TestModuleProvides(t *testing.T) {
 						Config:     mockCfg,
 						Sources:    testSources,
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
-						IndexMgr:   &mockIndexManager{},
+						IndexMgr:   testutils.NewMockIndexManager(),
 						Content:    content.NewService(mockLogger),
 						Crawler:    testutils.NewMockCrawler(),
 					}
@@ -271,7 +258,7 @@ func TestModuleConfiguration(t *testing.T) {
 						Config:     mockCfg,
 						Sources:    testSources,
 						ArticleSvc: article.NewService(mockLogger, config.DefaultArticleSelectors()),
-						IndexMgr:   &mockIndexManager{},
+						IndexMgr:   testutils.NewMockIndexManager(),
 						Content:    content.NewService(mockLogger),
 						Crawler:    testutils.NewMockCrawler(),
 					}
