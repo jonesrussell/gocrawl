@@ -42,7 +42,7 @@ func (m *MockCrawler) SetCollector(_ *colly.Collector) {
 }
 
 func (m *MockCrawler) GetIndexManager() api.IndexManager {
-	return &MockIndexManager{}
+	return NewMockIndexManager()
 }
 
 func (m *MockCrawler) Wait() {
