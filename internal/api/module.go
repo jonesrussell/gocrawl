@@ -2,8 +2,6 @@
 package api
 
 import (
-	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -45,7 +43,6 @@ var Module = fx.Module("api",
 			log common.Logger,
 			searchManager SearchManager,
 			cfg common.Config,
-			lc fx.Lifecycle,
 		) (*http.Server, middleware.SecurityMiddlewareInterface) {
 			// Create router and security middleware
 			router, security := SetupRouter(log, searchManager, cfg)
@@ -56,74 +53,6 @@ var Module = fx.Module("api",
 				Handler:           router,
 				ReadHeaderTimeout: ReadHeaderTimeout,
 			}
-
-			// Register lifecycle hooks
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					// Create a channel to signal when the server is ready
-					ready := make(chan struct{})
-					go func() {
-						// Start the server
-						if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-							log.Error("Server error", "error", err)
-						}
-					}()
-
-					// Create a timeout context for health check
-					healthCtx, cancel := context.WithTimeout(ctx, HealthCheckTimeout)
-					defer cancel()
-
-					// Create a ticker for health check attempts
-					ticker := time.NewTicker(HealthCheckInterval)
-					defer ticker.Stop()
-
-					// Try to connect to the health endpoint until successful or timeout
-					for {
-						select {
-						case <-healthCtx.Done():
-							return fmt.Errorf("server failed to become healthy within %v", HealthCheckTimeout)
-						case <-ticker.C:
-							// Create a temporary client for health check
-							client := &http.Client{
-								Timeout: HealthCheckInterval,
-							}
-
-							// Try to connect to the health endpoint
-							resp, err := client.Get(fmt.Sprintf("http://%s/health", server.Addr))
-							if err != nil {
-								continue // Server not ready yet
-							}
-							resp.Body.Close()
-
-							if resp.StatusCode == http.StatusOK {
-								close(ready)
-								return nil
-							}
-						}
-					}
-				},
-				OnStop: func(ctx context.Context) error {
-					// Create a timeout context for shutdown
-					shutdownCtx, cancel := context.WithTimeout(ctx, ShutdownTimeout)
-					defer cancel()
-
-					// Shutdown server
-					if err := server.Shutdown(shutdownCtx); err != nil {
-						return fmt.Errorf("server shutdown failed: %w", err)
-					}
-
-					// Cleanup security middleware
-					security.Cleanup(ctx)
-					security.WaitCleanup()
-
-					// Close search manager
-					if err := searchManager.Close(); err != nil {
-						return fmt.Errorf("search manager close failed: %w", err)
-					}
-
-					return nil
-				},
-			})
 
 			return server, security
 		},

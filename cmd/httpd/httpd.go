@@ -41,7 +41,7 @@ type Params struct {
 	Server  *http.Server
 	Logger  common.Logger
 	Storage types.Interface
-	Config  *config.Config
+	Config  config.Interface
 }
 
 // serverState tracks the HTTP server's state
@@ -55,7 +55,7 @@ type serverState struct {
 
 // Server implements the HTTP server
 type Server struct {
-	config *config.Config
+	config config.Interface
 	Logger common.Logger
 	server *http.Server
 }
@@ -70,7 +70,7 @@ func NewServer(params Params) *Server {
 
 // Start starts the HTTP server
 func (s *Server) Start(ctx context.Context) error {
-	s.Logger.Info("Starting HTTP server", "addr", s.config.Server.Address)
+	s.Logger.Info("Starting HTTP server", "addr", s.config.GetServerConfig().Address)
 	return s.server.ListenAndServe()
 }
 
@@ -143,12 +143,36 @@ You can send POST requests to /search with a JSON body containing the search par
 							}
 						}()
 
-						// Wait for error or context cancellation
-						select {
-						case err := <-errChan:
-							return err
-						case <-ctx.Done():
-							return ctx.Err()
+						// Wait for server to be ready
+						healthCtx, cancel := context.WithTimeout(ctx, api.HealthCheckTimeout)
+						defer cancel()
+
+						ticker := time.NewTicker(api.HealthCheckInterval)
+						defer ticker.Stop()
+
+						for {
+							select {
+							case <-healthCtx.Done():
+								return fmt.Errorf("server failed to become healthy within %v", api.HealthCheckTimeout)
+							case <-ticker.C:
+								client := &http.Client{
+									Timeout: api.HealthCheckInterval,
+								}
+
+								resp, err := client.Get(fmt.Sprintf("http://%s/health", p.Server.Addr))
+								if err != nil {
+									continue // Server not ready yet
+								}
+								resp.Body.Close()
+
+								if resp.StatusCode == http.StatusOK {
+									return nil
+								}
+							case err := <-errChan:
+								return err
+							case <-ctx.Done():
+								return ctx.Err()
+							}
 						}
 					},
 					OnStop: func(ctx context.Context) error {

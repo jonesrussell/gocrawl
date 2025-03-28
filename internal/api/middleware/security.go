@@ -80,6 +80,12 @@ func (m *SecurityMiddleware) SetRateLimitWindow(window time.Duration) {
 // Middleware returns the security middleware function
 func (m *SecurityMiddleware) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip security checks for health endpoint
+		if c.Request.URL.Path == "/health" {
+			c.Next()
+			return
+		}
+
 		// Skip security checks if disabled
 		if !m.cfg.Security.Enabled {
 			c.Next()
