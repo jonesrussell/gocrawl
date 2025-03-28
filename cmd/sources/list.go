@@ -36,16 +36,6 @@ type Params struct {
 	Logger        common.Logger
 }
 
-// listParams holds the parameters required for listing sources.
-type listParams struct {
-	ctx           context.Context
-	sources       sources.Interface
-	logger        common.Logger
-	outputFormat  string
-	showMetadata  bool
-	showSelectors bool
-}
-
 // ListCommand creates and returns the list command that displays all sources.
 func ListCommand() *cobra.Command {
 	return &cobra.Command{

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
+	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	commontypes "github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -31,6 +33,15 @@ func (m *mockStorage) Search(context.Context, string, any) ([]any, error) {
 }
 
 func (m *mockStorage) Close() error {
+	return nil
+}
+
+// searchManagerWrapper wraps storagetypes.Interface to implement api.SearchManager
+type searchManagerWrapper struct {
+	storagetypes.Interface
+}
+
+func (w *searchManagerWrapper) Close() error {
 	return nil
 }
 
@@ -69,16 +80,40 @@ func TestHTTPCommand(t *testing.T) {
 	// Create test app with mocked dependencies using fxtest
 	app := fxtest.New(t,
 		fx.NopLogger,
+		// Provide mock logger directly
+		fx.Provide(
+			fx.Annotate(
+				func() commontypes.Logger { return mockLogger },
+				fx.As(new(commontypes.Logger)),
+			),
+		),
 		fx.Supply(
-			fx.Annotate(mockLogger, fx.As(new(commontypes.Logger))),
 			mockStore,
 			mockSecurity,
+			mockCfg,
 		),
 		fx.Provide(
 			func() context.Context { return t.Context() },
 			func() storagetypes.Interface { return mockStore },
+			func() config.Interface { return mockCfg },
 		),
-		httpd.Module,
+		// Exclude logger module and provide other modules
+		fx.Module("test",
+			fx.Provide(
+				func(storage storagetypes.Interface) api.SearchManager {
+					return &searchManagerWrapper{storage}
+				},
+				func(cfg config.Interface) *http.Server {
+					return &http.Server{
+						Addr:    cfg.GetServerConfig().Address,
+						Handler: http.NewServeMux(),
+					}
+				},
+				func() middleware.SecurityMiddlewareInterface {
+					return mockSecurity
+				},
+			),
+		),
 	)
 
 	app.RequireStart()
@@ -120,16 +155,40 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	// Create test app with mocked dependencies using fxtest
 	app := fxtest.New(t,
 		fx.NopLogger,
+		// Provide mock logger directly
+		fx.Provide(
+			fx.Annotate(
+				func() commontypes.Logger { return mockLogger },
+				fx.As(new(commontypes.Logger)),
+			),
+		),
 		fx.Supply(
-			fx.Annotate(mockLogger, fx.As(new(commontypes.Logger))),
 			mockStore,
 			mockSecurity,
+			mockCfg,
 		),
 		fx.Provide(
 			func() context.Context { return t.Context() },
 			func() storagetypes.Interface { return mockStore },
+			func() config.Interface { return mockCfg },
 		),
-		httpd.Module,
+		// Exclude logger module and provide other modules
+		fx.Module("test",
+			fx.Provide(
+				func(storage storagetypes.Interface) api.SearchManager {
+					return &searchManagerWrapper{storage}
+				},
+				func(cfg config.Interface) *http.Server {
+					return &http.Server{
+						Addr:    cfg.GetServerConfig().Address,
+						Handler: http.NewServeMux(),
+					}
+				},
+				func() middleware.SecurityMiddlewareInterface {
+					return mockSecurity
+				},
+			),
+		),
 	)
 
 	app.RequireStart()
@@ -161,7 +220,10 @@ func TestHTTPCommandServerError(t *testing.T) {
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+	// Return an invalid port configuration to force an error
+	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+		Address: ":invalid_port",
+	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
 
@@ -171,20 +233,45 @@ func TestHTTPCommandServerError(t *testing.T) {
 	// Create test app with mocked dependencies using fxtest
 	app := fxtest.New(t,
 		fx.NopLogger,
+		// Provide mock logger directly
+		fx.Provide(
+			fx.Annotate(
+				func() commontypes.Logger { return mockLogger },
+				fx.As(new(commontypes.Logger)),
+			),
+		),
 		fx.Supply(
-			fx.Annotate(mockLogger, fx.As(new(commontypes.Logger))),
 			mockStore,
 			mockSecurity,
+			mockCfg,
 		),
 		fx.Provide(
 			func() context.Context { return t.Context() },
 			func() storagetypes.Interface { return mockStore },
+			func() config.Interface { return mockCfg },
 		),
-		httpd.Module,
+		// Exclude logger module and provide other modules
+		fx.Module("test",
+			fx.Provide(
+				func(storage storagetypes.Interface) api.SearchManager {
+					return &searchManagerWrapper{storage}
+				},
+				func(cfg config.Interface) *http.Server {
+					return &http.Server{
+						Addr:    cfg.GetServerConfig().Address,
+						Handler: http.NewServeMux(),
+					}
+				},
+				func() middleware.SecurityMiddlewareInterface {
+					return mockSecurity
+				},
+			),
+		),
 	)
 
 	err := app.Start(t.Context())
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid port")
 }
 
 func TestCommand(t *testing.T) {

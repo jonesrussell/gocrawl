@@ -58,7 +58,6 @@ func setupTestDependencies() (
 // createTestModule creates a test-specific module with all required dependencies
 func createTestModule(mockStore *httpdTestStorage) fx.Option {
 	return fx.Module("test",
-		common.Module,
 		fx.Supply(
 			mockStore,
 		),
@@ -159,11 +158,18 @@ func createServerAndSecurity(
 func TestModuleProvides(t *testing.T) {
 	t.Parallel()
 
-	_, _, mockStore, _, _ := setupTestDependencies()
+	mockLogger, _, mockStore, _, _ := setupTestDependencies()
 	testModule := createTestModule(mockStore)
 
 	app := fxtest.New(t,
 		fx.NopLogger,
+		// Provide mock logger directly
+		fx.Provide(
+			fx.Annotate(
+				func() common.Logger { return mockLogger },
+				fx.As(new(common.Logger)),
+			),
+		),
 		testModule,
 	)
 

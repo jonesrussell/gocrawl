@@ -11,7 +11,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	srcs "github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,14 +23,24 @@ var ErrSourceNotFound = errors.New("source not found")
 
 // mockLogger implements common.Logger for testing
 type mockLogger struct {
+	mock.Mock
 	common.Logger
 	infoMessages  []string
 	errorMessages []string
 }
 
-func (m *mockLogger) Info(msg string, _ ...any) { m.infoMessages = append(m.infoMessages, msg) }
-func (m *mockLogger) Error(msg string, _ ...any) {
+func (m *mockLogger) Info(msg string, args ...any) {
+	m.Called(msg, args)
+	m.infoMessages = append(m.infoMessages, msg)
+}
+
+func (m *mockLogger) Error(msg string, args ...any) {
+	m.Called(msg, args)
 	m.errorMessages = append(m.errorMessages, msg)
+}
+
+func (m *mockLogger) Warn(msg string, args ...any) {
+	m.Called(msg, args)
 }
 
 // mockSourceManager implements sources.Interface for testing
@@ -86,51 +95,22 @@ type TestParams struct {
 	Logger  common.Logger
 }
 
-// testParams holds the parameters required for listing sources.
-type testParams struct {
-	ctx           context.Context
-	sources       srcs.Interface
-	logger        common.Logger
-	outputFormat  string
-	showMetadata  bool
-	showSelectors bool
-}
-
-// setupTestApp creates a new test application with all required dependencies.
-func setupTestApp(t *testing.T) *fxtest.App {
-	t.Helper()
-
-	// Create mock logger
-	mockLogger := &testutils.MockLogger{}
-	mockLogger.On("Info", mock.Anything).Return()
-	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
-
-	return fxtest.New(t,
-		fx.NopLogger,
-		// Provide core dependencies
-		fx.Provide(
-			// Named dependencies
-			func() srcs.Interface { return &mockSources{} },
-			// Logger provider that replaces the default logger.Module provider
-			fx.Annotate(
-				func() common.Logger { return mockLogger },
-				fx.ResultTags(`name:"logger"`),
-			),
+// TestConfigModule provides test configuration
+var TestConfigModule = fx.Module("test_config",
+	fx.Provide(
+		fx.Annotate(
+			newMockConfig,
+			fx.As(new(config.Interface)),
 		),
-		// Include test config module and sources module
-		TestConfigModule,
-		TestCommonModule,
-		sources.Module,
-		// Verify dependencies
-		fx.Invoke(func(p TestParams) {
-			verifyDependencies(t, &p)
-		}),
-	)
-}
+	),
+)
+
+// TestCommonModule provides common test dependencies
+var TestCommonModule = fx.Module("test_common",
+	fx.Provide(
+		context.Background,
+	),
+)
 
 func Test_listCommand(t *testing.T) {
 	t.Parallel()
@@ -338,7 +318,7 @@ func TestFindByName(t *testing.T) {
 			MaxDepth:  2,
 		},
 	}
-	s := testutils.NewTestSources(testConfigs)
+	s := &mockSourceManager{sources: testConfigs}
 	require.NotNil(t, s)
 
 	tests := []struct {
