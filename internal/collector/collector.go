@@ -1,6 +1,43 @@
 // Package collector provides the web page collection functionality for GoCrawl.
 // It manages the actual crawling process using the Colly web scraping framework,
 // handling URL processing, rate limiting, and content extraction.
+//
+// The package is organized into several key components:
+//
+// 1. Collector: The main component that manages the crawling process
+//   - Handles URL validation and processing
+//   - Manages rate limiting and concurrency
+//   - Configures crawler behavior
+//
+// 2. Content Processing: Handles different types of content
+//   - Article detection and processing
+//   - General content processing
+//   - Link following and URL management
+//
+// 3. Context Management: Manages crawler state
+//   - Stores HTML elements
+//   - Tracks article status
+//   - Maintains crawler context
+//
+// Usage example:
+//
+//	params := collector.Params{
+//		BaseURL:   "https://example.com",
+//		MaxDepth:  2,
+//		RateLimit: time.Second,
+//		Logger:    logger,
+//	}
+//	result, err := collector.New(params)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	result.Collector.Visit("https://example.com")
+//
+// The package follows these design principles:
+// - Separation of concerns between crawling and content processing
+// - Configurable behavior through parameters
+// - Extensible processor interface for different content types
+// - Robust error handling and logging
 package collector
 
 import (
