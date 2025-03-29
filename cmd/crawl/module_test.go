@@ -6,6 +6,8 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/testutils"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -20,6 +22,12 @@ func TestModuleProvides(t *testing.T) {
 		fx.NopLogger,
 		testModule.Module(),
 		crawl.Module,
+		fx.Provide(
+			fx.Annotate(
+				configtestutils.NewMockConfig,
+				fx.As(new(config.Interface)),
+			),
+		),
 	)
 
 	require.NoError(t, app.Err())
@@ -34,6 +42,12 @@ func TestModuleConfiguration(t *testing.T) {
 		fx.NopLogger,
 		testModule.Module(),
 		crawl.Module,
+		fx.Provide(
+			fx.Annotate(
+				configtestutils.NewMockConfig,
+				fx.As(new(config.Interface)),
+			),
+		),
 	)
 
 	require.NoError(t, app.Err())
@@ -48,6 +62,12 @@ func TestCommandDeps(t *testing.T) {
 		fx.NopLogger,
 		testModule.Module(),
 		crawl.Module,
+		fx.Provide(
+			fx.Annotate(
+				configtestutils.NewMockConfig,
+				fx.As(new(config.Interface)),
+			),
+		),
 		fx.Invoke(func(deps crawl.CommandDeps) {
 			require.NotNil(t, deps.Lifecycle)
 			require.NotNil(t, deps.Sources)

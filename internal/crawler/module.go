@@ -55,7 +55,6 @@ var Module = fx.Module("crawler",
 	article.Module,
 	content.Module,
 	fx.Provide(
-		ProvideCollectorConfig,
 		ProvideCollyDebugger,
 		ProvideEventBus,
 		ProvideCrawler,
@@ -139,34 +138,16 @@ type Result struct {
 	Crawler Interface
 }
 
-// ProvideCollectorConfig creates a new collector configuration.
-func ProvideCollectorConfig(cfg config.Interface, logger common.Logger) *collector.Config {
-	crawlerCfg := cfg.GetCrawlerConfig()
-	return &collector.Config{
-		BaseURL:     crawlerCfg.BaseURL,
-		MaxDepth:    crawlerCfg.MaxDepth,
-		RateLimit:   crawlerCfg.RateLimit.String(),
-		Parallelism: 1,
-		RandomDelay: crawlerCfg.RandomDelay,
-		Logger:      logger,
-		Source: config.Source{
-			URL:       crawlerCfg.BaseURL,
-			MaxDepth:  crawlerCfg.MaxDepth,
-			RateLimit: crawlerCfg.RateLimit,
-		},
+// ProvideCollyDebugger creates a new debugger instance.
+func ProvideCollyDebugger(logger common.Logger) debug.Debugger {
+	return &debug.LogDebugger{
+		Output: newDebugLogger(logger),
 	}
 }
 
 // ProvideEventBus creates a new event bus instance.
 func ProvideEventBus() *events.Bus {
 	return events.NewBus()
-}
-
-// ProvideCollyDebugger creates a new debugger instance.
-func ProvideCollyDebugger(logger common.Logger) debug.Debugger {
-	return &debug.LogDebugger{
-		Output: newDebugLogger(logger),
-	}
 }
 
 // ProvideCrawler creates a new crawler instance.
