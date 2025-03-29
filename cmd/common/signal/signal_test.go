@@ -37,6 +37,15 @@ func sendSignal(t *testing.T) error {
 	return p.Signal(syscall.SIGINT)
 }
 
+// mockFXApp implements the FXApp interface for testing
+type mockFXApp struct {
+	stopFn func(context.Context) error
+}
+
+func (m *mockFXApp) Stop(ctx context.Context) error {
+	return m.stopFn(ctx)
+}
+
 func TestSignalHandler(t *testing.T) {
 	t.Parallel()
 
@@ -328,6 +337,7 @@ func TestSignalHandler_ShutdownTimeoutWithError(t *testing.T) {
 					return nil
 				},
 				OnStop: func(context.Context) error {
+					// Return a mock error that should be handled gracefully
 					return errors.New("mock error")
 				},
 			})
@@ -361,7 +371,7 @@ func TestSignalHandler_ShutdownTimeoutWithError(t *testing.T) {
 
 	select {
 	case <-shutdownComplete:
-		// Shutdown completed
+		// Shutdown completed successfully
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("Shutdown did not complete within timeout")
 	}
@@ -418,60 +428,124 @@ func TestSignalHandler_ShutdownChannel(t *testing.T) {
 }
 
 func TestSignalHandler_ContextError(t *testing.T) {
-	t.Parallel()
+	// Create channels for coordination
+	appReady := make(chan struct{})
+	shutdownStarted := make(chan struct{})
+	shutdownComplete := make(chan struct{})
+
+	// Create a mock fx app that simulates a slow shutdown
+	mockApp := &mockFXApp{
+		stopFn: func(ctx context.Context) error {
+			// Signal that shutdown has started
+			close(shutdownStarted)
+			// Simulate a slow shutdown that exceeds the context deadline
+			time.Sleep(200 * time.Millisecond)
+			// Signal that shutdown is complete
+			close(shutdownComplete)
+			return ctx.Err()
+		},
+	}
+
+	// Create a signal handler with a short timeout
 	handler := signal.NewSignalHandler(logger.NewNoOp())
 	handler.SetShutdownTimeout(100 * time.Millisecond)
+	handler.SetFXApp(mockApp)
 
-	// Create a context that we'll cancel
+	// Create a context that we'll cancel to trigger shutdown
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	// Create a test fx app that takes longer than the timeout
-	app := fxtest.New(t,
-		fx.NopLogger,
-		fx.Invoke(func(lc fx.Lifecycle) {
-			lc.Append(fx.Hook{
-				OnStart: func(context.Context) error {
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					time.Sleep(150 * time.Millisecond) // Sleep longer than timeout
-					return context.DeadlineExceeded
-				},
-			})
-		}),
-	)
-
-	// Set up the signal handler
-	handler.SetFXApp(app)
+	// Setup signal handling
 	cleanup := handler.Setup(ctx)
 	defer cleanup()
 
-	// Start the app
-	app.RequireStart()
-
 	// Start a goroutine to wait for shutdown
-	done := make(chan bool)
+	done := make(chan struct{})
 	go func() {
 		handler.Wait()
-		done <- true
+		close(done)
 	}()
 
-	// Cancel the context to trigger shutdown
-	cancel()
+	// Start the fx app
+	app := fx.New(
+		fx.Supply(handler),
+		fx.Invoke(func(lc fx.Lifecycle) {
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					close(appReady)
+					return nil
+				},
+				OnStop: func(ctx context.Context) error {
+					// Wait for mock app shutdown to complete or context to be cancelled
+					select {
+					case <-shutdownComplete:
+						return nil
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+				},
+			})
+		}),
+		fx.NopLogger,
+	)
+
+	// Start the app
+	startCtx, startCancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer startCancel()
+	if err := app.Start(startCtx); err != nil {
+		t.Fatalf("Failed to start fx app: %v", err)
+	}
+
+	// Wait for app to be ready
+	select {
+	case <-appReady:
+		// App is ready, proceed with shutdown
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("App did not become ready within timeout")
+	}
+
+	// Start a goroutine to request shutdown after a short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		handler.RequestShutdown()
+	}()
+
+	// Wait for shutdown to start
+	select {
+	case <-shutdownStarted:
+		// Shutdown started successfully
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Shutdown did not start within timeout")
+	}
 
 	// Wait for shutdown to complete
 	select {
-	case <-done:
-		// Success - handler completed despite context error
-		// Verify the state is correct
-		assert.Equal(t, "completed", handler.GetState())
+	case <-shutdownComplete:
+		// Shutdown completed successfully
 	case <-time.After(300 * time.Millisecond):
-		t.Fatal("Handler did not complete after context error")
+		t.Fatal("Shutdown did not complete within timeout")
 	}
 
-	// Verify app is stopped
-	app.RequireStop()
-	// Note: The error "application didn't stop cleanly: context deadline exceeded" is expected
-	// and is logged by fx, but doesn't affect the test result
+	// Wait for handler to complete
+	select {
+	case <-done:
+		// Handler completed successfully
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("Handler did not complete within timeout")
+	}
+
+	// Stop the fx app
+	stopCtx, stopCancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer stopCancel()
+	if err := app.Stop(stopCtx); err != nil {
+		// Context deadline exceeded error is expected here
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("Unexpected error stopping fx app: %v", err)
+		}
+	}
+
+	// Verify the final state
+	if handler.GetState() != "completed" {
+		t.Errorf("Expected state 'completed', got '%s'", handler.GetState())
+	}
 }

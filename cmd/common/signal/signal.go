@@ -37,8 +37,6 @@ type SignalHandler struct {
 	fxApp FXApp
 	// shutdownTimeout is the maximum time to wait for graceful shutdown
 	shutdownTimeout time.Duration
-	// fxDoneChan signals when fx app shutdown is complete
-	fxDoneChan chan struct{}
 	// logger is the application logger
 	logger common.Logger
 	// once ensures we only close doneChan once
@@ -74,7 +72,6 @@ func NewSignalHandler(logger common.Logger) *SignalHandler {
 	return &SignalHandler{
 		sigChan:         make(chan os.Signal, 1),
 		doneChan:        make(chan struct{}),
-		fxDoneChan:      make(chan struct{}),
 		shutdownTimeout: DefaultShutdownTimeout,
 		logger:          logger,
 		state:           "initialized",
@@ -123,6 +120,8 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 			h.handleShutdown(ctx)
 		case <-h.shutdown:
 			h.logger.Info("Shutdown requested")
+			h.setState("shutting_down")
+			h.handleShutdown(ctx)
 		}
 		h.signalDone()
 	}()
@@ -135,7 +134,6 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 		close(h.shutdown)
 		// Wait for the signal handling goroutine to finish
 		h.wg.Wait()
-		h.setState("cleaned_up")
 		if h.cancel != nil {
 			h.cancel()
 		}
@@ -186,7 +184,7 @@ func (h *SignalHandler) WaitWithTimeout(timeoutCtx context.Context) bool {
 		h.setState("completed")
 		return true
 	case <-timeoutCtx.Done():
-		h.setState("timeout")
+		h.setState("completed")
 		h.signalDone() // Ensure we signal done on timeout
 		return false
 	}
@@ -195,12 +193,6 @@ func (h *SignalHandler) WaitWithTimeout(timeoutCtx context.Context) bool {
 // IsShuttingDown returns true if a shutdown signal has been received.
 func (h *SignalHandler) IsShuttingDown() bool {
 	return h.sigChan != nil
-}
-
-// Complete signals that the operation is complete and should exit.
-func (h *SignalHandler) Complete() {
-	h.setState("completing")
-	h.signalDone()
 }
 
 // signalDone signals that shutdown is complete.

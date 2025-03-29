@@ -119,7 +119,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 						return err
 					}
 					// Signal completion
-					handler.Complete()
+					handler.RequestShutdown()
 					return nil
 				},
 				OnStop: func(context.Context) error {
