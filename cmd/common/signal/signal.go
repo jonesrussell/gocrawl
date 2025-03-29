@@ -157,8 +157,6 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 
 // handleShutdown coordinates the shutdown sequence between fx and our internal cleanup.
 func (h *SignalHandler) handleShutdown() {
-	h.logger.Info("Received signal, initiating shutdown...")
-
 	// Create a timeout context for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), h.shutdownTimeout)
 	defer cancel()

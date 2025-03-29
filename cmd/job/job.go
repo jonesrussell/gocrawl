@@ -71,19 +71,17 @@ func NewJobCommand(deps JobCommandDeps) *cobra.Command {
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			// Set up signal handling with a no-op logger initially
-			handler := signal.NewSignalHandler(deps.Logger)
-			cleanup := handler.Setup(ctx)
-			defer cleanup()
-
 			// Create a logger for command-level logging
 			cmdLogger := deps.Logger
 
 			// Initialize the Fx application
-			fxApp, done := setupFXApp(ctx, handler, cmdLogger)
+			fxApp, done := setupFXApp(ctx, cmdLogger, deps.Config)
 
-			// Set the fx app for coordinated shutdown
+			// Set up signal handling with the logger
+			handler := signal.NewSignalHandler(cmdLogger)
 			handler.SetFXApp(fxApp)
+			cleanup := handler.Setup(ctx)
+			defer cleanup()
 
 			// Start the application
 			if startErr := fxApp.Start(ctx); startErr != nil {
@@ -93,7 +91,7 @@ func NewJobCommand(deps JobCommandDeps) *cobra.Command {
 			// Wait for either context cancellation or job completion
 			select {
 			case <-ctx.Done():
-				cmdLogger.Info("Context cancelled, initiating shutdown")
+				cmdLogger.Info("Context cancelled, initiating shutdown...")
 			case <-done:
 				cmdLogger.Info("Job completed")
 			}
@@ -127,8 +125,11 @@ func Command() *cobra.Command {
 		}
 	}
 
+	// Create a logger for command-level logging
+	log := logger.NewNoOp()
+
 	return NewJobCommand(JobCommandDeps{
-		Logger: logger.NewNoOp(),
+		Logger: log,
 		Config: cfg,
 	})
 }
@@ -136,19 +137,34 @@ func Command() *cobra.Command {
 // setupFXApp initializes the Fx application with all required dependencies.
 func setupFXApp(
 	ctx context.Context,
-	handler *signal.SignalHandler,
 	logger common.Logger,
+	config config.Interface,
 ) (*fx.App, chan struct{}) {
 	done := make(chan struct{})
 
 	// Create the fx app with all required dependencies
 	options := []fx.Option{
 		fx.Supply(logger),
+		fx.Supply(config),
 		fx.Supply(done),
-		fx.Supply(handler),
 		fx.Supply(ctx),
 		Module,
 		fx.NopLogger,
+		fx.Invoke(func(lc fx.Lifecycle) {
+			lc.Append(fx.Hook{
+				OnStart: func(context.Context) error {
+					go func() {
+						// Simulate job completion after a short delay
+						time.Sleep(100 * time.Millisecond)
+						close(done)
+					}()
+					return nil
+				},
+				OnStop: func(context.Context) error {
+					return nil
+				},
+			})
+		}),
 	}
 
 	fxApp := fx.New(options...)
