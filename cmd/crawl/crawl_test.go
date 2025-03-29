@@ -40,7 +40,7 @@ func TestCommandExecution(t *testing.T) {
 			func() types.Interface { return mockStorage },
 			func() logger.Interface { return mockLogger },
 			func() *signal.SignalHandler { return mockHandler },
-			func() context.Context { return context.Background() },
+			func() context.Context { return t.Context() },
 			func() string { return "test-source" },
 		),
 		fx.Invoke(func(lc fx.Lifecycle, deps crawl.CommandDeps) {
@@ -72,14 +72,14 @@ func TestCommandExecution(t *testing.T) {
 	)
 
 	// Start the app
-	err := app.Start(context.Background())
+	err := app.Start(t.Context())
 	require.NoError(t, err)
 
 	// Wait for a short time to allow goroutines to complete
 	time.Sleep(100 * time.Millisecond)
 
 	// Stop the app
-	err = app.Stop(context.Background())
+	err = app.Stop(t.Context())
 	require.NoError(t, err)
 
 	// Verify all expectations were met
@@ -140,8 +140,7 @@ func TestCommandFlagHandling(t *testing.T) {
 	t.Parallel()
 
 	cmd := crawl.Command()
-	ctx := context.Background()
-	cmd.SetContext(ctx)
+	cmd.SetContext(t.Context())
 
 	// Test setting source flag
 	err := cmd.Flags().Set("source", "test-source")

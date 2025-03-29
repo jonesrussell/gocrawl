@@ -51,13 +51,33 @@ func (m *MockStorage) DeleteIndex(ctx context.Context, index string) error {
 // ListIndices implements types.Interface
 func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	args := m.Called(ctx)
-	return args.Get(0).([]string), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	result := args.Get(0)
+	if result == nil {
+		return nil, ErrInvalidResult
+	}
+	if val, ok := result.([]string); ok {
+		return val, nil
+	}
+	return nil, ErrInvalidResult
 }
 
 // GetMapping implements types.Interface
 func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(map[string]any), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	result := args.Get(0)
+	if result == nil {
+		return nil, ErrInvalidResult
+	}
+	if val, ok := result.(map[string]any); ok {
+		return val, nil
+	}
+	return nil, ErrInvalidResult
 }
 
 // UpdateMapping implements types.Interface
@@ -75,7 +95,17 @@ func (m *MockStorage) IndexExists(ctx context.Context, index string) (bool, erro
 // Search implements types.Interface
 func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).([]any), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	result := args.Get(0)
+	if result == nil {
+		return nil, ErrInvalidResult
+	}
+	if val, ok := result.([]any); ok {
+		return val, nil
+	}
+	return nil, ErrInvalidResult
 }
 
 // GetIndexHealth implements types.Interface
@@ -87,7 +117,17 @@ func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string,
 // GetIndexDocCount implements types.Interface
 func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(int64), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	result := args.Get(0)
+	if result == nil {
+		return 0, ErrInvalidResult
+	}
+	if val, ok := result.(int64); ok {
+		return val, nil
+	}
+	return 0, ErrInvalidResult
 }
 
 // Ping implements types.Interface
@@ -111,7 +151,17 @@ func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (an
 // Count implements types.Interface
 func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).(int64), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	result := args.Get(0)
+	if result == nil {
+		return 0, ErrInvalidResult
+	}
+	if val, ok := result.(int64); ok {
+		return val, nil
+	}
+	return 0, ErrInvalidResult
 }
 
 // Ensure MockStorage implements types.Interface
