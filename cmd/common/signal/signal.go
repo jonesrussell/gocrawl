@@ -180,6 +180,11 @@ func (h *SignalHandler) handleShutdown() {
 
 	// Cancel the context to ensure cleanup runs
 	h.cancel()
+
+	// Call exit function if set
+	if h.exitFunc != nil {
+		h.exitFunc(0)
+	}
 }
 
 // SetCleanup sets a cleanup function to be called during shutdown.
@@ -193,10 +198,16 @@ func (h *SignalHandler) Wait() bool {
 	select {
 	case <-h.doneChan:
 		h.setState("completed")
+		if h.exitFunc != nil {
+			h.exitFunc(0)
+		}
 		return true
 	case <-h.ctx.Done():
 		h.setState("completed")
 		h.signalDone() // Ensure we signal done on context cancellation
+		if h.exitFunc != nil {
+			h.exitFunc(0)
+		}
 		return false
 	}
 }
