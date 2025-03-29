@@ -153,6 +153,8 @@ func (h *SignalHandler) handleShutdown(ctx context.Context) {
 		if err := h.fxApp.Stop(shutdownCtx); err != nil {
 			if !isContextError(err) {
 				h.logger.Error("Error during fx shutdown", "error", err)
+			} else {
+				h.logger.Info("Fx shutdown timed out", "error", err)
 			}
 		}
 	}
@@ -185,6 +187,7 @@ func (h *SignalHandler) WaitWithTimeout(timeoutCtx context.Context) bool {
 		return true
 	case <-timeoutCtx.Done():
 		h.setState("timeout")
+		h.signalDone() // Ensure we signal done on timeout
 		return false
 	}
 }
@@ -200,18 +203,16 @@ func (h *SignalHandler) Complete() {
 	h.signalDone()
 }
 
-// signalDone ensures the doneChan is closed exactly once.
+// signalDone signals that shutdown is complete.
 func (h *SignalHandler) signalDone() {
 	h.once.Do(func() {
-		if h.doneChan != nil {
-			close(h.doneChan)
-		}
+		close(h.doneChan)
 	})
 }
 
-// isContextError checks if an error is a context-related error.
+// isContextError returns true if the error is a context error (deadline exceeded or canceled).
 func isContextError(err error) bool {
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }
 
 // RequestShutdown signals that the application should shut down.

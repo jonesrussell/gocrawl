@@ -371,3 +371,103 @@ func TestSignalHandler_ShutdownTimeoutWithError(t *testing.T) {
 	// Note: The error "application didn't stop cleanly: mock error" is expected
 	// and is logged by fx, but doesn't affect the test result
 }
+
+func TestSignalHandler_SetLogger(t *testing.T) {
+	t.Parallel()
+	handler := signal.NewSignalHandler(logger.NewNoOp())
+	newLogger := logger.NewNoOp()
+	handler.SetLogger(newLogger)
+	// No assertion needed - just verifying it doesn't panic
+}
+
+func TestSignalHandler_IsShuttingDown(t *testing.T) {
+	t.Parallel()
+	handler := signal.NewSignalHandler(logger.NewNoOp())
+	assert.True(t, handler.IsShuttingDown(), "IsShuttingDown should return true when sigChan is initialized")
+
+	// Test with nil sigChan
+	handler = &signal.SignalHandler{}
+	assert.False(t, handler.IsShuttingDown(), "IsShuttingDown should return false when sigChan is nil")
+}
+
+func TestSignalHandler_ShutdownChannel(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	handler := signal.NewSignalHandler(logger.NewNoOp())
+	cleanup := handler.Setup(ctx)
+
+	// Create a channel to track when Wait returns
+	done := make(chan bool)
+	go func() {
+		handler.Wait()
+		done <- true
+	}()
+
+	// Close the shutdown channel by calling cleanup
+	cleanup()
+
+	// Wait for the handler to complete
+	select {
+	case <-done:
+		// Success - handler completed
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Handler did not complete after closing shutdown channel")
+	}
+}
+
+func TestSignalHandler_ContextError(t *testing.T) {
+	t.Parallel()
+	handler := signal.NewSignalHandler(logger.NewNoOp())
+	handler.SetShutdownTimeout(100 * time.Millisecond)
+
+	// Create a context that we'll cancel
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// Create a test fx app that takes longer than the timeout
+	app := fxtest.New(t,
+		fx.NopLogger,
+		fx.Invoke(func(lc fx.Lifecycle) {
+			lc.Append(fx.Hook{
+				OnStart: func(context.Context) error {
+					return nil
+				},
+				OnStop: func(context.Context) error {
+					time.Sleep(200 * time.Millisecond)
+					return context.DeadlineExceeded
+				},
+			})
+		}),
+	)
+
+	// Set up the signal handler
+	handler.SetFXApp(app)
+	cleanup := handler.Setup(ctx)
+	defer cleanup()
+
+	// Start the app
+	app.RequireStart()
+
+	// Start a goroutine to wait for shutdown
+	done := make(chan bool)
+	go func() {
+		handler.Wait()
+		done <- true
+	}()
+
+	// Cancel the context to trigger shutdown
+	cancel()
+
+	// Wait for shutdown to complete
+	select {
+	case <-done:
+		// Success - handler completed despite context error
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("Handler did not complete after context error")
+	}
+
+	// Verify app is stopped
+	app.RequireStop()
+}
