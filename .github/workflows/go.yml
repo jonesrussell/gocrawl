@@ -42,13 +42,19 @@ jobs:
       # Test-specific settings
       TEST_MOCK_ENABLED: true
       
-      # Elasticsearch Security (using GitHub Secrets)
-      ELASTIC_USERNAME: ${{ secrets.ELASTIC_USERNAME }}
-      ELASTIC_PASSWORD: ${{ secrets.ELASTIC_PASSWORD }}
-      ELASTIC_API_KEY: ${{ secrets.ELASTIC_API_KEY }}
+      # Elasticsearch Security (using test values)
+      ELASTIC_USERNAME: test_user
+      ELASTIC_PASSWORD: test_password
+      ELASTIC_API_KEY: test_api_key
       
-      # Server Security
-      GOCRAWL_API_KEY: ${{ secrets.GOCRAWL_API_KEY }}
+      # Server Security (using test values)
+      GOCRAWL_API_KEY: test_api_key
+      
+      # TLS Configuration (disabled for tests)
+      ELASTIC_SKIP_TLS: true
+      ELASTIC_CERT_PATH: ""
+      ELASTIC_KEY_PATH: ""
+      ELASTIC_CA_PATH: ""
 
     steps:
     - name: Checkout Code
