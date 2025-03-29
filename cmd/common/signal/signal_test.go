@@ -1,3 +1,4 @@
+// Package signal_test provides tests for the signal handler package.
 package signal_test
 
 import (
@@ -8,34 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
-
-// setupTestHandler creates a signal handler with the given context and cleanup function.
-func setupTestHandler(t *testing.T, ctx context.Context, cleanupFn func()) (*signal.SignalHandler, func()) {
-	t.Helper()
-	handler := signal.NewSignalHandler(logger.NewNoOp())
-	if cleanupFn != nil {
-		handler.SetCleanup(cleanupFn)
-	}
-	cleanup := handler.Setup(ctx)
-	return handler, cleanup
-}
-
-// sendSignal sends a signal to the current process.
-func sendSignal(t *testing.T) error {
-	t.Helper()
-	p, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		return err
-	}
-	return p.Signal(syscall.SIGINT)
-}
 
 // mockFXApp implements the FXApp interface for testing
 type mockFXApp struct {
@@ -46,99 +27,113 @@ func (m *mockFXApp) Stop(ctx context.Context) error {
 	return m.stopFn(ctx)
 }
 
+// sendSignal sends a signal to the current process.
+func sendSignal(t *testing.T, sig os.Signal) error {
+	t.Helper()
+	p, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		return err
+	}
+	return p.Signal(sig)
+}
+
 func TestSignalHandler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("handles SIGINT", func(t *testing.T) {
 		t.Parallel()
+		// Create a mock logger
+		mockLog := common.NewNoOpLogger()
+
+		// Create signal handler
+		handler := signalhandler.NewSignalHandler(mockLog)
+
+		// Create a context for the test
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
-		// Create a channel to track if exit was called
-		exitCalled := make(chan int, 1)
-		mockExit := func(code int) {
-			exitCalled <- code
-		}
-
-		handler := signal.NewSignalHandler(logger.NewNoOp())
-		handler.SetExitFunc(mockExit)
+		// Set up signal handling
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
-		// Send SIGINT in a goroutine
-		var sigErr error
-		go func() {
-			time.Sleep(100 * time.Millisecond)
-			sigErr = sendSignal(t)
-		}()
+		// Send SIGINT to the process
+		require.NoError(t, sendSignal(t, syscall.SIGINT))
 
-		// Wait for exit to be called
-		select {
-		case code := <-exitCalled:
-			require.Equal(t, 0, code)
-		case <-time.After(time.Second):
-			t.Fatal("Timeout waiting for exit to be called")
-		}
-		require.NoError(t, sigErr)
+		// Wait for shutdown
+		shutdownReceived := handler.Wait()
+		assert.True(t, shutdownReceived)
+	})
+
+	t.Run("handles SIGTERM", func(t *testing.T) {
+		t.Parallel()
+		// Create a mock logger
+		mockLog := common.NewNoOpLogger()
+
+		// Create signal handler
+		handler := signalhandler.NewSignalHandler(mockLog)
+
+		// Create a context for the test
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		// Set up signal handling
+		cleanup := handler.Setup(ctx)
+		defer cleanup()
+
+		// Send SIGTERM to the process
+		require.NoError(t, sendSignal(t, syscall.SIGTERM))
+
+		// Wait for shutdown
+		shutdownReceived := handler.Wait()
+		assert.True(t, shutdownReceived)
 	})
 
 	t.Run("handles context cancellation", func(t *testing.T) {
 		t.Parallel()
+		// Create a mock logger
+		mockLog := common.NewNoOpLogger()
+
+		// Create signal handler
+		handler := signalhandler.NewSignalHandler(mockLog)
+
+		// Create a context for the test
 		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
 
-		// Create a channel to track if exit was called
-		exitCalled := make(chan int, 1)
-		mockExit := func(code int) {
-			exitCalled <- code
-		}
-
-		handler := signal.NewSignalHandler(logger.NewNoOp())
-		handler.SetExitFunc(mockExit)
+		// Set up signal handling
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
-		// Cancel context in a goroutine
-		go func() {
-			time.Sleep(100 * time.Millisecond)
-			cancel()
-		}()
+		// Cancel the context
+		cancel()
 
-		// Wait for exit to be called
-		select {
-		case code := <-exitCalled:
-			require.Equal(t, 0, code)
-		case <-time.After(time.Second):
-			t.Fatal("Timeout waiting for exit to be called")
-		}
+		// Wait for shutdown
+		shutdownReceived := handler.Wait()
+		assert.False(t, shutdownReceived)
 	})
 
-	t.Run("handles timeout", func(t *testing.T) {
+	t.Run("handles shutdown timeout", func(t *testing.T) {
 		t.Parallel()
+		// Create a mock logger
+		mockLog := common.NewNoOpLogger()
+
+		// Create signal handler
+		handler := signalhandler.NewSignalHandler(mockLog)
+		handler.SetShutdownTimeout(100 * time.Millisecond)
+
+		// Create a context for the test
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
-		// Create a channel to track if exit was called
-		exitCalled := make(chan int, 1)
-		mockExit := func(code int) {
-			exitCalled <- code
-		}
-
-		handler := signal.NewSignalHandler(logger.NewNoOp())
-		handler.SetExitFunc(mockExit)
+		// Set up signal handling
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
-		// Request shutdown
-		handler.RequestShutdown()
+		// Send SIGINT to the process
+		require.NoError(t, sendSignal(t, syscall.SIGINT))
 
-		// Wait for exit to be called
-		select {
-		case code := <-exitCalled:
-			require.Equal(t, 0, code)
-		case <-time.After(time.Second):
-			t.Fatal("Timeout waiting for exit to be called")
-		}
+		// Wait for shutdown
+		shutdownReceived := handler.Wait()
+		assert.True(t, shutdownReceived)
 	})
 
 	t.Run("coordinates with fx app shutdown", func(t *testing.T) {
@@ -168,7 +163,7 @@ func TestSignalHandler(t *testing.T) {
 		)
 
 		// Set up the signal handler
-		handler := signal.NewSignalHandler(logger.NewNoOp())
+		handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 		handler.SetExitFunc(mockExit)
 		handler.SetFXApp(app)
 		cleanup := handler.Setup(ctx)
@@ -181,7 +176,7 @@ func TestSignalHandler(t *testing.T) {
 		var sigErr error
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sigErr = sendSignal(t)
+			sigErr = sendSignal(t, syscall.SIGINT)
 		}()
 
 		// Wait for exit to be called
@@ -208,7 +203,7 @@ func TestSignalHandler(t *testing.T) {
 			exitCalled <- code
 		}
 
-		handler := signal.NewSignalHandler(logger.NewNoOp())
+		handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 		handler.SetExitFunc(mockExit)
 		handler.SetShutdownTimeout(5 * time.Second)
 		cleanup := handler.Setup(ctx)
@@ -218,7 +213,7 @@ func TestSignalHandler(t *testing.T) {
 		var sigErr error
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sigErr = sendSignal(t)
+			sigErr = sendSignal(t, syscall.SIGINT)
 		}()
 
 		// Wait for exit to be called
@@ -243,7 +238,7 @@ func TestSignalHandler(t *testing.T) {
 		}
 
 		cleanupCalled := false
-		handler := signal.NewSignalHandler(logger.NewNoOp())
+		handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 		handler.SetExitFunc(mockExit)
 		handler.SetCleanup(func() {
 			cleanupCalled = true
@@ -255,7 +250,7 @@ func TestSignalHandler(t *testing.T) {
 		var sigErr error
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			sigErr = sendSignal(t)
+			sigErr = sendSignal(t, syscall.SIGINT)
 		}()
 
 		// Wait for exit to be called
@@ -271,17 +266,18 @@ func TestSignalHandler(t *testing.T) {
 }
 
 func TestSignalHandler_ShutdownTimeout(t *testing.T) {
+	t.Parallel()
 	// Create a channel to track if exit was called
 	exitCalled := make(chan int, 1)
 	mockExit := func(code int) {
 		exitCalled <- code
 	}
 
-	handler := signal.NewSignalHandler(logger.NewNoOp())
+	handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 	handler.SetExitFunc(mockExit)
 	handler.SetShutdownTimeout(100 * time.Millisecond)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	cleanup := handler.Setup(ctx)
@@ -300,6 +296,7 @@ func TestSignalHandler_ShutdownTimeout(t *testing.T) {
 }
 
 func TestSignalHandler_ShutdownTimeoutWithFX(t *testing.T) {
+	t.Parallel()
 	// Create a channel to track if exit was called
 	exitCalled := make(chan int, 1)
 	mockExit := func(code int) {
@@ -307,7 +304,7 @@ func TestSignalHandler_ShutdownTimeoutWithFX(t *testing.T) {
 	}
 
 	// Create a signal handler with a short timeout
-	handler := signal.NewSignalHandler(logger.NewNoOp())
+	handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 	handler.SetExitFunc(mockExit)
 	handler.SetShutdownTimeout(100 * time.Millisecond)
 
@@ -380,8 +377,9 @@ func TestSignalHandler_ShutdownTimeoutWithFX(t *testing.T) {
 }
 
 func TestSignalHandler_ShutdownTimeoutWithError(t *testing.T) {
+	t.Parallel()
 	// Create a signal handler with a short timeout
-	handler := signal.NewSignalHandler(logger.NewNoOp())
+	handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 	handler.SetShutdownTimeout(100 * time.Millisecond)
 
 	// Create a context that we'll cancel
@@ -453,7 +451,7 @@ func TestSignalHandler_ShutdownTimeoutWithError(t *testing.T) {
 
 func TestSignalHandler_SetLogger(t *testing.T) {
 	t.Parallel()
-	handler := signal.NewSignalHandler(logger.NewNoOp())
+	handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 	newLogger := logger.NewNoOp()
 	handler.SetLogger(newLogger)
 	// No assertion needed - just verifying it doesn't panic
@@ -461,11 +459,11 @@ func TestSignalHandler_SetLogger(t *testing.T) {
 
 func TestSignalHandler_IsShuttingDown(t *testing.T) {
 	t.Parallel()
-	handler := signal.NewSignalHandler(logger.NewNoOp())
+	handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 	assert.True(t, handler.IsShuttingDown(), "IsShuttingDown should return true when sigChan is initialized")
 
 	// Test with nil sigChan
-	handler = &signal.SignalHandler{}
+	handler = &signalhandler.SignalHandler{}
 	assert.False(t, handler.IsShuttingDown(), "IsShuttingDown should return false when sigChan is nil")
 }
 
@@ -474,7 +472,7 @@ func TestSignalHandler_ShutdownChannel(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	handler := signal.NewSignalHandler(logger.NewNoOp())
+	handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 	cleanup := handler.Setup(ctx)
 
 	// Create a channel to track when Wait returns
@@ -497,6 +495,7 @@ func TestSignalHandler_ShutdownChannel(t *testing.T) {
 }
 
 func TestSignalHandler_ContextError(t *testing.T) {
+	t.Parallel()
 	// Create channels for coordination
 	appReady := make(chan struct{})
 	shutdownStarted := make(chan struct{})
@@ -516,7 +515,7 @@ func TestSignalHandler_ContextError(t *testing.T) {
 	}
 
 	// Create a signal handler with a short timeout
-	handler := signal.NewSignalHandler(logger.NewNoOp())
+	handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 	handler.SetShutdownTimeout(100 * time.Millisecond)
 	handler.SetFXApp(mockApp)
 

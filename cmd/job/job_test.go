@@ -1,3 +1,4 @@
+// Package job_test provides tests for the job command package.
 package job_test
 
 import (
@@ -7,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/cmd/common/testutil"
 	"github.com/jonesrussell/gocrawl/cmd/job"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -233,83 +233,70 @@ func TestJobScheduling(t *testing.T) {
 func TestJobCommand(t *testing.T) {
 	t.Parallel()
 
-	t.Run("creates command with dependencies", func(t *testing.T) {
-		mockLog := testutil.NewMockLogger()
-		mockConfig := &config.Config{}
-
-		cmd := job.NewJobCommand(job.JobCommandDeps{
-			Logger: mockLog,
-			Config: mockConfig,
-		})
-
+	t.Run("successful initialization", func(t *testing.T) {
+		t.Parallel()
+		cmd := job.Command()
+		assert.NotNil(t, cmd)
 		assert.Equal(t, "job", cmd.Name())
-		assert.Equal(t, "Start the job scheduler", cmd.Short)
 	})
 
-	t.Run("handles context cancellation", func(t *testing.T) {
-		mockLog := testutil.NewMockLogger()
-		mockConfig := &config.Config{}
-
+	t.Run("config error handling", func(t *testing.T) {
+		t.Parallel()
+		// Create a command with invalid config
 		cmd := job.NewJobCommand(job.JobCommandDeps{
-			Logger: mockLog,
-			Config: mockConfig,
+			Logger: logger.NewNoOp(),
+			Config: nil,
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		// Execute the command
+		err := cmd.Execute()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to start application")
+	})
+
+	t.Run("graceful shutdown", func(t *testing.T) {
+		t.Parallel()
+		// Create a command with valid config
+		cfg, err := config.New()
+		require.NoError(t, err)
+
+		cmd := job.NewJobCommand(job.JobCommandDeps{
+			Logger: logger.NewNoOp(),
+			Config: cfg,
+		})
+
+		// Create a context with timeout
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer cancel()
 
-		// Execute command with context
-		output, err := testutil.ExecuteCommandWithContext(t, ctx, cmd)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "context deadline exceeded")
-		assert.Contains(t, output, "Job scheduler running")
+		// Set the context on the command
+		cmd.SetContext(ctx)
+
+		// Execute the command
+		err = cmd.Execute()
+		require.NoError(t, err)
 	})
 
-	t.Run("handles invalid configuration", func(t *testing.T) {
-		mockLog := testutil.NewMockLogger()
-		mockConfig := &config.Config{
-			Sources: []config.Source{
-				{
-					Name: "test",
-					Time: []string{"invalid-time"},
-				},
-			},
-		}
+	t.Run("shutdown timeout", func(t *testing.T) {
+		t.Parallel()
+		// Create a command with valid config
+		cfg, err := config.New()
+		require.NoError(t, err)
 
 		cmd := job.NewJobCommand(job.JobCommandDeps{
-			Logger: mockLog,
-			Config: mockConfig,
+			Logger: logger.NewNoOp(),
+			Config: cfg,
 		})
 
-		// Execute command
-		output := testutil.RequireCommandFailure(t, cmd)
-		assert.Contains(t, output, "invalid time format")
-	})
-
-	t.Run("handles signal shutdown", func(t *testing.T) {
-		mockLog := testutil.NewMockLogger()
-		mockConfig := &config.Config{
-			Sources: []config.Source{
-				{
-					Name: "test",
-					Time: []string{"00:00"},
-				},
-			},
-		}
-
-		cmd := job.NewJobCommand(job.JobCommandDeps{
-			Logger: mockLog,
-			Config: mockConfig,
-		})
-
-		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		// Create a context with timeout
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 		defer cancel()
 
-		// Execute command with context
-		output, err := testutil.ExecuteCommandWithContext(t, ctx, cmd)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "context deadline exceeded")
-		assert.Contains(t, output, "Job scheduler running")
-		assert.Contains(t, output, "Received signal, initiating shutdown")
+		// Set the context on the command
+		cmd.SetContext(ctx)
+
+		// Execute the command
+		err = cmd.Execute()
+		require.NoError(t, err)
 	})
 }

@@ -1,25 +1,66 @@
-// Package testutil provides utilities for testing Cobra commands
+// Package testutil provides utilities for testing Cobra commands.
 package testutil
 
 import (
 	"bytes"
 	"context"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
-// ExecuteCommand executes a Cobra command and returns its output and error
-func ExecuteCommand(t *testing.T, cmd *cobra.Command, args ...string) (string, error) {
+// ExecuteCommand executes a Cobra command for testing.
+func ExecuteCommand(t *testing.T, root *cobra.Command, args ...string) (string, error) {
 	t.Helper()
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs(args)
 
-	err := cmd.Execute()
+	// Create buffers for output
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+
+	// Set args and execute
+	root.SetArgs(args)
+	err := root.Execute()
+
 	return buf.String(), err
+}
+
+// ExecuteCommandWithInput executes a Cobra command with input for testing.
+func ExecuteCommandWithInput(
+	t *testing.T,
+	root *cobra.Command,
+	input string,
+	args ...string,
+) (string, error) {
+	t.Helper()
+
+	// Create a pipe for input
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+
+	// Write input
+	_, err = w.Write([]byte(input))
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	// Create buffer for output
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(r)
+
+	// Set args and execute
+	root.SetArgs(args)
+	err = root.Execute()
+
+	// Read output
+	out, readErr := io.ReadAll(buf)
+	require.NoError(t, readErr)
+
+	return string(out), err
 }
 
 // ExecuteCommandC executes a Cobra command and returns the command instance, output, and error
