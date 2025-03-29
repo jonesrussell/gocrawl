@@ -7,8 +7,12 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
+	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/spf13/cobra"
@@ -26,6 +30,12 @@ func TestCommandExecution(t *testing.T) {
 	mockStorage := testutils.NewMockStorage()
 	mockLogger := logger.NewNoOp()
 	mockHandler := signal.NewSignalHandler(mockLogger)
+	mockConfig := testutils.NewMockConfig()
+	mockSourceManager := testutils.NewMockSourceManager()
+
+	// Create channels
+	commandDone := make(chan struct{})
+	articleChannel := make(chan *models.Article)
 
 	// Set up expectations
 	mockStorage.On("TestConnection", mock.Anything).Return(nil)
@@ -36,12 +46,38 @@ func TestCommandExecution(t *testing.T) {
 	// Create test app
 	app := fx.New(
 		fx.Provide(
+			// Core dependencies
 			func() crawler.Interface { return mockCrawler },
 			func() types.Interface { return mockStorage },
 			func() logger.Interface { return mockLogger },
-			func() *signal.SignalHandler { return mockHandler },
-			func() context.Context { return t.Context() },
-			func() string { return "test-source" },
+			func() config.Interface { return mockConfig },
+			func() sources.Interface { return mockSourceManager },
+
+			// Named dependencies
+			fx.Annotate(
+				func() *signal.SignalHandler { return mockHandler },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
+			fx.Annotate(
+				func() context.Context { return t.Context() },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			fx.Annotate(
+				func() string { return "test-source" },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() chan struct{} { return commandDone },
+				fx.ResultTags(`name:"commandDone"`),
+			),
+			fx.Annotate(
+				func() chan *models.Article { return articleChannel },
+				fx.ResultTags(`name:"commandArticleChannel"`),
+			),
+			fx.Annotate(
+				func() common.Logger { return mockLogger },
+				fx.ResultTags(`name:"testLogger"`),
+			),
 		),
 		fx.Invoke(func(lc fx.Lifecycle, deps crawl.CommandDeps) {
 			lc.Append(fx.Hook{
@@ -81,6 +117,10 @@ func TestCommandExecution(t *testing.T) {
 	// Stop the app
 	err = app.Stop(t.Context())
 	require.NoError(t, err)
+
+	// Close channels
+	close(commandDone)
+	close(articleChannel)
 
 	// Verify all expectations were met
 	mockCrawler.AssertExpectations(t)
