@@ -229,7 +229,8 @@ func (l *ContentLogger) Error(msg string, args ...any) {
 // Returns:
 //   - error: Any non-ignored error that occurred during the visit
 func VisitLink(e *colly.HTMLElement, link string, ignoredErrors map[string]bool) error {
-	if err := e.Request.Visit(e.Request.AbsoluteURL(link)); err != nil {
+	absURL := e.Request.AbsoluteURL(link)
+	if err := e.Response.Ctx.GetAny("collector").(*colly.Collector).Visit(absURL); err != nil {
 		if !ignoredErrors[err.Error()] {
 			return err
 		}

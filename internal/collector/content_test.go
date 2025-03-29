@@ -213,6 +213,7 @@ func TestContentProcessing(t *testing.T) {
 			html: `
 				<html>
 					<head>
+						<meta property="og:type" content="article">
 						<meta property="article:published_time" content="2024-01-01T00:00:00Z">
 					</head>
 					<body>
@@ -272,7 +273,24 @@ func TestContentProcessing(t *testing.T) {
 				ArticleProcessor: tt.articleProc,
 				ContentProcessor: tt.contentProc,
 			}
-			collector.ProcessContent(e, resp, p, collector.NewContextManager(req.Ctx), collector.NewLogger(p))
+
+			// Set up mock expectations for all possible Debug calls
+			mockLogger.On("Debug", mock.Anything, mock.Anything).Return()
+			mockLogger.On("Error", mock.Anything, mock.Anything).Return()
+
+			// Set up mock processor expectations
+			mockProcessor.On("Process", mock.Anything).Return(nil)
+
+			// Reset mock processor calls
+			mockProcessor.ProcessCalls = 0
+
+			// Create context manager and mark as article if needed
+			cm := collector.NewContextManager(req.Ctx)
+			if collector.IsArticleType(e) {
+				cm.MarkAsArticle()
+			}
+
+			collector.ProcessContent(e, resp, p, cm, collector.NewLogger(p))
 			assert.Equal(t, tt.expectedCalls, mockProcessor.ProcessCalls)
 			assert.Len(t, mockLogger.ErrorMessages, tt.expectedErrors)
 		})
@@ -313,6 +331,13 @@ func TestLinkFollowing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			// Create a collector
+			c := colly.NewCollector()
+
+			// Create a context with the collector
+			ctx := colly.NewContext()
+			ctx.Put("collector", c)
+
 			// Create a request directly
 			req := &colly.Request{
 				URL: &url.URL{
@@ -320,12 +345,13 @@ func TestLinkFollowing(t *testing.T) {
 					Host:   "example.com",
 					Path:   "/test",
 				},
-				Ctx: colly.NewContext(),
+				Ctx: ctx,
 			}
 
 			// Create a mock response
 			resp := &colly.Response{
 				Request: req,
+				Ctx:     ctx,
 			}
 
 			// Create a mock HTML element
@@ -333,6 +359,13 @@ func TestLinkFollowing(t *testing.T) {
 				Request:  req,
 				Response: resp,
 			}
+
+			// Set up collector to handle the visit
+			c.OnRequest(func(r *colly.Request) {
+				if tt.ignoredErrors["test error"] {
+					r.Abort()
+				}
+			})
 
 			// Call visitLink
 			err := collector.VisitLink(e, tt.link, tt.ignoredErrors)

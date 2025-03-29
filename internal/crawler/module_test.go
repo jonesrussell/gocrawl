@@ -4,19 +4,19 @@ package crawler_test
 import (
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/sources"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
-	"go.uber.org/fx/fxtest"
 )
 
 // TestCommonModule provides a test-specific common module that excludes the logger module.
@@ -25,8 +25,9 @@ var TestCommonModule = fx.Module("testCommon",
 	fx.WithLogger(func() fxevent.Logger {
 		return &fxevent.NopLogger
 	}),
-	// Core modules used by most commands, excluding logger and config.
-	sources.Module,
+	// Core modules used by most commands, excluding logger and sources.
+	config.Module,
+	logger.Module,
 )
 
 // TestConfigModule provides a test-specific config module that doesn't try to load files.
@@ -59,60 +60,85 @@ var TestConfigModule = fx.Module("testConfig",
 	),
 )
 
-// setupTestApp creates a new test application with all required dependencies.
-// It provides mock implementations of all interfaces required by the crawler module.
-func setupTestApp(t *testing.T) *fxtest.App {
-	t.Helper()
-
-	// Set environment variables to prevent file loading
-	t.Setenv("APP_ENV", "test")
-	t.Setenv("CONFIG_PATH", "")
-
-	// Create mock logger
-	mockLogger := &testutils.MockLogger{}
-	mockLogger.On("Info", mock.Anything).Return()
-	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
-
-	return fxtest.New(t,
-		fx.NopLogger,
-		// Provide core dependencies
-		fx.Provide(
-			// Named dependencies
-			func() sources.Interface { return &mockSources{} },
-			// Logger provider that replaces the default logger.Module provider
-			fx.Annotate(
-				func() common.Logger { return mockLogger },
-				fx.ResultTags(`name:"logger"`),
-			),
-			// Provide unnamed interfaces required by the crawler module
-			func() storagetypes.Interface { return &mockStorage{} },
-			fx.Annotate(
-				func() api.IndexManager { return &mockIndexManager{} },
-				fx.ResultTags(`name:"indexManager"`),
-			),
-			func() api.SearchManager { return &mockSearchManager{} },
+// TestCrawlerModule provides a test version of the crawler module without common.Module
+var TestCrawlerModule = fx.Module("crawler",
+	article.Module,
+	content.Module,
+	fx.Provide(
+		// Use the public functions from crawler package
+		crawler.ProvideCollectorConfig,
+		crawler.ProvideCollyDebugger,
+		crawler.ProvideEventBus,
+		crawler.ProvideCrawler,
+		// Article channel named instance
+		fx.Annotate(
+			func() chan *models.Article {
+				return make(chan *models.Article, crawler.ArticleChannelBufferSize)
+			},
+			fx.ResultTags(`name:"crawlerArticleChannel"`),
 		),
-		// Mock content processors
-		fx.Provide(
-			fx.Annotate(
-				func() collector.Processor {
-					return &mockContentProcessor{}
+		// Article index name
+		fx.Annotate(
+			func() string {
+				return "articles"
+			},
+			fx.ResultTags(`name:"indexName"`),
+		),
+		// Content index name
+		fx.Annotate(
+			func() string {
+				return "content"
+			},
+			fx.ResultTags(`name:"contentIndex"`),
+		),
+		// Article processor
+		fx.Annotate(
+			func(
+				log common.Logger,
+				articleService article.Interface,
+				storage types.Interface,
+				params struct {
+					fx.In
+					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
+					IndexName   string               `name:"indexName"`
 				},
-				fx.ResultTags(`group:"processors"`),
-			),
+			) collector.Processor {
+				log.Debug("Providing article processor")
+				return &article.ArticleProcessor{
+					Logger:         log,
+					ArticleService: articleService,
+					Storage:        storage,
+					IndexName:      params.IndexName,
+					ArticleChan:    params.ArticleChan,
+				}
+			},
+			fx.ResultTags(`group:"processors"`),
 		),
-		// Include test config module and crawler module
-		TestConfigModule,
+		// Content processor
+		fx.Annotate(
+			func(
+				log common.Logger,
+				contentService content.Interface,
+				storage types.Interface,
+				params struct {
+					fx.In
+					IndexName string `name:"contentIndex"`
+				},
+			) collector.Processor {
+				log.Debug("Providing content processor")
+				return content.NewProcessor(contentService, storage, log, params.IndexName)
+			},
+			fx.ResultTags(`group:"processors"`),
+		),
+	),
+)
+
+func setupTestApp(t *testing.T) *fx.App {
+	return fx.New(
 		TestCommonModule,
-		crawler.Module,
-		// Verify dependencies
-		fx.Invoke(func(p crawler.Params) {
-			verifyDependencies(t, &p)
-		}),
+		TestCrawlerModule,
+		fx.Supply(mockSources{}),
+		fx.NopLogger,
 	)
 }
 

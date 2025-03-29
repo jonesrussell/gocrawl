@@ -55,10 +55,10 @@ var Module = fx.Module("crawler",
 	article.Module,
 	content.Module,
 	fx.Provide(
-		provideCollectorConfig,
-		provideCollyDebugger,
-		provideEventBus,
-		provideCrawler,
+		ProvideCollectorConfig,
+		ProvideCollyDebugger,
+		ProvideEventBus,
+		ProvideCrawler,
 		// Article channel named instance
 		fx.Annotate(
 			func() chan *models.Article {
@@ -139,8 +139,8 @@ type Result struct {
 	Crawler Interface
 }
 
-// provideCollectorConfig creates a new collector configuration.
-func provideCollectorConfig(cfg config.Interface, logger common.Logger) *collector.Config {
+// ProvideCollectorConfig creates a new collector configuration.
+func ProvideCollectorConfig(cfg config.Interface, logger common.Logger) *collector.Config {
 	crawlerCfg := cfg.GetCrawlerConfig()
 	return &collector.Config{
 		BaseURL:     crawlerCfg.BaseURL,
@@ -157,20 +157,20 @@ func provideCollectorConfig(cfg config.Interface, logger common.Logger) *collect
 	}
 }
 
-// provideEventBus creates a new event bus instance.
-func provideEventBus() *events.Bus {
+// ProvideEventBus creates a new event bus instance.
+func ProvideEventBus() *events.Bus {
 	return events.NewBus()
 }
 
-// provideCollyDebugger creates a new debugger instance.
-func provideCollyDebugger(logger common.Logger) debug.Debugger {
+// ProvideCollyDebugger creates a new debugger instance.
+func ProvideCollyDebugger(logger common.Logger) debug.Debugger {
 	return &debug.LogDebugger{
 		Output: newDebugLogger(logger),
 	}
 }
 
-// provideCrawler creates a new crawler instance.
-func provideCrawler(p Params, bus *events.Bus) (Result, error) {
+// ProvideCrawler creates a new crawler instance.
+func ProvideCrawler(p Params, bus *events.Bus) (Result, error) {
 	c := &Crawler{
 		Logger:       p.Logger,
 		Debugger:     p.Debugger,
