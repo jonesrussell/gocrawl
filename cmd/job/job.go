@@ -7,13 +7,18 @@ import (
 	"fmt"
 	"time"
 
+	"sync/atomic"
+
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/app"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -46,59 +51,215 @@ type Params struct {
 	ActiveJobs *int32 `optional:"true" json:"active_jobs,omitempty"`
 }
 
-const (
-	shutdownTimeout  = 30 * time.Second
-	jobCheckInterval = 100 * time.Millisecond
-)
+// runScheduler manages the execution of scheduled jobs.
+func runScheduler(
+	ctx context.Context,
+	log common.Logger,
+	sources sources.Interface,
+	c crawler.Interface,
+	processors []collector.Processor,
+	done chan struct{},
+	cfg config.Interface,
+	activeJobs *int32,
+) {
+	log.Info("Starting job scheduler")
 
-// JobCommandDeps holds the dependencies for the job command
-type JobCommandDeps struct {
-	// Core dependencies
-	Logger     logger.Interface
-	Config     config.Interface
-	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
+	// Check every minute
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	// Do initial check
+	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg, activeJobs)
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("Job scheduler shutting down")
+			return
+		case t := <-ticker.C:
+			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg, activeJobs)
+		}
+	}
 }
 
-// NewJobCommand creates a new job command with the given dependencies
-func NewJobCommand(deps JobCommandDeps) *cobra.Command {
+// executeCrawl performs the crawl operation for a single source.
+func executeCrawl(
+	ctx context.Context,
+	log common.Logger,
+	c crawler.Interface,
+	source sources.Config,
+	processors []collector.Processor,
+	done chan struct{},
+	cfg config.Interface,
+	activeJobs *int32,
+) {
+	atomic.AddInt32(activeJobs, 1)
+	defer atomic.AddInt32(activeJobs, -1)
+
+	collectorResult, err := app.SetupCollector(ctx, log, source, processors, done, cfg)
+	if err != nil {
+		log.Error("Error setting up collector",
+			"error", err,
+			"source", source.Name)
+		return
+	}
+
+	if configErr := app.ConfigureCrawler(c, source, collectorResult); configErr != nil {
+		log.Error("Error configuring crawler",
+			"error", configErr,
+			"source", source.Name)
+		return
+	}
+
+	if startErr := c.Start(ctx, source.URL); startErr != nil {
+		log.Error("Error starting crawler",
+			"error", startErr,
+			"source", source.Name)
+		return
+	}
+
+	c.Wait()
+	log.Info("Crawl completed", "source", source.Name)
+}
+
+// checkAndRunJobs evaluates and executes scheduled jobs.
+func checkAndRunJobs(
+	ctx context.Context,
+	log common.Logger,
+	sources sources.Interface,
+	c crawler.Interface,
+	now time.Time,
+	processors []collector.Processor,
+	done chan struct{},
+	cfg config.Interface,
+	activeJobs *int32,
+) {
+	if sources == nil {
+		log.Error("Sources configuration is nil")
+		return
+	}
+
+	if c == nil {
+		log.Error("Crawler instance is nil")
+		return
+	}
+
+	currentTime := now.Format("15:04")
+	log.Info("Checking jobs", "current_time", currentTime)
+
+	for _, source := range sources.GetSources() {
+		for _, scheduledTime := range source.Time {
+			if currentTime == scheduledTime {
+				log.Info("Running scheduled crawl",
+					"source", source.Name,
+					"time", scheduledTime)
+				executeCrawl(ctx, log, c, source, processors, done, cfg, activeJobs)
+			}
+		}
+	}
+}
+
+// startJob initializes and starts the job scheduler.
+func startJob(p Params) error {
+	// Create cancellable context
+	ctx, cancel := context.WithCancel(p.Context)
+	defer cancel()
+
+	// Initialize active jobs counter if not provided
+	if p.ActiveJobs == nil {
+		var jobs int32
+		p.ActiveJobs = &jobs
+	}
+
+	// Print loaded schedules
+	p.Logger.Info("Loaded schedules:")
+	for _, source := range p.Sources.GetSources() {
+		if len(source.Time) > 0 {
+			p.Logger.Info("Source schedule",
+				"name", source.Name,
+				"times", source.Time)
+		}
+	}
+
+	// Start scheduler in background
+	go runScheduler(ctx, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config, p.ActiveJobs)
+
+	p.Logger.Info("Job scheduler running. Press Ctrl+C to stop...")
+
+	// Wait for crawler completion
+	<-p.Done
+
+	return nil
+}
+
+// Command returns the job command.
+func Command() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "job",
 		Short: "Start the job scheduler",
-		Long: "Start the job scheduler to manage and execute scheduled crawling tasks.\n" +
-			"The scheduler will run continuously until interrupted with Ctrl+C.",
+		Long: `Start the job scheduler to manage and execute scheduled crawling tasks.
+The scheduler will run continuously until interrupted with Ctrl+C.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Create a cancellable context that's tied to the command's context
+			// Create a cancellable context
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			// Create a logger for command-level logging
-			cmdLogger := deps.Logger
+			// Set up signal handling with a no-op logger initially
+			handler := signal.NewSignalHandler(logger.NewNoOp())
+			handler.Setup(ctx)
 
 			// Initialize the Fx application
-			fxApp, done := setupFXApp(ctx, cmdLogger, deps.Config)
+			fxApp := fx.New(
+				fx.NopLogger,
+				fx.Supply(
+					fx.Annotate(ctx, fx.As(new(context.Context))),
+					fx.Annotate(ctx, fx.As(new(context.Context)), fx.ResultTags(`name:"jobContext"`)),
+					fx.Annotate(make(chan struct{}), fx.ResultTags(`name:"crawlDone"`)),
+				),
+				fx.Provide(
+					func(cfg config.Interface) (string, error) {
+						sources := cfg.GetSources()
+						if len(sources) == 0 {
+							return "", errors.New("no sources configured")
+						}
+						return sources[0].Name, nil
+					},
+					fx.Annotate(
+						func(cfg config.Interface) string {
+							sources := cfg.GetSources()
+							if len(sources) == 0 {
+								return ""
+							}
+							return sources[0].Name
+						},
+						fx.ResultTags(`name:"sourceName"`),
+					),
+				),
+				common.Module,
+				api.Module,
+				storage.Module,
+				crawler.Module,
+				collector.Module,
+				fx.Invoke(func(p Params) {
+					// Update the signal handler with the real logger
+					handler.SetLogger(p.Logger)
+					if err := startJob(p); err != nil {
+						p.Logger.Error("Error starting job scheduler", "error", err)
+					}
+					// Wait for shutdown signal
+					handler.Wait()
+				}),
+			)
 
-			// Set up signal handling with the logger
-			handler := signal.NewSignalHandler(cmdLogger)
+			// Set the fx app for coordinated shutdown
 			handler.SetFXApp(fxApp)
-			cleanup := handler.Setup(ctx)
-			defer cleanup()
 
 			// Start the application
-			if startErr := fxApp.Start(ctx); startErr != nil {
-				return fmt.Errorf("failed to start application: %w", startErr)
-			}
-
-			// Wait for either context cancellation or job completion
-			select {
-			case <-ctx.Done():
-				cmdLogger.Info("Context cancelled, initiating shutdown...")
-			case <-done:
-				cmdLogger.Info("Job completed")
-			}
-
-			// Stop the application
-			if stopErr := stopFXApp(fxApp); stopErr != nil {
-				return fmt.Errorf("failed to stop application: %w", stopErr)
+			if err := fxApp.Start(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil
+				}
+				return fmt.Errorf("error starting application: %w", err)
 			}
 
 			return nil
@@ -108,79 +269,22 @@ func NewJobCommand(deps JobCommandDeps) *cobra.Command {
 	return cmd
 }
 
-// Command returns the job command with default dependencies
-func Command() *cobra.Command {
-	// Create configuration from Viper settings
-	cfg, err := config.New()
-	if err != nil {
-		// Return a command that will fail with the error
-		return &cobra.Command{
-			Use:   "job",
-			Short: "Start the job scheduler",
-			Long: "Start the job scheduler to manage and execute scheduled crawling tasks.\n" +
-				"The scheduler will run continuously until interrupted with Ctrl+C.",
-			RunE: func(cmd *cobra.Command, _ []string) error {
-				return fmt.Errorf("failed to create config: %w", err)
-			},
-		}
-	}
-
-	// Create a logger for command-level logging
-	log := logger.NewNoOp()
-
-	return NewJobCommand(JobCommandDeps{
-		Logger: log,
-		Config: cfg,
-	})
+type Job struct {
+	// Core dependencies
+	Logger     logger.Interface
+	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
+	// ... existing code ...
 }
 
-// setupFXApp initializes the Fx application with all required dependencies.
-func setupFXApp(
-	ctx context.Context,
-	logger common.Logger,
-	config config.Interface,
-) (*fx.App, chan struct{}) {
-	done := make(chan struct{})
-
-	// Create the fx app with all required dependencies
-	options := []fx.Option{
-		fx.Supply(logger),
-		fx.Supply(config),
-		fx.Supply(done),
-		fx.Supply(ctx),
-		Module,
-		fx.NopLogger,
-		fx.Invoke(func(lc fx.Lifecycle) {
-			lc.Append(fx.Hook{
-				OnStart: func(context.Context) error {
-					go func() {
-						// Simulate job completion after a short delay
-						time.Sleep(100 * time.Millisecond)
-						close(done)
-					}()
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					return nil
-				},
-			})
-		}),
+// NewJob creates a new job instance.
+func NewJob(
+	logger logger.Interface,
+	processors []collector.Processor,
+	// ... existing code ...
+) *Job {
+	return &Job{
+		Logger:     logger,
+		Processors: processors,
+		// ... existing code ...
 	}
-
-	fxApp := fx.New(options...)
-
-	return fxApp, done
-}
-
-// stopFXApp stops the Fx application with a timeout.
-func stopFXApp(fxApp *fx.App) error {
-	stopCtx, stopCancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer stopCancel()
-
-	if err := fxApp.Stop(stopCtx); err != nil {
-		if !errors.Is(err, context.Canceled) {
-			return fmt.Errorf("failed to stop application: %w", err)
-		}
-	}
-	return nil
 }
