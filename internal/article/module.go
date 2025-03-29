@@ -1,3 +1,6 @@
+// Package article provides functionality for processing and managing article content
+// from web pages. It includes services for article extraction, processing, and storage,
+// with support for configurable selectors and multiple content sources.
 package article
 
 import (
@@ -10,7 +13,13 @@ import (
 	"go.uber.org/fx"
 )
 
-// ProcessorParams contains the dependencies for creating a Processor
+// ProcessorParams contains the dependencies required to create an ArticleProcessor.
+// It uses fx.In for dependency injection and includes:
+// - Logger: For logging operations
+// - Storage: For article persistence
+// - IndexName: The Elasticsearch index name for articles
+// - ArticleChan: Channel for article processing
+// - Service: The article service interface
 type ProcessorParams struct {
 	fx.In
 
@@ -21,7 +30,13 @@ type ProcessorParams struct {
 	Service     Interface
 }
 
-// ServiceParams contains the dependencies for creating a service
+// ServiceParams contains the dependencies required to create an article service.
+// It uses fx.In for dependency injection and includes:
+// - Logger: For logging operations
+// - Config: For application configuration
+// - Storage: For article persistence
+// - Source: The content source name
+// - IndexName: The Elasticsearch index name for articles
 type ServiceParams struct {
 	fx.In
 
@@ -32,7 +47,12 @@ type ServiceParams struct {
 	IndexName string `name:"indexName"`
 }
 
-// Module provides article-related dependencies
+// Module provides article-related dependencies for the application.
+// It provides:
+// - Article service with configuration
+// - Article processor with fx.Annotate for named dependencies
+// The module uses fx.Provide to wire up dependencies and fx.Annotate
+// to specify the processor as part of the "processors" group.
 var Module = fx.Module("article",
 	fx.Provide(
 		NewServiceWithConfig,
@@ -60,7 +80,12 @@ var Module = fx.Module("article",
 	),
 )
 
-// NewServiceWithConfig creates a new article service with configuration
+// NewServiceWithConfig creates a new article service with configuration.
+// It takes ServiceParams for dependency injection and returns an Interface.
+// The function:
+// 1. Retrieves article selectors from the configuration for the specified source
+// 2. Falls back to default selectors if none are configured
+// 3. Creates and returns a new service instance with the configured selectors
 func NewServiceWithConfig(p ServiceParams) Interface {
 	// Get the source configuration
 	var selectors config.ArticleSelectors
@@ -83,7 +108,9 @@ func NewServiceWithConfig(p ServiceParams) Interface {
 	return NewService(p.Logger, selectors, p.Storage, p.IndexName)
 }
 
-// isEmptySelectors checks if the article selectors are empty
+// isEmptySelectors checks if the article selectors are empty.
+// It returns true if all selector fields are empty strings.
+// This is used to determine if default selectors should be used.
 func isEmptySelectors(s config.ArticleSelectors) bool {
 	return s.Container == "" &&
 		s.Title == "" &&

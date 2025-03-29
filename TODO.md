@@ -69,11 +69,11 @@
   - [x] Move common utilities to `common`
 
 ### 6. Documentation
-- [ ] Improve documentation
-  - [ ] Add package documentation
-  - [ ] Add function documentation
-  - [ ] Add type documentation
-  - [ ] Add interface documentation
+- [x] Improve documentation
+  - [x] Add package documentation
+  - [x] Add function documentation
+  - [x] Add type documentation
+  - [x] Add interface documentation
 - [ ] Add proper examples
   - [ ] Add usage examples
   - [ ] Add test examples
@@ -176,10 +176,13 @@
 
 ### In Progress
 - HTTP client error handling improvements
-- Documentation improvements
+- Example code additions
 
 ### Next Up
-- Example code additions
+- Add usage examples for each major component
+- Add test examples demonstrating common patterns
+- Add error handling examples showing best practices
+- Add configuration examples for different scenarios
 
 ## Notes
 - Each task should be completed in a separate commit
