@@ -9,6 +9,8 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/collector"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -32,6 +34,7 @@ type CommandTestModule struct {
 	Sources  sources.Interface `name:"testSourceManager"`
 	Storage  types.Interface
 	IndexMgr api.IndexManager
+	Config   config.Interface
 
 	// Command-specific dependencies
 	Ctx            context.Context       `name:"crawlContext"`
@@ -64,10 +67,14 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 	}
 	testSources := sourcestest.NewTestSources(testConfigs)
 
+	// Set up mock config
+	mockConfig := configtestutils.NewMockConfig()
+
 	return &CommandTestModule{
 		Sources:        testSources,
 		Storage:        mockutils.NewMockStorage(),
 		IndexMgr:       mockutils.NewMockIndexManager(),
+		Config:         mockConfig,
 		Ctx:            t.Context(),
 		SourceName:     "Test Source",
 		CommandDone:    make(chan struct{}),
@@ -81,7 +88,15 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 func (m *CommandTestModule) Module() fx.Option {
 	return fx.Module("test",
 		// Core dependencies
-		collector.Module,
+		fx.Provide(
+			// Provide mock config instead of using collector.Module
+			fx.Annotate(
+				func() config.Interface { return m.Config },
+				fx.As(new(config.Interface)),
+			),
+			collector.New,
+			collector.NewMetrics,
+		),
 
 		// Provide all required dependencies
 		fx.Provide(

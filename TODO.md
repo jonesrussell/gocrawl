@@ -18,10 +18,14 @@
   - [x] Use `fx.Annotate` for named dependencies
   - [x] Add proper lifecycle hooks
   - [x] Add proper error handling in constructors
-- [ ] Add proper dependency validation
-  - [ ] Add validation for required dependencies
-  - [ ] Add validation for optional dependencies
-  - [ ] Add proper error messages
+- [x] Add proper dependency validation
+  - [x] Add validation for required dependencies
+  - [x] Add validation for optional dependencies
+  - [x] Add proper error messages
+- [x] Fix dependency conflicts
+  - [x] Remove duplicate providers
+  - [x] Use mock configurations in tests
+  - [x] Properly scope test modules
 
 ### 3. Error Handling
 - [x] Standardize error handling
@@ -42,11 +46,16 @@
   - [x] Add proper test helpers
   - [x] Add proper test fixtures
   - [x] Add proper test cleanup
-- [ ] Add proper test coverage
-  - [ ] Add edge case tests
-  - [ ] Add error condition tests
-  - [ ] Add concurrent operation tests
-  - [ ] Add lifecycle event tests
+- [x] Add proper test coverage
+  - [x] Add edge case tests
+  - [x] Add error condition tests
+  - [x] Add concurrent operation tests
+  - [x] Add lifecycle event tests
+- [x] Improve test dependency injection
+  - [x] Create test-specific modules
+  - [x] Use mock configurations
+  - [x] Properly scope test dependencies
+  - [x] Add test validation
 
 ### 5. Code Organization
 - [x] Split large files
@@ -131,10 +140,19 @@
   - Improved fx module organization
   - Added proper lifecycle hooks
   - Added proper error handling in constructors
+  - Added proper dependency validation
+  - Fixed dependency conflicts
+  - Improved test dependency injection
 - Error Handling
   - Standardized error handling across the codebase
   - Added proper error wrapping and context
   - Fixed unchecked error returns
+- Testing
+  - Improved test organization
+  - Added comprehensive test coverage
+  - Added test helpers and fixtures
+  - Added lifecycle event tests
+  - Improved test dependency injection
 - Code Organization
   - Split large files into smaller, focused modules
   - Moved common types and interfaces to appropriate packages
@@ -157,16 +175,11 @@
   - Added security headers
 
 ### In Progress
-- Dependency Injection
-  - Adding proper dependency validation
-- Testing
-  - Adding comprehensive test coverage
-  - Adding edge case and error condition tests
+- HTTP client error handling improvements
+- Documentation improvements
 
 ### Next Up
-- Documentation improvements
 - Example code additions
-- HTTP client error handling improvements
 
 ## Notes
 - Each task should be completed in a separate commit

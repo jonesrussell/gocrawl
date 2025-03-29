@@ -72,7 +72,6 @@ var TestCrawlerModule = fx.Module("crawler",
 	content.Module,
 	fx.Provide(
 		// Use the public functions from crawler package
-		crawler.ProvideCollectorConfig,
 		crawler.ProvideCollyDebugger,
 		crawler.ProvideEventBus,
 		crawler.ProvideCrawler,
