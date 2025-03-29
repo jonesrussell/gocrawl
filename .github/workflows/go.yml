@@ -10,6 +10,46 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      # App Configuration
+      APP_NAME: gocrawl-test
+      APP_ENV: test
+      APP_DEBUG: true
+      
+      # Server Configuration
+      SERVER_PORT: 8081
+      SERVER_READ_TIMEOUT: 10s
+      SERVER_WRITE_TIMEOUT: 30s
+      SERVER_IDLE_TIMEOUT: 60s
+      
+      # Elasticsearch Configuration
+      ELASTICSEARCH_HOSTS: http://localhost:9200
+      ELASTICSEARCH_INDEX_PREFIX: test-gocrawl
+      ELASTICSEARCH_MAX_RETRIES: 3
+      ELASTICSEARCH_RETRY_INITIAL_WAIT: 1s
+      ELASTICSEARCH_RETRY_MAX_WAIT: 30s
+      
+      # Crawler Configuration
+      CRAWLER_MAX_DEPTH: 2
+      CRAWLER_PARALLELISM: 2
+      CRAWLER_MAX_AGE: 3600
+      CRAWLER_RATE_LIMIT: 30
+      
+      # Logging Configuration
+      LOG_LEVEL: debug
+      LOG_FORMAT: console
+      
+      # Test-specific settings
+      TEST_MOCK_ENABLED: true
+      
+      # Elasticsearch Security (using GitHub Secrets)
+      ELASTIC_USERNAME: ${{ secrets.ELASTIC_USERNAME }}
+      ELASTIC_PASSWORD: ${{ secrets.ELASTIC_PASSWORD }}
+      ELASTIC_API_KEY: ${{ secrets.ELASTIC_API_KEY }}
+      
+      # Server Security
+      GOCRAWL_API_KEY: ${{ secrets.GOCRAWL_API_KEY }}
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
