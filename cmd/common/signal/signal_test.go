@@ -435,7 +435,7 @@ func TestSignalHandler_ContextError(t *testing.T) {
 					return nil
 				},
 				OnStop: func(context.Context) error {
-					time.Sleep(200 * time.Millisecond)
+					time.Sleep(150 * time.Millisecond) // Sleep longer than timeout
 					return context.DeadlineExceeded
 				},
 			})
@@ -464,10 +464,14 @@ func TestSignalHandler_ContextError(t *testing.T) {
 	select {
 	case <-done:
 		// Success - handler completed despite context error
+		// Verify the state is correct
+		assert.Equal(t, "completed", handler.GetState())
 	case <-time.After(300 * time.Millisecond):
 		t.Fatal("Handler did not complete after context error")
 	}
 
 	// Verify app is stopped
 	app.RequireStop()
+	// Note: The error "application didn't stop cleanly: context deadline exceeded" is expected
+	// and is logged by fx, but doesn't affect the test result
 }

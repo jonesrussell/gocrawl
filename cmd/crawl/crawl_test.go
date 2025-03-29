@@ -49,7 +49,7 @@ func TestCommandExecution(t *testing.T) {
 			// Core dependencies
 			func() crawler.Interface { return mockCrawler },
 			func() types.Interface { return mockStorage },
-			func() logger.Interface { return mockLogger },
+			func() common.Logger { return mockLogger },
 			func() config.Interface { return mockConfig },
 			func() sources.Interface { return mockSourceManager },
 
@@ -77,6 +77,10 @@ func TestCommandExecution(t *testing.T) {
 			fx.Annotate(
 				func() common.Logger { return mockLogger },
 				fx.ResultTags(`name:"testLogger"`),
+			),
+			fx.Annotate(
+				func() sources.Interface { return mockSourceManager },
+				fx.ResultTags(`name:"testSourceManager"`),
 			),
 		),
 		fx.Invoke(func(lc fx.Lifecycle, deps crawl.CommandDeps) {
