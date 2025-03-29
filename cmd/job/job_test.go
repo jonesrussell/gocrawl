@@ -16,7 +16,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -32,6 +31,7 @@ type mockConfig struct {
 	sources             []config.Source
 	serverConfig        *config.ServerConfig
 	command             string
+	err                 error
 }
 
 func (m *mockConfig) GetAppConfig() *config.AppConfig         { return m.appConfig }
@@ -233,70 +233,104 @@ func TestJobScheduling(t *testing.T) {
 func TestJobCommand(t *testing.T) {
 	t.Parallel()
 
-	t.Run("successful initialization", func(t *testing.T) {
-		t.Parallel()
-		cmd := job.Command()
-		assert.NotNil(t, cmd)
-		assert.Equal(t, "job", cmd.Name())
-	})
+	tests := []struct {
+		name           string
+		setup          func(*testing.T) (*mockLogger, *mockConfig)
+		expectedError  string
+		expectedLogs   []string
+		timeout        time.Duration
+		shouldComplete bool
+	}{
+		{
+			name: "successful_initialization",
+			setup: func(t *testing.T) (*mockLogger, *mockConfig) {
+				mockLogger := &mockLogger{}
+				mockConfig := &mockConfig{}
+				return mockLogger, mockConfig
+			},
+			expectedError: "",
+			timeout:       5 * time.Second,
+		},
+		{
+			name: "config_error_handling",
+			setup: func(t *testing.T) (*mockLogger, *mockConfig) {
+				mockLogger := &mockLogger{}
+				mockConfig := &mockConfig{
+					err: errors.New("config error"),
+				}
+				return mockLogger, mockConfig
+			},
+			expectedError: "failed to create config: config error",
+			timeout:       5 * time.Second,
+		},
+		{
+			name: "graceful_shutdown",
+			setup: func(t *testing.T) (*mockLogger, *mockConfig) {
+				mockLogger := &mockLogger{}
+				mockConfig := &mockConfig{}
+				mockLogger.On("Info", "Context cancelled, initiating shutdown").Return()
+				mockLogger.On("Info", "Job completed").Return()
+				return mockLogger, mockConfig
+			},
+			expectedError: "",
+			timeout:       5 * time.Second,
+		},
+		{
+			name: "shutdown_timeout",
+			setup: func(t *testing.T) (*mockLogger, *mockConfig) {
+				mockLogger := &mockLogger{}
+				mockConfig := &mockConfig{}
+				mockLogger.On("Info", "Context cancelled, initiating shutdown").Return()
+				mockLogger.On("Info", "Job completed").Return()
+				return mockLogger, mockConfig
+			},
+			expectedError: "",
+			timeout:       5 * time.Second,
+		},
+	}
 
-	t.Run("config error handling", func(t *testing.T) {
-		t.Parallel()
-		// Create a command with invalid config
-		cmd := job.NewJobCommand(job.JobCommandDeps{
-			Logger: logger.NewNoOp(),
-			Config: nil,
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create test context with timeout
+			ctx, cancel := context.WithTimeout(context.Background(), tt.timeout)
+			defer cancel()
+
+			// Set up mocks
+			mockLogger, mockConfig := tt.setup(t)
+
+			// Create command with test dependencies
+			cmd := job.NewJobCommand(job.JobCommandDeps{
+				Logger: mockLogger,
+				Config: mockConfig,
+			})
+
+			// Set up test command context
+			cmd.SetContext(ctx)
+
+			// Execute command in a goroutine
+			errChan := make(chan error, 1)
+			go func() {
+				errChan <- cmd.Execute()
+			}()
+
+			// Wait for either error or timeout
+			select {
+			case err := <-errChan:
+				if tt.expectedError != "" {
+					require.Error(t, err)
+					require.Contains(t, err.Error(), tt.expectedError)
+				} else {
+					require.NoError(t, err)
+				}
+			case <-ctx.Done():
+				t.Fatal("test timed out")
+			}
+
+			// Verify mock expectations
+			mockLogger.AssertExpectations(t)
 		})
-
-		// Execute the command
-		err := cmd.Execute()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to start application")
-	})
-
-	t.Run("graceful shutdown", func(t *testing.T) {
-		t.Parallel()
-		// Create a command with valid config
-		cfg, err := config.New()
-		require.NoError(t, err)
-
-		cmd := job.NewJobCommand(job.JobCommandDeps{
-			Logger: logger.NewNoOp(),
-			Config: cfg,
-		})
-
-		// Create a context with timeout
-		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
-		defer cancel()
-
-		// Set the context on the command
-		cmd.SetContext(ctx)
-
-		// Execute the command
-		err = cmd.Execute()
-		require.NoError(t, err)
-	})
-
-	t.Run("shutdown timeout", func(t *testing.T) {
-		t.Parallel()
-		// Create a command with valid config
-		cfg, err := config.New()
-		require.NoError(t, err)
-
-		cmd := job.NewJobCommand(job.JobCommandDeps{
-			Logger: logger.NewNoOp(),
-			Config: cfg,
-		})
-
-		// Create a context with timeout
-		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
-		defer cancel()
-
-		// Set the context on the command
-		cmd.SetContext(ctx)
-
-		// Execute the command
-		err = cmd.Execute()
-		require.NoError(t, err)
-	})
+	}
 }

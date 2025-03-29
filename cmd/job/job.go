@@ -80,13 +80,7 @@ func NewJobCommand(deps JobCommandDeps) *cobra.Command {
 			cmdLogger := deps.Logger
 
 			// Initialize the Fx application
-			var fxApp *fx.App
-			var done chan struct{}
-			var setupErr error
-			fxApp, done, setupErr = setupFXApp(ctx, handler, cmdLogger)
-			if setupErr != nil {
-				return fmt.Errorf("failed to setup application: %w", setupErr)
-			}
+			fxApp, done := setupFXApp(ctx, handler, cmdLogger)
 
 			// Set the fx app for coordinated shutdown
 			handler.SetFXApp(fxApp)
@@ -141,25 +135,25 @@ func Command() *cobra.Command {
 
 // setupFXApp initializes the Fx application with all required dependencies.
 func setupFXApp(
-	_ context.Context,
-	_ *signal.SignalHandler,
-	_ common.Logger,
-) (*fx.App, chan struct{}, error) {
+	ctx context.Context,
+	handler *signal.SignalHandler,
+	logger common.Logger,
+) (*fx.App, chan struct{}) {
 	done := make(chan struct{})
 
-	// Create configuration from Viper settings
-	cfg, err := config.New()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create config: %w", err)
+	// Create the fx app with all required dependencies
+	options := []fx.Option{
+		fx.Supply(logger),
+		fx.Supply(done),
+		fx.Supply(handler),
+		fx.Supply(ctx),
+		Module,
+		fx.NopLogger,
 	}
 
-	fxApp := fx.New(
-		fx.Supply(cfg),
-		fx.Supply(logger.NewNoOp()),
-		fx.Supply(done),
-	)
+	fxApp := fx.New(options...)
 
-	return fxApp, done, nil
+	return fxApp, done
 }
 
 // stopFXApp stops the Fx application with a timeout.
@@ -169,7 +163,7 @@ func stopFXApp(fxApp *fx.App) error {
 
 	if err := fxApp.Stop(stopCtx); err != nil {
 		if !errors.Is(err, context.Canceled) {
-			return fmt.Errorf("error stopping application: %w", err)
+			return fmt.Errorf("failed to stop application: %w", err)
 		}
 	}
 	return nil
