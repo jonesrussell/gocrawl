@@ -9,6 +9,7 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/collector"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -35,6 +36,8 @@ type CommandTestModule struct {
 	Storage  types.Interface
 	IndexMgr api.IndexManager
 	Config   config.Interface
+	Logger   common.Logger
+	Crawler  crawler.Interface
 
 	// Command-specific dependencies
 	Ctx            context.Context       `name:"crawlContext"`
@@ -70,11 +73,16 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 	// Set up mock config
 	mockConfig := configtestutils.NewMockConfig()
 
+	// Set up mock crawler
+	mockCrawler := mockutils.NewMockCrawler()
+
 	return &CommandTestModule{
 		Sources:        testSources,
 		Storage:        mockutils.NewMockStorage(),
 		IndexMgr:       mockutils.NewMockIndexManager(),
 		Config:         mockConfig,
+		Logger:         mockLogger,
+		Crawler:        mockCrawler,
 		Ctx:            t.Context(),
 		SourceName:     "Test Source",
 		CommandDone:    make(chan struct{}),
@@ -94,7 +102,14 @@ func (m *CommandTestModule) Module() fx.Option {
 				func() config.Interface { return m.Config },
 				fx.As(new(config.Interface)),
 			),
-			collector.New,
+			fx.Annotate(
+				func() common.Logger { return m.Logger },
+				fx.As(new(common.Logger)),
+			),
+			fx.Annotate(
+				func() crawler.Interface { return m.Crawler },
+				fx.As(new(crawler.Interface)),
+			),
 			collector.NewMetrics,
 		),
 
@@ -108,6 +123,14 @@ func (m *CommandTestModule) Module() fx.Option {
 			fx.Annotate(
 				func() string { return m.SourceName },
 				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() chan struct{} { return m.CommandDone },
+				fx.ResultTags(`name:"commandDone"`),
+			),
+			fx.Annotate(
+				func() chan *models.Article { return m.ArticleChannel },
+				fx.ResultTags(`name:"commandArticleChannel"`),
 			),
 			fx.Annotate(
 				func() *signal.SignalHandler { return m.SignalHandler },
