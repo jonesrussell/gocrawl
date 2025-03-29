@@ -103,11 +103,29 @@ func bindEnvs(bindings map[string]string) error {
 	return nil
 }
 
-// SetupConfig initializes the configuration system
-func SetupConfig() error {
+// SetupConfig initializes the configuration system with an optional environment file
+func SetupConfig(envFile string) error {
 	// Initialize Viper configuration
 	if err := setupViper(); err != nil {
 		return fmt.Errorf("failed to setup Viper: %w", err)
+	}
+
+	// Load specified environment file if provided
+	if envFile != "" {
+		if err := godotenv.Load(envFile); err != nil {
+			if !os.IsNotExist(err) {
+				defaultLog.Warn("Error loading environment file", "file", envFile, "error", err)
+			}
+		} else {
+			defaultLog.Info("Loaded environment file", "file", envFile)
+		}
+	} else {
+		// Load default .env file if it exists
+		if err := godotenv.Load(); err != nil {
+			if !os.IsNotExist(err) {
+				defaultLog.Warn("Error loading .env file", "error", err)
+			}
+		}
 	}
 
 	// Bind environment variables
@@ -129,7 +147,7 @@ var Module = fx.Options(
 	fx.Provide(
 		fx.Annotate(
 			func() (Interface, error) {
-				if err := SetupConfig(); err != nil {
+				if err := SetupConfig(""); err != nil {
 					return nil, err
 				}
 				return New()
@@ -137,6 +155,22 @@ var Module = fx.Options(
 			fx.As(new(Interface)),
 		),
 		NewHTTPTransport, // Provides HTTP transport configuration
+	),
+)
+
+// TestModule provides a test configuration module that loads the test environment file
+var TestModule = fx.Options(
+	fx.Provide(
+		fx.Annotate(
+			func() (Interface, error) {
+				if err := SetupConfig(".env.test"); err != nil {
+					return nil, err
+				}
+				return New()
+			},
+			fx.As(new(Interface)),
+		),
+		NewHTTPTransport,
 	),
 )
 
