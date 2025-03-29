@@ -7,7 +7,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
@@ -23,7 +22,7 @@ import (
 type ProcessorParams struct {
 	fx.In
 
-	Logger      logger.Interface
+	Logger      common.Logger
 	Storage     types.Interface
 	IndexName   string `name:"indexName"`
 	ArticleChan chan *models.Article
@@ -40,7 +39,7 @@ type ProcessorParams struct {
 type ServiceParams struct {
 	fx.In
 
-	Logger    logger.Interface
+	Logger    common.Logger
 	Config    config.Interface
 	Storage   types.Interface
 	Source    string `name:"sourceName"`
@@ -63,7 +62,7 @@ var Module = fx.Module("article",
 				storage types.Interface,
 				params struct {
 					fx.In
-					ArticleChan chan *models.Article `name:"articleChannel"`
+					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 					IndexName   string               `name:"indexName"`
 				},
 			) collector.Processor {
@@ -89,7 +88,8 @@ var Module = fx.Module("article",
 func NewServiceWithConfig(p ServiceParams) Interface {
 	// Get the source configuration
 	var selectors config.ArticleSelectors
-	for _, source := range p.Config.GetSources() {
+	sources := p.Config.GetSources()
+	for _, source := range sources {
 		if source.Name == p.Source {
 			selectors = source.Selectors.Article
 			break

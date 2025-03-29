@@ -66,8 +66,8 @@ var Module = fx.Module("crawler",
 		),
 		// Article index name
 		fx.Annotate(
-			func() string {
-				return "articles"
+			func(cfg config.Interface) string {
+				return cfg.GetElasticsearchConfig().IndexName
 			},
 			fx.ResultTags(`name:"indexName"`),
 		),

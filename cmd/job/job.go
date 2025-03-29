@@ -216,6 +216,25 @@ The scheduler will run continuously until interrupted with Ctrl+C.`,
 					fx.Annotate(ctx, fx.As(new(context.Context)), fx.ResultTags(`name:"jobContext"`)),
 					fx.Annotate(make(chan struct{}), fx.ResultTags(`name:"crawlDone"`)),
 				),
+				fx.Provide(
+					func(cfg config.Interface) (string, error) {
+						sources := cfg.GetSources()
+						if len(sources) == 0 {
+							return "", errors.New("no sources configured")
+						}
+						return sources[0].Name, nil
+					},
+					fx.Annotate(
+						func(cfg config.Interface) string {
+							sources := cfg.GetSources()
+							if len(sources) == 0 {
+								return ""
+							}
+							return sources[0].Name
+						},
+						fx.ResultTags(`name:"sourceName"`),
+					),
+				),
 				common.Module,
 				api.Module,
 				storage.Module,
