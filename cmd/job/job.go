@@ -3,10 +3,10 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
-	"errors"
 	"sync/atomic"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
@@ -210,7 +210,7 @@ The scheduler will run continuously until interrupted with Ctrl+C.`,
 			fxApp := fx.New(
 				fx.NopLogger,
 				common.Module,
-				Module,
+				crawler.Module,
 				fx.Provide(
 					fx.Annotate(
 						func() context.Context { return ctx },

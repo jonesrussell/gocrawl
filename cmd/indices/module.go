@@ -3,7 +3,6 @@ package indices
 
 import (
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -20,7 +19,7 @@ type DeleteDeps struct {
 // Module provides the indices command dependencies
 var Module = fx.Module("indices",
 	// Core dependencies
-	config.Module,
+	common.Module,
 	sources.Module,
 	storage.Module,
 	logger.Module,

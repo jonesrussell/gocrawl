@@ -11,9 +11,12 @@ import (
 var Module = fx.Module("job",
 	fx.Provide(
 		// Core dependencies
-		func() chan struct{} {
-			return make(chan struct{})
-		},
+		fx.Annotate(
+			func() chan struct{} {
+				return make(chan struct{})
+			},
+			fx.ResultTags(`name:"crawlDone"`),
+		),
 		func() chan *models.Article {
 			return make(chan *models.Article, app.DefaultChannelBufferSize)
 		},

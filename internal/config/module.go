@@ -103,6 +103,19 @@ func bindEnvs(bindings map[string]string) error {
 	return nil
 }
 
+// loadEnvFile loads an environment file if it exists and logs any errors
+func loadEnvFile(envFile string) error {
+	if err := godotenv.Load(envFile); err != nil {
+		if !os.IsNotExist(err) {
+			defaultLog.Warn("Error loading environment file", "file", envFile, "error", err)
+			return err
+		}
+		return nil
+	}
+	defaultLog.Info("Loaded environment file", "file", envFile)
+	return nil
+}
+
 // SetupConfig initializes the configuration system with an optional environment file
 func SetupConfig(envFile string) error {
 	// Initialize Viper configuration
@@ -110,21 +123,15 @@ func SetupConfig(envFile string) error {
 		return fmt.Errorf("failed to setup Viper: %w", err)
 	}
 
-	// Load specified environment file if provided
+	// Load environment file
 	if envFile != "" {
-		if err := godotenv.Load(envFile); err != nil {
-			if !os.IsNotExist(err) {
-				defaultLog.Warn("Error loading environment file", "file", envFile, "error", err)
-			}
-		} else {
-			defaultLog.Info("Loaded environment file", "file", envFile)
+		if err := loadEnvFile(envFile); err != nil {
+			return fmt.Errorf("failed to load environment file: %w", err)
 		}
 	} else {
 		// Load default .env file if it exists
-		if err := godotenv.Load(); err != nil {
-			if !os.IsNotExist(err) {
-				defaultLog.Warn("Error loading .env file", "error", err)
-			}
+		if err := loadEnvFile(".env"); err != nil {
+			return fmt.Errorf("failed to load default .env file: %w", err)
 		}
 	}
 
@@ -145,15 +152,13 @@ func SetupConfig(envFile string) error {
 // - HTTP transport configuration via NewHTTPTransport
 var Module = fx.Options(
 	fx.Provide(
-		fx.Annotate(
-			func() (Interface, error) {
-				if err := SetupConfig(""); err != nil {
-					return nil, err
-				}
-				return New()
-			},
-			fx.As(new(Interface)),
-		),
+		// Provide the config interface
+		func() (Interface, error) {
+			if err := SetupConfig(""); err != nil {
+				return nil, err
+			}
+			return New()
+		},
 		NewHTTPTransport, // Provides HTTP transport configuration
 	),
 )
@@ -161,15 +166,13 @@ var Module = fx.Options(
 // TestModule provides a test configuration module that loads the test environment file
 var TestModule = fx.Options(
 	fx.Provide(
-		fx.Annotate(
-			func() (Interface, error) {
-				if err := SetupConfig(".env.test"); err != nil {
-					return nil, err
-				}
-				return New()
-			},
-			fx.As(new(Interface)),
-		),
+		// Provide the config interface for tests
+		func() (Interface, error) {
+			if err := SetupConfig(".env.test"); err != nil {
+				return nil, err
+			}
+			return New()
+		},
 		NewHTTPTransport,
 	),
 )
@@ -555,7 +558,7 @@ func createConfig() (*Impl, error) {
 }
 
 // New creates a new config provider
-func New() (Interface, error) {
+func New() (*Impl, error) {
 	// Load .env file in development mode
 	if os.Getenv("APP_ENV") != envProduction {
 		if loadErr := godotenv.Load(); loadErr != nil {
