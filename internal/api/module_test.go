@@ -6,16 +6,20 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 	"go.uber.org/fx/fxtest"
 )
 
@@ -66,13 +70,25 @@ func setupMockLogger() *testutils.MockLogger {
 
 // TestCommonModule provides a test-specific common module that excludes the logger module.
 var TestCommonModule = fx.Module("testCommon",
-	// Core modules used by most commands, excluding logger and sources.
-	common.Module,
+	// Suppress fx logging to reduce noise in the application logs.
+	fx.WithLogger(func() fxevent.Logger {
+		return &fxevent.NopLogger
+	}),
+	// Core modules used by most commands, excluding config and sources.
+	logger.Module,
 )
 
-// TestConfigModule provides a test-specific config module that doesn't try to load files.
-var TestConfigModule = fx.Module("testConfig",
+// TestAPIModule provides a test version of the API module with test-specific dependencies.
+var TestAPIModule = fx.Module("api",
+	TestCommonModule,
 	fx.Provide(
+		// Provide test context
+		context.Background,
+		// Provide mock search manager
+		func() api.SearchManager {
+			return setupMockSearchManager()
+		},
+		// Provide mock config
 		fx.Annotate(
 			func() common.Config {
 				mockCfg := &testutils.MockConfig{}
@@ -95,39 +111,35 @@ var TestConfigModule = fx.Module("testConfig",
 				mockCfg.On("GetCommand").Return("test")
 				return mockCfg
 			},
-			fx.ResultTags(`name:"config"`),
+			fx.As(new(common.Config)),
 		),
-	),
-)
+		// Provide the server and security middleware
+		func(
+			log common.Logger,
+			searchManager api.SearchManager,
+			cfg common.Config,
+		) (*http.Server, middleware.SecurityMiddlewareInterface) {
+			// Create router and security middleware
+			router, security := api.SetupRouter(log, searchManager, cfg)
 
-// TestAPIModule provides a test version of the API module with test-specific dependencies.
-var TestAPIModule = fx.Module("api",
-	TestCommonModule,
-	TestConfigModule,
-	fx.Provide(
-		// Provide test context
-		func() context.Context {
-			return context.Background()
-		},
-		// Provide mock search manager
-		func() api.SearchManager {
-			return &testutils.MockSearchManager{}
+			// Create server
+			server := &http.Server{
+				Addr:              cfg.GetServerConfig().Address,
+				Handler:           router,
+				ReadHeaderTimeout: api.ReadHeaderTimeout,
+			}
+
+			return server, security
 		},
 	),
-	api.Module,
+	fx.Invoke(api.ConfigureLifecycle),
 )
 
 func setupTestApp(t *testing.T) *testServer {
 	ts := &testServer{}
 
 	// Create mock dependencies
-	mockLogger := &testutils.MockLogger{}
-	mockLogger.On("Info", mock.Anything).Return()
-	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything).Return()
-	mockLogger.On("Warn", mock.Anything, mock.Anything, mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything).Return()
-	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockLogger := setupMockLogger()
 
 	// Store references for test assertions
 	ts.logger = mockLogger
@@ -179,19 +191,21 @@ func TestSearchEndpoint(t *testing.T) {
 	defer ts.app.RequireStop()
 
 	t.Run("requires API key", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), nil)
+		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), strings.NewReader(`{"query":"test","index":"test","size":10}`))
 		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
 
 		w := httptest.NewRecorder()
 		ts.server.Handler.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-		assert.Contains(t, w.Body.String(), "unauthorized")
+		assert.JSONEq(t, `{"error":"Unauthorized"}`, w.Body.String())
 	})
 
 	t.Run("returns search results with valid API key", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), nil)
+		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), strings.NewReader(`{"query":"test","index":"test","size":10}`))
 		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Api-Key", testAPIKey)
 
 		w := httptest.NewRecorder()
