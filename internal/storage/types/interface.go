@@ -38,4 +38,7 @@ type Interface interface {
 
 	// Count operation
 	Count(ctx context.Context, index string, query any) (int64, error)
+
+	// Close operation
+	Close() error
 }

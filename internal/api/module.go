@@ -36,7 +36,6 @@ type SearchResponse struct {
 
 // Module provides API dependencies
 var Module = fx.Module("api",
-	common.Module,
 	fx.Provide(
 		// Provide the server and security middleware together to avoid circular dependencies
 		func(

@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/app"
@@ -17,6 +18,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -209,14 +211,16 @@ The scheduler will run continuously until interrupted with Ctrl+C.`,
 			// Initialize the Fx application
 			fxApp := fx.New(
 				fx.NopLogger,
-				common.Module,
-				crawler.Module,
-				fx.Provide(
-					fx.Annotate(
-						func() context.Context { return ctx },
-						fx.ResultTags(`name:"jobContext"`),
-					),
+				fx.Supply(
+					fx.Annotate(ctx, fx.As(new(context.Context))),
+					fx.Annotate(ctx, fx.As(new(context.Context)), fx.ResultTags(`name:"jobContext"`)),
+					fx.Annotate(make(chan struct{}), fx.ResultTags(`name:"crawlDone"`)),
 				),
+				common.Module,
+				api.Module,
+				storage.Module,
+				crawler.Module,
+				collector.Module,
 				fx.Invoke(func(p Params) {
 					// Update the signal handler with the real logger
 					handler.SetLogger(p.Logger)

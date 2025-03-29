@@ -51,7 +51,6 @@ type Interface interface {
 // Module provides the crawler's dependencies.
 var Module = fx.Module("crawler",
 	// Core dependencies
-	common.Module,
 	article.Module,
 	content.Module,
 	fx.Provide(

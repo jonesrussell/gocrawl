@@ -865,3 +865,9 @@ func (s *Impl) TestConnection(ctx context.Context) error {
 
 	return nil
 }
+
+// Close closes any resources held by the search manager.
+func (s *Impl) Close() error {
+	// No resources to close in this implementation
+	return nil
+}

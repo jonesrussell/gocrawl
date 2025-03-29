@@ -50,7 +50,11 @@ var Module = fx.Module("storage",
 			NewStorage,
 			fx.As(new(types.Interface)),
 		),
-		ProvideIndexManager,
+		ProvideSearchManager,
+		fx.Annotate(
+			ProvideIndexManager,
+			fx.ResultTags(`name:"indexManager"`),
+		),
 	),
 )
 
@@ -153,4 +157,9 @@ func ProvideElasticsearchClient(opts ModuleOptions, log common.Logger) (*es.Clie
 
 	log.Info("Successfully connected to Elasticsearch", "addresses", opts.Addresses)
 	return client, nil
+}
+
+// ProvideSearchManager creates and returns a SearchManager implementation
+func ProvideSearchManager(client *es.Client, logger common.Logger, opts Options) api.SearchManager {
+	return NewStorage(client, logger, opts)
 }
