@@ -31,11 +31,9 @@ const (
 
 // testServer wraps the test application and server for API tests.
 type testServer struct {
-	app           *fxtest.App
-	server        *http.Server
-	logger        common.Logger
-	searchManager api.SearchManager
-	config        common.Config
+	app    *fxtest.App
+	server *http.Server
+	logger common.Logger
 }
 
 // setupMockSearchManager creates and configures a mock search manager for testing.
@@ -190,8 +188,15 @@ func TestSearchEndpoint(t *testing.T) {
 	ts := setupTestApp(t)
 	defer ts.app.RequireStop()
 
+	reqBody := `{"query":"test","index":"test","size":10}`
+	endpoint := fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint)
+
 	t.Run("requires API key", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), strings.NewReader(`{"query":"test","index":"test","size":10}`))
+		req, err := http.NewRequest(
+			http.MethodPost,
+			endpoint,
+			strings.NewReader(reqBody),
+		)
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 
@@ -203,7 +208,11 @@ func TestSearchEndpoint(t *testing.T) {
 	})
 
 	t.Run("returns search results with valid API key", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint), strings.NewReader(`{"query":"test","index":"test","size":10}`))
+		req, err := http.NewRequest(
+			http.MethodPost,
+			endpoint,
+			strings.NewReader(reqBody),
+		)
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Api-Key", testAPIKey)

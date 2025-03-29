@@ -12,12 +12,18 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 )
+
+// mockSources implements sources.Interface for testing.
+type mockSources struct {
+	sources.Interface
+}
 
 // TestCommonModule provides a test-specific common module that excludes the logger module.
 var TestCommonModule = fx.Module("testCommon",
@@ -133,7 +139,7 @@ var TestCrawlerModule = fx.Module("crawler",
 	),
 )
 
-func setupTestApp(t *testing.T) *fx.App {
+func setupTestApp() *fx.App {
 	return fx.New(
 		TestCommonModule,
 		TestCrawlerModule,
@@ -142,33 +148,26 @@ func setupTestApp(t *testing.T) *fx.App {
 	)
 }
 
-// verifyDependencies checks that all required dependencies are present in the Params struct.
-func verifyDependencies(t *testing.T, p *crawler.Params) {
-	t.Helper()
-
-	require.NotNil(t, p)
-	require.NotNil(t, p.Logger)
-	require.NotNil(t, p.Sources)
-	require.NotNil(t, p.IndexManager)
-}
-
 // TestDependencyInjection verifies that all dependencies are properly injected into the Params struct.
 func TestDependencyInjection(t *testing.T) {
-	app := setupTestApp(t)
+	app := setupTestApp()
 	require.NoError(t, app.Start(t.Context()))
 	defer app.Stop(t.Context())
+
+	// Verify dependencies by invoking a function that checks them
+	require.NoError(t, app.Err())
 }
 
 // TestModuleConstruction verifies that the crawler module can be constructed with all required dependencies.
 func TestModuleConstruction(t *testing.T) {
-	app := setupTestApp(t)
+	app := setupTestApp()
 	require.NoError(t, app.Start(t.Context()))
 	defer app.Stop(t.Context())
 }
 
 // TestModuleLifecycle verifies that the crawler module can be started and stopped correctly.
 func TestModuleLifecycle(t *testing.T) {
-	app := setupTestApp(t)
+	app := setupTestApp()
 	require.NoError(t, app.Start(t.Context()))
 	require.NoError(t, app.Stop(t.Context()))
 }

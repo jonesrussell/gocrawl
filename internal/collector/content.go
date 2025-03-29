@@ -10,6 +10,7 @@
 package collector
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/gocolly/colly/v2"
@@ -215,7 +216,7 @@ func (l *ContentLogger) Error(msg string, args ...any) {
 	l.p.Logger.Error(msg, append(args, "tag", logTag)...)
 }
 
-// VisitLink attempts to visit a link and handles any errors.
+// VisitLink attempts to visit a link from an HTML element.
 // The function:
 // 1. Resolves the absolute URL
 // 2. Visits the URL
@@ -230,7 +231,11 @@ func (l *ContentLogger) Error(msg string, args ...any) {
 //   - error: Any non-ignored error that occurred during the visit
 func VisitLink(e *colly.HTMLElement, link string, ignoredErrors map[string]bool) error {
 	absURL := e.Request.AbsoluteURL(link)
-	if err := e.Response.Ctx.GetAny("collector").(*colly.Collector).Visit(absURL); err != nil {
+	collector, ok := e.Response.Ctx.GetAny("collector").(*colly.Collector)
+	if !ok {
+		return errors.New("failed to get collector from context")
+	}
+	if err := collector.Visit(absURL); err != nil {
 		if !ignoredErrors[err.Error()] {
 			return err
 		}
