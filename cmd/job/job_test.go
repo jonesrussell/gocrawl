@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/cmd/common/testutil"
 	"github.com/jonesrussell/gocrawl/cmd/job"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/collector"
@@ -15,7 +16,9 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
@@ -225,4 +228,88 @@ func TestJobScheduling(t *testing.T) {
 
 	app.RequireStart()
 	app.RequireStop()
+}
+
+func TestJobCommand(t *testing.T) {
+	t.Parallel()
+
+	t.Run("creates command with dependencies", func(t *testing.T) {
+		mockLog := testutil.NewMockLogger()
+		mockConfig := &config.Config{}
+
+		cmd := job.NewJobCommand(job.JobCommandDeps{
+			Logger: mockLog,
+			Config: mockConfig,
+		})
+
+		assert.Equal(t, "job", cmd.Name())
+		assert.Equal(t, "Start the job scheduler", cmd.Short)
+	})
+
+	t.Run("handles context cancellation", func(t *testing.T) {
+		mockLog := testutil.NewMockLogger()
+		mockConfig := &config.Config{}
+
+		cmd := job.NewJobCommand(job.JobCommandDeps{
+			Logger: mockLog,
+			Config: mockConfig,
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		// Execute command with context
+		output, err := testutil.ExecuteCommandWithContext(t, ctx, cmd)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "context deadline exceeded")
+		assert.Contains(t, output, "Job scheduler running")
+	})
+
+	t.Run("handles invalid configuration", func(t *testing.T) {
+		mockLog := testutil.NewMockLogger()
+		mockConfig := &config.Config{
+			Sources: []config.Source{
+				{
+					Name: "test",
+					Time: []string{"invalid-time"},
+				},
+			},
+		}
+
+		cmd := job.NewJobCommand(job.JobCommandDeps{
+			Logger: mockLog,
+			Config: mockConfig,
+		})
+
+		// Execute command
+		output := testutil.RequireCommandFailure(t, cmd)
+		assert.Contains(t, output, "invalid time format")
+	})
+
+	t.Run("handles signal shutdown", func(t *testing.T) {
+		mockLog := testutil.NewMockLogger()
+		mockConfig := &config.Config{
+			Sources: []config.Source{
+				{
+					Name: "test",
+					Time: []string{"00:00"},
+				},
+			},
+		}
+
+		cmd := job.NewJobCommand(job.JobCommandDeps{
+			Logger: mockLog,
+			Config: mockConfig,
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer cancel()
+
+		// Execute command with context
+		output, err := testutil.ExecuteCommandWithContext(t, ctx, cmd)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "context deadline exceeded")
+		assert.Contains(t, output, "Job scheduler running")
+		assert.Contains(t, output, "Received signal, initiating shutdown")
+	})
 }
