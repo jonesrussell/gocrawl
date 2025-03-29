@@ -42,7 +42,7 @@ func ExecuteCommandWithInput(
 	require.NoError(t, err)
 
 	// Write input
-	_, err = w.Write([]byte(input))
+	_, err = w.WriteString(input)
 	require.NoError(t, err)
 	require.NoError(t, w.Close())
 
@@ -63,16 +63,22 @@ func ExecuteCommandWithInput(
 	return string(out), err
 }
 
-// ExecuteCommandC executes a Cobra command and returns the command instance, output, and error
-func ExecuteCommandC(t *testing.T, cmd *cobra.Command, args ...string) (*cobra.Command, string, error) {
+// ExecuteCommandC executes a Cobra command and returns the command instance,
+// output, and error.
+func ExecuteCommandC(
+	t *testing.T,
+	root *cobra.Command,
+	args ...string,
+) (*cobra.Command, string, error) {
 	t.Helper()
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs(args)
 
-	c, err := cmd.ExecuteC()
-	return c, buf.String(), err
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs(args)
+
+	err := root.Execute()
+	return root, buf.String(), err
 }
 
 // ExecuteCommandWithContext executes a Cobra command with a context and returns its output and error
@@ -88,17 +94,24 @@ func ExecuteCommandWithContext(t *testing.T, ctx context.Context, cmd *cobra.Com
 	return buf.String(), err
 }
 
-// ExecuteCommandWithContextC executes a Cobra command with a context and returns the command instance, output, and error
-func ExecuteCommandWithContextC(t *testing.T, ctx context.Context, cmd *cobra.Command, args ...string) (*cobra.Command, string, error) {
+// ExecuteCommandWithContextC executes a Cobra command with a context.
+// Returns the command instance, output, and error.
+func ExecuteCommandWithContextC(
+	t *testing.T,
+	ctx context.Context,
+	cmd *cobra.Command,
+	args ...string,
+) (*cobra.Command, string, error) {
 	t.Helper()
+
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	cmd.SetArgs(args)
 	cmd.SetContext(ctx)
+	cmd.SetArgs(args)
 
-	c, err := cmd.ExecuteC()
-	return c, buf.String(), err
+	err := cmd.Execute()
+	return cmd, buf.String(), err
 }
 
 // RequireCommandSuccess executes a command and requires it to succeed

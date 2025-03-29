@@ -253,17 +253,18 @@ func NewJobCommand(deps JobCommandDeps) *cobra.Command {
 			// Initialize the Fx application
 			var fxApp *fx.App
 			var done chan struct{}
-			fxApp, done, err := setupFXApp(ctx, handler, cmdLogger)
-			if err != nil {
-				return fmt.Errorf("failed to setup application: %w", err)
+			var setupErr error
+			fxApp, done, setupErr = setupFXApp(ctx, handler, cmdLogger)
+			if setupErr != nil {
+				return fmt.Errorf("failed to setup application: %w", setupErr)
 			}
 
 			// Set the fx app for coordinated shutdown
 			handler.SetFXApp(fxApp)
 
 			// Start the application
-			if err = fxApp.Start(ctx); err != nil {
-				return fmt.Errorf("failed to start application: %w", err)
+			if startErr := fxApp.Start(ctx); startErr != nil {
+				return fmt.Errorf("failed to start application: %w", startErr)
 			}
 
 			// Wait for either context cancellation or job completion
@@ -275,8 +276,8 @@ func NewJobCommand(deps JobCommandDeps) *cobra.Command {
 			}
 
 			// Stop the application
-			if err = stopFXApp(fxApp); err != nil {
-				return fmt.Errorf("failed to stop application: %w", err)
+			if stopErr := stopFXApp(fxApp); stopErr != nil {
+				return fmt.Errorf("failed to stop application: %w", stopErr)
 			}
 
 			return nil
