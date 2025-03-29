@@ -92,7 +92,6 @@ func (c *CustomLogger) Fatal(msg string, fields ...any) {
 		}
 		_ = c.fatalHook(entry)
 	}
-	c.Logger.Fatal(msg, ConvertToZapFields(fields)...)
 }
 
 // Printf logs a formatted message

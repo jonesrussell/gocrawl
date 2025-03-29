@@ -164,6 +164,12 @@ func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64
 	return 0, ErrInvalidResult
 }
 
+// Close implements types.Interface
+func (m *MockStorage) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
 // Ensure MockStorage implements types.Interface
 var _ types.Interface = (*MockStorage)(nil)
 
