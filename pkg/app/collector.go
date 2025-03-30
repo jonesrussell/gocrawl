@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gocolly/colly/v2"
@@ -31,11 +32,11 @@ func SetupCollector(
 	cfg config.Interface,
 ) (*CollectorResult, error) {
 	if source.URL == "" {
-		return nil, fmt.Errorf("source URL is required")
+		return nil, errors.New("source URL is required")
 	}
 
 	if len(processors) == 0 {
-		return nil, fmt.Errorf("at least one processor is required")
+		return nil, errors.New("at least one processor is required")
 	}
 
 	// Create new collector with rate limiting
@@ -46,11 +47,13 @@ func SetupCollector(
 
 	// Set rate limiting
 	if source.RateLimit > 0 {
-		c.Limit(&colly.LimitRule{
+		if err := c.Limit(&colly.LimitRule{
 			DomainGlob:  "*",
 			RandomDelay: source.RateLimit,
 			Parallelism: 1,
-		})
+		}); err != nil {
+			return nil, fmt.Errorf("failed to set rate limit: %w", err)
+		}
 	}
 
 	// Create event bus
@@ -81,9 +84,9 @@ func SetupCollector(
 			case <-done:
 				return
 			default:
-				if err := p.Process(e); err != nil {
+				if processErr := p.Process(e); processErr != nil {
 					crawlerResult.Crawler.GetMetrics().Errors++
-					log.Error("Failed to process HTML element", "error", err)
+					log.Error("Failed to process HTML element", "error", processErr)
 				}
 			}
 		})
@@ -108,7 +111,7 @@ func ConfigureCrawler(
 	collectorResult *CollectorResult,
 ) error {
 	if source.URL == "" {
-		return fmt.Errorf("source URL is required")
+		return errors.New("source URL is required")
 	}
 
 	// Set collector

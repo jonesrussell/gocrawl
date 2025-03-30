@@ -159,41 +159,14 @@ type selectorSource interface {
 	GetArticleSelectors() ArticleSelectors
 }
 
-// articleSelectorsFromLoader creates ArticleSelectors from loader.ArticleSelectors
-func articleSelectorsFromLoader(selectors loader.ArticleSelectors) ArticleSelectors {
-	return ArticleSelectors{
-		Container:     selectors.Container,
-		Title:         selectors.Title,
-		Body:          selectors.Body,
-		Intro:         selectors.Intro,
-		Byline:        selectors.Byline,
-		PublishedTime: selectors.PublishedTime,
-		TimeAgo:       selectors.TimeAgo,
-		JSONLD:        selectors.JSONLD,
-		Section:       selectors.Section,
-		Keywords:      selectors.Keywords,
-		Description:   selectors.Description,
-		OGTitle:       selectors.OGTitle,
-		OGDescription: selectors.OGDescription,
-		OGImage:       selectors.OGImage,
-		OgURL:         selectors.OgURL,
-		Canonical:     selectors.Canonical,
-		WordCount:     selectors.WordCount,
-		PublishDate:   selectors.PublishDate,
-		Category:      selectors.Category,
-		Tags:          selectors.Tags,
-		Author:        selectors.Author,
-		BylineName:    selectors.BylineName,
-	}
-}
-
 // loaderConfigWrapper wraps loader.Config to implement selectorSource
 type loaderConfigWrapper struct {
 	loader.Config
 }
 
 func (w loaderConfigWrapper) GetArticleSelectors() ArticleSelectors {
-	return articleSelectorsFromLoader(w.Selectors.Article)
+	// Return empty selectors since we no longer have selectors in the Source struct
+	return ArticleSelectors{}
 }
 
 // sourceWrapper wraps config.Source to implement selectorSource
