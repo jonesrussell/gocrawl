@@ -20,9 +20,33 @@
       - [ ] Update httpd command to use new config module
   - [ ] Create separate sources module
     - [ ] Move sources interface to pkg/sources
+      - [ ] Create pkg/sources/interface.go
+      - [ ] Define Interface type
+      - [ ] Add interface documentation
+      - [ ] Add interface examples
     - [ ] Create sources module for dependency injection
+      - [ ] Create pkg/sources/module.go
+      - [ ] Define Module variable
+      - [ ] Add module documentation
+      - [ ] Add module examples
     - [ ] Add sources tests
+      - [ ] Create pkg/sources/sources_test.go
+      - [ ] Add interface tests
+      - [ ] Add module tests
+      - [ ] Add integration tests
     - [ ] Update commands to use new sources module
+      - [ ] Update job command
+      - [ ] Update crawl command
+      - [ ] Update httpd command
+    - [ ] Add HTTP client error handling
+      - [ ] Add proper response body closure
+      - [ ] Add proper context handling
+      - [ ] Add proper timeout handling
+    - [ ] Add examples
+      - [ ] Add usage examples
+      - [ ] Add test examples
+      - [ ] Add error handling examples
+      - [ ] Add configuration examples
   - [ ] Create separate storage module
     - [ ] Move storage interface to pkg/storage
     - [ ] Create storage module for dependency injection
