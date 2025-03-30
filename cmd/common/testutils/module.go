@@ -32,7 +32,7 @@ const (
 // CommandTestModule provides a reusable test module for command tests.
 type CommandTestModule struct {
 	// Core dependencies
-	Sources  sources.Interface `name:"testSourceManager"`
+	Sources  sources.Interface
 	Storage  types.Interface
 	IndexMgr api.IndexManager
 	Config   config.Interface
@@ -40,11 +40,11 @@ type CommandTestModule struct {
 	Crawler  crawler.Interface
 
 	// Command-specific dependencies
-	Ctx            context.Context       `name:"crawlContext"`
-	SourceName     string                `name:"sourceName"`
-	CommandDone    chan struct{}         `name:"commandDone"`
-	ArticleChannel chan *models.Article  `name:"commandArticleChannel"`
-	SignalHandler  *signal.SignalHandler `name:"signalHandler"`
+	Ctx            context.Context
+	SourceName     string
+	CommandDone    chan struct{}
+	ArticleChannel chan *models.Article
+	SignalHandler  *signal.SignalHandler
 	Processors     []collector.Processor `group:"processors"`
 }
 
@@ -92,73 +92,31 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 	}
 }
 
-// Module returns an fx.Module configured for command testing.
+// Module returns an fx.Option configured for command testing.
 func (m *CommandTestModule) Module() fx.Option {
 	return fx.Module("test",
 		// Core dependencies
 		fx.Provide(
-			// Provide mock config instead of using collector.Module
-			fx.Annotate(
-				func() config.Interface { return m.Config },
-				fx.As(new(config.Interface)),
-			),
-			fx.Annotate(
-				func() common.Logger { return m.Logger },
-				fx.As(new(common.Logger)),
-			),
-			fx.Annotate(
-				func() crawler.Interface { return m.Crawler },
-				fx.As(new(crawler.Interface)),
-			),
+			func() config.Interface { return m.Config },
+			func() common.Logger { return m.Logger },
+			func() crawler.Interface { return m.Crawler },
 			collector.NewMetrics,
 		),
 
 		// Provide all required dependencies
 		fx.Provide(
 			// Command-specific dependencies
-			fx.Annotate(
-				func() context.Context { return m.Ctx },
-				fx.ResultTags(`name:"crawlContext"`),
-			),
-			fx.Annotate(
-				func() string { return m.SourceName },
-				fx.ResultTags(`name:"sourceName"`),
-			),
-			fx.Annotate(
-				func() chan struct{} { return m.CommandDone },
-				fx.ResultTags(`name:"commandDone"`),
-			),
-			fx.Annotate(
-				func() chan *models.Article { return m.ArticleChannel },
-				fx.ResultTags(`name:"commandArticleChannel"`),
-			),
-			fx.Annotate(
-				func() *signal.SignalHandler { return m.SignalHandler },
-				fx.ResultTags(`name:"signalHandler"`),
-			),
-			// Test dependencies
-			fx.Annotate(
-				func() struct {
-					fx.Out
-					Sources    sources.Interface `name:"testSourceManager"`
-					Storage    types.Interface
-					IndexMgr   api.IndexManager      `name:"indexManager"`
-					Processors []collector.Processor `group:"processors"`
-				} {
-					return struct {
-						fx.Out
-						Sources    sources.Interface `name:"testSourceManager"`
-						Storage    types.Interface
-						IndexMgr   api.IndexManager      `name:"indexManager"`
-						Processors []collector.Processor `group:"processors"`
-					}{
-						Sources:    m.Sources,
-						Storage:    m.Storage,
-						IndexMgr:   m.IndexMgr,
-						Processors: m.Processors,
-					}
-				},
-			),
+			func() context.Context { return m.Ctx },
+			func() string { return m.SourceName },
+			func() chan struct{} { return m.CommandDone },
+			func() chan *models.Article { return m.ArticleChannel },
+			func() *signal.SignalHandler { return m.SignalHandler },
 		),
+
+		// Test dependencies - provide each separately
+		fx.Provide(func() sources.Interface { return m.Sources }),
+		fx.Provide(func() types.Interface { return m.Storage }),
+		fx.Provide(func() api.IndexManager { return m.IndexMgr }),
+		fx.Supply(m.Processors),
 	)
 }
