@@ -367,3 +367,171 @@ func TestErrorHandling(t *testing.T) {
 	// Stop the application
 	require.NoError(t, app.Stop(context.Background()))
 }
+
+func TestConcurrentCrawling(t *testing.T) {
+	t.Parallel()
+
+	// Create mock dependencies
+	mockCrawler := testutils.NewMockCrawler()
+	mockStorage := testutils.NewMockStorage()
+	mockLogger := logger.NewNoOp()
+	mockHandler := signal.NewSignalHandler(mockLogger)
+	mockConfig := testutils.NewMockConfig()
+	mockSourceManager := testutils.NewMockSourceManager()
+
+	// Set up expectations for concurrent crawling
+	mockStorage.On("TestConnection", mock.Anything).Return(nil)
+	mockCrawler.On("Start", mock.Anything, "source1").Return(nil)
+	mockCrawler.On("Start", mock.Anything, "source2").Return(nil)
+	mockCrawler.On("Stop", mock.Anything).Return(nil).Times(2)
+	mockCrawler.On("Wait").Return().Times(2)
+
+	// Create test app
+	app := fx.New(
+		fx.Provide(
+			// Core dependencies
+			func() crawler.Interface { return mockCrawler },
+			func() types.Interface { return mockStorage },
+			func() common.Logger { return mockLogger },
+			func() config.Interface { return mockConfig },
+			func() sources.Interface { return mockSourceManager },
+
+			// Named dependencies
+			fx.Annotate(
+				func() *signal.SignalHandler { return mockHandler },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
+			fx.Annotate(
+				func() context.Context { return t.Context() },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+		),
+		fx.Invoke(func(lc fx.Lifecycle, deps crawl.CommandDeps) {
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					// Start first crawler
+					go func() {
+						if err := deps.Crawler.Start(ctx, "source1"); err != nil {
+							t.Errorf("Failed to start first crawler: %v", err)
+						}
+						deps.Crawler.Wait()
+					}()
+
+					// Start second crawler
+					go func() {
+						if err := deps.Crawler.Start(ctx, "source2"); err != nil {
+							t.Errorf("Failed to start second crawler: %v", err)
+						}
+						deps.Crawler.Wait()
+					}()
+
+					return nil
+				},
+				OnStop: func(ctx context.Context) error {
+					return deps.Crawler.Stop(ctx)
+				},
+			})
+		}),
+	)
+
+	// Start the app
+	err := app.Start(t.Context())
+	require.NoError(t, err)
+
+	// Wait for crawlers to complete
+	time.Sleep(200 * time.Millisecond)
+
+	// Stop the app
+	err = app.Stop(t.Context())
+	require.NoError(t, err)
+
+	// Verify all expectations were met
+	mockCrawler.AssertExpectations(t)
+	mockStorage.AssertExpectations(t)
+}
+
+func TestRateLimiting(t *testing.T) {
+	t.Parallel()
+
+	// Create mock dependencies
+	mockCrawler := testutils.NewMockCrawler()
+	mockStorage := testutils.NewMockStorage()
+	mockLogger := logger.NewNoOp()
+	mockHandler := signal.NewSignalHandler(mockLogger)
+	mockConfig := testutils.NewMockConfig()
+	mockSourceManager := testutils.NewMockSourceManager()
+
+	// Set up expectations
+	mockStorage.On("TestConnection", mock.Anything).Return(nil)
+	mockCrawler.On("Start", mock.Anything, "test-source").Return(nil)
+	mockCrawler.On("Stop", mock.Anything).Return(nil)
+	mockCrawler.On("Wait").Return()
+	mockCrawler.On("SetRateLimit", time.Second).Return(nil)
+
+	// Create test app
+	app := fx.New(
+		fx.Provide(
+			// Core dependencies
+			func() crawler.Interface { return mockCrawler },
+			func() types.Interface { return mockStorage },
+			func() common.Logger { return mockLogger },
+			func() config.Interface { return mockConfig },
+			func() sources.Interface { return mockSourceManager },
+
+			// Named dependencies
+			fx.Annotate(
+				func() *signal.SignalHandler { return mockHandler },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
+			fx.Annotate(
+				func() context.Context { return t.Context() },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			fx.Annotate(
+				func() string { return "test-source" },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+		),
+		fx.Invoke(func(lc fx.Lifecycle, deps crawl.CommandDeps) {
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					// Set rate limit
+					if err := deps.Crawler.SetRateLimit(time.Second); err != nil {
+						return err
+					}
+
+					// Start crawler
+					if err := deps.Crawler.Start(ctx, deps.SourceName); err != nil {
+						return err
+					}
+
+					// Wait for crawler to complete
+					go func() {
+						deps.Crawler.Wait()
+						deps.Handler.RequestShutdown()
+					}()
+
+					return nil
+				},
+				OnStop: func(ctx context.Context) error {
+					return deps.Crawler.Stop(ctx)
+				},
+			})
+		}),
+	)
+
+	// Start the app
+	err := app.Start(t.Context())
+	require.NoError(t, err)
+
+	// Wait for a short time to allow goroutines to complete
+	time.Sleep(100 * time.Millisecond)
+
+	// Stop the app
+	err = app.Stop(t.Context())
+	require.NoError(t, err)
+
+	// Verify all expectations were met
+	mockCrawler.AssertExpectations(t)
+	mockStorage.AssertExpectations(t)
+}
