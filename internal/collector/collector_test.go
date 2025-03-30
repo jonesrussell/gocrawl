@@ -7,8 +7,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/jonesrussell/gocrawl/pkg/logger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -62,7 +62,7 @@ func TestNew(t *testing.T) {
 				BaseURL:     "http://example.com",
 				MaxDepth:    2,
 				RateLimit:   1 * time.Second,
-				Debugger:    &logger.CollyDebugger{Logger: mockLogger},
+				Debugger:    logger.NewCollyDebugger(mockLogger),
 				Logger:      mockLogger,
 				Parallelism: 2,
 				RandomDelay: 2 * time.Second,
@@ -84,7 +84,7 @@ func TestNew(t *testing.T) {
 				BaseURL:     "",
 				MaxDepth:    2,
 				RateLimit:   1 * time.Second,
-				Debugger:    &logger.CollyDebugger{Logger: mockLogger},
+				Debugger:    logger.NewCollyDebugger(mockLogger),
 				Logger:      mockLogger,
 				Parallelism: 2,
 				RandomDelay: 2 * time.Second,
@@ -107,7 +107,7 @@ func TestNew(t *testing.T) {
 				BaseURL:     "not-a-url",
 				MaxDepth:    2,
 				RateLimit:   1 * time.Second,
-				Debugger:    &logger.CollyDebugger{Logger: mockLogger},
+				Debugger:    logger.NewCollyDebugger(mockLogger),
 				Logger:      mockLogger,
 				Parallelism: 2,
 				RandomDelay: 2 * time.Second,

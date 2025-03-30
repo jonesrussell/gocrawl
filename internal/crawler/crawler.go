@@ -12,17 +12,16 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/collector"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/pkg/logger"
 )
 
 // Crawler represents a web crawler instance.
 type Crawler struct {
 	collector    *colly.Collector
-	Logger       common.Logger
+	Logger       logger.Interface
 	Debugger     debug.Debugger
 	bus          *events.Bus
 	baseURL      string
@@ -78,9 +77,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		},
 	}
 	if c.Debugger != nil {
-		params.Debugger = &logger.CollyDebugger{
-			Logger: c.Logger,
-		}
+		params.Debugger = logger.NewCollyDebugger(c.Logger)
 	}
 
 	result, err := collector.New(params)
@@ -98,8 +95,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	// Start crawling
 	if visitErr := c.collector.Visit(c.baseURL); visitErr != nil {
-		c.Logger.Error("Error visiting base URL", "url", c.baseURL, "error", visitErr)
-		return fmt.Errorf("error starting crawl for base URL %s: %w", c.baseURL, visitErr)
+		return fmt.Errorf("failed to start crawling: %w", visitErr)
 	}
 
 	// Monitor context for cancellation while waiting

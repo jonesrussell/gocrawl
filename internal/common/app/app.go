@@ -11,8 +11,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/pkg/logger"
 )
 
 const (
@@ -23,7 +23,7 @@ const (
 // SetupCollector creates and configures a new collector for the given source.
 func SetupCollector(
 	ctx context.Context,
-	log common.Logger,
+	log logger.Interface,
 	source sources.Config,
 	processors []collector.Processor,
 	done chan struct{},

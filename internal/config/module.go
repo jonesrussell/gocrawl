@@ -227,7 +227,7 @@ var defaultLog = struct {
 // setupViper initializes Viper with default configuration
 func setupViper() error {
 	// Load config file from environment if specified
-	if cfgFile := os.Getenv("GOCRAWL_CONFIG"); cfgFile != "" {
+	if cfgFile := os.Getenv("CONFIG_FILE"); cfgFile != "" {
 		defaultLog.Info("Using config file from environment", "file", cfgFile)
 		viper.SetConfigFile(cfgFile)
 	} else {

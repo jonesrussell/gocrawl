@@ -16,9 +16,12 @@ var Module = fx.Module("job",
 			sources sources.Interface,
 			crawler crawler.Interface,
 			logger common.Logger,
-			done chan struct{},
+			p struct {
+				fx.In
+				Done chan struct{} `name:"crawlDone"`
+			},
 		) Interface {
-			return New(sources, crawler, logger, done)
+			return New(sources, crawler, logger, p.Done)
 		},
 	),
 )

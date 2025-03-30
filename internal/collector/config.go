@@ -9,9 +9,8 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/pkg/logger"
 	"go.uber.org/fx"
 )
 
@@ -46,7 +45,7 @@ type Params struct {
 	// Debugger handles debugging operations
 	Debugger *logger.CollyDebugger
 	// Logger provides logging capabilities
-	Logger common.Logger
+	Logger logger.Interface
 	// MaxDepth is the maximum crawling depth
 	MaxDepth int
 	// Parallelism is the number of concurrent requests
@@ -125,7 +124,7 @@ type Config struct {
 	// Debugger handles debugging operations
 	Debugger *logger.CollyDebugger
 	// Logger provides logging capabilities
-	Logger common.Logger
+	Logger logger.Interface
 	// Source contains source-specific configuration
 	Source config.Source
 	// ArticleProcessor handles the processing of article content

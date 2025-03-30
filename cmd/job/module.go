@@ -2,23 +2,20 @@
 package job
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common/app"
-	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/job"
 	"go.uber.org/fx"
 )
 
 // Module provides the job command's dependencies.
 var Module = fx.Module("job",
 	fx.Provide(
-		// Core dependencies
+		// Provide the done channel for job completion
 		fx.Annotate(
 			func() chan struct{} {
 				return make(chan struct{})
 			},
 			fx.ResultTags(`name:"crawlDone"`),
 		),
-		func() chan *models.Article {
-			return make(chan *models.Article, app.DefaultChannelBufferSize)
-		},
 	),
+	job.Module,
 )
