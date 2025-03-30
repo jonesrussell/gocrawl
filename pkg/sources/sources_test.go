@@ -1,7 +1,6 @@
 package sources_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -10,37 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// mockConfig implements sources.Interface for testing
-type mockConfig struct {
-	sources []sources.Config
-}
-
-func (m *mockConfig) GetSources() ([]sources.Config, error) {
-	return m.sources, nil
-}
-
-func (m *mockConfig) FindByName(name string) (*sources.Config, error) {
-	for _, source := range m.sources {
-		if source.Name == name {
-			return &source, nil
-		}
-	}
-	return nil, sources.ErrSourceNotFound
-}
-
-func (m *mockConfig) Validate(source *sources.Config) error {
-	if source == nil {
-		return sources.ErrInvalidSource
-	}
-	if source.Name == "" {
-		return sources.ErrInvalidSource
-	}
-	if source.URL == "" {
-		return sources.ErrInvalidSource
-	}
-	return nil
-}
 
 // TestNewSources tests the NewSources function
 func TestNewSources(t *testing.T) {
@@ -85,7 +53,7 @@ func TestSources_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test adding a source
 	source := &sources.Source{
@@ -142,7 +110,7 @@ func TestSources_Validation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name    string
@@ -192,12 +160,12 @@ func TestSources_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := s.AddSource(ctx, tt.source)
+			addErr := s.AddSource(ctx, tt.source)
 			if tt.wantErr {
-				require.Error(t, err)
+				require.Error(t, addErr)
 				return
 			}
-			require.NoError(t, err)
+			require.NoError(t, addErr)
 		})
 	}
 }
@@ -211,7 +179,7 @@ func TestSources_Metrics(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Initial metrics
 	metrics := s.GetMetrics()

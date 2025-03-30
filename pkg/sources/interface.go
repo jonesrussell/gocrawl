@@ -46,10 +46,10 @@ type Interface interface {
 type Params struct {
 	// Logger is the logger to use.
 	Logger interface {
-		Debug(msg string, fields ...interface{})
-		Info(msg string, fields ...interface{})
-		Warn(msg string, fields ...interface{})
-		Error(msg string, fields ...interface{})
+		Debug(msg string, fields ...any)
+		Info(msg string, fields ...any)
+		Warn(msg string, fields ...any)
+		Error(msg string, fields ...any)
 	}
 }
 
@@ -69,15 +69,15 @@ var (
 // Config represents a source configuration.
 type Config struct {
 	// Name is the unique identifier for the source.
-	Name string
+	Name string `yaml:"name"`
 	// URL is the base URL for the source.
-	URL string
+	URL string `yaml:"url"`
 	// RateLimit is the rate limit for requests to this source.
-	RateLimit time.Duration
+	RateLimit time.Duration `yaml:"rate_limit"`
 	// MaxDepth is the maximum depth for crawling this source.
-	MaxDepth int
+	MaxDepth int `yaml:"max_depth"`
 	// Time is the list of times when this source should be crawled.
-	Time []string
+	Time []string `yaml:"time"`
 }
 
 // ValidateParams validates the parameters for creating a sources instance.

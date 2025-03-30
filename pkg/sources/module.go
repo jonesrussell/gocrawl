@@ -20,10 +20,10 @@ var Module = fx.Module("sources",
 // sources implements the Interface.
 type sources struct {
 	logger interface {
-		Debug(msg string, fields ...interface{})
-		Info(msg string, fields ...interface{})
-		Warn(msg string, fields ...interface{})
-		Error(msg string, fields ...interface{})
+		Debug(msg string, fields ...any)
+		Info(msg string, fields ...any)
+		Warn(msg string, fields ...any)
+		Error(msg string, fields ...any)
 	}
 	sources map[string]*Source
 	mu      sync.RWMutex

@@ -2,6 +2,7 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -23,20 +24,20 @@ type FileConfig struct {
 
 // LoadFromFile loads source configurations from a YAML file.
 func LoadFromFile(path string) ([]Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
+	data, readErr := os.ReadFile(path)
+	if readErr != nil {
+		return nil, fmt.Errorf("failed to open file: %w", readErr)
 	}
 
 	var configs []Config
-	if err := yaml.Unmarshal(data, &configs); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	if unmarshalErr := yaml.Unmarshal(data, &configs); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w", unmarshalErr)
 	}
 
 	// Validate each config
 	for i, cfg := range configs {
-		if err := ValidateConfig(&cfg); err != nil {
-			return nil, fmt.Errorf("invalid config at index %d: %w", i, err)
+		if validateErr := ValidateConfig(&cfg); validateErr != nil {
+			return nil, fmt.Errorf("invalid config at index %d: %w", i, validateErr)
 		}
 	}
 
@@ -46,34 +47,36 @@ func LoadFromFile(path string) ([]Config, error) {
 // ValidateConfig validates a source configuration.
 func ValidateConfig(cfg *Config) error {
 	if cfg == nil {
-		return fmt.Errorf("config cannot be nil")
+		return errors.New("config cannot be nil")
 	}
 
 	if cfg.Name == "" {
-		return fmt.Errorf("name is required")
+		return errors.New("name is required")
 	}
 
 	if cfg.URL == "" {
-		return fmt.Errorf("URL is required")
+		return errors.New("URL is required")
 	}
 
-	if _, err := url.Parse(cfg.URL); err != nil {
-		return fmt.Errorf("invalid URL: %w", err)
+	// Parse URL and validate scheme
+	u, parseErr := url.Parse(cfg.URL)
+	if parseErr != nil || u.Scheme == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return errors.New("invalid URL: must be a valid HTTP(S) URL")
 	}
 
 	if cfg.RateLimit <= 0 {
-		return fmt.Errorf("rate limit must be positive")
+		return errors.New("rate limit must be positive")
 	}
 
 	if cfg.MaxDepth <= 0 {
-		return fmt.Errorf("max depth must be positive")
+		return errors.New("max depth must be positive")
 	}
 
 	// Validate time format if provided
 	if len(cfg.Time) > 0 {
 		for _, t := range cfg.Time {
-			if _, err := time.Parse("15:04", t); err != nil {
-				return fmt.Errorf("invalid time format: %w", err)
+			if _, timeErr := time.Parse("15:04", t); timeErr != nil {
+				return fmt.Errorf("invalid time format: %w", timeErr)
 			}
 		}
 	}
