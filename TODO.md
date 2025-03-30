@@ -461,12 +461,12 @@
 - [x] Fix logger dependency in API module
 - [x] Fix config dependency in API module
 - [ ] Add command integration tests
-  - [ ] Test HTTP server command
-    - [ ] Test server startup
-    - [ ] Test graceful shutdown
-    - [ ] Test health check endpoint
-    - [ ] Test search endpoint
-    - [ ] Test error handling
+  - [x] Test HTTP server command
+    - [x] Test server startup
+    - [x] Test graceful shutdown
+    - [x] Test health check endpoint
+    - [x] Test search endpoint
+    - [x] Test error handling
   - [ ] Test crawler command
     - [ ] Test crawler startup
     - [ ] Test crawler shutdown
