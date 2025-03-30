@@ -10,7 +10,6 @@ import (
 
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/collector"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -157,7 +156,13 @@ func checkAndRunJobs(
 	currentTime := now.Format("15:04")
 	log.Info("Checking jobs", "current_time", currentTime)
 
-	for _, source := range sources.GetSources() {
+	sourcesList, err := sources.GetSources()
+	if err != nil {
+		log.Error("Failed to get sources", "error", err)
+		return
+	}
+
+	for _, source := range sourcesList {
 		for _, scheduledTime := range source.Time {
 			if currentTime == scheduledTime {
 				log.Info("Running scheduled crawl",
@@ -187,7 +192,12 @@ func startJob(p Params) error {
 
 	// Print loaded schedules
 	p.Logger.Info("Loaded schedules:")
-	for _, source := range p.Sources.GetSources() {
+	sources, err := p.Sources.GetSources()
+	if err != nil {
+		return fmt.Errorf("failed to get sources: %w", err)
+	}
+
+	for _, source := range sources {
 		if len(source.Time) > 0 {
 			p.Logger.Info("Source schedule",
 				"name", source.Name,
@@ -207,7 +217,7 @@ func startJob(p Params) error {
 }
 
 // NewJobCommand creates a new job command with the given dependencies
-func NewJobCommand(logger logger.Interface) *cobra.Command {
+func NewJobCommand(log logger.Interface) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "job",
 		Short: "Start the job scheduler",
@@ -219,12 +229,12 @@ func NewJobCommand(logger logger.Interface) *cobra.Command {
 			defer cancel()
 
 			// Set up signal handling with a no-op logger initially
-			handler := signalhandler.NewSignalHandler(common.NewNoOpLogger())
+			handler := signalhandler.NewSignalHandler(logger.NewNoOp())
 			cleanup := handler.Setup(ctx)
 			defer cleanup()
 
 			// Initialize the Fx application
-			fxApp := setupFXApp(ctx, logger)
+			fxApp := setupFXApp()
 
 			// Set the fx app for coordinated shutdown
 			handler.SetFXApp(fxApp)
@@ -235,7 +245,7 @@ func NewJobCommand(logger logger.Interface) *cobra.Command {
 			}
 
 			// Update the signal handler with the real logger
-			handler.SetLogger(logger)
+			handler.SetLogger(log)
 
 			// Wait for shutdown signal
 			if !handler.Wait() {
@@ -258,25 +268,27 @@ func Command() *cobra.Command {
 	return NewJobCommand(log)
 }
 
-// setupFXApp initializes the Fx application with all required dependencies.
-func setupFXApp(
-	ctx context.Context,
-	logger logger.Interface,
-) *fx.App {
+// setupFXApp creates and configures the fx application with all required dependencies.
+func setupFXApp() *fx.App {
 	// Create the fx app with all required dependencies
 	options := []fx.Option{
-		fx.Supply(logger),
-		fx.Supply(ctx),
-		fx.Supply(config.Params{
-			Environment: "development",
-			Debug:       true,
-			Command:     "job",
-		}),
-		Module, // This includes job.Module
+		fx.Supply(
+			config.Params{
+				Environment: "development",
+				Debug:       true,
+				Command:     "job",
+			},
+			logger.Params{
+				Debug:  true,
+				Level:  "debug",
+				AppEnv: "development",
+			},
+		),
+		config.Module, // Provide config first
+		Module,        // Then job module
 		crawler.Module,
 		sources.Module,
 		storage.Module,
-		config.Module,
 		fx.NopLogger,
 		fx.Invoke(func(p Params) {
 			if err := startJob(p); err != nil {

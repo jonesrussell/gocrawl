@@ -137,7 +137,10 @@ func RunList(cmd *cobra.Command, _ []string) error {
 
 // ExecuteList retrieves and displays the list of sources.
 func ExecuteList(params Params) error {
-	allSources := params.SourceManager.GetSources()
+	allSources, err := params.SourceManager.GetSources()
+	if err != nil {
+		return fmt.Errorf("failed to get sources: %w", err)
+	}
 	if len(allSources) == 0 {
 		params.Logger.Info("No sources found")
 		return nil

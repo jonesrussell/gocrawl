@@ -2,7 +2,10 @@
 package job
 
 import (
+	"context"
+
 	"github.com/jonesrussell/gocrawl/internal/job"
+	"github.com/jonesrussell/gocrawl/pkg/logger"
 	"go.uber.org/fx"
 )
 
@@ -15,6 +18,20 @@ var Module = fx.Module("job",
 				return make(chan struct{})
 			},
 			fx.ResultTags(`name:"crawlDone"`),
+		),
+		// Provide the logger
+		fx.Annotate(
+			func(p logger.Params) logger.Interface {
+				return logger.NewNoOp()
+			},
+			fx.As(new(logger.Interface)),
+		),
+		// Provide the context
+		fx.Annotate(
+			func(lc fx.Lifecycle) context.Context {
+				return context.Background()
+			},
+			fx.As(new(context.Context)),
 		),
 	),
 	job.Module,

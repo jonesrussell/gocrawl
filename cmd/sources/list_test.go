@@ -48,15 +48,15 @@ type mockSourceManager struct {
 	sources []srcs.Config
 }
 
-func (m *mockSourceManager) GetSources() []srcs.Config { return m.sources }
+func (m *mockSourceManager) GetSources() ([]srcs.Config, error) { return m.sources, nil }
 
 func (m *mockSourceManager) FindByName(name string) (*srcs.Config, error) {
-	for _, source := range m.sources {
-		if source.Name == name {
-			return &source, nil
+	for _, s := range m.sources {
+		if s.Name == name {
+			return &s, nil
 		}
 	}
-	return nil, ErrSourceNotFound
+	return nil, nil
 }
 
 func (m *mockSourceManager) Validate(_ *srcs.Config) error { return nil }
@@ -71,12 +71,10 @@ func newMockConfig() *mockConfig {
 	return &mockConfig{
 		sources: []config.Source{
 			{
-				Name:         "Test Source",
-				URL:          "https://test.com",
-				Index:        "test_content",
-				ArticleIndex: "test_articles",
-				RateLimit:    time.Second,
-				MaxDepth:     2,
+				Name:      "Test Source",
+				URL:       "https://test.com",
+				RateLimit: time.Second,
+				MaxDepth:  2,
 			},
 		},
 	}
