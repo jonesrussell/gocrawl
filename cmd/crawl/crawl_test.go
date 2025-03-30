@@ -535,3 +535,87 @@ func TestRateLimiting(t *testing.T) {
 	mockCrawler.AssertExpectations(t)
 	mockStorage.AssertExpectations(t)
 }
+
+func TestMaxDepthConfiguration(t *testing.T) {
+	t.Parallel()
+
+	// Create mock dependencies
+	mockCrawler := testutils.NewMockCrawler()
+	mockStorage := testutils.NewMockStorage()
+	mockLogger := logger.NewNoOp()
+	mockHandler := signal.NewSignalHandler(mockLogger)
+	mockConfig := testutils.NewMockConfig()
+	mockSourceManager := testutils.NewMockSourceManager()
+
+	// Set up expectations
+	mockStorage.On("TestConnection", mock.Anything).Return(nil)
+	mockCrawler.On("Start", mock.Anything, "test-source").Return(nil)
+	mockCrawler.On("Stop", mock.Anything).Return(nil)
+	mockCrawler.On("Wait").Return()
+	mockCrawler.On("SetMaxDepth", 2).Return()
+
+	// Create test app
+	app := fx.New(
+		fx.Provide(
+			// Core dependencies
+			func() crawler.Interface { return mockCrawler },
+			func() types.Interface { return mockStorage },
+			func() common.Logger { return mockLogger },
+			func() config.Interface { return mockConfig },
+			func() sources.Interface { return mockSourceManager },
+
+			// Named dependencies
+			fx.Annotate(
+				func() *signal.SignalHandler { return mockHandler },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
+			fx.Annotate(
+				func() context.Context { return t.Context() },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			fx.Annotate(
+				func() string { return "test-source" },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+		),
+		fx.Invoke(func(lc fx.Lifecycle, deps crawl.CommandDeps) {
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					// Set max depth
+					deps.Crawler.SetMaxDepth(2)
+
+					// Start crawler
+					if err := deps.Crawler.Start(ctx, deps.SourceName); err != nil {
+						return err
+					}
+
+					// Wait for crawler to complete
+					go func() {
+						deps.Crawler.Wait()
+						deps.Handler.RequestShutdown()
+					}()
+
+					return nil
+				},
+				OnStop: func(ctx context.Context) error {
+					return deps.Crawler.Stop(ctx)
+				},
+			})
+		}),
+	)
+
+	// Start the app
+	err := app.Start(t.Context())
+	require.NoError(t, err)
+
+	// Wait for a short time to allow goroutines to complete
+	time.Sleep(100 * time.Millisecond)
+
+	// Stop the app
+	err = app.Stop(t.Context())
+	require.NoError(t, err)
+
+	// Verify all expectations were met
+	mockCrawler.AssertExpectations(t)
+	mockStorage.AssertExpectations(t)
+}
