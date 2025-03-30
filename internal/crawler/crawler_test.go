@@ -5,9 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -23,11 +26,23 @@ func TestCrawlerStartup(t *testing.T) {
 	log, err := logger.NewLogger(testCfg)
 	require.NoError(t, err)
 
+	// Create mock dependencies
+	mockIndexManager := testutils.NewMockIndexManager()
+	mockSourceManager := testutils.NewMockSourceManager()
+	mockEventBus := events.NewBus()
+
 	// Create test app
 	app := fx.New(
-		fx.Supply(testCfg, log),
-		fx.Provide(crawler.ProvideCrawler),
-		fx.Invoke(func(c *crawler.Crawler) {
+		fx.Supply(testCfg),
+		fx.Provide(
+			// Core dependencies
+			func() logger.Interface { return log },
+			func() api.IndexManager { return mockIndexManager },
+			func() sources.Interface { return mockSourceManager },
+			func() *events.Bus { return mockEventBus },
+			crawler.ProvideCrawler,
+		),
+		fx.Invoke(func(c crawler.Interface) {
 			// Start crawler in background
 			go func() {
 				if startErr := c.Start(t.Context(), "test_source"); startErr != nil {
@@ -66,11 +81,23 @@ func TestCrawlerShutdown(t *testing.T) {
 	log, err := logger.NewLogger(testCfg)
 	require.NoError(t, err)
 
+	// Create mock dependencies
+	mockIndexManager := testutils.NewMockIndexManager()
+	mockSourceManager := testutils.NewMockSourceManager()
+	mockEventBus := events.NewBus()
+
 	// Create test app
 	app := fx.New(
-		fx.Supply(testCfg, log),
-		fx.Provide(crawler.ProvideCrawler),
-		fx.Invoke(func(c *crawler.Crawler) {
+		fx.Supply(testCfg),
+		fx.Provide(
+			// Core dependencies
+			func() logger.Interface { return log },
+			func() api.IndexManager { return mockIndexManager },
+			func() sources.Interface { return mockSourceManager },
+			func() *events.Bus { return mockEventBus },
+			crawler.ProvideCrawler,
+		),
+		fx.Invoke(func(c crawler.Interface) {
 			// Start crawler in background
 			go func() {
 				if startErr := c.Start(t.Context(), "test_source"); startErr != nil {
@@ -124,11 +151,23 @@ func TestSourceValidation(t *testing.T) {
 	log, err := logger.NewLogger(testCfg)
 	require.NoError(t, err)
 
+	// Create mock dependencies
+	mockIndexManager := testutils.NewMockIndexManager()
+	mockSourceManager := testutils.NewMockSourceManager()
+	mockEventBus := events.NewBus()
+
 	// Create test app
 	app := fx.New(
-		fx.Supply(testCfg, log),
-		fx.Provide(crawler.ProvideCrawler),
-		fx.Invoke(func(c *crawler.Crawler) {
+		fx.Supply(testCfg),
+		fx.Provide(
+			// Core dependencies
+			func() logger.Interface { return log },
+			func() api.IndexManager { return mockIndexManager },
+			func() sources.Interface { return mockSourceManager },
+			func() *events.Bus { return mockEventBus },
+			crawler.ProvideCrawler,
+		),
+		fx.Invoke(func(c crawler.Interface) {
 			// Test valid source
 			source := &config.Source{
 				Name:      "test_source",
@@ -174,11 +213,23 @@ func TestErrorHandling(t *testing.T) {
 	log, err := logger.NewLogger(testCfg)
 	require.NoError(t, err)
 
+	// Create mock dependencies
+	mockIndexManager := testutils.NewMockIndexManager()
+	mockSourceManager := testutils.NewMockSourceManager()
+	mockEventBus := events.NewBus()
+
 	// Create test app
 	app := fx.New(
-		fx.Supply(testCfg, log),
-		fx.Provide(crawler.ProvideCrawler),
-		fx.Invoke(func(c *crawler.Crawler) {
+		fx.Supply(testCfg),
+		fx.Provide(
+			// Core dependencies
+			func() logger.Interface { return log },
+			func() api.IndexManager { return mockIndexManager },
+			func() sources.Interface { return mockSourceManager },
+			func() *events.Bus { return mockEventBus },
+			crawler.ProvideCrawler,
+		),
+		fx.Invoke(func(c crawler.Interface) {
 			// Attempt to start crawler with invalid config
 			startErr := c.Start(t.Context(), "test_source")
 			require.Error(t, startErr)

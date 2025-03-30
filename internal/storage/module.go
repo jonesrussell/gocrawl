@@ -52,8 +52,10 @@ var Module = fx.Module("storage",
 		),
 		ProvideSearchManager,
 		fx.Annotate(
-			ProvideIndexManager,
-			fx.ResultTags(`name:"indexManager"`),
+			func() api.IndexManager {
+				return &IndexManager{}
+			},
+			fx.ResultTags(),
 		),
 	),
 )
