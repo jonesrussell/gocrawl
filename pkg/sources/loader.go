@@ -2,16 +2,41 @@
 package sources
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"net/url"
+	"os"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // LoadFromFile loads source configurations from a file.
 func LoadFromFile(path string) ([]Config, error) {
-	// TODO: Implement file loading
-	return nil, errors.New("file loading not implemented")
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var configs []Config
+	if err := yaml.Unmarshal(data, &configs); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	// Validate each config
+	for i, cfg := range configs {
+		if err := ValidateConfig(&cfg); err != nil {
+			return nil, fmt.Errorf("invalid config at index %d: %w", i, err)
+		}
+	}
+
+	return configs, nil
 }
 
 // ValidateConfig validates a source configuration.

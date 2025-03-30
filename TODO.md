@@ -19,7 +19,7 @@
       - [ ] Update crawl command to use new config module
       - [ ] Update httpd command to use new config module
   - [ ] Create separate sources module
-    - [ ] Move sources interface to pkg/sources
+    - [x] Move sources interface to pkg/sources
       - [ ] Create pkg/sources/interface.go
         - [ ] Define Interface type with required methods
         - [ ] Add interface documentation
