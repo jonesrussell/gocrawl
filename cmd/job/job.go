@@ -249,7 +249,7 @@ func NewJobCommand(log logger.Interface) *cobra.Command {
 
 			// Wait for shutdown signal
 			if !handler.Wait() {
-				return fmt.Errorf("job scheduler shutdown timeout or context cancellation")
+				return errors.New("job scheduler shutdown timeout or context cancellation")
 			}
 
 			return nil

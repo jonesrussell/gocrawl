@@ -7,6 +7,39 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// ZapLogger wraps zap.Logger to implement Interface
+type ZapLogger struct {
+	*zap.Logger
+}
+
+func (l *ZapLogger) Debug(msg string, fields ...any) {
+	l.Logger.Debug(msg, zap.Any("fields", fields))
+}
+
+func (l *ZapLogger) Error(msg string, fields ...any) {
+	l.Logger.Error(msg, zap.Any("fields", fields))
+}
+
+func (l *ZapLogger) Info(msg string, fields ...any) {
+	l.Logger.Info(msg, zap.Any("fields", fields))
+}
+
+func (l *ZapLogger) Warn(msg string, fields ...any) {
+	l.Logger.Warn(msg, zap.Any("fields", fields))
+}
+
+func (l *ZapLogger) Fatal(msg string, fields ...any) {
+	l.Logger.Fatal(msg, zap.Any("fields", fields))
+}
+
+func (l *ZapLogger) Printf(format string, args ...any) {
+	l.Logger.Sugar().Infof(format, args...)
+}
+
+func (l *ZapLogger) Errorf(format string, args ...any) {
+	l.Logger.Sugar().Errorf(format, args...)
+}
+
 // Module provides the logger module for dependency injection.
 var Module = fx.Module("logger",
 	fx.Provide(
@@ -19,7 +52,7 @@ var Module = fx.Module("logger",
 )
 
 // NewLogger creates a new logger instance with the given configuration.
-func NewLogger(p Params) (*zap.Logger, error) {
+func NewLogger(p Params) (*ZapLogger, error) {
 	// Create the logger configuration
 	config := zap.NewProductionConfig()
 	if p.Debug {
@@ -34,5 +67,5 @@ func NewLogger(p Params) (*zap.Logger, error) {
 		return nil, err
 	}
 
-	return logger, nil
+	return &ZapLogger{Logger: logger}, nil
 }

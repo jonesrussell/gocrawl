@@ -56,7 +56,7 @@ func (m *mockSourceManager) FindByName(name string) (*srcs.Config, error) {
 			return &s, nil
 		}
 	}
-	return nil, nil
+	return nil, ErrSourceNotFound
 }
 
 func (m *mockSourceManager) Validate(_ *srcs.Config) error { return nil }
