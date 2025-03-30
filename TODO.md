@@ -455,75 +455,66 @@
 
 # TODO List
 
-## Completed
-- [x] Set up project structure
-- [x] Implement basic logging
-- [x] Implement source management
-- [x] Fix linter issues in sources package
-  - [x] Replace interface{} with any
-  - [x] Fix shadowing issues
-  - [x] Use t.Context() in tests
-  - [x] Remove unused code
+## High Priority
+- [x] Fix dependency injection issues in API module
+- [x] Fix duplicate SearchManager provider
+- [x] Fix logger dependency in API module
+- [x] Fix config dependency in API module
+- [ ] Add command integration tests
+  - [ ] Test HTTP server command
+    - [ ] Test server startup
+    - [ ] Test graceful shutdown
+    - [ ] Test health check endpoint
+    - [ ] Test search endpoint
+    - [ ] Test error handling
+  - [ ] Test crawler command
+    - [ ] Test crawler startup
+    - [ ] Test crawler shutdown
+    - [ ] Test source validation
+    - [ ] Test error handling
+  - [ ] Test index command
+    - [ ] Test index creation
+    - [ ] Test index deletion
+    - [ ] Test index mapping
+    - [ ] Test error handling
+  - [ ] Test dry-run command
+    - [ ] Test configuration validation
+    - [ ] Test source validation
+    - [ ] Test error handling
+  - [ ] Test version command
+    - [ ] Test version output
+    - [ ] Test build info output
 
-## In Progress
-- [ ] Complete HTML processor implementation
-  - [x] Add extractList method for categories and tags
-  - [x] Add extractMetadata method for additional metadata
-  - [x] Complete extractTime method with time format parsing
-  - [x] Add tests for HTML parsing
-  - [x] Add tests for time parsing
-  - [x] Add tests for metadata extraction
-  - [x] Add tests for error cases
-  - [ ] Add metrics collection
-    - [ ] Track processing time
-    - [ ] Track number of elements processed
-    - [ ] Track number of errors
-  - [ ] Add context support
-    - [ ] Allow cancellation of long-running processing
-    - [ ] Support timeouts
-    - [ ] Support request-scoped values
-  - [ ] Add validation for configuration
-    - [ ] Validate selectors
-    - [ ] Validate time formats
-    - [ ] Validate required fields
-  - [ ] Add support for custom time formats
-    - [ ] Allow configuration of additional time formats
-    - [ ] Support timezone handling
-
-## Next Steps
-- [ ] Implement storage integration
-  - [ ] Create storage interface
-  - [ ] Add storage dependency to processor
-  - [ ] Implement content persistence
-  - [ ] Add storage tests
-
-- [ ] Implement content processing pipeline
-  - [ ] Add content validation
-  - [ ] Add content transformation
-  - [ ] Add content enrichment
-  - [ ] Add pipeline tests
-
-- [ ] Add monitoring and metrics
+## Medium Priority
+- [ ] Add more test cases for HTML processor
+  - [ ] Test malformed HTML handling
+  - [ ] Test concurrent processing
+  - [ ] Test memory usage
+  - [ ] Test error recovery
+- [ ] Improve error handling in storage module
+  - [ ] Add retry mechanism for failed operations
+  - [ ] Add circuit breaker for failing operations
+  - [ ] Add metrics for error rates
+  - [ ] Add error reporting
+- [ ] Add metrics collection
   - [ ] Add Prometheus metrics
-  - [ ] Add health checks
-  - [ ] Add performance monitoring
-  - [ ] Add monitoring tests
+  - [ ] Add Grafana dashboards
+  - [ ] Add alerting rules
+  - [ ] Add monitoring documentation
 
-## Future Enhancements
-- [ ] Add support for different content types
-  - [ ] Markdown processing
-  - [ ] PDF processing
-  - [ ] Image processing
-  - [ ] Video processing
-
-- [ ] Add content analysis features
-  - [ ] Sentiment analysis
-  - [ ] Topic extraction
-  - [ ] Entity recognition
-  - [ ] Language detection
-
-- [ ] Add content management features
-  - [ ] Content versioning
-  - [ ] Content archiving
-  - [ ] Content search
-  - [ ] Content recommendations
+## Low Priority
+- [ ] Add more documentation
+  - [ ] Add API documentation
+  - [ ] Add configuration documentation
+  - [ ] Add deployment guide
+  - [ ] Add troubleshooting guide
+- [ ] Add more examples
+  - [ ] Add basic usage examples
+  - [ ] Add advanced usage examples
+  - [ ] Add integration examples
+  - [ ] Add deployment examples
+- [ ] Add more features
+  - [ ] Add rate limiting
+  - [ ] Add caching
+  - [ ] Add authentication
+  - [ ] Add authorization

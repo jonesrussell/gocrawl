@@ -1,9 +1,10 @@
-package processor
+package processor_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/pkg/processor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,7 +14,7 @@ func TestMetricsCollector(t *testing.T) {
 
 	t.Run("new_collector", func(t *testing.T) {
 		t.Parallel()
-		collector := NewMetricsCollector()
+		collector := processor.NewMetricsCollector()
 		require.NotNil(t, collector)
 		metrics := collector.GetMetrics()
 		require.NotNil(t, metrics)
@@ -25,7 +26,7 @@ func TestMetricsCollector(t *testing.T) {
 
 	t.Run("record_processing_time", func(t *testing.T) {
 		t.Parallel()
-		collector := NewMetricsCollector()
+		collector := processor.NewMetricsCollector()
 		duration := 100 * time.Millisecond
 		collector.RecordProcessingTime(duration)
 		metrics := collector.GetMetrics()
@@ -34,7 +35,7 @@ func TestMetricsCollector(t *testing.T) {
 
 	t.Run("record_elements_processed", func(t *testing.T) {
 		t.Parallel()
-		collector := NewMetricsCollector()
+		collector := processor.NewMetricsCollector()
 		collector.RecordElementsProcessed(5)
 		metrics := collector.GetMetrics()
 		assert.Equal(t, int64(5), metrics.ProcessedCount)
@@ -42,7 +43,7 @@ func TestMetricsCollector(t *testing.T) {
 
 	t.Run("record_error", func(t *testing.T) {
 		t.Parallel()
-		collector := NewMetricsCollector()
+		collector := processor.NewMetricsCollector()
 		collector.RecordError()
 		metrics := collector.GetMetrics()
 		assert.Equal(t, int64(1), metrics.ErrorCount)
@@ -50,7 +51,7 @@ func TestMetricsCollector(t *testing.T) {
 
 	t.Run("reset", func(t *testing.T) {
 		t.Parallel()
-		collector := NewMetricsCollector()
+		collector := processor.NewMetricsCollector()
 		collector.RecordProcessingTime(100 * time.Millisecond)
 		collector.RecordElementsProcessed(5)
 		collector.RecordError()
@@ -64,18 +65,18 @@ func TestMetricsCollector(t *testing.T) {
 
 	t.Run("concurrent_access", func(t *testing.T) {
 		t.Parallel()
-		collector := NewMetricsCollector()
+		collector := processor.NewMetricsCollector()
 		done := make(chan struct{})
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			go func() {
-				for j := 0; j < 100; j++ {
+				for range 100 {
 					collector.RecordElementsProcessed(1)
 					collector.RecordError()
 				}
 				done <- struct{}{}
 			}()
 		}
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			<-done
 		}
 		metrics := collector.GetMetrics()

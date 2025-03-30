@@ -7,6 +7,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"go.uber.org/fx"
 )
 
@@ -37,9 +38,13 @@ type SearchResponse struct {
 // Module provides API dependencies
 var Module = fx.Module("api",
 	fx.Provide(
+		// Provide a no-op logger for testing
+		func() types.Logger {
+			return common.NewNoOpLogger()
+		},
 		// Provide the server and security middleware together to avoid circular dependencies
 		func(
-			log common.Logger,
+			log types.Logger,
 			searchManager SearchManager,
 			cfg common.Config,
 		) (*http.Server, middleware.SecurityMiddlewareInterface) {
