@@ -429,3 +429,63 @@
 - Each commit should include documentation updates
 - Each commit should be reviewed before merging
 - Each commit should follow the project's coding standards
+
+# TODO List
+
+## Completed
+- [x] Set up project structure
+- [x] Implement basic logging
+- [x] Implement source management
+- [x] Fix linter issues in sources package
+  - [x] Replace interface{} with any
+  - [x] Fix shadowing issues
+  - [x] Use t.Context() in tests
+  - [x] Remove unused code
+
+## In Progress
+- [ ] Complete HTML processor implementation
+  - [ ] Add extractList method for categories and tags
+  - [ ] Add extractMetadata method for additional metadata
+  - [ ] Complete extractTime method with time format parsing
+  - [ ] Add tests for HTML parsing
+  - [ ] Add tests for time parsing
+  - [ ] Add tests for metadata extraction
+  - [ ] Add tests for error cases
+
+## Next Steps
+- [ ] Implement storage integration
+  - [ ] Create storage interface
+  - [ ] Add storage dependency to processor
+  - [ ] Implement content persistence
+  - [ ] Add storage tests
+
+- [ ] Implement content processing pipeline
+  - [ ] Add content validation
+  - [ ] Add content transformation
+  - [ ] Add content enrichment
+  - [ ] Add pipeline tests
+
+- [ ] Add monitoring and metrics
+  - [ ] Add Prometheus metrics
+  - [ ] Add health checks
+  - [ ] Add performance monitoring
+  - [ ] Add monitoring tests
+
+## Future Enhancements
+- [ ] Add support for different content types
+  - [ ] Markdown processing
+  - [ ] PDF processing
+  - [ ] Image processing
+  - [ ] Video processing
+
+- [ ] Add content analysis features
+  - [ ] Sentiment analysis
+  - [ ] Topic extraction
+  - [ ] Entity recognition
+  - [ ] Language detection
+
+- [ ] Add content management features
+  - [ ] Content versioning
+  - [ ] Content archiving
+  - [ ] Content search
+  - [ ] Content recommendations

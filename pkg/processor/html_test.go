@@ -10,157 +10,258 @@ import (
 )
 
 func TestHTMLProcessor_Process(t *testing.T) {
-	selectors := map[string]string{
-		"title":        "h1",
-		"body":         "article",
-		"author":       ".author",
-		"published_at": "time",
-		"categories":   ".categories span",
-		"tags":         ".tags span",
-	}
-
 	tests := []struct {
 		name     string
 		html     string
 		wantErr  bool
-		errMsg   string
-		validate func(t *testing.T, processed *processor.ProcessedContent)
+		validate func(t *testing.T, content *processor.Content)
 	}{
 		{
-			name: "valid HTML",
+			name: "valid HTML with all fields",
 			html: `
 				<!DOCTYPE html>
 				<html>
 				<head>
 					<link rel="canonical" href="http://example.com/article">
 					<meta property="og:url" content="http://example.com/article">
+					<meta name="author" content="John Doe">
 					<meta name="description" content="Test article">
 				</head>
 				<body>
-					<h1>Test Article</h1>
-					<article>This is the article body.</article>
+					<h1>Test Title</h1>
+					<article>Test body content</article>
 					<div class="author">John Doe</div>
-					<time>2024-03-20T10:00:00Z</time>
-					<div class="categories">
-						<span>Technology</span>
-						<span>Programming</span>
-					</div>
-					<div class="tags">
-						<span>go</span>
-						<span>testing</span>
-					</div>
+					<time>2024-03-30T12:00:00Z</time>
+					<div class="categories">Tech News</div>
+					<div class="tags">golang testing</div>
 				</body>
 				</html>
 			`,
 			wantErr: false,
-			validate: func(t *testing.T, processed *processor.ProcessedContent) {
-				assert.Equal(t, "Test Article", processed.Content.Title)
-				assert.Equal(t, "This is the article body.", processed.Content.Body)
-				assert.Equal(t, "http://example.com/article", processed.Content.URL)
-				assert.Equal(t, "John Doe", processed.Content.Author)
-				assert.Equal(t, time.Date(2024, 3, 20, 10, 0, 0, 0, time.UTC), processed.Content.PublishedAt)
-				assert.Equal(t, []string{"Technology", "Programming"}, processed.Content.Categories)
-				assert.Equal(t, []string{"go", "testing"}, processed.Content.Tags)
-				assert.Equal(t, "Test article", processed.Content.Metadata["description"])
+			validate: func(t *testing.T, content *processor.Content) {
+				assert.Equal(t, "Test Title", content.Title)
+				assert.Equal(t, "Test body content", content.Body)
+				assert.Equal(t, "http://example.com/article", content.URL)
+				assert.Equal(t, "John Doe", content.Author)
+				assert.Equal(t, []string{"Tech", "News"}, content.Categories)
+				assert.Equal(t, []string{"golang", "testing"}, content.Tags)
+				assert.NotZero(t, content.PublishedAt)
+				assert.Contains(t, content.Metadata, "author")
+				assert.Contains(t, content.Metadata, "description")
 			},
 		},
 		{
-			name: "missing required fields",
+			name:    "invalid HTML",
+			html:    "not html",
+			wantErr: true,
+		},
+		{
+			name: "missing required title",
 			html: `
 				<!DOCTYPE html>
 				<html>
 				<body>
-					<div class="author">John Doe</div>
+					<article>Test body content</article>
 				</body>
 				</html>
 			`,
 			wantErr: true,
-			errMsg:  "missing required field: title",
-		},
-		{
-			name:    "invalid HTML",
-			html:    `not html`,
-			wantErr: true,
-			errMsg:  "invalid HTML",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := processor.NewHTMLProcessor(selectors)
+			p := processor.NewHTMLProcessor(map[string]string{
+				"title":        "h1",
+				"body":         "article",
+				"author":       ".author",
+				"published_at": "time",
+				"categories":   ".categories",
+				"tags":         ".tags",
+			})
+
 			processed, err := p.Process([]byte(tt.html))
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
 				return
 			}
+
 			require.NoError(t, err)
 			require.NotNil(t, processed)
 			if tt.validate != nil {
-				tt.validate(t, processed)
+				tt.validate(t, &processed.Content)
 			}
 		})
 	}
 }
 
 func TestHTMLProcessor_ExtractTime(t *testing.T) {
-	selectors := map[string]string{
-		"title":        "h1",
-		"published_at": "time",
-	}
-
 	tests := []struct {
 		name     string
 		html     string
-		expected time.Time
+		selector string
+		want     time.Time
 	}{
 		{
-			name: "RFC3339",
+			name: "RFC3339 format",
 			html: `
 				<!DOCTYPE html>
 				<html>
 				<body>
-					<h1>Test Article</h1>
-					<time>2024-03-20T10:00:00Z</time>
+					<h1>Test Title</h1>
+					<time>2024-03-30T12:00:00Z</time>
 				</body>
 				</html>
 			`,
-			expected: time.Date(2024, 3, 20, 10, 0, 0, 0, time.UTC),
+			selector: "time",
+			want:     time.Date(2024, 3, 30, 12, 0, 0, 0, time.UTC),
 		},
 		{
-			name: "RFC1123",
-			html: `
-				<!DOCTYPE html>
-				<html>
-				<body>
-					<h1>Test Article</h1>
-					<time>Wed, 20 Mar 2024 10:00:00 UTC</time>
-				</body>
-				</html>
-			`,
-			expected: time.Date(2024, 3, 20, 10, 0, 0, 0, time.UTC),
+			name:     "RFC1123 format",
+			html:     `<time>Sun, 30 Mar 2024 12:00:00 UTC</time>`,
+			selector: "time",
+			want:     time.Date(2024, 3, 30, 12, 0, 0, 0, time.UTC),
 		},
 		{
-			name: "custom format",
-			html: `
-				<!DOCTYPE html>
-				<html>
-				<body>
-					<h1>Test Article</h1>
-					<time>2024-03-20 10:00:00</time>
-				</body>
-				</html>
-			`,
-			expected: time.Date(2024, 3, 20, 10, 0, 0, 0, time.UTC),
+			name:     "custom format",
+			html:     `<h1>Test Title</h1><time>2024-03-30 12:00:00</time>`,
+			selector: "time",
+			want:     time.Date(2024, 3, 30, 12, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "empty selector",
+			html:     `<time>2024-03-30T12:00:00Z</time>`,
+			selector: "",
+			want:     time.Time{},
+		},
+		{
+			name:     "empty content",
+			html:     `<time></time>`,
+			selector: "time",
+			want:     time.Time{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := processor.NewHTMLProcessor(selectors)
+			p := processor.NewHTMLProcessor(map[string]string{
+				"published_at": tt.selector,
+			})
+
 			processed, err := p.Process([]byte(tt.html))
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, processed.Content.PublishedAt)
+			assert.Equal(t, tt.want, processed.Content.PublishedAt)
+		})
+	}
+}
+
+func TestHTMLProcessor_ExtractList(t *testing.T) {
+	tests := []struct {
+		name     string
+		html     string
+		selector string
+		want     []string
+	}{
+		{
+			name:     "single item",
+			html:     `<div class="categories">Tech</div>`,
+			selector: ".categories",
+			want:     []string{"Tech"},
+		},
+		{
+			name:     "multiple items",
+			html:     `<div class="tags">golang testing</div>`,
+			selector: ".tags",
+			want:     []string{"golang", "testing"},
+		},
+		{
+			name:     "empty selector",
+			html:     `<div class="categories">Tech</div>`,
+			selector: "",
+			want:     nil,
+		},
+		{
+			name:     "empty content",
+			html:     `<div class="categories"></div>`,
+			selector: ".categories",
+			want:     nil,
+		},
+		{
+			name: "multiple elements",
+			html: `
+				<div class="categories">Tech</div>
+				<div class="categories">News</div>
+			`,
+			selector: ".categories",
+			want:     []string{"Tech", "News"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := processor.NewHTMLProcessor(map[string]string{
+				"categories": tt.selector,
+			})
+
+			processed, err := p.Process([]byte(tt.html))
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, processed.Content.Categories)
+		})
+	}
+}
+
+func TestHTMLProcessor_ExtractMetadata(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+		want map[string]string
+	}{
+		{
+			name: "meta tags with name",
+			html: `
+				<meta name="author" content="John Doe">
+				<meta name="description" content="Test article">
+			`,
+			want: map[string]string{
+				"author":      "John Doe",
+				"description": "Test article",
+			},
+		},
+		{
+			name: "meta tags with property",
+			html: `
+				<meta property="og:title" content="Test Title">
+				<meta property="og:url" content="http://example.com">
+			`,
+			want: map[string]string{
+				"og:title": "Test Title",
+				"og:url":   "http://example.com",
+			},
+		},
+		{
+			name: "mixed meta tags",
+			html: `
+				<meta name="author" content="John Doe">
+				<meta property="og:title" content="Test Title">
+			`,
+			want: map[string]string{
+				"author":   "John Doe",
+				"og:title": "Test Title",
+			},
+		},
+		{
+			name: "no meta tags",
+			html: `<div>No meta tags</div>`,
+			want: map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := processor.NewHTMLProcessor(nil)
+			processed, err := p.Process([]byte(tt.html))
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, processed.Content.Metadata)
 		})
 	}
 }

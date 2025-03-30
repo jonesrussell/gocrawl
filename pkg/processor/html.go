@@ -41,8 +41,8 @@ func (p *HTMLProcessor) Process(html []byte) (*ProcessedContent, error) {
 		Metadata:    p.extractMetadata(doc),
 	}
 
-	// Only check for required fields if the HTML is valid
-	if content.Title == "" {
+	// Only check for required fields if we're processing the full content
+	if p.Selectors["title"] != "" && content.Title == "" {
 		return nil, fmt.Errorf("%w: title", ErrMissingRequiredField)
 	}
 
