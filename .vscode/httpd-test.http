@@ -1,6 +1,6 @@
-@baseUrl = http://localhost:8080
+@baseUrl = http://localhost:{{$dotenv GOCRAWL_PORT}}
 @contentType = application/json
-@apiKey = {{$dotenv ELASTIC_API_KEY}}
+@apiKey = {{$dotenv GOCRAWL_API_KEY}}
 
 ### Health Check
 GET {{baseUrl}}/health
@@ -9,7 +9,7 @@ Content-Type: {{contentType}}
 ### Search
 POST {{baseUrl}}/search
 Content-Type: {{contentType}}
-Authorization: ApiKey {{apiKey}}
+X-API-Key: {{apiKey}}
 
 {
     "query": "test",
@@ -20,7 +20,7 @@ Authorization: ApiKey {{apiKey}}
 ### Search with empty query
 POST {{baseUrl}}/search
 Content-Type: {{contentType}}
-Authorization: ApiKey {{apiKey}}
+X-API-Key: {{apiKey}}
 
 {
     "query": "",
@@ -31,7 +31,7 @@ Authorization: ApiKey {{apiKey}}
 ### Search with invalid index
 POST {{baseUrl}}/search
 Content-Type: {{contentType}}
-Authorization: ApiKey {{apiKey}}
+X-API-Key: {{apiKey}}
 
 {
     "query": "test",
@@ -42,7 +42,7 @@ Authorization: ApiKey {{apiKey}}
 ### Search with invalid size
 POST {{baseUrl}}/search
 Content-Type: {{contentType}}
-Authorization: ApiKey {{apiKey}}
+X-API-Key: {{apiKey}}
 
 {
     "query": "test",
