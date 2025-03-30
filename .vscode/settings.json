@@ -20,5 +20,10 @@
   "rest-client.timeoutInMilliseconds": 5000,
   "rest-client.followredirect": true,
   "rest-client.previewResponsePanelTakeFocus": false,
-  "rest-client.showResponseInDifferentTab": true
+  "rest-client.showResponseInDifferentTab": true,
+  "yaml.validate": false,
+  "yaml.customTags": [],
+  "files.associations": {
+    ".cursorrules": "plaintext"
+  }
 }

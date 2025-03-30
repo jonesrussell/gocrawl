@@ -1,3 +1,5 @@
+# syntax=plaintext
+
 Code Organization & Structure
 - Split large files into smaller, focused modules
 - Keep related functionality together
