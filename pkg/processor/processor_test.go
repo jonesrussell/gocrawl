@@ -1,7 +1,6 @@
 package processor_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/pkg/logger"
@@ -102,12 +101,12 @@ func TestProcessor_Process(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := p.Process(context.Background(), tt.source, tt.content)
+			processErr := p.Process(t.Context(), tt.source, tt.content)
 			if tt.wantErr {
-				require.Error(t, err)
+				require.Error(t, processErr)
 				return
 			}
-			require.NoError(t, err)
+			require.NoError(t, processErr)
 		})
 	}
 }
@@ -148,12 +147,12 @@ func TestProcessor_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := p.Validate(tt.source, tt.content)
+			validateErr := p.Validate(tt.source, tt.content)
 			if tt.wantErr {
-				require.Error(t, err)
+				require.Error(t, validateErr)
 				return
 			}
-			require.NoError(t, err)
+			require.NoError(t, validateErr)
 		})
 	}
 }
@@ -167,7 +166,7 @@ func TestProcessor_GetMetrics(t *testing.T) {
 	require.NotNil(t, p)
 
 	// Process some content to update metrics
-	err = p.Process(context.Background(), "test", []byte(`
+	processErr := p.Process(t.Context(), "test", []byte(`
 		<!DOCTYPE html>
 		<html>
 		<body>
@@ -176,7 +175,7 @@ func TestProcessor_GetMetrics(t *testing.T) {
 		</body>
 		</html>
 	`))
-	require.NoError(t, err)
+	require.NoError(t, processErr)
 
 	metrics := p.GetMetrics()
 	require.NotNil(t, metrics)

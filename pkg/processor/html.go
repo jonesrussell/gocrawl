@@ -27,7 +27,7 @@ func (p *HTMLProcessor) Process(html []byte) (*ProcessedContent, error) {
 
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(html))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidHTML, err)
+		return nil, fmt.Errorf("%w: parse error", ErrInvalidHTML)
 	}
 
 	content := Content{
@@ -56,9 +56,6 @@ func (p *HTMLProcessor) extractText(doc *goquery.Document, selector string) stri
 	if selector == "" {
 		return ""
 	}
-	doc.Find(selector).Each(func(_ int, s *goquery.Selection) {
-		return
-	})
 	return strings.TrimSpace(doc.Find(selector).First().Text())
 }
 
@@ -137,13 +134,13 @@ func (p *HTMLProcessor) extractMetadata(doc *goquery.Document) map[string]string
 
 	// Extract meta tags
 	doc.Find("meta").Each(func(_ int, s *goquery.Selection) {
-		if name, exists := s.Attr("name"); exists {
-			if content, exists := s.Attr("content"); exists {
+		if name, nameOK := s.Attr("name"); nameOK {
+			if content, contentOK := s.Attr("content"); contentOK {
 				metadata[name] = content
 			}
 		}
-		if property, exists := s.Attr("property"); exists {
-			if content, exists := s.Attr("content"); exists {
+		if property, propertyOK := s.Attr("property"); propertyOK {
+			if content, contentOK := s.Attr("content"); contentOK {
 				metadata[property] = content
 			}
 		}
