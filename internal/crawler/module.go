@@ -125,8 +125,8 @@ type Params struct {
 	fx.In
 
 	Logger       logger.Interface
-	Debugger     debug.Debugger   `optional:"true"`
-	IndexManager api.IndexManager `name:"indexManager"`
+	Debugger     debug.Debugger `optional:"true"`
+	IndexManager api.IndexManager
 	Sources      sources.Interface
 }
 
