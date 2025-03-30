@@ -16,6 +16,7 @@ import (
 var Module = fx.Module("processor",
 	fx.Provide(
 		NewProcessor,
+		NewMetricsCollector,
 	),
 )
 
@@ -24,12 +25,14 @@ func NewProcessor(p Params) (Interface, error) {
 	if err := ValidateParams(p); err != nil {
 		return nil, err
 	}
+
+	metrics := NewMetricsCollector()
+	htmlProcessor := NewHTMLProcessor(defaultSelectors, p.Logger, metrics)
+
 	return &processor{
-		logger: p.Logger,
-		metrics: &Metrics{
-			LastProcessedTime: time.Now(),
-		},
-		htmlProcessor: NewHTMLProcessor(defaultSelectors),
+		logger:        p.Logger,
+		metrics:       &Metrics{LastProcessedTime: time.Now()},
+		htmlProcessor: htmlProcessor,
 	}, nil
 }
 

@@ -416,6 +416,29 @@
 ### In Progress
 - HTTP client error handling improvements
 - Example code additions
+- Complete HTML processor implementation
+  - [x] Add extractList method for categories and tags
+  - [x] Add extractMetadata method for additional metadata
+  - [x] Complete extractTime method with time format parsing
+  - [x] Add tests for HTML parsing
+  - [x] Add tests for time parsing
+  - [x] Add tests for metadata extraction
+  - [x] Add tests for error cases
+  - [ ] Add metrics collection
+    - [ ] Track processing time
+    - [ ] Track number of elements processed
+    - [ ] Track number of errors
+  - [ ] Add context support
+    - [ ] Allow cancellation of long-running processing
+    - [ ] Support timeouts
+    - [ ] Support request-scoped values
+  - [ ] Add validation for configuration
+    - [ ] Validate selectors
+    - [ ] Validate time formats
+    - [ ] Validate required fields
+  - [ ] Add support for custom time formats
+    - [ ] Allow configuration of additional time formats
+    - [ ] Support timezone handling
 
 ### Next Up
 - Add usage examples for each major component
@@ -444,13 +467,28 @@
 
 ## In Progress
 - [ ] Complete HTML processor implementation
-  - [ ] Add extractList method for categories and tags
-  - [ ] Add extractMetadata method for additional metadata
-  - [ ] Complete extractTime method with time format parsing
-  - [ ] Add tests for HTML parsing
-  - [ ] Add tests for time parsing
-  - [ ] Add tests for metadata extraction
-  - [ ] Add tests for error cases
+  - [x] Add extractList method for categories and tags
+  - [x] Add extractMetadata method for additional metadata
+  - [x] Complete extractTime method with time format parsing
+  - [x] Add tests for HTML parsing
+  - [x] Add tests for time parsing
+  - [x] Add tests for metadata extraction
+  - [x] Add tests for error cases
+  - [ ] Add metrics collection
+    - [ ] Track processing time
+    - [ ] Track number of elements processed
+    - [ ] Track number of errors
+  - [ ] Add context support
+    - [ ] Allow cancellation of long-running processing
+    - [ ] Support timeouts
+    - [ ] Support request-scoped values
+  - [ ] Add validation for configuration
+    - [ ] Validate selectors
+    - [ ] Validate time formats
+    - [ ] Validate required fields
+  - [ ] Add support for custom time formats
+    - [ ] Allow configuration of additional time formats
+    - [ ] Support timezone handling
 
 ## Next Steps
 - [ ] Implement storage integration

@@ -44,16 +44,3 @@ type Processor interface {
 	// Process processes the given content.
 	Process(content []byte) (*ProcessedContent, error)
 }
-
-// HTMLProcessor processes HTML content.
-type HTMLProcessor struct {
-	// Selectors are the CSS selectors to use.
-	Selectors map[string]string
-}
-
-// NewHTMLProcessor creates a new HTML processor.
-func NewHTMLProcessor(selectors map[string]string) *HTMLProcessor {
-	return &HTMLProcessor{
-		Selectors: selectors,
-	}
-}

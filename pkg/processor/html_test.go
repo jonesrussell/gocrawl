@@ -4,10 +4,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/pkg/logger"
 	"github.com/jonesrussell/gocrawl/pkg/processor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func newTestLogger() logger.Interface {
+	return logger.NewNoOp()
+}
+
+func newTestMetricsCollector() processor.MetricsCollector {
+	return processor.NewMetricsCollector()
+}
 
 func TestHTMLProcessor_Process(t *testing.T) {
 	tests := []struct {
@@ -78,7 +87,7 @@ func TestHTMLProcessor_Process(t *testing.T) {
 				"published_at": "time",
 				"categories":   ".categories",
 				"tags":         ".tags",
-			})
+			}, newTestLogger(), newTestMetricsCollector())
 
 			processed, err := p.Process([]byte(tt.html))
 			if tt.wantErr {
@@ -146,7 +155,7 @@ func TestHTMLProcessor_ExtractTime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := processor.NewHTMLProcessor(map[string]string{
 				"published_at": tt.selector,
-			})
+			}, newTestLogger(), newTestMetricsCollector())
 
 			processed, err := p.Process([]byte(tt.html))
 			require.NoError(t, err)
@@ -201,7 +210,7 @@ func TestHTMLProcessor_ExtractList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := processor.NewHTMLProcessor(map[string]string{
 				"categories": tt.selector,
-			})
+			}, newTestLogger(), newTestMetricsCollector())
 
 			processed, err := p.Process([]byte(tt.html))
 			require.NoError(t, err)
@@ -258,7 +267,8 @@ func TestHTMLProcessor_ExtractMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := processor.NewHTMLProcessor(nil)
+			p := processor.NewHTMLProcessor(nil, newTestLogger(), newTestMetricsCollector())
+
 			processed, err := p.Process([]byte(tt.html))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, processed.Content.Metadata)
