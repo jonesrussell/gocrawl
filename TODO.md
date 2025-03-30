@@ -518,3 +518,29 @@
   - [ ] Add caching
   - [ ] Add authentication
   - [ ] Add authorization
+
+### 12. Remove Named Dependencies
+- [ ] Remove named fx dependencies across codebase
+  - [ ] Audit all fx.Module declarations
+  - [ ] Remove fx.Annotate usage
+  - [ ] Update struct field tags
+  - [ ] Simplify dependency providers
+  - [ ] Update tests to use type-based injection
+  - [ ] Verify all modules work together
+
+Steps for each module:
+1. Remove name tags from struct fields
+2. Remove fx.Annotate wrappers
+3. Simplify fx.Provide calls
+4. Update tests to use type-based injection
+5. Verify module integration
+
+Priority order:
+1. cmd/common/testutils
+2. internal/api
+3. internal/collector
+4. internal/crawler
+5. internal/storage
+6. internal/sources
+7. pkg/config
+8. pkg/logger
