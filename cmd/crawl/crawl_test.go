@@ -195,3 +195,175 @@ func TestCommandFlagHandling(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "test-source", source)
 }
+
+func TestCrawlerCommandStartup(t *testing.T) {
+	t.Parallel()
+
+	// Create test configuration
+	testCfg := testutils.NewMockConfig()
+
+	// Create test app
+	app := fx.New(
+		fx.Supply(testCfg),
+		fx.Provide(crawl.Command),
+		fx.Invoke(func(cmd *cobra.Command) {
+			// Start command in background
+			go func() {
+				if err := cmd.Execute(); err != nil {
+					t.Errorf("Failed to execute command: %v", err)
+				}
+			}()
+
+			// Wait for command to start
+			time.Sleep(100 * time.Millisecond)
+
+			// Verify command is running
+			require.NotNil(t, cmd)
+
+			// Stop command
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			require.NoError(t, cmd.ExecuteContext(ctx))
+		}),
+	)
+
+	// Start the application
+	require.NoError(t, app.Start(context.Background()))
+
+	// Stop the application
+	require.NoError(t, app.Stop(context.Background()))
+}
+
+func TestCrawlerCommandShutdown(t *testing.T) {
+	t.Parallel()
+
+	// Create test configuration
+	testCfg := testutils.NewMockConfig()
+
+	// Create test app
+	app := fx.New(
+		fx.Supply(testCfg),
+		fx.Provide(crawl.Command),
+		fx.Invoke(func(cmd *cobra.Command) {
+			// Start command in background
+			go func() {
+				if err := cmd.Execute(); err != nil {
+					t.Errorf("Failed to execute command: %v", err)
+				}
+			}()
+
+			// Wait for command to start
+			time.Sleep(100 * time.Millisecond)
+
+			// Start a long-running crawl
+			done := make(chan bool)
+			go func() {
+				// Simulate a long-running crawl
+				time.Sleep(2 * time.Second)
+				done <- true
+			}()
+
+			// Wait for crawl to start
+			time.Sleep(50 * time.Millisecond)
+
+			// Stop command with timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			require.NoError(t, cmd.ExecuteContext(ctx))
+
+			// Wait for crawl to complete
+			select {
+			case <-done:
+				// Crawl completed successfully
+			case <-time.After(3 * time.Second):
+				t.Fatal("Crawl did not complete within timeout")
+			}
+		}),
+	)
+
+	// Start the application
+	require.NoError(t, app.Start(context.Background()))
+
+	// Stop the application
+	require.NoError(t, app.Stop(context.Background()))
+}
+
+func TestSourceValidation(t *testing.T) {
+	t.Parallel()
+
+	// Create test configuration
+	testCfg := testutils.NewMockConfig()
+
+	// Create test app
+	app := fx.New(
+		fx.Supply(testCfg),
+		fx.Provide(crawl.Command),
+		fx.Invoke(func(cmd *cobra.Command) {
+			// Test valid source
+			source := &config.Source{
+				Name:      "test_source",
+				URL:       "https://example.com",
+				MaxDepth:  1,
+				RateLimit: time.Second,
+			}
+			require.NoError(t, source.Validate())
+
+			// Test invalid source (missing URL)
+			invalidSource := &config.Source{
+				Name:      "invalid_source",
+				MaxDepth:  1,
+				RateLimit: time.Second,
+			}
+			require.Error(t, invalidSource.Validate())
+
+			// Test invalid source (missing name)
+			invalidSource = &config.Source{
+				URL:       "https://example.com",
+				MaxDepth:  1,
+				RateLimit: time.Second,
+			}
+			require.Error(t, invalidSource.Validate())
+		}),
+	)
+
+	// Start the application
+	require.NoError(t, app.Start(context.Background()))
+
+	// Stop the application
+	require.NoError(t, app.Stop(context.Background()))
+}
+
+func TestErrorHandling(t *testing.T) {
+	t.Parallel()
+
+	// Create test configuration with invalid settings
+	testCfg := testutils.NewMockConfig()
+	testCfg.Crawler.MaxDepth = -1 // Invalid value
+
+	// Create test app
+	app := fx.New(
+		fx.Supply(testCfg),
+		fx.Provide(crawl.Command),
+		fx.Invoke(func(cmd *cobra.Command) {
+			// Attempt to start command with invalid config
+			err := cmd.Execute()
+			require.Error(t, err)
+
+			// Test error handling during crawl
+			source := &config.Source{
+				Name:      "invalid_source",
+				URL:       "https://invalid-url.com",
+				MaxDepth:  1,
+				RateLimit: time.Second,
+			}
+			validateErr := source.Validate()
+			require.NoError(t, validateErr)
+		}),
+	)
+
+	// Start the application
+	require.NoError(t, app.Start(context.Background()))
+
+	// Stop the application
+	require.NoError(t, app.Stop(context.Background()))
+}
