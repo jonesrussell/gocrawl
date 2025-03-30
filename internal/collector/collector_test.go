@@ -19,20 +19,11 @@ const errMissingSource = "source configuration is required"
 // createTestConfig creates a test config.Source with default selectors
 func createTestConfig() *config.Source {
 	return &config.Source{
-		Name:         "test-source",
-		URL:          "http://example.com",
-		ArticleIndex: "test_articles",
-		Index:        "test_content",
-		RateLimit:    time.Second,
-		MaxDepth:     2,
-		Time:         []string{"03:00"},
-		Selectors: config.SourceSelectors{
-			Article: config.ArticleSelectors{
-				Title:         "h1",
-				Body:          ".article-body",
-				PublishedTime: "time",
-			},
-		},
+		Name:      "test-source",
+		URL:       "http://example.com",
+		RateLimit: time.Second,
+		MaxDepth:  2,
+		Time:      []string{"03:00"},
 	}
 }
 
@@ -123,6 +114,34 @@ func TestNew(t *testing.T) {
 			},
 			wantErr:    true,
 			wantErrMsg: "invalid base URL: not-a-url, must be a valid HTTP/HTTPS URL",
+		},
+		{
+			name: "with source",
+			params: collector.Params{
+				BaseURL:     "http://example.com",
+				MaxDepth:    2,
+				RateLimit:   1 * time.Second,
+				Debugger:    logger.NewCollyDebugger(mockLogger),
+				Logger:      mockLogger,
+				Parallelism: 2,
+				RandomDelay: 2 * time.Second,
+				Context:     t.Context(),
+				ArticleProcessor: &article.ArticleProcessor{
+					Logger:         mockLogger,
+					ArticleService: articleProcessor,
+					Storage:        nil,
+					IndexName:      "test-index",
+				},
+				Source: &config.Source{
+					Name:      "test-source",
+					URL:       "http://example.com",
+					RateLimit: time.Second,
+					MaxDepth:  2,
+					Time:      []string{"03:00"},
+				},
+				Done: make(chan struct{}),
+			},
+			wantErr: false,
 		},
 	}
 
@@ -220,20 +239,22 @@ func TestCollectorCreation(t *testing.T) {
 		{
 			name: "valid config",
 			cfg: &config.Source{
-				Name:         "test-source",
-				URL:          "http://example.com",
-				ArticleIndex: "test_articles",
-				Index:        "test_content",
-				RateLimit:    time.Second,
-				MaxDepth:     2,
-				Time:         []string{"03:00"},
-				Selectors: config.SourceSelectors{
-					Article: config.ArticleSelectors{
-						Title:         "h1",
-						Body:          ".article-body",
-						PublishedTime: "time",
-					},
-				},
+				Name:      "test-source",
+				URL:       "http://example.com",
+				RateLimit: time.Second,
+				MaxDepth:  2,
+				Time:      []string{"03:00"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "with source",
+			cfg: &config.Source{
+				Name:      "test-source",
+				URL:       "http://example.com",
+				RateLimit: time.Second,
+				MaxDepth:  2,
+				Time:      []string{"03:00"},
 			},
 			wantErr: false,
 		},

@@ -124,7 +124,7 @@ var Module = fx.Module("crawler",
 type Params struct {
 	fx.In
 
-	Logger       common.Logger
+	Logger       logger.Interface
 	Debugger     debug.Debugger   `optional:"true"`
 	IndexManager api.IndexManager `name:"indexManager"`
 	Sources      sources.Interface
@@ -138,7 +138,7 @@ type Result struct {
 }
 
 // ProvideCollyDebugger creates a new debugger instance.
-func ProvideCollyDebugger(logger common.Logger) debug.Debugger {
+func ProvideCollyDebugger(logger logger.Interface) debug.Debugger {
 	return &debug.LogDebugger{
 		Output: newDebugLogger(logger),
 	}

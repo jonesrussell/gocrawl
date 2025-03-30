@@ -32,16 +32,16 @@ func (m *MockSourceManager) FindByName(name string) (*sources.Config, error) {
 }
 
 // GetSources implements sources.Interface
-func (m *MockSourceManager) GetSources() []sources.Config {
+func (m *MockSourceManager) GetSources() ([]sources.Config, error) {
 	args := m.Called()
 	result := args.Get(0)
 	if result == nil {
-		return nil
+		return nil, args.Error(1)
 	}
 	if val, ok := result.([]sources.Config); ok {
-		return val
+		return val, args.Error(1)
 	}
-	return nil
+	return nil, args.Error(1)
 }
 
 // Validate implements sources.Interface

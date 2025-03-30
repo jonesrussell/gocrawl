@@ -91,7 +91,8 @@ func NewServiceWithConfig(p ServiceParams) Interface {
 	sources := p.Config.GetSources()
 	for _, source := range sources {
 		if source.Name == p.Source {
-			selectors = source.Selectors.Article
+			// Use default selectors since we no longer have selectors in the Source struct
+			selectors = config.ArticleSelectors{}
 			break
 		}
 	}

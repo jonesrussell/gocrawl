@@ -83,15 +83,11 @@ func LoadFromFile(path string) (*Sources, error) {
 		}
 
 		configs = append(configs, Config{
-			Name:         src.Name,
-			URL:          src.URL,
-			RateLimit:    rateLimit,
-			MaxDepth:     src.MaxDepth,
-			ArticleIndex: src.ArticleIndex,
-			Index:        src.Index,
-			Time:         src.Time,
-			Selectors:    NewSelectorConfigFromLoader(src),
-			Metadata:     src.Metadata,
+			Name:      src.Name,
+			URL:       src.URL,
+			RateLimit: rateLimit,
+			MaxDepth:  src.MaxDepth,
+			Time:      src.Time,
 		})
 	}
 
@@ -117,8 +113,8 @@ func (s *Sources) FindByName(name string) (*Config, error) {
 }
 
 // GetSources returns all available sources.
-func (s *Sources) GetSources() []Config {
-	return s.sources
+func (s *Sources) GetSources() ([]Config, error) {
+	return s.sources, nil
 }
 
 // Validate checks if a source configuration is valid.
@@ -191,34 +187,6 @@ func articleSelectorsFromLoader(selectors loader.ArticleSelectors) ArticleSelect
 	}
 }
 
-// articleSelectorsFromConfig creates ArticleSelectors from config.ArticleSelectors
-func articleSelectorsFromConfig(selectors config.ArticleSelectors) ArticleSelectors {
-	return ArticleSelectors{
-		Container:     selectors.Container,
-		Title:         selectors.Title,
-		Body:          selectors.Body,
-		Intro:         selectors.Intro,
-		Byline:        selectors.Byline,
-		PublishedTime: selectors.PublishedTime,
-		TimeAgo:       selectors.TimeAgo,
-		JSONLD:        selectors.JSONLD,
-		Section:       selectors.Section,
-		Keywords:      selectors.Keywords,
-		Description:   selectors.Description,
-		OGTitle:       selectors.OGTitle,
-		OGDescription: selectors.OGDescription,
-		OGImage:       selectors.OGImage,
-		OgURL:         selectors.OgURL,
-		Canonical:     selectors.Canonical,
-		WordCount:     selectors.WordCount,
-		PublishDate:   selectors.PublishDate,
-		Category:      selectors.Category,
-		Tags:          selectors.Tags,
-		Author:        selectors.Author,
-		BylineName:    selectors.BylineName,
-	}
-}
-
 // loaderConfigWrapper wraps loader.Config to implement selectorSource
 type loaderConfigWrapper struct {
 	loader.Config
@@ -234,7 +202,8 @@ type sourceWrapper struct {
 }
 
 func (w sourceWrapper) GetArticleSelectors() ArticleSelectors {
-	return articleSelectorsFromConfig(w.Selectors.Article)
+	// Return empty selectors since we no longer have selectors in the Source struct
+	return ArticleSelectors{}
 }
 
 // newArticleSelectors creates ArticleSelectors from a source with selectors

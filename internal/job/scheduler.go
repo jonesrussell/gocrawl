@@ -3,6 +3,7 @@ package job
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -108,7 +109,10 @@ func (s *Scheduler) Stop() error {
 
 // runJobs runs all configured jobs.
 func (s *Scheduler) runJobs(ctx context.Context) error {
-	sources := s.sources.GetSources()
+	sources, sourceErr := s.sources.GetSources()
+	if sourceErr != nil {
+		return fmt.Errorf("failed to get sources: %w", sourceErr)
+	}
 	s.logger.Info("Running jobs for sources", "count", len(sources))
 	for _, source := range sources {
 		select {

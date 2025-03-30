@@ -65,7 +65,8 @@ func TestLoadFromFile(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
-	allSources := s.GetSources()
+	allSources, err := s.GetSources()
+	require.NoError(t, err)
 	require.Len(t, allSources, 1)
 	require.Equal(t, "test_source", allSources[0].Name)
 	require.Equal(t, "https://example.com", allSources[0].URL)

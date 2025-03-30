@@ -18,39 +18,11 @@ func ConvertSourceConfig(source *sources.Config) *config.Source {
 	}
 
 	return &config.Source{
-		Name:         source.Name,
-		URL:          source.URL,
-		ArticleIndex: source.ArticleIndex,
-		Index:        source.Index,
-		RateLimit:    source.RateLimit,
-		MaxDepth:     source.MaxDepth,
-		Time:         source.Time,
-		Selectors: config.SourceSelectors{
-			Article: config.ArticleSelectors{
-				Container:     source.Selectors.Article.Container,
-				Title:         source.Selectors.Article.Title,
-				Body:          source.Selectors.Article.Body,
-				Intro:         source.Selectors.Article.Intro,
-				Byline:        source.Selectors.Article.Byline,
-				PublishedTime: source.Selectors.Article.PublishedTime,
-				TimeAgo:       source.Selectors.Article.TimeAgo,
-				JSONLD:        source.Selectors.Article.JSONLD,
-				Section:       source.Selectors.Article.Section,
-				Keywords:      source.Selectors.Article.Keywords,
-				Description:   source.Selectors.Article.Description,
-				OGTitle:       source.Selectors.Article.OGTitle,
-				OGDescription: source.Selectors.Article.OGDescription,
-				OGImage:       source.Selectors.Article.OGImage,
-				OgURL:         source.Selectors.Article.OgURL,
-				Canonical:     source.Selectors.Article.Canonical,
-				WordCount:     source.Selectors.Article.WordCount,
-				PublishDate:   source.Selectors.Article.PublishDate,
-				Category:      source.Selectors.Article.Category,
-				Tags:          source.Selectors.Article.Tags,
-				Author:        source.Selectors.Article.Author,
-				BylineName:    source.Selectors.Article.BylineName,
-			},
-		},
+		Name:      source.Name,
+		URL:       source.URL,
+		RateLimit: source.RateLimit,
+		MaxDepth:  source.MaxDepth,
+		Time:      source.Time,
 	}
 }
 

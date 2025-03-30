@@ -3,7 +3,7 @@
 package sources
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/pkg/config"
 	"go.uber.org/fx"
 )
 
@@ -21,7 +21,7 @@ type Interface interface {
 	Validate(source *Config) error
 
 	// GetSources returns all available sources.
-	GetSources() []Config
+	GetSources() ([]Config, error)
 }
 
 // Module provides the sources module's dependencies.
@@ -50,22 +50,23 @@ type Result struct {
 // provideSources creates a new sources instance.
 func provideSources(p Params) Interface {
 	var configs []Config
-	sources := p.Config.GetSources()
-	for _, src := range sources {
-		configs = append(configs, Config{
-			Name:         src.Name,
-			URL:          src.URL,
-			RateLimit:    src.RateLimit,
-			MaxDepth:     src.MaxDepth,
-			ArticleIndex: src.ArticleIndex,
-			Index:        src.Index,
-			Time:         src.Time,
-			Selectors:    NewSelectorConfigFromSource(src),
-			Metadata:     src.Metadata,
-		})
-	}
-	if len(configs) == 0 {
+	sources, err := p.Config.GetSources()
+	if err != nil {
+		// If there's an error getting sources, use a default config
 		configs = append(configs, *NewConfig())
+	} else {
+		for _, src := range sources {
+			configs = append(configs, Config{
+				Name:      src.Name,
+				URL:       src.URL,
+				RateLimit: src.RateLimit,
+				MaxDepth:  src.MaxDepth,
+				Time:      src.Time,
+			})
+		}
+		if len(configs) == 0 {
+			configs = append(configs, *NewConfig())
+		}
 	}
 	return &Sources{
 		sources: configs,

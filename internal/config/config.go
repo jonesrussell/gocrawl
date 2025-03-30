@@ -158,16 +158,8 @@ type Source struct {
 	RateLimit time.Duration `yaml:"rate_limit"`
 	// MaxDepth defines how deep to crawl this source
 	MaxDepth int `yaml:"max_depth"`
-	// ArticleIndex is the Elasticsearch index for storing articles
-	ArticleIndex string `yaml:"article_index"`
-	// Index is the Elasticsearch index for storing non-article content
-	Index string `yaml:"index"`
 	// Time defines which time-related fields to extract
 	Time []string `yaml:"time,omitempty"`
-	// Selectors defines how to extract content from pages
-	Selectors SourceSelectors `yaml:"selectors"`
-	// Metadata contains additional metadata for the source
-	Metadata map[string]string `yaml:"metadata,omitempty"`
 }
 
 // SourceSelectors defines the selectors for a source.
