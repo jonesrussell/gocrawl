@@ -3,7 +3,6 @@ package sources
 
 import (
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"time"
@@ -11,17 +10,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// LoadFromFile loads source configurations from a file.
+// FileConfig represents the configuration file structure.
+type FileConfig struct {
+	Sources []struct {
+		Name      string        `yaml:"name"`
+		URL       string        `yaml:"url"`
+		RateLimit time.Duration `yaml:"rate_limit"`
+		MaxDepth  int           `yaml:"max_depth"`
+		Time      []string      `yaml:"time"`
+	} `yaml:"sources"`
+}
+
+// LoadFromFile loads source configurations from a YAML file.
 func LoadFromFile(path string) ([]Config, error) {
-	file, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	var configs []Config
@@ -42,29 +46,37 @@ func LoadFromFile(path string) ([]Config, error) {
 // ValidateConfig validates a source configuration.
 func ValidateConfig(cfg *Config) error {
 	if cfg == nil {
-		return ErrInvalidSource
+		return fmt.Errorf("config cannot be nil")
 	}
+
 	if cfg.Name == "" {
-		return fmt.Errorf("%w: name is required", ErrInvalidSource)
+		return fmt.Errorf("name is required")
 	}
+
 	if cfg.URL == "" {
-		return fmt.Errorf("%w: URL is required", ErrInvalidSource)
+		return fmt.Errorf("URL is required")
 	}
+
 	if _, err := url.Parse(cfg.URL); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidURL, err)
+		return fmt.Errorf("invalid URL: %w", err)
 	}
-	if cfg.RateLimit < 0 {
-		return fmt.Errorf("%w: rate limit must be positive", ErrInvalidRateLimit)
+
+	if cfg.RateLimit <= 0 {
+		return fmt.Errorf("rate limit must be positive")
 	}
-	if cfg.MaxDepth < 0 {
-		return fmt.Errorf("%w: max depth must be positive", ErrInvalidMaxDepth)
+
+	if cfg.MaxDepth <= 0 {
+		return fmt.Errorf("max depth must be positive")
 	}
+
+	// Validate time format if provided
 	if len(cfg.Time) > 0 {
 		for _, t := range cfg.Time {
 			if _, err := time.Parse("15:04", t); err != nil {
-				return fmt.Errorf("%w: invalid time format %s", ErrInvalidTime, t)
+				return fmt.Errorf("invalid time format: %w", err)
 			}
 		}
 	}
+
 	return nil
 }
