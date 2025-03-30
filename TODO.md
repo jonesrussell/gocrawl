@@ -21,55 +21,159 @@
   - [ ] Create separate sources module
     - [ ] Move sources interface to pkg/sources
       - [ ] Create pkg/sources/interface.go
+        - [ ] Define Interface type with required methods
+        - [ ] Add interface documentation
+        - [ ] Add interface examples
+        - [ ] Add interface validation
+      - [ ] Create pkg/sources/types.go
+        - [ ] Define Config struct
+        - [ ] Define Params struct
+        - [ ] Add type documentation
+        - [ ] Add type validation
+      - [ ] Create pkg/sources/errors.go
+        - [ ] Define error types
+        - [ ] Add error documentation
+        - [ ] Add error examples
+    - [ ] Create sources module for dependency injection
+      - [ ] Create pkg/sources/module.go
+        - [ ] Define Module variable
+        - [ ] Add module documentation
+        - [ ] Add module examples
+        - [ ] Add module validation
+      - [ ] Create pkg/sources/loader.go
+        - [ ] Implement source loading
+        - [ ] Add loader documentation
+        - [ ] Add loader examples
+        - [ ] Add loader validation
+    - [ ] Add sources tests
+      - [ ] Create pkg/sources/sources_test.go
+        - [ ] Add interface tests
+        - [ ] Add module tests
+        - [ ] Add integration tests
+      - [ ] Create pkg/sources/loader_test.go
+        - [ ] Add loader tests
+        - [ ] Add validation tests
+        - [ ] Add error tests
+    - [ ] Update commands to use new sources module
+      - [ ] Update job command
+        - [ ] Update dependencies
+        - [ ] Update tests
+        - [ ] Update documentation
+      - [ ] Update crawl command
+        - [ ] Update dependencies
+        - [ ] Update tests
+        - [ ] Update documentation
+      - [ ] Update httpd command
+        - [ ] Update dependencies
+        - [ ] Update tests
+        - [ ] Update documentation
+    - [ ] Add HTTP client error handling
+      - [ ] Add proper response body closure
+        - [ ] Add defer statements
+        - [ ] Add error handling
+        - [ ] Add tests
+      - [ ] Add proper context handling
+        - [ ] Add context timeouts
+        - [ ] Add context cancellation
+        - [ ] Add tests
+      - [ ] Add proper timeout handling
+        - [ ] Add timeout configuration
+        - [ ] Add timeout errors
+        - [ ] Add tests
+    - [ ] Add examples
+      - [ ] Add usage examples
+        - [ ] Add basic usage
+        - [ ] Add advanced usage
+        - [ ] Add error handling
+      - [ ] Add test examples
+        - [ ] Add unit tests
+        - [ ] Add integration tests
+        - [ ] Add mock examples
+      - [ ] Add error handling examples
+        - [ ] Add error types
+        - [ ] Add error wrapping
+        - [ ] Add error recovery
+      - [ ] Add configuration examples
+        - [ ] Add basic config
+        - [ ] Add advanced config
+        - [ ] Add validation
+  - [ ] Create separate storage module
+    - [ ] Move storage interface to pkg/storage
+      - [ ] Create pkg/storage/interface.go
       - [ ] Define Interface type
       - [ ] Add interface documentation
       - [ ] Add interface examples
-    - [ ] Create sources module for dependency injection
-      - [ ] Create pkg/sources/module.go
+    - [ ] Create storage module for dependency injection
+      - [ ] Create pkg/storage/module.go
       - [ ] Define Module variable
       - [ ] Add module documentation
       - [ ] Add module examples
-    - [ ] Add sources tests
-      - [ ] Create pkg/sources/sources_test.go
+    - [ ] Add storage tests
+      - [ ] Create pkg/storage/storage_test.go
       - [ ] Add interface tests
       - [ ] Add module tests
       - [ ] Add integration tests
-    - [ ] Update commands to use new sources module
+    - [ ] Update commands to use new storage module
       - [ ] Update job command
       - [ ] Update crawl command
       - [ ] Update httpd command
-    - [ ] Add HTTP client error handling
-      - [ ] Add proper response body closure
-      - [ ] Add proper context handling
-      - [ ] Add proper timeout handling
-    - [ ] Add examples
-      - [ ] Add usage examples
-      - [ ] Add test examples
-      - [ ] Add error handling examples
-      - [ ] Add configuration examples
-  - [ ] Create separate storage module
-    - [ ] Move storage interface to pkg/storage
-    - [ ] Create storage module for dependency injection
-    - [ ] Add storage tests
-    - [ ] Update commands to use new storage module
   - [ ] Create separate metrics module
     - [ ] Move metrics interface to pkg/metrics
+      - [ ] Create pkg/metrics/interface.go
+      - [ ] Define Interface type
+      - [ ] Add interface documentation
+      - [ ] Add interface examples
     - [ ] Create metrics module for dependency injection
+      - [ ] Create pkg/metrics/module.go
+      - [ ] Define Module variable
+      - [ ] Add module documentation
+      - [ ] Add module examples
     - [ ] Add metrics tests
+      - [ ] Create pkg/metrics/metrics_test.go
+      - [ ] Add interface tests
+      - [ ] Add module tests
+      - [ ] Add integration tests
     - [ ] Update commands to use new metrics module
+      - [ ] Update job command
+      - [ ] Update crawl command
+      - [ ] Update httpd command
 - [ ] Make dependencies explicit in each module
   - [x] Remove implicit dependencies from common module
     - [x] Remove logger dependency from common module
     - [x] Remove config dependency from common module
     - [ ] Remove sources dependency from common module
+      - [ ] Remove sources imports
+      - [ ] Remove sources types
+      - [ ] Remove sources functions
+      - [ ] Update tests
     - [ ] Remove storage dependency from common module
+      - [ ] Remove storage imports
+      - [ ] Remove storage types
+      - [ ] Remove storage functions
+      - [ ] Update tests
     - [ ] Remove metrics dependency from common module
+      - [ ] Remove metrics imports
+      - [ ] Remove metrics types
+      - [ ] Remove metrics functions
+      - [ ] Update tests
   - [x] Add explicit dependency declarations in each module
     - [x] Add logger dependency declarations
     - [x] Add config dependency declarations
     - [ ] Add sources dependency declarations
+      - [ ] Add logger dependency
+      - [ ] Add config dependency
+      - [ ] Add validation
+      - [ ] Add tests
     - [ ] Add storage dependency declarations
+      - [ ] Add logger dependency
+      - [ ] Add config dependency
+      - [ ] Add validation
+      - [ ] Add tests
     - [ ] Add metrics dependency declarations
+      - [ ] Add logger dependency
+      - [ ] Add config dependency
+      - [ ] Add validation
+      - [ ] Add tests
   - [x] Update module tests to reflect explicit dependencies
     - [x] Update logger module tests
     - [x] Update config module tests
