@@ -125,8 +125,8 @@ sources:
 
 				elasticCfg := cfg.GetElasticsearchConfig()
 				require.Equal(t, []string{"https://localhost:9200"}, elasticCfg.Addresses)
-				require.Equal(t, "", elasticCfg.Username)
-				require.Equal(t, "", elasticCfg.Password)
+				require.Empty(t, elasticCfg.Username)
+				require.Empty(t, elasticCfg.Password)
 				require.Equal(t, "test_api_key", elasticCfg.APIKey)
 				require.True(t, elasticCfg.TLS.SkipVerify)
 			},

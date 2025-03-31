@@ -39,9 +39,7 @@ type SearchResponse struct {
 var Module = fx.Module("api",
 	fx.Provide(
 		// Provide a no-op logger for testing
-		func() types.Logger {
-			return common.NewNoOpLogger()
-		},
+		common.NewNoOpLogger,
 		// Provide the server and security middleware together to avoid circular dependencies
 		func(
 			log types.Logger,

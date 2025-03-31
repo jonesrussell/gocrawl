@@ -69,7 +69,7 @@ func setupTestDeps(t *testing.T) *testDeps {
 func createTestApp(t *testing.T, deps *testDeps, hooks ...fx.Hook) *fx.App {
 	t.Helper()
 
-	providers := []interface{}{
+	providers := []any{
 		// Core dependencies
 		func() crawler.Interface { return deps.Crawler },
 		func() types.Interface { return deps.Storage },

@@ -191,12 +191,12 @@ var defaultLog = struct {
 					formattedArgs = append(formattedArgs, args[i], args[i+1])
 				}
 			}
-			_, err := os.Stdout.WriteString(fmt.Sprintf("INFO: %s %v\n", msg, formattedArgs))
+			_, err := fmt.Fprintf(os.Stdout, "INFO: %s %v\n", msg, formattedArgs)
 			if err != nil {
 				return
 			}
 		} else {
-			_, err := os.Stdout.WriteString(fmt.Sprintf("INFO: %s\n", msg))
+			_, err := fmt.Fprintf(os.Stdout, "INFO: %s\n", msg)
 			if err != nil {
 				return
 			}
@@ -211,12 +211,12 @@ var defaultLog = struct {
 					formattedArgs = append(formattedArgs, args[i], args[i+1])
 				}
 			}
-			_, err := os.Stderr.WriteString(fmt.Sprintf("WARN: %s %v\n", msg, formattedArgs))
+			_, err := fmt.Fprintf(os.Stderr, "WARN: %s %v\n", msg, formattedArgs)
 			if err != nil {
 				return
 			}
 		} else {
-			_, err := os.Stderr.WriteString(fmt.Sprintf("WARN: %s\n", msg))
+			_, err := fmt.Fprintf(os.Stderr, "WARN: %s\n", msg)
 			if err != nil {
 				return
 			}
