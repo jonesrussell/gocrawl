@@ -1,4 +1,6 @@
-// Package crawler provides core crawling functionality.
+// Package crawler provides the core crawling functionality for GoCrawl.
+// It manages the crawling process, including URL processing, rate limiting,
+// and content extraction.
 package crawler
 
 import (
@@ -16,7 +18,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"go.uber.org/fx"
 )
@@ -48,171 +49,146 @@ type Interface interface {
 	GetMetrics() *collector.Metrics
 }
 
-// Module provides the crawler's dependencies.
+// Result holds the crawler module's output.
+type Result struct {
+	fx.Out
+	Crawler Interface
+}
+
+// Module provides the crawler module's dependencies.
 var Module = fx.Module("crawler",
-	// Core dependencies
-	article.Module,
-	content.Module,
 	fx.Provide(
-		ProvideCollyDebugger,
-		ProvideEventBus,
-		ProvideCrawler,
-		// Article channel named instance
+		// Provide core dependencies
+		func() context.Context {
+			return context.Background()
+		},
+		// Provide named dependencies
+		fx.Annotate(
+			func() chan struct{} {
+				return make(chan struct{})
+			},
+			fx.ResultTags(`name:"crawlerDoneChannel"`),
+		),
 		fx.Annotate(
 			func() chan *models.Article {
-				return make(chan *models.Article, ArticleChannelBufferSize)
+				return make(chan *models.Article)
 			},
 			fx.ResultTags(`name:"crawlerArticleChannel"`),
 		),
-		// Article index name
 		fx.Annotate(
-			func(cfg config.Interface) string {
-				return cfg.GetElasticsearchConfig().IndexName
+			func() string {
+				return "articles"
 			},
 			fx.ResultTags(`name:"indexName"`),
 		),
-		// Content index name
+		// Provide event bus
+		events.NewBus,
+		// Provide debugger
+		func(logger common.Logger) debug.Debugger {
+			return &debug.LogDebugger{
+				Output: NewDebugLogger(logger),
+			}
+		},
+		// Provide processors
 		fx.Annotate(
-			func() string {
-				return "content"
+			func(cfg config.Interface, logger common.Logger) collector.Processor {
+				return NewArticleProcessor(cfg, logger)
 			},
-			fx.ResultTags(`name:"contentIndex"`),
+			fx.ResultTags(`name:"articleProcessor"`),
 		),
-		// Article processor
 		fx.Annotate(
-			func(
-				log common.Logger,
-				articleService article.Interface,
-				storage types.Interface,
-				params struct {
-					fx.In
-					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
-					IndexName   string               `name:"indexName"`
-				},
-			) collector.Processor {
-				log.Debug("Providing article processor")
-				return &article.ArticleProcessor{
-					Logger:         log,
-					ArticleService: articleService,
-					Storage:        storage,
-					IndexName:      params.IndexName,
-					ArticleChan:    params.ArticleChan,
-				}
+			func(cfg config.Interface, logger common.Logger) collector.Processor {
+				return NewContentProcessor(cfg, logger)
 			},
-			fx.ResultTags(`group:"processors"`),
+			fx.ResultTags(`name:"contentProcessor"`),
 		),
-		// Content processor
+		// Provide crawler with all dependencies
 		fx.Annotate(
-			func(
-				log common.Logger,
-				contentService content.Interface,
-				storage types.Interface,
-				params struct {
-					fx.In
-					IndexName string `name:"contentIndex"`
-				},
-			) collector.Processor {
-				log.Debug("Providing content processor")
-				return content.NewProcessor(contentService, storage, log, params.IndexName)
-			},
-			fx.ResultTags(`group:"processors"`),
+			ProvideCrawler,
+			fx.ParamTags(
+				``,
+				``,
+				``,
+				``,
+				`name:"articleProcessor"`,
+				`name:"contentProcessor"`,
+				``,
+			),
 		),
 	),
 )
 
-// Params defines the required dependencies for the crawler module.
-type Params struct {
-	fx.In
-
-	Logger       common.Logger
-	Debugger     debug.Debugger `optional:"true"`
-	IndexManager api.IndexManager
-	Sources      sources.Interface
-	Processors   []collector.Processor `group:"processors"`
-}
-
-// Result contains the components provided by the crawler module.
-type Result struct {
-	fx.Out
-
-	Crawler Interface
-}
-
-// ProvideCollyDebugger creates a new debugger instance.
-func ProvideCollyDebugger(logger common.Logger) debug.Debugger {
-	return &debug.LogDebugger{
-		Output: newDebugLogger(logger),
-	}
-}
-
-// ProvideEventBus creates a new event bus instance.
-func ProvideEventBus() *events.Bus {
-	return events.NewBus()
-}
-
-// ProvideCrawler creates a new crawler instance.
-func ProvideCrawler(p Params, bus *events.Bus) (Result, error) {
+// ProvideCrawler creates a new crawler instance with all dependencies.
+func ProvideCrawler(
+	logger common.Logger,
+	debugger debug.Debugger,
+	indexManager api.IndexManager,
+	sources sources.Interface,
+	articleProcessor collector.Processor,
+	contentProcessor collector.Processor,
+	bus *events.Bus,
+) Result {
 	// Get sources
-	sources, err := p.Sources.GetSources()
+	sourcesList, err := sources.GetSources()
 	if err != nil {
-		return Result{}, fmt.Errorf("failed to get sources: %w", err)
+		logger.Error("Failed to get sources", "error", err)
+		return Result{}
 	}
-	if len(sources) == 0 {
-		return Result{}, fmt.Errorf("no sources configured")
+
+	if len(sourcesList) == 0 {
+		logger.Error("No sources configured")
+		return Result{}
 	}
+
+	// Get the first source for now (we'll update this to use the correct source name later)
+	source := sourcesList[0]
 
 	// Create collector params
 	params := collector.Params{
-		BaseURL:     sources[0].URL,
-		MaxDepth:    sources[0].MaxDepth,
-		RateLimit:   sources[0].RateLimit,
-		Logger:      p.Logger,
+		BaseURL:     source.URL,
+		MaxDepth:    source.MaxDepth,
+		RateLimit:   source.RateLimit,
+		Logger:      logger,
 		Context:     context.Background(),
 		Done:        make(chan struct{}),
 		Parallelism: 2, // Set a default parallelism value
 		Source: &config.Source{
-			URL:       sources[0].URL,
-			MaxDepth:  sources[0].MaxDepth,
-			RateLimit: sources[0].RateLimit,
+			URL:       source.URL,
+			MaxDepth:  source.MaxDepth,
+			RateLimit: source.RateLimit,
 		},
 	}
 
 	// Add processors
-	for _, processor := range p.Processors {
-		if articleProcessor, ok := processor.(*article.ArticleProcessor); ok {
-			params.ArticleProcessor = articleProcessor
-			p.Logger.Debug("Added article processor")
-		}
-		if contentProcessor, ok := processor.(*content.ContentProcessor); ok {
-			params.ContentProcessor = contentProcessor
-			p.Logger.Debug("Added content processor")
-		}
-	}
+	params.ArticleProcessor = articleProcessor
+	params.ContentProcessor = contentProcessor
 
-	// Validate processors
-	if params.ArticleProcessor == nil {
-		return Result{}, fmt.Errorf("article processor is required")
-	}
+	logger.Debug("Added processors",
+		"article", fmt.Sprintf("%T", articleProcessor),
+		"content", fmt.Sprintf("%T", contentProcessor))
 
 	// Create collector
 	result, err := collector.New(params)
 	if err != nil {
-		return Result{}, fmt.Errorf("failed to create collector: %w", err)
+		logger.Error("Failed to create collector", "error", err)
+		return Result{}
 	}
 
+	// Create crawler instance
 	c := &Crawler{
 		collector:    result.Collector,
-		Logger:       p.Logger,
-		Debugger:     p.Debugger,
+		Logger:       logger,
+		Debugger:     debugger,
 		bus:          bus,
-		indexManager: p.IndexManager,
-		sources:      p.Sources,
+		indexManager: indexManager,
+		sources:      sources,
 	}
-	return Result{Crawler: c}, nil
+
+	return Result{Crawler: c}
 }
 
 func NewContentProcessor(
-	cfg *config.Config,
+	cfg config.Interface,
 	logger common.Logger,
 ) collector.Processor {
 	service := content.NewService(logger)
@@ -220,7 +196,7 @@ func NewContentProcessor(
 }
 
 func NewArticleProcessor(
-	cfg *config.Config,
+	cfg config.Interface,
 	logger common.Logger,
 ) collector.Processor {
 	service := article.NewService(logger, config.DefaultArticleSelectors(), nil, "articles")

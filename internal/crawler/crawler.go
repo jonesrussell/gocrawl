@@ -3,131 +3,64 @@ package crawler
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sync"
+	"net/url"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
-	"github.com/jonesrussell/gocrawl/pkg/logger"
 )
 
-// Crawler represents a web crawler instance.
+// Crawler implements the crawler Interface.
 type Crawler struct {
 	collector    *colly.Collector
-	Logger       logger.Interface
+	Logger       common.Logger
 	Debugger     debug.Debugger
 	bus          *events.Bus
-	baseURL      string
-	ctx          context.Context
-	cancel       context.CancelFunc
 	indexManager api.IndexManager
 	sources      sources.Interface
-	done         chan struct{}
-	mu           sync.RWMutex
-	metrics      *collector.Metrics
 }
 
 var _ Interface = (*Crawler)(nil)
 
-// Start begins the crawling process at the specified base URL.
+// Start begins crawling from the given base URL.
 func (c *Crawler) Start(ctx context.Context, sourceName string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Logger.Info("Starting crawler", "source", sourceName)
 
-	// Get the source configuration
+	// Get source configuration
 	source, err := c.sources.FindByName(sourceName)
 	if err != nil {
-		return fmt.Errorf("failed to find source %s: %w", sourceName, err)
+		return fmt.Errorf("failed to get source configuration: %w", err)
 	}
 
-	if source.URL == "" {
-		return errors.New("source URL cannot be empty")
-	}
-
-	// Initialize crawler state
-	c.baseURL = source.URL
-	c.ctx, c.cancel = context.WithCancel(ctx)
-	c.done = make(chan struct{})
-	c.metrics = collector.NewMetrics()
-
-	// Ensure collector is initialized
-	if c.collector == nil {
-		return errors.New("collector not initialized")
-	}
-
-	// Configure collector based on source
-	params := collector.Params{
-		BaseURL:   source.URL,
-		MaxDepth:  source.MaxDepth,
-		RateLimit: source.RateLimit,
-		Logger:    c.Logger,
-		Context:   c.ctx,
-		Done:      c.done,
-		Source: &config.Source{
-			URL:       source.URL,
-			MaxDepth:  source.MaxDepth,
-			RateLimit: source.RateLimit,
-		},
-	}
-	if c.Debugger != nil {
-		params.Debugger = logger.NewCollyDebugger(c.Logger)
-	}
-
-	result, err := collector.New(params)
+	// Parse the source URL to get the domain
+	parsedURL, err := url.Parse(source.URL)
 	if err != nil {
-		return fmt.Errorf("failed to create collector: %w", err)
+		return fmt.Errorf("failed to parse source URL: %w", err)
 	}
-	c.collector = result.Collector
 
-	c.Logger.Info("Starting crawl",
-		"url", c.baseURL,
-		"max_depth", source.MaxDepth,
-		"rate_limit", source.RateLimit)
+	// Update collector configuration
+	c.collector.MaxDepth = source.MaxDepth
+	if err := c.SetRateLimit(source.RateLimit); err != nil {
+		return fmt.Errorf("failed to set rate limit: %w", err)
+	}
 
-	c.setupCallbacks()
+	// Update allowed domains
+	c.collector.AllowedDomains = []string{parsedURL.Hostname()}
 
 	// Start crawling
-	if visitErr := c.collector.Visit(c.baseURL); visitErr != nil {
-		return fmt.Errorf("failed to start crawling: %w", visitErr)
-	}
-
-	// Monitor context for cancellation while waiting
-	go c.monitorContext(c.ctx)
-
-	// Wait for crawling to complete
-	go func() {
-		c.collector.Wait()
-		close(c.done)
-		c.Logger.Info("Crawling completed",
-			"pages_visited", c.metrics.PagesVisited,
-			"articles_found", c.metrics.ArticlesFound,
-			"errors", c.metrics.Errors,
-			"duration", time.Since(time.Unix(c.metrics.StartTime, 0)))
-	}()
-
-	return nil
+	return c.collector.Visit(source.URL)
 }
 
-// Stop gracefully stops the crawler, respecting the provided context.
+// Stop gracefully stops the crawler.
 func (c *Crawler) Stop(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.cancel != nil {
-		c.cancel()
-	}
-
-	if c.collector != nil {
-		c.collector.Wait()
-	}
-
+	c.Logger.Info("Stopping crawler")
+	c.collector.Wait()
 	return nil
 }
 
@@ -138,9 +71,6 @@ func (c *Crawler) Subscribe(handler events.Handler) {
 
 // SetRateLimit sets the crawler's rate limit.
 func (c *Crawler) SetRateLimit(duration time.Duration) error {
-	if c.collector == nil {
-		return errors.New("collector not initialized")
-	}
 	if err := c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: duration,
@@ -153,9 +83,7 @@ func (c *Crawler) SetRateLimit(duration time.Duration) error {
 
 // SetMaxDepth sets the maximum crawl depth.
 func (c *Crawler) SetMaxDepth(depth int) {
-	if c.collector != nil {
-		c.collector.MaxDepth = depth
-	}
+	c.collector.MaxDepth = depth
 }
 
 // SetCollector sets the collector for the crawler.
@@ -170,43 +98,15 @@ func (c *Crawler) GetIndexManager() api.IndexManager {
 
 // Wait blocks until the crawler has finished processing all queued requests.
 func (c *Crawler) Wait() {
-	if c.collector != nil {
-		c.collector.Wait()
-	}
+	c.collector.Wait()
 }
 
 // GetMetrics returns the current crawler metrics.
 func (c *Crawler) GetMetrics() *collector.Metrics {
-	return c.metrics
-}
-
-// monitorContext monitors the context for cancellation.
-func (c *Crawler) monitorContext(ctx context.Context) {
-	<-ctx.Done()
-	if err := c.Stop(ctx); err != nil {
-		c.Logger.Error("Failed to stop crawler", "error", err)
+	return &collector.Metrics{
+		PagesVisited:  int64(c.collector.ID),
+		ArticlesFound: 0,
+		Errors:        0,
+		StartTime:     time.Now().Unix(),
 	}
-}
-
-// setupCallbacks sets up the crawler's event callbacks.
-func (c *Crawler) setupCallbacks() {
-	if c.collector == nil {
-		return
-	}
-
-	c.collector.OnRequest(func(r *colly.Request) {
-		// No need to update LastRequestTime as it's not part of the metrics struct
-	})
-
-	c.collector.OnResponse(func(r *colly.Response) {
-		c.metrics.PagesVisited++
-	})
-
-	c.collector.OnError(func(r *colly.Response, err error) {
-		c.metrics.Errors++
-		c.Logger.Error("Request error",
-			"url", r.Request.URL.String(),
-			"status_code", r.StatusCode,
-			"error", err)
-	})
 }

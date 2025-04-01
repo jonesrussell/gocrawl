@@ -19,6 +19,22 @@ const (
 	DefaultBodySelector = "article, .article"
 )
 
+// Interface defines the capabilities of the article service.
+type Interface interface {
+	// ExtractArticle extracts article data from the HTML element
+	ExtractArticle(e *colly.HTMLElement) *models.Article
+	// Process handles the processing of an article
+	Process(article *models.Article) error
+	// ExtractMetadata extracts metadata from the HTML element
+	ExtractMetadata(e *colly.HTMLElement) *models.Article
+	// ExtractContent extracts the main content from the HTML element
+	ExtractContent(e *colly.HTMLElement, article *models.Article)
+	// ExtractTags extracts tags from the HTML element and JSON-LD
+	ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string
+	// ParsePublishedDate parses the published date from various sources
+	ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time
+}
+
 // Service implements the Interface
 type Service struct {
 	Logger    common.Logger
@@ -210,6 +226,7 @@ func (s *Service) CleanAuthor(author string) string {
 	return author
 }
 
+// ExtractTags extracts tags from the HTML element and JSON-LD
 func (s *Service) ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string {
 	tags := make([]string, 0)
 
@@ -263,6 +280,7 @@ func RemoveDuplicates(tags []string) []string {
 	return uniqueTags
 }
 
+// ParsePublishedDate parses the published date from various sources
 func (s *Service) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time {
 	datesToTry := []string{
 		jsonLD.DatePublished,

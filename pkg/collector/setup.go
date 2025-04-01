@@ -138,16 +138,22 @@ func shouldRetry(r *colly.Response, err error, count int) bool {
 // Returns:
 //   - *colly.Collector: The configured collector instance
 func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
-	allowedDomains := s.config.AllowedDomains
-	if len(allowedDomains) == 0 {
-		allowedDomains = []string{domain}
+	// Parse the base URL to get the domain
+	baseURL, err := url.Parse(s.config.BaseURL)
+	if err != nil {
+		s.config.Logger.Error("Failed to parse base URL", "error", err)
+		return nil
 	}
 
+	// Set allowed domains to the base URL's domain
+	allowedDomains := []string{baseURL.Hostname()}
+
+	// Create collector with domain restrictions
 	c := colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(s.config.MaxDepth),
-		colly.AllowedDomains(allowedDomains...),
 		colly.MaxBodySize(maxBodySizeMB*megabyte),
+		colly.AllowedDomains(allowedDomains...),
 	)
 
 	c.DisableCookies()

@@ -4,6 +4,8 @@
 package article
 
 import (
+	"fmt"
+
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -46,19 +48,13 @@ type ServiceParams struct {
 	IndexName string `name:"indexName"`
 }
 
-// Module provides article-related dependencies for the application.
-// It provides:
-// - Article service with configuration
-// - Article processor with fx.Annotate for named dependencies
-// The module uses fx.Provide to wire up dependencies and fx.Annotate
-// to specify the processor as part of the "processors" group.
+// Module provides the article module's dependencies.
 var Module = fx.Module("article",
 	fx.Provide(
-		NewServiceWithConfig,
+		// Provide article processor with all dependencies
 		fx.Annotate(
 			func(
-				log common.Logger,
-				service Interface,
+				logger common.Logger,
 				storage types.Interface,
 				params struct {
 					fx.In
@@ -66,15 +62,22 @@ var Module = fx.Module("article",
 					IndexName   string               `name:"indexName"`
 				},
 			) collector.Processor {
-				return &ArticleProcessor{
-					Logger:         log,
+				// Create service with default selectors
+				service := NewService(logger, config.DefaultArticleSelectors(), storage, params.IndexName)
+				logger.Debug("Created article service", "type", fmt.Sprintf("%T", service))
+
+				// Create processor
+				processor := &ArticleProcessor{
+					Logger:         logger,
 					ArticleService: service,
 					Storage:        storage,
 					IndexName:      params.IndexName,
 					ArticleChan:    params.ArticleChan,
 				}
+				logger.Debug("Created article processor", "type", fmt.Sprintf("%T", processor))
+				return processor
 			},
-			fx.ResultTags(`group:"processors"`),
+			fx.ResultTags(`name:"articleProcessor"`),
 		),
 	),
 )

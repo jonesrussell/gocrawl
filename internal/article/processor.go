@@ -2,6 +2,8 @@
 package article
 
 import (
+	"fmt"
+
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -86,5 +88,41 @@ func (p *ArticleProcessor) ProcessContent(e *colly.HTMLElement) {
 		"url", e.Request.URL.String())
 }
 
+// ArticleProcessorWrapper wraps ArticleProcessor to implement both interfaces
+type ArticleProcessorWrapper struct {
+	*ArticleProcessor
+}
+
+// Process implements the collector.ArticleProcessor interface
+func (w *ArticleProcessorWrapper) Process(article any) error {
+	// Convert article to models.Article
+	a, ok := article.(*models.Article)
+	if !ok {
+		w.Logger.Error("Invalid article type",
+			"component", "article/processor",
+			"type", fmt.Sprintf("%T", article))
+		return fmt.Errorf("invalid article type: %T", article)
+	}
+
+	// Process the article
+	if err := w.ArticleService.Process(a); err != nil {
+		w.Logger.Error("Failed to process article",
+			"component", "article/processor",
+			"articleID", a.ID,
+			"error", err)
+		return err
+	}
+
+	// Send to channel if available
+	if w.ArticleChan != nil {
+		w.ArticleChan <- a
+	}
+
+	return nil
+}
+
 // Ensure ArticleProcessor implements collector.Processor
 var _ collector.Processor = (*ArticleProcessor)(nil)
+
+// Ensure ArticleProcessorWrapper implements collector.ArticleProcessor
+var _ collector.ArticleProcessor = (*ArticleProcessorWrapper)(nil)

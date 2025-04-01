@@ -4,11 +4,13 @@ package crawler_test
 import (
 	"testing"
 
+	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -71,9 +73,15 @@ var TestCrawlerModule = fx.Module("crawler",
 	article.Module,
 	content.Module,
 	fx.Provide(
-		// Use the public functions from crawler package
-		crawler.ProvideCollyDebugger,
-		crawler.ProvideEventBus,
+		// Provide debugger
+		func(logger common.Logger) debug.Debugger {
+			return &debug.LogDebugger{
+				Output: crawler.NewDebugLogger(logger),
+			}
+		},
+		// Provide event bus
+		events.NewBus,
+		// Provide crawler
 		crawler.ProvideCrawler,
 		// Article channel named instance
 		fx.Annotate(

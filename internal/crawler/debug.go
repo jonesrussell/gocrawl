@@ -1,21 +1,48 @@
 package crawler
 
 import (
+	"fmt"
+	"io"
+
 	"github.com/jonesrussell/gocrawl/internal/common"
 )
 
-// debugLogger adapts common.Logger to io.Writer for colly debugging.
-type debugLogger struct {
+// Logger defines the interface required for colly debugging.
+type Logger interface {
+	Printf(format string, v ...interface{})
+	Println(v ...interface{})
+}
+
+// DebugLogger implements both Logger and io.Writer interfaces for colly debugging.
+type DebugLogger struct {
 	logger common.Logger
 }
 
-// Write implements io.Writer.
-func (d *debugLogger) Write(p []byte) (int, error) {
+// NewDebugLogger creates a new debug logger instance.
+func NewDebugLogger(logger common.Logger) *DebugLogger {
+	return &DebugLogger{
+		logger: logger,
+	}
+}
+
+// Write implements io.Writer interface.
+func (d *DebugLogger) Write(p []byte) (int, error) {
 	d.logger.Debug(string(p))
 	return len(p), nil
 }
 
-// newDebugLogger creates a new debug logger adapter.
-func newDebugLogger(logger common.Logger) *debugLogger {
-	return &debugLogger{logger: logger}
+// Printf implements Logger interface.
+func (d *DebugLogger) Printf(format string, v ...interface{}) {
+	d.logger.Debug(fmt.Sprintf(format, v...))
 }
+
+// Println implements Logger interface.
+func (d *DebugLogger) Println(v ...interface{}) {
+	d.logger.Debug(fmt.Sprint(v...))
+}
+
+// Ensure DebugLogger implements both interfaces
+var (
+	_ io.Writer = (*DebugLogger)(nil)
+	_ Logger    = (*DebugLogger)(nil)
+)

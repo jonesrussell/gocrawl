@@ -8,12 +8,15 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/article"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/jonesrussell/gocrawl/pkg/config"
-	"github.com/jonesrussell/gocrawl/pkg/logger"
+	pkglogger "github.com/jonesrussell/gocrawl/pkg/logger"
 )
 
 // CollectorResult holds the result of setting up a collector.
@@ -25,7 +28,7 @@ type CollectorResult struct {
 // SetupCollector creates and configures a new collector instance.
 func SetupCollector(
 	ctx context.Context,
-	log logger.Interface,
+	log pkglogger.Interface,
 	source sources.Config,
 	processors []collector.Processor,
 	done chan struct{},
@@ -65,16 +68,34 @@ func SetupCollector(
 	// Create mock index manager for testing
 	indexManager := &api.MockIndexManager{}
 
-	// Create crawler with dependencies
-	crawlerResult, err := crawler.ProvideCrawler(crawler.Params{
-		Logger:       log,
-		Sources:      sources,
-		IndexManager: indexManager,
-		Processors:   processors,
-	}, bus)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create crawler: %w", err)
+	// Find article and content processors
+	var articleProc, contentProc collector.Processor
+	for _, p := range processors {
+		switch p.(type) {
+		case *article.ArticleProcessor:
+			articleProc = p
+		case *content.ContentProcessor:
+			contentProc = p
+		}
 	}
+
+	if articleProc == nil {
+		return nil, errors.New("article processor is required")
+	}
+	if contentProc == nil {
+		return nil, errors.New("content processor is required")
+	}
+
+	// Create crawler with dependencies
+	crawlerResult := crawler.ProvideCrawler(
+		log,
+		logger.NewCollyDebugger(log),
+		indexManager,
+		sources,
+		articleProc,
+		contentProc,
+		bus,
+	)
 
 	// Add processors
 	for _, p := range processors {
