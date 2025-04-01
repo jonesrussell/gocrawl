@@ -7,10 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
@@ -18,16 +15,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-)
-
-// Constants for table formatting
-const (
-
-	// Column width constants
-	sourceColumnWidth   = 80
-	indexesColumnWidth  = 80
-	configColumnWidth   = 25
-	labelFormatterWidth = 8
 )
 
 // Params holds the dependencies required for the list operation.
@@ -83,7 +70,7 @@ func RunList(cmd *cobra.Command, _ []string) error {
 						SourceManager: p.Sources,
 						Logger:        p.Logger,
 					}
-					if err := ExecuteList(*params); err != nil {
+					if err := ExecuteList(*params, ctx); err != nil {
 						p.Logger.Error("Error executing list", "error", err)
 						errChan <- err
 						return err
@@ -137,78 +124,37 @@ func RunList(cmd *cobra.Command, _ []string) error {
 }
 
 // ExecuteList retrieves and displays the list of sources.
-func ExecuteList(params Params) error {
-	allSources, err := params.SourceManager.GetSources()
+func ExecuteList(params Params, ctx context.Context) error {
+	// Get all sources
+	allSources, err := params.SourceManager.ListSources(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get sources: %w", err)
 	}
-	if len(allSources) == 0 {
-		params.Logger.Info("No sources found")
-		return nil
+
+	// Convert []*Config to []Config
+	sources := make([]sources.Config, len(allSources))
+	for i, src := range allSources {
+		sources[i] = *src
 	}
 
-	return PrintSources(allSources, params.Logger)
+	// Print sources
+	if printErr := PrintSources(sources, params.Logger); printErr != nil {
+		return fmt.Errorf("failed to print sources: %w", printErr)
+	}
+	return nil
 }
 
-// PrintSources formats and displays the sources in a table.
+// PrintSources prints the list of sources.
 func PrintSources(sources []sources.Config, logger types.Logger) error {
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-
-	// Configure table style
-	t.SetStyle(table.StyleRounded)
-	t.Style().Options.DrawBorder = true
-	t.Style().Options.SeparateColumns = true
-	t.Style().Options.SeparateRows = true
-	t.Style().Options.SeparateHeader = true
-
-	// Create transformers for consistent formatting
-	labelTransformer := text.Transformer(func(val any) string {
-		str, ok := val.(string)
-		if !ok {
-			return fmt.Sprintf("%-*s", labelFormatterWidth, "ERROR")
-		}
-		return fmt.Sprintf("%-*s", labelFormatterWidth, str)
-	})
-
-	// Set column configurations to prevent truncation and align content
-	t.SetColumnConfigs([]table.ColumnConfig{
-		{
-			Name:     "Source",
-			WidthMax: sourceColumnWidth,
-		},
-		{
-			Name:        "Indexes",
-			WidthMax:    indexesColumnWidth,
-			Align:       text.AlignLeft,
-			Transformer: labelTransformer,
-		},
-		{
-			Name:        "Crawl Config",
-			WidthMax:    configColumnWidth,
-			Align:       text.AlignLeft,
-			Transformer: labelTransformer,
-		},
-	})
-
-	t.AppendHeader(table.Row{"Source", "Indexes", "Crawl Config"})
-
-	for _, source := range sources {
-		sourceInfo := fmt.Sprintf("%s\n%s", source.Name, source.URL)
-		indexes := fmt.Sprintf("Articles: %s\nContent:  %s", source.ArticleIndex, source.Index)
-		crawlConfig := fmt.Sprintf("Rate:    %s\nDepth:    %d", source.RateLimit, source.MaxDepth)
-		t.AppendRow([]any{
-			sourceInfo,
-			indexes,
-			crawlConfig,
-		})
-	}
-
-	if t.Length() == 0 {
+	if len(sources) == 0 {
 		logger.Info("No sources found")
 		return nil
 	}
 
-	t.Render()
+	logger.Info("Found sources", "count", len(sources))
+	for _, source := range sources {
+		logger.Info("Source", "name", source.Name, "url", source.URL)
+	}
+
 	return nil
 }

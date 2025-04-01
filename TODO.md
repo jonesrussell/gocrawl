@@ -68,23 +68,23 @@
         - [ ] Update tests
         - [ ] Update documentation
     - [ ] Combine internal/sources and pkg/sources
-      - [ ] Move unique functionality from pkg/sources to internal/sources
-        - [ ] Move interface definitions
-        - [ ] Move type definitions
-        - [ ] Move error definitions
-        - [ ] Move loader implementation
-      - [ ] Update all references to use internal/sources
-        - [ ] Update imports in all files
-        - [ ] Update type references
-        - [ ] Update interface references
-      - [ ] Delete pkg/sources package
-        - [ ] Remove all files
-        - [ ] Update documentation
-      - [ ] Update test files
-        - [ ] Update imports
-        - [ ] Update type references
-        - [ ] Update interface references
-        - [ ] Update mock implementations
+      - [x] Move unique functionality from pkg/sources to internal/sources
+        - [x] Move interface definitions
+        - [x] Move type definitions
+        - [x] Move error definitions
+        - [x] Move loader implementation
+      - [x] Update all references to use internal/sources
+        - [x] Update imports in all files
+        - [x] Update type references
+        - [x] Update interface references
+      - [x] Delete pkg/sources package
+        - [x] Remove all files
+        - [x] Update documentation
+      - [x] Update test files
+        - [x] Update imports
+        - [x] Update type references
+        - [x] Update interface references
+        - [x] Update mock implementations
       - [ ] Verify all functionality works
         - [ ] Run all tests
         - [ ] Check coverage

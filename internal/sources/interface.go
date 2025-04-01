@@ -23,6 +23,10 @@ type Interface interface {
 	ValidateSource(source *Config) error
 	// GetMetrics returns the current metrics.
 	GetMetrics() Metrics
+	// FindByName finds a source by name.
+	FindByName(name string) (*Config, error)
+	// GetSources retrieves all source configurations.
+	GetSources() ([]Config, error)
 }
 
 // Params defines the parameters for creating a new Sources instance.

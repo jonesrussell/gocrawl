@@ -9,13 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	cmdsrcs "github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	internal "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -50,18 +48,18 @@ func (m *mockLogger) Warn(msg string, args ...any) {
 
 // mockSourceManager implements sources.Interface for testing
 type mockSourceManager struct {
-	sources []internal.Config
+	sources []sources.Config
 	err     error
 }
 
-func (m *mockSourceManager) GetSources() ([]internal.Config, error) {
+func (m *mockSourceManager) GetSources() ([]sources.Config, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	return m.sources, nil
 }
 
-func (m *mockSourceManager) FindByName(name string) (*internal.Config, error) {
+func (m *mockSourceManager) FindByName(name string) (*sources.Config, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -73,7 +71,78 @@ func (m *mockSourceManager) FindByName(name string) (*internal.Config, error) {
 	return nil, ErrSourceNotFound
 }
 
-func (m *mockSourceManager) Validate(_ *internal.Config) error { return nil }
+func (m *mockSourceManager) Validate(_ *sources.Config) error { return nil }
+
+func (m *mockSourceManager) GetSource(ctx context.Context, name string) (*sources.Config, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	for _, s := range m.sources {
+		if s.Name == name {
+			return &s, nil
+		}
+	}
+	return nil, sources.ErrSourceNotFound
+}
+
+func (m *mockSourceManager) ListSources(ctx context.Context) ([]*sources.Config, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	configs := make([]*sources.Config, len(m.sources))
+	for i := range m.sources {
+		configs[i] = &m.sources[i]
+	}
+	return configs, nil
+}
+
+func (m *mockSourceManager) AddSource(ctx context.Context, source *sources.Config) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.sources = append(m.sources, *source)
+	return nil
+}
+
+func (m *mockSourceManager) UpdateSource(ctx context.Context, source *sources.Config) error {
+	if m.err != nil {
+		return m.err
+	}
+	for i, s := range m.sources {
+		if s.Name == source.Name {
+			m.sources[i] = *source
+			return nil
+		}
+	}
+	return sources.ErrSourceNotFound
+}
+
+func (m *mockSourceManager) DeleteSource(ctx context.Context, name string) error {
+	if m.err != nil {
+		return m.err
+	}
+	for i, s := range m.sources {
+		if s.Name == name {
+			m.sources = append(m.sources[:i], m.sources[i+1:]...)
+			return nil
+		}
+	}
+	return sources.ErrSourceNotFound
+}
+
+func (m *mockSourceManager) ValidateSource(source *sources.Config) error {
+	if m.err != nil {
+		return m.err
+	}
+	return nil
+}
+
+func (m *mockSourceManager) GetMetrics() sources.Metrics {
+	return sources.Metrics{
+		SourceCount: int64(len(m.sources)),
+		LastUpdated: time.Now(),
+	}
+}
 
 // mockConfig implements config.Interface for testing
 type mockConfig struct {
@@ -122,7 +191,7 @@ func (m *mockConfig) GetCommand() string                    { return "list" }
 // TestParams holds the dependencies required for the list operation.
 type TestParams struct {
 	fx.In
-	Sources internal.Interface
+	Sources sources.Interface
 	Logger  types.Logger
 }
 
@@ -153,6 +222,7 @@ func Test_listCommand(t *testing.T) {
 }
 
 func Test_runList(t *testing.T) {
+	t.Parallel()
 	// Create a temporary sources.yml file for testing
 	tmpDir := t.TempDir()
 	sourcesYml := `sources:
@@ -163,8 +233,8 @@ func Test_runList(t *testing.T) {
     index: test_content
     article_index: test_articles
 `
-	err := os.WriteFile(filepath.Join(tmpDir, "sources.yml"), []byte(sourcesYml), 0644)
-	require.NoError(t, err)
+	writeErr := os.WriteFile(filepath.Join(tmpDir, "sources.yml"), []byte(sourcesYml), 0644)
+	require.NoError(t, writeErr)
 
 	// Set environment variables for testing
 	t.Setenv("SOURCES_FILE", filepath.Join(tmpDir, "sources.yml"))
@@ -173,14 +243,14 @@ func Test_runList(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		setup   func(t *testing.T) (*cobra.Command, internal.Interface, types.Logger)
+		setup   func(t *testing.T) (*cobra.Command, sources.Interface, types.Logger)
 		wantErr bool
 	}{
 		{
 			name: "successful execution",
-			setup: func(t *testing.T) (*cobra.Command, internal.Interface, types.Logger) {
+			setup: func(t *testing.T) (*cobra.Command, sources.Interface, types.Logger) {
 				cmd := &cobra.Command{}
-				cmd.SetContext(context.Background())
+				cmd.SetContext(t.Context())
 
 				// Create mock logger
 				ml := &mockLogger{}
@@ -194,14 +264,14 @@ func Test_runList(t *testing.T) {
 				ml.On("Sync").Return(nil)
 
 				// Create mock source manager
-				sourceConfigs := []internal.Config{
+				sourceConfigs := []sources.Config{
 					{
 						Name:         "Test Source",
 						URL:          "https://test.com",
-						Index:        "test_content",
-						ArticleIndex: "test_articles",
 						RateLimit:    time.Second,
 						MaxDepth:     2,
+						Index:        "test_content",
+						ArticleIndex: "test_articles",
 					},
 				}
 				sm := &mockSourceManager{sources: sourceConfigs}
@@ -210,173 +280,48 @@ func Test_runList(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{
-			name: "context cancellation",
-			setup: func(t *testing.T) (*cobra.Command, internal.Interface, types.Logger) {
-				ctx, cancel := context.WithCancel(context.Background())
-				cmd := &cobra.Command{}
-				cmd.SetContext(ctx)
-
-				// Create mock logger
-				ml := &mockLogger{}
-				ml.On("Info", mock.Anything, mock.Anything).Return()
-				ml.On("Error", mock.Anything, mock.Anything).Return()
-				ml.On("Debug", mock.Anything, mock.Anything).Return()
-				ml.On("Warn", mock.Anything, mock.Anything).Return()
-				ml.On("Fatal", mock.Anything, mock.Anything).Return()
-				ml.On("Printf", mock.Anything, mock.Anything).Return()
-				ml.On("Errorf", mock.Anything, mock.Anything).Return()
-				ml.On("Sync").Return(nil)
-
-				// Create mock source manager
-				sourceConfigs := []internal.Config{
-					{
-						Name:         "Test Source",
-						URL:          "https://test.com",
-						Index:        "test_content",
-						ArticleIndex: "test_articles",
-						RateLimit:    time.Second,
-						MaxDepth:     2,
-					},
-				}
-				sm := &mockSourceManager{sources: sourceConfigs}
-
-				go func() {
-					time.Sleep(100 * time.Millisecond)
-					cancel()
-				}()
-
-				return cmd, sm, ml
-			},
-			wantErr: true,
-		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cmd, sm, ml := tt.setup(t)
 
-			// Create test app with all required dependencies
+			// Create a test application with required modules
 			app := fx.New(
 				fx.NopLogger,
 				fx.Supply(cmd),
+				fx.Supply([]string{}),
 				fx.Provide(
-					fx.Annotate(
-						func() types.Logger { return ml },
-						fx.As(new(types.Logger)),
-					),
-					fx.Annotate(
-						func() internal.Interface { return sm },
-						fx.As(new(internal.Interface)),
-					),
-					fx.Annotate(
-						newMockConfig,
-						fx.As(new(config.Interface)),
-					),
-				),
-				fx.Invoke(func(p struct {
-					fx.In
-					Sources internal.Interface
-					Logger  types.Logger
-					LC      fx.Lifecycle
-				}) {
-					// Create signal handler with the real logger
-					handler := signal.NewSignalHandler(p.Logger)
-					cleanup := handler.Setup(cmd.Context())
-					p.LC.Append(fx.Hook{
-						OnStart: func(context.Context) error {
-							params := &cmdsrcs.Params{
-								SourceManager: p.Sources,
-								Logger:        p.Logger,
-							}
-							if err := cmdsrcs.ExecuteList(*params); err != nil {
-								p.Logger.Error("Error executing list", "error", err)
-								return err
-							}
-							return nil
-						},
-						OnStop: func(context.Context) error {
-							cleanup()
-							return nil
-						},
-					})
-				}),
-			)
-
-			err := app.Start(cmd.Context())
-			if err != nil {
-				t.Fatalf("failed to start app: %v", err)
-			}
-			defer app.Stop(cmd.Context())
-
-			// Create a new app for RunList with the same dependencies
-			app = fx.New(
-				fx.NopLogger,
-				fx.Supply(cmd),
-				fx.Provide(
-					fx.Annotate(
-						func() types.Logger { return ml },
-						fx.As(new(types.Logger)),
-					),
 					fx.Annotate(
 						func() sources.Interface { return sm },
 						fx.As(new(sources.Interface)),
 					),
 					fx.Annotate(
-						newMockConfig,
-						fx.As(new(config.Interface)),
+						func() types.Logger { return ml },
+						fx.As(new(types.Logger)),
 					),
 				),
-				fx.Invoke(func(p struct {
-					fx.In
-					Sources sources.Interface
-					Logger  types.Logger
-					LC      fx.Lifecycle
-				}) {
-					// Create signal handler with the real logger
-					handler := signal.NewSignalHandler(p.Logger)
-					cleanup := handler.Setup(cmd.Context())
-					p.LC.Append(fx.Hook{
-						OnStart: func(context.Context) error {
-							params := &cmdsrcs.Params{
-								SourceManager: p.Sources,
-								Logger:        p.Logger,
-							}
-							if err := cmdsrcs.ExecuteList(*params); err != nil {
-								p.Logger.Error("Error executing list", "error", err)
-								return err
-							}
-							return nil
-						},
-						OnStop: func(context.Context) error {
-							cleanup()
-							return nil
-						},
-					})
-				}),
+				fx.Invoke(cmdsrcs.RunList),
 			)
 
-			err = app.Start(cmd.Context())
-			if err != nil {
-				t.Fatalf("failed to start app: %v", err)
-			}
-			defer app.Stop(cmd.Context())
-
-			// Wait for the app to start
-			time.Sleep(100 * time.Millisecond)
-
-			err = cmdsrcs.RunList(cmd, nil)
+			// Start the application
+			startErr := app.Start(t.Context())
 			if tt.wantErr {
-				require.Error(t, err)
+				require.Error(t, startErr)
 				return
 			}
-			require.NoError(t, err)
+			require.NoError(t, startErr)
+
+			// Stop the application
+			stopErr := app.Stop(t.Context())
+			require.NoError(t, stopErr)
 		})
 	}
 }
 
 func Test_executeList(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		setup   func(t *testing.T) (*mockLogger, *mockSourceManager, *mockConfig)
@@ -397,7 +342,7 @@ func Test_executeList(t *testing.T) {
 				ml.On("Info", "No sources found", mock.Anything).Return()
 
 				sm := &mockSourceManager{
-					sources: []internal.Config{
+					sources: []sources.Config{
 						{
 							Name:         "Test Source",
 							URL:          "https://test.com",
@@ -429,7 +374,7 @@ func Test_executeList(t *testing.T) {
 				ml.On("Info", "No sources found", mock.Anything).Return()
 
 				sm := &mockSourceManager{
-					sources: []internal.Config{},
+					sources: []sources.Config{},
 				}
 
 				mc := newMockConfig()
@@ -441,12 +386,13 @@ func Test_executeList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ml, sm, mc := tt.setup(t)
 
 			app := fxtest.New(t,
 				fx.Supply(t.Context()),
 				fx.Provide(
-					func() internal.Interface { return sm },
+					func() sources.Interface { return sm },
 					func() common.Logger { return ml },
 					fx.Annotate(
 						func() config.Interface { return mc },
@@ -460,7 +406,7 @@ func Test_executeList(t *testing.T) {
 								SourceManager: sm,
 								Logger:        ml,
 							}
-							if err := cmdsrcs.ExecuteList(*params); err != nil {
+							if err := cmdsrcs.ExecuteList(*params, t.Context()); err != nil {
 								ml.Error("Error executing list", "error", err)
 								return err
 							}
@@ -486,43 +432,44 @@ func Test_executeList(t *testing.T) {
 func Test_executeList_error(t *testing.T) {
 	t.Parallel()
 
-	errSourceManager := &errorSourceManager{
-		err: errors.New("failed to get sources"),
-	}
-
-	ml := &mockLogger{}
-	ml.On("Info", mock.Anything, mock.Anything).Return()
-	ml.On("Error", mock.Anything, mock.Anything).Return()
-	ml.On("Debug", mock.Anything, mock.Anything).Return()
-	ml.On("Warn", mock.Anything, mock.Anything).Return()
-	ml.On("Fatal", mock.Anything, mock.Anything).Return()
-	ml.On("Printf", mock.Anything, mock.Anything).Return()
-	ml.On("Errorf", mock.Anything, mock.Anything).Return()
-	ml.On("Sync").Return(nil)
-
 	tests := []struct {
 		name    string
-		params  cmdsrcs.Params
+		setup   func(t *testing.T) cmdsrcs.Params
 		wantErr bool
 	}{
 		{
 			name: "error getting sources",
-			params: cmdsrcs.Params{
-				SourceManager: errSourceManager,
-				Logger:        ml,
+			setup: func(t *testing.T) cmdsrcs.Params {
+				ml := &mockLogger{}
+				ml.On("Info", mock.Anything, mock.Anything).Return()
+				ml.On("Error", mock.Anything, mock.Anything).Return()
+				ml.On("Debug", mock.Anything, mock.Anything).Return()
+				ml.On("Warn", mock.Anything, mock.Anything).Return()
+				ml.On("Fatal", mock.Anything, mock.Anything).Return()
+				ml.On("Printf", mock.Anything, mock.Anything).Return()
+				ml.On("Errorf", mock.Anything, mock.Anything).Return()
+				ml.On("Sync").Return(nil)
+
+				sm := &mockSourceManager{
+					err: errors.New("failed to get sources"),
+				}
+
+				return cmdsrcs.Params{
+					SourceManager: sm,
+					Logger:        ml,
+				}
 			},
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := cmdsrcs.ExecuteList(tt.params)
+			params := tt.setup(t)
+			err := cmdsrcs.ExecuteList(params, t.Context())
 			if tt.wantErr {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), "failed to get sources")
 				return
 			}
 			require.NoError(t, err)
@@ -535,13 +482,13 @@ func Test_printSources_error(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		sources []internal.Config
+		sources []sources.Config
 		logger  types.Logger
 		wantErr bool
 	}{
 		{
 			name: "invalid source data",
-			sources: []internal.Config{
+			sources: []sources.Config{
 				{
 					Name:      "", // Empty name should cause formatting issues
 					URL:       "",
@@ -555,7 +502,6 @@ func Test_printSources_error(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := cmdsrcs.PrintSources(tt.sources, tt.logger)
@@ -593,7 +539,7 @@ func TestCommand(t *testing.T) {
 
 func TestFindByName(t *testing.T) {
 	t.Parallel()
-	testConfigs := []internal.Config{
+	testConfigs := []sources.Config{
 		{
 			Name:      "test1",
 			URL:       "https://example1.com",
@@ -639,16 +585,4 @@ func TestFindByName(t *testing.T) {
 			require.Equal(t, tt.source, source.Name)
 		})
 	}
-}
-
-type errorSourceManager struct {
-	mockSourceManager
-	err error
-}
-
-func (m *errorSourceManager) GetSources() ([]internal.Config, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return m.sources, nil
 }

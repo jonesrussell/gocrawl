@@ -3,6 +3,7 @@ package sources_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,69 +13,46 @@ import (
 )
 
 func TestLoadFromFile(t *testing.T) {
-	// Create a temporary file with test data
-	content := `sources:
-  - name: test_source
-    url: https://example.com
+	t.Parallel()
+	// Create a temporary sources.yml file for testing
+	tmpDir := t.TempDir()
+	sourcesYml := `sources:
+  - name: Test Source
+    url: https://test.com
     rate_limit: 1s
     max_depth: 2
-    article_index: articles
-    index: content
-    time:
-      - published_time
-      - time_ago
-    selectors:
-      article:
-        container: article
-        title: h1
-        body: .content
-        intro: .intro
-        byline: .byline
-        published_time: time
-        time_ago: .time-ago
-        jsonld: script[type="application/ld+json"]
-        section: .section
-        keywords: meta[name=keywords]
-        description: meta[name=description]
-        og_title: meta[property="og:title"]
-        og_description: meta[property="og:description"]
-        og_image: meta[property="og:image"]
-        og_url: meta[property="og:url"]
-        canonical: link[rel=canonical]
-        word_count: .word-count
-        publish_date: time[pubdate]
-        category: .category
-        tags: .tags
-        author: .author
-        byline_name: .byline-name`
-
-	tmpfile, err := os.CreateTemp(t.TempDir(), "sources_test")
-	require.NoError(t, err)
-	defer func(name string) {
-		if removeErr := os.Remove(name); removeErr != nil {
-			t.Errorf("Error removing test file: %v", removeErr)
-		}
-	}(tmpfile.Name())
-
-	_, err = tmpfile.WriteString(content)
-	require.NoError(t, err)
-	err = tmpfile.Close()
+    index: test_content
+    article_index: test_articles
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "sources.yml"), []byte(sourcesYml), 0644)
 	require.NoError(t, err)
 
-	s, err := sources.LoadFromFile(tmpfile.Name())
-	require.NoError(t, err)
+	// Set environment variables for testing
+	t.Setenv("SOURCES_FILE", filepath.Join(tmpDir, "sources.yml"))
+	t.Setenv("APP_ENV", "test")
+	t.Setenv("LOG_LEVEL", "info")
+
+	// Create a new Sources instance
+	s := testutils.NewTestInterface(nil)
 	require.NotNil(t, s)
 
-	allSources, err := s.GetSources()
+	// Load sources from file
+	allSources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, allSources, 1)
-	require.Equal(t, "test_source", allSources[0].Name)
-	require.Equal(t, "https://example.com", allSources[0].URL)
-	require.Equal(t, time.Second, allSources[0].RateLimit)
-	require.Equal(t, 2, allSources[0].MaxDepth)
+
+	// Verify source details
+	source := allSources[0]
+	require.Equal(t, "Test Source", source.Name)
+	require.Equal(t, "https://test.com", source.URL)
+	require.Equal(t, time.Second, source.RateLimit)
+	require.Equal(t, 2, source.MaxDepth)
+	require.Equal(t, "test_content", source.Index)
+	require.Equal(t, "test_articles", source.ArticleIndex)
 }
 
-func TestFindByName(t *testing.T) {
+func TestGetSource(t *testing.T) {
+	t.Parallel()
 	testConfigs := []sources.Config{
 		{
 			Name:      "test1",
@@ -89,7 +67,7 @@ func TestFindByName(t *testing.T) {
 			MaxDepth:  2,
 		},
 	}
-	s := testutils.NewTestSources(testConfigs)
+	s := testutils.NewTestInterface(testConfigs)
 	require.NotNil(t, s)
 
 	tests := []struct {
@@ -111,7 +89,8 @@ func TestFindByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source, err := s.FindByName(tt.source)
+			t.Parallel()
+			source, err := s.GetSource(t.Context(), tt.source)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -122,7 +101,7 @@ func TestFindByName(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
+func TestValidateSource(t *testing.T) {
 	testConfigs := []sources.Config{
 		{
 			Name:      "test",
@@ -131,7 +110,7 @@ func TestValidate(t *testing.T) {
 			MaxDepth:  1,
 		},
 	}
-	s := testutils.NewTestSources(testConfigs)
+	s := testutils.NewTestInterface(testConfigs)
 	require.NotNil(t, s)
 
 	tests := []struct {
@@ -195,12 +174,233 @@ func TestValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validateErr := s.Validate(tt.source)
+			validateErr := s.ValidateSource(tt.source)
 			if tt.wantErr {
 				require.Error(t, validateErr)
 				return
 			}
 			require.NoError(t, validateErr)
+		})
+	}
+}
+
+func TestAddSource(t *testing.T) {
+	t.Parallel()
+	s := testutils.NewTestInterface(nil)
+	require.NotNil(t, s)
+
+	tests := []struct {
+		name    string
+		source  *sources.Config
+		wantErr bool
+	}{
+		{
+			name: "valid source",
+			source: &sources.Config{
+				Name:      "test1",
+				URL:       "https://example1.com",
+				RateLimit: time.Second,
+				MaxDepth:  1,
+			},
+			wantErr: false,
+		},
+		{
+			name: "duplicate source",
+			source: &sources.Config{
+				Name:      "test1",
+				URL:       "https://example1.com",
+				RateLimit: time.Second,
+				MaxDepth:  1,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := s.AddSource(t.Context(), tt.source)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			// Verify source was added
+			source, err := s.GetSource(t.Context(), tt.source.Name)
+			require.NoError(t, err)
+			require.Equal(t, tt.source.Name, source.Name)
+		})
+	}
+}
+
+func TestUpdateSource(t *testing.T) {
+	t.Parallel()
+	testConfigs := []sources.Config{
+		{
+			Name:      "test1",
+			URL:       "https://example1.com",
+			RateLimit: time.Second,
+			MaxDepth:  1,
+		},
+	}
+	s := testutils.NewTestInterface(testConfigs)
+	require.NotNil(t, s)
+
+	tests := []struct {
+		name    string
+		source  *sources.Config
+		wantErr bool
+	}{
+		{
+			name: "existing source",
+			source: &sources.Config{
+				Name:      "test1",
+				URL:       "https://example1.com/updated",
+				RateLimit: 2 * time.Second,
+				MaxDepth:  2,
+			},
+			wantErr: false,
+		},
+		{
+			name: "non-existing source",
+			source: &sources.Config{
+				Name:      "test2",
+				URL:       "https://example2.com",
+				RateLimit: time.Second,
+				MaxDepth:  1,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := s.UpdateSource(t.Context(), tt.source)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			// Verify source was updated
+			source, err := s.GetSource(t.Context(), tt.source.Name)
+			require.NoError(t, err)
+			require.Equal(t, tt.source.URL, source.URL)
+			require.Equal(t, tt.source.RateLimit, source.RateLimit)
+			require.Equal(t, tt.source.MaxDepth, source.MaxDepth)
+		})
+	}
+}
+
+func TestDeleteSource(t *testing.T) {
+	t.Parallel()
+	testConfigs := []sources.Config{
+		{
+			Name:      "test1",
+			URL:       "https://example1.com",
+			RateLimit: time.Second,
+			MaxDepth:  1,
+		},
+	}
+	s := testutils.NewTestInterface(testConfigs)
+	require.NotNil(t, s)
+
+	tests := []struct {
+		name    string
+		source  string
+		wantErr bool
+	}{
+		{
+			name:    "existing source",
+			source:  "test1",
+			wantErr: false,
+		},
+		{
+			name:    "non-existing source",
+			source:  "test2",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := s.DeleteSource(t.Context(), tt.source)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			// Verify source was deleted
+			_, err = s.GetSource(t.Context(), tt.source)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestGetMetrics(t *testing.T) {
+	testConfigs := []sources.Config{
+		{
+			Name:      "test",
+			URL:       "https://example.com",
+			RateLimit: time.Second,
+			MaxDepth:  1,
+		},
+	}
+	s := testutils.NewTestInterface(testConfigs)
+	require.NotNil(t, s)
+
+	metrics := s.GetMetrics()
+	require.Equal(t, int64(1), metrics.SourceCount)
+}
+
+func TestFindByName(t *testing.T) {
+	testConfigs := []sources.Config{
+		{
+			Name:      "test1",
+			URL:       "https://example1.com",
+			RateLimit: time.Second,
+			MaxDepth:  1,
+		},
+		{
+			Name:      "test2",
+			URL:       "https://example2.com",
+			RateLimit: 2 * time.Second,
+			MaxDepth:  2,
+		},
+	}
+	s := testutils.NewTestInterface(testConfigs)
+	require.NotNil(t, s)
+
+	tests := []struct {
+		name    string
+		source  string
+		wantErr bool
+	}{
+		{
+			name:    "existing source",
+			source:  "test1",
+			wantErr: false,
+		},
+		{
+			name:    "non-existing source",
+			source:  "test3",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source, err := s.FindByName(tt.source)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.source, source.Name)
 		})
 	}
 }

@@ -64,7 +64,7 @@ func SetupCollector(
 	bus := events.NewBus()
 
 	// Create sources instance
-	sources := sources.NewSources(&source)
+	sources := sources.NewSources(&source, log)
 
 	// Create mock index manager for testing
 	indexManager := &api.MockIndexManager{}

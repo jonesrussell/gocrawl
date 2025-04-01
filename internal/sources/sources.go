@@ -201,6 +201,21 @@ func (s *Sources) GetMetrics() Metrics {
 	return s.metrics
 }
 
+// GetSources retrieves all source configurations.
+func (s *Sources) GetSources() ([]Config, error) {
+	return s.sources, nil
+}
+
+// FindByName finds a source by name.
+func (s *Sources) FindByName(name string) (*Config, error) {
+	for _, src := range s.sources {
+		if src.Name == name {
+			return &src, nil
+		}
+	}
+	return nil, ErrSourceNotFound
+}
+
 // newArticleSelectors creates ArticleSelectors from a source with selectors
 type selectorSource interface {
 	GetArticleSelectors() ArticleSelectors

@@ -17,18 +17,6 @@ const (
 	DefaultRateLimit = 5 * time.Second
 )
 
-// Interface defines the interface for managing web content sources.
-type Interface interface {
-	// FindByName finds a source by its name.
-	FindByName(name string) (*Config, error)
-
-	// Validate checks if a source configuration is valid.
-	Validate(source *Config) error
-
-	// GetSources returns all available sources.
-	GetSources() ([]Config, error)
-}
-
 // Module provides the sources module's dependencies.
 var Module = fx.Module("sources",
 	fx.Provide(
@@ -36,15 +24,21 @@ var Module = fx.Module("sources",
 	),
 )
 
-// Params defines the required dependencies for the sources module.
-type Params struct {
+// ModuleParams defines the required dependencies for the sources module.
+type ModuleParams struct {
 	fx.In
 
 	Config config.Interface
+	Logger interface {
+		Debug(msg string, fields ...any)
+		Info(msg string, fields ...any)
+		Warn(msg string, fields ...any)
+		Error(msg string, fields ...any)
+	}
 }
 
 // provideSources creates a new sources instance.
-func provideSources(p Params) Interface {
+func provideSources(p ModuleParams) Interface {
 	var configs []Config
 	sources := p.Config.GetSources()
 	if len(sources) == 0 {
@@ -68,6 +62,10 @@ func provideSources(p Params) Interface {
 	}
 	return &Sources{
 		sources: configs,
+		logger:  p.Logger,
+		metrics: Metrics{
+			SourceCount: int64(len(configs)),
+		},
 	}
 }
 
@@ -82,9 +80,18 @@ func NewConfig() *Config {
 }
 
 // NewSources creates a new sources instance.
-func NewSources(cfg *Config) Interface {
+func NewSources(cfg *Config, logger interface {
+	Debug(msg string, fields ...any)
+	Info(msg string, fields ...any)
+	Warn(msg string, fields ...any)
+	Error(msg string, fields ...any)
+}) Interface {
 	return &Sources{
 		sources: []Config{*cfg},
+		logger:  logger,
+		metrics: Metrics{
+			SourceCount: 1,
+		},
 	}
 }
 
