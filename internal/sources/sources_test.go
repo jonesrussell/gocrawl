@@ -22,8 +22,8 @@ func TestLoadFromFile(t *testing.T) {
     rate_limit: 1s
     max_depth: 2
 `
-	err := os.WriteFile(filepath.Join(tmpDir, "sources.yml"), []byte(sourcesYml), 0644)
-	require.NoError(t, err)
+	writeErr := os.WriteFile(filepath.Join(tmpDir, "sources.yml"), []byte(sourcesYml), 0644)
+	require.NoError(t, writeErr)
 
 	// Set environment variables for testing
 	t.Setenv("SOURCES_FILE", filepath.Join(tmpDir, "sources.yml"))

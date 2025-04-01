@@ -7,7 +7,6 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
@@ -43,7 +42,7 @@ var Module = fx.Module("api",
 		logger.NewNoOp,
 		// Provide the server and security middleware together to avoid circular dependencies
 		func(
-			log types.Logger,
+			log logger.Interface,
 			searchManager SearchManager,
 			cfg common.Config,
 		) (*http.Server, middleware.SecurityMiddlewareInterface) {

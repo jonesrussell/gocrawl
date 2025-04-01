@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
 
@@ -26,17 +26,17 @@ type LifecycleParams struct {
 	Server        *http.Server
 	SearchManager SearchManager
 	Security      middleware.SecurityMiddlewareInterface
-	Log           common.Logger
+	Log           logger.Interface
 }
 
 // Lifecycle manages the API server lifecycle
 type Lifecycle struct {
 	server *http.Server
-	Log    common.Logger
+	Log    logger.Interface
 }
 
 // NewLifecycle creates a new API lifecycle manager
-func NewLifecycle(server *http.Server, log common.Logger) *Lifecycle {
+func NewLifecycle(server *http.Server, log logger.Interface) *Lifecycle {
 	return &Lifecycle{
 		server: server,
 		Log:    log,

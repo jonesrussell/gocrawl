@@ -15,6 +15,7 @@ const (
 	levelInfo  = "info"
 	levelWarn  = "warn"
 	levelError = "error"
+	levelFatal = "fatal"
 )
 
 // Interface defines the interface for logging operations.
@@ -266,7 +267,7 @@ func NewCustomLogger(logger *zap.Logger, params Params) (Interface, error) {
 			level = zapcore.WarnLevel
 		case levelError:
 			level = zapcore.ErrorLevel
-		case "fatal":
+		case levelFatal:
 			level = zapcore.FatalLevel
 		}
 	}

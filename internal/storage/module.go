@@ -11,8 +11,8 @@ import (
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -27,7 +27,7 @@ const (
 // Module provides the storage module for dependency injection.
 var Module = fx.Module("storage",
 	fx.Provide(
-		func(cfg config.Interface, logger common.Logger) (ModuleOptions, error) {
+		func(cfg config.Interface, logger logger.Interface) (ModuleOptions, error) {
 			transport, ok := http.DefaultTransport.(*http.Transport)
 			if !ok {
 				return ModuleOptions{}, errors.New("failed to get default transport")
@@ -63,7 +63,7 @@ var Module = fx.Module("storage",
 // ModuleOptions defines the options for the storage module
 type ModuleOptions struct {
 	Config         config.Interface
-	Logger         common.Logger
+	Logger         logger.Interface
 	Addresses      []string
 	APIKey         string
 	Username       string
@@ -76,13 +76,13 @@ type ModuleOptions struct {
 // ProvideIndexManager creates and returns an IndexManager implementation
 func ProvideIndexManager(
 	client *es.Client,
-	logger common.Logger,
+	logger logger.Interface,
 ) api.IndexManager {
 	return NewIndexManager(client, logger)
 }
 
 // ProvideElasticsearchClient provides the Elasticsearch client
-func ProvideElasticsearchClient(opts ModuleOptions, log common.Logger) (*es.Client, error) {
+func ProvideElasticsearchClient(opts ModuleOptions, log logger.Interface) (*es.Client, error) {
 	if len(opts.Addresses) == 0 {
 		return nil, errors.New("elasticsearch addresses are required")
 	}
@@ -162,6 +162,6 @@ func ProvideElasticsearchClient(opts ModuleOptions, log common.Logger) (*es.Clie
 }
 
 // ProvideSearchManager creates and returns a SearchManager implementation
-func ProvideSearchManager(client *es.Client, logger common.Logger, opts Options) api.SearchManager {
+func ProvideSearchManager(client *es.Client, logger logger.Interface, opts Options) api.SearchManager {
 	return NewStorage(client, logger, opts)
 }
