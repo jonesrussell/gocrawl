@@ -7,39 +7,39 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/cmd/job"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/collector"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/job"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/pkg/collector"
+	pkgconfig "github.com/jonesrussell/gocrawl/pkg/config"
+	"github.com/jonesrussell/gocrawl/pkg/logger"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
 
-// mockConfig implements config.Interface for testing
+// mockConfig implements pkgconfig.Interface for testing
 type mockConfig struct {
-	appConfig           *config.AppConfig
-	crawlerConfig       *config.CrawlerConfig
-	elasticsearchConfig *config.ElasticsearchConfig
-	logConfig           *config.LogConfig
-	sources             []config.Source
-	serverConfig        *config.ServerConfig
+	appConfig           *pkgconfig.AppConfig
+	crawlerConfig       *pkgconfig.CrawlerConfig
+	elasticsearchConfig *pkgconfig.ElasticsearchConfig
+	logConfig           *pkgconfig.LogConfig
+	sources             []pkgconfig.Source
+	serverConfig        *pkgconfig.ServerConfig
 	command             string
 }
 
-func (m *mockConfig) GetAppConfig() *config.AppConfig         { return m.appConfig }
-func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig { return m.crawlerConfig }
-func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
+func (m *mockConfig) GetAppConfig() *pkgconfig.AppConfig         { return m.appConfig }
+func (m *mockConfig) GetCrawlerConfig() *pkgconfig.CrawlerConfig { return m.crawlerConfig }
+func (m *mockConfig) GetElasticsearchConfig() *pkgconfig.ElasticsearchConfig {
 	return m.elasticsearchConfig
 }
-func (m *mockConfig) GetLogConfig() *config.LogConfig       { return m.logConfig }
-func (m *mockConfig) GetSources() []config.Source           { return m.sources }
-func (m *mockConfig) GetServerConfig() *config.ServerConfig { return m.serverConfig }
-func (m *mockConfig) GetCommand() string                    { return m.command }
+func (m *mockConfig) GetLogConfig() *pkgconfig.LogConfig       { return m.logConfig }
+func (m *mockConfig) GetSources() ([]pkgconfig.Source, error)  { return m.sources, nil }
+func (m *mockConfig) GetServerConfig() *pkgconfig.ServerConfig { return m.serverConfig }
+func (m *mockConfig) GetCommand() string                       { return m.command }
 
 // mockCrawler implements crawler.Interface for testing
 type mockCrawler struct{}
@@ -135,13 +135,29 @@ func TestModuleProvides(t *testing.T) {
 	mockLogger.On("Sync").Return(nil)
 
 	mockCfg := &mockConfig{
-		appConfig:           &config.AppConfig{},
-		crawlerConfig:       &config.CrawlerConfig{},
-		elasticsearchConfig: &config.ElasticsearchConfig{},
-		logConfig:           &config.LogConfig{},
-		sources:             []config.Source{},
-		serverConfig:        &config.ServerConfig{},
-		command:             "job",
+		appConfig: &pkgconfig.AppConfig{
+			Environment: "test",
+			Name:        "gocrawl",
+			Version:     "1.0.0",
+			Debug:       true,
+		},
+		crawlerConfig: &pkgconfig.CrawlerConfig{
+			MaxDepth:    2,
+			RateLimit:   time.Second * 2,
+			RandomDelay: time.Second,
+			Parallelism: 2,
+		},
+		elasticsearchConfig: &pkgconfig.ElasticsearchConfig{
+			Addresses: []string{"http://localhost:9200"},
+			IndexName: "test-index",
+		},
+		logConfig: &pkgconfig.LogConfig{
+			Level: "debug",
+			Debug: true,
+		},
+		sources:      []pkgconfig.Source{},
+		serverConfig: &pkgconfig.ServerConfig{Address: ":8080"},
+		command:      "job",
 	}
 
 	app := fxtest.New(t,
@@ -169,13 +185,29 @@ func TestModuleLifecycle(t *testing.T) {
 	mockLogger.On("Sync").Return(nil)
 
 	mockCfg := &mockConfig{
-		appConfig:           &config.AppConfig{},
-		crawlerConfig:       &config.CrawlerConfig{},
-		elasticsearchConfig: &config.ElasticsearchConfig{},
-		logConfig:           &config.LogConfig{},
-		sources:             []config.Source{},
-		serverConfig:        &config.ServerConfig{},
-		command:             "job",
+		appConfig: &pkgconfig.AppConfig{
+			Environment: "test",
+			Name:        "gocrawl",
+			Version:     "1.0.0",
+			Debug:       true,
+		},
+		crawlerConfig: &pkgconfig.CrawlerConfig{
+			MaxDepth:    2,
+			RateLimit:   time.Second * 2,
+			RandomDelay: time.Second,
+			Parallelism: 2,
+		},
+		elasticsearchConfig: &pkgconfig.ElasticsearchConfig{
+			Addresses: []string{"http://localhost:9200"},
+			IndexName: "test-index",
+		},
+		logConfig: &pkgconfig.LogConfig{
+			Level: "debug",
+			Debug: true,
+		},
+		sources:      []pkgconfig.Source{},
+		serverConfig: &pkgconfig.ServerConfig{Address: ":8080"},
+		command:      "job",
 	}
 
 	app := fxtest.New(t,
@@ -203,14 +235,30 @@ func TestJobScheduling(t *testing.T) {
 	mockLogger.On("Sync").Return(nil)
 
 	mockCfg := &mockConfig{
-		appConfig:           &config.AppConfig{},
-		crawlerConfig:       &config.CrawlerConfig{},
-		elasticsearchConfig: &config.ElasticsearchConfig{},
-		logConfig:           &config.LogConfig{},
-		sources: []config.Source{
+		appConfig: &pkgconfig.AppConfig{
+			Environment: "test",
+			Name:        "gocrawl",
+			Version:     "1.0.0",
+			Debug:       true,
+		},
+		crawlerConfig: &pkgconfig.CrawlerConfig{
+			MaxDepth:    2,
+			RateLimit:   time.Second * 2,
+			RandomDelay: time.Second,
+			Parallelism: 2,
+		},
+		elasticsearchConfig: &pkgconfig.ElasticsearchConfig{
+			Addresses: []string{"http://localhost:9200"},
+			IndexName: "test-index",
+		},
+		logConfig: &pkgconfig.LogConfig{
+			Level: "debug",
+			Debug: true,
+		},
+		sources: []pkgconfig.Source{
 			{Name: "Test Source", URL: "https://test.com", RateLimit: time.Second, MaxDepth: 1},
 		},
-		serverConfig: &config.ServerConfig{},
+		serverConfig: &pkgconfig.ServerConfig{Address: ":8080"},
 		command:      "job",
 	}
 

@@ -6,8 +6,8 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -76,3 +76,6 @@ func (m *MockCrawler) GetMetrics() *collector.Metrics {
 	}
 	return nil
 }
+
+// Ensure MockCrawler implements crawler.Interface
+var _ Interface = (*MockCrawler)(nil)

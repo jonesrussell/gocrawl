@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
@@ -15,6 +14,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -141,6 +141,7 @@ var TestCrawlerModule = fx.Module("crawler",
 func setupTestApp() *fx.App {
 	return fx.New(
 		TestCommonModule,
+		TestConfigModule,
 		TestCrawlerModule,
 		fx.Supply(mockSources{}),
 		fx.NopLogger,

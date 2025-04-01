@@ -3,10 +3,10 @@ package article
 
 import (
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/pkg/collector"
 )
 
 // ArticleProcessor handles article content processing.

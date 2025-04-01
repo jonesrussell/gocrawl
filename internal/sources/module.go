@@ -3,6 +3,8 @@
 package sources
 
 import (
+	"time"
+
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
 )
@@ -53,7 +55,12 @@ func provideSources(p Params) Interface {
 	sources := p.Config.GetSources()
 	if len(sources) == 0 {
 		// If no sources found, use a default config
-		configs = append(configs, *NewConfig())
+		defaultConfig := NewConfig()
+		defaultConfig.Name = "default"
+		defaultConfig.URL = "http://localhost"
+		defaultConfig.MaxDepth = DefaultMaxDepth
+		defaultConfig.RateLimit = 5 * time.Second
+		configs = append(configs, *defaultConfig)
 	} else {
 		for _, src := range sources {
 			configs = append(configs, Config{
@@ -73,9 +80,10 @@ func provideSources(p Params) Interface {
 // NewConfig creates a new source configuration.
 func NewConfig() *Config {
 	return &Config{
-		Name:     "default",
-		URL:      "http://localhost",
-		MaxDepth: DefaultMaxDepth,
+		Name:      "default",
+		URL:       "http://localhost",
+		MaxDepth:  DefaultMaxDepth,
+		RateLimit: 5 * time.Second,
 	}
 }
 

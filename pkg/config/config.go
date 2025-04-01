@@ -19,6 +19,8 @@ type Interface interface {
 	GetSources() ([]Source, error)
 	// GetCommand returns the current command being executed.
 	GetCommand() string
+	// GetCrawlerConfig returns the crawler configuration.
+	GetCrawlerConfig() *CrawlerConfig
 }
 
 // AppConfig holds application-level configuration.
@@ -53,6 +55,26 @@ type Source struct {
 	RateLimit time.Duration
 	MaxDepth  int
 	Time      []string
+}
+
+// CrawlerConfig holds crawler-specific configuration settings.
+type CrawlerConfig struct {
+	// BaseURL is the starting point for the crawler
+	BaseURL string
+	// MaxDepth defines how many levels deep the crawler should traverse
+	MaxDepth int
+	// RateLimit defines the delay between requests
+	RateLimit time.Duration
+	// RandomDelay adds randomization to the delay between requests
+	RandomDelay time.Duration
+	// IndexName is the Elasticsearch index for storing crawled content
+	IndexName string
+	// ContentIndexName is the Elasticsearch index for storing parsed content
+	ContentIndexName string
+	// SourceFile is the path to the sources configuration file
+	SourceFile string
+	// Parallelism defines how many concurrent crawlers to run
+	Parallelism int
 }
 
 // Params holds the parameters for creating a config.
@@ -106,4 +128,13 @@ func (c *NoOpConfig) GetSources() ([]Source, error) {
 
 func (c *NoOpConfig) GetCommand() string {
 	return "test"
+}
+
+func (c *NoOpConfig) GetCrawlerConfig() *CrawlerConfig {
+	return &CrawlerConfig{
+		MaxDepth:    2,
+		RateLimit:   time.Second * 2,
+		RandomDelay: time.Second,
+		Parallelism: 2,
+	}
 }

@@ -3,13 +3,13 @@ package crawler
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
@@ -17,6 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"go.uber.org/fx"
 )
 
@@ -127,6 +128,7 @@ type Params struct {
 	Debugger     debug.Debugger `optional:"true"`
 	IndexManager api.IndexManager
 	Sources      sources.Interface
+	Processors   []collector.Processor `group:"processors"`
 }
 
 // Result contains the components provided by the crawler module.
@@ -150,7 +152,56 @@ func ProvideEventBus() *events.Bus {
 
 // ProvideCrawler creates a new crawler instance.
 func ProvideCrawler(p Params, bus *events.Bus) (Result, error) {
+	// Get sources
+	sources, err := p.Sources.GetSources()
+	if err != nil {
+		return Result{}, fmt.Errorf("failed to get sources: %w", err)
+	}
+	if len(sources) == 0 {
+		return Result{}, fmt.Errorf("no sources configured")
+	}
+
+	// Create collector params
+	params := collector.Params{
+		BaseURL:     sources[0].URL,
+		MaxDepth:    sources[0].MaxDepth,
+		RateLimit:   sources[0].RateLimit,
+		Logger:      p.Logger,
+		Context:     context.Background(),
+		Done:        make(chan struct{}),
+		Parallelism: 2, // Set a default parallelism value
+		Source: &config.Source{
+			URL:       sources[0].URL,
+			MaxDepth:  sources[0].MaxDepth,
+			RateLimit: sources[0].RateLimit,
+		},
+	}
+
+	// Add processors
+	for _, processor := range p.Processors {
+		if articleProcessor, ok := processor.(*article.ArticleProcessor); ok {
+			params.ArticleProcessor = articleProcessor
+			p.Logger.Debug("Added article processor")
+		}
+		if contentProcessor, ok := processor.(*content.ContentProcessor); ok {
+			params.ContentProcessor = contentProcessor
+			p.Logger.Debug("Added content processor")
+		}
+	}
+
+	// Validate processors
+	if params.ArticleProcessor == nil {
+		return Result{}, fmt.Errorf("article processor is required")
+	}
+
+	// Create collector
+	result, err := collector.New(params)
+	if err != nil {
+		return Result{}, fmt.Errorf("failed to create collector: %w", err)
+	}
+
 	c := &Crawler{
+		collector:    result.Collector,
 		Logger:       p.Logger,
 		Debugger:     p.Debugger,
 		bus:          bus,

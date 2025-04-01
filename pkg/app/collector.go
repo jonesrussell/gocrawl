@@ -8,10 +8,10 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/collector"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/jonesrussell/gocrawl/pkg/config"
 	"github.com/jonesrussell/gocrawl/pkg/logger"
 )
@@ -50,7 +50,7 @@ func SetupCollector(
 		if err := c.Limit(&colly.LimitRule{
 			DomainGlob:  "*",
 			RandomDelay: source.RateLimit,
-			Parallelism: 1,
+			Parallelism: 2,
 		}); err != nil {
 			return nil, fmt.Errorf("failed to set rate limit: %w", err)
 		}
@@ -70,6 +70,7 @@ func SetupCollector(
 		Logger:       log,
 		Sources:      sources,
 		IndexManager: indexManager,
+		Processors:   processors,
 	}, bus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create crawler: %w", err)
