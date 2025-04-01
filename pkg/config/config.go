@@ -145,10 +145,10 @@ func (c *NoOpConfig) GetCommand() string {
 
 func (c *NoOpConfig) GetCrawlerConfig() *CrawlerConfig {
 	return &CrawlerConfig{
-		MaxDepth:    2,
-		RateLimit:   time.Second * 2,
+		MaxDepth:    DefaultParallelism,
+		RateLimit:   time.Second * DefaultParallelism,
 		RandomDelay: time.Second,
-		Parallelism: 2,
+		Parallelism: DefaultParallelism,
 	}
 }
 

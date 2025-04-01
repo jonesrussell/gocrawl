@@ -56,7 +56,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		Logger:      c.Logger,
 		Context:     ctx,
 		Done:        make(chan struct{}),
-		Parallelism: 2, // Set a default parallelism value
+		Parallelism: DefaultParallelism, // Use the default parallelism value
 		Source: &config.Source{
 			URL:       source.URL,
 			MaxDepth:  source.MaxDepth,
