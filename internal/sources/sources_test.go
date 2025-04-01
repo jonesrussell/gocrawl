@@ -38,8 +38,8 @@ func TestLoadFromFile(t *testing.T) {
 	// Convert loader.Config to sources.Config
 	var configs []sources.Config
 	for _, src := range loaderConfigs {
-		rateLimit, err := time.ParseDuration(src.RateLimit)
-		require.NoError(t, err)
+		rateLimit, parseErr := time.ParseDuration(src.RateLimit)
+		require.NoError(t, parseErr)
 
 		configs = append(configs, sources.Config{
 			Name:      src.Name,

@@ -10,6 +10,13 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+const (
+	levelDebug = "debug"
+	levelInfo  = "info"
+	levelWarn  = "warn"
+	levelError = "error"
+)
+
 // Interface defines the interface for logging operations.
 // It provides structured logging capabilities with different log levels and
 // support for additional fields in log messages.
@@ -251,13 +258,13 @@ func NewCustomLogger(logger *zap.Logger, params Params) (Interface, error) {
 		level = zapcore.DebugLevel
 	} else if params.Level != "" {
 		switch strings.ToLower(params.Level) {
-		case "debug":
+		case levelDebug:
 			level = zapcore.DebugLevel
-		case "info":
+		case levelInfo:
 			level = zapcore.InfoLevel
-		case "warn":
+		case levelWarn:
 			level = zapcore.WarnLevel
-		case "error":
+		case levelError:
 			level = zapcore.ErrorLevel
 		case "fatal":
 			level = zapcore.FatalLevel

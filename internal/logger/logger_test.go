@@ -1,7 +1,6 @@
 package logger_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -198,28 +197,6 @@ func TestNewProductionLogger(t *testing.T) {
 			log.Errorf("test error format %s", "value")
 		})
 	}
-}
-
-// createTestLogger creates a logger with the given configuration for testing
-func createTestLogger(levelStr string, appEnv string) (logger.Interface, error) {
-	var config zap.Config
-	if appEnv == "development" {
-		config = zap.NewDevelopmentConfig()
-	} else {
-		config = zap.NewProductionConfig()
-	}
-
-	level, err := zapcore.ParseLevel(levelStr)
-	if err != nil {
-		return nil, err
-	}
-	config.Level = zap.NewAtomicLevelAt(level)
-	zapLogger, err := config.Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create zap logger: %w", err)
-	}
-
-	return &logger.ZapLogger{Logger: zapLogger}, nil
 }
 
 func TestLoggerMethods(t *testing.T) {
