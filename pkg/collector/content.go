@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // Constants for content processing and error handling
@@ -54,7 +54,7 @@ var (
 // It holds the necessary dependencies and processors for handling different types of content.
 type ContentParams struct {
 	// Logger for content-related operations
-	Logger logger.Interface
+	Logger common.Logger
 	// Source configuration for the collector
 	Source config.Source
 	// Processor for handling article content

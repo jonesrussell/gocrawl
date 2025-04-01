@@ -8,11 +8,11 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/job"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	storage "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/mock"
@@ -82,7 +82,7 @@ func (m *mockStorage) Aggregate(context.Context, string, any) (any, error) {
 }
 func (m *mockStorage) Count(context.Context, string, any) (int64, error) { return 0, nil }
 
-// mockLogger implements logger.Interface for testing
+// mockLogger implements common.Logger for testing
 type mockLogger struct {
 	mock.Mock
 }
@@ -120,8 +120,8 @@ func (m *mockLogger) Sync() error {
 	return args.Error(0)
 }
 
-// Ensure mockLogger implements logger.Interface
-var _ logger.Interface = (*mockLogger)(nil)
+// Ensure mockLogger implements common.Logger
+var _ common.Logger = (*mockLogger)(nil)
 
 func TestModuleProvides(t *testing.T) {
 	mockLogger := &mockLogger{}

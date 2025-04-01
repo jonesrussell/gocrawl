@@ -11,8 +11,8 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
 
@@ -47,7 +47,7 @@ type Params struct {
 	// Debugger handles debugging operations
 	Debugger debug.Debugger
 	// Logger provides logging capabilities
-	Logger logger.Interface
+	Logger common.Logger
 	// MaxDepth is the maximum crawling depth
 	MaxDepth int
 	// Parallelism is the number of concurrent requests
@@ -113,7 +113,7 @@ func ValidateParams(p Params) error {
 // Config holds the configuration for the collector.
 type Config struct {
 	// Logger is the logger for the collector.
-	Logger logger.Interface
+	Logger common.Logger
 
 	// MaxDepth is the maximum depth to crawl.
 	MaxDepth int

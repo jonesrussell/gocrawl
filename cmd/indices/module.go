@@ -2,6 +2,7 @@
 package indices
 
 import (
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -16,7 +17,7 @@ type DeleteDeps struct {
 
 	Storage types.Interface
 	Sources sources.Interface `name:"sources"`
-	Logger  logger.Interface
+	Logger  common.Logger
 }
 
 // Module provides the indices command dependencies

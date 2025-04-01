@@ -28,7 +28,7 @@ type CollectorResult struct {
 // SetupCollector creates and configures a new collector instance.
 func SetupCollector(
 	ctx context.Context,
-	log logger.Interface,
+	log common.Logger,
 	source sources.Config,
 	processors []collector.Processor,
 	done chan struct{},
