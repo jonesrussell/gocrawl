@@ -14,7 +14,6 @@ import (
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -69,9 +68,7 @@ func RunList(cmd *cobra.Command, _ []string) error {
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		fx.NopLogger,
-		config.Module,
-		sources.Module,
-		logger.Module,
+		fx.Supply(cmd),
 		fx.Invoke(func(p struct {
 			fx.In
 			Sources sources.Interface

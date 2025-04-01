@@ -67,6 +67,28 @@
         - [ ] Update dependencies
         - [ ] Update tests
         - [ ] Update documentation
+    - [ ] Combine internal/sources and pkg/sources
+      - [ ] Move unique functionality from pkg/sources to internal/sources
+        - [ ] Move interface definitions
+        - [ ] Move type definitions
+        - [ ] Move error definitions
+        - [ ] Move loader implementation
+      - [ ] Update all references to use internal/sources
+        - [ ] Update imports in all files
+        - [ ] Update type references
+        - [ ] Update interface references
+      - [ ] Delete pkg/sources package
+        - [ ] Remove all files
+        - [ ] Update documentation
+      - [ ] Update test files
+        - [ ] Update imports
+        - [ ] Update type references
+        - [ ] Update interface references
+        - [ ] Update mock implementations
+      - [ ] Verify all functionality works
+        - [ ] Run all tests
+        - [ ] Check coverage
+        - [ ] Verify no regressions
     - [ ] Add HTTP client error handling
       - [ ] Add proper response body closure
         - [ ] Add defer statements

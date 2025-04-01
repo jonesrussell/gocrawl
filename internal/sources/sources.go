@@ -3,7 +3,7 @@
 package sources
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"time"
 
@@ -58,6 +58,13 @@ type SelectorConfig struct {
 // Sources manages web content source configurations.
 type Sources struct {
 	sources []Config
+	logger  interface {
+		Debug(msg string, fields ...any)
+		Info(msg string, fields ...any)
+		Warn(msg string, fields ...any)
+		Error(msg string, fields ...any)
+	}
+	metrics Metrics
 }
 
 // LoadFromFile loads source configurations from a YAML file.
@@ -69,7 +76,12 @@ type Sources struct {
 // Returns:
 //   - *Sources: The loaded sources configuration
 //   - error: Any error that occurred during loading
-func LoadFromFile(path string) (*Sources, error) {
+func LoadFromFile(path string, logger interface {
+	Debug(msg string, fields ...any)
+	Info(msg string, fields ...any)
+	Warn(msg string, fields ...any)
+	Error(msg string, fields ...any)
+}) (*Sources, error) {
 	loaderConfigs, err := loader.LoadFromFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sources: %w", err)
@@ -91,38 +103,102 @@ func LoadFromFile(path string) (*Sources, error) {
 		})
 	}
 
-	return &Sources{sources: configs}, nil
+	return &Sources{
+		sources: configs,
+		logger:  logger,
+		metrics: Metrics{
+			SourceCount: int64(len(configs)),
+		},
+	}, nil
 }
 
 // SetSources sets the sources for testing purposes.
 func (s *Sources) SetSources(configs []Config) {
 	s.sources = configs
+	s.metrics.SourceCount = int64(len(configs))
 }
 
-// FindByName finds a source by its name.
-func (s *Sources) FindByName(name string) (*Config, error) {
+// GetSource retrieves a source by name.
+func (s *Sources) GetSource(ctx context.Context, name string) (*Config, error) {
 	for _, src := range s.sources {
 		if src.Name == name {
 			return &src, nil
 		}
 	}
-	return nil, fmt.Errorf("source not found: %s", name)
+	return nil, ErrSourceNotFound
 }
 
-// Validate checks if a source configuration is valid.
-func (s *Sources) Validate(source *Config) error {
+// ListSources retrieves all sources.
+func (s *Sources) ListSources(ctx context.Context) ([]*Config, error) {
+	result := make([]*Config, len(s.sources))
+	for i := range s.sources {
+		result[i] = &s.sources[i]
+	}
+	return result, nil
+}
+
+// AddSource adds a new source.
+func (s *Sources) AddSource(ctx context.Context, source *Config) error {
+	if err := s.ValidateSource(source); err != nil {
+		return err
+	}
+
+	for _, existing := range s.sources {
+		if existing.Name == source.Name {
+			return ErrSourceExists
+		}
+	}
+
+	s.sources = append(s.sources, *source)
+	s.metrics.SourceCount = int64(len(s.sources))
+	s.metrics.LastUpdated = time.Now()
+	return nil
+}
+
+// UpdateSource updates an existing source.
+func (s *Sources) UpdateSource(ctx context.Context, source *Config) error {
+	if err := s.ValidateSource(source); err != nil {
+		return err
+	}
+
+	for i, existing := range s.sources {
+		if existing.Name == source.Name {
+			s.sources[i] = *source
+			s.metrics.LastUpdated = time.Now()
+			return nil
+		}
+	}
+
+	return ErrSourceNotFound
+}
+
+// DeleteSource deletes a source by name.
+func (s *Sources) DeleteSource(ctx context.Context, name string) error {
+	for i, src := range s.sources {
+		if src.Name == name {
+			s.sources = append(s.sources[:i], s.sources[i+1:]...)
+			s.metrics.SourceCount = int64(len(s.sources))
+			s.metrics.LastUpdated = time.Now()
+			return nil
+		}
+	}
+	return ErrSourceNotFound
+}
+
+// ValidateSource validates a source configuration.
+func (s *Sources) ValidateSource(source *Config) error {
 	if source.Name == "" {
-		return errors.New("source name is required")
+		return fmt.Errorf("%w: name is required", ErrInvalidSource)
 	}
 	if source.URL == "" {
-		return errors.New("source URL is required")
+		return fmt.Errorf("%w: URL is required", ErrInvalidSource)
 	}
 	return nil
 }
 
-// GetSources returns all available sources.
-func (s *Sources) GetSources() ([]Config, error) {
-	return s.sources, nil
+// GetMetrics returns the current metrics.
+func (s *Sources) GetMetrics() Metrics {
+	return s.metrics
 }
 
 // newArticleSelectors creates ArticleSelectors from a source with selectors
