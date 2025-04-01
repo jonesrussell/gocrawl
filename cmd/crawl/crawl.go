@@ -3,7 +3,6 @@ package crawl
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -55,7 +54,6 @@ You can specify the source to crawl using the --source flag.`,
 			storage.Module,
 			sources.Module,
 			config.Module,
-			logger.Module,
 			fx.Provide(
 				fx.Annotate(
 					func() context.Context { return ctx },
@@ -98,15 +96,20 @@ You can specify the source to crawl using the --source flag.`,
 							p.Crawler.Wait()
 							p.Logger.Info("Crawler finished processing")
 							// Signal completion to the signal handler
-							p.Handler.RequestShutdown()
+							handler.RequestShutdown()
 						}()
 
 						return nil
 					},
 					OnStop: func(ctx context.Context) error {
-						p.Logger.Info("Stopping crawler...")
+						// Stop crawler
 						if err := p.Crawler.Stop(ctx); err != nil {
 							return fmt.Errorf("failed to stop crawler: %w", err)
+						}
+
+						// Close storage connection
+						if err := p.Storage.Close(); err != nil {
+							return fmt.Errorf("failed to close storage connection: %w", err)
 						}
 
 						return nil
@@ -115,20 +118,14 @@ You can specify the source to crawl using the --source flag.`,
 			}),
 		)
 
-		// Set the fx app for coordinated shutdown
-		handler.SetFXApp(fxApp)
-
 		// Start the application
-		if err := fxApp.Start(ctx); err != nil {
-			return fmt.Errorf("error starting application: %w", err)
+		if err := fxApp.Start(context.Background()); err != nil {
+			return fmt.Errorf("failed to start application: %w", err)
 		}
 
-		// Wait for signal handler to complete
-		if !handler.Wait() {
-			return errors.New("shutdown timeout or context cancellation")
-		}
+		// Wait for completion signal
+		handler.Wait()
 
-		// If we got here, it means we received a signal and shutdown was successful
 		return nil
 	},
 }

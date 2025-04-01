@@ -56,6 +56,8 @@ type Result struct {
 
 // Module provides the crawler module's dependencies.
 var Module = fx.Module("crawler",
+	// Include common module for shared dependencies
+	common.Module,
 	fx.Provide(
 		// Provide core dependencies
 		func() context.Context {
@@ -80,6 +82,18 @@ var Module = fx.Module("crawler",
 			},
 			fx.ResultTags(`name:"indexName"`),
 		),
+		// Provide article service
+		fx.Annotate(
+			func(logger common.Logger, storage common.Storage) article.Interface {
+				return article.NewService(logger, config.DefaultArticleSelectors(), storage, "articles")
+			},
+		),
+		// Provide content service
+		fx.Annotate(
+			func(logger common.Logger) content.Interface {
+				return content.NewService(logger)
+			},
+		),
 		// Provide event bus
 		events.NewBus,
 		// Provide debugger
@@ -90,14 +104,55 @@ var Module = fx.Module("crawler",
 		},
 		// Provide processors
 		fx.Annotate(
-			func(cfg config.Interface, logger common.Logger, storage common.Storage) collector.Processor {
-				return NewArticleProcessor(cfg, logger, storage)
+			func(
+				log common.Logger,
+				articleService article.Interface,
+				storage common.Storage,
+				sources sources.Interface,
+				params struct {
+					fx.In
+					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
+					SourceName  string               `name:"sourceName"`
+				},
+			) collector.Processor {
+				// Get source configuration
+				source, err := sources.FindByName(params.SourceName)
+				if err != nil {
+					log.Error("Failed to find source", "error", err)
+					return nil
+				}
+
+				log.Debug("Providing article processor")
+				return &article.ArticleProcessor{
+					Logger:         log,
+					ArticleService: articleService,
+					Storage:        storage,
+					IndexName:      source.ArticleIndex,
+					ArticleChan:    params.ArticleChan,
+				}
 			},
 			fx.ResultTags(`name:"articleProcessor"`),
 		),
 		fx.Annotate(
-			func(cfg config.Interface, logger common.Logger, storage common.Storage) collector.Processor {
-				return NewContentProcessor(cfg, logger, storage)
+			func(
+				log common.Logger,
+				contentService content.Interface,
+				storage common.Storage,
+				sources sources.Interface,
+				params struct {
+					fx.In
+					SourceName string `name:"sourceName"`
+				},
+			) collector.Processor {
+				// Get source configuration
+				source, err := sources.FindByName(params.SourceName)
+				if err != nil {
+					log.Error("Failed to find source", "error", err)
+					return nil
+				}
+
+				log.Debug("Providing content processor")
+				return content.NewProcessor(contentService, storage, log, source.Index)
 			},
 			fx.ResultTags(`name:"contentProcessor"`),
 		),

@@ -71,40 +71,12 @@ func (h *Handlers) ConfigureHandlers() {
 		h.config.Logger.Debug("Received response", "url", r.Request.URL.String())
 	})
 
-	// Process content with article processor
-	if h.config.ArticleProcessor != nil {
-		h.collector.OnHTML("*", func(e *colly.HTMLElement) {
-			if err := h.config.ArticleProcessor.Process(e); err != nil {
-				h.config.Logger.Error("Failed to process article content",
-					"url", e.Request.URL.String(),
-					"error", err)
-			}
-		})
-	}
-
-	// Process content with content processor
-	if h.config.ContentProcessor != nil {
-		h.collector.OnHTML("*", func(e *colly.HTMLElement) {
-			if err := h.config.ContentProcessor.Process(e); err != nil {
-				h.config.Logger.Error("Failed to process content",
-					"url", e.Request.URL.String(),
-					"error", err)
-			}
-		})
-	}
-
 	// Handle URL discovery and depth checking
 	h.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
-		if link == "" {
-			return
-		}
-
 		// Log the URL being processed
 		h.config.Logger.Debug("Processing URL",
 			"url", link,
-			"current_depth", e.Request.Depth,
-			"max_depth", h.config.MaxDepth,
 			"parent_url", e.Request.URL.String())
 
 		// Visit the URL with depth tracking
