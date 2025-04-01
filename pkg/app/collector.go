@@ -20,11 +20,6 @@ import (
 	pkglogger "github.com/jonesrussell/gocrawl/pkg/logger"
 )
 
-const (
-	// DefaultParallelism is the default number of parallel requests
-	DefaultParallelism = 2
-)
-
 // CollectorResult holds the result of setting up a collector.
 type CollectorResult struct {
 	Collector *colly.Collector
@@ -59,7 +54,7 @@ func SetupCollector(
 		if err := c.Limit(&colly.LimitRule{
 			DomainGlob:  "*",
 			RandomDelay: source.RateLimit,
-			Parallelism: DefaultParallelism,
+			Parallelism: config.DefaultParallelism,
 		}); err != nil {
 			return nil, fmt.Errorf("failed to set rate limit: %w", err)
 		}
@@ -166,7 +161,7 @@ func NewCollector(cfg common.Config) (*colly.Collector, error) {
 		Logger:      log,
 		Context:     ctx,
 		Done:        make(chan struct{}),
-		Parallelism: DefaultParallelism,
+		Parallelism: config.DefaultParallelism,
 		Source:      source,
 	}
 

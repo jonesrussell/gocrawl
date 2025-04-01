@@ -1,7 +1,11 @@
 // Package config provides configuration functionality for the application.
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/crawler"
+)
 
 const (
 	// DefaultMaxDepth is the default maximum depth for crawling
@@ -151,8 +155,8 @@ func (c *NoOpConfig) GetCrawlerConfig() *CrawlerConfig {
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *CrawlerConfig {
 	return &CrawlerConfig{
-		MaxDepth:    DefaultMaxDepth,
-		RateLimit:   DefaultRateLimit,
-		Parallelism: DefaultParallelism,
+		MaxDepth:    crawler.DefaultParallelism,
+		RateLimit:   time.Second * crawler.DefaultParallelism,
+		Parallelism: crawler.DefaultParallelism,
 	}
 }

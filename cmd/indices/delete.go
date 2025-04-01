@@ -232,8 +232,8 @@ func executeDelete(p *deleteParams) error {
 
 	// Confirm deletion if needed
 	if !p.force {
-		if err := confirmDeletion(indicesToDelete); err != nil {
-			return err
+		if confirmErr := confirmDeletion(indicesToDelete); confirmErr != nil {
+			return confirmErr
 		}
 	}
 

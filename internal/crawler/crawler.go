@@ -18,10 +18,10 @@ import (
 )
 
 const (
+	// DefaultRandomDelayFactor is used to calculate random delay for rate limiting
+	DefaultRandomDelayFactor = 2
 	// DefaultParallelism is the default number of parallel requests
 	DefaultParallelism = 2
-	// DefaultRandomDelayFactor is the factor used to calculate random delay
-	DefaultRandomDelayFactor = 2
 )
 
 // Crawler implements the crawler Interface.
@@ -101,7 +101,7 @@ func (c *Crawler) SetRateLimit(duration time.Duration) error {
 		DomainGlob:  "*",
 		Delay:       duration,
 		RandomDelay: duration / DefaultRandomDelayFactor, // Add some randomization to avoid thundering herd
-		Parallelism: DefaultParallelism,                  // Set a default parallelism value
+		Parallelism: DefaultParallelism,                  // Use the default parallelism value
 	}); err != nil {
 		return fmt.Errorf("failed to set rate limit: %w", err)
 	}

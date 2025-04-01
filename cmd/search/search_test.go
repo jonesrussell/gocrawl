@@ -101,42 +101,18 @@ func runTestApp(t *testing.T, app *fx.App) {
 
 // TestCommandExecution tests the search command execution.
 func TestCommandExecution(t *testing.T) {
-	// Create mock dependencies
-	mockStorage := testutils.NewMockStorage()
-	mockLogger := logger.NewNoOp()
+	// Set up test dependencies
+	deps := setupTestDeps(t)
 
 	// Set up mock expectations
-	mockStorage.On("TestConnection", mock.Anything).Return(nil)
-	mockStorage.On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{}, nil)
-	mockStorage.On("Close").Return(nil)
+	deps.Storage.(*testutils.MockStorage).On("TestConnection", mock.Anything).Return(nil)
+	deps.Storage.(*testutils.MockStorage).On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{}, nil)
+	deps.Storage.(*testutils.MockStorage).On("Close").Return(nil)
 
-	// Create test app
-	app := fx.New(
-		fx.NopLogger,
-		fx.Supply(
-			mockStorage,
-			mockLogger,
-		),
-		fx.Invoke(func(lc fx.Lifecycle, p search.Params) {
-			lc.Append(fx.Hook{
-				OnStart: func(context.Context) error {
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					return nil
-				},
-			})
-		}),
-	)
-
-	// Start the app
-	err := app.Start(t.Context())
-	require.NoError(t, err)
-
-	// Stop the app
-	err = app.Stop(t.Context())
-	require.NoError(t, err)
+	// Create and run test app
+	app := createTestApp(t, deps)
+	runTestApp(t, app)
 
 	// Verify mock expectations
-	mockStorage.AssertExpectations(t)
+	deps.Storage.(*testutils.MockStorage).AssertExpectations(t)
 }
