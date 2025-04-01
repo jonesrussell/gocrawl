@@ -12,7 +12,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
@@ -39,7 +38,7 @@ type Interface interface {
 type Service struct {
 	Logger    common.Logger
 	Selectors config.ArticleSelectors
-	Storage   types.Interface
+	Storage   common.Storage
 	IndexName string
 }
 
@@ -50,7 +49,7 @@ var _ Interface = (*Service)(nil)
 func NewService(
 	logger common.Logger,
 	selectors config.ArticleSelectors,
-	storage types.Interface,
+	storage common.Storage,
 	indexName string,
 ) Interface {
 	return &Service{

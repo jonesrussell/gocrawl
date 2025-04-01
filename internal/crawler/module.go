@@ -5,7 +5,6 @@ package crawler
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -91,14 +90,14 @@ var Module = fx.Module("crawler",
 		},
 		// Provide processors
 		fx.Annotate(
-			func(cfg config.Interface, logger common.Logger) collector.Processor {
-				return NewArticleProcessor(cfg, logger)
+			func(cfg config.Interface, logger common.Logger, storage common.Storage) collector.Processor {
+				return NewArticleProcessor(cfg, logger, storage)
 			},
 			fx.ResultTags(`name:"articleProcessor"`),
 		),
 		fx.Annotate(
-			func(cfg config.Interface, logger common.Logger) collector.Processor {
-				return NewContentProcessor(cfg, logger)
+			func(cfg config.Interface, logger common.Logger, storage common.Storage) collector.Processor {
+				return NewContentProcessor(cfg, logger, storage)
 			},
 			fx.ResultTags(`name:"contentProcessor"`),
 		),
@@ -128,60 +127,15 @@ func ProvideCrawler(
 	contentProcessor collector.Processor,
 	bus *events.Bus,
 ) Result {
-	// Get sources
-	sourcesList, err := sources.GetSources()
-	if err != nil {
-		logger.Error("Failed to get sources", "error", err)
-		return Result{}
-	}
-
-	if len(sourcesList) == 0 {
-		logger.Error("No sources configured")
-		return Result{}
-	}
-
-	// Get the first source for now (we'll update this to use the correct source name later)
-	source := sourcesList[0]
-
-	// Create collector params
-	params := collector.Params{
-		BaseURL:     source.URL,
-		MaxDepth:    source.MaxDepth,
-		RateLimit:   source.RateLimit,
-		Logger:      logger,
-		Context:     context.Background(),
-		Done:        make(chan struct{}),
-		Parallelism: 2, // Set a default parallelism value
-		Source: &config.Source{
-			URL:       source.URL,
-			MaxDepth:  source.MaxDepth,
-			RateLimit: source.RateLimit,
-		},
-	}
-
-	// Add processors
-	params.ArticleProcessor = articleProcessor
-	params.ContentProcessor = contentProcessor
-
-	logger.Debug("Added processors",
-		"article", fmt.Sprintf("%T", articleProcessor),
-		"content", fmt.Sprintf("%T", contentProcessor))
-
-	// Create collector
-	result, err := collector.New(params)
-	if err != nil {
-		logger.Error("Failed to create collector", "error", err)
-		return Result{}
-	}
-
 	// Create crawler instance
 	c := &Crawler{
-		collector:    result.Collector,
-		Logger:       logger,
-		Debugger:     debugger,
-		bus:          bus,
-		indexManager: indexManager,
-		sources:      sources,
+		Logger:           logger,
+		Debugger:         debugger,
+		bus:              bus,
+		indexManager:     indexManager,
+		sources:          sources,
+		articleProcessor: articleProcessor,
+		contentProcessor: contentProcessor,
 	}
 
 	return Result{Crawler: c}
@@ -190,20 +144,22 @@ func ProvideCrawler(
 func NewContentProcessor(
 	cfg config.Interface,
 	logger common.Logger,
+	storage common.Storage,
 ) collector.Processor {
 	service := content.NewService(logger)
-	return content.NewProcessor(service, nil, logger, "content")
+	return content.NewProcessor(service, storage, logger, "content")
 }
 
 func NewArticleProcessor(
 	cfg config.Interface,
 	logger common.Logger,
+	storage common.Storage,
 ) collector.Processor {
-	service := article.NewService(logger, config.DefaultArticleSelectors(), nil, "articles")
+	service := article.NewService(logger, config.DefaultArticleSelectors(), storage, "articles")
 	return &article.ArticleProcessor{
 		Logger:         logger,
 		ArticleService: service,
-		Storage:        nil,
+		Storage:        storage,
 		IndexName:      "articles",
 	}
 }

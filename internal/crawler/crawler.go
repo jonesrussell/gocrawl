@@ -4,13 +4,13 @@ package crawler
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
@@ -18,12 +18,14 @@ import (
 
 // Crawler implements the crawler Interface.
 type Crawler struct {
-	collector    *colly.Collector
-	Logger       common.Logger
-	Debugger     debug.Debugger
-	bus          *events.Bus
-	indexManager api.IndexManager
-	sources      sources.Interface
+	collector        *colly.Collector
+	Logger           common.Logger
+	Debugger         debug.Debugger
+	bus              *events.Bus
+	indexManager     api.IndexManager
+	sources          sources.Interface
+	articleProcessor collector.Processor
+	contentProcessor collector.Processor
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -38,20 +40,32 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		return fmt.Errorf("failed to get source configuration: %w", err)
 	}
 
-	// Parse the source URL to get the domain
-	parsedURL, err := url.Parse(source.URL)
+	// Create collector params
+	params := collector.Params{
+		BaseURL:     source.URL,
+		MaxDepth:    source.MaxDepth,
+		RateLimit:   source.RateLimit,
+		Logger:      c.Logger,
+		Context:     ctx,
+		Done:        make(chan struct{}),
+		Parallelism: 2, // Set a default parallelism value
+		Source: &config.Source{
+			URL:       source.URL,
+			MaxDepth:  source.MaxDepth,
+			RateLimit: source.RateLimit,
+		},
+		ArticleProcessor: c.articleProcessor,
+		ContentProcessor: c.contentProcessor,
+	}
+
+	// Create collector
+	result, err := collector.New(params)
 	if err != nil {
-		return fmt.Errorf("failed to parse source URL: %w", err)
+		return fmt.Errorf("failed to create collector: %w", err)
 	}
 
-	// Update collector configuration
-	c.collector.MaxDepth = source.MaxDepth
-	if err := c.SetRateLimit(source.RateLimit); err != nil {
-		return fmt.Errorf("failed to set rate limit: %w", err)
-	}
-
-	// Update allowed domains
-	c.collector.AllowedDomains = []string{parsedURL.Hostname()}
+	// Set the new collector
+	c.collector = result.Collector
 
 	// Start crawling
 	return c.collector.Visit(source.URL)

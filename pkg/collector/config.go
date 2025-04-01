@@ -6,6 +6,7 @@ package collector
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -145,7 +146,13 @@ type Config struct {
 //   - *Config: The created configuration
 //   - error: Any error that occurred during creation
 func NewConfig(p Params) (*Config, error) {
-	return &Config{
+	// Ensure processors are provided
+	if p.ArticleProcessor == nil {
+		return nil, errors.New(errMissingArticleProc)
+	}
+
+	// Create config with all parameters
+	cfg := &Config{
 		BaseURL:          p.BaseURL,
 		MaxDepth:         p.MaxDepth,
 		RateLimit:        p.Source.RateLimit.String(),
@@ -157,7 +164,14 @@ func NewConfig(p Params) (*Config, error) {
 		ContentProcessor: p.ContentProcessor,
 		Source:           *p.Source, // Dereference the pointer to get the value
 		AllowedDomains:   p.AllowedDomains,
-	}, nil
+	}
+
+	// Log processor configuration
+	p.Logger.Debug("Collector config created",
+		"articleProcessor", fmt.Sprintf("%T", p.ArticleProcessor),
+		"contentProcessor", fmt.Sprintf("%T", p.ContentProcessor))
+
+	return cfg, nil
 }
 
 // ValidateConfig validates the collector configuration.

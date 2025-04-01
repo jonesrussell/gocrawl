@@ -213,10 +213,17 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 // Returns:
 //   - error: Any error that occurred during configuration
 func (s *Setup) ConfigureCollector(c *colly.Collector) error {
+	// Parse rate limit duration
+	rateLimit, err := time.ParseDuration(s.config.RateLimit)
+	if err != nil {
+		return fmt.Errorf("failed to parse rate limit: %w", err)
+	}
+
 	// Configure rate limiting with domain-specific rules
 	if err := c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		RandomDelay: s.config.RandomDelay,
+		Delay:       rateLimit,
+		RandomDelay: rateLimit / 2, // Add some randomization to avoid thundering herd
 		Parallelism: s.config.Parallelism,
 	}); err != nil {
 		return fmt.Errorf("failed to set rate limit: %w", err)

@@ -67,4 +67,26 @@ func (h *Handlers) ConfigureHandlers() {
 	h.collector.OnResponse(func(r *colly.Response) {
 		h.config.Logger.Debug("Received response", "url", r.Request.URL.String())
 	})
+
+	// Process content with article processor
+	if h.config.ArticleProcessor != nil {
+		h.collector.OnHTML("*", func(e *colly.HTMLElement) {
+			if err := h.config.ArticleProcessor.Process(e); err != nil {
+				h.config.Logger.Error("Failed to process article content",
+					"url", e.Request.URL.String(),
+					"error", err)
+			}
+		})
+	}
+
+	// Process content with content processor
+	if h.config.ContentProcessor != nil {
+		h.collector.OnHTML("*", func(e *colly.HTMLElement) {
+			if err := h.config.ContentProcessor.Process(e); err != nil {
+				h.config.Logger.Error("Failed to process content",
+					"url", e.Request.URL.String(),
+					"error", err)
+			}
+		})
+	}
 }
