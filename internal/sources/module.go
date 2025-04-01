@@ -29,9 +29,7 @@ type Interface interface {
 // Module provides the sources module's dependencies.
 var Module = fx.Module("sources",
 	fx.Provide(
-		fx.Annotate(
-			provideSources,
-		),
+		provideSources,
 	),
 )
 
@@ -40,13 +38,6 @@ type Params struct {
 	fx.In
 
 	Config config.Interface
-}
-
-// Result contains the components provided by the sources module.
-type Result struct {
-	fx.Out
-
-	Sources Interface
 }
 
 // provideSources creates a new sources instance.

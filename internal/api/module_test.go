@@ -54,7 +54,7 @@ var TestAPIModule = fx.Module("testAPI",
 		return &fxevent.NopLogger
 	}),
 	// Core modules used by most commands, excluding logger and sources.
-	config.Module,
+	config.TestModule,
 	logger.Module,
 )
 
@@ -72,7 +72,7 @@ func setupTestApp(t *testing.T) *testServer {
 	app := fxtest.New(t,
 		TestAPIModule,
 		fx.NopLogger,
-		fx.Supply(mockSearch, mockLogger),
+		fx.Supply(mockSearch),
 		fx.Invoke(func(s *http.Server) {
 			ts.server = s
 		}),

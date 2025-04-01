@@ -12,8 +12,10 @@ import (
 
 // DeleteDeps holds the dependencies for the delete command
 type DeleteDeps struct {
+	fx.In
+
 	Storage types.Interface
-	Sources sources.Interface
+	Sources sources.Interface `name:"sources"`
 	Logger  logger.Interface
 }
 

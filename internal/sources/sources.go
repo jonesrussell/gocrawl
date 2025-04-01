@@ -94,64 +94,35 @@ func LoadFromFile(path string) (*Sources, error) {
 	return &Sources{sources: configs}, nil
 }
 
+// SetSources sets the sources for testing purposes.
+func (s *Sources) SetSources(configs []Config) {
+	s.sources = configs
+}
+
 // FindByName finds a source by its name.
-// It searches through the sources list for a matching name.
-//
-// Parameters:
-//   - name: The name of the source to find
-//
-// Returns:
-//   - *Config: The found source configuration
-//   - error: Any error that occurred during the search
 func (s *Sources) FindByName(name string) (*Config, error) {
-	for _, source := range s.sources {
-		if source.Name == name {
-			return &source, nil
+	for _, src := range s.sources {
+		if src.Name == name {
+			return &src, nil
 		}
 	}
-	return nil, fmt.Errorf("no source found with name: %s", name)
+	return nil, fmt.Errorf("source not found: %s", name)
+}
+
+// Validate checks if a source configuration is valid.
+func (s *Sources) Validate(source *Config) error {
+	if source.Name == "" {
+		return errors.New("source name is required")
+	}
+	if source.URL == "" {
+		return errors.New("source URL is required")
+	}
+	return nil
 }
 
 // GetSources returns all available sources.
 func (s *Sources) GetSources() ([]Config, error) {
 	return s.sources, nil
-}
-
-// Validate checks if a source configuration is valid.
-// It ensures all required fields are present and properly formatted.
-//
-// Parameters:
-//   - source: The source configuration to validate
-//
-// Returns:
-//   - error: Any validation errors found
-func (s *Sources) Validate(source *Config) error {
-	if source == nil {
-		return errors.New("source configuration is nil")
-	}
-
-	if source.Name == "" {
-		return errors.New("source name is required")
-	}
-
-	if source.URL == "" {
-		return errors.New("source URL is required")
-	}
-
-	if source.RateLimit == 0 {
-		return errors.New("rate limit is required")
-	}
-
-	if source.MaxDepth <= 0 {
-		return errors.New("max depth must be greater than 0")
-	}
-
-	return nil
-}
-
-// SetSources sets the sources list. This is primarily used for testing.
-func (s *Sources) SetSources(sources []Config) {
-	s.sources = sources
 }
 
 // newArticleSelectors creates ArticleSelectors from a source with selectors

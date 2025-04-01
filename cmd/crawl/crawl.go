@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -53,7 +52,6 @@ You can specify the source to crawl using the --source flag.`,
 			crawler.Module,
 			storage.Module,
 			sources.Module,
-			config.Module,
 			fx.Provide(
 				fx.Annotate(
 					func() context.Context { return ctx },

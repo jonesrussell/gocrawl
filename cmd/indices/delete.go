@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -27,7 +28,7 @@ type Params struct {
 	fx.In
 	Storage types.Interface
 	Sources sources.Interface
-	Logger  logger.Interface
+	Logger  common.Logger
 }
 
 // deleteParams holds the parameters required for deleting indices.
@@ -35,7 +36,7 @@ type deleteParams struct {
 	ctx     context.Context
 	storage types.Interface
 	sources sources.Interface
-	logger  logger.Interface
+	logger  common.Logger
 	indices []string
 	force   bool
 }
@@ -44,8 +45,8 @@ type deleteParams struct {
 var deleteModule = fx.Module("delete",
 	// Core dependencies
 	config.Module,
-	logger.Module,
 	storage.Module,
+	sources.Module,
 )
 
 // deleteCommand creates and returns the delete command that removes indices.
@@ -108,6 +109,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		deleteModule,
 		fx.Provide(
 			func() context.Context { return ctx },
+			func() common.Logger { return logger.NewNoOp() },
 		),
 		fx.Invoke(func(lc fx.Lifecycle, p Params) {
 			// Update the signal handler with the real logger
@@ -152,78 +154,31 @@ func runDelete(cmd *cobra.Command, args []string) error {
 }
 
 // executeDelete performs the actual deletion of indices.
-// It:
-// - Resolves indices to delete (from args or source)
-// - Checks which indices exist
-// - Filters out non-existent indices
-// - Requests confirmation if needed
-// - Deletes the specified indices
 func executeDelete(p *deleteParams) error {
-	if err := resolveIndices(p); err != nil {
-		return err
-	}
-
-	existingMap, err := getExistingIndices(p)
-	if err != nil {
-		return err
-	}
-
-	indicesToDelete := filterExistingIndices(p, existingMap)
-	if len(indicesToDelete) == 0 {
-		return nil
-	}
-
-	if !p.force {
-		if !confirmDeletion(indicesToDelete) {
-			return nil
-		}
-	}
-
-	return deleteIndices(p, indicesToDelete)
-}
-
-// resolveIndices determines which indices to delete.
-// It:
-// - Uses command-line arguments if provided
-// - Uses source configuration if --source flag is used
-func resolveIndices(p *deleteParams) error {
+	// Resolve indices to delete
 	if deleteSourceName != "" {
 		source, err := p.sources.FindByName(deleteSourceName)
 		if err != nil {
 			return err
 		}
-		// Use both content and article indices
 		p.indices = []string{source.Index, source.ArticleIndex}
 	}
-	return nil
-}
 
-// getExistingIndices retrieves a list of all existing indices.
-// It:
-// - Queries Elasticsearch for all indices
-// - Creates a map for efficient lookup
-func getExistingIndices(p *deleteParams) (map[string]bool, error) {
-	indices, err := p.storage.ListIndices(p.ctx)
+	// Get existing indices
+	existingIndices, err := p.storage.ListIndices(p.ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	// Create map of existing indices
 	existingMap := make(map[string]bool)
-	for _, idx := range indices {
+	for _, idx := range existingIndices {
 		existingMap[idx] = true
 	}
-	return existingMap, nil
-}
 
-// filterExistingIndices filters out non-existent indices and reports them.
-// It:
-// - Checks each requested index against existing indices
-// - Reports non-existent indices to the user
-// - Returns only the indices that exist
-func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []string {
-	var missingIndices []string
+	// Filter and report non-existent indices
 	var indicesToDelete []string
-
+	var missingIndices []string
 	for _, index := range p.indices {
 		if !existingMap[index] {
 			missingIndices = append(missingIndices, index)
@@ -239,29 +194,26 @@ func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []strin
 		}
 	}
 
-	return indicesToDelete
-}
-
-// confirmDeletion prompts the user for confirmation before deleting indices.
-// It:
-// - Displays the list of indices to be deleted
-// - Requests user confirmation
-func confirmDeletion(indices []string) bool {
-	fmt.Printf("\nAre you sure you want to delete the following indices?\n")
-	for _, index := range indices {
-		fmt.Printf("  - %s\n", index)
+	if len(indicesToDelete) == 0 {
+		return nil
 	}
-	fmt.Printf("\nContinue? (y/N): ")
-	var response string
-	fmt.Scanln(&response)
-	return response == "y" || response == "Y"
-}
 
-// deleteIndices performs the actual deletion of the specified indices.
-// It:
-// - Deletes each index from Elasticsearch
-func deleteIndices(p *deleteParams, indices []string) error {
-	for _, index := range indices {
+	// Confirm deletion if needed
+	if !p.force {
+		fmt.Printf("\nAre you sure you want to delete the following indices?\n")
+		for _, index := range indicesToDelete {
+			fmt.Printf("  - %s\n", index)
+		}
+		fmt.Printf("\nContinue? (y/N): ")
+		var response string
+		fmt.Scanln(&response)
+		if response != "y" && response != "Y" {
+			return nil
+		}
+	}
+
+	// Delete indices
+	for _, index := range indicesToDelete {
 		if err := p.storage.DeleteIndex(p.ctx, index); err != nil {
 			return err
 		}
