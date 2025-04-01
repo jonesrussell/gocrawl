@@ -7,9 +7,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +38,7 @@ type testServer struct {
 
 // setupMockLogger creates and configures a mock logger for testing.
 func setupMockLogger() *testutils.MockLogger {
-	mockLog := &testutils.MockLogger{}
+	mockLog := testutils.NewMockLogger()
 	mockLog.On("Info", mock.Anything, mock.Anything).Return()
 	mockLog.On("Error", mock.Anything, mock.Anything).Return()
 	mockLog.On("Debug", mock.Anything, mock.Anything).Return()
@@ -56,6 +59,8 @@ var TestAPIModule = fx.Module("testAPI",
 	// Core modules used by most commands, excluding logger and sources.
 	config.TestModule,
 	logger.Module,
+	// Include the API module itself
+	api.Module,
 )
 
 func setupTestApp(t *testing.T) *testServer {
@@ -64,6 +69,34 @@ func setupTestApp(t *testing.T) *testServer {
 	// Create mock dependencies
 	mockLogger := setupMockLogger()
 	mockSearch := testutils.NewMockSearchManager()
+	mockConfig := configtest.NewMockConfig().
+		WithServerConfig(&config.ServerConfig{
+			Address:      ":0", // Use random port for testing
+			ReadTimeout:  15 * time.Second,
+			WriteTimeout: 15 * time.Second,
+			IdleTimeout:  60 * time.Second,
+		}).
+		WithAppConfig(&config.AppConfig{
+			Environment: "test",
+		}).
+		WithLogConfig(&config.LogConfig{
+			Level: "info",
+			Debug: false,
+		}).
+		WithElasticsearchConfig(&config.ElasticsearchConfig{
+			Addresses: []string{"http://localhost:9200"},
+			IndexName: "test_index",
+		})
+
+	// Set up mock search expectations
+	mockSearch.On("Search", mock.Anything, "test", mock.Anything).Return([]any{
+		map[string]any{
+			"title": "Test Result",
+			"url":   "https://test.com",
+		},
+	}, nil)
+	mockSearch.On("Count", mock.Anything, "test", mock.Anything).Return(int64(1), nil)
+	mockSearch.On("Close").Return(nil)
 
 	// Store references for test assertions
 	ts.logger = mockLogger
@@ -72,7 +105,7 @@ func setupTestApp(t *testing.T) *testServer {
 	app := fxtest.New(t,
 		TestAPIModule,
 		fx.NopLogger,
-		fx.Supply(mockSearch),
+		fx.Supply(mockSearch, mockConfig),
 		fx.Invoke(func(s *http.Server) {
 			ts.server = s
 		}),
