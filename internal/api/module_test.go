@@ -2,15 +2,12 @@
 package api_test
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -66,71 +63,15 @@ func setupMockLogger() *testutils.MockLogger {
 	return mockLog
 }
 
-// TestCommonModule provides a test-specific common module that excludes the logger module.
-var TestCommonModule = fx.Module("testCommon",
+// TestAPIModule provides a test version of the API module with test-specific dependencies.
+var TestAPIModule = fx.Module("testAPI",
 	// Suppress fx logging to reduce noise in the application logs.
 	fx.WithLogger(func() fxevent.Logger {
 		return &fxevent.NopLogger
 	}),
-	// Core modules used by most commands, excluding config and sources.
+	// Core modules used by most commands, excluding logger and sources.
+	config.Module,
 	logger.Module,
-)
-
-// TestAPIModule provides a test version of the API module with test-specific dependencies.
-var TestAPIModule = fx.Module("api",
-	TestCommonModule,
-	fx.Provide(
-		// Provide test context
-		context.Background,
-		// Provide mock search manager
-		func() api.SearchManager {
-			return setupMockSearchManager()
-		},
-		// Provide mock config
-		fx.Annotate(
-			func() common.Config {
-				mockCfg := &testutils.MockConfig{}
-				mockCfg.On("GetAppConfig").Return(&config.AppConfig{
-					Environment: "test",
-					Name:        "gocrawl",
-					Version:     "1.0.0",
-					Debug:       true,
-				})
-				mockCfg.On("GetLogConfig").Return(&config.LogConfig{
-					Level: "debug",
-					Debug: true,
-				})
-				mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
-					Addresses: []string{"http://localhost:9200"},
-					IndexName: "test-index",
-				})
-				mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
-				mockCfg.On("GetSources").Return([]config.Source{}, nil)
-				mockCfg.On("GetCommand").Return("test")
-				return mockCfg
-			},
-			fx.As(new(common.Config)),
-		),
-		// Provide the server and security middleware
-		func(
-			log common.Logger,
-			searchManager api.SearchManager,
-			cfg common.Config,
-		) (*http.Server, middleware.SecurityMiddlewareInterface) {
-			// Create router and security middleware
-			router, security := api.SetupRouter(log, searchManager, cfg)
-
-			// Create server
-			server := &http.Server{
-				Addr:              cfg.GetServerConfig().Address,
-				Handler:           router,
-				ReadHeaderTimeout: api.ReadHeaderTimeout,
-			}
-
-			return server, security
-		},
-	),
-	fx.Invoke(api.ConfigureLifecycle),
 )
 
 func setupTestApp(t *testing.T) *testServer {
@@ -138,6 +79,7 @@ func setupTestApp(t *testing.T) *testServer {
 
 	// Create mock dependencies
 	mockLogger := setupMockLogger()
+	mockSearch := setupMockSearchManager()
 
 	// Store references for test assertions
 	ts.logger = mockLogger
@@ -146,6 +88,7 @@ func setupTestApp(t *testing.T) *testServer {
 	app := fxtest.New(t,
 		TestAPIModule,
 		fx.NopLogger,
+		fx.Supply(mockSearch),
 		fx.Invoke(func(s *http.Server) {
 			ts.server = s
 		}),
@@ -222,5 +165,7 @@ func TestSearchEndpoint(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Contains(t, w.Body.String(), "results")
+		assert.Contains(t, w.Body.String(), "Test Result")
+		assert.Contains(t, w.Body.String(), "https://test.com")
 	})
 }

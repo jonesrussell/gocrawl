@@ -9,10 +9,11 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -24,20 +25,28 @@ var deleteSourceName string
 // Params holds the dependencies required for the delete operation.
 type Params struct {
 	fx.In
-	Storage common.Storage
+	Storage types.Interface
 	Sources sources.Interface
-	Logger  common.Logger
+	Logger  logger.Interface
 }
 
 // deleteParams holds the parameters required for deleting indices.
 type deleteParams struct {
 	ctx     context.Context
-	storage common.Storage
+	storage types.Interface
 	sources sources.Interface
-	logger  common.Logger
+	logger  logger.Interface
 	indices []string
 	force   bool
 }
+
+// deleteModule provides the delete command dependencies
+var deleteModule = fx.Module("delete",
+	// Core dependencies
+	config.Module,
+	logger.Module,
+	storage.Module,
+)
 
 // deleteCommand creates and returns the delete command that removes indices.
 // It:
@@ -96,8 +105,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	// Initialize the Fx application
 	fxApp := fx.New(
 		fx.NopLogger,
-		common.Module,
-		storage.Module,
+		deleteModule,
 		fx.Provide(
 			func() context.Context { return ctx },
 		),
@@ -225,9 +233,9 @@ func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []strin
 	}
 
 	if len(missingIndices) > 0 {
-		common.PrintInfof("\nThe following indices do not exist (already deleted):")
+		fmt.Printf("\nThe following indices do not exist (already deleted):\n")
 		for _, index := range missingIndices {
-			common.PrintInfof("  - %s", index)
+			fmt.Printf("  - %s\n", index)
 		}
 	}
 
@@ -239,11 +247,14 @@ func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []strin
 // - Displays the list of indices to be deleted
 // - Requests user confirmation
 func confirmDeletion(indices []string) bool {
-	common.PrintInfof("\nAre you sure you want to delete the following indices?")
+	fmt.Printf("\nAre you sure you want to delete the following indices?\n")
 	for _, index := range indices {
-		common.PrintInfof("  - %s", index)
+		fmt.Printf("  - %s\n", index)
 	}
-	return common.PrintConfirmation("\nContinue?")
+	fmt.Printf("\nContinue? (y/N): ")
+	var response string
+	fmt.Scanln(&response)
+	return response == "y" || response == "Y"
 }
 
 // deleteIndices performs the actual deletion of the specified indices.

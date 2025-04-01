@@ -2,25 +2,26 @@
 package indices
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
 // DeleteDeps holds the dependencies for the delete command
 type DeleteDeps struct {
-	Storage common.Storage
+	Storage types.Interface
 	Sources sources.Interface
-	Logger  common.Logger
+	Logger  logger.Interface
 }
 
 // Module provides the indices command dependencies
 var Module = fx.Module("indices",
 	// Core dependencies
-	common.Module,
+	config.Module,
+	logger.Module,
 	sources.Module,
 	storage.Module,
-	logger.Module,
 )

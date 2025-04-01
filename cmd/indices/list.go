@@ -10,7 +10,8 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
@@ -23,9 +24,17 @@ type Dependencies struct {
 
 	Lifecycle fx.Lifecycle
 	Storage   types.Interface
-	Logger    common.Logger
+	Logger    logger.Interface
 	Context   context.Context `name:"crawlContext"`
 }
+
+// listModule provides the list command dependencies
+var listModule = fx.Module("list",
+	// Core dependencies
+	config.Module,
+	logger.Module,
+	storage.Module,
+)
 
 // listCommand creates and returns the list command that displays all indices.
 // It integrates with the Cobra command framework and sets up the command
@@ -46,7 +55,7 @@ Example:
 }
 
 // renderIndicesTable formats and displays the indices in a table format.
-func renderIndicesTable(ctx context.Context, indices []string, storage types.Interface, logger common.Logger) error {
+func renderIndicesTable(ctx context.Context, indices []string, storage types.Interface, logger logger.Interface) error {
 	// Initialize table writer with stdout as output
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -97,8 +106,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 	// Initialize the Fx application
 	fxApp := fx.New(
 		fx.NopLogger,
-		storage.Module,
-		common.Module,
+		listModule,
 		fx.Provide(
 			fx.Annotate(
 				func() context.Context { return ctx },

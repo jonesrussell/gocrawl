@@ -11,12 +11,13 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"go.uber.org/fx"
 )
@@ -56,8 +57,10 @@ type Result struct {
 
 // Module provides the crawler module's dependencies.
 var Module = fx.Module("crawler",
-	// Include common module for shared dependencies
-	common.Module,
+	// Include core dependencies
+	config.Module,
+	logger.Module,
+	sources.Module,
 	fx.Provide(
 		// Provide core dependencies
 		func() context.Context {
@@ -84,20 +87,20 @@ var Module = fx.Module("crawler",
 		),
 		// Provide article service
 		fx.Annotate(
-			func(logger common.Logger, storage common.Storage) article.Interface {
+			func(logger logger.Interface, storage storagetypes.Interface) article.Interface {
 				return article.NewService(logger, config.DefaultArticleSelectors(), storage, "articles")
 			},
 		),
 		// Provide content service
 		fx.Annotate(
-			func(logger common.Logger) content.Interface {
+			func(logger logger.Interface) content.Interface {
 				return content.NewService(logger)
 			},
 		),
 		// Provide event bus
 		events.NewBus,
 		// Provide debugger
-		func(logger common.Logger) debug.Debugger {
+		func(logger logger.Interface) debug.Debugger {
 			return &debug.LogDebugger{
 				Output: NewDebugLogger(logger),
 			}
@@ -105,9 +108,9 @@ var Module = fx.Module("crawler",
 		// Provide processors
 		fx.Annotate(
 			func(
-				log common.Logger,
+				log logger.Interface,
 				articleService article.Interface,
-				storage common.Storage,
+				storage storagetypes.Interface,
 				sources sources.Interface,
 				params struct {
 					fx.In
@@ -135,9 +138,9 @@ var Module = fx.Module("crawler",
 		),
 		fx.Annotate(
 			func(
-				log common.Logger,
+				log logger.Interface,
 				contentService content.Interface,
-				storage common.Storage,
+				storage storagetypes.Interface,
 				sources sources.Interface,
 				params struct {
 					fx.In
@@ -174,7 +177,7 @@ var Module = fx.Module("crawler",
 
 // ProvideCrawler creates a new crawler instance with all dependencies.
 func ProvideCrawler(
-	logger common.Logger,
+	logger logger.Interface,
 	debugger debug.Debugger,
 	indexManager api.IndexManager,
 	sources sources.Interface,
@@ -198,8 +201,8 @@ func ProvideCrawler(
 
 func NewContentProcessor(
 	cfg config.Interface,
-	logger common.Logger,
-	storage common.Storage,
+	logger logger.Interface,
+	storage storagetypes.Interface,
 ) collector.Processor {
 	service := content.NewService(logger)
 	return content.NewProcessor(service, storage, logger, "content")
@@ -207,8 +210,8 @@ func NewContentProcessor(
 
 func NewArticleProcessor(
 	cfg config.Interface,
-	logger common.Logger,
-	storage common.Storage,
+	logger logger.Interface,
+	storage storagetypes.Interface,
 ) collector.Processor {
 	service := article.NewService(logger, config.DefaultArticleSelectors(), storage, "articles")
 	return &article.ArticleProcessor{

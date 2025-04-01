@@ -10,8 +10,9 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -44,9 +45,9 @@ type Params struct {
 	fx.In
 
 	// Logger provides logging capabilities for the search operation
-	Logger common.Logger
+	Logger logger.Interface
 	// Config holds the application configuration
-	Config common.Config
+	Config config.Interface
 	// SearchManager is the service responsible for executing searches
 	SearchManager api.SearchManager
 	// IndexName specifies which Elasticsearch index to search
@@ -71,6 +72,14 @@ var Cmd = &cobra.Command{
 	RunE:  runSearch,
 }
 
+// searchModule provides the search command dependencies
+var searchModule = fx.Module("search",
+	// Core dependencies
+	config.Module,
+	logger.Module,
+	storage.Module,
+)
+
 // Command returns the search command for use in the root command
 func Command() *cobra.Command {
 	// Define flags for the search command
@@ -80,7 +89,7 @@ func Command() *cobra.Command {
 
 	// Mark the query flag as required
 	if err := Cmd.MarkFlagRequired("query"); err != nil {
-		common.PrintErrorf("Error marking query flag as required: %v", err)
+		fmt.Printf("Error marking query flag as required: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -118,8 +127,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 
 	// Initialize the Fx application with required modules and dependencies
 	fxApp := fx.New(
-		common.Module,
-		Module,
+		searchModule,
 		fx.Provide(
 			// Provide search parameters with appropriate tags for dependency injection
 			fx.Annotate(
@@ -141,7 +149,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 					// Execute the search and handle any errors
 					if err := executeSearch(cmd.Context(), p); err != nil {
 						p.Logger.Error("Error executing search", "error", err)
-						common.PrintErrorf("\nSearch failed: %v", err)
+						fmt.Printf("\nSearch failed: %v\n", err)
 						return err
 					}
 					return nil
@@ -180,7 +188,7 @@ func buildSearchQuery(size int, query string) map[string]any {
 }
 
 // processSearchResults converts raw search results to Result structs
-func processSearchResults(rawResults []any, logger common.Logger) []Result {
+func processSearchResults(rawResults []any, logger logger.Interface) []Result {
 	var results []Result
 	for _, raw := range rawResults {
 		hit, ok := raw.(map[string]any)
@@ -248,7 +256,7 @@ func renderSearchResults(results []Result, query string) {
 
 	t.AppendFooter(table.Row{"Total", len(results), fmt.Sprintf("Query: %s", query)})
 
-	common.PrintInfof("\nSearch Results:")
+	fmt.Printf("\nSearch Results:\n")
 	t.Render()
 }
 
@@ -275,7 +283,7 @@ func executeSearch(ctx context.Context, p Params) error {
 	)
 
 	if len(results) == 0 {
-		common.PrintInfof("No results found for query: %s", p.Query)
+		fmt.Printf("No results found for query: %s\n", p.Query)
 		return nil
 	}
 
