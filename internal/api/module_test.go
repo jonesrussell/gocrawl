@@ -33,22 +33,6 @@ type testServer struct {
 	logger common.Logger
 }
 
-// setupMockSearchManager creates and configures a mock search manager for testing.
-func setupMockSearchManager() *testutils.MockSearchManager {
-	mockSearch := &testutils.MockSearchManager{}
-	mockSearch.On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{
-		map[string]any{
-			"title":   "Test Result",
-			"url":     "https://test.com",
-			"content": "This is a test result",
-		},
-	}, nil)
-	mockSearch.On("Count", mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
-	mockSearch.On("Aggregate", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-	mockSearch.On("Close").Return(nil)
-	return mockSearch
-}
-
 // setupMockLogger creates and configures a mock logger for testing.
 func setupMockLogger() *testutils.MockLogger {
 	mockLog := &testutils.MockLogger{}
@@ -79,7 +63,7 @@ func setupTestApp(t *testing.T) *testServer {
 
 	// Create mock dependencies
 	mockLogger := setupMockLogger()
-	mockSearch := setupMockSearchManager()
+	mockSearch := testutils.NewMockSearchManager()
 
 	// Store references for test assertions
 	ts.logger = mockLogger
@@ -88,7 +72,7 @@ func setupTestApp(t *testing.T) *testServer {
 	app := fxtest.New(t,
 		TestAPIModule,
 		fx.NopLogger,
-		fx.Supply(mockSearch),
+		fx.Supply(mockSearch, mockLogger),
 		fx.Invoke(func(s *http.Server) {
 			ts.server = s
 		}),
