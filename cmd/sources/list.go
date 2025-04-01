@@ -13,6 +13,8 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -33,7 +35,7 @@ const (
 type Params struct {
 	fx.In
 	SourceManager sources.Interface
-	Logger        common.Logger
+	Logger        types.Logger
 }
 
 // ListCommand creates and returns the list command that displays all sources.
@@ -67,11 +69,13 @@ func RunList(cmd *cobra.Command, _ []string) error {
 	// Initialize the Fx application with required modules
 	app := fx.New(
 		fx.NopLogger,
-		Module,
+		config.Module,
+		sources.Module,
+		logger.Module,
 		fx.Invoke(func(p struct {
 			fx.In
 			Sources sources.Interface
-			Logger  common.Logger
+			Logger  types.Logger
 			LC      fx.Lifecycle
 		}) {
 			// Update the signal handler with the real logger
@@ -150,7 +154,7 @@ func ExecuteList(params Params) error {
 }
 
 // PrintSources formats and displays the sources in a table.
-func PrintSources(sources []sources.Config, logger common.Logger) error {
+func PrintSources(sources []sources.Config, logger types.Logger) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 
