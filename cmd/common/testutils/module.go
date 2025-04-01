@@ -8,14 +8,14 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	mockutils "github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/mock"
@@ -33,10 +33,10 @@ const (
 type CommandTestModule struct {
 	// Core dependencies
 	Sources  sources.Interface
-	Storage  types.Interface
+	Storage  storagetypes.Interface
 	IndexMgr api.IndexManager
 	Config   config.Interface
-	Logger   common.Logger
+	Logger   types.Logger
 	Crawler  crawler.Interface
 
 	// Command-specific dependencies
@@ -98,7 +98,7 @@ func (m *CommandTestModule) Module() fx.Option {
 		// Core dependencies
 		fx.Provide(
 			func() config.Interface { return m.Config },
-			func() common.Logger { return m.Logger },
+			func() types.Logger { return m.Logger },
 			func() crawler.Interface { return m.Crawler },
 			collector.NewMetrics,
 		),
@@ -115,7 +115,7 @@ func (m *CommandTestModule) Module() fx.Option {
 
 		// Test dependencies - provide each separately
 		fx.Provide(func() sources.Interface { return m.Sources }),
-		fx.Provide(func() types.Interface { return m.Storage }),
+		fx.Provide(func() storagetypes.Interface { return m.Storage }),
 		fx.Provide(func() api.IndexManager { return m.IndexMgr }),
 		fx.Supply(m.Processors),
 	)

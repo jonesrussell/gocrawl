@@ -9,6 +9,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	srcs "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -99,7 +100,7 @@ func (m *mockConfig) GetSources() []config.Source           { return m.sources }
 type TestParams struct {
 	fx.In
 	Sources srcs.Interface
-	Logger  common.Logger
+	Logger  types.Logger
 }
 
 // TestConfigModule provides test configuration

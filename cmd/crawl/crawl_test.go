@@ -7,13 +7,13 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/spf13/cobra"
@@ -26,8 +26,8 @@ import (
 // testDeps holds all the dependencies needed for testing
 type testDeps struct {
 	Crawler       crawler.Interface
-	Storage       types.Interface
-	Logger        common.Logger
+	Storage       storagetypes.Interface
+	Logger        types.Logger
 	Config        config.Interface
 	SourceManager sources.Interface
 	Handler       *signal.SignalHandler
@@ -73,8 +73,8 @@ func createTestApp(t *testing.T, deps *testDeps, hooks ...fx.Hook) *fx.App {
 	providers := []any{
 		// Core dependencies
 		func() crawler.Interface { return deps.Crawler },
-		func() types.Interface { return deps.Storage },
-		func() common.Logger { return deps.Logger },
+		func() storagetypes.Interface { return deps.Storage },
+		func() types.Logger { return deps.Logger },
 		func() config.Interface { return deps.Config },
 		func() sources.Interface { return deps.SourceManager },
 		func() *signal.SignalHandler { return deps.Handler },
@@ -157,8 +157,8 @@ func TestCommandExecution(t *testing.T) {
 		fx.Provide(
 			// Core dependencies
 			func() crawler.Interface { return mockCrawler },
-			func() types.Interface { return mockStorage },
-			func() common.Logger { return mockLogger },
+			func() storagetypes.Interface { return mockStorage },
+			func() types.Logger { return mockLogger },
 			func() config.Interface { return mockConfig },
 			func() sources.Interface { return mockSourceManager },
 			func() *signal.SignalHandler { return mockHandler },

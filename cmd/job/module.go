@@ -4,6 +4,7 @@ package job
 import (
 	"context"
 
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/job"
 	"github.com/jonesrussell/gocrawl/pkg/logger"
 	"go.uber.org/fx"
@@ -21,10 +22,10 @@ var Module = fx.Module("job",
 		),
 		// Provide the logger
 		fx.Annotate(
-			func(p logger.Params) logger.Interface {
+			func(p logger.Params) types.Logger {
 				return logger.NewNoOp()
 			},
-			fx.As(new(logger.Interface)),
+			fx.As(new(types.Logger)),
 		),
 		// Provide the context
 		fx.Annotate(

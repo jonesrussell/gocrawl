@@ -9,12 +9,12 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -26,17 +26,17 @@ var deleteSourceName string
 // Params holds the dependencies required for the delete operation.
 type Params struct {
 	fx.In
-	Storage types.Interface
+	Storage storagetypes.Interface
 	Sources sources.Interface
-	Logger  common.Logger
+	Logger  types.Logger
 }
 
 // deleteParams holds the parameters required for deleting indices.
 type deleteParams struct {
 	ctx     context.Context
-	storage types.Interface
+	storage storagetypes.Interface
 	sources sources.Interface
-	logger  common.Logger
+	logger  types.Logger
 	indices []string
 	force   bool
 }
@@ -109,7 +109,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		deleteModule,
 		fx.Provide(
 			func() context.Context { return ctx },
-			func() common.Logger { return logger.NewNoOp() },
+			func() types.Logger { return logger.NewNoOp() },
 		),
 		fx.Invoke(func(lc fx.Lifecycle, p Params) {
 			// Update the signal handler with the real logger

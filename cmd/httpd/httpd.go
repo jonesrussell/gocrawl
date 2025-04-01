@@ -12,8 +12,9 @@ import (
 	signal "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -28,9 +29,9 @@ type Dependencies struct {
 	fx.In
 
 	Lifecycle    fx.Lifecycle
-	Logger       common.Logger
+	Logger       types.Logger
 	Config       config.Interface
-	Storage      types.Interface
+	Storage      storagetypes.Interface
 	IndexManager api.IndexManager
 	Context      context.Context
 }
@@ -39,8 +40,8 @@ type Dependencies struct {
 type Params struct {
 	fx.In
 	Server  *http.Server
-	Logger  common.Logger
-	Storage types.Interface
+	Logger  types.Logger
+	Storage storagetypes.Interface
 	Config  config.Interface
 }
 
@@ -56,7 +57,7 @@ type serverState struct {
 // Server implements the HTTP server
 type Server struct {
 	config config.Interface
-	Logger common.Logger
+	Logger types.Logger
 	server *http.Server
 }
 

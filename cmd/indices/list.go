@@ -10,11 +10,11 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -24,8 +24,8 @@ type Dependencies struct {
 	fx.In
 
 	Lifecycle fx.Lifecycle
-	Storage   types.Interface
-	Logger    common.Logger
+	Storage   storagetypes.Interface
+	Logger    types.Logger
 	Context   context.Context `name:"crawlContext"`
 }
 
@@ -55,7 +55,7 @@ Example:
 }
 
 // renderIndicesTable formats and displays the indices in a table format.
-func renderIndicesTable(ctx context.Context, indices []string, storage types.Interface, logger common.Logger) error {
+func renderIndicesTable(ctx context.Context, indices []string, storage storagetypes.Interface, logger types.Logger) error {
 	// Initialize table writer with stdout as output
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -112,7 +112,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 				func() context.Context { return ctx },
 				fx.ResultTags(`name:"crawlContext"`),
 			),
-			func() common.Logger { return logger.NewNoOp() },
+			func() types.Logger { return logger.NewNoOp() },
 		),
 		fx.Invoke(func(lc fx.Lifecycle, p Dependencies) {
 			lc.Append(fx.Hook{

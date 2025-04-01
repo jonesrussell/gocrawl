@@ -7,9 +7,9 @@ import (
 	"os"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -51,7 +51,6 @@ You can specify the source to crawl using the --source flag.`,
 		fxApp := fx.New(
 			crawler.Module,
 			storage.Module,
-			sources.Module,
 			fx.Provide(
 				fx.Annotate(
 					func() context.Context { return ctx },
@@ -72,6 +71,7 @@ You can specify the source to crawl using the --source flag.`,
 					func() chan struct{} { return make(chan struct{}) },
 					fx.ResultTags(`name:"shutdownChan"`),
 				),
+				func() types.Logger { return logger.NewNoOp() },
 			),
 			fx.Invoke(func(lc fx.Lifecycle, p CommandDeps) {
 				// Update the signal handler with the real logger

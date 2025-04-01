@@ -5,12 +5,12 @@ import (
 	"context"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"go.uber.org/fx"
 )
@@ -22,9 +22,9 @@ type CommandDeps struct {
 	Lifecycle   fx.Lifecycle
 	Sources     sources.Interface
 	Crawler     crawler.Interface
-	Logger      common.Logger
+	Logger      types.Logger
 	Config      config.Interface
-	Storage     types.Interface
+	Storage     storagetypes.Interface
 	Done        chan struct{}         `name:"shutdownChan"`
 	Context     context.Context       `name:"crawlContext"`
 	Processors  []collector.Processor `group:"processors"`
@@ -50,7 +50,7 @@ var Module = fx.Module("crawl",
 type Params struct {
 	fx.In
 	Sources sources.Interface `json:"sources,omitempty"`
-	Logger  common.Logger
+	Logger  types.Logger
 
 	// Lifecycle manages the application's startup and shutdown hooks
 	Lifecycle fx.Lifecycle `json:"lifecycle,omitempty"`

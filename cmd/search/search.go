@@ -10,6 +10,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -45,7 +46,7 @@ type Params struct {
 	fx.In
 
 	// Logger provides logging capabilities for the search operation
-	Logger logger.Interface
+	Logger types.Logger
 	// Config holds the application configuration
 	Config config.Interface
 	// SearchManager is the service responsible for executing searches
@@ -188,7 +189,7 @@ func buildSearchQuery(size int, query string) map[string]any {
 }
 
 // processSearchResults converts raw search results to Result structs
-func processSearchResults(rawResults []any, logger logger.Interface) []Result {
+func processSearchResults(rawResults []any, logger types.Logger) []Result {
 	var results []Result
 	for _, raw := range rawResults {
 		hit, ok := raw.(map[string]any)

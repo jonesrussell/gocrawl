@@ -9,6 +9,7 @@ import (
 	"time"
 
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -24,7 +25,7 @@ import (
 type Params struct {
 	fx.In
 	Sources sources.Interface
-	Logger  logger.Interface
+	Logger  types.Logger
 
 	// Lifecycle manages the application's startup and shutdown hooks
 	Lifecycle fx.Lifecycle
@@ -56,14 +57,14 @@ const (
 // JobCommandDeps holds the dependencies for the job command
 type JobCommandDeps struct {
 	// Core dependencies
-	Logger     logger.Interface
+	Logger     types.Logger
 	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
 }
 
 // runScheduler manages the execution of scheduled jobs.
 func runScheduler(
 	ctx context.Context,
-	log logger.Interface,
+	log types.Logger,
 	sources sources.Interface,
 	c crawler.Interface,
 	processors []collector.Processor,
@@ -94,7 +95,7 @@ func runScheduler(
 // executeCrawl performs the crawl operation for a single source.
 func executeCrawl(
 	ctx context.Context,
-	log logger.Interface,
+	log types.Logger,
 	c crawler.Interface,
 	source sources.Config,
 	processors []collector.Processor,
@@ -134,7 +135,7 @@ func executeCrawl(
 // checkAndRunJobs evaluates and executes scheduled jobs.
 func checkAndRunJobs(
 	ctx context.Context,
-	log logger.Interface,
+	log types.Logger,
 	sources sources.Interface,
 	c crawler.Interface,
 	now time.Time,
@@ -217,7 +218,7 @@ func startJob(p Params) error {
 }
 
 // NewJobCommand creates a new job command with the given dependencies
-func NewJobCommand(log logger.Interface) *cobra.Command {
+func NewJobCommand(log types.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "job",
 		Short: "Start the job scheduler",
@@ -302,14 +303,14 @@ func setupFXApp() *fx.App {
 
 type Job struct {
 	// Core dependencies
-	Logger     logger.Interface
+	Logger     types.Logger
 	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
 	// ... existing code ...
 }
 
 // NewJob creates a new job instance.
 func NewJob(
-	logger logger.Interface,
+	logger types.Logger,
 	processors []collector.Processor,
 	// ... existing code ...
 ) *Job {
