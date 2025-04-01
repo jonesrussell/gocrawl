@@ -4,6 +4,9 @@
 package collector
 
 import (
+	"net/url"
+	"strings"
+
 	"github.com/gocolly/colly/v2"
 )
 
@@ -89,4 +92,48 @@ func (h *Handlers) ConfigureHandlers() {
 			}
 		})
 	}
+
+	// Handle URL discovery and depth checking
+	h.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		if link == "" {
+			return
+		}
+
+		// Parse the link
+		linkURL, err := url.Parse(link)
+		if err != nil {
+			h.config.Logger.Error("Failed to parse URL", "url", link, "error", err)
+			return
+		}
+
+		// Resolve relative URLs
+		if !linkURL.IsAbs() {
+			linkURL = e.Request.URL.ResolveReference(linkURL)
+		}
+
+		// Check if the URL is within the allowed domain
+		if !strings.HasSuffix(linkURL.Hostname(), e.Request.URL.Hostname()) {
+			return
+		}
+
+		// Get the current depth from the request
+		currentDepth := e.Request.Depth
+
+		// Log the depth for debugging
+		h.config.Logger.Debug("Processing URL",
+			"url", linkURL.String(),
+			"current_depth", currentDepth,
+			"max_depth", h.config.MaxDepth)
+
+		// Only visit if within max depth
+		if currentDepth < h.config.MaxDepth {
+			err := e.Request.Visit(linkURL.String())
+			if err != nil {
+				h.config.Logger.Error("Failed to visit URL",
+					"url", linkURL.String(),
+					"error", err)
+			}
+		}
+	})
 }
