@@ -74,6 +74,14 @@ func (s *testSources) AddSource(ctx context.Context, source *sources.Config) err
 	if err := s.ValidateSource(source); err != nil {
 		return err
 	}
+
+	// Check for duplicate source
+	for _, config := range s.configs {
+		if config.Name == source.Name {
+			return sources.ErrSourceExists
+		}
+	}
+
 	s.configs = append(s.configs, *source)
 	return nil
 }

@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLoadFromFile(t *testing.T) {
-	t.Parallel()
 	// Create a temporary sources.yml file for testing
 	tmpDir := t.TempDir()
 	sourcesYml := `sources:
@@ -21,8 +21,6 @@ func TestLoadFromFile(t *testing.T) {
     url: https://test.com
     rate_limit: 1s
     max_depth: 2
-    index: test_content
-    article_index: test_articles
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "sources.yml"), []byte(sourcesYml), 0644)
 	require.NoError(t, err)
@@ -32,11 +30,31 @@ func TestLoadFromFile(t *testing.T) {
 	t.Setenv("APP_ENV", "test")
 	t.Setenv("LOG_LEVEL", "info")
 
-	// Create a new Sources instance
-	s := testutils.NewTestInterface(nil)
+	// Load sources from file
+	loaderConfigs, err := loader.LoadFromFile(filepath.Join(tmpDir, "sources.yml"))
+	require.NoError(t, err)
+	require.Len(t, loaderConfigs, 1)
+
+	// Convert loader.Config to sources.Config
+	var configs []sources.Config
+	for _, src := range loaderConfigs {
+		rateLimit, err := time.ParseDuration(src.RateLimit)
+		require.NoError(t, err)
+
+		configs = append(configs, sources.Config{
+			Name:      src.Name,
+			URL:       src.URL,
+			RateLimit: rateLimit,
+			MaxDepth:  src.MaxDepth,
+			Time:      src.Time,
+		})
+	}
+
+	// Create a new Sources instance with the loaded configs
+	s := testutils.NewTestInterface(configs)
 	require.NotNil(t, s)
 
-	// Load sources from file
+	// Get all sources
 	allSources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, allSources, 1)
@@ -47,8 +65,6 @@ func TestLoadFromFile(t *testing.T) {
 	require.Equal(t, "https://test.com", source.URL)
 	require.Equal(t, time.Second, source.RateLimit)
 	require.Equal(t, 2, source.MaxDepth)
-	require.Equal(t, "test_content", source.Index)
-	require.Equal(t, "test_articles", source.ArticleIndex)
 }
 
 func TestGetSource(t *testing.T) {

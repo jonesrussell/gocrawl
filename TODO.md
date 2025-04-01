@@ -20,20 +20,20 @@
       - [ ] Update httpd command to use new config module
   - [ ] Create separate sources module
     - [x] Move sources interface to pkg/sources
-      - [ ] Create pkg/sources/interface.go
-        - [ ] Define Interface type with required methods
-        - [ ] Add interface documentation
-        - [ ] Add interface examples
-        - [ ] Add interface validation
-      - [ ] Create pkg/sources/types.go
-        - [ ] Define Config struct
-        - [ ] Define Params struct
-        - [ ] Add type documentation
-        - [ ] Add type validation
-      - [ ] Create pkg/sources/errors.go
-        - [ ] Define error types
-        - [ ] Add error documentation
-        - [ ] Add error examples
+      - [x] Create pkg/sources/interface.go
+        - [x] Define Interface type with required methods
+        - [x] Add interface documentation
+        - [x] Add interface examples
+        - [x] Add interface validation
+      - [x] Create pkg/sources/types.go
+        - [x] Define Config struct
+        - [x] Define Params struct
+        - [x] Add type documentation
+        - [x] Add type validation
+      - [x] Create pkg/sources/errors.go
+        - [x] Define error types
+        - [x] Add error documentation
+        - [x] Add error examples
     - [ ] Create sources module for dependency injection
       - [ ] Create pkg/sources/module.go
         - [ ] Define Module variable
@@ -46,10 +46,10 @@
         - [ ] Add loader examples
         - [ ] Add loader validation
     - [ ] Add sources tests
-      - [ ] Create pkg/sources/sources_test.go
-        - [ ] Add interface tests
-        - [ ] Add module tests
-        - [ ] Add integration tests
+      - [x] Create pkg/sources/sources_test.go
+        - [x] Add interface tests
+        - [x] Add module tests
+        - [x] Add integration tests
       - [ ] Create pkg/sources/loader_test.go
         - [ ] Add loader tests
         - [ ] Add validation tests
@@ -296,8 +296,17 @@
   - [x] Add proper error types
 - [ ] Improve HTTP client error handling
   - [ ] Add proper response body closure
+    - [ ] Add defer statements
+    - [ ] Add error handling
+    - [ ] Add tests
   - [ ] Add proper context handling
+    - [ ] Add context timeouts
+    - [ ] Add context cancellation
+    - [ ] Add tests
   - [ ] Add proper timeout handling
+    - [ ] Add timeout configuration
+    - [ ] Add timeout errors
+    - [ ] Add tests
 
 ## Medium Priority
 
