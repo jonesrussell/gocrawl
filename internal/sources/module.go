@@ -3,7 +3,7 @@
 package sources
 
 import (
-	"github.com/jonesrussell/gocrawl/pkg/config"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
 )
 
@@ -50,9 +50,9 @@ type Result struct {
 // provideSources creates a new sources instance.
 func provideSources(p Params) Interface {
 	var configs []Config
-	sources, err := p.Config.GetSources()
-	if err != nil {
-		// If there's an error getting sources, use a default config
+	sources := p.Config.GetSources()
+	if len(sources) == 0 {
+		// If no sources found, use a default config
 		configs = append(configs, *NewConfig())
 	} else {
 		for _, src := range sources {
@@ -63,9 +63,6 @@ func provideSources(p Params) Interface {
 				MaxDepth:  src.MaxDepth,
 				Time:      src.Time,
 			})
-		}
-		if len(configs) == 0 {
-			configs = append(configs, *NewConfig())
 		}
 	}
 	return &Sources{

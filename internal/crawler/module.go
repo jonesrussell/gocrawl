@@ -14,7 +14,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -124,7 +123,7 @@ var Module = fx.Module("crawler",
 type Params struct {
 	fx.In
 
-	Logger       logger.Interface
+	Logger       common.Logger
 	Debugger     debug.Debugger `optional:"true"`
 	IndexManager api.IndexManager
 	Sources      sources.Interface
@@ -138,7 +137,7 @@ type Result struct {
 }
 
 // ProvideCollyDebugger creates a new debugger instance.
-func ProvideCollyDebugger(logger logger.Interface) debug.Debugger {
+func ProvideCollyDebugger(logger common.Logger) debug.Debugger {
 	return &debug.LogDebugger{
 		Output: newDebugLogger(logger),
 	}
@@ -163,7 +162,7 @@ func ProvideCrawler(p Params, bus *events.Bus) (Result, error) {
 
 func NewContentProcessor(
 	cfg *config.Config,
-	logger logger.Interface,
+	logger common.Logger,
 ) collector.Processor {
 	service := content.NewService(logger)
 	return content.NewProcessor(service, nil, logger, "content")
@@ -171,7 +170,7 @@ func NewContentProcessor(
 
 func NewArticleProcessor(
 	cfg *config.Config,
-	logger logger.Interface,
+	logger common.Logger,
 ) collector.Processor {
 	service := article.NewService(logger, config.DefaultArticleSelectors(), nil, "articles")
 	return &article.ArticleProcessor{

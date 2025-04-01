@@ -25,12 +25,12 @@ type CommandDeps struct {
 	Logger      common.Logger
 	Config      config.Interface
 	Storage     types.Interface
-	Done        chan struct{}
-	Context     context.Context
+	Done        chan struct{}         `name:"shutdownChan"`
+	Context     context.Context       `name:"crawlContext"`
 	Processors  []collector.Processor `group:"processors"`
-	SourceName  string
-	ArticleChan chan *models.Article
-	Handler     *signal.SignalHandler
+	SourceName  string                `name:"sourceName"`
+	ArticleChan chan *models.Article  `name:"crawlerArticleChannel"`
+	Handler     *signal.SignalHandler `name:"signalHandler"`
 }
 
 // Module provides the crawl command's dependencies.
