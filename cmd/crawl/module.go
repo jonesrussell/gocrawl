@@ -20,17 +20,17 @@ type CommandDeps struct {
 	fx.In
 
 	Lifecycle   fx.Lifecycle
-	Sources     sources.Interface `name:"testSourceManager"`
+	Sources     sources.Interface
 	Crawler     crawler.Interface
 	Logger      common.Logger
 	Config      config.Interface
 	Storage     types.Interface
-	Done        chan struct{}         `name:"commandDone"`
-	Context     context.Context       `name:"crawlContext"`
+	Done        chan struct{}
+	Context     context.Context
 	Processors  []collector.Processor `group:"processors"`
-	SourceName  string                `name:"sourceName"`
-	ArticleChan chan *models.Article  `name:"commandArticleChannel"`
-	Handler     *signal.SignalHandler `name:"signalHandler"`
+	SourceName  string
+	ArticleChan chan *models.Article
+	Handler     *signal.SignalHandler
 }
 
 // Module provides the crawl command's dependencies.
@@ -38,18 +38,12 @@ var Module = fx.Module("crawl",
 	crawler.Module,
 	fx.Provide(
 		// Command-specific dependencies
-		fx.Annotate(
-			func() chan struct{} {
-				return make(chan struct{})
-			},
-			fx.ResultTags(`name:"commandDone"`),
-		),
-		fx.Annotate(
-			func() chan *models.Article {
-				return make(chan *models.Article, crawler.ArticleChannelBufferSize)
-			},
-			fx.ResultTags(`name:"commandArticleChannel"`),
-		),
+		func() chan struct{} {
+			return make(chan struct{})
+		},
+		func() chan *models.Article {
+			return make(chan *models.Article, crawler.ArticleChannelBufferSize)
+		},
 	),
 )
 

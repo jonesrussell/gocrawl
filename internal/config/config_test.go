@@ -32,7 +32,7 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: ./testdata/sources.yml
+  source_file: internal/config/testdata/sources.yml
 log:
   level: debug
   debug: true
@@ -43,10 +43,10 @@ elasticsearch:
   tls:
     skip_verify: true
 `
-	writeErr := os.WriteFile("testdata/config.yml", []byte(testConfig), 0644)
+	writeErr := os.WriteFile("internal/config/testdata/config.yml", []byte(testConfig), 0644)
 	require.NoError(t, writeErr)
 	defer func() {
-		if removeErr := os.Remove("testdata/config.yml"); removeErr != nil {
+		if removeErr := os.Remove("internal/config/testdata/config.yml"); removeErr != nil {
 			t.Errorf("Error removing config file: %v", removeErr)
 		}
 	}()
@@ -67,10 +67,10 @@ sources:
         author: .author
         date: .date
 `
-	writeErr = os.WriteFile("testdata/sources.yml", []byte(testSources), 0644)
+	writeErr = os.WriteFile("internal/config/testdata/sources.yml", []byte(testSources), 0644)
 	require.NoError(t, writeErr)
 	defer func() {
-		if removeErr := os.Remove("testdata/sources.yml"); removeErr != nil {
+		if removeErr := os.Remove("internal/config/testdata/sources.yml"); removeErr != nil {
 			t.Errorf("Error removing sources file: %v", removeErr)
 		}
 	}()
@@ -88,11 +88,11 @@ sources:
 
 				// Set test environment
 				t.Setenv("APP_ENV", "test")
-				t.Setenv("CONFIG_FILE", "./testdata/config.yml")
+				t.Setenv("CONFIG_FILE", "./internal/config/testdata/config.yml")
 				t.Setenv("LOG_LEVEL", "debug")
 
 				// Configure viper
-				viper.SetConfigFile("./testdata/config.yml")
+				viper.SetConfigFile("./internal/config/testdata/config.yml")
 				viper.AutomaticEnv()
 				viper.SetEnvPrefix("")
 				viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -449,12 +449,12 @@ crawler:
   max_depth: 3
   parallelism: 2
   rate_limit: 1s
-  source_file: ./testdata/sources.yml
+  source_file: ./internal/config/testdata/sources.yml
 `
-	err := os.WriteFile("testdata/config.yml", []byte(configWithAPIKey), 0644)
+	err := os.WriteFile("internal/config/testdata/config.yml", []byte(configWithAPIKey), 0644)
 	require.NoError(t, err)
 	defer func() {
-		if removeErr := os.Remove("testdata/config.yml"); removeErr != nil {
+		if removeErr := os.Remove("internal/config/testdata/config.yml"); removeErr != nil {
 			t.Errorf("Error removing config file: %v", removeErr)
 		}
 	}()
@@ -475,16 +475,16 @@ sources:
         author: .author
         date: .date
 `
-	err = os.WriteFile("testdata/sources.yml", []byte(testSources), 0644)
+	err = os.WriteFile("internal/config/testdata/sources.yml", []byte(testSources), 0644)
 	require.NoError(t, err)
 	defer func() {
-		if removeErr := os.Remove("testdata/sources.yml"); removeErr != nil {
+		if removeErr := os.Remove("internal/config/testdata/sources.yml"); removeErr != nil {
 			t.Errorf("Error removing sources file: %v", removeErr)
 		}
 	}()
 
 	// Set up Viper
-	viper.SetConfigFile("testdata/config.yml")
+	viper.SetConfigFile("internal/config/testdata/config.yml")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
@@ -534,7 +534,7 @@ app:
 crawler:
   max_depth: 3
   parallelism: 2
-  source_file: ./testdata/sources.yml
+  source_file: ./internal/config/testdata/sources.yml
 log:
   level: debug
 elasticsearch:
@@ -551,25 +551,25 @@ app:
 crawler:
   max_depth: 3
   parallelism: 2
-  source_file: ./testdata/sources.yml
+  source_file: ./internal/config/testdata/sources.yml
 log:
   level: debug
 elasticsearch:
   addresses:
     - http://localhost:9200
 `
-	writeErr1 := os.WriteFile("testdata/valid_config.yml", []byte(validConfig), 0644)
+	writeErr1 := os.WriteFile("internal/config/testdata/valid_config.yml", []byte(validConfig), 0644)
 	require.NoError(t, writeErr1)
 	defer func() {
-		if removeErr := os.Remove("testdata/valid_config.yml"); removeErr != nil {
+		if removeErr := os.Remove("internal/config/testdata/valid_config.yml"); removeErr != nil {
 			t.Errorf("Error removing valid config file: %v", removeErr)
 		}
 	}()
 
-	writeErr2 := os.WriteFile("testdata/no_api_key_config.yml", []byte(noAPIKeyConfig), 0644)
+	writeErr2 := os.WriteFile("internal/config/testdata/no_api_key_config.yml", []byte(noAPIKeyConfig), 0644)
 	require.NoError(t, writeErr2)
 	defer func() {
-		if removeErr := os.Remove("testdata/no_api_key_config.yml"); removeErr != nil {
+		if removeErr := os.Remove("internal/config/testdata/no_api_key_config.yml"); removeErr != nil {
 			t.Errorf("Error removing no API key config file: %v", removeErr)
 		}
 	}()
@@ -590,10 +590,10 @@ sources:
         author: .author
         date: .date
 `
-	writeErr3 := os.WriteFile("testdata/sources.yml", []byte(testSources), 0644)
+	writeErr3 := os.WriteFile("internal/config/testdata/sources.yml", []byte(testSources), 0644)
 	require.NoError(t, writeErr3)
 	defer func() {
-		if removeErr := os.Remove("testdata/sources.yml"); removeErr != nil {
+		if removeErr := os.Remove("internal/config/testdata/sources.yml"); removeErr != nil {
 			t.Errorf("Error removing sources file: %v", removeErr)
 		}
 	}()
@@ -612,9 +612,9 @@ sources:
 				"ELASTIC_API_KEY": "test_key",
 				"APP_ENV":         "development",
 				"LOG_LEVEL":       "debug",
-				"CONFIG_FILE":     "testdata/valid_config.yml",
+				"CONFIG_FILE":     "internal/config/testdata/valid_config.yml",
 			},
-			configFile:  "testdata/valid_config.yml",
+			configFile:  "internal/config/testdata/valid_config.yml",
 			expectError: false,
 		},
 		{
@@ -622,9 +622,9 @@ sources:
 			envVars: map[string]string{
 				"APP_ENV":     "production",
 				"LOG_LEVEL":   "debug",
-				"CONFIG_FILE": "testdata/no_api_key_config.yml",
+				"CONFIG_FILE": "internal/config/testdata/no_api_key_config.yml",
 			},
-			configFile:  "testdata/no_api_key_config.yml",
+			configFile:  "internal/config/testdata/no_api_key_config.yml",
 			expectError: true,
 			errorMsg:    "API key is required in production",
 		},
