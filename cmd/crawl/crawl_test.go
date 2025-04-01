@@ -444,6 +444,9 @@ func TestRateLimiting(t *testing.T) {
 	mockCrawler.On("Wait").Return()
 	mockCrawler.On("SetRateLimit", time.Second).Return(nil)
 
+	// Create a channel to signal completion
+	done := make(chan struct{})
+
 	// Create test app with startup hook
 	app := createTestApp(t, deps, fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -460,7 +463,7 @@ func TestRateLimiting(t *testing.T) {
 			// Wait for crawler to complete
 			go func() {
 				deps.Crawler.Wait()
-				deps.Handler.RequestShutdown()
+				close(done)
 			}()
 
 			return nil
@@ -472,6 +475,14 @@ func TestRateLimiting(t *testing.T) {
 
 	// Run the app
 	runTestApp(t, app)
+
+	// Wait for completion
+	select {
+	case <-done:
+		// Test passed
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out waiting for crawler to complete")
+	}
 
 	// Verify all expectations were met
 	mockCrawler.AssertExpectations(t)
