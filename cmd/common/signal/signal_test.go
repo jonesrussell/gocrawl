@@ -10,7 +10,6 @@ import (
 	"time"
 
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,7 +42,7 @@ func TestSignalHandler(t *testing.T) {
 	t.Run("handles SIGINT", func(t *testing.T) {
 		t.Parallel()
 		// Create a mock logger
-		mockLog := common.NewNoOpLogger()
+		mockLog := logger.NewNoOp()
 
 		// Create signal handler
 		handler := signalhandler.NewSignalHandler(mockLog)
@@ -67,7 +66,7 @@ func TestSignalHandler(t *testing.T) {
 	t.Run("handles SIGTERM", func(t *testing.T) {
 		t.Parallel()
 		// Create a mock logger
-		mockLog := common.NewNoOpLogger()
+		mockLog := logger.NewNoOp()
 
 		// Create signal handler
 		handler := signalhandler.NewSignalHandler(mockLog)
@@ -91,7 +90,7 @@ func TestSignalHandler(t *testing.T) {
 	t.Run("handles context cancellation", func(t *testing.T) {
 		t.Parallel()
 		// Create a mock logger
-		mockLog := common.NewNoOpLogger()
+		mockLog := logger.NewNoOp()
 
 		// Create signal handler
 		handler := signalhandler.NewSignalHandler(mockLog)
@@ -114,7 +113,7 @@ func TestSignalHandler(t *testing.T) {
 	t.Run("handles shutdown timeout", func(t *testing.T) {
 		t.Parallel()
 		// Create a mock logger
-		mockLog := common.NewNoOpLogger()
+		mockLog := logger.NewNoOp()
 
 		// Create signal handler
 		handler := signalhandler.NewSignalHandler(mockLog)

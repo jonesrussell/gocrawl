@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/pkg/logger"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
 
@@ -44,7 +45,7 @@ type Params struct {
 	// Context provides cancellation and timeout support
 	Context context.Context
 	// Debugger handles debugging operations
-	Debugger *logger.CollyDebugger
+	Debugger debug.Debugger
 	// Logger provides logging capabilities
 	Logger logger.Interface
 	// MaxDepth is the maximum crawling depth
@@ -109,92 +110,89 @@ func ValidateParams(p Params) error {
 	return nil
 }
 
-// Config holds all configuration for the collector.
-// It combines source-specific settings with general collector settings.
+// Config holds the configuration for the collector.
 type Config struct {
-	// BaseURL is the starting URL for crawling
-	BaseURL string
-	// MaxDepth is the maximum crawling depth
-	MaxDepth int
-	// RateLimit is the time between requests as a string
-	RateLimit string
-	// Parallelism is the number of concurrent requests
-	Parallelism int
-	// RandomDelay adds random delay between requests
-	RandomDelay time.Duration
-	// Debugger handles debugging operations
-	Debugger *logger.CollyDebugger
-	// Logger provides logging capabilities
+	// Logger is the logger for the collector.
 	Logger logger.Interface
-	// Source contains source-specific configuration
+
+	// MaxDepth is the maximum depth to crawl.
+	MaxDepth int
+
+	// RateLimit is the rate limit for requests.
+	RateLimit time.Duration
+
+	// Processors are the processors to use.
+	Processors []Processor
+
+	// Debugger is the debugger to use.
+	Debugger debug.Debugger
+
+	// BaseURL is the starting URL for crawling.
+	BaseURL string
+
+	// Parallelism is the number of concurrent requests.
+	Parallelism int
+
+	// Source contains source-specific configuration.
 	Source config.Source
-	// ArticleProcessor handles the processing of article content
+
+	// ArticleProcessor handles the processing of article content.
 	ArticleProcessor Processor
-	// ContentProcessor handles the processing of general content
+
+	// ContentProcessor handles the processing of general content.
 	ContentProcessor Processor
-	// AllowedDomains is a list of domains that the collector is allowed to visit
-	AllowedDomains []string
 }
 
-// NewConfig creates a new collector configuration from the provided parameters.
-// It parses the rate limit duration and creates a complete configuration.
+// NewConfig creates a new Config instance with the given parameters.
 //
 // Parameters:
-//   - p: Params containing all required configuration
+//   - p: Params to create the config from
 //
 // Returns:
-//   - *Config: The created configuration
+//   - *Config: The new config instance
 //   - error: Any error that occurred during creation
 func NewConfig(p Params) (*Config, error) {
-	// Ensure processors are provided
-	if p.ArticleProcessor == nil {
-		return nil, errors.New(errMissingArticleProc)
+	// Validate parameters
+	if err := ValidateParams(p); err != nil {
+		return nil, fmt.Errorf("invalid parameters: %w", err)
 	}
 
-	// Create config with all parameters
-	cfg := &Config{
-		BaseURL:          p.BaseURL,
-		MaxDepth:         p.MaxDepth,
-		RateLimit:        p.Source.RateLimit.String(),
-		Parallelism:      p.Parallelism,
-		RandomDelay:      p.RandomDelay,
-		Debugger:         p.Debugger,
+	// Create config
+	config := &Config{
 		Logger:           p.Logger,
+		MaxDepth:         p.MaxDepth,
+		RateLimit:        p.RateLimit,
+		Processors:       []Processor{p.ArticleProcessor, p.ContentProcessor},
+		Debugger:         p.Debugger,
+		BaseURL:          p.BaseURL,
+		Parallelism:      p.Parallelism,
+		Source:           *p.Source,
 		ArticleProcessor: p.ArticleProcessor,
 		ContentProcessor: p.ContentProcessor,
-		Source:           *p.Source, // Dereference the pointer to get the value
-		AllowedDomains:   p.AllowedDomains,
 	}
 
-	// Log processor configuration
-	p.Logger.Debug("Collector config created",
-		"articleProcessor", fmt.Sprintf("%T", p.ArticleProcessor),
-		"contentProcessor", fmt.Sprintf("%T", p.ContentProcessor))
+	// Validate config
+	if err := config.ValidateConfig(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
 
-	return cfg, nil
+	return config, nil
 }
 
 // ValidateConfig validates the collector configuration.
-// It ensures all required fields are present and valid.
 //
 // Returns:
 //   - error: Any validation error that occurred
 func (c *Config) ValidateConfig() error {
-	// Validate base URL
-	if c.BaseURL == "" {
-		return errors.New("base URL is required")
+	// Ensure Logger is provided
+	if c.Logger == nil {
+		return errors.New(errMissingLogger)
 	}
-	// Validate max depth
-	if c.MaxDepth < 0 {
-		return errors.New("max depth must be non-negative")
+
+	// Ensure at least one processor is provided
+	if len(c.Processors) == 0 {
+		return errors.New("at least one processor is required")
 	}
-	// Validate parallelism
-	if c.Parallelism < 1 {
-		return errors.New("parallelism must be positive")
-	}
-	// Validate random delay
-	if c.RandomDelay < 0 {
-		return errors.New("random delay must be non-negative")
-	}
+
 	return nil
 }

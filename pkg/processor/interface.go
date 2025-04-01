@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/pkg/logger"
+	"github.com/jonesrussell/gocrawl/internal/common"
 )
 
 var (
@@ -39,10 +39,9 @@ type Metrics struct {
 	ProcessingDuration time.Duration
 }
 
-// Params holds the parameters for creating a processor instance.
+// Params holds the parameters for creating a processor.
 type Params struct {
-	// Logger is the logger for the processor instance.
-	Logger logger.Interface
+	Logger common.Logger
 }
 
 // ValidateParams validates the parameters for creating a processor instance.

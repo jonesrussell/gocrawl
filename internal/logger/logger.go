@@ -1,12 +1,11 @@
+// Package logger provides logging functionality for the application.
 package logger
 
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
-	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -41,104 +40,92 @@ type Interface interface {
 	Sync() error
 }
 
-// CustomLogger wraps the zap.Logger
-type CustomLogger struct {
-	*zap.Logger
-	fatalHook func(zapcore.Entry) error
-}
-
-// Ensure CustomLogger implements Interface
-var _ Interface = (*CustomLogger)(nil)
-
 // Params holds the parameters for creating a logger
 type Params struct {
-	fx.In
-
 	Debug  bool
-	Level  zapcore.Level
-	AppEnv string `name:"appEnv"`
+	Level  string
+	AppEnv string
 }
 
-const (
-	defaultLogLevel = "info"
-	// LogLevelDebug represents the debug log level
-	LogLevelDebug = "debug"
-)
-
-// Info logs an info message
-func (c *CustomLogger) Info(msg string, fields ...any) {
-	c.Logger.Info(msg, ConvertToZapFields(fields)...)
+// ZapLogger implements Interface using zap.Logger
+type ZapLogger struct {
+	*zap.Logger
 }
 
-// Error logs an error message
-func (c *CustomLogger) Error(msg string, fields ...any) {
-	c.Logger.Error(msg, ConvertToZapFields(fields)...)
-}
-
-// Debug logs a debug message
-func (c *CustomLogger) Debug(msg string, fields ...any) {
-	c.Logger.Debug(msg, ConvertToZapFields(fields)...)
-}
-
-// Warn logs a warning message
-func (c *CustomLogger) Warn(msg string, fields ...any) {
-	c.Logger.Warn(msg, ConvertToZapFields(fields)...)
-}
-
-// Fatal logs a fatal message and executes the fatal hook
-func (c *CustomLogger) Fatal(msg string, fields ...any) {
-	if c.fatalHook != nil {
-		entry := zapcore.Entry{
-			Level:   zapcore.FatalLevel,
-			Message: msg,
-		}
-		_ = c.fatalHook(entry)
+func (l *ZapLogger) Debug(msg string, fields ...any) {
+	zapFields := make([]zap.Field, len(fields))
+	for i, field := range fields {
+		zapFields[i] = zap.Any("", field)
 	}
+	l.Logger.Debug(msg, zapFields...)
 }
 
-// Printf logs a formatted message
-func (c *CustomLogger) Printf(format string, args ...any) {
-	c.Logger.Info(fmt.Sprintf(format, args...))
-}
-
-// Errorf logs a formatted error message
-func (c *CustomLogger) Errorf(format string, args ...any) {
-	c.Logger.Error(fmt.Sprintf(format, args...))
-}
-
-// Sync flushes any buffered log entries
-func (c *CustomLogger) Sync() error {
-	return c.Logger.Sync()
-}
-
-// GetZapLogger returns the underlying zap.Logger
-func (c *CustomLogger) GetZapLogger() *zap.Logger {
-	return c.Logger
-}
-
-// ParseLogLevel converts a string log level to a zapcore.Level
-func ParseLogLevel(logLevelStr string) (zapcore.Level, error) {
-	var logLevel zapcore.Level
-
-	// If no level specified, use default
-	if logLevelStr == "" {
-		logLevelStr = defaultLogLevel
+func (l *ZapLogger) Error(msg string, fields ...any) {
+	zapFields := make([]zap.Field, len(fields))
+	for i, field := range fields {
+		zapFields[i] = zap.Any("", field)
 	}
+	l.Logger.Error(msg, zapFields...)
+}
 
-	switch logLevelStr {
-	case LogLevelDebug:
-		logLevel = zapcore.DebugLevel
-	case "info":
-		logLevel = zapcore.InfoLevel
-	case "warn":
-		logLevel = zapcore.WarnLevel
-	case "error":
-		logLevel = zapcore.ErrorLevel
-	default:
-		return zapcore.DebugLevel, fmt.Errorf("unknown log level: %s", logLevelStr)
+func (l *ZapLogger) Info(msg string, fields ...any) {
+	zapFields := make([]zap.Field, len(fields))
+	for i, field := range fields {
+		zapFields[i] = zap.Any("", field)
 	}
+	l.Logger.Info(msg, zapFields...)
+}
 
-	return logLevel, nil
+func (l *ZapLogger) Warn(msg string, fields ...any) {
+	zapFields := make([]zap.Field, len(fields))
+	for i, field := range fields {
+		zapFields[i] = zap.Any("", field)
+	}
+	l.Logger.Warn(msg, zapFields...)
+}
+
+func (l *ZapLogger) Fatal(msg string, fields ...any) {
+	zapFields := make([]zap.Field, len(fields))
+	for i, field := range fields {
+		zapFields[i] = zap.Any("", field)
+	}
+	l.Logger.Fatal(msg, zapFields...)
+}
+
+func (l *ZapLogger) Printf(format string, args ...any) {
+	l.Logger.Sugar().Infof(format, args...)
+}
+
+func (l *ZapLogger) Errorf(format string, args ...any) {
+	l.Logger.Sugar().Errorf(format, args...)
+}
+
+func (l *ZapLogger) Sync() error {
+	return l.Logger.Sync()
+}
+
+// NewNoOp creates a no-op logger that discards all log messages.
+// This is useful for testing or when logging is not needed.
+func NewNoOp() Interface {
+	return &NoOpLogger{}
+}
+
+// NoOpLogger implements Interface but discards all log messages.
+type NoOpLogger struct{}
+
+func (l *NoOpLogger) Debug(msg string, fields ...any)   {}
+func (l *NoOpLogger) Error(msg string, fields ...any)   {}
+func (l *NoOpLogger) Info(msg string, fields ...any)    {}
+func (l *NoOpLogger) Warn(msg string, fields ...any)    {}
+func (l *NoOpLogger) Fatal(msg string, fields ...any)   {}
+func (l *NoOpLogger) Printf(format string, args ...any) {}
+func (l *NoOpLogger) Errorf(format string, args ...any) {}
+func (l *NoOpLogger) Sync() error                       { return nil }
+
+// NewTestLogger creates a new logger for testing.
+func NewTestLogger() Interface {
+	logger, _ := zap.NewDevelopment()
+	return &ZapLogger{Logger: logger}
 }
 
 // maskSensitiveData masks sensitive information in the given value
@@ -239,16 +226,13 @@ func FromContext(ctx context.Context) *zap.Logger {
 	return logger
 }
 
-// NewCustomLogger creates a new CustomLogger. If a logger is provided, it will be used.
-// Otherwise, a new logger will be created with default configuration.
-func NewCustomLogger(logger *zap.Logger) (*CustomLogger, error) {
+// NewCustomLogger creates a new logger with the given parameters.
+// If a logger is provided, it will be used. Otherwise, a new logger will be created
+// with the given configuration.
+func NewCustomLogger(logger *zap.Logger, params Params) (Interface, error) {
 	if logger != nil {
-		return &CustomLogger{
+		return &ZapLogger{
 			Logger: logger,
-			fatalHook: func(entry zapcore.Entry) error {
-				os.Exit(1)
-				return nil
-			},
 		}, nil
 	}
 
@@ -260,45 +244,34 @@ func NewCustomLogger(logger *zap.Logger) (*CustomLogger, error) {
 	config.EncoderConfig.LevelKey = "level"
 	config.EncoderConfig.MessageKey = "message"
 	config.EncoderConfig.CallerKey = "" // Remove caller key
-	config.EncoderConfig.NameKey = ""   // Remove name key
 
-	// Disable stacktrace for warnings
-	config.OutputPaths = []string{"stdout"}
-	config.ErrorOutputPaths = []string{"stderr"}
-	config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	// Set log level based on params
+	level := zapcore.InfoLevel
+	if params.Debug {
+		level = zapcore.DebugLevel
+	} else if params.Level != "" {
+		switch strings.ToLower(params.Level) {
+		case "debug":
+			level = zapcore.DebugLevel
+		case "info":
+			level = zapcore.InfoLevel
+		case "warn":
+			level = zapcore.WarnLevel
+		case "error":
+			level = zapcore.ErrorLevel
+		case "fatal":
+			level = zapcore.FatalLevel
+		}
+	}
+	config.Level = zap.NewAtomicLevelAt(level)
 
-	newLogger, err := config.Build()
+	// Create logger
+	zapLogger, err := config.Build()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	return &CustomLogger{
-		Logger: newLogger,
-		fatalHook: func(entry zapcore.Entry) error {
-			os.Exit(1)
-			return nil
-		},
+	return &ZapLogger{
+		Logger: zapLogger,
 	}, nil
 }
-
-// SetFatalHook allows overriding the default fatal behavior for testing
-func (c *CustomLogger) SetFatalHook(hook func(zapcore.Entry) error) {
-	c.fatalHook = hook
-}
-
-// NewNoOp creates a no-op logger that discards all logs
-func NewNoOp() Interface {
-	return &noOpLogger{}
-}
-
-// noOpLogger implements Interface but discards all logs
-type noOpLogger struct{}
-
-func (l *noOpLogger) Debug(string, ...any)  {}
-func (l *noOpLogger) Info(string, ...any)   {}
-func (l *noOpLogger) Warn(string, ...any)   {}
-func (l *noOpLogger) Error(string, ...any)  {}
-func (l *noOpLogger) Fatal(string, ...any)  {}
-func (l *noOpLogger) Printf(string, ...any) {}
-func (l *noOpLogger) Errorf(string, ...any) {}
-func (l *noOpLogger) Sync() error           { return nil }

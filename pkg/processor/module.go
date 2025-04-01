@@ -9,7 +9,8 @@ import (
 
 	"go.uber.org/fx"
 
-	"github.com/jonesrussell/gocrawl/pkg/logger"
+	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 )
 
 // Module provides the processor module for dependency injection.
@@ -19,6 +20,14 @@ var Module = fx.Module("processor",
 		NewMetricsCollector,
 	),
 )
+
+// ModuleParams holds the parameters for creating a processor module.
+type ModuleParams struct {
+	fx.In
+
+	Config config.Interface
+	Logger common.Logger
+}
 
 // NewProcessor creates a new processor instance.
 func NewProcessor(p Params) (Interface, error) {
@@ -46,7 +55,7 @@ var defaultSelectors = map[string]string{
 }
 
 type processor struct {
-	logger        logger.Interface
+	logger        common.Logger
 	metrics       *Metrics
 	mu            sync.RWMutex
 	htmlProcessor *HTMLProcessor

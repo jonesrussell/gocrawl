@@ -9,14 +9,14 @@ import (
 	"time"
 
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/jonesrussell/gocrawl/pkg/app"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
-	pkgconfig "github.com/jonesrussell/gocrawl/pkg/config"
-	"github.com/jonesrussell/gocrawl/pkg/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -34,7 +34,7 @@ type Params struct {
 	CrawlerInstance crawler.Interface
 
 	// Config holds the application configuration
-	Config pkgconfig.Interface
+	Config config.Interface
 
 	// Context provides the context for the job scheduler
 	Context context.Context
@@ -69,7 +69,7 @@ func runScheduler(
 	c crawler.Interface,
 	processors []collector.Processor,
 	done chan struct{},
-	cfg pkgconfig.Interface,
+	cfg config.Interface,
 	activeJobs *int32,
 ) {
 	log.Info("Starting job scheduler")
@@ -100,7 +100,7 @@ func executeCrawl(
 	source sources.Config,
 	processors []collector.Processor,
 	done chan struct{},
-	cfg pkgconfig.Interface,
+	cfg config.Interface,
 	activeJobs *int32,
 ) {
 	atomic.AddInt32(activeJobs, 1)
@@ -141,7 +141,7 @@ func checkAndRunJobs(
 	now time.Time,
 	processors []collector.Processor,
 	done chan struct{},
-	cfg pkgconfig.Interface,
+	cfg config.Interface,
 	activeJobs *int32,
 ) {
 	if sources == nil {
@@ -274,7 +274,7 @@ func setupFXApp() *fx.App {
 	// Create the fx app with all required dependencies
 	options := []fx.Option{
 		fx.Supply(
-			pkgconfig.Params{
+			config.Params{
 				Environment: "development",
 				Debug:       true,
 				Command:     "job",
@@ -285,8 +285,8 @@ func setupFXApp() *fx.App {
 				AppEnv: "development",
 			},
 		),
-		pkgconfig.Module, // Provide config first
-		Module,           // Then job module
+		config.Module, // Provide config first
+		Module,        // Then job module
 		crawler.Module,
 		sources.Module,
 		storage.Module,

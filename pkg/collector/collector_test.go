@@ -6,9 +6,9 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
-	"github.com/jonesrussell/gocrawl/pkg/logger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

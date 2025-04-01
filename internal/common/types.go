@@ -3,7 +3,6 @@ package common
 import (
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -18,14 +17,6 @@ type (
 	// Logger is an alias for the logger interface, providing
 	// structured logging capabilities across the application.
 	Logger = types.Logger
-
-	// SourceManager is an alias for sources.Interface, providing
-	// source configuration management across the application.
-	SourceManager = sources.Interface
-
-	// SourceConfig is an alias for sources.Config, providing
-	// source configuration data structure across the application.
-	SourceConfig = sources.Config
 
 	// Storage is an alias for storage.Interface, providing
 	// data persistence operations across the application.

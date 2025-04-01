@@ -2,24 +2,24 @@
 package processor
 
 import (
-	"github.com/jonesrussell/gocrawl/pkg/logger"
+	"github.com/jonesrussell/gocrawl/internal/common"
 )
 
 // HTMLProcessor processes HTML content.
 type HTMLProcessor struct {
 	// Selectors are the CSS selectors to use.
-	Selectors map[string]string
+	selectors map[string]string
 	// Logger is the logger for the processor.
-	Logger logger.Interface
+	logger common.Logger
 	// MetricsCollector is the metrics collector for the processor.
-	MetricsCollector MetricsCollector
+	metrics MetricsCollector
 }
 
 // NewHTMLProcessor creates a new HTML processor.
-func NewHTMLProcessor(selectors map[string]string, logger logger.Interface, metrics MetricsCollector) *HTMLProcessor {
+func NewHTMLProcessor(selectors map[string]string, logger common.Logger, metrics MetricsCollector) *HTMLProcessor {
 	return &HTMLProcessor{
-		Selectors:        selectors,
-		Logger:           logger,
-		MetricsCollector: metrics,
+		selectors: selectors,
+		logger:    logger,
+		metrics:   metrics,
 	}
 }

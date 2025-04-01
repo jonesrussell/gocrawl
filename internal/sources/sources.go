@@ -58,12 +58,7 @@ type SelectorConfig struct {
 // Sources manages web content source configurations.
 type Sources struct {
 	sources []Config
-	logger  interface {
-		Debug(msg string, fields ...any)
-		Info(msg string, fields ...any)
-		Warn(msg string, fields ...any)
-		Error(msg string, fields ...any)
-	}
+	logger  Logger
 	metrics Metrics
 }
 
@@ -76,12 +71,7 @@ type Sources struct {
 // Returns:
 //   - *Sources: The loaded sources configuration
 //   - error: Any error that occurred during loading
-func LoadFromFile(path string, logger interface {
-	Debug(msg string, fields ...any)
-	Info(msg string, fields ...any)
-	Warn(msg string, fields ...any)
-	Error(msg string, fields ...any)
-}) (*Sources, error) {
+func LoadFromFile(path string, logger Logger) (*Sources, error) {
 	loaderConfigs, err := loader.LoadFromFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sources: %w", err)
@@ -99,7 +89,7 @@ func LoadFromFile(path string, logger interface {
 			URL:       src.URL,
 			RateLimit: rateLimit,
 			MaxDepth:  src.MaxDepth,
-			Time:      src.Time,
+			Selectors: NewSelectorConfigFromLoader(src),
 		})
 	}
 

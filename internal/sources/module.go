@@ -24,17 +24,12 @@ var Module = fx.Module("sources",
 	),
 )
 
-// ModuleParams defines the required dependencies for the sources module.
+// ModuleParams holds the parameters for creating a sources module.
 type ModuleParams struct {
 	fx.In
 
 	Config config.Interface
-	Logger interface {
-		Debug(msg string, fields ...any)
-		Info(msg string, fields ...any)
-		Warn(msg string, fields ...any)
-		Error(msg string, fields ...any)
-	}
+	Logger Logger
 }
 
 // provideSources creates a new sources instance.
@@ -80,12 +75,7 @@ func NewConfig() *Config {
 }
 
 // NewSources creates a new sources instance.
-func NewSources(cfg *Config, logger interface {
-	Debug(msg string, fields ...any)
-	Info(msg string, fields ...any)
-	Warn(msg string, fields ...any)
-	Error(msg string, fields ...any)
-}) Interface {
+func NewSources(cfg *Config, logger Logger) *Sources {
 	return &Sources{
 		sources: []Config{*cfg},
 		logger:  logger,

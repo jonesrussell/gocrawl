@@ -17,7 +17,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/jonesrussell/gocrawl/pkg/config"
-	pkglogger "github.com/jonesrussell/gocrawl/pkg/logger"
 )
 
 // CollectorResult holds the result of setting up a collector.
@@ -29,7 +28,7 @@ type CollectorResult struct {
 // SetupCollector creates and configures a new collector instance.
 func SetupCollector(
 	ctx context.Context,
-	log pkglogger.Interface,
+	log logger.Interface,
 	source sources.Config,
 	processors []collector.Processor,
 	done chan struct{},

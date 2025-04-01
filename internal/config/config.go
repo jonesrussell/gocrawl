@@ -17,6 +17,12 @@ import (
 // Constants for default configuration values
 const (
 	defaultRateLimit = 2 * time.Second
+	// DefaultMaxDepth is the default maximum depth for crawling
+	DefaultMaxDepth = 2
+	// DefaultRateLimit is the default rate limit
+	DefaultRateLimit = time.Second * 2
+	// DefaultParallelism is the default number of parallel requests
+	DefaultParallelism = 2
 )
 
 // AppConfig holds application-level configuration settings.
@@ -351,4 +357,78 @@ func (s *Source) Validate() error {
 		return errors.New("max depth must be non-negative")
 	}
 	return nil
+}
+
+// NewNoOp creates a no-op config that returns default values.
+// This is useful for testing or when configuration is not needed.
+func NewNoOp() Interface {
+	return &NoOpConfig{}
+}
+
+// NoOpConfig implements Interface but returns default values.
+type NoOpConfig struct{}
+
+func (c *NoOpConfig) GetAppConfig() *AppConfig {
+	return &AppConfig{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       false,
+	}
+}
+
+func (c *NoOpConfig) GetLogConfig() *LogConfig {
+	return &LogConfig{
+		Level: "info",
+		Debug: false,
+	}
+}
+
+func (c *NoOpConfig) GetElasticsearchConfig() *ElasticsearchConfig {
+	return &ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "gocrawl",
+	}
+}
+
+func (c *NoOpConfig) GetServerConfig() *ServerConfig {
+	return &ServerConfig{
+		Address: ":8080",
+	}
+}
+
+func (c *NoOpConfig) GetSources() []Source {
+	return []Source{}
+}
+
+func (c *NoOpConfig) GetCommand() string {
+	return "test"
+}
+
+func (c *NoOpConfig) GetCrawlerConfig() *CrawlerConfig {
+	return &CrawlerConfig{
+		MaxDepth:    DefaultMaxDepth,
+		RateLimit:   DefaultRateLimit,
+		RandomDelay: time.Second,
+		Parallelism: DefaultParallelism,
+	}
+}
+
+// DefaultConfig returns the default configuration.
+func DefaultConfig() *CrawlerConfig {
+	return &CrawlerConfig{
+		MaxDepth:    DefaultMaxDepth,
+		RateLimit:   DefaultRateLimit,
+		Parallelism: DefaultParallelism,
+	}
+}
+
+// Params holds the parameters for creating a config.
+type Params struct {
+	// Environment specifies the runtime environment (development, staging, production)
+	Environment string
+	// Debug enables debug mode for additional logging
+	Debug bool
+	// Command is the command being run (e.g., "httpd", "job")
+	Command string
 }

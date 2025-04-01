@@ -28,13 +28,24 @@ func (w *zapWrapper) Warn(msg string, fields ...any) {
 	w.logger.Warn(msg, zap.Any("fields", fields))
 }
 
+func (w *zapWrapper) Fatal(msg string, fields ...any) {
+	w.logger.Fatal(msg, zap.Any("fields", fields))
+}
+
+func (w *zapWrapper) Printf(format string, args ...any) {
+	w.logger.Info(format, zap.Any("args", args))
+}
+
+func (w *zapWrapper) Errorf(format string, args ...any) {
+	w.logger.Error(format, zap.Any("args", args))
+}
+
+func (w *zapWrapper) Sync() error {
+	return w.logger.Sync()
+}
+
 // NewTestLogger creates a new test logger.
-func NewTestLogger() interface {
-	Debug(msg string, fields ...any)
-	Error(msg string, fields ...any)
-	Info(msg string, fields ...any)
-	Warn(msg string, fields ...any)
-} {
+func NewTestLogger() sources.Logger {
 	logger, _ := zap.NewDevelopment()
 	return &zapWrapper{logger: logger}
 }
@@ -43,11 +54,13 @@ func NewTestLogger() interface {
 func NewTestInterface(configs []sources.Config) sources.Interface {
 	return &testSources{
 		configs: configs,
+		logger:  NewTestLogger(),
 	}
 }
 
 type testSources struct {
 	configs []sources.Config
+	logger  sources.Logger
 }
 
 func (s *testSources) GetSource(ctx context.Context, name string) (*sources.Config, error) {

@@ -4,14 +4,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/pkg/logger"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/pkg/processor"
+	"github.com/jonesrussell/gocrawl/pkg/processor/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestLogger() logger.Interface {
-	return logger.NewNoOp()
+func newTestLogger() common.Logger {
+	return testutils.NewTestLogger()
 }
 
 func newTestMetricsCollector() processor.MetricsCollector {

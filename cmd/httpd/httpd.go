@@ -11,9 +11,9 @@ import (
 
 	signal "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -103,7 +103,7 @@ You can send POST requests to /search with a JSON body containing the search par
 		defer cancel()
 
 		// Set up signal handling with a no-op logger initially
-		handler := signal.NewSignalHandler(common.NewNoOpLogger())
+		handler := signal.NewSignalHandler(logger.NewNoOp())
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 

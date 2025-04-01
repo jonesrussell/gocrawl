@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
-	"github.com/jonesrussell/gocrawl/pkg/logger"
+	"go.uber.org/fx"
 )
 
 const (
@@ -20,10 +21,18 @@ const (
 	DefaultChannelBufferSize = 100
 )
 
+// Params holds the parameters for creating an application.
+type Params struct {
+	fx.In
+
+	Config config.Interface
+	Logger common.Logger
+}
+
 // SetupCollector creates and configures a new collector for the given source.
 func SetupCollector(
 	ctx context.Context,
-	log logger.Interface,
+	log common.Logger,
 	source sources.Config,
 	processors []collector.Processor,
 	done chan struct{},
@@ -41,6 +50,12 @@ func SetupCollector(
 		return collector.Result{}, fmt.Errorf("error extracting domain: %w", err)
 	}
 
+	// Create a debugger if debug mode is enabled
+	var debugger debug.Debugger
+	if cfg.GetLogConfig().Debug {
+		debugger = &debug.LogDebugger{}
+	}
+
 	return collector.New(collector.Params{
 		BaseURL:          source.URL,
 		MaxDepth:         source.MaxDepth,
@@ -50,7 +65,7 @@ func SetupCollector(
 		ArticleProcessor: processors[0], // First processor handles articles
 		ContentProcessor: processors[1], // Second processor handles content
 		Done:             done,
-		Debugger:         logger.NewCollyDebugger(log),
+		Debugger:         debugger,
 		Source:           sourceConfig,
 		Parallelism:      cfg.GetCrawlerConfig().Parallelism,
 		RandomDelay:      cfg.GetCrawlerConfig().RandomDelay,

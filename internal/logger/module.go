@@ -92,17 +92,14 @@ func NewLogger(cfg config.Interface) (types.Logger, error) {
 
 	// Create logger
 	zapLogger := zap.New(core)
-	customLogger, err := NewCustomLogger(zapLogger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create custom logger: %w", err)
-	}
+	logger := &ZapLogger{Logger: zapLogger}
 
-	customLogger.Info("Initializing logger",
+	logger.Info("Initializing logger",
 		"environment", env,
 		"log_level", logLevelStr,
 		"debug", env == envDevelopment)
 
-	return customLogger, nil
+	return logger, nil
 }
 
 // parseLogLevel converts a string log level to a zapcore.Level

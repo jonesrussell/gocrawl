@@ -1,4 +1,4 @@
-package job_test
+package job
 
 import (
 	"context"
@@ -8,38 +8,38 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/job"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	storage "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
-	pkgconfig "github.com/jonesrussell/gocrawl/pkg/config"
-	"github.com/jonesrussell/gocrawl/pkg/logger"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
 
-// mockConfig implements pkgconfig.Interface for testing
+// mockConfig implements config.Interface for testing
 type mockConfig struct {
-	appConfig           *pkgconfig.AppConfig
-	crawlerConfig       *pkgconfig.CrawlerConfig
-	elasticsearchConfig *pkgconfig.ElasticsearchConfig
-	logConfig           *pkgconfig.LogConfig
-	sources             []pkgconfig.Source
-	serverConfig        *pkgconfig.ServerConfig
+	appConfig           *config.AppConfig
+	crawlerConfig       *config.CrawlerConfig
+	elasticsearchConfig *config.ElasticsearchConfig
+	logConfig           *config.LogConfig
+	sources             []config.Source
+	serverConfig        *config.ServerConfig
 	command             string
 }
 
-func (m *mockConfig) GetAppConfig() *pkgconfig.AppConfig         { return m.appConfig }
-func (m *mockConfig) GetCrawlerConfig() *pkgconfig.CrawlerConfig { return m.crawlerConfig }
-func (m *mockConfig) GetElasticsearchConfig() *pkgconfig.ElasticsearchConfig {
+func (m *mockConfig) GetAppConfig() *config.AppConfig         { return m.appConfig }
+func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig { return m.crawlerConfig }
+func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 	return m.elasticsearchConfig
 }
-func (m *mockConfig) GetLogConfig() *pkgconfig.LogConfig       { return m.logConfig }
-func (m *mockConfig) GetSources() ([]pkgconfig.Source, error)  { return m.sources, nil }
-func (m *mockConfig) GetServerConfig() *pkgconfig.ServerConfig { return m.serverConfig }
-func (m *mockConfig) GetCommand() string                       { return m.command }
+func (m *mockConfig) GetLogConfig() *config.LogConfig       { return m.logConfig }
+func (m *mockConfig) GetSources() []config.Source           { return m.sources }
+func (m *mockConfig) GetServerConfig() *config.ServerConfig { return m.serverConfig }
+func (m *mockConfig) GetCommand() string                    { return m.command }
 
 // mockCrawler implements crawler.Interface for testing
 type mockCrawler struct{}
@@ -54,7 +54,7 @@ func (m *mockCrawler) GetIndexManager() api.IndexManager   { return nil }
 func (m *mockCrawler) Wait()                               {}
 func (m *mockCrawler) GetMetrics() *collector.Metrics      { return nil }
 
-// mockStorage implements types.Interface for testing
+// mockStorage implements storage.types.Interface for testing
 type mockStorage struct{}
 
 func (m *mockStorage) IndexDocument(context.Context, string, string, any) error  { return nil }
@@ -135,28 +135,28 @@ func TestModuleProvides(t *testing.T) {
 	mockLogger.On("Sync").Return(nil)
 
 	mockCfg := &mockConfig{
-		appConfig: &pkgconfig.AppConfig{
+		appConfig: &config.AppConfig{
 			Environment: "test",
 			Name:        "gocrawl",
 			Version:     "1.0.0",
 			Debug:       true,
 		},
-		crawlerConfig: &pkgconfig.CrawlerConfig{
+		crawlerConfig: &config.CrawlerConfig{
 			MaxDepth:    2,
 			RateLimit:   time.Second * 2,
 			RandomDelay: time.Second,
 			Parallelism: 2,
 		},
-		elasticsearchConfig: &pkgconfig.ElasticsearchConfig{
+		elasticsearchConfig: &config.ElasticsearchConfig{
 			Addresses: []string{"http://localhost:9200"},
 			IndexName: "test-index",
 		},
-		logConfig: &pkgconfig.LogConfig{
+		logConfig: &config.LogConfig{
 			Level: "debug",
 			Debug: true,
 		},
-		sources:      []pkgconfig.Source{},
-		serverConfig: &pkgconfig.ServerConfig{Address: ":8080"},
+		sources:      []config.Source{},
+		serverConfig: &config.ServerConfig{Address: ":8080"},
 		command:      "job",
 	}
 
@@ -164,7 +164,7 @@ func TestModuleProvides(t *testing.T) {
 		fx.Supply(mockLogger, mockCfg),
 		fx.Provide(
 			fx.Annotate(func() crawler.Interface { return &mockCrawler{} }, fx.As(new(crawler.Interface))),
-			fx.Annotate(func() types.Interface { return &mockStorage{} }, fx.As(new(types.Interface))),
+			fx.Annotate(func() storage.Interface { return &mockStorage{} }, fx.As(new(storage.Interface))),
 		),
 		job.Module,
 	)
@@ -185,28 +185,28 @@ func TestModuleLifecycle(t *testing.T) {
 	mockLogger.On("Sync").Return(nil)
 
 	mockCfg := &mockConfig{
-		appConfig: &pkgconfig.AppConfig{
+		appConfig: &config.AppConfig{
 			Environment: "test",
 			Name:        "gocrawl",
 			Version:     "1.0.0",
 			Debug:       true,
 		},
-		crawlerConfig: &pkgconfig.CrawlerConfig{
+		crawlerConfig: &config.CrawlerConfig{
 			MaxDepth:    2,
 			RateLimit:   time.Second * 2,
 			RandomDelay: time.Second,
 			Parallelism: 2,
 		},
-		elasticsearchConfig: &pkgconfig.ElasticsearchConfig{
+		elasticsearchConfig: &config.ElasticsearchConfig{
 			Addresses: []string{"http://localhost:9200"},
 			IndexName: "test-index",
 		},
-		logConfig: &pkgconfig.LogConfig{
+		logConfig: &config.LogConfig{
 			Level: "debug",
 			Debug: true,
 		},
-		sources:      []pkgconfig.Source{},
-		serverConfig: &pkgconfig.ServerConfig{Address: ":8080"},
+		sources:      []config.Source{},
+		serverConfig: &config.ServerConfig{Address: ":8080"},
 		command:      "job",
 	}
 
@@ -214,7 +214,7 @@ func TestModuleLifecycle(t *testing.T) {
 		fx.Supply(mockLogger, mockCfg),
 		fx.Provide(
 			fx.Annotate(func() crawler.Interface { return &mockCrawler{} }, fx.As(new(crawler.Interface))),
-			fx.Annotate(func() types.Interface { return &mockStorage{} }, fx.As(new(types.Interface))),
+			fx.Annotate(func() storage.Interface { return &mockStorage{} }, fx.As(new(storage.Interface))),
 		),
 		job.Module,
 	)
@@ -235,30 +235,30 @@ func TestJobScheduling(t *testing.T) {
 	mockLogger.On("Sync").Return(nil)
 
 	mockCfg := &mockConfig{
-		appConfig: &pkgconfig.AppConfig{
+		appConfig: &config.AppConfig{
 			Environment: "test",
 			Name:        "gocrawl",
 			Version:     "1.0.0",
 			Debug:       true,
 		},
-		crawlerConfig: &pkgconfig.CrawlerConfig{
+		crawlerConfig: &config.CrawlerConfig{
 			MaxDepth:    2,
 			RateLimit:   time.Second * 2,
 			RandomDelay: time.Second,
 			Parallelism: 2,
 		},
-		elasticsearchConfig: &pkgconfig.ElasticsearchConfig{
+		elasticsearchConfig: &config.ElasticsearchConfig{
 			Addresses: []string{"http://localhost:9200"},
 			IndexName: "test-index",
 		},
-		logConfig: &pkgconfig.LogConfig{
+		logConfig: &config.LogConfig{
 			Level: "debug",
 			Debug: true,
 		},
-		sources: []pkgconfig.Source{
+		sources: []config.Source{
 			{Name: "Test Source", URL: "https://test.com", RateLimit: time.Second, MaxDepth: 1},
 		},
-		serverConfig: &pkgconfig.ServerConfig{Address: ":8080"},
+		serverConfig: &config.ServerConfig{Address: ":8080"},
 		command:      "job",
 	}
 
@@ -266,7 +266,7 @@ func TestJobScheduling(t *testing.T) {
 		fx.Supply(mockLogger, mockCfg),
 		fx.Provide(
 			fx.Annotate(func() crawler.Interface { return &mockCrawler{} }, fx.As(new(crawler.Interface))),
-			fx.Annotate(func() types.Interface { return &mockStorage{} }, fx.As(new(types.Interface))),
+			fx.Annotate(func() storage.Interface { return &mockStorage{} }, fx.As(new(storage.Interface))),
 		),
 		job.Module,
 	)

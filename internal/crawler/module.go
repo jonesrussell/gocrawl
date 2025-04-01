@@ -106,7 +106,7 @@ var Module = fx.Module("crawler",
 				log common.Logger,
 				articleService article.Interface,
 				storage storagetypes.Interface,
-				sources common.SourceManager,
+				sources *sources.Sources,
 				params struct {
 					fx.In
 					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
@@ -136,7 +136,7 @@ var Module = fx.Module("crawler",
 				log common.Logger,
 				contentService content.Interface,
 				storage storagetypes.Interface,
-				sources common.SourceManager,
+				sources *sources.Sources,
 				params struct {
 					fx.In
 					SourceName string `name:"sourceName"`
@@ -175,7 +175,7 @@ func ProvideCrawler(
 	logger common.Logger,
 	debugger debug.Debugger,
 	indexManager api.IndexManager,
-	sources common.SourceManager,
+	sources *sources.Sources,
 	articleProcessor collector.Processor,
 	contentProcessor collector.Processor,
 	bus *events.Bus,

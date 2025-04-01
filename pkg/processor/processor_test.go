@@ -3,7 +3,7 @@ package processor_test
 import (
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/pkg/logger"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/pkg/processor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

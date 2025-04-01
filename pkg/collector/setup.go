@@ -35,12 +35,31 @@ const (
 	RandomDelayFactor = 2
 )
 
-// Logger defines the interface for logging operations
+// Logger defines the interface for logging operations.
 type Logger interface {
-	Info(msg string, keysAndValues ...any)
-	Error(msg string, keysAndValues ...any)
-	Warn(msg string, keysAndValues ...any)
-	Debug(msg string, keysAndValues ...any)
+	// Debug logs a debug message with optional key-value pairs.
+	Debug(msg string, fields ...any)
+
+	// Error logs an error message with optional key-value pairs.
+	Error(msg string, fields ...any)
+
+	// Info logs an informational message with optional key-value pairs.
+	Info(msg string, fields ...any)
+
+	// Warn logs a warning message with optional key-value pairs.
+	Warn(msg string, fields ...any)
+
+	// Fatal logs a fatal message with optional key-value pairs and exits.
+	Fatal(msg string, fields ...any)
+
+	// Printf logs a formatted message.
+	Printf(format string, args ...any)
+
+	// Errorf logs a formatted error message.
+	Errorf(format string, args ...any)
+
+	// Sync flushes any buffered log entries.
+	Sync() error
 }
 
 // Setup handles the setup and configuration of the collector.
@@ -140,11 +159,8 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 // Returns:
 //   - error: Any error that occurred during configuration
 func (s *Setup) ConfigureCollector(c *colly.Collector) error {
-	// Parse rate limit duration
-	rateLimit, err := time.ParseDuration(s.config.RateLimit)
-	if err != nil {
-		return fmt.Errorf("failed to parse rate limit: %w", err)
-	}
+	// Get rate limit duration
+	rateLimit := s.config.RateLimit
 
 	// Log rate limiting configuration
 	s.config.Logger.Debug("Configuring rate limiting",

@@ -6,7 +6,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/job"
-	"github.com/jonesrussell/gocrawl/pkg/logger"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
 

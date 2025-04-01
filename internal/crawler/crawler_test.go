@@ -2,16 +2,20 @@ package crawler_test
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
+	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 )
@@ -36,10 +40,29 @@ func TestCrawlerStartup(t *testing.T) {
 		fx.Supply(testCfg),
 		fx.Provide(
 			// Core dependencies
-			func() logger.Interface { return log },
+			func() common.Logger { return log },
 			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSourceManager },
 			func() *events.Bus { return mockEventBus },
+			// Provide debugger
+			func(logger common.Logger) debug.Debugger {
+				return &debug.LogDebugger{
+					Output: NewDebugLogger(logger),
+				}
+			},
+			// Provide processors
+			fx.Annotate(
+				func(logger common.Logger) collector.Processor {
+					return &testutils.MockProcessor{}
+				},
+				fx.ResultTags(`name:"articleProcessor"`),
+			),
+			fx.Annotate(
+				func(logger common.Logger) collector.Processor {
+					return &testutils.MockProcessor{}
+				},
+				fx.ResultTags(`name:"contentProcessor"`),
+			),
 			crawler.ProvideCrawler,
 		),
 		fx.Invoke(func(c crawler.Interface) {
@@ -91,10 +114,29 @@ func TestCrawlerShutdown(t *testing.T) {
 		fx.Supply(testCfg),
 		fx.Provide(
 			// Core dependencies
-			func() logger.Interface { return log },
+			func() common.Logger { return log },
 			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSourceManager },
 			func() *events.Bus { return mockEventBus },
+			// Provide debugger
+			func(logger common.Logger) debug.Debugger {
+				return &debug.LogDebugger{
+					Output: NewDebugLogger(logger),
+				}
+			},
+			// Provide processors
+			fx.Annotate(
+				func(logger common.Logger) collector.Processor {
+					return &testutils.MockProcessor{}
+				},
+				fx.ResultTags(`name:"articleProcessor"`),
+			),
+			fx.Annotate(
+				func(logger common.Logger) collector.Processor {
+					return &testutils.MockProcessor{}
+				},
+				fx.ResultTags(`name:"contentProcessor"`),
+			),
 			crawler.ProvideCrawler,
 		),
 		fx.Invoke(func(c crawler.Interface) {
@@ -161,10 +203,29 @@ func TestSourceValidation(t *testing.T) {
 		fx.Supply(testCfg),
 		fx.Provide(
 			// Core dependencies
-			func() logger.Interface { return log },
+			func() common.Logger { return log },
 			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSourceManager },
 			func() *events.Bus { return mockEventBus },
+			// Provide debugger
+			func(logger common.Logger) debug.Debugger {
+				return &debug.LogDebugger{
+					Output: NewDebugLogger(logger),
+				}
+			},
+			// Provide processors
+			fx.Annotate(
+				func(logger common.Logger) collector.Processor {
+					return &testutils.MockProcessor{}
+				},
+				fx.ResultTags(`name:"articleProcessor"`),
+			),
+			fx.Annotate(
+				func(logger common.Logger) collector.Processor {
+					return &testutils.MockProcessor{}
+				},
+				fx.ResultTags(`name:"contentProcessor"`),
+			),
 			crawler.ProvideCrawler,
 		),
 		fx.Invoke(func(c crawler.Interface) {
@@ -223,10 +284,29 @@ func TestErrorHandling(t *testing.T) {
 		fx.Supply(testCfg),
 		fx.Provide(
 			// Core dependencies
-			func() logger.Interface { return log },
+			func() common.Logger { return log },
 			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSourceManager },
 			func() *events.Bus { return mockEventBus },
+			// Provide debugger
+			func(logger common.Logger) debug.Debugger {
+				return &debug.LogDebugger{
+					Output: NewDebugLogger(logger),
+				}
+			},
+			// Provide processors
+			fx.Annotate(
+				func(logger common.Logger) collector.Processor {
+					return &testutils.MockProcessor{}
+				},
+				fx.ResultTags(`name:"articleProcessor"`),
+			),
+			fx.Annotate(
+				func(logger common.Logger) collector.Processor {
+					return &testutils.MockProcessor{}
+				},
+				fx.ResultTags(`name:"contentProcessor"`),
+			),
 			crawler.ProvideCrawler,
 		),
 		fx.Invoke(func(c crawler.Interface) {
@@ -251,4 +331,20 @@ func TestErrorHandling(t *testing.T) {
 
 	// Stop the application
 	require.NoError(t, app.Stop(t.Context()))
+}
+
+// writerWrapper implements io.Writer for the logger
+type writerWrapper struct {
+	logger common.Logger
+}
+
+// Write implements io.Writer interface
+func (w *writerWrapper) Write(p []byte) (int, error) {
+	w.logger.Debug(string(p))
+	return len(p), nil
+}
+
+// NewDebugLogger creates a debug logger for testing.
+func NewDebugLogger(logger common.Logger) io.Writer {
+	return &writerWrapper{logger: logger}
 }
