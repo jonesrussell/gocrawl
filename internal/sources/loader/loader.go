@@ -13,11 +13,45 @@ import (
 
 // Config represents a source configuration loaded from a file.
 type Config struct {
-	Name      string   `yaml:"name"`
-	URL       string   `yaml:"url"`
-	RateLimit string   `yaml:"rate_limit"`
-	MaxDepth  int      `yaml:"max_depth"`
-	Time      []string `yaml:"time"`
+	Name         string          `yaml:"name"`
+	URL          string          `yaml:"url"`
+	RateLimit    string          `yaml:"rate_limit"`
+	MaxDepth     int             `yaml:"max_depth"`
+	Time         []string        `yaml:"time"`
+	ArticleIndex string          `yaml:"article_index"`
+	Index        string          `yaml:"index"`
+	Selectors    SourceSelectors `yaml:"selectors"`
+}
+
+// SourceSelectors defines the selectors for a source.
+type SourceSelectors struct {
+	Article ArticleSelectors `yaml:"article"`
+}
+
+// ArticleSelectors defines the CSS selectors used for article content extraction.
+type ArticleSelectors struct {
+	Container     string `yaml:"container"`
+	Title         string `yaml:"title"`
+	Body          string `yaml:"body"`
+	Intro         string `yaml:"intro"`
+	Byline        string `yaml:"byline"`
+	PublishedTime string `yaml:"published_time"`
+	TimeAgo       string `yaml:"time_ago"`
+	JSONLD        string `yaml:"jsonld"`
+	Section       string `yaml:"section"`
+	Keywords      string `yaml:"keywords"`
+	Description   string `yaml:"description"`
+	OGTitle       string `yaml:"og_title"`
+	OGDescription string `yaml:"og_description"`
+	OGImage       string `yaml:"og_image"`
+	OgURL         string `yaml:"og_url"`
+	Canonical     string `yaml:"canonical"`
+	WordCount     string `yaml:"word_count"`
+	PublishDate   string `yaml:"publish_date"`
+	Category      string `yaml:"category"`
+	Tags          string `yaml:"tags"`
+	Author        string `yaml:"author"`
+	BylineName    string `yaml:"byline_name"`
 }
 
 // FileConfig represents the configuration file structure.

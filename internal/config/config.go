@@ -166,6 +166,12 @@ type Source struct {
 	MaxDepth int `yaml:"max_depth"`
 	// Time defines which time-related fields to extract
 	Time []string `yaml:"time,omitempty"`
+	// ArticleIndex is the Elasticsearch index for storing article data
+	ArticleIndex string `yaml:"article_index"`
+	// Index is the Elasticsearch index for storing content data
+	Index string `yaml:"index"`
+	// Selectors defines the CSS selectors for content extraction
+	Selectors SourceSelectors `yaml:"selectors"`
 }
 
 // SourceSelectors defines the selectors for a source.
@@ -344,18 +350,30 @@ func LoadConfig(path string) (*Config, error) {
 	return &config, nil
 }
 
-// Validate validates the source configuration.
-// It checks that all required fields are present and have valid values.
-//
-// Returns:
-//   - error: Any validation errors that occurred
+// Validate validates a source configuration.
 func (s *Source) Validate() error {
+	if s.Name == "" {
+		return errors.New("name is required")
+	}
+	if s.URL == "" {
+		return errors.New("URL is required")
+	}
 	if s.RateLimit <= 0 {
 		return errors.New("rate limit must be positive")
 	}
-	if s.MaxDepth < 0 {
-		return errors.New("max depth must be non-negative")
+	if s.MaxDepth <= 0 {
+		return errors.New("max depth must be positive")
 	}
+
+	// Validate time format if provided
+	if len(s.Time) > 0 {
+		for _, t := range s.Time {
+			if _, timeErr := time.Parse("15:04", t); timeErr != nil {
+				return fmt.Errorf("invalid time format: %w", timeErr)
+			}
+		}
+	}
+
 	return nil
 }
 

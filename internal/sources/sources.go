@@ -89,6 +89,7 @@ func LoadFromFile(path string, logger Logger) (*Sources, error) {
 			URL:       src.URL,
 			RateLimit: rateLimit,
 			MaxDepth:  src.MaxDepth,
+			Time:      src.Time,
 			Selectors: NewSelectorConfigFromLoader(src),
 		})
 	}

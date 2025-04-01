@@ -496,11 +496,39 @@ func createConfig() (*Impl, error) {
 		}
 
 		sources = append(sources, Source{
-			Name:      src.Name,
-			URL:       src.URL,
-			RateLimit: rateLimit,
-			MaxDepth:  src.MaxDepth,
-			Time:      src.Time,
+			Name:         src.Name,
+			URL:          src.URL,
+			RateLimit:    rateLimit,
+			MaxDepth:     src.MaxDepth,
+			Time:         src.Time,
+			ArticleIndex: src.ArticleIndex,
+			Index:        src.Index,
+			Selectors: SourceSelectors{
+				Article: ArticleSelectors{
+					Container:     src.Selectors.Article.Container,
+					Title:         src.Selectors.Article.Title,
+					Body:          src.Selectors.Article.Body,
+					Intro:         src.Selectors.Article.Intro,
+					Byline:        src.Selectors.Article.Byline,
+					PublishedTime: src.Selectors.Article.PublishedTime,
+					TimeAgo:       src.Selectors.Article.TimeAgo,
+					JSONLD:        src.Selectors.Article.JSONLD,
+					Section:       src.Selectors.Article.Section,
+					Keywords:      src.Selectors.Article.Keywords,
+					Description:   src.Selectors.Article.Description,
+					OGTitle:       src.Selectors.Article.OGTitle,
+					OGDescription: src.Selectors.Article.OGDescription,
+					OGImage:       src.Selectors.Article.OGImage,
+					OgURL:         src.Selectors.Article.OgURL,
+					Canonical:     src.Selectors.Article.Canonical,
+					WordCount:     src.Selectors.Article.WordCount,
+					PublishDate:   src.Selectors.Article.PublishDate,
+					Category:      src.Selectors.Article.Category,
+					Tags:          src.Selectors.Article.Tags,
+					Author:        src.Selectors.Article.Author,
+					BylineName:    src.Selectors.Article.BylineName,
+				},
+			},
 		})
 	}
 
