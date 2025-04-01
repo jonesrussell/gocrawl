@@ -298,7 +298,9 @@ func defaultEnvBindings() map[string]string {
 		"server.address":                "GOCRAWL_PORT",
 		"server.security.api_key":       "GOCRAWL_API_KEY",
 		"app.environment":               "APP_ENV",
+		"app.debug":                     "APP_DEBUG",
 		"log.level":                     "LOG_LEVEL",
+		"log.debug":                     "LOG_DEBUG",
 	}
 }
 

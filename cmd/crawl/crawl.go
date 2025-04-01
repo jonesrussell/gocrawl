@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -27,6 +28,16 @@ You can specify the source to crawl using the --source flag.`,
 		// Set the source flag from the argument
 		if err := cmd.Flags().Set("source", args[0]); err != nil {
 			return fmt.Errorf("failed to set source flag: %w", err)
+		}
+
+		// Set debug mode if enabled
+		if debug, _ := cmd.Flags().GetBool("debug"); debug {
+			if err := os.Setenv("APP_DEBUG", "true"); err != nil {
+				return fmt.Errorf("failed to set debug environment variable: %w", err)
+			}
+			if err := os.Setenv("LOG_DEBUG", "true"); err != nil {
+				return fmt.Errorf("failed to set debug environment variable: %w", err)
+			}
 		}
 
 		// Create a cancellable context
@@ -129,4 +140,5 @@ func Command() *cobra.Command {
 
 func init() {
 	Cmd.Flags().String("source", "", "The source to crawl")
+	Cmd.Flags().Bool("debug", false, "Enable debug mode")
 }

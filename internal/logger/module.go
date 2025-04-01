@@ -37,6 +37,11 @@ func NewLogger(cfg config.Interface) (types.Logger, error) {
 		logLevelStr = defaultLevel
 	}
 
+	// If debug is enabled in app config, force debug level
+	if cfg.GetAppConfig().Debug {
+		logLevelStr = "debug"
+	}
+
 	logLevel, err := parseLogLevel(logLevelStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse log level: %w", err)

@@ -87,8 +87,9 @@ func (c *Crawler) Subscribe(handler events.Handler) {
 func (c *Crawler) SetRateLimit(duration time.Duration) error {
 	if err := c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		RandomDelay: duration,
-		Parallelism: 1,
+		Delay:       duration,
+		RandomDelay: duration / 2, // Add some randomization to avoid thundering herd
+		Parallelism: 2,            // Set a default parallelism value
 	}); err != nil {
 		return fmt.Errorf("failed to set rate limit: %w", err)
 	}

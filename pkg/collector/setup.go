@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -41,6 +42,7 @@ type Logger interface {
 	Info(msg string, keysAndValues ...any)
 	Error(msg string, keysAndValues ...any)
 	Warn(msg string, keysAndValues ...any)
+	Debug(msg string, keysAndValues ...any)
 }
 
 // Setup handles the setup and configuration of the collector.
@@ -148,16 +150,22 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 	// Set allowed domains to the base URL's domain
 	allowedDomains := []string{baseURL.Hostname()}
 
-	// Create collector with domain restrictions
+	// Create collector with domain restrictions and duplicate handling
 	c := colly.NewCollector(
-		colly.Async(true),
+		colly.Async(false), // Disable async to ensure proper rate limiting
 		colly.MaxDepth(s.config.MaxDepth),
 		colly.MaxBodySize(maxBodySizeMB*megabyte),
 		colly.AllowedDomains(allowedDomains...),
+		colly.URLFilters(
+			regexp.MustCompile(`.*`), // Allow all URLs within allowed domains
+		),
 	)
 
+	// Configure duplicate handling
+	c.SetRequestTimeout(time.Duration(requestTimeoutSeconds) * time.Second)
 	c.DisableCookies()
 
+	// Configure transport with keep-alives disabled to prevent connection reuse
 	transport := &http.Transport{
 		DisableKeepAlives:     true,
 		MaxIdleConns:          maxConnections,
@@ -169,7 +177,6 @@ func (s *Setup) CreateBaseCollector(domain string) *colly.Collector {
 	}
 
 	c.WithTransport(transport)
-	c.SetRequestTimeout(time.Duration(requestTimeoutSeconds) * time.Second)
 
 	retryCount := make(map[string]int)
 
@@ -219,6 +226,15 @@ func (s *Setup) ConfigureCollector(c *colly.Collector) error {
 		return fmt.Errorf("failed to parse rate limit: %w", err)
 	}
 
+	// Log rate limiting configuration
+	s.config.Logger.Debug("Configuring rate limiting",
+		"rate_limit", rateLimit,
+		"random_delay", rateLimit/2,
+		"parallelism", s.config.Parallelism,
+		"max_depth", s.config.MaxDepth,
+		"source", s.config.Source.Name,
+		"base_url", s.config.Source.URL)
+
 	// Configure rate limiting with domain-specific rules
 	if err := c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
@@ -228,6 +244,41 @@ func (s *Setup) ConfigureCollector(c *colly.Collector) error {
 	}); err != nil {
 		return fmt.Errorf("failed to set rate limit: %w", err)
 	}
+
+	// Add detailed request timing and depth logging
+	c.OnRequest(func(r *colly.Request) {
+		s.config.Logger.Debug("Starting request",
+			"url", r.URL.String(),
+			"domain", r.URL.Hostname(),
+			"depth", r.Depth,
+			"max_depth", s.config.MaxDepth,
+			"rate_limit", rateLimit.String(),
+			"timestamp", time.Now().Format(time.RFC3339Nano),
+			"source", s.config.Source.Name)
+	})
+
+	// Add response timing logging with more details
+	c.OnResponse(func(r *colly.Response) {
+		s.config.Logger.Debug("Completed request",
+			"url", r.Request.URL.String(),
+			"domain", r.Request.URL.Hostname(),
+			"depth", r.Request.Depth,
+			"status", r.StatusCode,
+			"timestamp", time.Now().Format(time.RFC3339Nano),
+			"source", s.config.Source.Name)
+	})
+
+	// Add error logging with more context
+	c.OnError(func(r *colly.Response, err error) {
+		s.config.Logger.Error("Request failed",
+			"url", r.Request.URL.String(),
+			"domain", r.Request.URL.Hostname(),
+			"depth", r.Request.Depth,
+			"status", r.StatusCode,
+			"error", err.Error(),
+			"timestamp", time.Now().Format(time.RFC3339Nano),
+			"source", s.config.Source.Name)
+	})
 
 	// Configure debugger and logging if enabled
 	if s.config.Debugger != nil {

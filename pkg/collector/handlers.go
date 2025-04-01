@@ -4,8 +4,8 @@
 package collector
 
 import (
-	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gocolly/colly/v2"
 )
@@ -100,40 +100,45 @@ func (h *Handlers) ConfigureHandlers() {
 			return
 		}
 
-		// Parse the link
-		linkURL, err := url.Parse(link)
-		if err != nil {
-			h.config.Logger.Error("Failed to parse URL", "url", link, "error", err)
-			return
-		}
-
-		// Resolve relative URLs
-		if !linkURL.IsAbs() {
-			linkURL = e.Request.URL.ResolveReference(linkURL)
-		}
-
-		// Check if the URL is within the allowed domain
-		if !strings.HasSuffix(linkURL.Hostname(), e.Request.URL.Hostname()) {
-			return
-		}
-
-		// Get the current depth from the request
-		currentDepth := e.Request.Depth
-
-		// Log the depth for debugging
+		// Log the URL being processed
 		h.config.Logger.Debug("Processing URL",
-			"url", linkURL.String(),
-			"current_depth", currentDepth,
-			"max_depth", h.config.MaxDepth)
+			"url", link,
+			"current_depth", e.Request.Depth,
+			"max_depth", h.config.MaxDepth,
+			"parent_url", e.Request.URL.String())
 
-		// Only visit if within max depth
-		if currentDepth < h.config.MaxDepth {
-			err := e.Request.Visit(linkURL.String())
-			if err != nil {
+		// Visit the URL with depth tracking
+		err := e.Request.Visit(link)
+		if err != nil {
+			if strings.Contains(err.Error(), "URL already visited") {
+				h.config.Logger.Debug("Skipping duplicate URL",
+					"url", link,
+					"parent_url", e.Request.URL.String())
+			} else if strings.Contains(err.Error(), "Max depth reached") {
+				h.config.Logger.Debug("Skipping URL - max depth",
+					"url", link,
+					"current_depth", e.Request.Depth,
+					"max_depth", h.config.MaxDepth,
+					"parent_url", e.Request.URL.String())
+			} else if strings.Contains(err.Error(), "Rate limit exceeded") {
+				h.config.Logger.Debug("Rate limit enforced",
+					"url", link,
+					"parent_url", e.Request.URL.String())
+			} else {
 				h.config.Logger.Error("Failed to visit URL",
-					"url", linkURL.String(),
+					"url", link,
+					"parent_url", e.Request.URL.String(),
 					"error", err)
 			}
 		}
+	})
+
+	// Add completion handler
+	h.collector.OnScraped(func(r *colly.Response) {
+		h.config.Logger.Debug("Completed scraping URL",
+			"url", r.Request.URL.String(),
+			"depth", r.Request.Depth,
+			"domain", r.Request.URL.Hostname(),
+			"timestamp", time.Now().Format(time.RFC3339Nano))
 	})
 }
