@@ -9,8 +9,8 @@ import (
 
 // Logger defines the interface required for colly debugging.
 type Logger interface {
-	Printf(format string, v ...interface{})
-	Println(v ...interface{})
+	Printf(format string, v ...any)
+	Println(v ...any)
 }
 
 // DebugLogger implements both Logger and io.Writer interfaces for colly debugging.
@@ -32,12 +32,12 @@ func (d *DebugLogger) Write(p []byte) (int, error) {
 }
 
 // Printf implements Logger interface.
-func (d *DebugLogger) Printf(format string, v ...interface{}) {
+func (d *DebugLogger) Printf(format string, v ...any) {
 	d.logger.Debug(fmt.Sprintf(format, v...))
 }
 
 // Println implements Logger interface.
-func (d *DebugLogger) Println(v ...interface{}) {
+func (d *DebugLogger) Println(v ...any) {
 	d.logger.Debug(fmt.Sprint(v...))
 }
 

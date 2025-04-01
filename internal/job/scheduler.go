@@ -9,7 +9,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/sources"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Interface defines the job scheduler interface.
@@ -22,26 +22,21 @@ type Interface interface {
 
 // Scheduler implements the job scheduler.
 type Scheduler struct {
-	sources  sources.Interface
-	crawler  crawler.Interface
 	logger   common.Logger
+	sources  common.SourceManager
+	storage  storagetypes.Interface
+	crawler  crawler.Interface
 	done     chan struct{}
 	mu       sync.Mutex
 	isActive bool
 }
 
 // New creates a new job scheduler.
-func New(
-	sources sources.Interface,
-	crawler crawler.Interface,
-	logger common.Logger,
-	done chan struct{},
-) *Scheduler {
+func NewScheduler(logger common.Logger, sources common.SourceManager, storage storagetypes.Interface) *Scheduler {
 	return &Scheduler{
-		sources: sources,
-		crawler: crawler,
 		logger:  logger,
-		done:    done,
+		sources: sources,
+		storage: storage,
 	}
 }
 

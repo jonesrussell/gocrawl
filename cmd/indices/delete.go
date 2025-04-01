@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
@@ -153,23 +154,8 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// executeDelete performs the actual deletion of indices.
-func executeDelete(p *deleteParams) error {
-	// Resolve indices to delete
-	if deleteSourceName != "" {
-		source, err := p.sources.FindByName(deleteSourceName)
-		if err != nil {
-			return err
-		}
-		p.indices = []string{source.Index, source.ArticleIndex}
-	}
-
-	// Get existing indices
-	existingIndices, err := p.storage.ListIndices(p.ctx)
-	if err != nil {
-		return err
-	}
-
+// filterIndices filters out non-existent indices and returns lists of indices to delete and missing indices.
+func filterIndices(p *deleteParams, existingIndices []string) ([]string, []string) {
 	// Create map of existing indices
 	existingMap := make(map[string]bool)
 	for _, idx := range existingIndices {
@@ -187,12 +173,58 @@ func executeDelete(p *deleteParams) error {
 		}
 	}
 
+	return indicesToDelete, missingIndices
+}
+
+// reportMissingIndices prints a list of indices that do not exist.
+func reportMissingIndices(missingIndices []string) {
 	if len(missingIndices) > 0 {
-		fmt.Printf("\nThe following indices do not exist (already deleted):\n")
+		fmt.Fprintf(os.Stdout, "\nThe following indices do not exist (already deleted):\n")
 		for _, index := range missingIndices {
-			fmt.Printf("  - %s\n", index)
+			fmt.Fprintf(os.Stdout, "  - %s\n", index)
 		}
 	}
+}
+
+// confirmDeletion prompts the user to confirm deletion of indices.
+func confirmDeletion(indicesToDelete []string) error {
+	fmt.Fprintf(os.Stdout, "\nAre you sure you want to delete the following indices?\n")
+	for _, index := range indicesToDelete {
+		fmt.Fprintf(os.Stdout, "  - %s\n", index)
+	}
+	fmt.Fprintf(os.Stdout, "\nContinue? (y/N): ")
+	var response string
+	if _, confirmErr := fmt.Scanln(&response); confirmErr != nil {
+		return fmt.Errorf("failed to read user input: %w", confirmErr)
+	}
+	if response != "y" && response != "Y" {
+		return nil
+	}
+	return nil
+}
+
+// executeDelete performs the actual deletion of indices.
+func executeDelete(p *deleteParams) error {
+	// Resolve indices to delete
+	if deleteSourceName != "" {
+		source, err := p.sources.FindByName(deleteSourceName)
+		if err != nil {
+			return err
+		}
+		p.indices = []string{source.Index, source.ArticleIndex}
+	}
+
+	// Get existing indices
+	existingIndices, err := p.storage.ListIndices(p.ctx)
+	if err != nil {
+		return err
+	}
+
+	// Filter indices
+	indicesToDelete, missingIndices := filterIndices(p, existingIndices)
+
+	// Report missing indices
+	reportMissingIndices(missingIndices)
 
 	if len(indicesToDelete) == 0 {
 		return nil
@@ -200,22 +232,15 @@ func executeDelete(p *deleteParams) error {
 
 	// Confirm deletion if needed
 	if !p.force {
-		fmt.Printf("\nAre you sure you want to delete the following indices?\n")
-		for _, index := range indicesToDelete {
-			fmt.Printf("  - %s\n", index)
-		}
-		fmt.Printf("\nContinue? (y/N): ")
-		var response string
-		fmt.Scanln(&response)
-		if response != "y" && response != "Y" {
-			return nil
+		if err := confirmDeletion(indicesToDelete); err != nil {
+			return err
 		}
 	}
 
 	// Delete indices
 	for _, index := range indicesToDelete {
-		if err := p.storage.DeleteIndex(p.ctx, index); err != nil {
-			return err
+		if deleteErr := p.storage.DeleteIndex(p.ctx, index); deleteErr != nil {
+			return deleteErr
 		}
 	}
 	return nil

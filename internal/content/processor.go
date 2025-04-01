@@ -5,23 +5,23 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 )
 
 // ContentProcessor handles the processing of non-article content
 type ContentProcessor struct {
 	service   Interface
-	storage   common.Storage
-	logger    logger.Interface
+	storage   storagetypes.Interface
+	logger    common.Logger
 	indexName string
 }
 
 // NewProcessor creates a new content processor instance.
 func NewProcessor(
 	service Interface,
-	storage common.Storage,
-	logger logger.Interface,
+	storage storagetypes.Interface,
+	logger common.Logger,
 	indexName string,
 ) *ContentProcessor {
 	return &ContentProcessor{

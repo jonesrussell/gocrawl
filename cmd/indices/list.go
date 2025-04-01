@@ -55,7 +55,12 @@ Example:
 }
 
 // renderIndicesTable formats and displays the indices in a table format.
-func renderIndicesTable(ctx context.Context, indices []string, storage storagetypes.Interface, logger types.Logger) error {
+func renderIndicesTable(
+	ctx context.Context,
+	indices []string,
+	storage storagetypes.Interface,
+	logger types.Logger,
+) error {
 	// Initialize table writer with stdout as output
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)

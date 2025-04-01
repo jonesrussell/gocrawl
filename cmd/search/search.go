@@ -90,7 +90,7 @@ func Command() *cobra.Command {
 
 	// Mark the query flag as required
 	if err := Cmd.MarkFlagRequired("query"); err != nil {
-		fmt.Printf("Error marking query flag as required: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error marking query flag as required: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -150,7 +150,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 					// Execute the search and handle any errors
 					if err := executeSearch(cmd.Context(), p); err != nil {
 						p.Logger.Error("Error executing search", "error", err)
-						fmt.Printf("\nSearch failed: %v\n", err)
+						fmt.Fprintf(os.Stderr, "\nSearch failed: %v\n", err)
 						return err
 					}
 					return nil
@@ -257,7 +257,7 @@ func renderSearchResults(results []Result, query string) {
 
 	t.AppendFooter(table.Row{"Total", len(results), fmt.Sprintf("Query: %s", query)})
 
-	fmt.Printf("\nSearch Results:\n")
+	fmt.Fprintf(os.Stdout, "\nSearch Results:\n")
 	t.Render()
 }
 
@@ -284,7 +284,7 @@ func executeSearch(ctx context.Context, p Params) error {
 	)
 
 	if len(results) == 0 {
-		fmt.Printf("No results found for query: %s\n", p.Query)
+		fmt.Fprintf(os.Stdout, "No results found for query: %s\n", p.Query)
 		return nil
 	}
 

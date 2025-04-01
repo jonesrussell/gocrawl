@@ -3,6 +3,15 @@ package config
 
 import "time"
 
+const (
+	// DefaultMaxDepth is the default maximum depth for crawling
+	DefaultMaxDepth = 2
+	// DefaultRateLimit is the default rate limit
+	DefaultRateLimit = time.Second * 2
+	// DefaultParallelism is the default number of parallel requests
+	DefaultParallelism = 2
+)
+
 // Interface defines the interface for configuration operations.
 // It provides access to application configuration settings and
 // supports different configuration sources.
@@ -136,5 +145,14 @@ func (c *NoOpConfig) GetCrawlerConfig() *CrawlerConfig {
 		RateLimit:   time.Second * 2,
 		RandomDelay: time.Second,
 		Parallelism: 2,
+	}
+}
+
+// DefaultConfig returns the default configuration.
+func DefaultConfig() *CrawlerConfig {
+	return &CrawlerConfig{
+		MaxDepth:    DefaultMaxDepth,
+		RateLimit:   DefaultRateLimit,
+		Parallelism: DefaultParallelism,
 	}
 }

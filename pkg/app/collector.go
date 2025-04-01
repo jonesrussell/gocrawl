@@ -9,6 +9,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -17,6 +18,11 @@ import (
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/jonesrussell/gocrawl/pkg/config"
 	pkglogger "github.com/jonesrussell/gocrawl/pkg/logger"
+)
+
+const (
+	// DefaultParallelism is the default number of parallel requests
+	DefaultParallelism = 2
 )
 
 // CollectorResult holds the result of setting up a collector.
@@ -53,7 +59,7 @@ func SetupCollector(
 		if err := c.Limit(&colly.LimitRule{
 			DomainGlob:  "*",
 			RandomDelay: source.RateLimit,
-			Parallelism: 2,
+			Parallelism: DefaultParallelism,
 		}); err != nil {
 			return nil, fmt.Errorf("failed to set rate limit: %w", err)
 		}
@@ -140,4 +146,34 @@ func ConfigureCrawler(
 	c.SetCollector(collectorResult.Collector)
 
 	return nil
+}
+
+// NewCollector creates a new collector with the given configuration.
+func NewCollector(cfg common.Config) (*colly.Collector, error) {
+	ctx := context.Background()
+	log := logger.NewNoOp()
+
+	sources := cfg.GetSources()
+	if len(sources) == 0 {
+		return nil, errors.New("no sources configured")
+	}
+	source := &sources[0] // Use the first source
+
+	params := collector.Params{
+		BaseURL:     source.URL,
+		MaxDepth:    source.MaxDepth,
+		RateLimit:   source.RateLimit,
+		Logger:      log,
+		Context:     ctx,
+		Done:        make(chan struct{}),
+		Parallelism: DefaultParallelism,
+		Source:      source,
+	}
+
+	result, err := collector.New(params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create collector: %w", err)
+	}
+
+	return result.Collector, nil
 }

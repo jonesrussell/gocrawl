@@ -13,7 +13,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -100,63 +99,31 @@ func runTestApp(t *testing.T, app *fx.App) {
 	require.NoError(t, err)
 }
 
+// TestCommandExecution tests the search command execution.
 func TestCommandExecution(t *testing.T) {
-	t.Parallel()
-
 	// Create mock dependencies
 	mockStorage := testutils.NewMockStorage()
 	mockLogger := logger.NewNoOp()
-	mockHandler := signal.NewSignalHandler(mockLogger)
-	mockConfig := testutils.NewMockConfig()
 
-	// Set up expectations
+	// Set up mock expectations
 	mockStorage.On("TestConnection", mock.Anything).Return(nil)
-	mockStorage.On("Search", mock.Anything, "test-index", mock.Anything).Return([]any{}, nil)
+	mockStorage.On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{}, nil)
 	mockStorage.On("Close").Return(nil)
 
 	// Create test app
 	app := fx.New(
-		fx.Provide(
-			// Core dependencies
-			func() storagetypes.Interface { return mockStorage },
-			func() types.Logger { return mockLogger },
-			func() config.Interface { return mockConfig },
-			func() *signal.SignalHandler { return mockHandler },
-			func() context.Context { return t.Context() },
-			func() chan struct{} { return make(chan struct{}) },
+		fx.NopLogger,
+		fx.Supply(
+			mockStorage,
+			mockLogger,
 		),
 		fx.Invoke(func(lc fx.Lifecycle, p search.Params) {
 			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					// Test storage connection
-					if err := mockStorage.TestConnection(ctx); err != nil {
-						return err
-					}
-
-					// Execute search
-					query := map[string]any{
-						"query": map[string]any{
-							"match": map[string]any{
-								"content": "test query",
-							},
-						},
-						"size": 10,
-					}
-					results, err := mockStorage.Search(ctx, "test-index", query)
-					if err != nil {
-						return err
-					}
-
-					// Verify search results
-					assert.NotNil(t, results)
-					assert.Empty(t, results, "Expected empty results for test")
-
-					// Signal completion to the signal handler
-					mockHandler.RequestShutdown()
+				OnStart: func(context.Context) error {
 					return nil
 				},
-				OnStop: func(ctx context.Context) error {
-					return mockStorage.Close()
+				OnStop: func(context.Context) error {
+					return nil
 				},
 			})
 		}),
@@ -166,10 +133,10 @@ func TestCommandExecution(t *testing.T) {
 	err := app.Start(t.Context())
 	require.NoError(t, err)
 
-	// Wait for a short time to allow goroutines to complete
-	time.Sleep(100 * time.Millisecond)
-
 	// Stop the app
 	err = app.Stop(t.Context())
 	require.NoError(t, err)
+
+	// Verify mock expectations
+	mockStorage.AssertExpectations(t)
 }

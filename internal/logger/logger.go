@@ -61,6 +61,8 @@ type Params struct {
 
 const (
 	defaultLogLevel = "info"
+	// LogLevelDebug represents the debug log level
+	LogLevelDebug = "debug"
 )
 
 // Info logs an info message
@@ -124,7 +126,7 @@ func ParseLogLevel(logLevelStr string) (zapcore.Level, error) {
 	}
 
 	switch logLevelStr {
-	case "debug":
+	case LogLevelDebug:
 		logLevel = zapcore.DebugLevel
 	case "info":
 		logLevel = zapcore.InfoLevel

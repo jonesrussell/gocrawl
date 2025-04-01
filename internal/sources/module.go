@@ -12,6 +12,9 @@ import (
 const (
 	// DefaultMaxDepth is the default maximum depth for crawling.
 	DefaultMaxDepth = 2
+
+	// DefaultRateLimit is the default rate limit for sources
+	DefaultRateLimit = 5 * time.Second
 )
 
 // Interface defines the interface for managing web content sources.
@@ -50,7 +53,7 @@ func provideSources(p Params) Interface {
 		defaultConfig.Name = "default"
 		defaultConfig.URL = "http://localhost"
 		defaultConfig.MaxDepth = DefaultMaxDepth
-		defaultConfig.RateLimit = 5 * time.Second
+		defaultConfig.RateLimit = DefaultRateLimit
 		configs = append(configs, *defaultConfig)
 	} else {
 		for _, src := range sources {
@@ -74,7 +77,7 @@ func NewConfig() *Config {
 		Name:      "default",
 		URL:       "http://localhost",
 		MaxDepth:  DefaultMaxDepth,
-		RateLimit: 5 * time.Second,
+		RateLimit: DefaultRateLimit,
 	}
 }
 
@@ -83,4 +86,12 @@ func NewSources(cfg *Config) Interface {
 	return &Sources{
 		sources: []Config{*cfg},
 	}
+}
+
+// DefaultConfig returns the default source configuration.
+func DefaultConfig() *Config {
+	defaultConfig := &Config{
+		RateLimit: DefaultRateLimit,
+	}
+	return defaultConfig
 }

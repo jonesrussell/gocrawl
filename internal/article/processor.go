@@ -6,19 +6,19 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
 )
 
 // ArticleProcessor handles article content processing.
 type ArticleProcessor struct {
 	// Logger for article processing operations
-	Logger logger.Interface
+	Logger common.Logger
 	// ArticleService for article operations
 	ArticleService Interface
 	// Storage for article persistence
-	Storage common.Storage
+	Storage storagetypes.Interface
 	// IndexName is the name of the article index
 	IndexName string
 	// ArticleChan is the channel for sending processed articles

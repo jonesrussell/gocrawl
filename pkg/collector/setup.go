@@ -31,6 +31,8 @@ const (
 	tlsTimeoutSeconds = 10
 	// expectContinueTimeoutSeconds is the timeout for expect-continue handshake.
 	expectContinueTimeoutSeconds = 1
+	// RandomDelayFactor is used to calculate random delay for rate limiting
+	RandomDelayFactor = 2
 )
 
 // Logger defines the interface for logging operations
@@ -147,20 +149,20 @@ func (s *Setup) ConfigureCollector(c *colly.Collector) error {
 	// Log rate limiting configuration
 	s.config.Logger.Debug("Configuring rate limiting",
 		"rate_limit", rateLimit,
-		"random_delay", rateLimit/2,
+		"random_delay", rateLimit/RandomDelayFactor,
 		"parallelism", s.config.Parallelism,
 		"max_depth", s.config.MaxDepth,
 		"source", s.config.Source.Name,
 		"base_url", s.config.Source.URL)
 
 	// Configure rate limiting with domain-specific rules
-	if err := c.Limit(&colly.LimitRule{
+	if limitErr := c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Delay:       rateLimit,
-		RandomDelay: rateLimit / 2, // Add some randomization to avoid thundering herd
+		RandomDelay: rateLimit / RandomDelayFactor, // Add some randomization to avoid thundering herd
 		Parallelism: s.config.Parallelism,
-	}); err != nil {
-		return fmt.Errorf("failed to set rate limit: %w", err)
+	}); limitErr != nil {
+		return fmt.Errorf("failed to set rate limit: %w", limitErr)
 	}
 
 	// Add detailed request timing and depth logging

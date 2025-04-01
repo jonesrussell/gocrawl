@@ -3,6 +3,7 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +15,13 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/pkg/collector"
+)
+
+const (
+	// DefaultParallelism is the default number of parallel requests
+	DefaultParallelism = 2
+	// DefaultRandomDelayFactor is the factor used to calculate random delay
+	DefaultRandomDelayFactor = 2
 )
 
 // Crawler implements the crawler Interface.
@@ -85,14 +93,19 @@ func (c *Crawler) Subscribe(handler events.Handler) {
 
 // SetRateLimit sets the crawler's rate limit.
 func (c *Crawler) SetRateLimit(duration time.Duration) error {
+	if duration <= 0 {
+		return errors.New("rate limit must be positive")
+	}
+
 	if err := c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Delay:       duration,
-		RandomDelay: duration / 2, // Add some randomization to avoid thundering herd
-		Parallelism: 2,            // Set a default parallelism value
+		RandomDelay: duration / DefaultRandomDelayFactor, // Add some randomization to avoid thundering herd
+		Parallelism: DefaultParallelism,                  // Set a default parallelism value
 	}); err != nil {
 		return fmt.Errorf("failed to set rate limit: %w", err)
 	}
+
 	return nil
 }
 

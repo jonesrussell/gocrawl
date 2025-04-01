@@ -82,25 +82,20 @@ func (h *Handlers) ConfigureHandlers() {
 		// Visit the URL with depth tracking
 		err := e.Request.Visit(link)
 		if err != nil {
-			if strings.Contains(err.Error(), "URL already visited") {
+			switch {
+			case strings.Contains(err.Error(), "URL already visited"):
 				h.config.Logger.Debug("Skipping duplicate URL",
 					"url", link,
 					"parent_url", e.Request.URL.String())
-			} else if strings.Contains(err.Error(), "Max depth reached") {
+			case strings.Contains(err.Error(), "Max depth reached"):
 				h.config.Logger.Debug("Skipping URL - max depth",
 					"url", link,
-					"current_depth", e.Request.Depth,
-					"max_depth", h.config.MaxDepth,
 					"parent_url", e.Request.URL.String())
-			} else if strings.Contains(err.Error(), "Rate limit exceeded") {
-				h.config.Logger.Debug("Rate limit enforced",
+			default:
+				h.config.Logger.Error("Error visiting URL",
 					"url", link,
+					"error", err,
 					"parent_url", e.Request.URL.String())
-			} else {
-				h.config.Logger.Error("Failed to visit URL",
-					"url", link,
-					"parent_url", e.Request.URL.String(),
-					"error", err)
 			}
 		}
 	})
