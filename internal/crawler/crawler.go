@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -27,13 +26,16 @@ const (
 type Crawler struct {
 	collector        *colly.Collector
 	Logger           common.Logger
-	Debugger         debug.Debugger
 	bus              *events.Bus
 	indexManager     api.IndexManager
 	sources          sources.Interface
 	articleProcessor common.Processor
 	contentProcessor common.Processor
 	testServerURL    string
+	processedCount   int64
+	errorCount       int64
+	startTime        time.Time
+	isRunning        bool
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -92,6 +94,12 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.collector.MaxDepth = source.MaxDepth
 	c.collector.Async = true
 
+	// Reset metrics
+	c.processedCount = 0
+	c.errorCount = 0
+	c.startTime = time.Now()
+	c.isRunning = true
+
 	// Start crawling
 	if crawlErr := c.collector.Visit(source.URL); crawlErr != nil {
 		return fmt.Errorf("error starting crawl: %w", crawlErr)
@@ -99,18 +107,28 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	// Start processing in background
 	go func() {
-		c.collector.Wait()
-		c.Logger.Info("Crawler finished processing", "source", sourceName)
+		for {
+			select {
+			case <-ctx.Done():
+				c.isRunning = false
+				return
+			case <-time.After(100 * time.Millisecond):
+				if !c.isRunning {
+					c.Logger.Info("Crawler finished processing", "source", sourceName)
+					return
+				}
+			}
+		}
 	}()
 
 	return nil
 }
 
-// Stop gracefully stops the crawler.
+// Stop stops the crawler.
 func (c *Crawler) Stop(ctx context.Context) error {
-	if c.collector != nil {
-		c.collector.Wait()
-	}
+	c.Logger.Info("Stopping crawler")
+	c.isRunning = false
+	c.collector.Wait()
 	return nil
 }
 
@@ -121,21 +139,20 @@ func (c *Crawler) Subscribe(handler events.Handler) {
 
 // SetRateLimit sets the crawler's rate limit.
 func (c *Crawler) SetRateLimit(duration time.Duration) error {
-	if err := c.collector.Limit(&colly.LimitRule{
+	if rateErr := c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		RandomDelay: duration,
-		Parallelism: 1,
-	}); err != nil {
-		return fmt.Errorf("failed to set rate limit: %w", err)
+		Delay:       duration,
+		RandomDelay: 0,
+		Parallelism: DefaultParallelism,
+	}); rateErr != nil {
+		return fmt.Errorf("error setting rate limit: %w", rateErr)
 	}
 	return nil
 }
 
 // SetMaxDepth sets the maximum crawl depth.
 func (c *Crawler) SetMaxDepth(depth int) {
-	if c.collector != nil {
-		c.collector.MaxDepth = depth
-	}
+	c.collector.MaxDepth = depth
 }
 
 // SetCollector sets the collector for the crawler.
@@ -150,22 +167,16 @@ func (c *Crawler) GetIndexManager() api.IndexManager {
 
 // Wait blocks until the crawler has finished processing all queued requests.
 func (c *Crawler) Wait() {
-	if c.collector != nil {
-		c.collector.Wait()
-	}
+	c.collector.Wait()
 }
 
 // GetMetrics returns the current crawler metrics.
 func (c *Crawler) GetMetrics() *common.Metrics {
-	// Aggregate metrics from both processors
-	articleMetrics := c.articleProcessor.GetMetrics()
-	contentMetrics := c.contentProcessor.GetMetrics()
-
 	return &common.Metrics{
-		ProcessedCount:     articleMetrics.ProcessedCount + contentMetrics.ProcessedCount,
-		ErrorCount:         articleMetrics.ErrorCount + contentMetrics.ErrorCount,
-		LastProcessedTime:  articleMetrics.LastProcessedTime,
-		ProcessingDuration: articleMetrics.ProcessingDuration + contentMetrics.ProcessingDuration,
+		ProcessedCount:     c.processedCount,
+		ErrorCount:         c.errorCount,
+		LastProcessedTime:  time.Now(),
+		ProcessingDuration: time.Since(c.startTime),
 	}
 }
 
@@ -177,11 +188,17 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	// Process article content
 	if articleErr := c.articleProcessor.ProcessHTML(e); articleErr != nil {
 		c.Logger.Error("Error processing article", "error", articleErr)
+		c.errorCount++
+	} else {
+		c.processedCount++
 	}
 
 	// Process general content
 	if contentErr := c.contentProcessor.ProcessHTML(e); contentErr != nil {
 		c.Logger.Error("Error processing content", "error", contentErr)
+		c.errorCount++
+	} else {
+		c.processedCount++
 	}
 }
 

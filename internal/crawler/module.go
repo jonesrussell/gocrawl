@@ -5,7 +5,6 @@ package crawler
 
 import (
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -34,7 +33,6 @@ var Module = fx.Module("crawler",
 				``,
 				``,
 				``,
-				``,
 				`name:"startupArticleProcessor"`,
 				`name:"startupContentProcessor"`,
 				`name:"eventBus"`,
@@ -46,7 +44,6 @@ var Module = fx.Module("crawler",
 // ProvideCrawler creates a new crawler instance.
 func ProvideCrawler(
 	logger common.Logger,
-	debugger debug.Debugger,
 	indexManager api.IndexManager,
 	sources sources.Interface,
 	articleProcessor common.Processor,
@@ -55,7 +52,6 @@ func ProvideCrawler(
 ) Result {
 	crawler := NewCrawler(
 		logger,
-		debugger,
 		indexManager,
 		sources,
 		articleProcessor,
@@ -72,7 +68,6 @@ func ProvideCrawler(
 // NewCrawler creates a new crawler instance.
 func NewCrawler(
 	logger common.Logger,
-	debugger debug.Debugger,
 	indexManager api.IndexManager,
 	sources sources.Interface,
 	articleProcessor common.Processor,
@@ -82,7 +77,6 @@ func NewCrawler(
 	collector := colly.NewCollector(
 		colly.MaxDepth(3),
 		colly.Async(true),
-		colly.Debugger(debugger),
 		colly.AllowedDomains(),
 		colly.ParseHTTPErrorResponse(),
 	)
@@ -97,7 +91,6 @@ func NewCrawler(
 
 	crawler := &Crawler{
 		Logger:           logger,
-		Debugger:         debugger,
 		indexManager:     indexManager,
 		sources:          sources,
 		articleProcessor: articleProcessor,

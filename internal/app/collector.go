@@ -5,10 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -17,22 +15,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 )
-
-// writerWrapper wraps a logger to implement io.Writer
-type writerWrapper struct {
-	logger types.Logger
-}
-
-// Write implements io.Writer
-func (w *writerWrapper) Write(p []byte) (int, error) {
-	w.logger.Debug(string(p))
-	return len(p), nil
-}
-
-// newDebugLogger creates a new debug logger that wraps a types.Logger
-func newDebugLogger(logger types.Logger) io.Writer {
-	return &writerWrapper{logger: logger}
-}
 
 // SetupCollector initializes and configures a new collector instance.
 //
@@ -58,9 +40,6 @@ func SetupCollector(
 	client *elasticsearch.Client,
 ) (crawler.Interface, error) {
 	// Create dependencies
-	debugger := &debug.LogDebugger{
-		Output: newDebugLogger(log),
-	}
 	indexManager := testutils.NewMockIndexManager()
 	bus := events.NewBus()
 	sources := sources.NewSources(&source, log)
@@ -68,7 +47,6 @@ func SetupCollector(
 	// Create crawler using the module's provider
 	result := crawler.ProvideCrawler(
 		log,
-		debugger,
 		indexManager,
 		sources,
 		processors[0], // First processor is for articles
