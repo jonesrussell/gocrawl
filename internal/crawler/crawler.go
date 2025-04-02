@@ -63,14 +63,6 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.collector.AllowedDomains = []string{host}
 	c.Logger.Info("Set allowed domain", "domain", host)
 
-	// For testing, use the test server's URL for requests
-	if sourceURL.Host == "test.example.com" {
-		c.collector.OnRequest(func(r *colly.Request) {
-			// Replace the test domain with the actual test server URL
-			r.URL.Host = strings.TrimPrefix(c.testServerURL, "http://")
-		})
-	}
-
 	// Set up rate limiting - limit to 1 request per rate limit duration
 	if rateErr := c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
