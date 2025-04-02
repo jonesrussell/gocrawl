@@ -16,7 +16,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -266,11 +265,12 @@ func NewCrawler(
 
 // TestCrawlerStartup tests crawler startup functionality.
 func TestCrawlerStartup(t *testing.T) {
-	// Create test configuration
-	testCfg := testutils.NewMockConfig()
-
 	// Create test logger
-	testLogger, initErr := logger.NewLogger(testCfg)
+	testLogger, initErr := logger.NewCustomLogger(nil, logger.Params{
+		Debug:  true,
+		Level:  "info",
+		AppEnv: "development",
+	})
 	require.NoError(t, initErr)
 
 	// Create mock HTTP server
@@ -385,11 +385,12 @@ func TestCrawlerStartup(t *testing.T) {
 
 // TestCrawlerShutdown tests crawler shutdown functionality.
 func TestCrawlerShutdown(t *testing.T) {
-	// Create test configuration
-	testCfg := testutils.NewMockConfig()
-
 	// Create test logger
-	testLogger, initErr := logger.NewLogger(testCfg)
+	testLogger, initErr := logger.NewCustomLogger(nil, logger.Params{
+		Debug:  true,
+		Level:  "info",
+		AppEnv: "development",
+	})
 	require.NoError(t, initErr)
 
 	// Create test app with all required dependencies
@@ -444,11 +445,12 @@ func TestCrawlerShutdown(t *testing.T) {
 
 // TestSourceValidation tests source validation functionality.
 func TestSourceValidation(t *testing.T) {
-	// Create test configuration
-	testCfg := testutils.NewMockConfig()
-
 	// Create test logger
-	testLogger, initErr := logger.NewLogger(testCfg)
+	testLogger, initErr := logger.NewCustomLogger(nil, logger.Params{
+		Debug:  true,
+		Level:  "info",
+		AppEnv: "development",
+	})
 	require.NoError(t, initErr)
 
 	// Create test app with all required dependencies
@@ -503,11 +505,12 @@ func TestSourceValidation(t *testing.T) {
 
 // TestErrorHandling tests error handling functionality.
 func TestErrorHandling(t *testing.T) {
-	// Create test configuration
-	testCfg := testutils.NewMockConfig()
-
 	// Create test logger
-	testLogger, initErr := logger.NewLogger(testCfg)
+	testLogger, initErr := logger.NewCustomLogger(nil, logger.Params{
+		Debug:  true,
+		Level:  "info",
+		AppEnv: "development",
+	})
 	require.NoError(t, initErr)
 
 	// Create test app with all required dependencies
@@ -580,6 +583,14 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 	// Create a test context
 	ctx := context.Background()
 
+	// Create a development logger with nice formatting
+	devLogger, err := logger.NewCustomLogger(nil, logger.Params{
+		Debug:  true,
+		Level:  "debug",
+		AppEnv: "development",
+	})
+	require.NoError(t, err)
+
 	// Create mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -599,16 +610,15 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 	defer server.Close()
 
 	// Create test dependencies
-	mockLogger := &MockLogger{}
 	mockIndexManager := &MockIndexManager{}
 	mockSources := &MockSources{}
 	mockArticleProcessor := &MockProcessor{}
 	mockContentProcessor := &MockProcessor{}
 	bus := events.NewBus()
 
-	// Create crawler
+	// Create crawler with development logger
 	c := NewCrawler(
-		mockLogger,
+		devLogger,
 		bus,
 		mockIndexManager,
 		mockSources,
@@ -639,7 +649,7 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 	})
 
 	// Visit the test server URL
-	err := collector.Visit(server.URL)
+	err = collector.Visit(server.URL)
 	require.NoError(t, err)
 
 	// Wait for the crawler to finish

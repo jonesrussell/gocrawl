@@ -65,7 +65,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		host = host[:i]
 	}
 	c.collector.AllowedDomains = []string{host}
-	c.Logger.Info("Set allowed domain", "domain", host)
+	c.Logger.Debug("Set allowed domain", "domain", host)
 
 	// Set up rate limiting - limit to 1 request per rate limit duration
 	if rateErr := c.collector.Limit(&colly.LimitRule{
@@ -76,11 +76,11 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	}); rateErr != nil {
 		return fmt.Errorf("error setting rate limit: %w", rateErr)
 	}
-	c.Logger.Info("Set rate limit", "delay", source.RateLimit, "parallelism", DefaultParallelism)
+	c.Logger.Debug("Set rate limit", "delay", source.RateLimit, "parallelism", DefaultParallelism)
 
 	// Set max depth
 	c.SetMaxDepth(source.MaxDepth)
-	c.Logger.Info("Set max depth", "depth", source.MaxDepth)
+	c.Logger.Debug("Set max depth", "depth", source.MaxDepth)
 
 	// Configure collector
 	c.collector.DetectCharset = true
@@ -104,9 +104,28 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.done = make(chan struct{})
 	c.ctx = ctx
 
-	// Start crawling
-	if crawlErr := c.collector.Visit(source.URL); crawlErr != nil {
-		return fmt.Errorf("error starting crawl: %w", crawlErr)
+	// Create a timeout context for starting the crawler
+	startCtx, startCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer startCancel()
+
+	// Start crawling with timeout
+	crawlErr := make(chan error)
+	go func() {
+		defer close(crawlErr)
+		if err := c.collector.Visit(source.URL); err != nil {
+			crawlErr <- fmt.Errorf("error starting crawl: %w", err)
+		}
+	}()
+
+	select {
+	case err := <-crawlErr:
+		if err != nil {
+			return err
+		}
+	case <-startCtx.Done():
+		return fmt.Errorf("timeout starting crawler")
+	case <-ctx.Done():
+		return fmt.Errorf("context cancelled while starting crawler")
 	}
 
 	// Start processing in background
@@ -127,6 +146,47 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		}
 	}()
 
+	// Let Colly handle link discovery with context awareness
+	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+			e.Request.Visit(e.Attr("href"))
+		}
+	})
+
+	// Add context-aware request handling
+	c.collector.OnRequest(func(r *colly.Request) {
+		select {
+		case <-c.ctx.Done():
+			r.Abort()
+		default:
+			c.Logger.Debug("Visiting", "url", r.URL.String())
+		}
+	})
+
+	c.collector.OnResponse(func(r *colly.Response) {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+			c.Logger.Debug("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
+		}
+	})
+
+	c.collector.OnError(func(r *colly.Response, err error) {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+			c.Logger.Error("Error while crawling",
+				"url", r.Request.URL.String(),
+				"status", r.StatusCode,
+				"error", err)
+		}
+	})
+
 	return nil
 }
 
@@ -134,13 +194,34 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 func (c *Crawler) Stop(ctx context.Context) error {
 	c.Logger.Info("Stopping crawler")
 	c.isRunning = false
-	c.collector.Wait()
+
+	// Create a timeout context for stopping
+	stopCtx, stopCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer stopCancel()
+
+	// Stop the collector with timeout
+	collectorDone := make(chan struct{})
+	go func() {
+		defer close(collectorDone)
+		c.collector.Wait()
+	}()
+
+	select {
+	case <-collectorDone:
+		c.Logger.Info("Collector stopped successfully")
+	case <-stopCtx.Done():
+		c.Logger.Warn("Timeout waiting for collector to stop")
+	case <-ctx.Done():
+		c.Logger.Warn("Context cancelled while stopping collector")
+	}
 
 	// Wait for background goroutine to finish
 	if c.done != nil {
 		select {
 		case <-c.done:
 			c.Logger.Info("Crawler stopped successfully")
+		case <-stopCtx.Done():
+			c.Logger.Warn("Timeout waiting for crawler to stop")
 		case <-ctx.Done():
 			c.Logger.Warn("Context cancelled while waiting for crawler to stop")
 		}
@@ -203,7 +284,7 @@ func (c *Crawler) GetMetrics() *common.Metrics {
 // ProcessHTML processes HTML content from a source.
 func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	// Log the element being processed
-	c.Logger.Info("Processing HTML element", "tag", e.Name, "url", e.Request.URL.String())
+	c.Logger.Debug("Processing HTML element", "tag", e.Name, "url", e.Request.URL.String())
 
 	// Process article content
 	c.handleArticle(e)

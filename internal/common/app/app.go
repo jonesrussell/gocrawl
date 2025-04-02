@@ -145,7 +145,13 @@ var Module = fx.Module("app",
 		// Provide configuration
 		config.LoadConfig,
 		// Provide logger
-		logger.NewLogger,
+		func() (common.Logger, error) {
+			return logger.NewCustomLogger(nil, logger.Params{
+				Debug:  true,
+				Level:  "info",
+				AppEnv: "development",
+			})
+		},
 		// Provide event bus
 		events.NewBus,
 		// Provide crawler

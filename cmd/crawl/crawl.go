@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
@@ -34,7 +34,7 @@ Specify the source name as an argument.`,
 		// Create a logger with the appropriate configuration
 		logger, err := logger.NewCustomLogger(nil, logger.Params{
 			Debug:  true,
-			Level:  "debug",
+			Level:  "info",
 			AppEnv: "development",
 		})
 		if err != nil {
@@ -64,7 +64,6 @@ Specify the source name as an argument.`,
 					func() *signal.SignalHandler { return handler },
 					fx.ResultTags(`name:"signalHandler"`),
 				),
-				func() types.Logger { return logger },
 			),
 			fx.Invoke(func(lc fx.Lifecycle, p CommandDeps) {
 				// Update the signal handler with the logger
@@ -100,7 +99,7 @@ Specify the source name as an argument.`,
 										return
 									}
 
-									// Create a job for each article
+									// Create a job for each article with timeout
 									job := &common.Job{
 										ID:        article.ID,
 										URL:       article.Source,
@@ -109,18 +108,30 @@ Specify the source name as an argument.`,
 										UpdatedAt: article.UpdatedAt,
 									}
 
-									// Process the article using each processor
+									// Process the article using each processor with timeout
 									for _, processor := range p.Processors {
-										processor.ProcessJob(p.Context, job)
+										// Create a timeout context for each processor
+										processorCtx, processorCancel := context.WithTimeout(ctx, 30*time.Second)
+										processor.ProcessJob(processorCtx, job)
+										processorCancel()
 									}
 								}
 							}
 						}()
 
-						// Wait for crawler to complete
+						// Wait for crawler to complete with timeout
 						go func() {
-							p.Crawler.Wait()
-							p.Logger.Info("Crawler finished processing")
+							// Create a timeout context for waiting
+							waitCtx, waitCancel := context.WithTimeout(ctx, 5*time.Minute)
+							defer waitCancel()
+
+							select {
+							case <-waitCtx.Done():
+								p.Logger.Warn("Timeout waiting for crawler to complete")
+							default:
+								p.Crawler.Wait()
+								p.Logger.Info("Crawler finished processing")
+							}
 							// Signal completion to the signal handler
 							handler.RequestShutdown()
 						}()
