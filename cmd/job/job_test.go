@@ -52,6 +52,7 @@ func (m *mockCrawler) SetCollector(_ *colly.Collector)     {}
 func (m *mockCrawler) GetIndexManager() api.IndexManager   { return nil }
 func (m *mockCrawler) Wait()                               {}
 func (m *mockCrawler) GetMetrics() *common.Metrics         { return nil }
+func (m *mockCrawler) SetTestServerURL(url string)         {}
 
 // mockStorage implements storage.types.Interface for testing
 type mockStorage struct{}

@@ -81,5 +81,10 @@ func (m *MockCrawler) GetMetrics() *common.Metrics {
 	return metrics
 }
 
+// SetTestServerURL implements crawler.Interface
+func (m *MockCrawler) SetTestServerURL(url string) {
+	m.Called(url)
+}
+
 // Ensure MockCrawler implements crawler.Interface
 var _ Interface = (*MockCrawler)(nil)

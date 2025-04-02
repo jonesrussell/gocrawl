@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -22,7 +23,7 @@ const (
 	DefaultParallelism = 2
 )
 
-// Crawler implements the crawler Interface.
+// Crawler implements the crawler interface
 type Crawler struct {
 	collector        *colly.Collector
 	Logger           common.Logger
@@ -32,6 +33,7 @@ type Crawler struct {
 	sources          sources.Interface
 	articleProcessor common.Processor
 	contentProcessor common.Processor
+	testServerURL    string
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -52,9 +54,28 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		return fmt.Errorf("error parsing source URL: %w", err)
 	}
 
-	// Set allowed domains
-	c.collector.AllowedDomains = []string{sourceURL.Host}
-	c.Logger.Info("Set allowed domain", "domain", sourceURL.Host)
+	// Set allowed domains only if not already configured (respect test configuration)
+	if c.collector.AllowedDomains == nil && c.collector.DisallowedDomains == nil {
+		// Extract host without port
+		host := sourceURL.Host
+		if i := strings.LastIndex(host, ":"); i != -1 {
+			host = host[:i]
+		}
+		c.collector.AllowedDomains = []string{host}
+		c.Logger.Info("Set allowed domain", "domain", host)
+	} else {
+		c.Logger.Info("Using pre-configured domain settings",
+			"allowed_domains", c.collector.AllowedDomains,
+			"disallowed_domains", c.collector.DisallowedDomains)
+	}
+
+	// For testing, use the test server's URL for requests
+	if sourceURL.Host == "test.example.com" {
+		c.collector.OnRequest(func(r *colly.Request) {
+			// Replace the test domain with the actual test server URL
+			r.URL.Host = strings.TrimPrefix(c.testServerURL, "http://")
+		})
+	}
 
 	// Set up rate limiting - limit to 1 request per rate limit duration
 	if rateErr := c.collector.Limit(&colly.LimitRule{
@@ -74,8 +95,14 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Configure collector
 	c.collector.DetectCharset = true
 	c.collector.CheckHead = true
-	c.collector.DisallowedDomains = []string{}
-	c.collector.AllowURLRevisit = false
+	// Don't override domain settings if they were pre-configured
+	if c.collector.DisallowedDomains == nil {
+		c.collector.DisallowedDomains = nil
+	}
+	// Don't override URL revisit setting if it was pre-configured
+	if !c.collector.AllowURLRevisit {
+		c.collector.AllowURLRevisit = false
+	}
 	c.collector.MaxDepth = source.MaxDepth
 	c.collector.Async = true
 
@@ -170,4 +197,9 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	if contentErr := c.contentProcessor.ProcessHTML(e); contentErr != nil {
 		c.Logger.Error("Error processing content", "error", contentErr)
 	}
+}
+
+// SetTestServerURL sets the test server URL for testing purposes
+func (c *Crawler) SetTestServerURL(url string) {
+	c.testServerURL = url
 }

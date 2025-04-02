@@ -4,9 +4,6 @@
 package crawler
 
 import (
-	"context"
-	"time"
-
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -20,28 +17,6 @@ const (
 	// ArticleChannelBufferSize is the buffer size for the article channel.
 	ArticleChannelBufferSize = 100
 )
-
-// Interface defines the crawler's capabilities.
-type Interface interface {
-	// Start begins crawling from the given base URL.
-	Start(ctx context.Context, sourceName string) error
-	// Stop gracefully stops the crawler.
-	Stop(ctx context.Context) error
-	// Subscribe adds a content handler to receive discovered content.
-	Subscribe(handler events.Handler)
-	// SetRateLimit sets the crawler's rate limit.
-	SetRateLimit(duration time.Duration) error
-	// SetMaxDepth sets the maximum crawl depth.
-	SetMaxDepth(depth int)
-	// SetCollector sets the collector for the crawler.
-	SetCollector(collector *colly.Collector)
-	// GetIndexManager returns the index manager interface.
-	GetIndexManager() api.IndexManager
-	// Wait blocks until the crawler has finished processing all queued requests.
-	Wait()
-	// GetMetrics returns the current crawler metrics.
-	GetMetrics() *common.Metrics
-}
 
 // Result defines the crawler module's output.
 type Result struct {

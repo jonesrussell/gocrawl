@@ -96,9 +96,8 @@ func (m *MockProcessor) Stop(ctx context.Context) error {
 // Ensure MockProcessor implements common.Processor
 var _ common.Processor = (*MockProcessor)(nil)
 
+// TestCrawlerStartup tests crawler startup functionality.
 func TestCrawlerStartup(t *testing.T) {
-	t.Parallel()
-
 	// Create test configuration
 	testCfg := testutils.NewMockConfig()
 
@@ -118,10 +117,50 @@ func TestCrawlerStartup(t *testing.T) {
 	mockSources.SetSources([]sources.Config{
 		{
 			Name:      "test",
-			URL:       server.URL,
-			RateLimit: time.Millisecond * 100, // Use a shorter rate limit for testing
+			URL:       "http://test.example.com", // Use the test domain from config
+			RateLimit: time.Millisecond * 100,    // Use a shorter rate limit for testing
 			MaxDepth:  1,
 		},
+	})
+
+	// Initialize collector with test configuration
+	collector := colly.NewCollector(
+		colly.AllowURLRevisit(),
+		colly.Async(true),
+		colly.IgnoreRobotsTxt(),
+	)
+
+	// Configure collector for testing
+	collector.AllowedDomains = []string{"test.example.com"} // Use the test domain from config
+	collector.DisallowedDomains = nil                       // Don't disallow any domains
+	collector.MaxDepth = 1
+	collector.DetectCharset = true
+	collector.CheckHead = true
+	collector.AllowURLRevisit = true
+	collector.Async = true
+
+	// Log collector configuration
+	testLogger.Info("Configured collector for testing",
+		"allowed_domains", collector.AllowedDomains,
+		"disallowed_domains", collector.DisallowedDomains,
+		"max_depth", collector.MaxDepth,
+		"allow_url_revisit", collector.AllowURLRevisit,
+		"async", collector.Async)
+
+	// Set up callbacks for testing
+	collector.OnRequest(func(r *colly.Request) {
+		testLogger.Info("Visiting", "url", r.URL.String())
+	})
+
+	collector.OnResponse(func(r *colly.Response) {
+		testLogger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
+	})
+
+	collector.OnError(func(r *colly.Response, err error) {
+		testLogger.Error("Error while crawling",
+			"url", r.Request.URL.String(),
+			"status", r.StatusCode,
+			"error", err)
 	})
 
 	// Create test app with all required dependencies
@@ -139,7 +178,7 @@ func TestCrawlerStartup(t *testing.T) {
 			// Provide index manager
 			func() api.IndexManager { return &mockIndexManager{} },
 			// Provide sources with test data
-			func() *sources.Sources { return mockSources },
+			func() sources.Interface { return mockSources },
 			// Provide article processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
@@ -150,13 +189,15 @@ func TestCrawlerStartup(t *testing.T) {
 				func() common.Processor { return &MockProcessor{} },
 				fx.ResultTags(`name:"startupContentProcessor"`),
 			),
-			// Provide event bus
-			events.NewBus,
+			// Provide event bus with correct name
+			fx.Annotate(
+				events.NewBus,
+				fx.ResultTags(`name:"eventBus"`),
+			),
 		),
 		fx.Invoke(func(c crawler.Interface) {
-			// Initialize collector
-			collector := colly.NewCollector()
 			c.SetCollector(collector)
+			c.SetTestServerURL(server.URL) // Set the test server URL
 
 			// Test startup with timeout
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -164,6 +205,9 @@ func TestCrawlerStartup(t *testing.T) {
 
 			startErr := c.Start(ctx, "test")
 			require.NoError(t, startErr)
+
+			// Wait for crawler to finish
+			c.Wait()
 		}),
 	)
 
@@ -171,9 +215,8 @@ func TestCrawlerStartup(t *testing.T) {
 	defer app.Stop(t.Context())
 }
 
+// TestCrawlerShutdown tests crawler shutdown functionality.
 func TestCrawlerShutdown(t *testing.T) {
-	t.Parallel()
-
 	// Create test configuration
 	testCfg := testutils.NewMockConfig()
 
@@ -195,8 +238,8 @@ func TestCrawlerShutdown(t *testing.T) {
 			},
 			// Provide index manager
 			func() api.IndexManager { return &mockIndexManager{} },
-			// Provide sources
-			func() *sources.Sources { return &sources.Sources{} },
+			// Provide sources with test data
+			func() sources.Interface { return &sources.Sources{} },
 			// Provide article processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
@@ -207,12 +250,22 @@ func TestCrawlerShutdown(t *testing.T) {
 				func() common.Processor { return &MockProcessor{} },
 				fx.ResultTags(`name:"startupContentProcessor"`),
 			),
-			// Provide event bus
-			events.NewBus,
+			// Provide event bus with correct name
+			fx.Annotate(
+				events.NewBus,
+				fx.ResultTags(`name:"eventBus"`),
+			),
 		),
 		fx.Invoke(func(c crawler.Interface) {
-			// Test shutdown
-			stopErr := c.Stop(t.Context())
+			// Initialize collector
+			collector := colly.NewCollector()
+			c.SetCollector(collector)
+
+			// Test shutdown with timeout
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+
+			stopErr := c.Stop(ctx)
 			require.NoError(t, stopErr)
 		}),
 	)
@@ -221,9 +274,8 @@ func TestCrawlerShutdown(t *testing.T) {
 	defer app.Stop(t.Context())
 }
 
+// TestSourceValidation tests source validation functionality.
 func TestSourceValidation(t *testing.T) {
-	t.Parallel()
-
 	// Create test configuration
 	testCfg := testutils.NewMockConfig()
 
@@ -245,8 +297,8 @@ func TestSourceValidation(t *testing.T) {
 			},
 			// Provide index manager
 			func() api.IndexManager { return &mockIndexManager{} },
-			// Provide sources
-			func() *sources.Sources { return &sources.Sources{} },
+			// Provide sources with test data
+			func() sources.Interface { return &sources.Sources{} },
 			// Provide article processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
@@ -257,12 +309,22 @@ func TestSourceValidation(t *testing.T) {
 				func() common.Processor { return &MockProcessor{} },
 				fx.ResultTags(`name:"startupContentProcessor"`),
 			),
-			// Provide event bus
-			events.NewBus,
+			// Provide event bus with correct name
+			fx.Annotate(
+				events.NewBus,
+				fx.ResultTags(`name:"eventBus"`),
+			),
 		),
 		fx.Invoke(func(c crawler.Interface) {
-			// Test source validation
-			startErr := c.Start(t.Context(), "invalid")
+			// Initialize collector
+			collector := colly.NewCollector()
+			c.SetCollector(collector)
+
+			// Test source validation with timeout
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+
+			startErr := c.Start(ctx, "nonexistent")
 			require.Error(t, startErr)
 		}),
 	)
@@ -271,9 +333,8 @@ func TestSourceValidation(t *testing.T) {
 	defer app.Stop(t.Context())
 }
 
+// TestErrorHandling tests error handling functionality.
 func TestErrorHandling(t *testing.T) {
-	t.Parallel()
-
 	// Create test configuration
 	testCfg := testutils.NewMockConfig()
 
@@ -295,8 +356,8 @@ func TestErrorHandling(t *testing.T) {
 			},
 			// Provide index manager
 			func() api.IndexManager { return &mockIndexManager{} },
-			// Provide sources
-			func() *sources.Sources { return &sources.Sources{} },
+			// Provide sources with test data
+			func() sources.Interface { return &sources.Sources{} },
 			// Provide article processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
@@ -307,12 +368,22 @@ func TestErrorHandling(t *testing.T) {
 				func() common.Processor { return &MockProcessor{} },
 				fx.ResultTags(`name:"startupContentProcessor"`),
 			),
-			// Provide event bus
-			events.NewBus,
+			// Provide event bus with correct name
+			fx.Annotate(
+				events.NewBus,
+				fx.ResultTags(`name:"eventBus"`),
+			),
 		),
 		fx.Invoke(func(c crawler.Interface) {
-			// Test error handling
-			startErr := c.Start(t.Context(), "error")
+			// Initialize collector
+			collector := colly.NewCollector()
+			c.SetCollector(collector)
+
+			// Test error handling with timeout
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+
+			startErr := c.Start(ctx, "nonexistent")
 			require.Error(t, startErr)
 		}),
 	)
