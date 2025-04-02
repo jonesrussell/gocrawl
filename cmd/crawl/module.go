@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/gocolly/colly/v2/debug"
-	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
@@ -16,6 +15,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -30,24 +30,26 @@ type CommandDeps struct {
 	Logger      types.Logger
 	Config      config.Interface
 	Storage     storagetypes.Interface
-	Done        chan struct{}         `name:"shutdownChan"`
-	Context     context.Context       `name:"crawlContext"`
-	Processors  []common.Processor    `group:"processors"`
-	SourceName  string                `name:"sourceName"`
-	ArticleChan chan *models.Article  `name:"crawlerArticleChannel"`
-	Handler     *signal.SignalHandler `name:"signalHandler"`
+	Done        chan struct{}        `name:"shutdownChan"`
+	Context     context.Context      `name:"crawlContext"`
+	Processors  []common.Processor   `group:"processors"`
+	SourceName  string               `name:"sourceName"`
+	ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 }
 
 // Module provides the crawl command's dependencies.
 var Module = fx.Module("crawl",
-	crawler.Module,
-	sources.Module,
+	// Core dependencies
 	config.Module,
+	logger.Module,
+	sources.Module,
+	storage.Module,
+	crawler.Module,
 	article.Module,
 	content.Module,
-	logger.Module,
+
+	// Provide command channels
 	fx.Provide(
-		// Command-specific dependencies
 		fx.Annotate(
 			func() chan struct{} {
 				return make(chan struct{})
@@ -56,90 +58,80 @@ var Module = fx.Module("crawl",
 		),
 		fx.Annotate(
 			func() chan *models.Article {
-				return make(chan *models.Article, crawler.ArticleChannelBufferSize)
+				return make(chan *models.Article)
 			},
 			fx.ResultTags(`name:"crawlerArticleChannel"`),
 		),
-		// Provide debugger
-		func(logger types.Logger) debug.Debugger {
-			return &debug.LogDebugger{
-				Output: crawler.NewDebugLogger(logger),
-			}
+	),
+
+	// Provide debugger
+	fx.Provide(
+		func() debug.Debugger {
+			return &debug.LogDebugger{}
 		},
-		// Provide event bus
+	),
+
+	// Provide event bus
+	fx.Provide(
 		fx.Annotate(
 			events.NewBus,
 			fx.ResultTags(`name:"eventBus"`),
 		),
-		// Provide startup processors
+	),
+
+	// Provide processors
+	fx.Provide(
 		fx.Annotate(
 			func(
-				logger types.Logger,
+				logger common.Logger,
 				storage storagetypes.Interface,
-				articleChan chan *models.Article,
-				indexName string,
+				articleService article.Interface,
+				params struct {
+					fx.In
+					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
+					IndexName   string               `name:"indexName"`
+				},
 			) common.Processor {
-				service := article.NewService(
-					logger,
-					config.DefaultArticleSelectors(),
-					storage,
-					indexName,
-				)
-				return article.NewArticleProcessor(article.ProcessorParams{
-					Logger:      logger,
-					Service:     service,
-					Storage:     storage,
-					IndexName:   indexName,
-					ArticleChan: articleChan,
-				})
+				return &article.ArticleProcessor{
+					Logger:         logger,
+					ArticleService: articleService,
+					Storage:        storage,
+					IndexName:      params.IndexName,
+					ArticleChan:    params.ArticleChan,
+				}
 			},
-			fx.ParamTags(
-				``,
-				``,
-				`name:"crawlerArticleChannel"`,
-				`name:"indexName"`,
-			),
 			fx.ResultTags(`name:"startupArticleProcessor"`),
 		),
 		fx.Annotate(
 			func(
-				logger types.Logger,
+				logger common.Logger,
 				storage storagetypes.Interface,
-				contentIndex string,
+				contentService content.Interface,
+				params struct {
+					fx.In
+					IndexName string `name:"contentIndex"`
+				},
 			) common.Processor {
-				service := content.NewService(logger)
-				return content.NewContentProcessor(content.ProcessorParams{
-					Logger:    logger,
-					Service:   service,
-					Storage:   storage,
-					IndexName: contentIndex,
-				})
-			},
-			fx.ParamTags(
-				``,
-				``,
-				`name:"contentIndex"`,
-			),
-			fx.ResultTags(`name:"startupContentProcessor"`),
-		),
-		// Provide processors group
-		fx.Annotate(
-			func(
-				articleProcessor common.Processor,
-				contentProcessor common.Processor,
-			) []common.Processor {
-				return []common.Processor{
-					articleProcessor,
-					contentProcessor,
+				return &content.ContentProcessor{
+					Logger:         logger,
+					ContentService: contentService,
+					Storage:        storage,
+					IndexName:      params.IndexName,
 				}
 			},
-			fx.ParamTags(
-				`name:"startupArticleProcessor"`,
-				`name:"startupContentProcessor"`,
-			),
+			fx.ResultTags(`name:"startupContentProcessor"`),
+		),
+		fx.Annotate(
+			func(articleProcessor common.Processor, contentProcessor common.Processor) []common.Processor {
+				return []common.Processor{articleProcessor, contentProcessor}
+			},
+			fx.ParamTags(`name:"startupArticleProcessor"`, `name:"startupContentProcessor"`),
 			fx.ResultTags(`group:"processors"`),
 		),
-		// Provide index names
+	),
+
+	// Provide index names
+	fx.Provide(
 		fx.Annotate(
 			func() string {
 				return "articles"

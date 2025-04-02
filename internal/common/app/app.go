@@ -9,14 +9,12 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	mockutils "github.com/jonesrussell/gocrawl/internal/testutils"
 	"go.uber.org/fx"
 )
 
@@ -100,10 +98,6 @@ func SetupCollector(
 			fx.Annotate(
 				events.NewBus,
 				fx.ResultTags(`name:"bus"`),
-			),
-			fx.Annotate(
-				func() api.IndexManager { return &mockutils.MockIndexManager{} },
-				fx.ResultTags(`name:"indexManager"`),
 			),
 			crawler.ProvideCrawler,
 		),

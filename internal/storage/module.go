@@ -13,7 +13,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -27,36 +26,25 @@ const (
 // Module provides the storage module for dependency injection.
 var Module = fx.Module("storage",
 	fx.Provide(
-		func(cfg config.Interface, logger common.Logger) (ModuleOptions, error) {
-			transport, ok := http.DefaultTransport.(*http.Transport)
-			if !ok {
-				return ModuleOptions{}, errors.New("failed to get default transport")
-			}
+		ProvideIndexManager,
+		ProvideElasticsearchClient,
+		NewStorage,
+		func(cfg config.Interface) Options {
+			return NewOptionsFromConfig(cfg)
+		},
+		func(cfg config.Interface, logger common.Logger) ModuleOptions {
+			esConfig := cfg.GetElasticsearchConfig()
 			return ModuleOptions{
 				Config:         cfg,
 				Logger:         logger,
-				Addresses:      cfg.GetElasticsearchConfig().Addresses,
-				APIKey:         cfg.GetElasticsearchConfig().APIKey,
-				Username:       cfg.GetElasticsearchConfig().Username,
-				Password:       cfg.GetElasticsearchConfig().Password,
-				Transport:      transport,
-				IndexName:      cfg.GetElasticsearchConfig().IndexName,
+				Addresses:      esConfig.Addresses,
+				APIKey:         esConfig.APIKey,
+				Username:       esConfig.Username,
+				Password:       esConfig.Password,
+				IndexName:      esConfig.IndexName,
 				ScrollDuration: DefaultScrollDuration,
-			}, nil
+			}
 		},
-		ProvideElasticsearchClient,
-		NewOptionsFromConfig,
-		fx.Annotate(
-			NewStorage,
-			fx.As(new(types.Interface)),
-		),
-		ProvideSearchManager,
-		fx.Annotate(
-			func() api.IndexManager {
-				return &IndexManager{}
-			},
-			fx.ResultTags(),
-		),
 	),
 )
 
@@ -168,9 +156,4 @@ func ProvideElasticsearchClient(opts ModuleOptions, log common.Logger) (*es.Clie
 
 	log.Info("Successfully connected to Elasticsearch", "addresses", opts.Addresses)
 	return client, nil
-}
-
-// ProvideSearchManager creates and returns a SearchManager implementation
-func ProvideSearchManager(client *es.Client, logger common.Logger, opts Options) api.SearchManager {
-	return NewStorage(client, logger, opts)
 }

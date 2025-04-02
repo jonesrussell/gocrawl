@@ -4,14 +4,12 @@ package crawl
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -21,6 +19,8 @@ const (
 	processorTimeout = 30 * time.Second
 	// crawlerTimeout is the timeout for waiting for the crawler to complete
 	crawlerTimeout = 5 * time.Minute
+	// shutdownTimeout is the timeout for graceful shutdown
+	shutdownTimeout = 30 * time.Second
 )
 
 // Cmd represents the crawl command
@@ -38,26 +38,15 @@ Specify the source name as an argument.`,
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Create a logger for signal handling only
-		signalLogger, loggerErr := logger.NewCustomLogger(nil, logger.Params{
-			Debug:  true,
-			Level:  "info",
-			AppEnv: "development",
-		})
-		if loggerErr != nil {
-			return fmt.Errorf("failed to create logger: %w", loggerErr)
-		}
-
-		// Set up signal handling with the logger
-		handler := signal.NewSignalHandler(signalLogger)
-		handler.SetExitFunc(os.Exit) // Set the exit function
+		// Set up signal handling with a no-op logger initially
+		handler := signal.NewSignalHandler(logger.NewNoOp())
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
 		// Initialize the Fx application
 		fxApp := fx.New(
 			Module,
-			storage.Module,
+			// storage.Module is already provided through app.Module
 			fx.Provide(
 				fx.Annotate(
 					func() context.Context { return ctx },
@@ -67,13 +56,9 @@ Specify the source name as an argument.`,
 					func() string { return sourceName },
 					fx.ResultTags(`name:"sourceName"`),
 				),
-				fx.Annotate(
-					func() *signal.SignalHandler { return handler },
-					fx.ResultTags(`name:"signalHandler"`),
-				),
 			),
 			fx.Invoke(func(lc fx.Lifecycle, p CommandDeps) {
-				// Update the signal handler with the logger
+				// Update the signal handler with the real logger
 				handler.SetLogger(p.Logger)
 
 				// Create a channel to signal when the crawler is done
@@ -134,7 +119,7 @@ Specify the source name as an argument.`,
 
 							select {
 							case <-waitCtx.Done():
-								p.Logger.Warn("Timeout waiting for crawler to complete")
+								p.Logger.Info("Crawler reached timeout limit")
 							default:
 								p.Crawler.Wait()
 								p.Logger.Info("Crawler finished processing")
@@ -146,17 +131,24 @@ Specify the source name as an argument.`,
 						return nil
 					},
 					OnStop: func(ctx context.Context) error {
+						// Create a timeout context for shutdown
+						shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
+						defer shutdownCancel()
+
 						// Stop crawler
-						if stopErr := p.Crawler.Stop(p.Context); stopErr != nil {
-							return fmt.Errorf("failed to stop crawler: %w", stopErr)
+						if stopErr := p.Crawler.Stop(shutdownCtx); stopErr != nil {
+							if !strings.Contains(stopErr.Error(), "Max depth limit reached") {
+								return fmt.Errorf("failed to stop crawler: %w", stopErr)
+							}
+							p.Logger.Info("Crawler stopped at max depth limit")
 						}
 
 						// Wait for article processing to complete
 						select {
 						case <-crawlerDone:
 							p.Logger.Info("Article processing completed")
-						case <-ctx.Done():
-							p.Logger.Warn("Context cancelled while waiting for article processing")
+						case <-shutdownCtx.Done():
+							p.Logger.Info("Shutdown timeout reached, stopping article processing")
 						}
 
 						// Close storage connection

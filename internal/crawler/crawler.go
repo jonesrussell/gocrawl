@@ -52,6 +52,7 @@ type Crawler struct {
 	isRunning        bool
 	done             chan struct{}
 	ctx              context.Context
+	cancel           context.CancelFunc
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -111,10 +112,16 @@ func (c *Crawler) setupCallbacks() {
 	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		select {
 		case <-c.ctx.Done():
+			e.Request.Abort()
 			return
 		default:
 			if visitErr := e.Request.Visit(e.Attr("href")); visitErr != nil {
-				c.Logger.Error("Failed to visit link", "url", e.Attr("href"), "error", visitErr)
+				// Log "URL already visited" as debug instead of error
+				if strings.Contains(visitErr.Error(), "URL already visited") {
+					c.Logger.Debug("URL already visited", "url", e.Attr("href"))
+				} else {
+					c.Logger.Error("Failed to visit link", "url", e.Attr("href"), "error", visitErr)
+				}
 			}
 		}
 	})
@@ -124,6 +131,7 @@ func (c *Crawler) setupCallbacks() {
 		select {
 		case <-c.ctx.Done():
 			r.Abort()
+			return
 		default:
 			c.Logger.Debug("Visiting", "url", r.URL.String())
 		}
@@ -149,6 +157,16 @@ func (c *Crawler) setupCallbacks() {
 				"error", err)
 		}
 	})
+
+	// Add context-aware HTML processing
+	c.collector.OnHTML("*", func(e *colly.HTMLElement) {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+			c.ProcessHTML(e)
+		}
+	})
 }
 
 // Start starts the crawler for the given source.
@@ -161,8 +179,12 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
 
-	// Configure collector
+	// Create a cancellable context for the crawler
+	c.ctx, c.cancel = context.WithCancel(ctx)
+
+	// Configure collector with context
 	if configErr := c.configureCollector(source); configErr != nil {
+		c.cancel() // Clean up context on error
 		return configErr
 	}
 
@@ -172,10 +194,12 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.startTime = time.Now()
 	c.isRunning = true
 	c.done = make(chan struct{})
-	c.ctx = ctx
+
+	// Set up callbacks first to ensure they're ready
+	c.setupCallbacks()
 
 	// Create a timeout context for starting the crawler
-	startCtx, startCancel := context.WithTimeout(ctx, DefaultStartTimeout)
+	startCtx, startCancel := context.WithTimeout(c.ctx, DefaultStartTimeout)
 	defer startCancel()
 
 	// Start crawling with timeout
@@ -191,11 +215,13 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	select {
 	case crawlError := <-crawlErr:
 		if crawlError != nil {
+			c.cancel() // Clean up context on error
 			return fmt.Errorf("error during crawling: %w", crawlError)
 		}
 	case <-startCtx.Done():
+		c.cancel() // Clean up context on timeout
 		return ErrCrawlerTimeout
-	case <-ctx.Done():
+	case <-c.ctx.Done():
 		return ErrCrawlerContextCancelled
 	}
 
@@ -204,7 +230,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		defer close(c.done)
 		for {
 			select {
-			case <-ctx.Done():
+			case <-c.ctx.Done():
 				c.isRunning = false
 				c.Logger.Info("Context cancelled, stopping crawler", "source", sourceName)
 				return
@@ -217,9 +243,6 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		}
 	}()
 
-	// Set up callbacks
-	c.setupCallbacks()
-
 	return nil
 }
 
@@ -227,6 +250,11 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 func (c *Crawler) Stop(ctx context.Context) error {
 	c.Logger.Info("Stopping crawler")
 	c.isRunning = false
+
+	// Cancel the crawler's context first to stop all goroutines
+	if c.cancel != nil {
+		c.cancel()
+	}
 
 	// Create a timeout context for stopping
 	stopCtx, stopCancel := context.WithTimeout(ctx, DefaultStopTimeout)
@@ -239,6 +267,7 @@ func (c *Crawler) Stop(ctx context.Context) error {
 		c.collector.Wait()
 	}()
 
+	// Wait for collector to stop or timeout
 	select {
 	case <-collectorDone:
 		c.Logger.Info("Collector stopped successfully")
@@ -259,6 +288,12 @@ func (c *Crawler) Stop(ctx context.Context) error {
 			c.Logger.Warn("Context cancelled while waiting for crawler to stop")
 		}
 	}
+
+	// Clean up resources
+	c.collector = nil
+	c.done = nil
+	c.ctx = nil
+	c.cancel = nil
 
 	return nil
 }
