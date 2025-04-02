@@ -61,43 +61,23 @@ type ZapLogger struct {
 }
 
 func (l *ZapLogger) Debug(msg string, fields ...any) {
-	zapFields := make([]zap.Field, len(fields))
-	for i, field := range fields {
-		zapFields[i] = zap.Any("", field)
-	}
-	l.Logger.Debug(msg, zapFields...)
+	l.Logger.Debug(msg, ConvertToZapFields(fields)...)
 }
 
 func (l *ZapLogger) Error(msg string, fields ...any) {
-	zapFields := make([]zap.Field, len(fields))
-	for i, field := range fields {
-		zapFields[i] = zap.Any("", field)
-	}
-	l.Logger.Error(msg, zapFields...)
+	l.Logger.Error(msg, ConvertToZapFields(fields)...)
 }
 
 func (l *ZapLogger) Info(msg string, fields ...any) {
-	zapFields := make([]zap.Field, len(fields))
-	for i, field := range fields {
-		zapFields[i] = zap.Any("", field)
-	}
-	l.Logger.Info(msg, zapFields...)
+	l.Logger.Info(msg, ConvertToZapFields(fields)...)
 }
 
 func (l *ZapLogger) Warn(msg string, fields ...any) {
-	zapFields := make([]zap.Field, len(fields))
-	for i, field := range fields {
-		zapFields[i] = zap.Any("", field)
-	}
-	l.Logger.Warn(msg, zapFields...)
+	l.Logger.Warn(msg, ConvertToZapFields(fields)...)
 }
 
 func (l *ZapLogger) Fatal(msg string, fields ...any) {
-	zapFields := make([]zap.Field, len(fields))
-	for i, field := range fields {
-		zapFields[i] = zap.Any("", field)
-	}
-	l.Logger.Fatal(msg, zapFields...)
+	l.Logger.Fatal(msg, ConvertToZapFields(fields)...)
 }
 
 func (l *ZapLogger) Printf(format string, args ...any) {
@@ -248,32 +228,29 @@ func NewCustomLogger(logger *zap.Logger, params Params) (Interface, error) {
 	config.OutputPaths = []string{"stdout"}
 	config.EncoderConfig.TimeKey = "timestamp"
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	config.EncoderConfig.StacktraceKey = "" // Remove stacktrace key
-	config.EncoderConfig.LevelKey = "level"
-	config.EncoderConfig.MessageKey = "message"
-	config.EncoderConfig.CallerKey = "" // Remove caller key
+	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	config.EncoderConfig.EncodeDuration = zapcore.SecondsDurationEncoder
+	config.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
 
 	// Set log level based on params
-	level := zapcore.InfoLevel
-	if params.Debug {
+	var level zapcore.Level
+	switch params.Level {
+	case levelDebug:
 		level = zapcore.DebugLevel
-	} else if params.Level != "" {
-		switch strings.ToLower(params.Level) {
-		case levelDebug:
-			level = zapcore.DebugLevel
-		case levelInfo:
-			level = zapcore.InfoLevel
-		case levelWarn:
-			level = zapcore.WarnLevel
-		case levelError:
-			level = zapcore.ErrorLevel
-		case levelFatal:
-			level = zapcore.FatalLevel
-		}
+	case levelInfo:
+		level = zapcore.InfoLevel
+	case levelWarn:
+		level = zapcore.WarnLevel
+	case levelError:
+		level = zapcore.ErrorLevel
+	case levelFatal:
+		level = zapcore.FatalLevel
+	default:
+		level = zapcore.InfoLevel
 	}
 	config.Level = zap.NewAtomicLevelAt(level)
 
-	// Create logger
+	// Create the logger
 	zapLogger, err := config.Build()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
