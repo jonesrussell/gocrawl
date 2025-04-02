@@ -21,4 +21,10 @@ type (
 	// Storage is an alias for storage.Interface, providing
 	// data persistence operations across the application.
 	Storage = storagetypes.Interface
+
+	// Job is an alias for types.Job, representing a crawling job.
+	Job = types.Job
+
+	// Item is an alias for types.Item, representing a crawled item.
+	Item = types.Item
 )

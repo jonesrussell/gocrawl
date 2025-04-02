@@ -10,15 +10,9 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"go.uber.org/fx"
 )
 
@@ -46,115 +40,19 @@ type Interface interface {
 	// Wait blocks until the crawler has finished processing all queued requests.
 	Wait()
 	// GetMetrics returns the current crawler metrics.
-	GetMetrics() *collector.Metrics
+	GetMetrics() *common.Metrics
 }
 
-// Result holds the crawler module's output.
+// Result defines the crawler module's output.
 type Result struct {
 	fx.Out
 	Crawler Interface
 }
 
-// Module provides the crawler module's dependencies.
+// Module provides the crawler module and its dependencies.
 var Module = fx.Module("crawler",
-	// Include core dependencies
-	config.Module,
-	sources.Module,
 	fx.Provide(
-		// Provide core dependencies
-		context.Background,
-		// Provide named dependencies
-		fx.Annotate(
-			func() chan struct{} {
-				return make(chan struct{})
-			},
-			fx.ResultTags(`name:"crawlerDoneChannel"`),
-		),
-		fx.Annotate(
-			func() chan *models.Article {
-				return make(chan *models.Article)
-			},
-			fx.ResultTags(`name:"crawlerArticleChannel"`),
-		),
-		fx.Annotate(
-			func() string {
-				return "articles"
-			},
-			fx.ResultTags(`name:"indexName"`),
-		),
-		// Provide article service
-		fx.Annotate(
-			func(logger common.Logger, storage storagetypes.Interface) article.Interface {
-				return article.NewService(logger, config.DefaultArticleSelectors(), storage, "articles")
-			},
-		),
-		// Provide content service
-		fx.Annotate(
-			content.NewService,
-		),
-		// Provide event bus
-		events.NewBus,
-		// Provide debugger
-		func(logger common.Logger) debug.Debugger {
-			return &debug.LogDebugger{
-				Output: NewDebugLogger(logger),
-			}
-		},
-		// Provide processors
-		fx.Annotate(
-			func(
-				log common.Logger,
-				articleService article.Interface,
-				storage storagetypes.Interface,
-				sources *sources.Sources,
-				params struct {
-					fx.In
-					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
-					SourceName  string               `name:"sourceName"`
-				},
-			) collector.Processor {
-				// Get source configuration
-				source, err := sources.FindByName(params.SourceName)
-				if err != nil {
-					log.Error("Failed to find source", "error", err)
-					return nil
-				}
-
-				log.Debug("Providing article processor")
-				return &article.ArticleProcessor{
-					Logger:         log,
-					ArticleService: articleService,
-					Storage:        storage,
-					IndexName:      source.ArticleIndex,
-					ArticleChan:    params.ArticleChan,
-				}
-			},
-			fx.ResultTags(`name:"articleProcessor"`),
-		),
-		fx.Annotate(
-			func(
-				log common.Logger,
-				contentService content.Interface,
-				storage storagetypes.Interface,
-				sources *sources.Sources,
-				params struct {
-					fx.In
-					SourceName string `name:"sourceName"`
-				},
-			) collector.Processor {
-				// Get source configuration
-				source, err := sources.FindByName(params.SourceName)
-				if err != nil {
-					log.Error("Failed to find source", "error", err)
-					return nil
-				}
-
-				log.Debug("Providing content processor")
-				return content.NewProcessor(contentService, storage, log, source.Index)
-			},
-			fx.ResultTags(`name:"contentProcessor"`),
-		),
-		// Provide crawler with all dependencies
+		// Provide the crawler implementation
 		fx.Annotate(
 			ProvideCrawler,
 			fx.ParamTags(
@@ -162,8 +60,8 @@ var Module = fx.Module("crawler",
 				``,
 				``,
 				``,
-				`name:"articleProcessor"`,
-				`name:"contentProcessor"`,
+				`name:"startupArticleProcessor"`,
+				`name:"startupContentProcessor"`,
 				``,
 			),
 		),
@@ -176,43 +74,19 @@ func ProvideCrawler(
 	debugger debug.Debugger,
 	indexManager api.IndexManager,
 	sources *sources.Sources,
-	articleProcessor collector.Processor,
-	contentProcessor collector.Processor,
+	articleProcessor common.Processor,
+	contentProcessor common.Processor,
 	bus *events.Bus,
 ) Result {
-	// Create crawler instance
-	c := &Crawler{
-		Logger:           logger,
-		Debugger:         debugger,
-		bus:              bus,
-		indexManager:     indexManager,
-		sources:          sources,
-		articleProcessor: articleProcessor,
-		contentProcessor: contentProcessor,
-	}
-
-	return Result{Crawler: c}
-}
-
-func NewContentProcessor(
-	cfg common.Config,
-	logger common.Logger,
-	storage storagetypes.Interface,
-) collector.Processor {
-	service := content.NewService(logger)
-	return content.NewProcessor(service, storage, logger, "content")
-}
-
-func NewArticleProcessor(
-	cfg common.Config,
-	logger common.Logger,
-	storage storagetypes.Interface,
-) collector.Processor {
-	service := article.NewService(logger, config.DefaultArticleSelectors(), storage, "articles")
-	return &article.ArticleProcessor{
-		Logger:         logger,
-		ArticleService: service,
-		Storage:        storage,
-		IndexName:      "articles",
+	return Result{
+		Crawler: &Crawler{
+			Logger:           logger,
+			Debugger:         debugger,
+			indexManager:     indexManager,
+			sources:          sources,
+			articleProcessor: articleProcessor,
+			contentProcessor: contentProcessor,
+			bus:              bus,
+		},
 	}
 }

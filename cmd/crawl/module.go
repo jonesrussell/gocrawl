@@ -5,13 +5,13 @@ import (
 	"context"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"go.uber.org/fx"
 )
 
@@ -27,7 +27,7 @@ type CommandDeps struct {
 	Storage     storagetypes.Interface
 	Done        chan struct{}         `name:"shutdownChan"`
 	Context     context.Context       `name:"crawlContext"`
-	Processors  []collector.Processor `group:"processors"`
+	Processors  []common.Processor    `group:"processors"`
 	SourceName  string                `name:"sourceName"`
 	ArticleChan chan *models.Article  `name:"crawlerArticleChannel"`
 	Handler     *signal.SignalHandler `name:"signalHandler"`
@@ -65,7 +65,7 @@ type Params struct {
 	Context context.Context `name:"crawlContext" json:"context,omitempty"`
 
 	// Processors is a slice of content processors, injected as a group
-	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
+	Processors []common.Processor `group:"processors" json:"processors,omitempty"`
 
 	// Done is a channel that signals when the crawl operation is complete
 	Done chan struct{} `name:"crawlDone" json:"done,omitempty"`

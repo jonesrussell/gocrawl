@@ -16,7 +16,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -81,8 +80,10 @@ var TestCrawlerModule = fx.Module("crawler",
 		},
 		// Provide event bus
 		events.NewBus,
-		// Provide crawler
-		crawler.ProvideCrawler,
+		// Provide sources
+		func() *sources.Sources {
+			return &sources.Sources{}
+		},
 		// Article channel named instance
 		fx.Annotate(
 			func() chan *models.Article {
@@ -115,7 +116,7 @@ var TestCrawlerModule = fx.Module("crawler",
 					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 					IndexName   string               `name:"indexName"`
 				},
-			) collector.Processor {
+			) common.Processor {
 				log.Debug("Providing article processor")
 				return &article.ArticleProcessor{
 					Logger:         log,
@@ -125,7 +126,7 @@ var TestCrawlerModule = fx.Module("crawler",
 					ArticleChan:    params.ArticleChan,
 				}
 			},
-			fx.ResultTags(`group:"processors"`),
+			fx.ResultTags(`name:"articleProcessor"`),
 		),
 		// Content processor
 		fx.Annotate(
@@ -137,12 +138,14 @@ var TestCrawlerModule = fx.Module("crawler",
 					fx.In
 					IndexName string `name:"contentIndex"`
 				},
-			) collector.Processor {
+			) common.Processor {
 				log.Debug("Providing content processor")
 				return content.NewProcessor(contentService, storage, log, params.IndexName)
 			},
-			fx.ResultTags(`group:"processors"`),
+			fx.ResultTags(`name:"contentProcessor"`),
 		),
+		// Provide crawler
+		crawler.ProvideCrawler,
 	),
 )
 

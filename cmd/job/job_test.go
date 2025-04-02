@@ -14,7 +14,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/job"
 	storage "github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -52,7 +51,7 @@ func (m *mockCrawler) SetMaxDepth(_ int)                   {}
 func (m *mockCrawler) SetCollector(_ *colly.Collector)     {}
 func (m *mockCrawler) GetIndexManager() api.IndexManager   { return nil }
 func (m *mockCrawler) Wait()                               {}
-func (m *mockCrawler) GetMetrics() *collector.Metrics      { return nil }
+func (m *mockCrawler) GetMetrics() *common.Metrics         { return nil }
 
 // mockStorage implements storage.types.Interface for testing
 type mockStorage struct{}

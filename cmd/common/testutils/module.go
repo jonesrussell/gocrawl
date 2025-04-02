@@ -8,6 +8,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
@@ -17,7 +18,6 @@ import (
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	mockutils "github.com/jonesrussell/gocrawl/internal/testutils"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/fx"
 )
@@ -45,7 +45,7 @@ type CommandTestModule struct {
 	CommandDone    chan struct{}
 	ArticleChannel chan *models.Article
 	SignalHandler  *signal.SignalHandler
-	Processors     []collector.Processor `group:"processors"`
+	Processors     []common.Processor `group:"processors"`
 }
 
 // NewCommandTestModule creates a new command test module with default values.
@@ -88,7 +88,7 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 		CommandDone:    make(chan struct{}),
 		ArticleChannel: make(chan *models.Article, crawler.ArticleChannelBufferSize),
 		SignalHandler:  signal.NewSignalHandler(mockLogger),
-		Processors:     []collector.Processor{}, // Empty processors for testing
+		Processors:     []common.Processor{}, // Empty processors for testing
 	}
 }
 
@@ -100,23 +100,35 @@ func (m *CommandTestModule) Module() fx.Option {
 			func() config.Interface { return m.Config },
 			func() types.Logger { return m.Logger },
 			func() crawler.Interface { return m.Crawler },
-			collector.NewMetrics,
+			func() sources.Interface { return m.Sources },
+			func() storagetypes.Interface { return m.Storage },
+			func() api.IndexManager { return m.IndexMgr },
 		),
 
 		// Provide all required dependencies
 		fx.Provide(
 			// Command-specific dependencies
-			func() context.Context { return m.Ctx },
-			func() string { return m.SourceName },
-			func() chan struct{} { return m.CommandDone },
-			func() chan *models.Article { return m.ArticleChannel },
-			func() *signal.SignalHandler { return m.SignalHandler },
+			fx.Annotate(
+				func() context.Context { return m.Ctx },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			fx.Annotate(
+				func() string { return m.SourceName },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() chan struct{} { return m.CommandDone },
+				fx.ResultTags(`name:"shutdownChan"`),
+			),
+			fx.Annotate(
+				func() chan *models.Article { return m.ArticleChannel },
+				fx.ResultTags(`name:"crawlerArticleChannel"`),
+			),
+			fx.Annotate(
+				func() *signal.SignalHandler { return m.SignalHandler },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
 		),
-
-		// Test dependencies - provide each separately
-		fx.Provide(func() sources.Interface { return m.Sources }),
-		fx.Provide(func() storagetypes.Interface { return m.Storage }),
-		fx.Provide(func() api.IndexManager { return m.IndexMgr }),
 		fx.Supply(m.Processors),
 	)
 }

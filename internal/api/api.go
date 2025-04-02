@@ -19,22 +19,6 @@ const (
 	shutdownTimeout   = 5 * time.Second  // Timeout for graceful shutdown
 )
 
-// API implements the HTTP API
-type API struct {
-	router *gin.Engine
-	config *config.Config
-	log    common.Logger
-}
-
-// NewAPI creates a new API instance
-func NewAPI(router *gin.Engine, config *config.Config, log common.Logger) *API {
-	return &API{
-		router: router,
-		config: config,
-		log:    log,
-	}
-}
-
 // SetupRouter creates and configures the Gin router with all routes
 func SetupRouter(
 	log common.Logger,

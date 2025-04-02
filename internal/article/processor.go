@@ -2,13 +2,13 @@
 package article
 
 import (
-	"fmt"
+	"context"
+	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 )
 
 // ArticleProcessor handles article content processing.
@@ -23,10 +23,62 @@ type ArticleProcessor struct {
 	IndexName string
 	// ArticleChan is the channel for sending processed articles
 	ArticleChan chan *models.Article
+	// metrics holds processing metrics
+	metrics *common.Metrics
 }
 
-// Process implements the collector.Processor interface
-func (p *ArticleProcessor) Process(e *colly.HTMLElement) error {
+// NewArticleProcessor creates a new article processor.
+func NewArticleProcessor(p ProcessorParams) *ArticleProcessor {
+	return &ArticleProcessor{
+		Logger:         p.Logger,
+		ArticleService: p.Service,
+		Storage:        p.Storage,
+		IndexName:      p.IndexName,
+		ArticleChan:    p.ArticleChan,
+		metrics:        &common.Metrics{},
+	}
+}
+
+// ProcessJob processes a job and its items.
+func (p *ArticleProcessor) ProcessJob(ctx context.Context, job *common.Job) {
+	start := time.Now()
+	defer func() {
+		p.metrics.ProcessingDuration += time.Since(start)
+	}()
+
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		p.Logger.Warn("Job processing cancelled",
+			"job_id", job.ID,
+			"error", ctx.Err(),
+		)
+		p.metrics.ErrorCount++
+		return
+	default:
+		// Process the job
+		p.Logger.Info("Processing job",
+			"job_id", job.ID,
+		)
+
+		// TODO: Implement job processing logic
+		// This would typically involve:
+		// 1. Fetching items associated with the job
+		// 2. Processing each item
+		// 3. Updating job status
+		// 4. Handling errors and retries
+
+		p.metrics.ProcessedCount++
+	}
+}
+
+// ProcessHTML processes HTML content from a source.
+func (p *ArticleProcessor) ProcessHTML(e *colly.HTMLElement) error {
+	start := time.Now()
+	defer func() {
+		p.metrics.ProcessingDuration += time.Since(start)
+	}()
+
 	// Extract article data from HTML element
 	article := p.ArticleService.ExtractArticle(e)
 	if article == nil {
@@ -42,6 +94,7 @@ func (p *ArticleProcessor) Process(e *colly.HTMLElement) error {
 			"component", "article/processor",
 			"articleID", article.ID,
 			"error", err)
+		p.metrics.ErrorCount++
 		return err
 	}
 
@@ -50,7 +103,15 @@ func (p *ArticleProcessor) Process(e *colly.HTMLElement) error {
 		p.ArticleChan <- article
 	}
 
+	p.metrics.ProcessedCount++
+	p.metrics.LastProcessedTime = time.Now()
+
 	return nil
+}
+
+// GetMetrics returns the current processing metrics.
+func (p *ArticleProcessor) GetMetrics() *common.Metrics {
+	return p.metrics
 }
 
 // ProcessHTMLElement handles article extraction from HTML elements
@@ -88,41 +149,5 @@ func (p *ArticleProcessor) ProcessContent(e *colly.HTMLElement) {
 		"url", e.Request.URL.String())
 }
 
-// ArticleProcessorWrapper wraps ArticleProcessor to implement both interfaces
-type ArticleProcessorWrapper struct {
-	*ArticleProcessor
-}
-
-// Process implements the collector.ArticleProcessor interface
-func (w *ArticleProcessorWrapper) Process(article any) error {
-	// Convert article to models.Article
-	a, ok := article.(*models.Article)
-	if !ok {
-		w.Logger.Error("Invalid article type",
-			"component", "article/processor",
-			"type", fmt.Sprintf("%T", article))
-		return fmt.Errorf("invalid article type: %T", article)
-	}
-
-	// Process the article
-	if err := w.ArticleService.Process(a); err != nil {
-		w.Logger.Error("Failed to process article",
-			"component", "article/processor",
-			"articleID", a.ID,
-			"error", err)
-		return err
-	}
-
-	// Send to channel if available
-	if w.ArticleChan != nil {
-		w.ArticleChan <- a
-	}
-
-	return nil
-}
-
-// Ensure ArticleProcessor implements collector.Processor
-var _ collector.Processor = (*ArticleProcessor)(nil)
-
-// Ensure ArticleProcessorWrapper implements collector.ArticleProcessor
-var _ collector.ArticleProcessor = (*ArticleProcessorWrapper)(nil)
+// Ensure ArticleProcessor implements common.Processor
+var _ common.Processor = (*ArticleProcessor)(nil)

@@ -8,7 +8,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
 
@@ -39,27 +38,17 @@ type SearchResponse struct {
 // Module provides API dependencies
 var Module = fx.Module("api",
 	fx.Provide(
-		// Provide a no-op logger for testing
-		fx.Annotate(
-			logger.NewNoOp,
-			fx.As(new(types.Logger)),
-		),
 		// Provide the server and security middleware together to avoid circular dependencies
 		func(
 			log types.Logger,
 			searchManager SearchManager,
 			cfg common.Config,
 		) (*http.Server, middleware.SecurityMiddlewareInterface) {
-			// Create router and security middleware
-			router, security := SetupRouter(log, searchManager, cfg)
-
-			// Create server
-			server := &http.Server{
-				Addr:              cfg.GetServerConfig().Address,
-				Handler:           router,
-				ReadHeaderTimeout: ReadHeaderTimeout,
+			// Use StartHTTPServer to create the server and security middleware
+			server, security, err := StartHTTPServer(log, searchManager, cfg)
+			if err != nil {
+				panic(err)
 			}
-
 			return server, security
 		},
 	),

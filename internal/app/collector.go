@@ -5,50 +5,83 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
 )
 
-// SetupCollector creates and configures a new collector instance.
+// writerWrapper wraps a logger to implement io.Writer
+type writerWrapper struct {
+	logger types.Logger
+}
+
+// Write implements io.Writer
+func (w *writerWrapper) Write(p []byte) (int, error) {
+	w.logger.Debug(string(p))
+	return len(p), nil
+}
+
+// newDebugLogger creates a new debug logger that wraps a types.Logger
+func newDebugLogger(logger types.Logger) io.Writer {
+	return &writerWrapper{logger: logger}
+}
+
+// SetupCollector initializes and configures a new collector instance.
 //
 // Parameters:
-//   - ctx: The context for the collector
-//   - log: The logger to use
+//   - ctx: The context for the collector operation
+//   - log: The logger instance
 //   - source: The source configuration
-//   - processors: The content processors to use
+//   - processors: List of processors to apply to collected data
 //   - done: A channel that signals when crawling is complete
 //   - cfg: The application configuration
+//   - client: The Elasticsearch client
 //
 // Returns:
-//   - collector.Result: The configured collector
+//   - crawler.Interface: The configured crawler instance
 //   - error: Any error that occurred during setup
 func SetupCollector(
 	ctx context.Context,
 	log types.Logger,
 	source sources.Config,
-	processors []collector.Processor,
+	processors []common.Processor,
 	done chan struct{},
 	cfg config.Interface,
-) (collector.Result, error) {
-	// Create collector parameters
-	params := collector.Params{
-		ArticleProcessor: processors[0], // First processor is for articles
-		ContentProcessor: processors[1], // Second processor is for content
-		BaseURL:          source.URL,
-		Context:          ctx,
-		Logger:           log,
-		MaxDepth:         source.MaxDepth,
-		RateLimit:        source.RateLimit,
-		Done:             done,
-		AllowedDomains:   []string{source.URL},
+	client *elasticsearch.Client,
+) (crawler.Interface, error) {
+	// Create dependencies
+	debugger := &debug.LogDebugger{
+		Output: newDebugLogger(log),
+	}
+	indexManager := testutils.NewMockIndexManager()
+	bus := events.NewBus()
+	sources := sources.NewSources(&source, log)
+
+	// Create crawler using the module's provider
+	result := crawler.ProvideCrawler(
+		log,
+		debugger,
+		indexManager,
+		sources,
+		processors[0], // First processor is for articles
+		processors[1], // Second processor is for content
+		bus,
+	)
+
+	// Configure crawler with source settings
+	if err := ConfigureCrawler(result.Crawler, source); err != nil {
+		return nil, fmt.Errorf("failed to configure crawler: %w", err)
 	}
 
-	// Create collector
-	return collector.New(params)
+	return result.Crawler, nil
 }
 
 // ConfigureCrawler configures a crawler instance with the given source.
@@ -56,26 +89,24 @@ func SetupCollector(
 // Parameters:
 //   - c: The crawler instance to configure
 //   - source: The source configuration
-//   - result: The collector result
 //
 // Returns:
 //   - error: Any error that occurred during configuration
 func ConfigureCrawler(
 	c crawler.Interface,
 	source sources.Config,
-	result collector.Result,
 ) error {
 	if source.URL == "" {
 		return errors.New("source URL is required")
 	}
 
-	// Set collector
-	c.SetCollector(result.Collector)
-
 	// Set rate limit
 	if err := c.SetRateLimit(source.RateLimit); err != nil {
 		return fmt.Errorf("failed to set rate limit: %w", err)
 	}
+
+	// Set max depth
+	c.SetMaxDepth(source.MaxDepth)
 
 	return nil
 }

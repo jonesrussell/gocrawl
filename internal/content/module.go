@@ -10,7 +10,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"go.uber.org/fx"
 )
 
@@ -29,29 +28,18 @@ var Module = fx.Module("content",
 	fx.Provide(
 		// Provide content processor with all dependencies
 		fx.Annotate(
-			func(
-				logger common.Logger,
-				storage types.Interface,
-				params struct {
-					fx.In
-					IndexName string `name:"contentIndex"`
-				},
-			) collector.Processor {
-				// Create service
-				service := NewService(logger)
-				logger.Debug("Created content service", "type", fmt.Sprintf("%T", service))
-
+			func(p ProcessorParams) common.Processor {
 				// Create processor
-				processor := &ContentProcessor{
-					service:   service,
-					storage:   storage,
-					logger:    logger,
-					indexName: params.IndexName,
-				}
-				logger.Debug("Created content processor", "type", fmt.Sprintf("%T", processor))
+				processor := NewProcessor(
+					p.Service,
+					p.Storage,
+					p.Logger,
+					p.IndexName,
+				)
+				p.Logger.Debug("Created content processor", "type", fmt.Sprintf("%T", processor))
 				return processor
 			},
-			fx.ResultTags(`name:"contentProcessor"`),
+			fx.ResultTags(`group:"processors"`),
 		),
 	),
 )

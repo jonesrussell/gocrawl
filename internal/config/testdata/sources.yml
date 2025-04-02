@@ -1,0 +1,13 @@
+sources:
+  - name: "test-source"
+    url: "https://example.com"
+    selectors:
+      article:
+        container: "article"
+        title: "h1"
+        body: ".content"
+        author: ".author"
+        published_time: ".date"
+    rate_limit: "1s"
+    max_depth: 2
+    parallel: 1 

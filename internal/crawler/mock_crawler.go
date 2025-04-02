@@ -1,3 +1,4 @@
+// Package crawler provides the core crawling functionality for the application.
 package crawler
 
 import (
@@ -6,8 +7,8 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -17,8 +18,8 @@ type MockCrawler struct {
 }
 
 // Start implements crawler.Interface
-func (m *MockCrawler) Start(ctx context.Context, url string) error {
-	args := m.Called(ctx, url)
+func (m *MockCrawler) Start(ctx context.Context, sourceName string) error {
+	args := m.Called(ctx, sourceName)
 	return args.Error(0)
 }
 
@@ -49,15 +50,17 @@ func (m *MockCrawler) SetCollector(collector *colly.Collector) {
 	m.Called(collector)
 }
 
-// GetIndexManager implements crawler.Interface
+// GetIndexManager returns the index manager interface.
 func (m *MockCrawler) GetIndexManager() api.IndexManager {
 	args := m.Called()
-	if result := args.Get(0); result != nil {
-		if im, ok := result.(api.IndexManager); ok {
-			return im
-		}
+	if args.Get(0) == nil {
+		return nil
 	}
-	return nil
+	indexManager, ok := args.Get(0).(api.IndexManager)
+	if !ok {
+		return nil
+	}
+	return indexManager
 }
 
 // Wait implements crawler.Interface
@@ -65,16 +68,17 @@ func (m *MockCrawler) Wait() {
 	m.Called()
 }
 
-// GetMetrics implements crawler.Interface
-func (m *MockCrawler) GetMetrics() *collector.Metrics {
+// GetMetrics returns the current crawler metrics.
+func (m *MockCrawler) GetMetrics() *common.Metrics {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return nil
 	}
-	if metrics, ok := args.Get(0).(*collector.Metrics); ok {
-		return metrics
+	metrics, ok := args.Get(0).(*common.Metrics)
+	if !ok {
+		return nil
 	}
-	return nil
+	return metrics
 }
 
 // Ensure MockCrawler implements crawler.Interface

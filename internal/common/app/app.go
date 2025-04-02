@@ -9,10 +9,14 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
+	mockutils "github.com/jonesrussell/gocrawl/internal/testutils"
 	"go.uber.org/fx"
 )
 
@@ -34,61 +38,117 @@ func SetupCollector(
 	ctx context.Context,
 	log common.Logger,
 	source sources.Config,
-	processors []collector.Processor,
+	processors []common.Processor,
 	done chan struct{},
 	cfg config.Interface,
-) (collector.Result, error) {
+) (crawler.Interface, error) {
 	// Convert source config to the expected type
 	sourceConfig := common.ConvertSourceConfig(&source)
 	if sourceConfig == nil {
-		return collector.Result{}, errors.New("source configuration is nil")
+		return nil, errors.New("source configuration is nil")
 	}
 
 	// Extract domain from source URL
 	domain, err := common.ExtractDomain(source.URL)
 	if err != nil {
-		return collector.Result{}, fmt.Errorf("error extracting domain: %w", err)
+		return nil, fmt.Errorf("error extracting domain: %w", err)
 	}
 
-	// Create a debugger if debug mode is enabled
-	var debugger debug.Debugger
-	if cfg.GetLogConfig().Debug {
-		debugger = &debug.LogDebugger{}
+	// Create a new collector with debug logging
+	debugger := &debug.LogDebugger{}
+	c := colly.NewCollector(
+		colly.MaxDepth(source.MaxDepth),
+		colly.Async(true),
+		colly.AllowURLRevisit(),
+		colly.AllowedDomains(domain),
+		colly.Debugger(debugger),
+	)
+
+	// Set up rate limiting
+	if rateErr := c.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		RandomDelay: source.RateLimit,
+		Parallelism: crawler.DefaultParallelism,
+	}); rateErr != nil {
+		return nil, fmt.Errorf("error setting rate limit: %w", rateErr)
 	}
 
-	return collector.New(collector.Params{
-		BaseURL:          source.URL,
-		MaxDepth:         source.MaxDepth,
-		RateLimit:        source.RateLimit,
-		Logger:           log,
-		Context:          ctx,
-		ArticleProcessor: processors[0], // First processor handles articles
-		ContentProcessor: processors[1], // Second processor handles content
-		Done:             done,
-		Debugger:         debugger,
-		Source:           sourceConfig,
-		Parallelism:      cfg.GetCrawlerConfig().Parallelism,
-		RandomDelay:      cfg.GetCrawlerConfig().RandomDelay,
-		AllowedDomains:   []string{domain},
-	})
+	// Create a new crawler using fx
+	var crawlerResult crawler.Result
+	app := fx.New(
+		fx.Provide(
+			fx.Annotate(
+				func() common.Logger { return log },
+				fx.ResultTags(`name:"logger"`),
+			),
+			fx.Annotate(
+				func() debug.Debugger { return debugger },
+				fx.ResultTags(`name:"debugger"`),
+			),
+			fx.Annotate(
+				func() common.Processor { return processors[0] },
+				fx.ResultTags(`name:"articleProcessor"`),
+			),
+			fx.Annotate(
+				func() common.Processor { return processors[1] },
+				fx.ResultTags(`name:"contentProcessor"`),
+			),
+			fx.Annotate(
+				func() sources.Interface { return &sources.Sources{} },
+				fx.ResultTags(`name:"sources"`),
+			),
+			fx.Annotate(
+				events.NewBus,
+				fx.ResultTags(`name:"bus"`),
+			),
+			fx.Annotate(
+				func() api.IndexManager { return &mockutils.MockIndexManager{} },
+				fx.ResultTags(`name:"indexManager"`),
+			),
+			crawler.ProvideCrawler,
+		),
+		fx.Populate(&crawlerResult),
+	)
+
+	// Start the application
+	if startErr := app.Start(ctx); startErr != nil {
+		return nil, fmt.Errorf("error starting crawler: %w", startErr)
+	}
+
+	// Configure the crawler
+	crawlerResult.Crawler.SetCollector(c)
+
+	return crawlerResult.Crawler, nil
 }
 
-// ConfigureCrawler sets up the crawler with the given source configuration.
+// ConfigureCrawler configures a crawler with the given source and collector.
 func ConfigureCrawler(c interface {
 	SetCollector(*colly.Collector)
 	SetMaxDepth(int)
 	SetRateLimit(time.Duration) error
-}, source sources.Config, collector collector.Result) error {
-	c.SetCollector(collector.Collector)
-	c.SetMaxDepth(source.MaxDepth)
+}, source sources.Config, crawler crawler.Interface) error {
 	if err := c.SetRateLimit(source.RateLimit); err != nil {
 		return fmt.Errorf("error setting rate limit: %w", err)
 	}
+	c.SetMaxDepth(source.MaxDepth)
 	return nil
 }
 
-// Shutdowner GracefulShutdown performs a graceful shutdown of the provided fx.App.
-// It creates a timeout context and handles any shutdown errors.
+// Shutdowner defines the interface for components that need cleanup.
 type Shutdowner interface {
 	Stop(context.Context) error
 }
+
+// Module provides the application module and its dependencies.
+var Module = fx.Module("app",
+	fx.Provide(
+		// Provide configuration
+		config.LoadConfig,
+		// Provide logger
+		logger.NewLogger,
+		// Provide event bus
+		events.NewBus,
+		// Provide crawler
+		crawler.ProvideCrawler,
+	),
+)

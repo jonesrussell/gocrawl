@@ -8,6 +8,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/cmd/search"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -18,13 +19,39 @@ import (
 	"go.uber.org/fx"
 )
 
+// mockSearchManager implements api.SearchManager for testing
+type mockSearchManager struct {
+	mock.Mock
+}
+
+func (m *mockSearchManager) Search(ctx context.Context, index string, query any) ([]any, error) {
+	args := m.Called(ctx, index, query)
+	return args.Get(0).([]any), args.Error(1)
+}
+
+func (m *mockSearchManager) Aggregate(ctx context.Context, index string, query any) (any, error) {
+	args := m.Called(ctx, index, query)
+	return args.Get(0), args.Error(1)
+}
+
+func (m *mockSearchManager) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *mockSearchManager) Count(ctx context.Context, index string, query any) (int64, error) {
+	args := m.Called(ctx, index, query)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 // testDeps holds all the dependencies needed for testing
 type testDeps struct {
-	Storage storagetypes.Interface
-	Logger  types.Logger
-	Config  config.Interface
-	Handler *signal.SignalHandler
-	Context context.Context
+	Storage       storagetypes.Interface
+	Logger        types.Logger
+	Config        config.Interface
+	Handler       *signal.SignalHandler
+	Context       context.Context
+	SearchManager api.SearchManager
 }
 
 // setupTestDeps creates and configures all test dependencies
@@ -36,13 +63,15 @@ func setupTestDeps(t *testing.T) *testDeps {
 	mockLogger := logger.NewNoOp()
 	mockHandler := signal.NewSignalHandler(mockLogger)
 	mockConfig := testutils.NewMockConfig()
+	mockSearchManager := &mockSearchManager{}
 
 	return &testDeps{
-		Storage: mockStorage,
-		Logger:  mockLogger,
-		Config:  mockConfig,
-		Handler: mockHandler,
-		Context: t.Context(),
+		Storage:       mockStorage,
+		Logger:        mockLogger,
+		Config:        mockConfig,
+		Handler:       mockHandler,
+		Context:       t.Context(),
+		SearchManager: mockSearchManager,
 	}
 }
 
@@ -57,6 +86,20 @@ func createTestApp(t *testing.T, deps *testDeps) *fx.App {
 		func() config.Interface { return deps.Config },
 		func() *signal.SignalHandler { return deps.Handler },
 		func() context.Context { return deps.Context },
+		func() api.SearchManager { return deps.SearchManager },
+		// Named parameters
+		fx.Annotate(
+			func() string { return "test-index" },
+			fx.ResultTags(`name:"indexName"`),
+		),
+		fx.Annotate(
+			func() string { return "test query" },
+			fx.ResultTags(`name:"query"`),
+		),
+		fx.Annotate(
+			func() int { return 10 },
+			fx.ResultTags(`name:"resultSize"`),
+		),
 	}
 
 	// Add command channels
@@ -69,8 +112,15 @@ func createTestApp(t *testing.T, deps *testDeps) *fx.App {
 	app := fx.New(
 		fx.Provide(providers...),
 		fx.Invoke(func(lc fx.Lifecycle, p search.Params) {
-			// Add a default stop hook to clean up resources
 			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					// Execute the search command
+					if err := search.ExecuteSearch(ctx, p); err != nil {
+						p.Logger.Error("Error executing search", "error", err)
+						return err
+					}
+					return nil
+				},
 				OnStop: func(ctx context.Context) error {
 					// Close channels
 					close(commandDone)
@@ -104,15 +154,22 @@ func TestCommandExecution(t *testing.T) {
 	// Set up test dependencies
 	deps := setupTestDeps(t)
 
-	// Set up mock expectations
-	deps.Storage.(*testutils.MockStorage).On("TestConnection", mock.Anything).Return(nil)
-	deps.Storage.(*testutils.MockStorage).On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{}, nil)
-	deps.Storage.(*testutils.MockStorage).On("Close").Return(nil)
+	// Set up search manager expectations
+	expectedQuery := map[string]any{
+		"query": map[string]any{
+			"match": map[string]any{
+				"content": "test query",
+			},
+		},
+		"size": 10,
+	}
+	deps.SearchManager.(*mockSearchManager).On("Search", mock.Anything, "test-index", expectedQuery).Return([]any{}, nil)
+	deps.SearchManager.(*mockSearchManager).On("Close").Return(nil)
 
 	// Create and run test app
 	app := createTestApp(t, deps)
 	runTestApp(t, app)
 
 	// Verify mock expectations
-	deps.Storage.(*testutils.MockStorage).AssertExpectations(t)
+	deps.SearchManager.(*mockSearchManager).AssertExpectations(t)
 }

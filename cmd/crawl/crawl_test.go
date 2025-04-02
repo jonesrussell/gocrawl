@@ -7,6 +7,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -15,7 +16,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -33,7 +33,7 @@ type testDeps struct {
 	Handler       *signal.SignalHandler
 	Context       context.Context
 	SourceName    string
-	Processors    []collector.Processor
+	Processors    []common.Processor
 }
 
 // setupTestDeps creates and configures all test dependencies
@@ -62,7 +62,7 @@ func setupTestDeps(t *testing.T) *testDeps {
 		Handler:       mockHandler,
 		Context:       t.Context(),
 		SourceName:    "test-source",
-		Processors:    []collector.Processor{},
+		Processors:    []common.Processor{},
 	}
 }
 
@@ -71,24 +71,62 @@ func createTestApp(t *testing.T, deps *testDeps, hooks ...fx.Hook) *fx.App {
 	t.Helper()
 
 	providers := []any{
-		// Core dependencies
+		// Core dependencies - provide both named and unnamed versions
 		func() crawler.Interface { return deps.Crawler },
+		fx.Annotate(
+			func() crawler.Interface { return deps.Crawler },
+			fx.ResultTags(`name:"crawler"`),
+		),
 		func() storagetypes.Interface { return deps.Storage },
+		fx.Annotate(
+			func() storagetypes.Interface { return deps.Storage },
+			fx.ResultTags(`name:"storage"`),
+		),
 		func() types.Logger { return deps.Logger },
+		fx.Annotate(
+			func() types.Logger { return deps.Logger },
+			fx.ResultTags(`name:"logger"`),
+		),
 		func() config.Interface { return deps.Config },
+		fx.Annotate(
+			func() config.Interface { return deps.Config },
+			fx.ResultTags(`name:"config"`),
+		),
 		func() sources.Interface { return deps.SourceManager },
-		func() *signal.SignalHandler { return deps.Handler },
-		func() context.Context { return deps.Context },
-		func() string { return deps.SourceName },
-		func() []collector.Processor { return deps.Processors },
+		fx.Annotate(
+			func() sources.Interface { return deps.SourceManager },
+			fx.ResultTags(`name:"sources"`),
+		),
+		fx.Annotate(
+			func() *signal.SignalHandler { return deps.Handler },
+			fx.ResultTags(`name:"signalHandler"`),
+		),
+		fx.Annotate(
+			func() context.Context { return deps.Context },
+			fx.ResultTags(`name:"crawlContext"`),
+		),
+		fx.Annotate(
+			func() string { return deps.SourceName },
+			fx.ResultTags(`name:"sourceName"`),
+		),
+		fx.Annotate(
+			func() []common.Processor { return deps.Processors },
+			fx.ResultTags(`group:"processors"`),
+		),
 	}
 
 	// Add command channels
 	commandDone := make(chan struct{})
 	articleChannel := make(chan *models.Article)
 	providers = append(providers,
-		func() chan struct{} { return commandDone },
-		func() chan *models.Article { return articleChannel },
+		fx.Annotate(
+			func() chan struct{} { return commandDone },
+			fx.ResultTags(`name:"shutdownChan"`),
+		),
+		fx.Annotate(
+			func() chan *models.Article { return articleChannel },
+			fx.ResultTags(`name:"crawlerArticleChannel"`),
+		),
 	)
 
 	// Create the app
@@ -131,6 +169,7 @@ func runTestApp(t *testing.T, app *fx.App) {
 	require.NoError(t, err)
 }
 
+// TestCommandExecution tests the crawl command execution
 func TestCommandExecution(t *testing.T) {
 	t.Parallel()
 
@@ -155,17 +194,52 @@ func TestCommandExecution(t *testing.T) {
 	// Create test app
 	app := fx.New(
 		fx.Provide(
-			// Core dependencies
+			// Core dependencies - provide both named and unnamed versions
 			func() crawler.Interface { return mockCrawler },
+			fx.Annotate(
+				func() crawler.Interface { return mockCrawler },
+				fx.ResultTags(`name:"crawler"`),
+			),
 			func() storagetypes.Interface { return mockStorage },
+			fx.Annotate(
+				func() storagetypes.Interface { return mockStorage },
+				fx.ResultTags(`name:"storage"`),
+			),
 			func() types.Logger { return mockLogger },
+			fx.Annotate(
+				func() types.Logger { return mockLogger },
+				fx.ResultTags(`name:"logger"`),
+			),
 			func() config.Interface { return mockConfig },
+			fx.Annotate(
+				func() config.Interface { return mockConfig },
+				fx.ResultTags(`name:"config"`),
+			),
 			func() sources.Interface { return mockSourceManager },
-			func() *signal.SignalHandler { return mockHandler },
-			func() context.Context { return t.Context() },
-			func() string { return "test-source" },
-			func() chan struct{} { return commandDone },
-			func() chan *models.Article { return articleChannel },
+			fx.Annotate(
+				func() sources.Interface { return mockSourceManager },
+				fx.ResultTags(`name:"sources"`),
+			),
+			fx.Annotate(
+				func() *signal.SignalHandler { return mockHandler },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
+			fx.Annotate(
+				func() context.Context { return t.Context() },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			fx.Annotate(
+				func() string { return "test-source" },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() chan struct{} { return commandDone },
+				fx.ResultTags(`name:"shutdownChan"`),
+			),
+			fx.Annotate(
+				func() chan *models.Article { return articleChannel },
+				fx.ResultTags(`name:"crawlerArticleChannel"`),
+			),
 		),
 		fx.Invoke(func(lc fx.Lifecycle, deps crawl.CommandDeps) {
 			lc.Append(fx.Hook{

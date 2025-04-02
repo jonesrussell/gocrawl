@@ -10,7 +10,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"go.uber.org/fx"
 )
 
@@ -48,69 +47,42 @@ type ServiceParams struct {
 	IndexName string `name:"indexName"`
 }
 
-// Module provides the article module's dependencies.
+// Module provides the article module and its dependencies.
 var Module = fx.Module("article",
 	fx.Provide(
-		// Provide article processor with all dependencies
-		fx.Annotate(
-			func(
-				logger common.Logger,
-				storage types.Interface,
-				params struct {
-					fx.In
-					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
-					IndexName   string               `name:"indexName"`
-				},
-			) collector.Processor {
-				// Create service with default selectors
-				service := NewService(logger, config.DefaultArticleSelectors(), storage, params.IndexName)
-				logger.Debug("Created article service", "type", fmt.Sprintf("%T", service))
+		// Provide the article service
+		func(p ServiceParams) (Interface, error) {
+			// Get source configuration
+			sources := p.Config.GetSources()
+			var selectors config.ArticleSelectors
 
-				// Create processor
-				processor := &ArticleProcessor{
-					Logger:         logger,
-					ArticleService: service,
-					Storage:        storage,
-					IndexName:      params.IndexName,
-					ArticleChan:    params.ArticleChan,
+			// Find selectors for the current source
+			for _, source := range sources {
+				if source.Name == p.Source {
+					selectors = source.Selectors.Article
+					break
 				}
-				logger.Debug("Created article processor", "type", fmt.Sprintf("%T", processor))
-				return processor
+			}
+
+			// Use default selectors if source selectors are empty
+			if isEmptySelectors(selectors) {
+				selectors = config.DefaultArticleSelectors()
+			}
+
+			// Create service with selectors
+			service := NewService(p.Logger, selectors, p.Storage, p.IndexName)
+			p.Logger.Debug("Created article service", "type", fmt.Sprintf("%T", service))
+			return service, nil
+		},
+		// Provide the article processor
+		fx.Annotate(
+			func(p ProcessorParams) common.Processor {
+				return NewArticleProcessor(p)
 			},
-			fx.ResultTags(`name:"articleProcessor"`),
+			fx.ResultTags(`group:"processors"`),
 		),
 	),
 )
-
-// NewServiceWithConfig creates a new article service with configuration.
-// It takes ServiceParams for dependency injection and returns an Interface.
-// The function:
-// 1. Retrieves article selectors from the configuration for the specified source
-// 2. Falls back to default selectors if none are configured
-// 3. Creates and returns a new service instance with the configured selectors
-func NewServiceWithConfig(p ServiceParams) Interface {
-	// Get the source configuration
-	var selectors config.ArticleSelectors
-	sources := p.Config.GetSources()
-	for _, source := range sources {
-		if source.Name == p.Source {
-			// Use default selectors since we no longer have selectors in the Source struct
-			selectors = config.ArticleSelectors{}
-			break
-		}
-	}
-
-	if isEmptySelectors(selectors) {
-		p.Logger.Debug("Using default article selectors")
-		selectors = config.DefaultArticleSelectors()
-	} else {
-		p.Logger.Debug("Using article selectors",
-			"source", p.Source,
-			"selectors", selectors)
-	}
-
-	return NewService(p.Logger, selectors, p.Storage, p.IndexName)
-}
 
 // isEmptySelectors checks if the article selectors are empty.
 // It returns true if all selector fields are empty strings.

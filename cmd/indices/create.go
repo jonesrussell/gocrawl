@@ -11,8 +11,8 @@ import (
 	"go.uber.org/fx"
 )
 
-// defaultMapping provides a default mapping for new indices
-var defaultMapping = map[string]any{
+// DefaultMapping provides a default mapping for new indices
+var DefaultMapping = map[string]any{
 	"mappings": map[string]any{
 		"properties": map[string]any{
 			"title": map[string]any{
@@ -72,7 +72,7 @@ The index will be created with default settings unless overridden by configurati
 					indexName := args[0]
 
 					// Create the index with default mapping
-					if err := p.Storage.CreateIndex(p.Context, indexName, defaultMapping); err != nil {
+					if err := p.Storage.CreateIndex(p.Context, indexName, DefaultMapping); err != nil {
 						return fmt.Errorf("failed to create index %s: %w", indexName, err)
 					}
 
@@ -81,7 +81,7 @@ The index will be created with default settings unless overridden by configurati
 				}),
 			)
 
-			// Start the application
+			// Start the application and return any error
 			if err := app.Start(ctx); err != nil {
 				return fmt.Errorf("error starting application: %w", err)
 			}

@@ -222,7 +222,6 @@ func Test_listCommand(t *testing.T) {
 }
 
 func Test_runList(t *testing.T) {
-	t.Parallel()
 	// Create a temporary sources.yml file for testing
 	tmpDir := t.TempDir()
 	sourcesYml := `sources:
@@ -284,7 +283,6 @@ func Test_runList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			cmd, sm, ml := tt.setup(t)
 
 			// Create a test application with required modules
@@ -302,7 +300,29 @@ func Test_runList(t *testing.T) {
 						fx.As(new(types.Logger)),
 					),
 				),
-				fx.Invoke(cmdsrcs.RunList),
+				fx.Invoke(func(p struct {
+					fx.In
+					Sources sources.Interface
+					Logger  types.Logger
+					LC      fx.Lifecycle
+				}) {
+					p.LC.Append(fx.Hook{
+						OnStart: func(context.Context) error {
+							params := &cmdsrcs.Params{
+								SourceManager: p.Sources,
+								Logger:        p.Logger,
+							}
+							if err := cmdsrcs.ExecuteList(*params, t.Context()); err != nil {
+								p.Logger.Error("Error executing list", "error", err)
+								return err
+							}
+							return nil
+						},
+						OnStop: func(context.Context) error {
+							return nil
+						},
+					})
+				}),
 			)
 
 			// Start the application
@@ -504,12 +524,17 @@ func Test_printSources_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			mockLog := tt.logger.(*mockLogger)
+			mockLog.On("Info", "Found sources", []interface{}{"count", 1}).Return()
+			mockLog.On("Info", "Source", []interface{}{"name", "", "url", ""}).Return()
+
 			err := cmdsrcs.PrintSources(tt.sources, tt.logger)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
+			mockLog.AssertExpectations(t)
 		})
 	}
 }

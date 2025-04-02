@@ -6,9 +6,9 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -63,12 +63,12 @@ func (m *MockCrawler) Wait() {
 	m.Called()
 }
 
-func (m *MockCrawler) GetMetrics() *collector.Metrics {
+func (m *MockCrawler) GetMetrics() *common.Metrics {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return nil
 	}
-	if metrics, ok := args.Get(0).(*collector.Metrics); ok {
+	if metrics, ok := args.Get(0).(*common.Metrics); ok {
 		return metrics
 	}
 	return nil

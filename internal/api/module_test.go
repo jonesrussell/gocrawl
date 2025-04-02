@@ -2,6 +2,7 @@
 package api_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -66,6 +67,10 @@ var TestAPIModule = fx.Module("testAPI",
 func setupTestApp(t *testing.T) *testServer {
 	ts := &testServer{}
 
+	// Set environment variables for test configuration
+	t.Setenv("CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+	t.Setenv("CONFIG_FILE", "testdata/config.yaml")
+
 	// Create mock dependencies
 	mockLogger := setupMockLogger()
 	mockSearch := testutils.NewMockSearchManager()
@@ -105,7 +110,17 @@ func setupTestApp(t *testing.T) *testServer {
 	app := fxtest.New(t,
 		TestAPIModule,
 		fx.NopLogger,
-		fx.Supply(mockSearch, mockConfig),
+		fx.Supply(
+			mockConfig,
+			fx.Annotate(
+				mockSearch,
+				fx.As(new(api.SearchManager)),
+			),
+			fx.Annotate(
+				context.Background(),
+				fx.As(new(context.Context)),
+			),
+		),
 		fx.Invoke(func(s *http.Server) {
 			ts.server = s
 		}),

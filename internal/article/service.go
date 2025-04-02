@@ -1,4 +1,4 @@
-// Package article handles article-related operations
+// Package article provides functionality for processing and managing articles.
 package article
 
 import (
@@ -12,44 +12,32 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
 	DefaultBodySelector = "article, .article"
 )
 
-// Interface defines the capabilities of the article service.
-type Interface interface {
-	// ExtractArticle extracts article data from the HTML element
-	ExtractArticle(e *colly.HTMLElement) *models.Article
-	// Process handles the processing of an article
-	Process(article *models.Article) error
-	// ExtractMetadata extracts metadata from the HTML element
-	ExtractMetadata(e *colly.HTMLElement) *models.Article
-	// ExtractContent extracts the main content from the HTML element
-	ExtractContent(e *colly.HTMLElement, article *models.Article)
-	// ExtractTags extracts tags from the HTML element and JSON-LD
-	ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string
-	// ParsePublishedDate parses the published date from various sources
-	ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time
-}
-
-// Service implements the Interface
+// Service implements article processing operations.
 type Service struct {
-	Logger    common.Logger
+	// Logger for article operations
+	Logger common.Logger
+	// Selectors for article extraction
 	Selectors config.ArticleSelectors
-	Storage   common.Storage
+	// Storage for article persistence
+	Storage types.Interface
+	// IndexName is the name of the article index
 	IndexName string
+	// metrics holds processing metrics
+	metrics *common.Metrics
 }
 
-// Ensure Service implements Interface
-var _ Interface = (*Service)(nil)
-
-// NewService creates a new Service instance
+// NewService creates a new article service.
 func NewService(
 	logger common.Logger,
 	selectors config.ArticleSelectors,
-	storage common.Storage,
+	storage types.Interface,
 	indexName string,
 ) Interface {
 	return &Service{
@@ -57,6 +45,7 @@ func NewService(
 		Selectors: selectors,
 		Storage:   storage,
 		IndexName: indexName,
+		metrics:   &common.Metrics{},
 	}
 }
 
@@ -356,4 +345,72 @@ func (s *Service) Process(article *models.Article) error {
 	}
 
 	return nil
+}
+
+// GetMetrics returns the current processing metrics.
+func (s *Service) GetMetrics() *common.Metrics {
+	return s.metrics
+}
+
+// ProcessHTML processes HTML content from a source.
+func (s *Service) ProcessHTML(e *colly.HTMLElement) error {
+	start := time.Now()
+	defer func() {
+		s.metrics.ProcessingDuration += time.Since(start)
+	}()
+
+	article := s.ExtractArticle(e)
+	if article == nil {
+		s.Logger.Debug("No article found in HTML element",
+			"component", "article/service",
+			"url", e.Request.URL.String())
+		return nil
+	}
+
+	if err := s.Process(article); err != nil {
+		s.Logger.Error("Failed to process article",
+			"component", "article/service",
+			"articleID", article.ID,
+			"error", err)
+		s.metrics.ErrorCount++
+		return err
+	}
+
+	s.metrics.ProcessedCount++
+	s.metrics.LastProcessedTime = time.Now()
+
+	return nil
+}
+
+// ProcessJob processes a job and its items.
+func (s *Service) ProcessJob(ctx context.Context, job *common.Job) {
+	start := time.Now()
+	defer func() {
+		s.metrics.ProcessingDuration += time.Since(start)
+	}()
+
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		s.Logger.Warn("Job processing cancelled",
+			"job_id", job.ID,
+			"error", ctx.Err(),
+		)
+		s.metrics.ErrorCount++
+		return
+	default:
+		// Process the job
+		s.Logger.Info("Processing job",
+			"job_id", job.ID,
+		)
+
+		// TODO: Implement job processing logic
+		// This would typically involve:
+		// 1. Fetching items associated with the job
+		// 2. Processing each item
+		// 3. Updating job status
+		// 4. Handling errors and retries
+
+		s.metrics.ProcessedCount++
+	}
 }

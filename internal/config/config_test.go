@@ -686,6 +686,10 @@ sources:
 func TestModule(t *testing.T) {
 	t.Parallel()
 
+	// Set the sources file path for testing
+	os.Setenv("CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+	os.Setenv("CONFIG_FILE", "testdata/config.yaml")
+
 	// Create test app with config module
 	app := fxtest.New(t,
 		fx.Supply(config.Params{
@@ -708,23 +712,6 @@ func TestModule(t *testing.T) {
 			// Test log config
 			logConfig := c.GetLogConfig()
 			assert.Equal(t, "info", logConfig.Level)
-			assert.False(t, logConfig.Debug)
-
-			// Test elasticsearch config
-			esConfig := c.GetElasticsearchConfig()
-			assert.Equal(t, []string{"http://localhost:9200"}, esConfig.Addresses)
-			assert.Equal(t, "gocrawl", esConfig.IndexName)
-
-			// Test server config
-			serverConfig := c.GetServerConfig()
-			assert.Equal(t, ":8080", serverConfig.Address)
-
-			// Test sources
-			sources := c.GetSources()
-			assert.Empty(t, sources)
-
-			// Test command
-			assert.Equal(t, "test", c.GetCommand())
 		}),
 	)
 

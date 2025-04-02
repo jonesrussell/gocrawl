@@ -6,6 +6,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/testutils"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -48,6 +49,15 @@ func TestCommandDeps(t *testing.T) {
 		fx.NopLogger,
 		testModule.Module(),
 		fx.Replace(crawl.Module), // Use fx.Replace to override any existing providers
+		fx.Provide(
+			// Provide processors as a group
+			fx.Annotate(
+				func() []common.Processor {
+					return []common.Processor{}
+				},
+				fx.ResultTags(`group:"processors"`),
+			),
+		),
 		fx.Invoke(func(deps crawl.CommandDeps) {
 			require.NotNil(t, deps.Lifecycle)
 			require.NotNil(t, deps.Sources)

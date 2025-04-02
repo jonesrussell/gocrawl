@@ -101,7 +101,10 @@ func ProvideElasticsearchClient(opts ModuleOptions, log common.Logger) (*es.Clie
 
 	// Check if TLS verification should be skipped based on environment variable
 	skipTLS := false
-	if skipTLSStr := os.Getenv("ELASTIC_SKIP_TLS"); skipTLSStr != "" {
+	switch skipTLSStr := os.Getenv("ELASTIC_SKIP_TLS"); {
+	case skipTLSStr == "":
+		// Default to false
+	case skipTLSStr != "":
 		var err error
 		skipTLS, err = strconv.ParseBool(skipTLSStr)
 		if err != nil {
@@ -131,14 +134,15 @@ func ProvideElasticsearchClient(opts ModuleOptions, log common.Logger) (*es.Clie
 	}
 
 	// Configure authentication
-	if opts.APIKey != "" {
+	switch {
+	case opts.APIKey != "":
 		cfg.APIKey = opts.APIKey
 		log.Debug("Using API key authentication")
-	} else if opts.Username != "" && opts.Password != "" {
+	case opts.Username != "" && opts.Password != "":
 		cfg.Username = opts.Username
 		cfg.Password = opts.Password
 		log.Debug("Using basic authentication")
-	} else {
+	default:
 		return nil, errors.New("either API key or basic authentication is required")
 	}
 

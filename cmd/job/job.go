@@ -8,15 +8,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/app"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -40,13 +41,16 @@ type Params struct {
 	Context context.Context
 
 	// Processors is a slice of content processors, injected as a group
-	Processors []collector.Processor `group:"processors"`
+	Processors []common.Processor `group:"processors"`
 
 	// Done is a channel that signals when the crawl operation is complete
 	Done chan struct{} `name:"crawlDone"`
 
 	// ActiveJobs tracks the number of currently running jobs
 	ActiveJobs *int32 `optional:"true"`
+
+	// Client is the Elasticsearch client
+	Client *elasticsearch.Client
 }
 
 const (
@@ -58,7 +62,7 @@ const (
 type JobCommandDeps struct {
 	// Core dependencies
 	Logger     types.Logger
-	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
+	Processors []common.Processor `group:"processors" json:"processors,omitempty"`
 }
 
 // runScheduler manages the execution of scheduled jobs.
@@ -67,10 +71,11 @@ func runScheduler(
 	log types.Logger,
 	sources sources.Interface,
 	c crawler.Interface,
-	processors []collector.Processor,
+	processors []common.Processor,
 	done chan struct{},
 	cfg config.Interface,
 	activeJobs *int32,
+	client *elasticsearch.Client,
 ) {
 	log.Info("Starting job scheduler")
 
@@ -79,7 +84,7 @@ func runScheduler(
 	defer ticker.Stop()
 
 	// Do initial check
-	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg, activeJobs)
+	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg, activeJobs, client)
 
 	for {
 		select {
@@ -87,7 +92,7 @@ func runScheduler(
 			log.Info("Job scheduler shutting down")
 			return
 		case t := <-ticker.C:
-			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg, activeJobs)
+			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg, activeJobs, client)
 		}
 	}
 }
@@ -98,15 +103,16 @@ func executeCrawl(
 	log types.Logger,
 	c crawler.Interface,
 	source sources.Config,
-	processors []collector.Processor,
+	processors []common.Processor,
 	done chan struct{},
 	cfg config.Interface,
 	activeJobs *int32,
+	client *elasticsearch.Client,
 ) {
 	atomic.AddInt32(activeJobs, 1)
 	defer atomic.AddInt32(activeJobs, -1)
 
-	collectorResult, err := app.SetupCollector(ctx, log, source, processors, done, cfg)
+	collectorResult, err := app.SetupCollector(ctx, log, source, processors, done, cfg, client)
 	if err != nil {
 		log.Error("Error setting up collector",
 			"error", err,
@@ -114,7 +120,7 @@ func executeCrawl(
 		return
 	}
 
-	if configErr := app.ConfigureCrawler(c, source, collectorResult); configErr != nil {
+	if configErr := app.ConfigureCrawler(collectorResult, source); configErr != nil {
 		log.Error("Error configuring crawler",
 			"error", configErr,
 			"source", source.Name)
@@ -139,10 +145,11 @@ func checkAndRunJobs(
 	sources sources.Interface,
 	c crawler.Interface,
 	now time.Time,
-	processors []collector.Processor,
+	processors []common.Processor,
 	done chan struct{},
 	cfg config.Interface,
 	activeJobs *int32,
+	client *elasticsearch.Client,
 ) {
 	if sources == nil {
 		log.Error("Sources configuration is nil")
@@ -169,7 +176,7 @@ func checkAndRunJobs(
 				log.Info("Running scheduled crawl",
 					"source", source.Name,
 					"time", scheduledTime)
-				executeCrawl(ctx, log, c, source, processors, done, cfg, activeJobs)
+				executeCrawl(ctx, log, c, source, processors, done, cfg, activeJobs, client)
 			}
 		}
 	}
@@ -191,28 +198,18 @@ func startJob(p Params) error {
 		p.ActiveJobs = &jobs
 	}
 
-	// Print loaded schedules
-	p.Logger.Info("Loaded schedules:")
-	sources, err := p.Sources.GetSources()
-	if err != nil {
-		return fmt.Errorf("failed to get sources: %w", err)
-	}
-
-	for _, source := range sources {
-		if len(source.Time) > 0 {
-			p.Logger.Info("Source schedule",
-				"name", source.Name,
-				"times", source.Time)
-		}
-	}
-
-	// Start scheduler in background
-	go runScheduler(p.Context, p.Logger, p.Sources, p.CrawlerInstance, p.Processors, p.Done, p.Config, p.ActiveJobs)
-
-	p.Logger.Info("Job scheduler running. Press Ctrl+C to stop...")
-
-	// Wait for crawler completion
-	<-p.Done
+	// Start the job scheduler
+	go runScheduler(
+		p.Context,
+		p.Logger,
+		p.Sources,
+		p.CrawlerInstance,
+		p.Processors,
+		p.Done,
+		p.Config,
+		p.ActiveJobs,
+		p.Client,
+	)
 
 	return nil
 }
@@ -299,24 +296,4 @@ func setupFXApp() *fx.App {
 	}
 
 	return fx.New(options...)
-}
-
-type Job struct {
-	// Core dependencies
-	Logger     types.Logger
-	Processors []collector.Processor `group:"processors" json:"processors,omitempty"`
-	// ... existing code ...
-}
-
-// NewJob creates a new job instance.
-func NewJob(
-	logger types.Logger,
-	processors []collector.Processor,
-	// ... existing code ...
-) *Job {
-	return &Job{
-		Logger:     logger,
-		Processors: processors,
-		// ... existing code ...
-	}
 }

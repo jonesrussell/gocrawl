@@ -3,7 +3,6 @@ package crawler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -11,10 +10,8 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 )
 
 const (
@@ -32,57 +29,41 @@ type Crawler struct {
 	bus              *events.Bus
 	indexManager     api.IndexManager
 	sources          sources.Interface
-	articleProcessor collector.Processor
-	contentProcessor collector.Processor
+	articleProcessor common.Processor
+	contentProcessor common.Processor
 }
 
 var _ Interface = (*Crawler)(nil)
 
 // Start begins crawling from the given base URL.
 func (c *Crawler) Start(ctx context.Context, sourceName string) error {
-	c.Logger.Info("Starting crawler", "source", sourceName)
-
 	// Get source configuration
-	source, err := c.sources.FindByName(sourceName)
+	source, err := c.sources.GetSource(ctx, sourceName)
 	if err != nil {
-		return fmt.Errorf("failed to get source configuration: %w", err)
+		return fmt.Errorf("error getting source: %w", err)
 	}
 
-	// Create collector params
-	params := collector.Params{
-		BaseURL:     source.URL,
-		MaxDepth:    source.MaxDepth,
-		RateLimit:   source.RateLimit,
-		Logger:      c.Logger,
-		Context:     ctx,
-		Done:        make(chan struct{}),
-		Parallelism: DefaultParallelism, // Use the default parallelism value
-		Source: &config.Source{
-			URL:       source.URL,
-			MaxDepth:  source.MaxDepth,
-			RateLimit: source.RateLimit,
-		},
-		ArticleProcessor: c.articleProcessor,
-		ContentProcessor: c.contentProcessor,
+	// Set up rate limiting
+	if rateErr := c.SetRateLimit(source.RateLimit); rateErr != nil {
+		return fmt.Errorf("error setting rate limit: %w", rateErr)
 	}
 
-	// Create collector
-	result, err := collector.New(params)
-	if err != nil {
-		return fmt.Errorf("failed to create collector: %w", err)
-	}
-
-	// Set the new collector
-	c.collector = result.Collector
+	// Set max depth
+	c.SetMaxDepth(source.MaxDepth)
 
 	// Start crawling
-	return c.collector.Visit(source.URL)
+	if crawlErr := c.collector.Visit(source.URL); crawlErr != nil {
+		return fmt.Errorf("error starting crawl: %w", crawlErr)
+	}
+
+	return nil
 }
 
 // Stop gracefully stops the crawler.
 func (c *Crawler) Stop(ctx context.Context) error {
-	c.Logger.Info("Stopping crawler")
-	c.collector.Wait()
+	if c.collector != nil {
+		c.collector.Wait()
+	}
 	return nil
 }
 
@@ -93,25 +74,21 @@ func (c *Crawler) Subscribe(handler events.Handler) {
 
 // SetRateLimit sets the crawler's rate limit.
 func (c *Crawler) SetRateLimit(duration time.Duration) error {
-	if duration <= 0 {
-		return errors.New("rate limit must be positive")
-	}
-
 	if err := c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Delay:       duration,
-		RandomDelay: duration / DefaultRandomDelayFactor, // Add some randomization to avoid thundering herd
-		Parallelism: DefaultParallelism,                  // Use the default parallelism value
+		RandomDelay: duration,
+		Parallelism: 1,
 	}); err != nil {
 		return fmt.Errorf("failed to set rate limit: %w", err)
 	}
-
 	return nil
 }
 
 // SetMaxDepth sets the maximum crawl depth.
 func (c *Crawler) SetMaxDepth(depth int) {
-	c.collector.MaxDepth = depth
+	if c.collector != nil {
+		c.collector.MaxDepth = depth
+	}
 }
 
 // SetCollector sets the collector for the crawler.
@@ -126,15 +103,36 @@ func (c *Crawler) GetIndexManager() api.IndexManager {
 
 // Wait blocks until the crawler has finished processing all queued requests.
 func (c *Crawler) Wait() {
-	c.collector.Wait()
+	if c.collector != nil {
+		c.collector.Wait()
+	}
 }
 
 // GetMetrics returns the current crawler metrics.
-func (c *Crawler) GetMetrics() *collector.Metrics {
-	return &collector.Metrics{
-		PagesVisited:  int64(c.collector.ID),
-		ArticlesFound: 0,
-		Errors:        0,
-		StartTime:     time.Now().Unix(),
+func (c *Crawler) GetMetrics() *common.Metrics {
+	// Aggregate metrics from both processors
+	articleMetrics := c.articleProcessor.GetMetrics()
+	contentMetrics := c.contentProcessor.GetMetrics()
+
+	return &common.Metrics{
+		ProcessedCount:     articleMetrics.ProcessedCount + contentMetrics.ProcessedCount,
+		ErrorCount:         articleMetrics.ErrorCount + contentMetrics.ErrorCount,
+		LastProcessedTime:  articleMetrics.LastProcessedTime,
+		ProcessingDuration: articleMetrics.ProcessingDuration + contentMetrics.ProcessingDuration,
 	}
+}
+
+// ProcessHTML processes HTML content from a source.
+func (c *Crawler) ProcessHTML(e *colly.HTMLElement) error {
+	// Process article content
+	if articleErr := c.articleProcessor.ProcessHTML(e); articleErr != nil {
+		return fmt.Errorf("error processing article: %w", articleErr)
+	}
+
+	// Process general content
+	if contentErr := c.contentProcessor.ProcessHTML(e); contentErr != nil {
+		return fmt.Errorf("error processing content: %w", contentErr)
+	}
+
+	return nil
 }

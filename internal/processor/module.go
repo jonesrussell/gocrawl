@@ -11,7 +11,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/pkg/collector"
 	"go.uber.org/fx"
 )
 
@@ -28,7 +27,7 @@ var Module = fx.Module("processor",
 					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 					IndexName   string               `name:"indexName"`
 				},
-			) collector.Processor {
+			) common.Processor {
 				// Create article service
 				articleService := article.NewService(logger, config.DefaultArticleSelectors(), storage, params.IndexName)
 				logger.Debug("Created article service", "type", fmt.Sprintf("%T", articleService))
@@ -55,7 +54,7 @@ var Module = fx.Module("processor",
 					fx.In
 					IndexName string `name:"indexName"`
 				},
-			) collector.Processor {
+			) common.Processor {
 				// Create content service
 				contentService := NewContentService(logger)
 				logger.Debug("Created content service", "type", fmt.Sprintf("%T", contentService))

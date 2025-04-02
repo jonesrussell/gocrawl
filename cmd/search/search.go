@@ -148,7 +148,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 			lc.Append(fx.Hook{
 				OnStart: func(context.Context) error {
 					// Execute the search and handle any errors
-					if err := executeSearch(cmd.Context(), p); err != nil {
+					if err := ExecuteSearch(cmd.Context(), p); err != nil {
 						p.Logger.Error("Error executing search", "error", err)
 						fmt.Fprintf(os.Stderr, "\nSearch failed: %v\n", err)
 						return err
@@ -261,8 +261,8 @@ func renderSearchResults(results []Result, query string) {
 	t.Render()
 }
 
-// executeSearch performs the actual search operation using the provided parameters.
-func executeSearch(ctx context.Context, p Params) error {
+// ExecuteSearch performs the actual search operation using the provided parameters.
+func ExecuteSearch(ctx context.Context, p Params) error {
 	p.Logger.Info("Starting search...",
 		"query", p.Query,
 		"index", p.IndexName,
@@ -285,7 +285,12 @@ func executeSearch(ctx context.Context, p Params) error {
 
 	if len(results) == 0 {
 		fmt.Fprintf(os.Stdout, "No results found for query: %s\n", p.Query)
-		return nil
+	}
+
+	// Close the search manager
+	if err := p.SearchManager.Close(); err != nil {
+		p.Logger.Error("Error closing search manager", "error", err)
+		return fmt.Errorf("error closing search manager: %w", err)
 	}
 
 	renderSearchResults(results, p.Query)
