@@ -3,40 +3,41 @@
 ## High Priority
 
 ### 1. Dependency Injection Simplification
-- [ ] Simplify Logger Implementation
-  - [ ] Consolidate logger interfaces into single package
-    - [ ] Move logger interface to internal/logger
-    - [ ] Remove common/types logger interface
-    - [ ] Update all imports to use new logger package
-  - [ ] Simplify zap integration
-    - [ ] Remove unnecessary wrapper layers
-    - [ ] Use zap directly with minimal abstraction
-    - [ ] Keep only essential logging methods
-  - [ ] Remove fx module for logger
-    - [ ] Create simple constructor function
-    - [ ] Use environment-based configuration
-    - [ ] Add proper error handling
+- [x] Simplify Logger Implementation
+  - [x] Consolidate logger interfaces into single package
+    - [x] Move logger interface to internal/logger
+    - [x] Remove common/types logger interface
+    - [x] Update all imports to use new logger package
+  - [x] Simplify zap integration
+    - [x] Remove unnecessary wrapper layers
+    - [x] Use zap directly with minimal abstraction
+    - [x] Keep only essential logging methods
+  - [x] Remove fx module for logger
+    - [x] Create simple constructor function
+    - [x] Use environment-based configuration
+    - [x] Add proper error handling
   - [ ] Update tests
     - [ ] Simplify mock logger implementation
     - [ ] Update test utilities
     - [ ] Add proper test coverage
 - [ ] Remove Unnecessary Abstractions
-  - [ ] Remove common/types package
-    - [ ] Move interfaces to consuming packages
-    - [ ] Update all imports
-    - [ ] Update tests
-  - [ ] Remove type aliases
-    - [ ] Use direct type references
-    - [ ] Update imports
-    - [ ] Update tests
+  - [x] Remove common/types package
+    - [x] Move interfaces to consuming packages
+    - [x] Update all imports
+    - [x] Update tests
+  - [x] Remove type aliases
+    - [x] Use direct type references
+    - [x] Update imports
+    - [x] Update tests
   - [ ] Simplify module structure
     - [ ] Reduce nesting levels
     - [ ] Combine related modules
     - [ ] Remove unnecessary modules
 - [ ] Simplify Dependency Injection
   - [ ] Remove named dependencies
+    - [ ] Remove fx.Annotate usage
+    - [ ] Remove name tags from struct fields
     - [ ] Use type-based injection
-    - [ ] Update fx modules
     - [ ] Update tests
   - [ ] Use constructor injection
     - [ ] Replace fx where appropriate
@@ -84,250 +85,21 @@
       - [x] Update job command to use new config module
       - [ ] Update crawl command to use new config module
       - [ ] Update httpd command to use new config module
-  - [ ] Create separate sources module
+  - [x] Create separate sources module
     - [x] Move sources interface to internal/sources
-      - [x] Create internal/sources/interface.go
-        - [x] Define Interface type with required methods
-        - [x] Add interface documentation
-        - [x] Add interface examples
-        - [x] Add interface validation
-      - [x] Create internal/sources/types.go
-        - [x] Define Config struct
-        - [x] Define Params struct
-        - [x] Add type documentation
-        - [x] Add type validation
-      - [x] Create internal/sources/errors.go
-        - [x] Define error types
-        - [x] Add error documentation
-        - [x] Add error examples
-    - [ ] Create sources module for dependency injection
-      - [ ] Create internal/sources/module.go
-        - [ ] Define Module variable
-        - [ ] Add module documentation
-        - [ ] Add module examples
-        - [ ] Add module validation
-      - [ ] Create internal/sources/loader.go
-        - [ ] Implement source loading
-        - [ ] Add loader documentation
-        - [ ] Add loader examples
-        - [ ] Add loader validation
-    - [ ] Add sources tests
-      - [x] Create internal/sources/sources_test.go
-        - [x] Add interface tests
-        - [x] Add module tests
-        - [x] Add integration tests
-      - [ ] Create internal/sources/loader_test.go
-        - [ ] Add loader tests
-        - [ ] Add validation tests
-        - [ ] Add error tests
+    - [x] Create sources module for dependency injection
+    - [x] Add sources tests
     - [ ] Update commands to use new sources module
-      - [ ] Update job command
-        - [ ] Update dependencies
-        - [ ] Update tests
-        - [ ] Update documentation
-      - [ ] Update crawl command
-        - [ ] Update dependencies
-        - [ ] Update tests
-        - [ ] Update documentation
-      - [ ] Update httpd command
-        - [ ] Update dependencies
-        - [ ] Update tests
-        - [ ] Update documentation
-    - [ ] Combine internal/sources and internal/sources
-      - [x] Move unique functionality from internal/sources to internal/sources
-        - [x] Move interface definitions
-        - [x] Move type definitions
-        - [x] Move error definitions
-        - [x] Move loader implementation
-      - [x] Update all references to use internal/sources
-        - [x] Update imports in all files
-        - [x] Update type references
-        - [x] Update interface references
-      - [x] Delete internal/sources package
-        - [x] Remove all files
-        - [x] Update documentation
-      - [x] Update test files
-        - [x] Update imports
-        - [x] Update type references
-        - [x] Update interface references
-        - [x] Update mock implementations
-      - [ ] Verify all functionality works
-        - [ ] Run all tests
-        - [ ] Check coverage
-        - [ ] Verify no regressions
-    - [ ] Add HTTP client error handling
-      - [ ] Add proper response body closure
-        - [ ] Add defer statements
-        - [ ] Add error handling
-        - [ ] Add tests
-      - [ ] Add proper context handling
-        - [ ] Add context timeouts
-        - [ ] Add context cancellation
-        - [ ] Add tests
-      - [ ] Add proper timeout handling
-        - [ ] Add timeout configuration
-        - [ ] Add timeout errors
-        - [ ] Add tests
-    - [ ] Add examples
-      - [ ] Add usage examples
-        - [ ] Add basic usage
-        - [ ] Add advanced usage
-        - [ ] Add error handling
-      - [ ] Add test examples
-        - [ ] Add unit tests
-        - [ ] Add integration tests
-        - [ ] Add mock examples
-      - [ ] Add error handling examples
-        - [ ] Add error types
-        - [ ] Add error wrapping
-        - [ ] Add error recovery
-      - [ ] Add configuration examples
-        - [ ] Add basic config
-        - [ ] Add advanced config
-        - [ ] Add validation
   - [ ] Create separate storage module
-    - [ ] Move storage interface to pkg/storage
-      - [ ] Create pkg/storage/interface.go
-      - [ ] Define Interface type
-      - [ ] Add interface documentation
-      - [ ] Add interface examples
+    - [ ] Move storage interface to internal/storage
     - [ ] Create storage module for dependency injection
-      - [ ] Create pkg/storage/module.go
-      - [ ] Define Module variable
-      - [ ] Add module documentation
-      - [ ] Add module examples
     - [ ] Add storage tests
-      - [ ] Create pkg/storage/storage_test.go
-      - [ ] Add interface tests
-      - [ ] Add module tests
-      - [ ] Add integration tests
     - [ ] Update commands to use new storage module
-      - [ ] Update job command
-      - [ ] Update crawl command
-      - [ ] Update httpd command
   - [ ] Create separate metrics module
-    - [ ] Move metrics interface to pkg/metrics
-      - [ ] Create pkg/metrics/interface.go
-      - [ ] Define Interface type
-      - [ ] Add interface documentation
-      - [ ] Add interface examples
+    - [ ] Move metrics interface to internal/metrics
     - [ ] Create metrics module for dependency injection
-      - [ ] Create pkg/metrics/module.go
-      - [ ] Define Module variable
-      - [ ] Add module documentation
-      - [ ] Add module examples
     - [ ] Add metrics tests
-      - [ ] Create pkg/metrics/metrics_test.go
-      - [ ] Add interface tests
-      - [ ] Add module tests
-      - [ ] Add integration tests
     - [ ] Update commands to use new metrics module
-      - [ ] Update job command
-      - [ ] Update crawl command
-      - [ ] Update httpd command
-- [ ] Make dependencies explicit in each module
-  - [x] Remove implicit dependencies from common module
-    - [x] Remove logger dependency from common module
-    - [x] Remove config dependency from common module
-    - [ ] Remove sources dependency from common module
-      - [ ] Remove sources imports
-      - [ ] Remove sources types
-      - [ ] Remove sources functions
-      - [ ] Update tests
-    - [ ] Remove storage dependency from common module
-      - [ ] Remove storage imports
-      - [ ] Remove storage types
-      - [ ] Remove storage functions
-      - [ ] Update tests
-    - [ ] Remove metrics dependency from common module
-      - [ ] Remove metrics imports
-      - [ ] Remove metrics types
-      - [ ] Remove metrics functions
-      - [ ] Update tests
-  - [x] Add explicit dependency declarations in each module
-    - [x] Add logger dependency declarations
-    - [x] Add config dependency declarations
-    - [ ] Add sources dependency declarations
-      - [ ] Add logger dependency
-      - [ ] Add config dependency
-      - [ ] Add validation
-      - [ ] Add tests
-    - [ ] Add storage dependency declarations
-      - [ ] Add logger dependency
-      - [ ] Add config dependency
-      - [ ] Add validation
-      - [ ] Add tests
-    - [ ] Add metrics dependency declarations
-      - [ ] Add logger dependency
-      - [ ] Add config dependency
-      - [ ] Add validation
-      - [ ] Add tests
-  - [x] Update module tests to reflect explicit dependencies
-    - [x] Update logger module tests
-    - [x] Update config module tests
-    - [ ] Update sources module tests
-    - [ ] Update storage module tests
-    - [ ] Update metrics module tests
-  - [ ] Add dependency validation in each module
-    - [x] Add logger dependency validation
-    - [x] Add config dependency validation
-    - [ ] Add sources dependency validation
-    - [ ] Add storage dependency validation
-    - [ ] Add metrics dependency validation
-- [ ] Implement interface segregation
-  - [x] Create specific interfaces for each module
-    - [x] Create logger interface
-    - [x] Create config interface
-    - [ ] Create sources interface
-    - [ ] Create storage interface
-    - [ ] Create metrics interface
-  - [x] Move interfaces to consuming packages
-    - [x] Move logger interface to internal/logger
-    - [x] Move config interface to internal/config
-    - [ ] Move sources interface to internal/sources
-    - [ ] Move storage interface to pkg/storage
-    - [ ] Move metrics interface to pkg/metrics
-  - [ ] Remove generic interfaces from common package
-    - [x] Remove logger interface from common package
-    - [x] Remove config interface from common package
-    - [ ] Remove sources interface from common package
-    - [ ] Remove storage interface from common package
-    - [ ] Remove metrics interface from common package
-  - [ ] Update tests to use specific interfaces
-    - [x] Update tests to use logger interface
-    - [x] Update tests to use config interface
-    - [ ] Update tests to use sources interface
-    - [ ] Update tests to use storage interface
-    - [ ] Update tests to use metrics interface
-- [ ] Reorganize shared code
-  - [x] Move shared code from internal/common to pkg
-    - [x] Move logger code to internal/logger
-    - [x] Move config code to internal/config
-    - [ ] Move sources code to internal/sources
-    - [ ] Move storage code to pkg/storage
-    - [ ] Move metrics code to pkg/metrics
-  - [x] Create internal/logger for logging utilities
-    - [x] Create logger interface
-    - [x] Create logger module
-    - [x] Create logger tests
-  - [x] Create internal/config for configuration utilities
-    - [x] Create config interface
-    - [x] Create config module
-    - [x] Create config tests
-  - [ ] Create pkg/metrics for metrics utilities
-    - [ ] Create metrics interface
-    - [ ] Create metrics module
-    - [ ] Create metrics tests
-  - [ ] Create pkg/storage for storage utilities
-    - [ ] Create storage interface
-    - [ ] Create storage module
-    - [ ] Create storage tests
-  - [ ] Update imports across the codebase
-    - [x] Update logger imports
-    - [x] Update config imports
-    - [ ] Update sources imports
-    - [ ] Update storage imports
-    - [ ] Update metrics imports
 
 ### 3. Interface Organization and Naming
 - [x] Move interfaces to consuming packages
@@ -339,22 +111,7 @@
   - [x] `collector.ArticleProcessor` → `article.Processor`
   - [x] `collector.ContentProcessor` → `content.Processor`
 
-### 4. Dependency Injection
-- [x] Improve fx module organization
-  - [x] Move all fx-related code to `module.go` files
-  - [x] Use `fx.Annotate` for named dependencies
-  - [x] Add proper lifecycle hooks
-  - [x] Add proper error handling in constructors
-- [x] Add proper dependency validation
-  - [x] Add validation for required dependencies
-  - [x] Add validation for optional dependencies
-  - [x] Add proper error messages
-- [x] Fix dependency conflicts
-  - [x] Remove duplicate providers
-  - [x] Use mock configurations in tests
-  - [x] Properly scope test modules
-
-### 5. Error Handling
+### 4. Error Handling
 - [x] Standardize error handling
   - [x] Use `errors.New` for simple errors
   - [x] Use `fmt.Errorf` with `%w` for wrapped errors
@@ -376,7 +133,7 @@
 
 ## Medium Priority
 
-### 6. Testing
+### 5. Testing
 - [x] Improve test organization
   - [x] Move tests to separate `_test` packages
   - [x] Add proper test helpers
@@ -393,7 +150,7 @@
   - [x] Properly scope test dependencies
   - [x] Add test validation
 
-### 7. Code Organization
+### 6. Code Organization
 - [x] Split large files
   - [x] Split `collector.go`
   - [x] Split `crawler.go`
@@ -404,7 +161,7 @@
   - [x] Move common constants to `common`
   - [x] Move common utilities to `common`
 
-### 8. Documentation
+### 7. Documentation
 - [x] Improve documentation
   - [x] Add package documentation
   - [x] Add function documentation
@@ -418,7 +175,7 @@
 
 ## Low Priority
 
-### 9. Configuration
+### 8. Configuration
 - [x] Improve configuration
   - [x] Add proper validation
   - [x] Add proper defaults
@@ -430,7 +187,7 @@
   - [x] Add configuration validation
   - [x] Add configuration defaults
 
-### 10. Logging
+### 9. Logging
 - [x] Improve logging
   - [x] Add proper log levels
   - [x] Add proper log fields
@@ -442,7 +199,7 @@
   - [x] Add log filtering
   - [x] Add log formatting
 
-### 11. Metrics and Monitoring
+### 10. Metrics and Monitoring
 - [x] Add proper metrics
   - [x] Add counter metrics
   - [x] Add gauge metrics
@@ -454,7 +211,7 @@
   - [x] Add liveness checks
   - [x] Add metrics endpoint
 
-### 12. Security
+### 11. Security
 - [x] Improve security
   - [x] Add proper TLS configuration
   - [x] Add proper authentication
@@ -616,7 +373,7 @@
   - [ ] Add authentication
   - [ ] Add authorization
 
-### 13. Remove Named Dependencies
+### 12. Remove Named Dependencies
 - [ ] Remove named fx dependencies across codebase
   - [ ] Audit all fx.Module declarations
   - [ ] Remove fx.Annotate usage

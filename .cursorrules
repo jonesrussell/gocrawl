@@ -13,22 +13,14 @@ Code Organization & Structure
 - Use canonical import paths
 
 Dependency Injection & Interfaces
-- Use fx.In and fx.Out for dependency injection
 - Define interfaces in the package that uses them, not where they are implemented
 - For module-specific interfaces, define them in module.go
 - For interfaces used across multiple packages, define them in the consuming package
 - Avoid interface stuttering (e.g., use `Logger` instead of `CollectorLogger`)
-- Use type aliases from common package:
-  - Use common.Logger instead of logger.Interface
-  - Use common.Storage instead of storage.Interface
-  - Use common.Config instead of config.Config
 - Define New* constructors only in module.go files
-- When testing fx modules:
-  - Provide all required dependencies with correct names
-  - Use fx.Annotate for named dependencies
-  - Avoid providing dependencies that are already provided by the module
-  - Use fx.NopLogger in tests to reduce noise
-  - Test dependency injection separately from lifecycle
+- When testing modules:
+  - Provide all required dependencies
+  - Avoid providing dependencies that are already provided
   - Use test helpers for common dependency setup
   - Verify dependency injection before testing functionality
 
@@ -72,16 +64,6 @@ Testing
 - Use meaningful assertion messages
 - Test error conditions explicitly
 - Use test coverage tools appropriately
-- For fx-based tests:
-  - Test module construction separately
-  - Test dependency injection separately
-  - Test lifecycle separately
-  - Use fx.Invoke for verification
-  - Clean up resources in defer
-  - Use fx.Supply for simple dependencies
-  - Use fx.Provide for complex dependencies
-  - Use fx.Annotate for named dependencies
-  - Avoid duplicate dependency providers
 
 Dependencies
 - Use go 1.24
@@ -148,13 +130,3 @@ Style & Best Practices
   - Use meaningful assertions
   - Test error conditions
   - Use coverage tools
-  - For fx-based tests:
-    - Test module construction
-    - Test dependency injection
-    - Test lifecycle
-    - Use fx.Invoke
-    - Clean up resources
-    - Use fx.Supply
-    - Use fx.Provide
-    - Use fx.Annotate
-    - Avoid duplicates

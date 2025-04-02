@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
 	httpdcmd "github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/indices"
-	jobcmd "github.com/jonesrussell/gocrawl/cmd/job"
+	"github.com/jonesrussell/gocrawl/cmd/job"
 	"github.com/jonesrussell/gocrawl/cmd/search"
 	"github.com/jonesrussell/gocrawl/cmd/sources"
-	"github.com/jonesrussell/gocrawl/internal/common"
 )
 
 var (
@@ -29,17 +29,9 @@ var (
 	// It serves as the base command that all subcommands are attached to.
 	rootCmd = &cobra.Command{
 		Use:   "gocrawl",
-		Short: "A web crawler that stores content in Elasticsearch",
-		Long: `GoCrawl is a powerful web crawler that efficiently collects and stores web content
-in Elasticsearch. It supports configurable crawling strategies, rate limiting,
-and content processing through a YAML-based configuration system.
-
-The crawler can be configured to:
-- Define multiple content sources with custom crawling rules
-- Process and extract structured data from web pages
-- Store content in Elasticsearch with proper indexing
-- Handle rate limiting and respect robots.txt
-- Process different types of content (articles, general web pages)`,
+		Short: "A web crawler for collecting and processing content",
+		Long: `gocrawl is a web crawler that helps you collect and process content from various sources.
+It provides a flexible and extensible framework for building custom crawlers.`,
 		PersistentPreRunE: setupConfig,
 	}
 )
@@ -80,8 +72,24 @@ func setupConfig(_ *cobra.Command, _ []string) error {
 // It runs the root command and handles any errors that occur during execution.
 // If an error occurs, it prints the error message and exits with status code 1.
 func Execute() {
+	log, err := logger.New(logger.DefaultConfig())
+	if err != nil {
+		os.Exit(1)
+	}
+
+	// Add commands
+	rootCmd.AddCommand(
+		job.NewJobCommand(log),         // Main job command with fx
+		job.NewJobSubCommands(log),     // Job subcommands
+		indices.Command(),              // For managing Elasticsearch indices
+		sources.NewSourcesCommand(log), // For managing web content sources
+		crawlcmd.Command(),             // For crawling web content
+		httpdcmd.Command(),             // For running the HTTP server
+		search.Command(),               // For searching content in Elasticsearch
+	)
+
 	if err := rootCmd.Execute(); err != nil {
-		common.PrintErrorf("Error executing root command: %v", err)
+		log.Error("Failed to execute command", "error", err)
 		os.Exit(1)
 	}
 }
@@ -103,14 +111,4 @@ func init() {
 
 	// Add the persistent --debug flag to all commands
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug mode")
-
-	// Add subcommands for managing different aspects of the crawler
-	rootCmd.AddCommand(
-		indices.Command(),  // For managing Elasticsearch indices
-		sources.Command(),  // For managing web content sources
-		crawlcmd.Command(), // For crawling web content
-		httpdcmd.Command(), // For running the HTTP server
-		jobcmd.Command(),   // For managing scheduled crawl jobs
-		search.Command(),   // For searching content in Elasticsearch
-	)
 }

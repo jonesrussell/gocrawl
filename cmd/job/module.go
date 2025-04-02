@@ -1,39 +1,18 @@
-// Package job implements the job scheduler command.
+// Package job provides the job command implementation.
 package job
 
 import (
-	"context"
-
-	"github.com/jonesrussell/gocrawl/internal/common/types"
-	"github.com/jonesrussell/gocrawl/internal/job"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"go.uber.org/fx"
 )
 
-// Module provides the job command's dependencies.
-var Module = fx.Module("job",
-	fx.Provide(
-		// Provide the done channel for job completion
-		fx.Annotate(
-			func() chan struct{} {
-				return make(chan struct{})
-			},
-			fx.ResultTags(`name:"crawlDone"`),
-		),
-		// Provide the logger
-		fx.Annotate(
-			func(p logger.Params) types.Logger {
-				return logger.NewNoOp()
-			},
-			fx.As(new(types.Logger)),
-		),
-		// Provide the context
-		fx.Annotate(
-			func(lc fx.Lifecycle) context.Context {
-				return context.Background()
-			},
-			fx.As(new(context.Context)),
-		),
-	),
-	job.Module,
-)
+// Module provides the job command module.
+type Module struct {
+	logger logger.Logger
+}
+
+// NewModule creates a new job module.
+func NewModule(log logger.Logger) *Module {
+	return &Module{
+		logger: log,
+	}
+}

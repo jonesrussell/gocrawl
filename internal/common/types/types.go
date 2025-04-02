@@ -1,19 +1,18 @@
+// Package types provides common type definitions used across the application.
 package types
 
 import (
 	"time"
 )
 
-// Logger is an interface for structured logging capabilities.
-type Logger interface {
-	Info(msg string, fields ...interface{})
-	Error(msg string, fields ...interface{})
-	Debug(msg string, fields ...interface{})
-	Warn(msg string, fields ...interface{})
-	Fatal(msg string, fields ...interface{})
-	Printf(format string, v ...interface{})
-	Errorf(format string, v ...interface{})
-	Sync() error
+// Storage defines the interface for data storage operations.
+type Storage interface {
+	// Add your storage methods here
+}
+
+// Config defines the interface for configuration operations.
+type Config interface {
+	// Add your config methods here
 }
 
 // Job represents a crawling job.
