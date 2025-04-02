@@ -52,6 +52,15 @@ func NewTestLogger() sources.Logger {
 
 // NewTestInterface creates a new test sources interface implementation.
 func NewTestInterface(configs []sources.Config) sources.Interface {
+	// Set default index names for any config that doesn't have them
+	for i := range configs {
+		if configs[i].ArticleIndex == "" {
+			configs[i].ArticleIndex = "articles"
+		}
+		if configs[i].Index == "" {
+			configs[i].Index = "content"
+		}
+	}
 	return &testSources{
 		configs: configs,
 		logger:  NewTestLogger(),

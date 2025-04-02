@@ -20,7 +20,7 @@ const (
 // Module provides the sources module's dependencies.
 var Module = fx.Module("sources",
 	fx.Provide(
-		provideSources,
+		ProvideSources,
 	),
 )
 
@@ -32,8 +32,8 @@ type ModuleParams struct {
 	Logger Logger
 }
 
-// provideSources creates a new sources instance.
-func provideSources(p ModuleParams) Interface {
+// ProvideSources creates a new sources instance.
+func ProvideSources(p ModuleParams) Interface {
 	var configs []Config
 	sources := p.Config.GetSources()
 	if len(sources) == 0 {
@@ -43,15 +43,19 @@ func provideSources(p ModuleParams) Interface {
 		defaultConfig.URL = "http://localhost"
 		defaultConfig.MaxDepth = DefaultMaxDepth
 		defaultConfig.RateLimit = DefaultRateLimit
+		defaultConfig.ArticleIndex = "articles"
+		defaultConfig.Index = "content"
 		configs = append(configs, *defaultConfig)
 	} else {
 		for _, src := range sources {
 			configs = append(configs, Config{
-				Name:      src.Name,
-				URL:       src.URL,
-				RateLimit: src.RateLimit,
-				MaxDepth:  src.MaxDepth,
-				Time:      src.Time,
+				Name:         src.Name,
+				URL:          src.URL,
+				RateLimit:    src.RateLimit,
+				MaxDepth:     src.MaxDepth,
+				Time:         src.Time,
+				ArticleIndex: src.ArticleIndex,
+				Index:        src.Index,
 			})
 		}
 	}
@@ -67,10 +71,12 @@ func provideSources(p ModuleParams) Interface {
 // NewConfig creates a new source configuration.
 func NewConfig() *Config {
 	return &Config{
-		Name:      "default",
-		URL:       "http://localhost",
-		MaxDepth:  DefaultMaxDepth,
-		RateLimit: DefaultRateLimit,
+		Name:         "default",
+		URL:          "http://localhost",
+		MaxDepth:     DefaultMaxDepth,
+		RateLimit:    DefaultRateLimit,
+		ArticleIndex: "articles",
+		Index:        "content",
 	}
 }
 
