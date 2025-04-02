@@ -229,10 +229,13 @@ func NewCustomLogger(logger *zap.Logger, params Params) (Interface, error) {
 	config.OutputPaths = []string{"stdout"}
 	config.EncoderConfig.TimeKey = "timestamp"
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder // Use colored level encoder
+	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	config.EncoderConfig.EncodeDuration = zapcore.StringDurationEncoder
-	config.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
-	config.EncoderConfig.ConsoleSeparator = " | " // Use a separator between fields
+	config.EncoderConfig.ConsoleSeparator = " | "
+
+	// Disable caller and stacktrace for non-error levels
+	config.DisableCaller = true
+	config.DisableStacktrace = true
 
 	// Set log level based on params
 	var level zapcore.Level
@@ -245,26 +248,31 @@ func NewCustomLogger(logger *zap.Logger, params Params) (Interface, error) {
 		level = zapcore.WarnLevel
 	case levelError:
 		level = zapcore.ErrorLevel
+		// Enable caller and stacktrace for error level
+		config.DisableCaller = false
+		config.DisableStacktrace = false
 	case levelFatal:
 		level = zapcore.FatalLevel
+		// Enable caller and stacktrace for fatal level
+		config.DisableCaller = false
+		config.DisableStacktrace = false
 	default:
-		level = zapcore.InfoLevel
-	}
-
-	// Set level based on debug flag
-	if params.Debug {
-		level = zapcore.DebugLevel
+		if params.Debug {
+			level = zapcore.DebugLevel
+		} else {
+			level = zapcore.InfoLevel
+		}
 	}
 
 	config.Level = zap.NewAtomicLevelAt(level)
 
-	// Create the logger
-	logger, err := config.Build()
+	// Build the logger
+	zapLogger, err := config.Build()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
+		return nil, err
 	}
 
 	return &ZapLogger{
-		Logger: logger,
+		Logger: zapLogger,
 	}, nil
 }

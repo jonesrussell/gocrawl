@@ -83,23 +83,25 @@ var Module = fx.Module("crawl",
 	// Provide index names
 	fx.Provide(
 		fx.Annotate(
-			func() string {
-				return "articles"
+			func(sources sources.Interface, sourceName string) string {
+				source, err := sources.FindByName(sourceName)
+				if err != nil {
+					panic(fmt.Sprintf("failed to get source %s: %v", sourceName, err))
+				}
+				return source.ArticleIndex
 			},
+			fx.ParamTags(`name:"sourceName"`),
 			fx.ResultTags(`name:"indexName"`),
 		),
 		fx.Annotate(
-			func(p struct {
-				fx.In
-				Sources sources.Interface
-				Name    string `name:"sourceName"`
-			}) string {
-				source, err := p.Sources.FindByName(p.Name)
+			func(sources sources.Interface, sourceName string) string {
+				source, err := sources.FindByName(sourceName)
 				if err != nil {
-					panic(fmt.Sprintf("failed to get source %s: %v", p.Name, err))
+					panic(fmt.Sprintf("failed to get source %s: %v", sourceName, err))
 				}
 				return source.Index
 			},
+			fx.ParamTags(`name:"sourceName"`),
 			fx.ResultTags(`name:"contentIndex"`),
 		),
 	),
