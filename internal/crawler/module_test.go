@@ -140,7 +140,12 @@ var TestCrawlerModule = fx.Module("crawler",
 				},
 			) common.Processor {
 				log.Debug("Providing content processor")
-				return content.NewProcessor(contentService, storage, log, params.IndexName)
+				return content.NewContentProcessor(content.ProcessorParams{
+					Logger:    log,
+					Service:   contentService,
+					Storage:   storage,
+					IndexName: params.IndexName,
+				})
 			},
 			fx.ResultTags(`name:"contentProcessor"`),
 		),

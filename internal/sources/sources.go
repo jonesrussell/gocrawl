@@ -9,57 +9,84 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
+	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 )
 
 // Config represents a source configuration.
-type Config struct {
-	Name         string            `yaml:"name"`
-	URL          string            `yaml:"url"`
-	RateLimit    time.Duration     `yaml:"-"`
-	MaxDepth     int               `yaml:"max_depth"`
-	ArticleIndex string            `yaml:"article_index"`
-	Index        string            `yaml:"index"`
-	Time         []string          `yaml:"time,omitempty"`
-	Selectors    SelectorConfig    `yaml:"selectors"`
-	Metadata     map[string]string `yaml:"metadata,omitempty"`
-}
-
-// ArticleSelectors defines the CSS selectors used for article content extraction.
-type ArticleSelectors struct {
-	Container     string `yaml:"container"`
-	Title         string `yaml:"title"`
-	Body          string `yaml:"body"`
-	Intro         string `yaml:"intro"`
-	Byline        string `yaml:"byline"`
-	PublishedTime string `yaml:"published_time"`
-	TimeAgo       string `yaml:"time_ago"`
-	JSONLD        string `yaml:"jsonld"`
-	Section       string `yaml:"section"`
-	Keywords      string `yaml:"keywords"`
-	Description   string `yaml:"description"`
-	OGTitle       string `yaml:"og_title"`
-	OGDescription string `yaml:"og_description"`
-	OGImage       string `yaml:"og_image"`
-	OgURL         string `yaml:"og_url"`
-	Canonical     string `yaml:"canonical"`
-	WordCount     string `yaml:"word_count"`
-	PublishDate   string `yaml:"publish_date"`
-	Category      string `yaml:"category"`
-	Tags          string `yaml:"tags"`
-	Author        string `yaml:"author"`
-	BylineName    string `yaml:"byline_name"`
-}
+type Config = sourceutils.SourceConfig
 
 // SelectorConfig defines the CSS selectors used for content extraction.
-type SelectorConfig struct {
-	Article ArticleSelectors `yaml:"article"`
-}
+type SelectorConfig = sourceutils.SelectorConfig
+
+// ArticleSelectors defines the CSS selectors used for article content extraction.
+type ArticleSelectors = sourceutils.ArticleSelectors
 
 // Sources manages web content source configurations.
 type Sources struct {
 	sources []Config
 	logger  Logger
 	metrics Metrics
+}
+
+// Ensure Sources implements Interface
+var _ Interface = (*Sources)(nil)
+
+// convertSourceConfig converts a config.Source to a Config
+func convertSourceConfig(src config.Source) Config {
+	return Config{
+		Name:         src.Name,
+		URL:          src.URL,
+		RateLimit:    src.RateLimit,
+		MaxDepth:     src.MaxDepth,
+		Time:         src.Time,
+		ArticleIndex: src.ArticleIndex,
+		Index:        src.Index,
+		Selectors: SelectorConfig{
+			Article: ArticleSelectors{
+				Container:     src.Selectors.Article.Container,
+				Title:         src.Selectors.Article.Title,
+				Body:          src.Selectors.Article.Body,
+				Intro:         src.Selectors.Article.Intro,
+				Byline:        src.Selectors.Article.Byline,
+				PublishedTime: src.Selectors.Article.PublishedTime,
+				TimeAgo:       src.Selectors.Article.TimeAgo,
+				JSONLD:        src.Selectors.Article.JSONLD,
+				Section:       src.Selectors.Article.Section,
+				Keywords:      src.Selectors.Article.Keywords,
+				Description:   src.Selectors.Article.Description,
+				OGTitle:       src.Selectors.Article.OGTitle,
+				OGDescription: src.Selectors.Article.OGDescription,
+				OGImage:       src.Selectors.Article.OGImage,
+				OgURL:         src.Selectors.Article.OgURL,
+				Canonical:     src.Selectors.Article.Canonical,
+				WordCount:     src.Selectors.Article.WordCount,
+				PublishDate:   src.Selectors.Article.PublishDate,
+				Category:      src.Selectors.Article.Category,
+				Tags:          src.Selectors.Article.Tags,
+				Author:        src.Selectors.Article.Author,
+				BylineName:    src.Selectors.Article.BylineName,
+			},
+		},
+	}
+}
+
+// NewSourcesFromConfig creates a new Sources instance from a config.Interface.
+// It converts the config sources to internal source configurations.
+func NewSourcesFromConfig(cfg config.Interface, logger Logger) *Sources {
+	configSources := cfg.GetSources()
+	var sources []Config
+
+	for _, src := range configSources {
+		sources = append(sources, convertSourceConfig(src))
+	}
+
+	return &Sources{
+		sources: sources,
+		logger:  logger,
+		metrics: Metrics{
+			SourceCount: int64(len(sources)),
+		},
+	}
 }
 
 // LoadFromFile loads source configurations from a YAML file.
@@ -85,12 +112,39 @@ func LoadFromFile(path string, logger Logger) (*Sources, error) {
 		}
 
 		configs = append(configs, Config{
-			Name:      src.Name,
-			URL:       src.URL,
-			RateLimit: rateLimit,
-			MaxDepth:  src.MaxDepth,
-			Time:      src.Time,
-			Selectors: NewSelectorConfigFromLoader(src),
+			Name:         src.Name,
+			URL:          src.URL,
+			RateLimit:    rateLimit,
+			MaxDepth:     src.MaxDepth,
+			Time:         src.Time,
+			ArticleIndex: src.ArticleIndex,
+			Index:        src.Index,
+			Selectors: SelectorConfig{
+				Article: ArticleSelectors{
+					Container:     src.Selectors.Article.Container,
+					Title:         src.Selectors.Article.Title,
+					Body:          src.Selectors.Article.Body,
+					Intro:         src.Selectors.Article.Intro,
+					Byline:        src.Selectors.Article.Byline,
+					PublishedTime: src.Selectors.Article.PublishedTime,
+					TimeAgo:       src.Selectors.Article.TimeAgo,
+					JSONLD:        src.Selectors.Article.JSONLD,
+					Section:       src.Selectors.Article.Section,
+					Keywords:      src.Selectors.Article.Keywords,
+					Description:   src.Selectors.Article.Description,
+					OGTitle:       src.Selectors.Article.OGTitle,
+					OGDescription: src.Selectors.Article.OGDescription,
+					OGImage:       src.Selectors.Article.OGImage,
+					OgURL:         src.Selectors.Article.OgURL,
+					Canonical:     src.Selectors.Article.Canonical,
+					WordCount:     src.Selectors.Article.WordCount,
+					PublishDate:   src.Selectors.Article.PublishDate,
+					Category:      src.Selectors.Article.Category,
+					Tags:          src.Selectors.Article.Tags,
+					Author:        src.Selectors.Article.Author,
+					BylineName:    src.Selectors.Article.BylineName,
+				},
+			},
 		})
 	}
 

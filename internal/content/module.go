@@ -44,12 +44,7 @@ var Module = fx.Module("content",
 		fx.Annotate(
 			func(p ProcessorParams) common.Processor {
 				// Create processor
-				processor := NewProcessor(
-					p.Service,
-					p.Storage,
-					p.Logger,
-					p.IndexName,
-				)
+				processor := NewContentProcessor(p)
 				p.Logger.Debug("Created content processor", "type", fmt.Sprintf("%T", processor))
 				return processor
 			},

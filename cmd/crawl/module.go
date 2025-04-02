@@ -64,56 +64,30 @@ var Module = fx.Module("crawl",
 				Output: crawler.NewDebugLogger(logger),
 			}
 		},
-		// Provide sources
-		func() *sources.Sources {
-			return &sources.Sources{}
-		},
 		// Provide event bus
 		func() *events.Bus {
 			return events.NewBus()
 		},
-		// Provide article processor with correct name
+		// Provide startup processors
 		fx.Annotate(
-			func(
-				logger types.Logger,
-				storage storagetypes.Interface,
-				params struct {
-					fx.In
-					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
-					IndexName   string               `name:"indexName"`
-				},
-			) common.Processor {
-				return &article.ArticleProcessor{
-					Logger:      logger,
-					Storage:     storage,
-					IndexName:   params.IndexName,
-					ArticleChan: params.ArticleChan,
-				}
+			func() common.Processor {
+				return common.NewNoopProcessor()
 			},
 			fx.ResultTags(`name:"startupArticleProcessor"`),
 		),
-		// Provide content processor with correct name
 		fx.Annotate(
-			func(
-				logger types.Logger,
-				storage storagetypes.Interface,
-				params struct {
-					fx.In
-					IndexName string `name:"contentIndex"`
-				},
-			) common.Processor {
-				return content.NewProcessor(nil, storage, logger, params.IndexName)
+			func() common.Processor {
+				return common.NewNoopProcessor()
 			},
 			fx.ResultTags(`name:"startupContentProcessor"`),
 		),
-		// Provide index name
+		// Provide index names
 		fx.Annotate(
 			func() string {
 				return "articles"
 			},
 			fx.ResultTags(`name:"indexName"`),
 		),
-		// Provide content index name
 		fx.Annotate(
 			func() string {
 				return "content"

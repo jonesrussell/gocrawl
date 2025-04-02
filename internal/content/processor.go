@@ -1,37 +1,54 @@
+// Package content provides functionality for processing and managing content.
 package content
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// ContentProcessor handles the processing of non-article content
+// ContentProcessor handles content processing.
 type ContentProcessor struct {
-	service   Interface
-	storage   storagetypes.Interface
-	logger    common.Logger
-	indexName string
-	metrics   *common.Metrics
+	// Logger for content processing operations
+	Logger common.Logger
+	// ContentService for content operations
+	ContentService Interface
+	// Storage for content persistence
+	Storage storagetypes.Interface
+	// IndexName is the name of the content index
+	IndexName string
+	// metrics holds processing metrics
+	metrics *common.Metrics
 }
 
-// NewProcessor creates a new content processor instance.
-func NewProcessor(
-	service Interface,
-	storage storagetypes.Interface,
-	logger common.Logger,
-	indexName string,
-) *ContentProcessor {
+// NewContentProcessor creates a new content processor.
+func NewContentProcessor(p ProcessorParams) *ContentProcessor {
 	return &ContentProcessor{
-		service:   service,
-		storage:   storage,
-		logger:    logger,
-		indexName: indexName,
-		metrics:   &common.Metrics{},
+		Logger:         p.Logger,
+		ContentService: p.Service,
+		Storage:        p.Storage,
+		IndexName:      p.IndexName,
+		metrics:        &common.Metrics{},
 	}
+}
+
+// Start implements common.Processor.Start.
+func (p *ContentProcessor) Start(ctx context.Context) error {
+	p.Logger.Info("Starting content processor",
+		"component", "content/processor")
+	return nil
+}
+
+// Stop implements common.Processor.Stop.
+func (p *ContentProcessor) Stop(ctx context.Context) error {
+	p.Logger.Info("Stopping content processor",
+		"component", "content/processor")
+	return nil
 }
 
 // ProcessJob processes a job and its items.
@@ -44,7 +61,7 @@ func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 	// Check context cancellation
 	select {
 	case <-ctx.Done():
-		p.logger.Warn("Job processing cancelled",
+		p.Logger.Warn("Job processing cancelled",
 			"job_id", job.ID,
 			"error", ctx.Err(),
 		)
@@ -52,7 +69,7 @@ func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 		return
 	default:
 		// Process the job
-		p.logger.Info("Processing job",
+		p.Logger.Info("Processing job",
 			"job_id", job.ID,
 		)
 
@@ -74,26 +91,18 @@ func (p *ContentProcessor) ProcessHTML(e *colly.HTMLElement) error {
 		p.metrics.ProcessingDuration += time.Since(start)
 	}()
 
-	p.logger.Debug("Processing content",
-		"component", "content/processor",
-		"url", e.Request.URL.String(),
-		"index", p.indexName)
-
-	content := p.service.ExtractContent(e)
+	// Extract content data from HTML element
+	content := p.ContentService.ExtractContent(e)
 	if content == nil {
-		p.logger.Debug("No content extracted",
+		p.Logger.Debug("No content found in HTML element",
 			"component", "content/processor",
 			"url", e.Request.URL.String())
 		return nil
 	}
 
-	p.logger.Debug("Content extracted",
-		"component", "content/processor",
-		"url", e.Request.URL.String(),
-		"title", content.Title)
-
-	if err := p.storage.IndexDocument(context.Background(), p.indexName, content.ID, content); err != nil {
-		p.logger.Error("Failed to index content",
+	// Process the content
+	if err := p.Storage.IndexDocument(context.Background(), p.IndexName, content.ID, content); err != nil {
+		p.Logger.Error("Failed to index content",
 			"component", "content/processor",
 			"contentID", content.ID,
 			"error", err)
@@ -110,6 +119,55 @@ func (p *ContentProcessor) ProcessHTML(e *colly.HTMLElement) error {
 // GetMetrics returns the current processing metrics.
 func (p *ContentProcessor) GetMetrics() *common.Metrics {
 	return p.metrics
+}
+
+// ProcessContent implements the collector.Processor interface
+func (p *ContentProcessor) ProcessContent(e *colly.HTMLElement) {
+	p.Logger.Debug("Processing content from HTML",
+		"component", "content/processor",
+		"url", e.Request.URL.String())
+
+	content := p.ContentService.ExtractContent(e)
+	if content == nil {
+		p.Logger.Debug("No content extracted",
+			"component", "content/processor",
+			"url", e.Request.URL.String())
+		return
+	}
+
+	p.Logger.Debug("Content extracted",
+		"component", "content/processor",
+		"url", e.Request.URL.String(),
+		"title", content.Title)
+
+	if err := p.Storage.IndexDocument(context.Background(), p.IndexName, content.ID, content); err != nil {
+		p.Logger.Error("Failed to index content",
+			"component", "content/processor",
+			"contentID", content.ID,
+			"error", err)
+	}
+}
+
+// Process implements common.Processor.Process.
+func (p *ContentProcessor) Process(ctx context.Context, data interface{}) error {
+	content, ok := data.(*models.Content)
+	if !ok {
+		return fmt.Errorf("invalid data type: expected *models.Content, got %T", data)
+	}
+
+	// Process the content using the ContentService
+	if err := p.Storage.IndexDocument(ctx, p.IndexName, content.ID, content); err != nil {
+		p.Logger.Error("Failed to index content",
+			"component", "content/processor",
+			"contentID", content.ID,
+			"error", err)
+		p.metrics.ErrorCount++
+		return err
+	}
+
+	p.metrics.ProcessedCount++
+	p.metrics.LastProcessedTime = time.Now()
+	return nil
 }
 
 // Ensure ContentProcessor implements common.Processor

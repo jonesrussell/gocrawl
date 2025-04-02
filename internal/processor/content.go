@@ -39,8 +39,27 @@ type ContentProcessor struct {
 	processingTime    time.Duration
 }
 
+// NewContentProcessor creates a new content processor.
+func NewContentProcessor(
+	service *ContentService,
+	storage types.Interface,
+	logger common.Logger,
+	indexName string,
+) *ContentProcessor {
+	return &ContentProcessor{
+		service:   service,
+		storage:   storage,
+		logger:    logger,
+		indexName: indexName,
+	}
+}
+
 // Process implements common.Processor
-func (p *ContentProcessor) Process(e *colly.HTMLElement) error {
+func (p *ContentProcessor) Process(ctx context.Context, data interface{}) error {
+	e, ok := data.(*colly.HTMLElement)
+	if !ok {
+		return fmt.Errorf("invalid data type: expected *colly.HTMLElement, got %T", data)
+	}
 	return p.ProcessHTML(e)
 }
 
@@ -113,4 +132,16 @@ func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 
 		atomic.AddInt64(&p.processedCount, 1)
 	}
+}
+
+// Start implements common.Processor
+func (p *ContentProcessor) Start(ctx context.Context) error {
+	p.logger.Info("Starting content processor")
+	return nil
+}
+
+// Stop implements common.Processor
+func (p *ContentProcessor) Stop(ctx context.Context) error {
+	p.logger.Info("Stopping content processor")
+	return nil
 }

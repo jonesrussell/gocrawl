@@ -9,6 +9,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -20,6 +21,8 @@ import (
 // - IndexName: The Elasticsearch index name for articles
 // - ArticleChan: Channel for article processing
 // - Service: The article service interface
+// - Config: For application configuration
+// - Sources: The content source interface
 type ProcessorParams struct {
 	fx.In
 
@@ -28,6 +31,9 @@ type ProcessorParams struct {
 	IndexName   string               `name:"indexName"`
 	ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 	Service     Interface
+	Config      config.Interface
+	Sources     sources.Interface
+	Source      string `name:"sourceName"`
 }
 
 // ServiceParams contains the dependencies required to create an article service.
@@ -37,11 +43,13 @@ type ProcessorParams struct {
 // - Storage: For article persistence
 // - Source: The content source name
 // - IndexName: The Elasticsearch index name for articles
+// - Sources: The content source interface
 type ServiceParams struct {
 	fx.In
 
 	Logger    common.Logger
 	Config    config.Interface
+	Sources   sources.Interface
 	Storage   types.Interface
 	Source    string `name:"sourceName"`
 	IndexName string `name:"indexName"`
@@ -53,15 +61,35 @@ var Module = fx.Module("article",
 		// Provide the article service
 		func(p ServiceParams) (Interface, error) {
 			// Get source configuration
-			sources := p.Config.GetSources()
-			var selectors config.ArticleSelectors
+			source, err := p.Sources.FindByName(p.Source)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find source %s: %w", p.Source, err)
+			}
 
-			// Find selectors for the current source
-			for _, source := range sources {
-				if source.Name == p.Source {
-					selectors = source.Selectors.Article
-					break
-				}
+			// Convert source selectors to article selectors
+			selectors := config.ArticleSelectors{
+				Container:     source.Selectors.Article.Container,
+				Title:         source.Selectors.Article.Title,
+				Body:          source.Selectors.Article.Body,
+				Intro:         source.Selectors.Article.Intro,
+				Byline:        source.Selectors.Article.Byline,
+				PublishedTime: source.Selectors.Article.PublishedTime,
+				TimeAgo:       source.Selectors.Article.TimeAgo,
+				JSONLD:        source.Selectors.Article.JSONLD,
+				Section:       source.Selectors.Article.Section,
+				Keywords:      source.Selectors.Article.Keywords,
+				Description:   source.Selectors.Article.Description,
+				OGTitle:       source.Selectors.Article.OGTitle,
+				OGDescription: source.Selectors.Article.OGDescription,
+				OGImage:       source.Selectors.Article.OGImage,
+				OgURL:         source.Selectors.Article.OgURL,
+				Canonical:     source.Selectors.Article.Canonical,
+				WordCount:     source.Selectors.Article.WordCount,
+				PublishDate:   source.Selectors.Article.PublishDate,
+				Category:      source.Selectors.Article.Category,
+				Tags:          source.Selectors.Article.Tags,
+				Author:        source.Selectors.Article.Author,
+				BylineName:    source.Selectors.Article.BylineName,
 			}
 
 			// Use default selectors if source selectors are empty

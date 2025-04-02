@@ -3,6 +3,7 @@ package article
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -37,6 +38,20 @@ func NewArticleProcessor(p ProcessorParams) *ArticleProcessor {
 		ArticleChan:    p.ArticleChan,
 		metrics:        &common.Metrics{},
 	}
+}
+
+// Start implements common.Processor.Start.
+func (p *ArticleProcessor) Start(ctx context.Context) error {
+	p.Logger.Info("Starting article processor",
+		"component", "article/processor")
+	return nil
+}
+
+// Stop implements common.Processor.Stop.
+func (p *ArticleProcessor) Stop(ctx context.Context) error {
+	p.Logger.Info("Stopping article processor",
+		"component", "article/processor")
+	return nil
 }
 
 // ProcessJob processes a job and its items.
@@ -147,6 +162,17 @@ func (p *ArticleProcessor) ProcessContent(e *colly.HTMLElement) {
 	p.Logger.Debug("Skipping content page in article processor",
 		"component", "article/processor",
 		"url", e.Request.URL.String())
+}
+
+// Process implements common.Processor.Process.
+func (p *ArticleProcessor) Process(ctx context.Context, data interface{}) error {
+	article, ok := data.(*models.Article)
+	if !ok {
+		return fmt.Errorf("invalid data type: expected *models.Article, got %T", data)
+	}
+
+	// Process the article using the ArticleService
+	return p.ArticleService.Process(article)
 }
 
 // Ensure ArticleProcessor implements common.Processor

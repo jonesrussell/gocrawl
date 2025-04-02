@@ -55,7 +55,7 @@ var (
 	ErrInvalidSource = errors.New("invalid source configuration")
 )
 
-// ValidateParams validates the parameters for creating a sources instance.
+// ValidateParams validates the parameters for creating a new Sources instance.
 func ValidateParams(p Params) error {
 	if p.Logger == nil {
 		return errors.New("logger is required")

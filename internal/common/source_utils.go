@@ -8,6 +8,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 )
 
 // ConvertSourceConfig converts a sources.Config to a config.Source.
@@ -17,13 +18,7 @@ func ConvertSourceConfig(source *sources.Config) *config.Source {
 		return nil
 	}
 
-	return &config.Source{
-		Name:      source.Name,
-		URL:       source.URL,
-		RateLimit: source.RateLimit,
-		MaxDepth:  source.MaxDepth,
-		Time:      source.Time,
-	}
+	return sourceutils.ConvertToConfigSource((*sourceutils.SourceConfig)(source))
 }
 
 // ExtractDomain extracts the domain from a URL string.

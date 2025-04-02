@@ -5,6 +5,7 @@ package sources
 import (
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
 )
@@ -17,63 +18,66 @@ const (
 	DefaultRateLimit = 5 * time.Second
 )
 
-// Module provides the sources module's dependencies.
+// Module provides the sources package's dependencies.
 var Module = fx.Module("sources",
 	fx.Provide(
-		ProvideSources,
+		// Provide sources from config
+		func(cfg config.Interface, logger Logger) Interface {
+			return NewSourcesFromConfig(cfg, logger)
+		},
+		// Provide logger
+		func(logger types.Logger) Logger {
+			return logger
+		},
 	),
 )
 
-// ModuleParams holds the parameters for creating a sources module.
+// ModuleParams defines the parameters for creating a new Sources instance.
 type ModuleParams struct {
 	fx.In
 
 	Config config.Interface
-	Logger Logger
+	Logger types.Logger
 }
 
-// ProvideSources creates a new sources instance.
-func ProvideSources(p ModuleParams) Interface {
-	var configs []Config
-	sources := p.Config.GetSources()
-	if len(sources) == 0 {
-		// If no sources found, use a default config
-		defaultConfig := NewConfig()
-		defaultConfig.Name = "default"
-		defaultConfig.URL = "http://localhost"
-		defaultConfig.MaxDepth = DefaultMaxDepth
-		defaultConfig.RateLimit = DefaultRateLimit
-		defaultConfig.ArticleIndex = "articles"
-		defaultConfig.Index = "content"
-		configs = append(configs, *defaultConfig)
-	} else {
-		for _, src := range sources {
-			config := Config{
-				Name:         src.Name,
-				URL:          src.URL,
-				RateLimit:    src.RateLimit,
-				MaxDepth:     src.MaxDepth,
-				Time:         src.Time,
-				ArticleIndex: src.ArticleIndex,
-				Index:        src.Index,
-			}
-			// Set default index names if empty
-			if config.ArticleIndex == "" {
-				config.ArticleIndex = "articles"
-			}
-			if config.Index == "" {
-				config.Index = "content"
-			}
-			configs = append(configs, config)
+// Result defines the sources module's output.
+type Result struct {
+	fx.Out
+
+	Sources Interface
+}
+
+// ProvideSources creates a new Sources instance.
+func ProvideSources(p ModuleParams) (Result, error) {
+	// Get sources from config
+	configSources := p.Config.GetSources()
+
+	// Convert config sources to internal sources
+	var sources []Config
+	for _, src := range configSources {
+		// Set default index names if empty
+		if src.ArticleIndex == "" {
+			src.ArticleIndex = "articles"
 		}
+		if src.Index == "" {
+			src.Index = "content"
+		}
+
+		sources = append(sources, convertSourceConfig(src))
 	}
-	return &Sources{
-		sources: configs,
+
+	// Create sources instance
+	s := &Sources{
+		sources: sources,
 		logger:  p.Logger,
 		metrics: Metrics{
-			SourceCount: int64(len(configs)),
+			SourceCount: int64(len(sources)),
 		},
 	}
+
+	return Result{
+		Sources: s,
+	}, nil
 }
 
 // NewConfig creates a new source configuration.
