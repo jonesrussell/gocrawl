@@ -162,8 +162,8 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
 
 	// Configure collector
-	if err := c.configureCollector(source); err != nil {
-		return err
+	if configErr := c.configureCollector(source); configErr != nil {
+		return configErr
 	}
 
 	// Reset metrics and state
