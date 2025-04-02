@@ -118,6 +118,30 @@ func TestCreateCommand(t *testing.T) {
 	mockStore.AssertCalled(t, "CreateIndex", mock.Anything, "test-index", mock.Anything)
 }
 
+// TestCreateCommandArgs tests argument validation in the create index command
+func TestCreateCommandArgs(t *testing.T) {
+	t.Parallel()
+
+	// Get the create command
+	cmd := indices.Command()
+	createCmd := cmd.Commands()[2] // Get the create subcommand
+
+	// Test with no arguments
+	err := createCmd.RunE(createCmd, []string{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "accepts 1 arg(s)")
+
+	// Test with too many arguments
+	err = createCmd.RunE(createCmd, []string{"index1", "index2"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "accepts 1 arg(s)")
+
+	// Test with valid arguments
+	err = createCmd.RunE(createCmd, []string{"test-index"})
+	require.Error(t, err) // Should error because we're not providing real dependencies
+	require.Contains(t, err.Error(), "failed to create index test-index")
+}
+
 // TestCreateCommandError tests error handling in the create index command
 func TestCreateCommandError(t *testing.T) {
 	t.Parallel()
@@ -181,28 +205,4 @@ func TestCreateCommandError(t *testing.T) {
 	err := app.Start(t.Context())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to create index test-index: index creation failed")
-}
-
-// TestCreateCommandArgs tests argument validation in the create index command
-func TestCreateCommandArgs(t *testing.T) {
-	t.Parallel()
-
-	// Get the create command
-	cmd := indices.Command()
-	createCmd := cmd.Commands()[2] // Get the create subcommand
-
-	// Test with no arguments
-	err := createCmd.RunE(createCmd, []string{})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "accepts 1 arg(s)")
-
-	// Test with too many arguments
-	err = createCmd.RunE(createCmd, []string{"index1", "index2"})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "accepts 1 arg(s)")
-
-	// Test with valid arguments
-	err = createCmd.RunE(createCmd, []string{"test-index"})
-	require.Error(t, err) // Should error because we're not providing real dependencies
-	require.Contains(t, err.Error(), "failed to create index test-index")
 }
