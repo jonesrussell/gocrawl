@@ -4,6 +4,7 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -45,13 +46,38 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
 
-	// Set up rate limiting
-	if rateErr := c.SetRateLimit(source.RateLimit); rateErr != nil {
+	// Parse the source URL to get the domain
+	sourceURL, err := url.Parse(source.URL)
+	if err != nil {
+		return fmt.Errorf("error parsing source URL: %w", err)
+	}
+
+	// Set allowed domains
+	c.collector.AllowedDomains = []string{sourceURL.Host}
+	c.Logger.Info("Set allowed domain", "domain", sourceURL.Host)
+
+	// Set up rate limiting - limit to 1 request per rate limit duration
+	if rateErr := c.collector.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Delay:       source.RateLimit,
+		RandomDelay: 0,
+		Parallelism: DefaultParallelism,
+	}); rateErr != nil {
 		return fmt.Errorf("error setting rate limit: %w", rateErr)
 	}
+	c.Logger.Info("Set rate limit", "delay", source.RateLimit, "parallelism", DefaultParallelism)
 
 	// Set max depth
 	c.SetMaxDepth(source.MaxDepth)
+	c.Logger.Info("Set max depth", "depth", source.MaxDepth)
+
+	// Configure collector
+	c.collector.DetectCharset = true
+	c.collector.CheckHead = true
+	c.collector.DisallowedDomains = []string{}
+	c.collector.AllowURLRevisit = false
+	c.collector.MaxDepth = source.MaxDepth
+	c.collector.Async = true
 
 	// Start crawling
 	if crawlErr := c.collector.Visit(source.URL); crawlErr != nil {

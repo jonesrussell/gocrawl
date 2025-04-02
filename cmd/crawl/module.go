@@ -71,16 +71,71 @@ var Module = fx.Module("crawl",
 		),
 		// Provide startup processors
 		fx.Annotate(
-			func() common.Processor {
-				return common.NewNoopProcessor()
+			func(
+				logger types.Logger,
+				storage storagetypes.Interface,
+				articleChan chan *models.Article,
+				indexName string,
+			) common.Processor {
+				service := article.NewService(
+					logger,
+					config.DefaultArticleSelectors(),
+					storage,
+					indexName,
+				)
+				return article.NewArticleProcessor(article.ProcessorParams{
+					Logger:      logger,
+					Service:     service,
+					Storage:     storage,
+					IndexName:   indexName,
+					ArticleChan: articleChan,
+				})
 			},
+			fx.ParamTags(
+				``,
+				``,
+				`name:"crawlerArticleChannel"`,
+				`name:"indexName"`,
+			),
 			fx.ResultTags(`name:"startupArticleProcessor"`),
 		),
 		fx.Annotate(
-			func() common.Processor {
-				return common.NewNoopProcessor()
+			func(
+				logger types.Logger,
+				storage storagetypes.Interface,
+				contentIndex string,
+			) common.Processor {
+				service := content.NewService(logger)
+				return content.NewContentProcessor(content.ProcessorParams{
+					Logger:    logger,
+					Service:   service,
+					Storage:   storage,
+					IndexName: contentIndex,
+				})
 			},
+			fx.ParamTags(
+				``,
+				``,
+				`name:"contentIndex"`,
+			),
 			fx.ResultTags(`name:"startupContentProcessor"`),
+		),
+		// Provide processors group
+		fx.Annotate(
+			func(
+				articleProcessor common.Processor,
+				contentProcessor common.Processor,
+			) []common.Processor {
+				return []common.Processor{
+					articleProcessor,
+					contentProcessor,
+				}
+			},
+			fx.ParamTags(
+				`name:"startupArticleProcessor"`,
+				`name:"startupContentProcessor"`,
+			),
+			fx.ResultTags(`group:"processors"`),
 		),
 		// Provide index names
 		fx.Annotate(

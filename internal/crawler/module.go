@@ -78,16 +78,19 @@ func ProvideCrawler(
 	contentProcessor common.Processor,
 	bus *events.Bus,
 ) Result {
+	crawler := NewCrawler(
+		logger,
+		debugger,
+		indexManager,
+		sources,
+		articleProcessor,
+		contentProcessor,
+		bus,
+	)
+
+	logger.Info("Created crawler instance")
 	return Result{
-		Crawler: NewCrawler(
-			logger,
-			debugger,
-			indexManager,
-			sources,
-			articleProcessor,
-			contentProcessor,
-			bus,
-		),
+		Crawler: crawler,
 	}
 }
 
@@ -105,7 +108,17 @@ func NewCrawler(
 		colly.MaxDepth(3),
 		colly.Async(true),
 		colly.Debugger(debugger),
+		colly.AllowedDomains(),
+		colly.ParseHTTPErrorResponse(),
 	)
+
+	// Disable URL revisiting
+	collector.AllowURLRevisit = false
+
+	// Configure collector
+	collector.DetectCharset = true
+	collector.CheckHead = true
+	collector.DisallowedDomains = []string{}
 
 	crawler := &Crawler{
 		Logger:           logger,
@@ -124,15 +137,20 @@ func NewCrawler(
 	})
 
 	collector.OnResponse(func(r *colly.Response) {
-		crawler.Logger.Info("Visited", "url", r.Request.URL.String())
+		crawler.Logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
 	})
 
 	collector.OnError(func(r *colly.Response, err error) {
-		crawler.Logger.Error("Error while crawling", "url", r.Request.URL.String(), "error", err)
+		crawler.Logger.Error("Error while crawling",
+			"url", r.Request.URL.String(),
+			"status", r.StatusCode,
+			"error", err)
 	})
 
-	// Set up HTML callback
-	collector.OnHTML("*", crawler.ProcessHTML)
+	// Let Colly handle link discovery
+	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		e.Request.Visit(e.Attr("href"))
+	})
 
 	return crawler
 }
