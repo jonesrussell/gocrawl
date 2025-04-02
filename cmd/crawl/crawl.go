@@ -31,16 +31,6 @@ Specify the source name as an argument.`,
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Set debug mode if enabled
-		if debug, _ := cmd.Flags().GetBool("debug"); debug {
-			if err := os.Setenv("APP_DEBUG", "true"); err != nil {
-				return fmt.Errorf("failed to set debug environment variable: %w", err)
-			}
-			if err := os.Setenv("LOG_DEBUG", "true"); err != nil {
-				return fmt.Errorf("failed to set debug environment variable: %w", err)
-			}
-		}
-
 		// Create a logger with the appropriate configuration
 		logger, err := logger.NewCustomLogger(nil, logger.Params{
 			Debug:  true,
@@ -53,6 +43,7 @@ Specify the source name as an argument.`,
 
 		// Set up signal handling with the logger
 		handler := signal.NewSignalHandler(logger)
+		handler.SetExitFunc(os.Exit) // Set the exit function
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
@@ -78,6 +69,10 @@ Specify the source name as an argument.`,
 			fx.Invoke(func(lc fx.Lifecycle, p CommandDeps) {
 				// Update the signal handler with the logger
 				handler.SetLogger(p.Logger)
+
+				// Create a channel to signal when the crawler is done
+				crawlerDone := make(chan struct{})
+
 				lc.Append(fx.Hook{
 					OnStart: func(ctx context.Context) error {
 						// Test storage connection
@@ -93,19 +88,31 @@ Specify the source name as an argument.`,
 
 						// Process articles from the channel
 						go func() {
-							for article := range p.ArticleChan {
-								// Create a job for each article
-								job := &common.Job{
-									ID:        article.ID,
-									URL:       article.Source,
-									Status:    "pending",
-									CreatedAt: article.CreatedAt,
-									UpdatedAt: article.UpdatedAt,
-								}
+							defer close(crawlerDone)
+							for {
+								select {
+								case <-ctx.Done():
+									p.Logger.Info("Context cancelled, stopping article processing")
+									return
+								case article, ok := <-p.ArticleChan:
+									if !ok {
+										p.Logger.Info("Article channel closed")
+										return
+									}
 
-								// Process the article using each processor
-								for _, processor := range p.Processors {
-									processor.ProcessJob(p.Context, job)
+									// Create a job for each article
+									job := &common.Job{
+										ID:        article.ID,
+										URL:       article.Source,
+										Status:    "pending",
+										CreatedAt: article.CreatedAt,
+										UpdatedAt: article.UpdatedAt,
+									}
+
+									// Process the article using each processor
+									for _, processor := range p.Processors {
+										processor.ProcessJob(p.Context, job)
+									}
 								}
 							}
 						}()
@@ -126,6 +133,14 @@ Specify the source name as an argument.`,
 							return fmt.Errorf("failed to stop crawler: %w", err)
 						}
 
+						// Wait for article processing to complete
+						select {
+						case <-crawlerDone:
+							p.Logger.Info("Article processing completed")
+						case <-ctx.Done():
+							p.Logger.Warn("Context cancelled while waiting for article processing")
+						}
+
 						// Close storage connection
 						if err := p.Storage.Close(); err != nil {
 							return fmt.Errorf("failed to close storage connection: %w", err)
@@ -137,6 +152,9 @@ Specify the source name as an argument.`,
 			}),
 		)
 
+		// Set the fx app for coordinated shutdown
+		handler.SetFXApp(fxApp)
+
 		// Start the application
 		if err := fxApp.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start application: %w", err)
@@ -145,11 +163,6 @@ Specify the source name as an argument.`,
 		// Wait for completion signal
 		handler.Wait()
 
-		// Stop the application
-		if err := fxApp.Stop(ctx); err != nil {
-			return fmt.Errorf("failed to stop application: %w", err)
-		}
-
 		return nil
 	},
 }
@@ -157,8 +170,4 @@ Specify the source name as an argument.`,
 // Command returns the crawl command for use in the root command
 func Command() *cobra.Command {
 	return Cmd
-}
-
-func init() {
-	Cmd.Flags().Bool("debug", false, "Enable debug mode")
 }

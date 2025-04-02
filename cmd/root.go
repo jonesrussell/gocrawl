@@ -22,6 +22,9 @@ var (
 	// It can be set via the --config flag or defaults to config.yaml.
 	cfgFile string
 
+	// debug enables debug mode for all commands
+	debug bool
+
 	// rootCmd represents the root command for the GoCrawl CLI.
 	// It serves as the base command that all subcommands are attached to.
 	rootCmd = &cobra.Command{
@@ -59,6 +62,17 @@ func setupConfig(_ *cobra.Command, _ []string) error {
 			return err
 		}
 	}
+
+	// Set debug mode if enabled
+	if debug {
+		if err := os.Setenv("APP_DEBUG", "true"); err != nil {
+			return fmt.Errorf("failed to set debug environment variable: %w", err)
+		}
+		if err := os.Setenv("LOG_DEBUG", "true"); err != nil {
+			return fmt.Errorf("failed to set debug environment variable: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -75,6 +89,7 @@ func Execute() {
 // init initializes the root command and its subcommands.
 // It sets up:
 // - The persistent --config flag for specifying the configuration file
+// - The persistent --debug flag for enabling debug mode
 // - Adds all subcommands for managing different aspects of the crawler:
 //   - indices: For managing Elasticsearch indices
 //   - sources: For managing web content sources
@@ -85,6 +100,9 @@ func Execute() {
 func init() {
 	// Add the persistent --config flag to all commands
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
+
+	// Add the persistent --debug flag to all commands
+	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug mode")
 
 	// Add subcommands for managing different aspects of the crawler
 	rootCmd.AddCommand(

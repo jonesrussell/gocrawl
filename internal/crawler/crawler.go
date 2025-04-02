@@ -36,6 +36,7 @@ type Crawler struct {
 	errorCount       int64
 	startTime        time.Time
 	isRunning        bool
+	done             chan struct{}
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -94,11 +95,12 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.collector.MaxDepth = source.MaxDepth
 	c.collector.Async = true
 
-	// Reset metrics
+	// Reset metrics and state
 	c.processedCount = 0
 	c.errorCount = 0
 	c.startTime = time.Now()
 	c.isRunning = true
+	c.done = make(chan struct{})
 
 	// Start crawling
 	if crawlErr := c.collector.Visit(source.URL); crawlErr != nil {
@@ -107,10 +109,12 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	// Start processing in background
 	go func() {
+		defer close(c.done)
 		for {
 			select {
 			case <-ctx.Done():
 				c.isRunning = false
+				c.Logger.Info("Context cancelled, stopping crawler", "source", sourceName)
 				return
 			case <-time.After(100 * time.Millisecond):
 				if !c.isRunning {
@@ -129,6 +133,17 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	c.Logger.Info("Stopping crawler")
 	c.isRunning = false
 	c.collector.Wait()
+
+	// Wait for background goroutine to finish
+	if c.done != nil {
+		select {
+		case <-c.done:
+			c.Logger.Info("Crawler stopped successfully")
+		case <-ctx.Done():
+			c.Logger.Warn("Context cancelled while waiting for crawler to stop")
+		}
+	}
+
 	return nil
 }
 
@@ -168,6 +183,9 @@ func (c *Crawler) GetIndexManager() api.IndexManager {
 // Wait blocks until the crawler has finished processing all queued requests.
 func (c *Crawler) Wait() {
 	c.collector.Wait()
+	if c.done != nil {
+		<-c.done
+	}
 }
 
 // GetMetrics returns the current crawler metrics.
