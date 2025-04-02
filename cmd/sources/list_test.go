@@ -525,8 +525,8 @@ func Test_printSources_error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			mockLog := tt.logger.(*mockLogger)
-			mockLog.On("Info", "Found sources", []interface{}{"count", 1}).Return()
-			mockLog.On("Info", "Source", []interface{}{"name", "", "url", ""}).Return()
+			mockLog.On("Info", "Found sources", []any{"count", 1}).Return()
+			mockLog.On("Info", "Source", []any{"name", "", "url", ""}).Return()
 
 			err := cmdsrcs.PrintSources(tt.sources, tt.logger)
 			if tt.wantErr {

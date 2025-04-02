@@ -687,8 +687,8 @@ func TestModule(t *testing.T) {
 	t.Parallel()
 
 	// Set the sources file path for testing
-	os.Setenv("CRAWLER_SOURCE_FILE", "testdata/sources.yml")
-	os.Setenv("CONFIG_FILE", "testdata/config.yaml")
+	t.Setenv("CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+	t.Setenv("CONFIG_FILE", "testdata/config.yaml")
 
 	// Create test app with config module
 	app := fxtest.New(t,

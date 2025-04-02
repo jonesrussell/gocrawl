@@ -288,9 +288,9 @@ func ExecuteSearch(ctx context.Context, p Params) error {
 	}
 
 	// Close the search manager
-	if err := p.SearchManager.Close(); err != nil {
-		p.Logger.Error("Error closing search manager", "error", err)
-		return fmt.Errorf("error closing search manager: %w", err)
+	if closeErr := p.SearchManager.Close(); closeErr != nil {
+		p.Logger.Error("Error closing search manager", "error", closeErr)
+		return fmt.Errorf("error closing search manager: %w", closeErr)
 	}
 
 	renderSearchResults(results, p.Query)

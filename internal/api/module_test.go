@@ -117,7 +117,7 @@ func setupTestApp(t *testing.T) *testServer {
 				fx.As(new(api.SearchManager)),
 			),
 			fx.Annotate(
-				context.Background(),
+				t.Context(),
 				fx.As(new(context.Context)),
 			),
 		),

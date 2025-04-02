@@ -86,8 +86,8 @@ func TestCrawlerStartup(t *testing.T) {
 	testCfg := testutils.NewMockConfig()
 
 	// Create test logger
-	log, err := logger.NewLogger(testCfg)
-	require.NoError(t, err)
+	testLogger, initErr := logger.NewLogger(testCfg)
+	require.NoError(t, initErr)
 
 	// Create mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -112,11 +112,11 @@ func TestCrawlerStartup(t *testing.T) {
 		crawler.Module,
 		fx.Provide(
 			// Provide logger
-			func() common.Logger { return log },
+			func() common.Logger { return testLogger },
 			// Provide debugger
 			func() debug.Debugger {
 				return &debug.LogDebugger{
-					Output: crawler.NewDebugLogger(log),
+					Output: crawler.NewDebugLogger(testLogger),
 				}
 			},
 			// Provide index manager
@@ -142,16 +142,16 @@ func TestCrawlerStartup(t *testing.T) {
 			c.SetCollector(collector)
 
 			// Test startup with timeout
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
 
-			err := c.Start(ctx, "test")
-			require.NoError(t, err)
+			startErr := c.Start(ctx, "test")
+			require.NoError(t, startErr)
 		}),
 	)
 
-	require.NoError(t, app.Start(context.Background()))
-	defer app.Stop(context.Background())
+	require.NoError(t, app.Start(t.Context()))
+	defer app.Stop(t.Context())
 }
 
 func TestCrawlerShutdown(t *testing.T) {
@@ -161,19 +161,19 @@ func TestCrawlerShutdown(t *testing.T) {
 	testCfg := testutils.NewMockConfig()
 
 	// Create test logger
-	log, err := logger.NewLogger(testCfg)
-	require.NoError(t, err)
+	testLogger, initErr := logger.NewLogger(testCfg)
+	require.NoError(t, initErr)
 
 	// Create test app with all required dependencies
 	app := fx.New(
 		crawler.Module,
 		fx.Provide(
 			// Provide logger
-			func() common.Logger { return log },
+			func() common.Logger { return testLogger },
 			// Provide debugger
 			func() debug.Debugger {
 				return &debug.LogDebugger{
-					Output: crawler.NewDebugLogger(log),
+					Output: crawler.NewDebugLogger(testLogger),
 				}
 			},
 			// Provide index manager
@@ -195,13 +195,13 @@ func TestCrawlerShutdown(t *testing.T) {
 		),
 		fx.Invoke(func(c crawler.Interface) {
 			// Test shutdown
-			err := c.Stop(context.Background())
-			require.NoError(t, err)
+			stopErr := c.Stop(t.Context())
+			require.NoError(t, stopErr)
 		}),
 	)
 
-	require.NoError(t, app.Start(context.Background()))
-	defer app.Stop(context.Background())
+	require.NoError(t, app.Start(t.Context()))
+	defer app.Stop(t.Context())
 }
 
 func TestSourceValidation(t *testing.T) {
@@ -211,19 +211,19 @@ func TestSourceValidation(t *testing.T) {
 	testCfg := testutils.NewMockConfig()
 
 	// Create test logger
-	log, err := logger.NewLogger(testCfg)
-	require.NoError(t, err)
+	testLogger, initErr := logger.NewLogger(testCfg)
+	require.NoError(t, initErr)
 
 	// Create test app with all required dependencies
 	app := fx.New(
 		crawler.Module,
 		fx.Provide(
 			// Provide logger
-			func() common.Logger { return log },
+			func() common.Logger { return testLogger },
 			// Provide debugger
 			func() debug.Debugger {
 				return &debug.LogDebugger{
-					Output: crawler.NewDebugLogger(log),
+					Output: crawler.NewDebugLogger(testLogger),
 				}
 			},
 			// Provide index manager
@@ -245,13 +245,13 @@ func TestSourceValidation(t *testing.T) {
 		),
 		fx.Invoke(func(c crawler.Interface) {
 			// Test source validation
-			err := c.Start(context.Background(), "invalid")
-			require.Error(t, err)
+			startErr := c.Start(t.Context(), "invalid")
+			require.Error(t, startErr)
 		}),
 	)
 
-	require.NoError(t, app.Start(context.Background()))
-	defer app.Stop(context.Background())
+	require.NoError(t, app.Start(t.Context()))
+	defer app.Stop(t.Context())
 }
 
 func TestErrorHandling(t *testing.T) {
@@ -261,19 +261,19 @@ func TestErrorHandling(t *testing.T) {
 	testCfg := testutils.NewMockConfig()
 
 	// Create test logger
-	log, err := logger.NewLogger(testCfg)
-	require.NoError(t, err)
+	testLogger, initErr := logger.NewLogger(testCfg)
+	require.NoError(t, initErr)
 
 	// Create test app with all required dependencies
 	app := fx.New(
 		crawler.Module,
 		fx.Provide(
 			// Provide logger
-			func() common.Logger { return log },
+			func() common.Logger { return testLogger },
 			// Provide debugger
 			func() debug.Debugger {
 				return &debug.LogDebugger{
-					Output: crawler.NewDebugLogger(log),
+					Output: crawler.NewDebugLogger(testLogger),
 				}
 			},
 			// Provide index manager
@@ -295,13 +295,13 @@ func TestErrorHandling(t *testing.T) {
 		),
 		fx.Invoke(func(c crawler.Interface) {
 			// Test error handling
-			err := c.Start(context.Background(), "error")
-			require.Error(t, err)
+			startErr := c.Start(t.Context(), "error")
+			require.Error(t, startErr)
 		}),
 	)
 
-	require.NoError(t, app.Start(context.Background()))
-	defer app.Stop(context.Background())
+	require.NoError(t, app.Start(t.Context()))
+	defer app.Stop(t.Context())
 }
 
 // writerWrapper implements io.Writer for the logger

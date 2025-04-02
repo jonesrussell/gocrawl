@@ -52,13 +52,15 @@ func (m *mockStorage) TestConnection(ctx context.Context) error {
 }
 
 // testModule provides a test module with mock dependencies
-var testModule = fx.Module("test",
-	fx.Provide(
-		func() context.Context { return context.Background() },
-		func() config.Interface { return configtestutils.NewMockConfig() },
-		func() types.Logger { return logger.NewNoOp() },
-	),
-)
+var testModule = func(t *testing.T) fx.Option {
+	return fx.Module("test",
+		fx.Provide(
+			func() context.Context { return t.Context() },
+			func() config.Interface { return configtestutils.NewMockConfig() },
+			func() types.Logger { return logger.NewNoOp() },
+		),
+	)
+}
 
 // TestCreateCommand tests the create index command
 func TestCreateCommand(t *testing.T) {
@@ -70,7 +72,7 @@ func TestCreateCommand(t *testing.T) {
 	// Create test app with mocked dependencies
 	app := fxtest.New(t,
 		fx.NopLogger,
-		testModule,
+		testModule(t),
 		fx.Provide(
 			func() storagetypes.Interface { return mockStore },
 		),
@@ -78,8 +80,8 @@ func TestCreateCommand(t *testing.T) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
 					// Create the index with default mapping
-					if err := storage.CreateIndex(ctx, "test-index", indices.DefaultMapping); err != nil {
-						return fmt.Errorf("failed to create index test-index: %w", err)
+					if createErr := storage.CreateIndex(ctx, "test-index", indices.DefaultMapping); createErr != nil {
+						return fmt.Errorf("failed to create index test-index: %w", createErr)
 					}
 					logger.Info("Successfully created index", "name", "test-index")
 					return nil
@@ -92,8 +94,8 @@ func TestCreateCommand(t *testing.T) {
 	)
 
 	// Start the app and verify it starts without errors
-	err := app.Start(t.Context())
-	require.NoError(t, err)
+	startErr := app.Start(t.Context())
+	require.NoError(t, startErr)
 	defer app.RequireStop()
 
 	// Verify that the index was created
@@ -134,7 +136,10 @@ func TestCreateCommandArgs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			mockStore := &mockStorage{}
 			switch tt.name {
 			case "invalid index name":
@@ -147,17 +152,17 @@ func TestCreateCommandArgs(t *testing.T) {
 			cmd.SetArgs(append([]string{"create"}, tt.args...))
 
 			// Execute the command to check argument validation
-			err := cmd.Execute()
+			execErr := cmd.Execute()
 			if tt.name == "no args" || tt.name == "too many args" {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.errMsg)
+				require.Error(t, execErr)
+				require.Contains(t, execErr.Error(), tt.errMsg)
 				return
 			}
 
 			// For valid args and invalid index name, create test app with mocked dependencies
 			app := fxtest.New(t,
 				fx.NopLogger,
-				testModule,
+				testModule(t),
 				fx.Provide(
 					func() storagetypes.Interface { return mockStore },
 					func() *cobra.Command { return cmd },
@@ -166,8 +171,8 @@ func TestCreateCommandArgs(t *testing.T) {
 					lc.Append(fx.Hook{
 						OnStart: func(ctx context.Context) error {
 							indexName := tt.args[0]
-							if err := storage.CreateIndex(ctx, indexName, indices.DefaultMapping); err != nil {
-								return fmt.Errorf("failed to create index %s: %w", indexName, err)
+							if createErr := storage.CreateIndex(ctx, indexName, indices.DefaultMapping); createErr != nil {
+								return fmt.Errorf("failed to create index %s: %w", indexName, createErr)
 							}
 							logger.Info("Successfully created index", "name", indexName)
 							return nil
@@ -180,12 +185,12 @@ func TestCreateCommandArgs(t *testing.T) {
 			)
 
 			// Start the app
-			err = app.Start(t.Context())
+			startErr := app.Start(t.Context())
 			if tt.wantErr {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.errMsg)
+				require.Error(t, startErr)
+				require.Contains(t, startErr.Error(), tt.errMsg)
 			} else {
-				require.NoError(t, err)
+				require.NoError(t, startErr)
 			}
 			app.RequireStop()
 		})
