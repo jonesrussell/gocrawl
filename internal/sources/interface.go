@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 )
 
 // Interface defines the interface for source management.
@@ -30,12 +32,7 @@ type Interface interface {
 // Params defines the parameters for creating a new Sources instance.
 type Params struct {
 	// Logger is the logger to use.
-	Logger interface {
-		Debug(msg string, fields ...any)
-		Info(msg string, fields ...any)
-		Warn(msg string, fields ...any)
-		Error(msg string, fields ...any)
-	}
+	Logger types.Logger
 }
 
 // Metrics defines the metrics for the Sources module.

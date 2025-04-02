@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
@@ -21,10 +22,10 @@ type SelectorConfig = sourceutils.SelectorConfig
 // ArticleSelectors defines the CSS selectors used for article content extraction.
 type ArticleSelectors = sourceutils.ArticleSelectors
 
-// Sources manages web content source configurations.
+// Sources manages a collection of source configurations.
 type Sources struct {
 	sources []Config
-	logger  Logger
+	logger  types.Logger
 	metrics Metrics
 }
 
@@ -70,16 +71,26 @@ func convertSourceConfig(src config.Source) Config {
 	}
 }
 
-// NewSourcesFromConfig creates a new Sources instance from a config.Interface.
-// It converts the config sources to internal source configurations.
-func NewSourcesFromConfig(cfg config.Interface, logger Logger) *Sources {
+// NewSourcesFromConfig creates a new Sources instance from a config.
+func NewSourcesFromConfig(cfg config.Interface, logger types.Logger) Interface {
+	// Get sources from config
 	configSources := cfg.GetSources()
-	var sources []Config
 
+	// Convert config sources to internal sources
+	var sources []Config
 	for _, src := range configSources {
+		// Set default index names if empty
+		if src.ArticleIndex == "" {
+			src.ArticleIndex = "articles"
+		}
+		if src.Index == "" {
+			src.Index = "content"
+		}
+
 		sources = append(sources, convertSourceConfig(src))
 	}
 
+	// Create sources instance
 	return &Sources{
 		sources: sources,
 		logger:  logger,
@@ -98,7 +109,7 @@ func NewSourcesFromConfig(cfg config.Interface, logger Logger) *Sources {
 // Returns:
 //   - *Sources: The loaded sources configuration
 //   - error: Any error that occurred during loading
-func LoadFromFile(path string, logger Logger) (*Sources, error) {
+func LoadFromFile(path string, logger types.Logger) (*Sources, error) {
 	loaderConfigs, err := loader.LoadFromFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sources: %w", err)

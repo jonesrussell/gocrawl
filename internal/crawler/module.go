@@ -62,31 +62,77 @@ var Module = fx.Module("crawler",
 				``,
 				`name:"startupArticleProcessor"`,
 				`name:"startupContentProcessor"`,
-				``,
+				`name:"eventBus"`,
 			),
 		),
 	),
 )
 
-// ProvideCrawler creates a new crawler instance with all dependencies.
+// ProvideCrawler creates a new crawler instance.
 func ProvideCrawler(
 	logger common.Logger,
 	debugger debug.Debugger,
 	indexManager api.IndexManager,
-	sources *sources.Sources,
+	sources sources.Interface,
 	articleProcessor common.Processor,
 	contentProcessor common.Processor,
 	bus *events.Bus,
 ) Result {
 	return Result{
-		Crawler: &Crawler{
-			Logger:           logger,
-			Debugger:         debugger,
-			indexManager:     indexManager,
-			sources:          sources,
-			articleProcessor: articleProcessor,
-			contentProcessor: contentProcessor,
-			bus:              bus,
-		},
+		Crawler: NewCrawler(
+			logger,
+			debugger,
+			indexManager,
+			sources,
+			articleProcessor,
+			contentProcessor,
+			bus,
+		),
 	}
+}
+
+// NewCrawler creates a new crawler instance.
+func NewCrawler(
+	logger common.Logger,
+	debugger debug.Debugger,
+	indexManager api.IndexManager,
+	sources sources.Interface,
+	articleProcessor common.Processor,
+	contentProcessor common.Processor,
+	bus *events.Bus,
+) Interface {
+	collector := colly.NewCollector(
+		colly.MaxDepth(3),
+		colly.Async(true),
+		colly.Debugger(debugger),
+	)
+
+	crawler := &Crawler{
+		Logger:           logger,
+		Debugger:         debugger,
+		indexManager:     indexManager,
+		sources:          sources,
+		articleProcessor: articleProcessor,
+		contentProcessor: contentProcessor,
+		bus:              bus,
+		collector:        collector,
+	}
+
+	// Set up callbacks
+	collector.OnRequest(func(r *colly.Request) {
+		crawler.Logger.Info("Visiting", "url", r.URL.String())
+	})
+
+	collector.OnResponse(func(r *colly.Response) {
+		crawler.Logger.Info("Visited", "url", r.Request.URL.String())
+	})
+
+	collector.OnError(func(r *colly.Response, err error) {
+		crawler.Logger.Error("Error while crawling", "url", r.Request.URL.String(), "error", err)
+	})
+
+	// Set up HTML callback
+	collector.OnHTML("*", crawler.ProcessHTML)
+
+	return crawler
 }

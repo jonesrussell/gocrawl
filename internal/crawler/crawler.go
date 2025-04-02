@@ -43,6 +43,8 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		return fmt.Errorf("error getting source: %w", err)
 	}
 
+	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
+
 	// Set up rate limiting
 	if rateErr := c.SetRateLimit(source.RateLimit); rateErr != nil {
 		return fmt.Errorf("error setting rate limit: %w", rateErr)
@@ -55,6 +57,12 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	if crawlErr := c.collector.Visit(source.URL); crawlErr != nil {
 		return fmt.Errorf("error starting crawl: %w", crawlErr)
 	}
+
+	// Start processing in background
+	go func() {
+		c.collector.Wait()
+		c.Logger.Info("Crawler finished processing", "source", sourceName)
+	}()
 
 	return nil
 }
@@ -123,16 +131,17 @@ func (c *Crawler) GetMetrics() *common.Metrics {
 }
 
 // ProcessHTML processes HTML content from a source.
-func (c *Crawler) ProcessHTML(e *colly.HTMLElement) error {
+func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
+	// Log the element being processed
+	c.Logger.Info("Processing HTML element", "tag", e.Name, "url", e.Request.URL.String())
+
 	// Process article content
 	if articleErr := c.articleProcessor.ProcessHTML(e); articleErr != nil {
-		return fmt.Errorf("error processing article: %w", articleErr)
+		c.Logger.Error("Error processing article", "error", articleErr)
 	}
 
 	// Process general content
 	if contentErr := c.contentProcessor.ProcessHTML(e); contentErr != nil {
-		return fmt.Errorf("error processing content: %w", contentErr)
+		c.Logger.Error("Error processing content", "error", contentErr)
 	}
-
-	return nil
 }

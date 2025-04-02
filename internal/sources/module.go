@@ -22,12 +22,8 @@ const (
 var Module = fx.Module("sources",
 	fx.Provide(
 		// Provide sources from config
-		func(cfg config.Interface, logger Logger) Interface {
+		func(cfg config.Interface, logger types.Logger) Interface {
 			return NewSourcesFromConfig(cfg, logger)
-		},
-		// Provide logger
-		func(logger types.Logger) Logger {
-			return logger
 		},
 	),
 )
@@ -48,36 +44,10 @@ type Result struct {
 }
 
 // ProvideSources creates a new Sources instance.
-func ProvideSources(p ModuleParams) (Result, error) {
-	// Get sources from config
-	configSources := p.Config.GetSources()
-
-	// Convert config sources to internal sources
-	var sources []Config
-	for _, src := range configSources {
-		// Set default index names if empty
-		if src.ArticleIndex == "" {
-			src.ArticleIndex = "articles"
-		}
-		if src.Index == "" {
-			src.Index = "content"
-		}
-
-		sources = append(sources, convertSourceConfig(src))
-	}
-
-	// Create sources instance
-	s := &Sources{
-		sources: sources,
-		logger:  p.Logger,
-		metrics: Metrics{
-			SourceCount: int64(len(sources)),
-		},
-	}
-
+func ProvideSources(params ModuleParams) Result {
 	return Result{
-		Sources: s,
-	}, nil
+		Sources: NewSourcesFromConfig(params.Config, params.Logger),
+	}
 }
 
 // NewConfig creates a new source configuration.
@@ -93,7 +63,7 @@ func NewConfig() *Config {
 }
 
 // NewSources creates a new sources instance.
-func NewSources(cfg *Config, logger Logger) *Sources {
+func NewSources(cfg *Config, logger types.Logger) *Sources {
 	return &Sources{
 		sources: []Config{*cfg},
 		logger:  logger,
