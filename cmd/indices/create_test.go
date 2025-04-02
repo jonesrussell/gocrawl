@@ -2,6 +2,7 @@ package indices_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -104,6 +105,8 @@ func TestCreateCommand(t *testing.T) {
 
 // TestCreateCommandArgs tests argument validation in the create index command
 func TestCreateCommandArgs(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		args    []string
@@ -136,14 +139,14 @@ func TestCreateCommandArgs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			mockStore := &mockStorage{}
 			switch tt.name {
 			case "invalid index name":
-				mockStore.On("CreateIndex", mock.Anything, "invalid/index/name", mock.Anything).Return(fmt.Errorf("failed to create index"))
+				mockStore.On("CreateIndex", mock.Anything, "invalid/index/name", mock.Anything).
+					Return(errors.New("failed to create index"))
 			case "valid args":
 				mockStore.On("CreateIndex", mock.Anything, "index1", mock.Anything).Return(nil)
 			}
