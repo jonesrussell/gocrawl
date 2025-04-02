@@ -684,8 +684,6 @@ sources:
 
 // TestModule provides tests for the config module's dependency injection.
 func TestModule(t *testing.T) {
-	t.Parallel()
-
 	// Set the sources file path for testing
 	t.Setenv("CRAWLER_SOURCE_FILE", "testdata/sources.yml")
 	t.Setenv("CONFIG_FILE", "testdata/config.yaml")
