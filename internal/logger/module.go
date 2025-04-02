@@ -15,7 +15,7 @@ var Module = fx.Options(
 			func() (common.Logger, error) {
 				return NewCustomLogger(nil, Params{
 					Debug:  true,
-					Level:  "info",
+					Level:  "debug",
 					AppEnv: "development",
 				})
 			},

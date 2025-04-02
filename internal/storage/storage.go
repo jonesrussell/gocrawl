@@ -84,7 +84,10 @@ func (s *Impl) IndexDocument(ctx context.Context, index string, id string, docum
 		return fmt.Errorf("error indexing document: %s", res.String())
 	}
 
-	s.Logger.Info("Document indexed successfully", "index", index, "docID", id)
+	s.Logger.Info("Document indexed successfully",
+		"index", index,
+		"docID", id,
+		"type", fmt.Sprintf("%T", document))
 	return nil
 }
 
