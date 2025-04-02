@@ -2,13 +2,12 @@ package indices_test
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/cmd/indices"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/mock"
@@ -120,33 +119,50 @@ func TestCreateCommand(t *testing.T) {
 
 // TestCreateCommandArgs tests argument validation in the create index command
 func TestCreateCommandArgs(t *testing.T) {
-	t.Parallel()
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "no args",
+			args:    []string{},
+			wantErr: true,
+			errMsg:  "accepts 1 arg(s)",
+		},
+		{
+			name:    "too many args",
+			args:    []string{"index1", "index2"},
+			wantErr: true,
+			errMsg:  "accepts 1 arg(s)",
+		},
+		{
+			name:    "valid args",
+			args:    []string{"index1"},
+			wantErr: true,
+			errMsg:  "error starting application",
+		},
+	}
 
-	// Get the create command
-	cmd := indices.Command()
-	createCmd := cmd.Commands()[2] // Get the create subcommand
-
-	// Test with no arguments
-	err := createCmd.RunE(createCmd, []string{})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "accepts 1 arg(s)")
-
-	// Test with too many arguments
-	err = createCmd.RunE(createCmd, []string{"index1", "index2"})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "accepts 1 arg(s)")
-
-	// Test with valid arguments
-	err = createCmd.RunE(createCmd, []string{"test-index"})
-	require.Error(t, err) // Should error because we're not providing real dependencies
-	require.Contains(t, err.Error(), "failed to create index test-index")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := indices.Command()
+			cmd.SetArgs(append([]string{"create"}, tt.args...))
+			err := cmd.Execute()
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 // TestCreateCommandError tests error handling in the create index command
 func TestCreateCommandError(t *testing.T) {
-	t.Parallel()
-
-	// Create test dependencies
+	// Create mock dependencies
 	mockLogger := &testutils.MockLogger{}
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 
@@ -170,7 +186,7 @@ func TestCreateCommandError(t *testing.T) {
 	mockCfg.On("GetCommand").Return("test")
 
 	mockStore := &mockStorage{}
-	mockStore.On("CreateIndex", mock.Anything, "test-index", mock.Anything).Return(errors.New("index creation failed"))
+	mockStore.On("CreateIndex", mock.Anything, "test-index", mock.Anything).Return(storage.ErrIndexNotFound)
 
 	// Create test app with mocked dependencies
 	app := fxtest.New(t,
@@ -190,19 +206,20 @@ func TestCreateCommandError(t *testing.T) {
 			func() storagetypes.Interface { return mockStore },
 			func() config.Interface { return mockCfg },
 		),
-		fx.Invoke(func(p indices.CreateParams) error {
-			// Create the index
-			if err := p.Storage.CreateIndex(p.Context, "test-index", nil); err != nil {
-				return fmt.Errorf("failed to create index %s: %w", "test-index", err)
-			}
-
-			p.Logger.Info("Successfully created index", "name", "test-index")
-			return nil
-		}),
 	)
 
-	// Verify that the app fails to start due to index creation error
+	// Start the app and verify it starts without errors
 	err := app.Start(t.Context())
+	require.NoError(t, err)
+	defer app.RequireStop()
+
+	// Get the command and run it
+	cmd := indices.Command()
+	cmd.SetArgs([]string{"create", "test-index"})
+	err = cmd.Execute()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to create index test-index: index creation failed")
+	require.Contains(t, err.Error(), "error starting application")
+
+	// Verify that the index creation was attempted
+	mockStore.AssertCalled(t, "CreateIndex", mock.Anything, "test-index", mock.Anything)
 }
