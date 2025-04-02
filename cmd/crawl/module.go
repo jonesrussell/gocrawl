@@ -3,6 +3,7 @@ package crawl
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/article"
@@ -79,33 +80,6 @@ var Module = fx.Module("crawl",
 		),
 	),
 
-	// Provide processors
-	fx.Provide(
-		fx.Annotate(
-			func(
-				logger common.Logger,
-				storage storagetypes.Interface,
-				contentService content.Interface,
-				params struct {
-					fx.In
-					IndexName string `name:"contentIndex"`
-				},
-			) common.Processor {
-				processor := &content.ContentProcessor{
-					Logger:         logger,
-					ContentService: contentService,
-					Storage:        storage,
-					IndexName:      params.IndexName,
-				}
-				if processor == nil {
-					panic("failed to create content processor")
-				}
-				return processor
-			},
-			fx.ResultTags(`name:"contentProcessor"`),
-		),
-	),
-
 	// Provide index names
 	fx.Provide(
 		fx.Annotate(
@@ -115,8 +89,16 @@ var Module = fx.Module("crawl",
 			fx.ResultTags(`name:"indexName"`),
 		),
 		fx.Annotate(
-			func() string {
-				return "content"
+			func(p struct {
+				fx.In
+				Sources sources.Interface
+				Name    string `name:"sourceName"`
+			}) string {
+				source, err := p.Sources.FindByName(p.Name)
+				if err != nil {
+					panic(fmt.Sprintf("failed to get source %s: %v", p.Name, err))
+				}
+				return source.Index
 			},
 			fx.ResultTags(`name:"contentIndex"`),
 		),
