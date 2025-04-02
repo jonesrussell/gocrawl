@@ -40,55 +40,28 @@ func NewArticleProcessor(p ProcessorParams) *ArticleProcessor {
 	}
 }
 
-// Start implements common.Processor.Start.
-func (p *ArticleProcessor) Start(ctx context.Context) error {
-	p.Logger.Info("Starting article processor",
-		"component", "article/processor")
-	return nil
+// ContentType implements ContentProcessor.ContentType
+func (p *ArticleProcessor) ContentType() common.ContentType {
+	return common.ContentTypeArticle
 }
 
-// Stop implements common.Processor.Stop.
-func (p *ArticleProcessor) Stop(ctx context.Context) error {
-	p.Logger.Info("Stopping article processor",
-		"component", "article/processor")
-	return nil
+// CanProcess implements ContentProcessor.CanProcess
+func (p *ArticleProcessor) CanProcess(content interface{}) bool {
+	_, ok := content.(*colly.HTMLElement)
+	return ok
 }
 
-// ProcessJob processes a job and its items.
-func (p *ArticleProcessor) ProcessJob(ctx context.Context, job *common.Job) {
-	start := time.Now()
-	defer func() {
-		p.metrics.ProcessingDuration += time.Since(start)
-	}()
-
-	// Check context cancellation
-	select {
-	case <-ctx.Done():
-		p.Logger.Warn("Job processing cancelled",
-			"job_id", job.ID,
-			"error", ctx.Err(),
-		)
-		p.metrics.ErrorCount++
-		return
-	default:
-		// Process the job
-		p.Logger.Info("Processing job",
-			"job_id", job.ID,
-		)
-
-		// TODO: Implement job processing logic
-		// This would typically involve:
-		// 1. Fetching items associated with the job
-		// 2. Processing each item
-		// 3. Updating job status
-		// 4. Handling errors and retries
-
-		p.metrics.ProcessedCount++
+// Process implements ContentProcessor.Process
+func (p *ArticleProcessor) Process(ctx context.Context, content interface{}) error {
+	e, ok := content.(*colly.HTMLElement)
+	if !ok {
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
 	}
+	return p.ProcessHTML(ctx, e)
 }
 
-// ProcessHTML processes HTML content from a source.
-func (p *ArticleProcessor) ProcessHTML(e *colly.HTMLElement) error {
+// ProcessHTML implements HTMLProcessor.ProcessHTML
+func (p *ArticleProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
 	start := time.Now()
 	defer func() {
 		p.metrics.ProcessingDuration += time.Since(start)
@@ -122,6 +95,39 @@ func (p *ArticleProcessor) ProcessHTML(e *colly.HTMLElement) error {
 	p.metrics.LastProcessedTime = time.Now()
 
 	return nil
+}
+
+// ProcessJob implements JobProcessor.ProcessJob
+func (p *ArticleProcessor) ProcessJob(ctx context.Context, job *common.Job) {
+	start := time.Now()
+	defer func() {
+		p.metrics.ProcessingDuration += time.Since(start)
+	}()
+
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		p.Logger.Warn("Job processing cancelled",
+			"job_id", job.ID,
+			"error", ctx.Err(),
+		)
+		p.metrics.ErrorCount++
+		return
+	default:
+		// Process the job
+		p.Logger.Info("Processing job",
+			"job_id", job.ID,
+		)
+
+		// TODO: Implement job processing logic
+		// This would typically involve:
+		// 1. Fetching items associated with the job
+		// 2. Processing each item
+		// 3. Updating job status
+		// 4. Handling errors and retries
+
+		p.metrics.ProcessedCount++
+	}
 }
 
 // GetMetrics returns the current processing metrics.
@@ -164,14 +170,21 @@ func (p *ArticleProcessor) ProcessContent(e *colly.HTMLElement) {
 		"url", e.Request.URL.String())
 }
 
-// Process implements common.Processor
-func (p *ArticleProcessor) Process(ctx context.Context, data any) error {
-	e, ok := data.(*colly.HTMLElement)
-	if !ok {
-		return fmt.Errorf("invalid data type: expected *colly.HTMLElement, got %T", data)
-	}
-	return p.ProcessHTML(e)
+// Start implements Processor.Start
+func (p *ArticleProcessor) Start(ctx context.Context) error {
+	p.Logger.Info("Starting article processor")
+	return nil
 }
 
-// Ensure ArticleProcessor implements common.Processor
-var _ common.Processor = (*ArticleProcessor)(nil)
+// Stop implements Processor.Stop
+func (p *ArticleProcessor) Stop(ctx context.Context) error {
+	p.Logger.Info("Stopping article processor")
+	return nil
+}
+
+// Ensure ArticleProcessor implements required interfaces
+var (
+	_ common.ContentProcessor = (*ArticleProcessor)(nil)
+	_ common.HTMLProcessor    = (*ArticleProcessor)(nil)
+	_ common.JobProcessor     = (*ArticleProcessor)(nil)
+)

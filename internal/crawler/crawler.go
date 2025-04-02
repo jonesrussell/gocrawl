@@ -37,6 +37,7 @@ type Crawler struct {
 	startTime        time.Time
 	isRunning        bool
 	done             chan struct{}
+	ctx              context.Context
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -101,6 +102,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.startTime = time.Now()
 	c.isRunning = true
 	c.done = make(chan struct{})
+	c.ctx = ctx
 
 	// Start crawling
 	if crawlErr := c.collector.Visit(source.URL); crawlErr != nil {
@@ -204,16 +206,32 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	c.Logger.Info("Processing HTML element", "tag", e.Name, "url", e.Request.URL.String())
 
 	// Process article content
-	if articleErr := c.articleProcessor.ProcessHTML(e); articleErr != nil {
-		c.Logger.Error("Error processing article", "error", articleErr)
+	c.handleArticle(e)
+
+	// Process general content
+	c.handleContent(e)
+}
+
+// handleArticle processes an article using the article processor
+func (c *Crawler) handleArticle(e *colly.HTMLElement) {
+	if err := c.articleProcessor.ProcessHTML(c.ctx, e); err != nil {
+		c.Logger.Error("Failed to process article",
+			"component", "crawler",
+			"url", e.Request.URL.String(),
+			"error", err)
 		c.errorCount++
 	} else {
 		c.processedCount++
 	}
+}
 
-	// Process general content
-	if contentErr := c.contentProcessor.ProcessHTML(e); contentErr != nil {
-		c.Logger.Error("Error processing content", "error", contentErr)
+// handleContent processes content using the content processor
+func (c *Crawler) handleContent(e *colly.HTMLElement) {
+	if err := c.contentProcessor.ProcessHTML(c.ctx, e); err != nil {
+		c.Logger.Error("Failed to process content",
+			"component", "crawler",
+			"url", e.Request.URL.String(),
+			"error", err)
 		c.errorCount++
 	} else {
 		c.processedCount++

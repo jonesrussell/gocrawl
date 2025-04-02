@@ -38,11 +38,43 @@ func NewContentProcessor(
 	}
 }
 
-// Process implements common.Processor
-func (p *ContentProcessor) Process(ctx context.Context, data any) error {
-	content, ok := data.(*models.Content)
+// ContentType implements ContentProcessor.ContentType
+func (p *ContentProcessor) ContentType() common.ContentType {
+	return common.ContentTypePage
+}
+
+// CanProcess implements ContentProcessor.CanProcess
+func (p *ContentProcessor) CanProcess(content interface{}) bool {
+	_, ok := content.(*colly.HTMLElement)
+	return ok
+}
+
+// Process implements ContentProcessor.Process
+func (p *ContentProcessor) Process(ctx context.Context, content interface{}) error {
+	e, ok := content.(*colly.HTMLElement)
 	if !ok {
-		return fmt.Errorf("invalid data type: expected *models.Content, got %T", data)
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
+	}
+	return p.ProcessHTML(ctx, e)
+}
+
+// ProcessHTML implements HTMLProcessor.ProcessHTML
+func (p *ContentProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
+	start := time.Now()
+	defer func() {
+		p.metrics.LastProcessedTime = time.Now()
+		p.metrics.ProcessedCount++
+		p.metrics.ProcessingDuration += time.Since(start)
+	}()
+
+	// Extract content data
+	content := &models.Content{
+		ID:        uuid.New().String(),
+		Title:     e.ChildText("h1"),
+		Body:      e.ChildText("article"),
+		Type:      "page",
+		URL:       e.Request.URL.String(),
+		CreatedAt: time.Now(),
 	}
 
 	// Process the content using the ContentService
@@ -65,36 +97,6 @@ func (p *ContentProcessor) Process(ctx context.Context, data any) error {
 		return err
 	}
 
-	p.metrics.ProcessedCount++
-	p.metrics.LastProcessedTime = time.Now()
-	return nil
-}
-
-// ProcessHTML implements common.Processor
-func (p *ContentProcessor) ProcessHTML(e *colly.HTMLElement) error {
-	start := time.Now()
-	defer func() {
-		p.metrics.LastProcessedTime = time.Now()
-		p.metrics.ProcessedCount++
-		p.metrics.ProcessingDuration += time.Since(start)
-	}()
-
-	// Extract content data
-	content := &models.Content{
-		ID:        uuid.New().String(),
-		Title:     e.ChildText("h1"),
-		Body:      e.ChildText("article"),
-		Type:      "page",
-		URL:       e.Request.URL.String(),
-		CreatedAt: time.Now(),
-	}
-
-	// Store content
-	if err := p.Storage.IndexDocument(context.Background(), p.IndexName, content.ID, content); err != nil {
-		p.metrics.ErrorCount++
-		return fmt.Errorf("failed to store content: %w", err)
-	}
-
 	return nil
 }
 
@@ -102,6 +104,12 @@ func (p *ContentProcessor) ProcessHTML(e *colly.HTMLElement) error {
 func (p *ContentProcessor) GetMetrics() *common.Metrics {
 	return p.metrics
 }
+
+// Ensure ContentProcessor implements required interfaces
+var (
+	_ common.ContentProcessor = (*ContentProcessor)(nil)
+	_ common.HTMLProcessor    = (*ContentProcessor)(nil)
+)
 
 // ProcessJob processes a job and its items.
 func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
@@ -136,13 +144,13 @@ func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 	}
 }
 
-// Start implements common.Processor
+// Start implements Processor.Start
 func (p *ContentProcessor) Start(ctx context.Context) error {
 	p.Logger.Info("Starting content processor")
 	return nil
 }
 
-// Stop implements common.Processor
+// Stop implements Processor.Stop
 func (p *ContentProcessor) Stop(ctx context.Context) error {
 	p.Logger.Info("Stopping content processor")
 	return nil

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -63,10 +64,10 @@ func (m *MockProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 	m.Called(ctx, job)
 }
 
-// ProcessHTML implements common.Processor
-func (m *MockProcessor) ProcessHTML(e *colly.HTMLElement) error {
+// ProcessHTML implements HTMLProcessor.ProcessHTML
+func (m *MockProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
 	m.ProcessCalls++
-	args := m.Called(e)
+	args := m.Called(ctx, e)
 	return args.Error(0)
 }
 
@@ -93,8 +94,176 @@ func (m *MockProcessor) Stop(ctx context.Context) error {
 	return args.Error(0)
 }
 
+// CanProcess implements ContentProcessor.CanProcess
+func (m *MockProcessor) CanProcess(content interface{}) bool {
+	_, ok := content.(*colly.HTMLElement)
+	return ok
+}
+
+// ContentType implements ContentProcessor.ContentType
+func (m *MockProcessor) ContentType() common.ContentType {
+	return common.ContentTypePage
+}
+
 // Ensure MockProcessor implements common.Processor
 var _ common.Processor = (*MockProcessor)(nil)
+
+// MockLogger is a mock implementation of common.Logger
+type MockLogger struct {
+	mock.Mock
+}
+
+func (m *MockLogger) Info(msg string, args ...interface{}) {
+	m.Called(msg, args)
+}
+
+func (m *MockLogger) Error(msg string, args ...interface{}) {
+	m.Called(msg, args)
+}
+
+func (m *MockLogger) Debug(msg string, args ...interface{}) {
+	m.Called(msg, args)
+}
+
+func (m *MockLogger) Warn(msg string, args ...interface{}) {
+	m.Called(msg, args)
+}
+
+func (m *MockLogger) Errorf(format string, args ...interface{}) {
+	m.Called(format, args)
+}
+
+func (m *MockLogger) Fatal(msg string, args ...interface{}) {
+	m.Called(msg, args)
+}
+
+func (m *MockLogger) Printf(format string, args ...interface{}) {
+	m.Called(format, args)
+}
+
+func (m *MockLogger) Sync() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+// MockBus is a mock implementation of events.Bus
+type MockBus struct {
+	mock.Mock
+	handlers []events.Handler
+}
+
+func (m *MockBus) Subscribe(handler events.Handler) {
+	m.Called(handler)
+	m.handlers = append(m.handlers, handler)
+}
+
+func (m *MockBus) Publish(ctx context.Context, content *events.Content) error {
+	args := m.Called(ctx, content)
+	return args.Error(0)
+}
+
+// MockIndexManager is a mock implementation of api.IndexManager
+type MockIndexManager struct {
+	mock.Mock
+}
+
+func (m *MockIndexManager) CreateIndex(ctx context.Context, name string) error {
+	args := m.Called(ctx, name)
+	return args.Error(0)
+}
+
+func (m *MockIndexManager) DeleteIndex(ctx context.Context, name string) error {
+	args := m.Called(ctx, name)
+	return args.Error(0)
+}
+
+func (m *MockIndexManager) IndexExists(ctx context.Context, name string) (bool, error) {
+	args := m.Called(ctx, name)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockIndexManager) EnsureIndex(ctx context.Context, name string, settings any) error {
+	args := m.Called(ctx, name, settings)
+	return args.Error(0)
+}
+
+func (m *MockIndexManager) UpdateMapping(ctx context.Context, name string, mapping any) error {
+	args := m.Called(ctx, name, mapping)
+	return args.Error(0)
+}
+
+// MockSources is a mock implementation of sources.Interface
+type MockSources struct {
+	mock.Mock
+}
+
+func (m *MockSources) FindByName(name string) (*sources.Config, error) {
+	args := m.Called(name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*sources.Config), args.Error(1)
+}
+
+func (m *MockSources) AddSource(ctx context.Context, source *sources.Config) error {
+	args := m.Called(ctx, source)
+	return args.Error(0)
+}
+
+func (m *MockSources) ListSources(ctx context.Context) ([]*sources.Config, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*sources.Config), args.Error(1)
+}
+
+func (m *MockSources) UpdateSource(ctx context.Context, source *sources.Config) error {
+	args := m.Called(ctx, source)
+	return args.Error(0)
+}
+
+func (m *MockSources) DeleteSource(ctx context.Context, name string) error {
+	args := m.Called(ctx, name)
+	return args.Error(0)
+}
+
+func (m *MockSources) ValidateSource(source *sources.Config) error {
+	args := m.Called(source)
+	return args.Error(0)
+}
+
+func (m *MockSources) GetMetrics() sources.Metrics {
+	args := m.Called()
+	return args.Get(0).(sources.Metrics)
+}
+
+func (m *MockSources) GetSources() ([]sources.Config, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]sources.Config), args.Error(1)
+}
+
+// NewCrawler creates a new crawler instance with the given dependencies
+func NewCrawler(
+	logger common.Logger,
+	bus *events.Bus,
+	indexManager api.IndexManager,
+	sources sources.Interface,
+	articleProcessor common.Processor,
+	contentProcessor common.Processor,
+) crawler.Interface {
+	return crawler.NewCrawler(
+		logger,
+		indexManager,
+		sources,
+		articleProcessor,
+		contentProcessor,
+		bus,
+	)
+}
 
 // TestCrawlerStartup tests crawler startup functionality.
 func TestCrawlerStartup(t *testing.T) {
@@ -406,4 +575,68 @@ func (w *writerWrapper) Write(p []byte) (int, error) {
 // NewDebugLogger creates a debug logger for testing.
 func NewDebugLogger(logger common.Logger) io.Writer {
 	return &writerWrapper{logger: logger}
+}
+
+func TestCrawler_ProcessHTML(t *testing.T) {
+	// Create a test context
+	ctx := context.Background()
+
+	// Create test dependencies
+	mockLogger := &MockLogger{}
+	mockIndexManager := &MockIndexManager{}
+	mockSources := &MockSources{}
+	mockArticleProcessor := &MockProcessor{}
+	mockContentProcessor := &MockProcessor{}
+	bus := events.NewBus()
+
+	// Create crawler
+	c := NewCrawler(
+		mockLogger,
+		bus,
+		mockIndexManager,
+		mockSources,
+		mockArticleProcessor,
+		mockContentProcessor,
+	)
+
+	// Create test HTML element
+	e := &colly.HTMLElement{
+		Request: &colly.Request{
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   "example.com",
+				Path:   "/test",
+			},
+		},
+	}
+
+	// Set up expectations
+	mockArticleProcessor.On("ProcessHTML", ctx, e).Return(nil)
+	mockContentProcessor.On("ProcessHTML", ctx, e).Return(nil)
+
+	// Create a test collector
+	collector := colly.NewCollector()
+	c.SetCollector(collector)
+
+	// Set up the crawler's HTML handlers
+	collector.OnHTML("article", func(e *colly.HTMLElement) {
+		err := mockArticleProcessor.ProcessHTML(ctx, e)
+		require.NoError(t, err)
+	})
+
+	collector.OnHTML("div.content", func(e *colly.HTMLElement) {
+		err := mockContentProcessor.ProcessHTML(ctx, e)
+		require.NoError(t, err)
+	})
+
+	// Visit a test URL
+	err := collector.Visit("http://example.com/test")
+	require.NoError(t, err)
+
+	// Wait for the crawler to finish
+	c.Wait()
+
+	// Verify expectations
+	mockArticleProcessor.AssertExpectations(t)
+	mockContentProcessor.AssertExpectations(t)
 }

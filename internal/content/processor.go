@@ -3,10 +3,12 @@ package content
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -84,24 +86,37 @@ func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 	}
 }
 
-// ProcessHTML processes HTML content from a source.
-func (p *ContentProcessor) ProcessHTML(e *colly.HTMLElement) error {
+// ProcessHTML implements HTMLProcessor.ProcessHTML
+func (p *ContentProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
 	start := time.Now()
 	defer func() {
+		p.metrics.LastProcessedTime = time.Now()
+		p.metrics.ProcessedCount++
 		p.metrics.ProcessingDuration += time.Since(start)
 	}()
 
-	// Extract content data from HTML element
-	content := p.ContentService.ExtractContent(e)
-	if content == nil {
-		p.Logger.Debug("No content found in HTML element",
-			"component", "content/processor",
-			"url", e.Request.URL.String())
-		return nil
+	// Extract content data
+	content := &models.Content{
+		ID:        uuid.New().String(),
+		Title:     e.ChildText("h1"),
+		Body:      e.ChildText("article"),
+		Type:      "page",
+		URL:       e.Request.URL.String(),
+		CreatedAt: time.Now(),
 	}
 
-	// Process the content
-	if err := p.Storage.IndexDocument(context.Background(), p.IndexName, content.ID, content); err != nil {
+	// Process the content using the ContentService
+	processedContent := p.ContentService.Process(ctx, content.ID)
+	if processedContent == "" {
+		p.Logger.Error("Failed to process content",
+			"component", "content/processor",
+			"contentID", content.ID)
+		p.metrics.ErrorCount++
+		return errors.New("failed to process content: empty result")
+	}
+
+	// Store the processed content
+	if err := p.Storage.IndexDocument(ctx, p.IndexName, content.ID, content); err != nil {
 		p.Logger.Error("Failed to index content",
 			"component", "content/processor",
 			"contentID", content.ID,
@@ -109,9 +124,6 @@ func (p *ContentProcessor) ProcessHTML(e *colly.HTMLElement) error {
 		p.metrics.ErrorCount++
 		return err
 	}
-
-	p.metrics.ProcessedCount++
-	p.metrics.LastProcessedTime = time.Now()
 
 	return nil
 }
@@ -168,6 +180,17 @@ func (p *ContentProcessor) Process(ctx context.Context, data any) error {
 	p.metrics.ProcessedCount++
 	p.metrics.LastProcessedTime = time.Now()
 	return nil
+}
+
+// CanProcess implements ContentProcessor.CanProcess
+func (p *ContentProcessor) CanProcess(content interface{}) bool {
+	_, ok := content.(*colly.HTMLElement)
+	return ok
+}
+
+// ContentType implements ContentProcessor.ContentType
+func (p *ContentProcessor) ContentType() common.ContentType {
+	return common.ContentTypePage
 }
 
 // Ensure ContentProcessor implements common.Processor
