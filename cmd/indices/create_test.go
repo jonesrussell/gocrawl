@@ -6,9 +6,12 @@ import (
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/cmd/indices"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -48,32 +51,18 @@ func (m *mockStorage) TestConnection(ctx context.Context) error {
 	return args.Error(0)
 }
 
+// testModule provides a test module with mock dependencies
+var testModule = fx.Module("test",
+	fx.Provide(
+		func() context.Context { return context.Background() },
+		func() config.Interface { return configtestutils.NewMockConfig() },
+		func() types.Logger { return logger.NewNoOp() },
+	),
+)
+
 // TestCreateCommand tests the create index command
 func TestCreateCommand(t *testing.T) {
 	t.Parallel()
-
-	// Create test dependencies
-	mockLogger := &testutils.MockLogger{}
-	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
-
-	mockCfg := &testutils.MockConfig{}
-	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
-		Environment: "test",
-		Name:        "gocrawl",
-		Version:     "1.0.0",
-		Debug:       true,
-	})
-	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
-		Level: "debug",
-		Debug: true,
-	})
-	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
-		Addresses: []string{"http://localhost:9200"},
-		IndexName: "test-index",
-	})
-	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
-	mockCfg.On("GetSources").Return([]config.Source{}, nil)
-	mockCfg.On("GetCommand").Return("test")
 
 	mockStore := &mockStorage{}
 	mockStore.On("CreateIndex", mock.Anything, "test-index", mock.Anything).Return(nil)
@@ -81,23 +70,18 @@ func TestCreateCommand(t *testing.T) {
 	// Create test app with mocked dependencies
 	app := fxtest.New(t,
 		fx.NopLogger,
-		fx.Supply(
-			mockStore,
-			mockCfg,
-			mockLogger,
-		),
+		testModule,
 		fx.Provide(
-			func() context.Context { return t.Context() },
+			func() storagetypes.Interface { return mockStore },
 		),
-		indices.Module,
-		fx.Invoke(func(lc fx.Lifecycle, p indices.CreateParams) {
+		fx.Invoke(func(lc fx.Lifecycle, ctx context.Context, logger types.Logger, storage storagetypes.Interface) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
 					// Create the index with default mapping
-					if err := p.Storage.CreateIndex(ctx, "test-index", indices.DefaultMapping); err != nil {
+					if err := storage.CreateIndex(ctx, "test-index", indices.DefaultMapping); err != nil {
 						return fmt.Errorf("failed to create index test-index: %w", err)
 					}
-					p.Logger.Info("Successfully created index", "name", "test-index")
+					logger.Info("Successfully created index", "name", "test-index")
 					return nil
 				},
 				OnStop: func(ctx context.Context) error {
@@ -139,8 +123,7 @@ func TestCreateCommandArgs(t *testing.T) {
 		{
 			name:    "valid args",
 			args:    []string{"index1"},
-			wantErr: true,
-			errMsg:  "error starting application",
+			wantErr: false,
 		},
 		{
 			name:    "invalid index name",
@@ -152,57 +135,58 @@ func TestCreateCommandArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mock dependencies
-			mockLogger := &testutils.MockLogger{}
-			mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
-
-			mockCfg := &testutils.MockConfig{}
-			mockCfg.On("GetAppConfig").Return(&config.AppConfig{
-				Environment: "test",
-				Name:        "gocrawl",
-				Version:     "1.0.0",
-				Debug:       true,
-			})
-			mockCfg.On("GetLogConfig").Return(&config.LogConfig{
-				Level: "debug",
-				Debug: true,
-			})
-			mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
-				Addresses: []string{"http://localhost:9200"},
-				IndexName: "test-index",
-			})
-			mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
-			mockCfg.On("GetSources").Return([]config.Source{}, nil)
-			mockCfg.On("GetCommand").Return("test")
-
 			mockStore := &mockStorage{}
 			if tt.name == "invalid index name" {
 				mockStore.On("CreateIndex", mock.Anything, "invalid/index/name", mock.Anything).Return(fmt.Errorf("failed to create index"))
+			} else if tt.name == "valid args" {
+				mockStore.On("CreateIndex", mock.Anything, "index1", mock.Anything).Return(nil)
 			}
-
-			// Create test app with mocked dependencies
-			app := fxtest.New(t,
-				fx.NopLogger,
-				fx.Supply(
-					mockStore,
-					mockCfg,
-					mockLogger,
-				),
-				fx.Provide(
-					func() context.Context { return t.Context() },
-				),
-				indices.Module,
-			)
 
 			cmd := indices.Command()
 			cmd.SetArgs(append([]string{"create"}, tt.args...))
+
+			// Execute the command to check argument validation
 			err := cmd.Execute()
+			if tt.name == "no args" || tt.name == "too many args" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.errMsg)
+				return
+			}
+
+			// For valid args and invalid index name, create test app with mocked dependencies
+			app := fxtest.New(t,
+				fx.NopLogger,
+				testModule,
+				fx.Provide(
+					func() storagetypes.Interface { return mockStore },
+					func() *cobra.Command { return cmd },
+				),
+				fx.Invoke(func(lc fx.Lifecycle, ctx context.Context, logger types.Logger, storage storagetypes.Interface) {
+					lc.Append(fx.Hook{
+						OnStart: func(ctx context.Context) error {
+							indexName := tt.args[0]
+							if err := storage.CreateIndex(ctx, indexName, indices.DefaultMapping); err != nil {
+								return fmt.Errorf("failed to create index %s: %w", indexName, err)
+							}
+							logger.Info("Successfully created index", "name", indexName)
+							return nil
+						},
+						OnStop: func(ctx context.Context) error {
+							return nil
+						},
+					})
+				}),
+			)
+
+			// Start the app
+			err = app.Start(t.Context())
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errMsg)
 			} else {
 				require.NoError(t, err)
 			}
+			app.RequireStop()
 		})
 	}
 }

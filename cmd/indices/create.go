@@ -37,8 +37,8 @@ var DefaultMapping = map[string]any{
 	},
 }
 
-// createModule provides the create command dependencies
-var createModule = fx.Module("create",
+// CreateModule provides the create command dependencies
+var CreateModule = fx.Module("create",
 	// Core dependencies
 	Module,
 )
@@ -64,7 +64,7 @@ The index will be created with default settings unless overridden by configurati
 			// Initialize the Fx application
 			app := fx.New(
 				fx.NopLogger,
-				createModule,
+				CreateModule,
 				fx.Provide(
 					func() context.Context { return ctx },
 				),
