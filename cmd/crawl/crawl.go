@@ -14,7 +14,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 // Cmd represents the crawl command
@@ -42,13 +41,8 @@ Specify the source name as an argument.`,
 			}
 		}
 
-		// Create a real logger
-		zapLogger, err := zap.NewDevelopment()
-		if err != nil {
-			return fmt.Errorf("failed to create zap logger: %w", err)
-		}
-
-		logger, err := logger.NewCustomLogger(zapLogger, logger.Params{
+		// Create a logger with the appropriate configuration
+		logger, err := logger.NewCustomLogger(nil, logger.Params{
 			Debug:  true,
 			Level:  "debug",
 			AppEnv: "development",
@@ -57,7 +51,7 @@ Specify the source name as an argument.`,
 			return fmt.Errorf("failed to create logger: %w", err)
 		}
 
-		// Set up signal handling with the real logger
+		// Set up signal handling with the logger
 		handler := signal.NewSignalHandler(logger)
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
@@ -82,7 +76,7 @@ Specify the source name as an argument.`,
 				func() types.Logger { return logger },
 			),
 			fx.Invoke(func(lc fx.Lifecycle, p CommandDeps) {
-				// Update the signal handler with the real logger
+				// Update the signal handler with the logger
 				handler.SetLogger(p.Logger)
 				lc.Append(fx.Hook{
 					OnStart: func(ctx context.Context) error {
