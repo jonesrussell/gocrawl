@@ -93,9 +93,10 @@ func (m *MockProcessor) Stop(ctx context.Context) error {
 	return args.Error(0)
 }
 
-// CanProcess implements ContentProcessor.CanProcess
+// CanProcess implements Processor.CanProcess
 func (m *MockProcessor) CanProcess(content any) bool {
-	return true
+	_, ok := content.(*colly.HTMLElement)
+	return ok
 }
 
 // ContentType implements ContentProcessor.ContentType

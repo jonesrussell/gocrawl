@@ -45,7 +45,8 @@ func (p *ContentProcessor) ContentType() common.ContentType {
 
 // CanProcess checks if this processor can handle the given content
 func (p *ContentProcessor) CanProcess(content any) bool {
-	return true
+	_, ok := content.(*colly.HTMLElement)
+	return ok
 }
 
 // Process processes the content and returns the processed result

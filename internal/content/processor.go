@@ -162,16 +162,16 @@ func (p *ContentProcessor) ProcessContent(e *colly.HTMLElement) {
 
 // Process processes the content and returns the processed result
 func (p *ContentProcessor) Process(ctx context.Context, content any) error {
-	content, ok := content.(*models.Content)
+	e, ok := content.(*colly.HTMLElement)
 	if !ok {
-		return fmt.Errorf("invalid data type: expected *models.Content, got %T", content)
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
 	}
 
 	// Process the content using the ContentService
-	if err := p.Storage.IndexDocument(ctx, p.IndexName, content.ID, content); err != nil {
+	if err := p.Storage.IndexDocument(ctx, p.IndexName, e.Request.URL.String(), e); err != nil {
 		p.Logger.Error("Failed to index content",
 			"component", "content/processor",
-			"contentID", content.ID,
+			"contentID", e.Request.URL.String(),
 			"error", err)
 		p.metrics.ErrorCount++
 		return err
@@ -184,7 +184,8 @@ func (p *ContentProcessor) Process(ctx context.Context, content any) error {
 
 // CanProcess checks if this processor can handle the given content
 func (p *ContentProcessor) CanProcess(content any) bool {
-	return true
+	_, ok := content.(*colly.HTMLElement)
+	return ok
 }
 
 // ContentType implements ContentProcessor.ContentType

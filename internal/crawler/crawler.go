@@ -56,16 +56,8 @@ type Crawler struct {
 
 var _ Interface = (*Crawler)(nil)
 
-// Start starts the crawler for the given source.
-func (c *Crawler) Start(ctx context.Context, sourceName string) error {
-	// Get source configuration
-	source, err := c.sources.FindByName(sourceName)
-	if err != nil {
-		return fmt.Errorf("error getting source: %w", err)
-	}
-
-	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
-
+// configureCollector configures the collector with the given source settings
+func (c *Crawler) configureCollector(source *sources.Config) error {
 	// Parse the source URL to get the domain
 	sourceURL, err := url.Parse(source.URL)
 	if err != nil {
@@ -109,6 +101,70 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	}
 	c.collector.MaxDepth = source.MaxDepth
 	c.collector.Async = true
+
+	return nil
+}
+
+// setupCallbacks sets up the collector callbacks
+func (c *Crawler) setupCallbacks() {
+	// Let Colly handle link discovery with context awareness
+	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+			if visitErr := e.Request.Visit(e.Attr("href")); visitErr != nil {
+				c.Logger.Error("Failed to visit link", "url", e.Attr("href"), "error", visitErr)
+			}
+		}
+	})
+
+	// Add context-aware request handling
+	c.collector.OnRequest(func(r *colly.Request) {
+		select {
+		case <-c.ctx.Done():
+			r.Abort()
+		default:
+			c.Logger.Debug("Visiting", "url", r.URL.String())
+		}
+	})
+
+	c.collector.OnResponse(func(r *colly.Response) {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+			c.Logger.Debug("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
+		}
+	})
+
+	c.collector.OnError(func(r *colly.Response, err error) {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+			c.Logger.Error("Error while crawling",
+				"url", r.Request.URL.String(),
+				"status", r.StatusCode,
+				"error", err)
+		}
+	})
+}
+
+// Start starts the crawler for the given source.
+func (c *Crawler) Start(ctx context.Context, sourceName string) error {
+	// Get source configuration
+	source, err := c.sources.FindByName(sourceName)
+	if err != nil {
+		return fmt.Errorf("error getting source: %w", err)
+	}
+
+	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
+
+	// Configure collector
+	if err := c.configureCollector(source); err != nil {
+		return err
+	}
 
 	// Reset metrics and state
 	c.processedCount = 0
@@ -161,48 +217,8 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		}
 	}()
 
-	// Let Colly handle link discovery with context awareness
-	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		select {
-		case <-c.ctx.Done():
-			return
-		default:
-			if visitErr := e.Request.Visit(e.Attr("href")); visitErr != nil {
-				c.Logger.Error("Failed to visit link", "url", e.Attr("href"), "error", visitErr)
-			}
-		}
-	})
-
-	// Add context-aware request handling
-	c.collector.OnRequest(func(r *colly.Request) {
-		select {
-		case <-c.ctx.Done():
-			r.Abort()
-		default:
-			c.Logger.Debug("Visiting", "url", r.URL.String())
-		}
-	})
-
-	c.collector.OnResponse(func(r *colly.Response) {
-		select {
-		case <-c.ctx.Done():
-			return
-		default:
-			c.Logger.Debug("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
-		}
-	})
-
-	c.collector.OnError(func(r *colly.Response, err error) {
-		select {
-		case <-c.ctx.Done():
-			return
-		default:
-			c.Logger.Error("Error while crawling",
-				"url", r.Request.URL.String(),
-				"status", r.StatusCode,
-				"error", err)
-		}
-	})
+	// Set up callbacks
+	c.setupCallbacks()
 
 	return nil
 }
