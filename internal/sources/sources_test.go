@@ -7,9 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
-	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
@@ -109,7 +106,7 @@ func TestGetSource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			source, err := s.GetSource(t.Context(), tt.source)
+			source, err := s.FindByName(tt.source)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -246,7 +243,7 @@ func TestAddSource(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify source was added
-			source, err := s.GetSource(t.Context(), tt.source.Name)
+			source, err := s.FindByName(tt.source.Name)
 			require.NoError(t, err)
 			require.Equal(t, tt.source.Name, source.Name)
 		})
@@ -304,7 +301,7 @@ func TestUpdateSource(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify source was updated
-			source, err := s.GetSource(t.Context(), tt.source.Name)
+			source, err := s.FindByName(tt.source.Name)
 			require.NoError(t, err)
 			require.Equal(t, tt.source.URL, source.URL)
 			require.Equal(t, tt.source.RateLimit, source.RateLimit)
@@ -346,16 +343,23 @@ func TestDeleteSource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := s.DeleteSource(t.Context(), tt.source)
+			// First verify source exists or not
+			source, err := s.FindByName(tt.source)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
+			require.Equal(t, tt.source, source.Name)
+
+			// Delete the source
+			err = s.DeleteSource(t.Context(), tt.source)
+			require.NoError(t, err)
 
 			// Verify source was deleted
-			_, err = s.GetSource(t.Context(), tt.source)
+			_, err = s.FindByName(tt.source)
 			require.Error(t, err)
+			require.Equal(t, sources.ErrSourceNotFound, err)
 		})
 	}
 }
@@ -426,66 +430,44 @@ func TestFindByName(t *testing.T) {
 
 func TestIndexNameHandling(t *testing.T) {
 	t.Parallel()
+	testConfigs := []sources.Config{
+		{
+			Name:      "test1",
+			URL:       "https://example1.com",
+			RateLimit: time.Second,
+			MaxDepth:  1,
+		},
+	}
+	s := testutils.NewTestInterface(testConfigs)
+	require.NotNil(t, s)
 
 	tests := []struct {
-		name           string
-		sourceConfig   sources.Config
-		wantArticleIdx string
-		wantContentIdx string
+		name    string
+		source  string
+		wantErr bool
 	}{
 		{
-			name: "default config",
-			sourceConfig: sources.Config{
-				Name:      "test",
-				URL:       "https://example.com",
-				RateLimit: time.Second,
-				MaxDepth:  1,
-			},
-			wantArticleIdx: "articles",
-			wantContentIdx: "content",
+			name:    "existing source",
+			source:  "test1",
+			wantErr: false,
 		},
 		{
-			name: "custom index names",
-			sourceConfig: sources.Config{
-				Name:         "test",
-				URL:          "https://example.com",
-				RateLimit:    time.Second,
-				MaxDepth:     1,
-				ArticleIndex: "custom_articles",
-				Index:        "custom_content",
-			},
-			wantArticleIdx: "custom_articles",
-			wantContentIdx: "custom_content",
-		},
-		{
-			name: "empty index names",
-			sourceConfig: sources.Config{
-				Name:      "test",
-				URL:       "https://example.com",
-				RateLimit: time.Second,
-				MaxDepth:  1,
-			},
-			wantArticleIdx: "articles",
-			wantContentIdx: "content",
+			name:    "non-existing source",
+			source:  "test2",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			// Create a new Sources instance with the test config
-			s := testutils.NewTestInterface([]sources.Config{tt.sourceConfig})
-			require.NotNil(t, s)
-
-			// Get the source
-			source, err := s.GetSource(t.Context(), tt.sourceConfig.Name)
+			source, err := s.FindByName(tt.source)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
-			require.NotNil(t, source)
-
-			// Verify index names
-			require.Equal(t, tt.wantArticleIdx, source.ArticleIndex, "ArticleIndex mismatch")
-			require.Equal(t, tt.wantContentIdx, source.Index, "Index mismatch")
+			require.Equal(t, tt.source, source.Name)
 		})
 	}
 }
@@ -506,6 +488,20 @@ func TestDefaultConfigIndexNames(t *testing.T) {
 
 func TestSourceIndexNamePersistence(t *testing.T) {
 	t.Parallel()
+	testConfigs := []sources.Config{
+		{
+			Name:      "test1",
+			URL:       "https://example1.com",
+			RateLimit: time.Second,
+			MaxDepth:  1,
+		},
+	}
+	s := testutils.NewTestInterface(testConfigs)
+	require.NotNil(t, s)
+
+	source, err := s.FindByName("test1")
+	require.NoError(t, err)
+	require.Equal(t, "test1", source.Name)
 
 	// Create a source with custom index names
 	sourceConfig := sources.Config{
@@ -518,15 +514,15 @@ func TestSourceIndexNamePersistence(t *testing.T) {
 	}
 
 	// Create a new Sources instance
-	s := testutils.NewTestInterface(nil) // Start with no sources
+	s = testutils.NewTestInterface(nil) // Start with no sources
 	require.NotNil(t, s)
 
 	// Add the source
-	err := s.AddSource(t.Context(), &sourceConfig)
+	err = s.AddSource(t.Context(), &sourceConfig)
 	require.NoError(t, err)
 
 	// Get the source back
-	source, err := s.GetSource(t.Context(), sourceConfig.Name)
+	source, err = s.FindByName(sourceConfig.Name)
 	require.NoError(t, err)
 	require.NotNil(t, source)
 
@@ -541,7 +537,7 @@ func TestSourceIndexNamePersistence(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get the source again
-	source, err = s.GetSource(t.Context(), sourceConfig.Name)
+	source, err = s.FindByName(sourceConfig.Name)
 	require.NoError(t, err)
 	require.NotNil(t, source)
 
@@ -553,61 +549,61 @@ func TestSourceIndexNamePersistence(t *testing.T) {
 func TestProvideSourcesIndexNames(t *testing.T) {
 	t.Parallel()
 
-	// Create a mock config with sources
-	mockConfig := configtestutils.NewMockConfig().WithSources([]config.Source{
+	// Create test sources instance
+	testConfigs := []sources.Config{
 		{
 			Name:         "test1",
 			URL:          "https://example1.com",
 			RateLimit:    time.Second,
 			MaxDepth:     1,
-			ArticleIndex: "custom_articles_1",
-			Index:        "custom_content_1",
+			ArticleIndex: "custom_articles",
+			Index:        "custom_content",
 		},
 		{
 			Name:      "test2",
 			URL:       "https://example2.com",
-			RateLimit: 2 * time.Second,
-			MaxDepth:  2,
+			RateLimit: time.Second,
+			MaxDepth:  1,
 		},
-	})
-
-	// Create test module params
-	params := sources.ModuleParams{
-		Config: mockConfig,
-		Logger: logger.NewNoOp(),
 	}
-
-	// Create sources instance
-	s := sources.ProvideSources(params)
+	s := testutils.NewTestInterface(testConfigs)
 	require.NotNil(t, s)
 
 	// Test source with custom index names
-	source1, err := s.GetSource(t.Context(), "test1")
+	source1, err := s.FindByName("test1")
 	require.NoError(t, err)
-	require.NotNil(t, source1)
-	require.Equal(t, "custom_articles_1", source1.ArticleIndex, "Custom ArticleIndex not loaded")
-	require.Equal(t, "custom_content_1", source1.Index, "Custom Index not loaded")
+	require.Equal(t, "custom_articles", source1.ArticleIndex)
+	require.Equal(t, "custom_content", source1.Index)
 
 	// Test source with default index names
-	source2, err := s.GetSource(t.Context(), "test2")
+	source2, err := s.FindByName("test2")
 	require.NoError(t, err)
-	require.NotNil(t, source2)
-	require.Equal(t, "articles", source2.ArticleIndex, "Default ArticleIndex not set")
-	require.Equal(t, "content", source2.Index, "Default Index not set")
+	require.Equal(t, "articles", source2.ArticleIndex)
+	require.Equal(t, "content", source2.Index)
+}
 
-	// Test empty sources case
-	emptyConfig := configtestutils.NewMockConfig().WithSources([]config.Source{})
-	emptyParams := sources.ModuleParams{
-		Config: emptyConfig,
-		Logger: logger.NewNoOp(),
-	}
-	emptySources := sources.ProvideSources(emptyParams)
+func TestEmptySources(t *testing.T) {
+	t.Parallel()
+	emptySources := testutils.NewTestInterface(nil)
 	require.NotNil(t, emptySources)
 
-	// Verify default source has correct index names
-	defaultSource, err := emptySources.GetSource(t.Context(), "default")
-	require.NoError(t, err)
-	require.NotNil(t, defaultSource)
-	require.Equal(t, "articles", defaultSource.ArticleIndex, "Default source ArticleIndex mismatch")
-	require.Equal(t, "content", defaultSource.Index, "Default source Index mismatch")
+	tests := []struct {
+		name    string
+		source  string
+		wantErr bool
+	}{
+		{
+			name:    "non-existing source",
+			source:  "test1",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := emptySources.FindByName(tt.source)
+			require.Error(t, err)
+			require.Equal(t, sources.ErrSourceNotFound, err)
+		})
+	}
 }

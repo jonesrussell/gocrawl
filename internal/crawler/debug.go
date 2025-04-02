@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 )
 
 // Logger defines the interface required for colly debugging.
@@ -15,11 +15,11 @@ type Logger interface {
 
 // DebugLogger implements both Logger and io.Writer interfaces for colly debugging.
 type DebugLogger struct {
-	logger common.Logger
+	logger types.Logger
 }
 
 // NewDebugLogger creates a new debug logger instance.
-func NewDebugLogger(logger common.Logger) *DebugLogger {
+func NewDebugLogger(logger types.Logger) *DebugLogger {
 	return &DebugLogger{
 		logger: logger,
 	}

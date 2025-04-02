@@ -73,27 +73,15 @@ func (m *mockSourceManager) FindByName(name string) (*sources.Config, error) {
 
 func (m *mockSourceManager) Validate(_ *sources.Config) error { return nil }
 
-func (m *mockSourceManager) GetSource(ctx context.Context, name string) (*sources.Config, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	for _, s := range m.sources {
-		if s.Name == name {
-			return &s, nil
-		}
-	}
-	return nil, sources.ErrSourceNotFound
-}
-
 func (m *mockSourceManager) ListSources(ctx context.Context) ([]*sources.Config, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	configs := make([]*sources.Config, len(m.sources))
+	result := make([]*sources.Config, len(m.sources))
 	for i := range m.sources {
-		configs[i] = &m.sources[i]
+		result[i] = &m.sources[i]
 	}
-	return configs, nil
+	return result, nil
 }
 
 func (m *mockSourceManager) AddSource(ctx context.Context, source *sources.Config) error {

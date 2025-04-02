@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
@@ -88,6 +89,10 @@ func validateDeleteArgs(_ *cobra.Command, args []string) error {
 	}
 	if deleteSourceName != "" && len(args) > 0 {
 		return errors.New("cannot specify both indices and --source flag")
+	}
+	// Trim quotes from source name if present
+	if deleteSourceName != "" {
+		deleteSourceName = strings.Trim(deleteSourceName, "\"")
 	}
 	return nil
 }

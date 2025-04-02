@@ -77,15 +77,7 @@ type testSources struct {
 	logger  sources.Logger
 }
 
-func (s *testSources) GetSource(ctx context.Context, name string) (*sources.Config, error) {
-	for _, config := range s.configs {
-		if config.Name == name {
-			return &config, nil
-		}
-	}
-	return nil, sources.ErrSourceNotFound
-}
-
+// ListSources retrieves all sources.
 func (s *testSources) ListSources(ctx context.Context) ([]*sources.Config, error) {
 	result := make([]*sources.Config, len(s.configs))
 	for i := range s.configs {
@@ -94,6 +86,7 @@ func (s *testSources) ListSources(ctx context.Context) ([]*sources.Config, error
 	return result, nil
 }
 
+// AddSource adds a new source.
 func (s *testSources) AddSource(ctx context.Context, source *sources.Config) error {
 	if source == nil {
 		return sources.ErrInvalidSource
@@ -194,4 +187,8 @@ func (s *testSources) FindByName(name string) (*sources.Config, error) {
 		}
 	}
 	return nil, sources.ErrSourceNotFound
+}
+
+func (s *testSources) SetSources(configs []sources.Config) {
+	s.configs = configs
 }

@@ -35,10 +35,10 @@ type Crawler struct {
 
 var _ Interface = (*Crawler)(nil)
 
-// Start begins crawling from the given base URL.
+// Start starts the crawler for the given source.
 func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Get source configuration
-	source, err := c.sources.GetSource(ctx, sourceName)
+	source, err := c.sources.FindByName(sourceName)
 	if err != nil {
 		return fmt.Errorf("error getting source: %w", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -20,13 +21,15 @@ var Cmd = &cobra.Command{
 	Use:   "crawl [source]",
 	Short: "Crawl a website for content",
 	Long: `This command crawls a website for content and stores it in the configured storage.
-You can specify the source to crawl using the --source flag.`,
+Specify the source name as an argument.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Set the source flag from the argument
-		if err := cmd.Flags().Set("source", args[0]); err != nil {
-			return fmt.Errorf("failed to set source flag: %w", err)
-		}
+		// Trim quotes from source name
+		sourceName := strings.Trim(args[0], "\"")
+
+		// Create a cancellable context
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
 
 		// Set debug mode if enabled
 		if debug, _ := cmd.Flags().GetBool("debug"); debug {
@@ -37,10 +40,6 @@ You can specify the source to crawl using the --source flag.`,
 				return fmt.Errorf("failed to set debug environment variable: %w", err)
 			}
 		}
-
-		// Create a cancellable context
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
 
 		// Set up signal handling with a no-op logger initially
 		handler := signal.NewSignalHandler(logger.NewNoOp())
@@ -57,10 +56,7 @@ You can specify the source to crawl using the --source flag.`,
 					fx.ResultTags(`name:"crawlContext"`),
 				),
 				fx.Annotate(
-					func() string {
-						sourceName, _ := cmd.Flags().GetString("source")
-						return sourceName
-					},
+					func() string { return sourceName },
 					fx.ResultTags(`name:"sourceName"`),
 				),
 				fx.Annotate(
@@ -149,6 +145,5 @@ func Command() *cobra.Command {
 }
 
 func init() {
-	Cmd.Flags().String("source", "", "The source to crawl")
 	Cmd.Flags().Bool("debug", false, "Enable debug mode")
 }

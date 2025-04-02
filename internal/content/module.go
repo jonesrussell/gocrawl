@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -23,9 +22,24 @@ type ProcessorParams struct {
 	IndexName string `name:"contentIndex"`
 }
 
+// Params defines the parameters required for creating a content service.
+// It uses fx.In for dependency injection and includes:
+// - Logger: For logging operations
+type Params struct {
+	fx.In
+
+	Logger common.Logger
+}
+
 // Module provides the content module's dependencies.
 var Module = fx.Module("content",
 	fx.Provide(
+		// Provide the content service
+		func(p Params) (Interface, error) {
+			service := NewService(p.Logger)
+			p.Logger.Debug("Created content service", "type", fmt.Sprintf("%T", service))
+			return service, nil
+		},
 		// Provide content processor with all dependencies
 		fx.Annotate(
 			func(p ProcessorParams) common.Processor {
@@ -43,18 +57,3 @@ var Module = fx.Module("content",
 		),
 	),
 )
-
-// Params defines the parameters required for creating a content service.
-// It uses fx.In for dependency injection and includes:
-// - Logger: For logging operations
-// - Config: For application configuration
-// - Storage: For content persistence
-// - IndexName: The Elasticsearch index name for content
-type Params struct {
-	fx.In
-
-	Logger    common.Logger
-	Config    *config.Config
-	Storage   types.Interface
-	IndexName string
-}

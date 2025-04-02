@@ -109,16 +109,6 @@ func (s *Sources) SetSources(configs []Config) {
 	s.metrics.SourceCount = int64(len(configs))
 }
 
-// GetSource retrieves a source by name.
-func (s *Sources) GetSource(ctx context.Context, name string) (*Config, error) {
-	for _, src := range s.sources {
-		if src.Name == name {
-			return &src, nil
-		}
-	}
-	return nil, ErrSourceNotFound
-}
-
 // ListSources retrieves all sources.
 func (s *Sources) ListSources(ctx context.Context) ([]*Config, error) {
 	result := make([]*Config, len(s.sources))

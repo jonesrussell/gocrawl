@@ -6,7 +6,6 @@ import (
 
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
@@ -14,11 +13,9 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
-	mockutils "github.com/jonesrussell/gocrawl/internal/testutils"
 	"go.uber.org/fx"
 )
 
@@ -61,19 +58,11 @@ var Module = fx.Module("crawl",
 			},
 			fx.ResultTags(`name:"crawlerArticleChannel"`),
 		),
-		// Provide logger
-		func() common.Logger {
-			return logger.NewNoOp()
-		},
 		// Provide debugger
-		func(logger common.Logger) debug.Debugger {
+		func(logger types.Logger) debug.Debugger {
 			return &debug.LogDebugger{
 				Output: crawler.NewDebugLogger(logger),
 			}
-		},
-		// Provide index manager
-		func() api.IndexManager {
-			return &mockutils.MockIndexManager{}
 		},
 		// Provide sources
 		func() *sources.Sources {
@@ -86,7 +75,7 @@ var Module = fx.Module("crawl",
 		// Provide article processor with correct name
 		fx.Annotate(
 			func(
-				logger common.Logger,
+				logger types.Logger,
 				storage storagetypes.Interface,
 				params struct {
 					fx.In
@@ -106,7 +95,7 @@ var Module = fx.Module("crawl",
 		// Provide content processor with correct name
 		fx.Annotate(
 			func(
-				logger common.Logger,
+				logger types.Logger,
 				storage storagetypes.Interface,
 				params struct {
 					fx.In

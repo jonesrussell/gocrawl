@@ -67,36 +67,10 @@ func (m *MockSourceManager) DeleteSource(ctx context.Context, name string) error
 	return args.Error(0)
 }
 
-// GetSource implements sources.Interface
-func (m *MockSourceManager) GetSource(ctx context.Context, name string) (*sources.Config, error) {
-	args := m.Called(ctx, name)
-	if err := args.Error(1); err != nil {
-		return nil, err
-	}
-	result := args.Get(0)
-	if result == nil {
-		return nil, sources.ErrSourceNotFound
-	}
-	if val, ok := result.(*sources.Config); ok {
-		return val, nil
-	}
-	return nil, sources.ErrInvalidSource
-}
-
 // ListSources implements sources.Interface
 func (m *MockSourceManager) ListSources(ctx context.Context) ([]*sources.Config, error) {
 	args := m.Called(ctx)
-	if err := args.Error(1); err != nil {
-		return nil, err
-	}
-	result := args.Get(0)
-	if result == nil {
-		return nil, nil
-	}
-	if val, ok := result.([]*sources.Config); ok {
-		return val, nil
-	}
-	return nil, sources.ErrInvalidSource
+	return args.Get(0).([]*sources.Config), args.Error(1)
 }
 
 // UpdateSource implements sources.Interface

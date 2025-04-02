@@ -338,22 +338,6 @@ func TestCommandErrorHandling(t *testing.T) {
 	}
 }
 
-func TestCommandFlagHandling(t *testing.T) {
-	t.Parallel()
-
-	cmd := crawl.Command()
-	cmd.SetContext(t.Context())
-
-	// Test setting source flag
-	err := cmd.Flags().Set("source", "test-source")
-	require.NoError(t, err)
-
-	// Verify flag value
-	source, err := cmd.Flags().GetString("source")
-	require.NoError(t, err)
-	assert.Equal(t, "test-source", source)
-}
-
 func TestCrawlerCommandStartup(t *testing.T) {
 	t.Parallel()
 

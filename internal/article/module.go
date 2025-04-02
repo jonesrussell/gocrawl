@@ -25,8 +25,8 @@ type ProcessorParams struct {
 
 	Logger      common.Logger
 	Storage     types.Interface
-	IndexName   string `name:"indexName"`
-	ArticleChan chan *models.Article
+	IndexName   string               `name:"indexName"`
+	ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 	Service     Interface
 }
 

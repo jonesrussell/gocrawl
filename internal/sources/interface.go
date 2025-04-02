@@ -9,8 +9,6 @@ import (
 
 // Interface defines the interface for source management.
 type Interface interface {
-	// GetSource retrieves a source by name.
-	GetSource(ctx context.Context, name string) (*Config, error)
 	// ListSources retrieves all sources.
 	ListSources(ctx context.Context) ([]*Config, error)
 	// AddSource adds a new source.
