@@ -8,6 +8,7 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"go.uber.org/fx"
@@ -26,41 +27,50 @@ type Result struct {
 	Crawler Interface
 }
 
-// Module provides the crawler module and its dependencies.
+// Module provides the crawler module for dependency injection.
 var Module = fx.Module("crawler",
 	fx.Provide(
-		// Provide the crawler implementation
+		// Provide the collector
+		func(logger types.Logger, debugger debug.Debugger) *colly.Collector {
+			return colly.NewCollector(
+				colly.MaxDepth(DefaultMaxDepth),
+				colly.Async(true),
+				colly.AllowedDomains(),
+				colly.ParseHTTPErrorResponse(),
+			)
+		},
+		// Provide the event bus
 		fx.Annotate(
-			ProvideCrawler,
-			fx.ParamTags(
-				``,
-				``,
-				``,
-				`name:"articleProcessor"`,
-				`name:"contentProcessor"`,
-				`name:"eventBus"`,
-			),
+			events.NewBus,
+			fx.ResultTags(`name:"eventBus"`),
 		),
+		// Provide the crawler
 		fx.Annotate(
-			func(logger common.Logger, debugger debug.Debugger) *colly.Collector {
-				return colly.NewCollector(
-					colly.MaxDepth(DefaultMaxDepth),
-					colly.Async(true),
-					colly.AllowedDomains(),
-					colly.ParseHTTPErrorResponse(),
+			func(
+				logger types.Logger,
+				indexManager api.IndexManager,
+				sources sources.Interface,
+				articleProcessor common.Processor,
+				contentProcessor common.Processor,
+				eventBus *events.Bus,
+			) Interface {
+				return NewCrawler(
+					logger,
+					indexManager,
+					sources,
+					articleProcessor,
+					contentProcessor,
+					eventBus,
 				)
 			},
-			fx.ParamTags(
-				``,
-				``,
-			),
+			fx.ParamTags("", "", "", `name:"articleProcessor"`, `name:"contentProcessor"`, `name:"eventBus"`),
 		),
 	),
 )
 
 // ProvideCrawler creates a new crawler instance.
 func ProvideCrawler(
-	logger common.Logger,
+	logger types.Logger,
 	indexManager api.IndexManager,
 	sources sources.Interface,
 	articleProcessor common.Processor,
@@ -84,7 +94,7 @@ func ProvideCrawler(
 
 // NewCrawler creates a new crawler instance.
 func NewCrawler(
-	logger common.Logger,
+	logger types.Logger,
 	indexManager api.IndexManager,
 	sources sources.Interface,
 	articleProcessor common.Processor,

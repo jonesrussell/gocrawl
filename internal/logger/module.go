@@ -2,7 +2,6 @@
 package logger
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"go.uber.org/fx"
 )
@@ -10,16 +9,12 @@ import (
 // Module provides the logger module and its dependencies using fx.
 var Module = fx.Options(
 	fx.Provide(
-		// Provide both common.Logger and types.Logger
-		fx.Annotate(
-			func() (common.Logger, error) {
-				return NewCustomLogger(nil, Params{
-					Debug:  true,
-					Level:  "debug",
-					AppEnv: "development",
-				})
-			},
-			fx.As(new(types.Logger)),
-		),
+		func() (types.Logger, error) {
+			return NewCustomLogger(nil, Params{
+				Debug:  true,
+				Level:  "debug",
+				AppEnv: "development",
+			})
+		},
 	),
 )

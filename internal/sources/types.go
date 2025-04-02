@@ -1,7 +1,7 @@
 package sources
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/logger/types"
 )
 
 // Type aliases for source-related interfaces and types.

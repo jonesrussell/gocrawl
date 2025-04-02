@@ -82,7 +82,7 @@ func NewSignalHandler(logger common.Logger) *SignalHandler {
 		logger:          logger,
 		state:           "initialized",
 		shutdown:        make(chan struct{}),
-		exitFunc:        nil, // Don't exit by default
+		exitFunc:        os.Exit, // Set default exit function
 	}
 }
 

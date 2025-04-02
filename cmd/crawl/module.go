@@ -5,14 +5,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -21,21 +19,19 @@ import (
 	"go.uber.org/fx"
 )
 
-// CommandDeps holds the crawl command's dependencies
+// CommandDeps holds the dependencies for the crawl command.
 type CommandDeps struct {
 	fx.In
 
-	Lifecycle   fx.Lifecycle
-	Sources     sources.Interface
-	Crawler     crawler.Interface
+	Context     context.Context  `name:"crawlContext"`
+	SourceName  string           `name:"sourceName"`
+	Config      config.Interface `name:"config"`
 	Logger      types.Logger
-	Config      config.Interface
 	Storage     storagetypes.Interface
-	Done        chan struct{}        `name:"shutdownChan"`
-	Context     context.Context      `name:"crawlContext"`
-	Processors  []common.Processor   `group:"processors"`
-	SourceName  string               `name:"sourceName"`
+	Crawler     crawler.Interface
+	Sources     sources.Interface
 	ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
+	Processors  []common.Processor   `group:"processors"`
 }
 
 // Module provides the crawl command's dependencies.
@@ -62,21 +58,6 @@ var Module = fx.Module("crawl",
 				return make(chan *models.Article)
 			},
 			fx.ResultTags(`name:"crawlerArticleChannel"`),
-		),
-	),
-
-	// Provide debugger
-	fx.Provide(
-		func() debug.Debugger {
-			return &debug.LogDebugger{}
-		},
-	),
-
-	// Provide event bus
-	fx.Provide(
-		fx.Annotate(
-			events.NewBus,
-			fx.ResultTags(`name:"eventBus"`),
 		),
 	),
 

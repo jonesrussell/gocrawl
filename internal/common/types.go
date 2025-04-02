@@ -1,8 +1,9 @@
 package common
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	loggertypes "github.com/jonesrussell/gocrawl/internal/logger/types"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -14,17 +15,16 @@ type (
 	// access to application-wide settings.
 	Config = config.Interface
 
-	// Logger is an alias for the logger interface, providing
-	// structured logging capabilities across the application.
-	Logger = types.Logger
+	// Logger is an alias for logger/types.Logger, providing structured logging capabilities.
+	Logger = loggertypes.Logger
 
 	// Storage is an alias for storage.Interface, providing
 	// data persistence operations across the application.
 	Storage = storagetypes.Interface
 
-	// Job is an alias for types.Job, representing a crawling job.
-	Job = types.Job
+	// Job is an alias for jobtypes.Job, representing a crawling job.
+	Job = jobtypes.Job
 
-	// Item is an alias for types.Item, representing a crawled item.
-	Item = types.Item
+	// Item is an alias for jobtypes.Item, representing a crawled item.
+	Item = jobtypes.Item
 )

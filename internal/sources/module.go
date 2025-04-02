@@ -18,15 +18,14 @@ const (
 	DefaultRateLimit = 5 * time.Second
 )
 
-// Module provides the sources package's dependencies.
+// Module provides the sources module for dependency injection.
 var Module = fx.Module("sources",
 	fx.Provide(
 		fx.Annotate(
-			NewSourcesFromConfig,
-			fx.ParamTags(
-				``,
-				``,
-			),
+			func(cfg config.Interface, logger types.Logger) Interface {
+				return NewSourcesFromConfig(cfg, logger)
+			},
+			fx.ParamTags(`name:"config"`, ""),
 		),
 	),
 )
@@ -35,7 +34,7 @@ var Module = fx.Module("sources",
 type ModuleParams struct {
 	fx.In
 
-	Config config.Interface
+	Config config.Interface `name:"config"`
 	Logger types.Logger
 }
 

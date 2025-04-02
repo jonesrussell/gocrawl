@@ -153,12 +153,15 @@ func SetupConfig(envFile string) error {
 var Module = fx.Options(
 	fx.Provide(
 		// Provide the config interface
-		func() (Interface, error) {
-			if err := SetupConfig(""); err != nil {
-				return nil, err
-			}
-			return New()
-		},
+		fx.Annotate(
+			func() (Interface, error) {
+				if err := SetupConfig(""); err != nil {
+					return nil, err
+				}
+				return New()
+			},
+			fx.ResultTags(`name:"config"`),
+		),
 		NewHTTPTransport, // Provides HTTP transport configuration
 	),
 )
