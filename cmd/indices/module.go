@@ -2,12 +2,15 @@
 package indices
 
 import (
+	"context"
+
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -15,9 +18,19 @@ import (
 type DeleteDeps struct {
 	fx.In
 
-	Storage types.Interface
+	Storage storagetypes.Interface
 	Sources sources.Interface `name:"sources"`
 	Logger  common.Logger
+}
+
+// CreateParams holds the parameters for creating an index
+type CreateParams struct {
+	fx.In
+
+	Context context.Context
+	Logger  types.Logger
+	Storage storagetypes.Interface
+	Config  config.Interface
 }
 
 // Module provides the indices command dependencies
