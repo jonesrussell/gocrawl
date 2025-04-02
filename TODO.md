@@ -2,15 +2,81 @@
 
 ## High Priority
 
-### 1. Module Reorganization
+### 1. Dependency Injection Simplification
+- [ ] Simplify Logger Implementation
+  - [ ] Consolidate logger interfaces into single package
+    - [ ] Move logger interface to internal/logger
+    - [ ] Remove common/types logger interface
+    - [ ] Update all imports to use new logger package
+  - [ ] Simplify zap integration
+    - [ ] Remove unnecessary wrapper layers
+    - [ ] Use zap directly with minimal abstraction
+    - [ ] Keep only essential logging methods
+  - [ ] Remove fx module for logger
+    - [ ] Create simple constructor function
+    - [ ] Use environment-based configuration
+    - [ ] Add proper error handling
+  - [ ] Update tests
+    - [ ] Simplify mock logger implementation
+    - [ ] Update test utilities
+    - [ ] Add proper test coverage
+- [ ] Remove Unnecessary Abstractions
+  - [ ] Remove common/types package
+    - [ ] Move interfaces to consuming packages
+    - [ ] Update all imports
+    - [ ] Update tests
+  - [ ] Remove type aliases
+    - [ ] Use direct type references
+    - [ ] Update imports
+    - [ ] Update tests
+  - [ ] Simplify module structure
+    - [ ] Reduce nesting levels
+    - [ ] Combine related modules
+    - [ ] Remove unnecessary modules
+- [ ] Simplify Dependency Injection
+  - [ ] Remove named dependencies
+    - [ ] Use type-based injection
+    - [ ] Update fx modules
+    - [ ] Update tests
+  - [ ] Use constructor injection
+    - [ ] Replace fx where appropriate
+    - [ ] Add proper error handling
+    - [ ] Update tests
+  - [ ] Keep fx for application composition only
+    - [ ] Remove unnecessary fx usage
+    - [ ] Simplify module structure
+    - [ ] Update tests
+- [ ] Review and Replace Cobra CLI
+  - [ ] Evaluate current CLI needs
+    - [ ] List required commands
+    - [ ] Document usage patterns
+    - [ ] Identify complexity points
+  - [ ] Design simpler CLI
+    - [ ] Use standard flag package
+    - [ ] Create simple command structure
+    - [ ] Add proper help messages
+  - [ ] Implement new CLI
+    - [ ] Create basic command structure
+    - [ ] Add command implementations
+    - [ ] Add proper error handling
+  - [ ] Update tests
+    - [ ] Add CLI tests
+    - [ ] Add integration tests
+    - [ ] Update existing tests
+  - [ ] Remove Cobra dependency
+    - [ ] Clean up imports
+    - [ ] Update documentation
+    - [ ] Update build scripts
+
+### 2. Module Reorganization
 - [ ] Split common module into specific modules
   - [x] Create separate logger module
-    - [x] Move logger interface to pkg/logger
+    - [x] Move logger interface to internal/logger
     - [x] Create logger module for dependency injection
     - [x] Add logger tests
     - [x] Update job command to use new logger module
   - [x] Create separate config module
-    - [x] Move config interface to pkg/config
+    - [x] Move config interface to internal/config
     - [x] Create config module for dependency injection
     - [x] Add config tests
     - [ ] Update commands to use new config module
@@ -19,38 +85,38 @@
       - [ ] Update crawl command to use new config module
       - [ ] Update httpd command to use new config module
   - [ ] Create separate sources module
-    - [x] Move sources interface to pkg/sources
-      - [x] Create pkg/sources/interface.go
+    - [x] Move sources interface to internal/sources
+      - [x] Create internal/sources/interface.go
         - [x] Define Interface type with required methods
         - [x] Add interface documentation
         - [x] Add interface examples
         - [x] Add interface validation
-      - [x] Create pkg/sources/types.go
+      - [x] Create internal/sources/types.go
         - [x] Define Config struct
         - [x] Define Params struct
         - [x] Add type documentation
         - [x] Add type validation
-      - [x] Create pkg/sources/errors.go
+      - [x] Create internal/sources/errors.go
         - [x] Define error types
         - [x] Add error documentation
         - [x] Add error examples
     - [ ] Create sources module for dependency injection
-      - [ ] Create pkg/sources/module.go
+      - [ ] Create internal/sources/module.go
         - [ ] Define Module variable
         - [ ] Add module documentation
         - [ ] Add module examples
         - [ ] Add module validation
-      - [ ] Create pkg/sources/loader.go
+      - [ ] Create internal/sources/loader.go
         - [ ] Implement source loading
         - [ ] Add loader documentation
         - [ ] Add loader examples
         - [ ] Add loader validation
     - [ ] Add sources tests
-      - [x] Create pkg/sources/sources_test.go
+      - [x] Create internal/sources/sources_test.go
         - [x] Add interface tests
         - [x] Add module tests
         - [x] Add integration tests
-      - [ ] Create pkg/sources/loader_test.go
+      - [ ] Create internal/sources/loader_test.go
         - [ ] Add loader tests
         - [ ] Add validation tests
         - [ ] Add error tests
@@ -67,8 +133,8 @@
         - [ ] Update dependencies
         - [ ] Update tests
         - [ ] Update documentation
-    - [ ] Combine internal/sources and pkg/sources
-      - [x] Move unique functionality from pkg/sources to internal/sources
+    - [ ] Combine internal/sources and internal/sources
+      - [x] Move unique functionality from internal/sources to internal/sources
         - [x] Move interface definitions
         - [x] Move type definitions
         - [x] Move error definitions
@@ -77,7 +143,7 @@
         - [x] Update imports in all files
         - [x] Update type references
         - [x] Update interface references
-      - [x] Delete pkg/sources package
+      - [x] Delete internal/sources package
         - [x] Remove all files
         - [x] Update documentation
       - [x] Update test files
@@ -216,9 +282,9 @@
     - [ ] Create storage interface
     - [ ] Create metrics interface
   - [x] Move interfaces to consuming packages
-    - [x] Move logger interface to pkg/logger
-    - [x] Move config interface to pkg/config
-    - [ ] Move sources interface to pkg/sources
+    - [x] Move logger interface to internal/logger
+    - [x] Move config interface to internal/config
+    - [ ] Move sources interface to internal/sources
     - [ ] Move storage interface to pkg/storage
     - [ ] Move metrics interface to pkg/metrics
   - [ ] Remove generic interfaces from common package
@@ -235,16 +301,16 @@
     - [ ] Update tests to use metrics interface
 - [ ] Reorganize shared code
   - [x] Move shared code from internal/common to pkg
-    - [x] Move logger code to pkg/logger
-    - [x] Move config code to pkg/config
-    - [ ] Move sources code to pkg/sources
+    - [x] Move logger code to internal/logger
+    - [x] Move config code to internal/config
+    - [ ] Move sources code to internal/sources
     - [ ] Move storage code to pkg/storage
     - [ ] Move metrics code to pkg/metrics
-  - [x] Create pkg/logger for logging utilities
+  - [x] Create internal/logger for logging utilities
     - [x] Create logger interface
     - [x] Create logger module
     - [x] Create logger tests
-  - [x] Create pkg/config for configuration utilities
+  - [x] Create internal/config for configuration utilities
     - [x] Create config interface
     - [x] Create config module
     - [x] Create config tests
@@ -263,7 +329,7 @@
     - [ ] Update storage imports
     - [ ] Update metrics imports
 
-### 2. Interface Organization and Naming
+### 3. Interface Organization and Naming
 - [x] Move interfaces to consuming packages
   - [x] Move `ContentProcessor` from `models` to `collector`
   - [x] Move `Logger` interface from `collector` to `common`
@@ -273,7 +339,7 @@
   - [x] `collector.ArticleProcessor` → `article.Processor`
   - [x] `collector.ContentProcessor` → `content.Processor`
 
-### 3. Dependency Injection
+### 4. Dependency Injection
 - [x] Improve fx module organization
   - [x] Move all fx-related code to `module.go` files
   - [x] Use `fx.Annotate` for named dependencies
@@ -288,7 +354,7 @@
   - [x] Use mock configurations in tests
   - [x] Properly scope test modules
 
-### 4. Error Handling
+### 5. Error Handling
 - [x] Standardize error handling
   - [x] Use `errors.New` for simple errors
   - [x] Use `fmt.Errorf` with `%w` for wrapped errors
@@ -310,7 +376,7 @@
 
 ## Medium Priority
 
-### 5. Testing
+### 6. Testing
 - [x] Improve test organization
   - [x] Move tests to separate `_test` packages
   - [x] Add proper test helpers
@@ -327,7 +393,7 @@
   - [x] Properly scope test dependencies
   - [x] Add test validation
 
-### 6. Code Organization
+### 7. Code Organization
 - [x] Split large files
   - [x] Split `collector.go`
   - [x] Split `crawler.go`
@@ -338,7 +404,7 @@
   - [x] Move common constants to `common`
   - [x] Move common utilities to `common`
 
-### 7. Documentation
+### 8. Documentation
 - [x] Improve documentation
   - [x] Add package documentation
   - [x] Add function documentation
@@ -352,7 +418,7 @@
 
 ## Low Priority
 
-### 8. Configuration
+### 9. Configuration
 - [x] Improve configuration
   - [x] Add proper validation
   - [x] Add proper defaults
@@ -364,7 +430,7 @@
   - [x] Add configuration validation
   - [x] Add configuration defaults
 
-### 9. Logging
+### 10. Logging
 - [x] Improve logging
   - [x] Add proper log levels
   - [x] Add proper log fields
@@ -376,7 +442,7 @@
   - [x] Add log filtering
   - [x] Add log formatting
 
-### 10. Metrics and Monitoring
+### 11. Metrics and Monitoring
 - [x] Add proper metrics
   - [x] Add counter metrics
   - [x] Add gauge metrics
@@ -388,7 +454,7 @@
   - [x] Add liveness checks
   - [x] Add metrics endpoint
 
-### 11. Security
+### 12. Security
 - [x] Improve security
   - [x] Add proper TLS configuration
   - [x] Add proper authentication
@@ -550,7 +616,7 @@
   - [ ] Add authentication
   - [ ] Add authorization
 
-### 12. Remove Named Dependencies
+### 13. Remove Named Dependencies
 - [ ] Remove named fx dependencies across codebase
   - [ ] Audit all fx.Module declarations
   - [ ] Remove fx.Annotate usage
@@ -573,5 +639,5 @@ Priority order:
 4. internal/crawler
 5. internal/storage
 6. internal/sources
-7. pkg/config
-8. pkg/logger
+7. internal/config
+8. internal/logger
