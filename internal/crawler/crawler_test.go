@@ -2,6 +2,7 @@ package crawler_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -93,9 +94,8 @@ func (m *MockProcessor) Stop(ctx context.Context) error {
 }
 
 // CanProcess implements ContentProcessor.CanProcess
-func (m *MockProcessor) CanProcess(content interface{}) bool {
-	_, ok := content.(*colly.HTMLElement)
-	return ok
+func (m *MockProcessor) CanProcess(content any) bool {
+	return true
 }
 
 // ContentType implements ContentProcessor.ContentType
@@ -109,34 +109,42 @@ var _ common.Processor = (*MockProcessor)(nil)
 // MockLogger is a mock implementation of common.Logger
 type MockLogger struct {
 	mock.Mock
+	logs []string
 }
 
-func (m *MockLogger) Info(msg string, args ...interface{}) {
-	m.Called(msg, args)
+// Info implements Logger.Info
+func (m *MockLogger) Info(msg string, args ...any) {
+	m.logs = append(m.logs, fmt.Sprintf("INFO: %s", msg))
 }
 
-func (m *MockLogger) Error(msg string, args ...interface{}) {
-	m.Called(msg, args)
+// Error implements Logger.Error
+func (m *MockLogger) Error(msg string, args ...any) {
+	m.logs = append(m.logs, fmt.Sprintf("ERROR: %s", msg))
 }
 
-func (m *MockLogger) Debug(msg string, args ...interface{}) {
-	m.Called(msg, args)
+// Debug implements Logger.Debug
+func (m *MockLogger) Debug(msg string, args ...any) {
+	m.logs = append(m.logs, fmt.Sprintf("DEBUG: %s", msg))
 }
 
-func (m *MockLogger) Warn(msg string, args ...interface{}) {
-	m.Called(msg, args)
+// Warn implements Logger.Warn
+func (m *MockLogger) Warn(msg string, args ...any) {
+	m.logs = append(m.logs, fmt.Sprintf("WARN: %s", msg))
 }
 
-func (m *MockLogger) Errorf(format string, args ...interface{}) {
-	m.Called(format, args)
+// Errorf implements Logger.Errorf
+func (m *MockLogger) Errorf(format string, args ...any) {
+	m.logs = append(m.logs, fmt.Sprintf("ERROR: %s", format))
 }
 
-func (m *MockLogger) Fatal(msg string, args ...interface{}) {
-	m.Called(msg, args)
+// Fatal implements Logger.Fatal
+func (m *MockLogger) Fatal(msg string, args ...any) {
+	m.logs = append(m.logs, fmt.Sprintf("FATAL: %s", msg))
 }
 
-func (m *MockLogger) Printf(format string, args ...interface{}) {
-	m.Called(format, args)
+// Printf implements Logger.Printf
+func (m *MockLogger) Printf(format string, args ...any) {
+	m.logs = append(m.logs, fmt.Sprintf("PRINT: %s", format))
 }
 
 func (m *MockLogger) Sync() error {
@@ -581,7 +589,7 @@ func NewDebugLogger(logger common.Logger) io.Writer {
 
 func TestCrawler_ProcessHTML(t *testing.T) {
 	// Create a test context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a development logger with nice formatting
 	devLogger, err := logger.NewCustomLogger(nil, logger.Params{
@@ -637,15 +645,15 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 	collector.OnHTML("article", func(e *colly.HTMLElement) {
 		// Set up expectations for the actual element being processed
 		mockArticleProcessor.On("ProcessHTML", ctx, e).Return(nil)
-		err := mockArticleProcessor.ProcessHTML(ctx, e)
-		require.NoError(t, err)
+		processErr := mockArticleProcessor.ProcessHTML(ctx, e)
+		require.NoError(t, processErr)
 	})
 
 	collector.OnHTML("div.content", func(e *colly.HTMLElement) {
 		// Set up expectations for the actual element being processed
 		mockContentProcessor.On("ProcessHTML", ctx, e).Return(nil)
-		err := mockContentProcessor.ProcessHTML(ctx, e)
-		require.NoError(t, err)
+		processErr := mockContentProcessor.ProcessHTML(ctx, e)
+		require.NoError(t, processErr)
 	})
 
 	// Visit the test server URL

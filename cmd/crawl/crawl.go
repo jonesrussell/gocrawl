@@ -16,6 +16,13 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// processorTimeout is the timeout for each processor
+	processorTimeout = 30 * time.Second
+	// crawlerTimeout is the timeout for waiting for the crawler to complete
+	crawlerTimeout = 5 * time.Minute
+)
+
 // Cmd represents the crawl command
 var Cmd = &cobra.Command{
 	Use:   "crawl [source]",
@@ -31,18 +38,18 @@ Specify the source name as an argument.`,
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Create a logger with the appropriate configuration
-		logger, err := logger.NewCustomLogger(nil, logger.Params{
+		// Create a logger for signal handling only
+		signalLogger, loggerErr := logger.NewCustomLogger(nil, logger.Params{
 			Debug:  true,
 			Level:  "info",
 			AppEnv: "development",
 		})
-		if err != nil {
-			return fmt.Errorf("failed to create logger: %w", err)
+		if loggerErr != nil {
+			return fmt.Errorf("failed to create logger: %w", loggerErr)
 		}
 
 		// Set up signal handling with the logger
-		handler := signal.NewSignalHandler(logger)
+		handler := signal.NewSignalHandler(signalLogger)
 		handler.SetExitFunc(os.Exit) // Set the exit function
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
@@ -75,14 +82,14 @@ Specify the source name as an argument.`,
 				lc.Append(fx.Hook{
 					OnStart: func(ctx context.Context) error {
 						// Test storage connection
-						if err := p.Storage.TestConnection(p.Context); err != nil {
-							return fmt.Errorf("failed to connect to storage: %w", err)
+						if testErr := p.Storage.TestConnection(p.Context); testErr != nil {
+							return fmt.Errorf("failed to connect to storage: %w", testErr)
 						}
 
 						// Start crawler
 						p.Logger.Info("Starting crawler...", "source", p.SourceName)
-						if err := p.Crawler.Start(p.Context, p.SourceName); err != nil {
-							return fmt.Errorf("failed to start crawler: %w", err)
+						if startErr := p.Crawler.Start(p.Context, p.SourceName); startErr != nil {
+							return fmt.Errorf("failed to start crawler: %w", startErr)
 						}
 
 						// Process articles from the channel
@@ -111,7 +118,7 @@ Specify the source name as an argument.`,
 									// Process the article using each processor with timeout
 									for _, processor := range p.Processors {
 										// Create a timeout context for each processor
-										processorCtx, processorCancel := context.WithTimeout(ctx, 30*time.Second)
+										processorCtx, processorCancel := context.WithTimeout(ctx, processorTimeout)
 										processor.ProcessJob(processorCtx, job)
 										processorCancel()
 									}
@@ -122,7 +129,7 @@ Specify the source name as an argument.`,
 						// Wait for crawler to complete with timeout
 						go func() {
 							// Create a timeout context for waiting
-							waitCtx, waitCancel := context.WithTimeout(ctx, 5*time.Minute)
+							waitCtx, waitCancel := context.WithTimeout(ctx, crawlerTimeout)
 							defer waitCancel()
 
 							select {
@@ -140,8 +147,8 @@ Specify the source name as an argument.`,
 					},
 					OnStop: func(ctx context.Context) error {
 						// Stop crawler
-						if err := p.Crawler.Stop(p.Context); err != nil {
-							return fmt.Errorf("failed to stop crawler: %w", err)
+						if stopErr := p.Crawler.Stop(p.Context); stopErr != nil {
+							return fmt.Errorf("failed to stop crawler: %w", stopErr)
 						}
 
 						// Wait for article processing to complete
@@ -153,8 +160,8 @@ Specify the source name as an argument.`,
 						}
 
 						// Close storage connection
-						if err := p.Storage.Close(); err != nil {
-							return fmt.Errorf("failed to close storage connection: %w", err)
+						if closeErr := p.Storage.Close(); closeErr != nil {
+							return fmt.Errorf("failed to close storage connection: %w", closeErr)
 						}
 
 						return nil
@@ -167,8 +174,8 @@ Specify the source name as an argument.`,
 		handler.SetFXApp(fxApp)
 
 		// Start the application
-		if err := fxApp.Start(ctx); err != nil {
-			return fmt.Errorf("failed to start application: %w", err)
+		if startErr := fxApp.Start(ctx); startErr != nil {
+			return fmt.Errorf("failed to start application: %w", startErr)
 		}
 
 		// Wait for completion signal

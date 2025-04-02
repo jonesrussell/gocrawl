@@ -13,6 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -44,6 +45,7 @@ var Module = fx.Module("crawl",
 	config.Module,
 	article.Module,
 	content.Module,
+	logger.Module,
 	fx.Provide(
 		// Command-specific dependencies
 		fx.Annotate(

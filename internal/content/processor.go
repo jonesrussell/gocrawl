@@ -160,11 +160,11 @@ func (p *ContentProcessor) ProcessContent(e *colly.HTMLElement) {
 	}
 }
 
-// Process implements common.Processor
-func (p *ContentProcessor) Process(ctx context.Context, data any) error {
-	content, ok := data.(*models.Content)
+// Process processes the content and returns the processed result
+func (p *ContentProcessor) Process(ctx context.Context, content any) error {
+	content, ok := content.(*models.Content)
 	if !ok {
-		return fmt.Errorf("invalid data type: expected *models.Content, got %T", data)
+		return fmt.Errorf("invalid data type: expected *models.Content, got %T", content)
 	}
 
 	// Process the content using the ContentService
@@ -182,10 +182,9 @@ func (p *ContentProcessor) Process(ctx context.Context, data any) error {
 	return nil
 }
 
-// CanProcess implements ContentProcessor.CanProcess
-func (p *ContentProcessor) CanProcess(content interface{}) bool {
-	_, ok := content.(*colly.HTMLElement)
-	return ok
+// CanProcess checks if this processor can handle the given content
+func (p *ContentProcessor) CanProcess(content any) bool {
+	return true
 }
 
 // ContentType implements ContentProcessor.ContentType

@@ -5,6 +5,7 @@ package crawler
 
 import (
 	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -15,6 +16,8 @@ import (
 const (
 	// ArticleChannelBufferSize is the buffer size for the article channel.
 	ArticleChannelBufferSize = 100
+	// DefaultMaxDepth is the default maximum depth for crawling
+	DefaultMaxDepth = 3
 )
 
 // Result defines the crawler module's output.
@@ -36,6 +39,20 @@ var Module = fx.Module("crawler",
 				`name:"startupArticleProcessor"`,
 				`name:"startupContentProcessor"`,
 				`name:"eventBus"`,
+			),
+		),
+		fx.Annotate(
+			func(logger common.Logger, debugger debug.Debugger) *colly.Collector {
+				return colly.NewCollector(
+					colly.MaxDepth(DefaultMaxDepth),
+					colly.Async(true),
+					colly.AllowedDomains(),
+					colly.ParseHTTPErrorResponse(),
+				)
+			},
+			fx.ParamTags(
+				``,
+				``,
 			),
 		),
 	),
@@ -75,7 +92,7 @@ func NewCrawler(
 	bus *events.Bus,
 ) Interface {
 	collector := colly.NewCollector(
-		colly.MaxDepth(3),
+		colly.MaxDepth(DefaultMaxDepth),
 		colly.Async(true),
 		colly.AllowedDomains(),
 		colly.ParseHTTPErrorResponse(),
@@ -117,7 +134,9 @@ func NewCrawler(
 
 	// Let Colly handle link discovery
 	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		e.Request.Visit(e.Attr("href"))
+		if err := e.Request.Visit(e.Attr("href")); err != nil {
+			logger.Error("Failed to visit link", "url", e.Attr("href"), "error", err)
+		}
 	})
 
 	return crawler

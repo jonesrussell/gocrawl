@@ -3,6 +3,7 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -20,6 +21,19 @@ const (
 	DefaultRandomDelayFactor = 2
 	// DefaultParallelism is the default number of parallel requests
 	DefaultParallelism = 2
+	// DefaultStartTimeout is the default timeout for starting the crawler
+	DefaultStartTimeout = 30 * time.Second
+	// DefaultStopTimeout is the default timeout for stopping the crawler
+	DefaultStopTimeout = 30 * time.Second
+	// DefaultPollInterval is the default interval for polling crawler status
+	DefaultPollInterval = 100 * time.Millisecond
+)
+
+var (
+	// ErrCrawlerTimeout is returned when the crawler times out while starting
+	ErrCrawlerTimeout = errors.New("timeout starting crawler")
+	// ErrCrawlerContextCancelled is returned when the context is cancelled while starting the crawler
+	ErrCrawlerContextCancelled = errors.New("context cancelled while starting crawler")
 )
 
 // Crawler implements the crawler interface
@@ -105,27 +119,28 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.ctx = ctx
 
 	// Create a timeout context for starting the crawler
-	startCtx, startCancel := context.WithTimeout(ctx, 30*time.Second)
+	startCtx, startCancel := context.WithTimeout(ctx, DefaultStartTimeout)
 	defer startCancel()
 
 	// Start crawling with timeout
 	crawlErr := make(chan error)
 	go func() {
 		defer close(crawlErr)
-		if err := c.collector.Visit(source.URL); err != nil {
-			crawlErr <- fmt.Errorf("error starting crawl: %w", err)
+		if visitErr := c.collector.Visit(source.URL); visitErr != nil {
+			crawlErr <- fmt.Errorf("failed to start crawling: %w", visitErr)
 		}
 	}()
 
+	// Wait for crawling to complete or timeout
 	select {
-	case err := <-crawlErr:
-		if err != nil {
-			return err
+	case crawlError := <-crawlErr:
+		if crawlError != nil {
+			return fmt.Errorf("error during crawling: %w", crawlError)
 		}
 	case <-startCtx.Done():
-		return fmt.Errorf("timeout starting crawler")
+		return ErrCrawlerTimeout
 	case <-ctx.Done():
-		return fmt.Errorf("context cancelled while starting crawler")
+		return ErrCrawlerContextCancelled
 	}
 
 	// Start processing in background
@@ -137,7 +152,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 				c.isRunning = false
 				c.Logger.Info("Context cancelled, stopping crawler", "source", sourceName)
 				return
-			case <-time.After(100 * time.Millisecond):
+			case <-time.After(DefaultPollInterval):
 				if !c.isRunning {
 					c.Logger.Info("Crawler finished processing", "source", sourceName)
 					return
@@ -152,7 +167,9 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		case <-c.ctx.Done():
 			return
 		default:
-			e.Request.Visit(e.Attr("href"))
+			if visitErr := e.Request.Visit(e.Attr("href")); visitErr != nil {
+				c.Logger.Error("Failed to visit link", "url", e.Attr("href"), "error", visitErr)
+			}
 		}
 	})
 
@@ -196,7 +213,7 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	c.isRunning = false
 
 	// Create a timeout context for stopping
-	stopCtx, stopCancel := context.WithTimeout(ctx, 30*time.Second)
+	stopCtx, stopCancel := context.WithTimeout(ctx, DefaultStopTimeout)
 	defer stopCancel()
 
 	// Stop the collector with timeout

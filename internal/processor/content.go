@@ -43,14 +43,13 @@ func (p *ContentProcessor) ContentType() common.ContentType {
 	return common.ContentTypePage
 }
 
-// CanProcess implements ContentProcessor.CanProcess
-func (p *ContentProcessor) CanProcess(content interface{}) bool {
-	_, ok := content.(*colly.HTMLElement)
-	return ok
+// CanProcess checks if this processor can handle the given content
+func (p *ContentProcessor) CanProcess(content any) bool {
+	return true
 }
 
-// Process implements ContentProcessor.Process
-func (p *ContentProcessor) Process(ctx context.Context, content interface{}) error {
+// Process processes the content and returns the processed result
+func (p *ContentProcessor) Process(ctx context.Context, content any) error {
 	e, ok := content.(*colly.HTMLElement)
 	if !ok {
 		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)

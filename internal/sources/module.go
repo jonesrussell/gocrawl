@@ -21,10 +21,13 @@ const (
 // Module provides the sources package's dependencies.
 var Module = fx.Module("sources",
 	fx.Provide(
-		// Provide sources from config
-		func(cfg config.Interface, logger types.Logger) Interface {
-			return NewSourcesFromConfig(cfg, logger)
-		},
+		fx.Annotate(
+			NewSourcesFromConfig,
+			fx.ParamTags(
+				``,
+				``,
+			),
+		),
 	),
 )
 

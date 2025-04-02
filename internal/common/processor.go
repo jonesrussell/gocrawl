@@ -29,9 +29,9 @@ type ContentProcessor interface {
 	// ContentType returns the type of content this processor handles
 	ContentType() ContentType
 	// CanProcess checks if this processor can handle the given content
-	CanProcess(content interface{}) bool
+	CanProcess(content any) bool
 	// Process processes the content and returns the processed result
-	Process(ctx context.Context, content interface{}) error
+	Process(ctx context.Context, content any) error
 	// GetMetrics returns processing metrics
 	GetMetrics() *Metrics
 }
@@ -78,12 +78,24 @@ func (r *ProcessorRegistry) GetProcessor(contentType ContentType) (ContentProces
 	return p, ok
 }
 
-// ContentTypeDetector determines the type of content
-type ContentTypeDetector interface {
-	Detect(content interface{}) (ContentType, error)
+// Processor combines ContentProcessor, HTMLProcessor, and JobProcessor with lifecycle methods
+type Processor interface {
+	ContentProcessor
+	HTMLProcessor
+	JobProcessor
+	// Start initializes the processor
+	Start(ctx context.Context) error
+	// Stop cleans up the processor
+	Stop(ctx context.Context) error
 }
 
-// HTMLContentTypeDetector implements content type detection for HTML
+// ContentTypeDetector defines the interface for content type detection.
+type ContentTypeDetector interface {
+	// Detect detects the content type of the given content.
+	Detect(content any) (ContentType, error)
+}
+
+// HTMLContentTypeDetector implements ContentTypeDetector for HTML content.
 type HTMLContentTypeDetector struct {
 	selectors map[ContentType]string
 }
@@ -95,9 +107,9 @@ func NewHTMLContentTypeDetector(selectors map[ContentType]string) *HTMLContentTy
 	}
 }
 
-// Detect determines the content type from HTML content
-func (d *HTMLContentTypeDetector) Detect(content interface{}) (ContentType, error) {
-	e, ok := content.(*colly.HTMLElement)
+// Detect implements ContentTypeDetector.
+func (d *HTMLContentTypeDetector) Detect(content any) (ContentType, error) {
+	e, ok := content.(colly.HTMLElement)
 	if !ok {
 		return "", fmt.Errorf("unsupported content type: %T", content)
 	}
@@ -112,39 +124,35 @@ func (d *HTMLContentTypeDetector) Detect(content interface{}) (ContentType, erro
 	return ContentTypePage, nil // Default to page type
 }
 
-// ProcessingPipeline represents a chain of processing steps
+// ProcessingStep defines a step in a processing pipeline.
+type ProcessingStep interface {
+	// Process processes the content and returns the processed result.
+	Process(ctx context.Context, content any) (any, error)
+}
+
+// ProcessingPipeline represents a pipeline of processing steps.
 type ProcessingPipeline struct {
 	steps []ProcessingStep
 }
 
-// ProcessingStep represents a single step in the pipeline
-type ProcessingStep interface {
-	Process(ctx context.Context, content interface{}) (interface{}, error)
-	Name() string
-}
-
-// AddPipelineStep adds a new step to the pipeline
-func (p *ProcessingPipeline) AddStep(step ProcessingStep) {
-	p.steps = append(p.steps, step)
-}
-
-// Execute runs the pipeline on the given content
-func (p *ProcessingPipeline) Execute(ctx context.Context, content interface{}) (interface{}, error) {
+// Execute executes the pipeline on the given content.
+func (p *ProcessingPipeline) Execute(ctx context.Context, content any) (any, error) {
 	var err error
 	for _, step := range p.steps {
 		content, err = step.Process(ctx, content)
 		if err != nil {
-			return nil, fmt.Errorf("step %s failed: %w", step.Name(), err)
+			return nil, fmt.Errorf("step failed: %w", err)
 		}
 	}
 	return content, nil
 }
 
-// ProcessorConfig holds configuration for content processors
+// ProcessorConfig holds configuration for a processor.
 type ProcessorConfig struct {
-	ContentTypes []ContentType          `json:"content_types"`
-	Selectors    map[string]string      `json:"selectors"`
-	Options      map[string]interface{} `json:"options"`
+	Name    string         `json:"name"`
+	Type    string         `json:"type"`
+	Enabled bool           `json:"enabled"`
+	Options map[string]any `json:"options"`
 }
 
 // ProcessorFactory creates processors based on configuration
@@ -152,27 +160,32 @@ type ProcessorFactory interface {
 	CreateProcessor(config ProcessorConfig) (ContentProcessor, error)
 }
 
-// NoopProcessor is a no-op implementation of ContentProcessor
+// NoopProcessor implements Processor with no-op implementations.
 type NoopProcessor struct{}
-
-// NewNoopProcessor creates a new no-op processor
-func NewNoopProcessor() *NoopProcessor {
-	return &NoopProcessor{}
-}
 
 // ContentType implements ContentProcessor.ContentType
 func (p *NoopProcessor) ContentType() ContentType {
 	return ContentTypePage
 }
 
-// CanProcess implements ContentProcessor.CanProcess
-func (p *NoopProcessor) CanProcess(content interface{}) bool {
+// CanProcess implements Processor.CanProcess
+func (p *NoopProcessor) CanProcess(content any) bool {
 	return true
 }
 
-// Process implements ContentProcessor.Process
-func (p *NoopProcessor) Process(ctx context.Context, content interface{}) error {
+// Process implements Processor.Process
+func (p *NoopProcessor) Process(ctx context.Context, content any) error {
 	return nil
+}
+
+// ProcessHTML implements HTMLProcessor.ProcessHTML
+func (p *NoopProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
+	return nil
+}
+
+// ProcessJob implements JobProcessor.ProcessJob
+func (p *NoopProcessor) ProcessJob(ctx context.Context, job *Job) {
+	// No-op implementation
 }
 
 // GetMetrics implements ContentProcessor.GetMetrics
@@ -193,15 +206,4 @@ func (p *NoopProcessor) Start(ctx context.Context) error {
 // Stop implements Processor.Stop
 func (p *NoopProcessor) Stop(ctx context.Context) error {
 	return nil
-}
-
-// Processor combines ContentProcessor, HTMLProcessor, and JobProcessor with lifecycle methods
-type Processor interface {
-	ContentProcessor
-	HTMLProcessor
-	JobProcessor
-	// Start initializes the processor
-	Start(ctx context.Context) error
-	// Stop cleans up the processor
-	Stop(ctx context.Context) error
 }
