@@ -3,6 +3,8 @@ package crawler_test
 import (
 	"context"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -87,13 +89,20 @@ func TestCrawlerStartup(t *testing.T) {
 	log, err := logger.NewLogger(testCfg)
 	require.NoError(t, err)
 
-	// Create mock sources
+	// Create mock HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("<html><body><h1>Test Page</h1></body></html>"))
+	}))
+	defer server.Close()
+
+	// Create mock sources with the test server URL
 	mockSources := &sources.Sources{}
 	mockSources.SetSources([]sources.Config{
 		{
 			Name:      "test",
-			URL:       "http://test.com",
-			RateLimit: time.Hour,
+			URL:       server.URL,
+			RateLimit: time.Millisecond * 100, // Use a shorter rate limit for testing
 			MaxDepth:  1,
 		},
 	})
@@ -132,8 +141,11 @@ func TestCrawlerStartup(t *testing.T) {
 			collector := colly.NewCollector()
 			c.SetCollector(collector)
 
-			// Test startup
-			err := c.Start(context.Background(), "test")
+			// Test startup with timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			err := c.Start(ctx, "test")
 			require.NoError(t, err)
 		}),
 	)
