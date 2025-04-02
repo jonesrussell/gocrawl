@@ -34,6 +34,13 @@ tasks:
     cmds:
       - go run main.go --help
 
+  indices:create:
+    desc: "Create an Elasticsearch index"
+    cmds:
+      - go run main.go indices create {{.CLI_ARGS}}
+    ignore_error: true
+    interactive: true
+
   indices:list:
     desc: "List all Elasticsearch indices"
     cmds:

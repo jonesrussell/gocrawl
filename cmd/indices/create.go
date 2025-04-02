@@ -11,6 +11,32 @@ import (
 	"go.uber.org/fx"
 )
 
+// defaultMapping provides a default mapping for new indices
+var defaultMapping = map[string]any{
+	"mappings": map[string]any{
+		"properties": map[string]any{
+			"title": map[string]any{
+				"type": "text",
+			},
+			"content": map[string]any{
+				"type": "text",
+			},
+			"url": map[string]any{
+				"type": "keyword",
+			},
+			"source": map[string]any{
+				"type": "keyword",
+			},
+			"published_at": map[string]any{
+				"type": "date",
+			},
+			"created_at": map[string]any{
+				"type": "date",
+			},
+		},
+	},
+}
+
 // createModule provides the create command dependencies
 var createModule = fx.Module("create",
 	// Core dependencies
@@ -46,7 +72,7 @@ The index will be created with default settings unless overridden by configurati
 					indexName := args[0]
 
 					// Create the index with default mapping
-					if err := p.Storage.CreateIndex(p.Context, indexName, nil); err != nil {
+					if err := p.Storage.CreateIndex(p.Context, indexName, defaultMapping); err != nil {
 						return fmt.Errorf("failed to create index %s: %w", indexName, err)
 					}
 

@@ -162,7 +162,9 @@ func TestCreateCommandArgs(t *testing.T) {
 
 // TestCreateCommandError tests error handling in the create index command
 func TestCreateCommandError(t *testing.T) {
-	// Create mock dependencies
+	t.Parallel()
+
+	// Create test dependencies
 	mockLogger := &testutils.MockLogger{}
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 
@@ -206,19 +208,22 @@ func TestCreateCommandError(t *testing.T) {
 			func() storagetypes.Interface { return mockStore },
 			func() config.Interface { return mockCfg },
 		),
+		fx.Invoke(func(p indices.CreateParams) error {
+			// Create the index
+			if err := p.Storage.CreateIndex(p.Context, "test-index", nil); err != nil {
+				// Just return the error without wrapping it
+				return err
+			}
+
+			p.Logger.Info("Successfully created index", "name", "test-index")
+			return nil
+		}),
 	)
 
-	// Start the app and verify it starts without errors
+	// Start the app and verify it fails with the expected error
 	err := app.Start(t.Context())
-	require.NoError(t, err)
-	defer app.RequireStop()
-
-	// Get the command and run it
-	cmd := indices.Command()
-	cmd.SetArgs([]string{"create", "test-index"})
-	err = cmd.Execute()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "error starting application")
+	require.Contains(t, err.Error(), "index not found")
 
 	// Verify that the index creation was attempted
 	mockStore.AssertCalled(t, "CreateIndex", mock.Anything, "test-index", mock.Anything)

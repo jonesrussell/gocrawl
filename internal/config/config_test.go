@@ -92,6 +92,7 @@ sources:
 				t.Setenv("APP_ENV", "test")
 				t.Setenv("CONFIG_FILE", "./internal/config/testdata/config.yml")
 				t.Setenv("LOG_LEVEL", "debug")
+				t.Setenv("ELASTICSEARCH_API_KEY", "test_api_key")
 
 				// Configure viper
 				viper.SetConfigFile("./internal/config/testdata/config.yml")
@@ -102,7 +103,7 @@ sources:
 				// Bind environment variables
 				require.NoError(t, viper.BindEnv("app.environment", "APP_ENV"))
 				require.NoError(t, viper.BindEnv("log.level", "LOG_LEVEL"))
-				require.NoError(t, viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY"))
+				require.NoError(t, viper.BindEnv("elasticsearch.api_key", "ELASTICSEARCH_API_KEY"))
 
 				// Read config file
 				readErr := viper.ReadInConfig()
@@ -425,7 +426,7 @@ func TestConfigurationPriority(t *testing.T) {
 	envContent := `
 APP_ENV=development
 LOG_LEVEL=info
-ELASTIC_API_KEY=env_api_key
+ELASTICSEARCH_API_KEY=env_api_key
 `
 	envErr := os.WriteFile(".env", []byte(envContent), 0644)
 	require.NoError(t, envErr)
@@ -491,7 +492,7 @@ sources:
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Bind environment variables
-	require.NoError(t, viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY"))
+	require.NoError(t, viper.BindEnv("elasticsearch.api_key", "ELASTICSEARCH_API_KEY"))
 	require.NoError(t, viper.BindEnv("app.environment", "APP_ENV"))
 	require.NoError(t, viper.BindEnv("log.level", "LOG_LEVEL"))
 
@@ -504,7 +505,7 @@ sources:
 
 	// Verify environment variables take precedence over config file values
 	require.Equal(t, "env_api_key", cfg.GetElasticsearchConfig().APIKey,
-		"Environment variable ELASTIC_API_KEY should override config file value")
+		"Environment variable ELASTICSEARCH_API_KEY should override config file value")
 	require.Equal(t, "development", cfg.GetAppConfig().Environment,
 		"Environment variable APP_ENV should override config file value")
 	require.Equal(t, "info", cfg.GetLogConfig().Level,
@@ -516,7 +517,7 @@ func TestRequiredConfigurationValidation(t *testing.T) {
 	envContent := `
 APP_ENV=development
 LOG_LEVEL=debug
-ELASTIC_API_KEY=test_key
+ELASTICSEARCH_API_KEY=test_key
 `
 	envErr := os.WriteFile(".env", []byte(envContent), 0644)
 	require.NoError(t, envErr)
@@ -611,10 +612,10 @@ sources:
 		{
 			name: "valid configuration with all required fields",
 			envVars: map[string]string{
-				"ELASTIC_API_KEY": "test_key",
-				"APP_ENV":         "development",
-				"LOG_LEVEL":       "debug",
-				"CONFIG_FILE":     "internal/config/testdata/valid_config.yml",
+				"ELASTICSEARCH_API_KEY": "test_key",
+				"APP_ENV":               "development",
+				"LOG_LEVEL":             "debug",
+				"CONFIG_FILE":           "internal/config/testdata/valid_config.yml",
 			},
 			configFile:  "internal/config/testdata/valid_config.yml",
 			expectError: false,
@@ -650,7 +651,7 @@ sources:
 
 			// Set up environment variable bindings
 			require.NoError(t, viper.BindEnv("app.environment", "APP_ENV"))
-			require.NoError(t, viper.BindEnv("elasticsearch.api_key", "ELASTIC_API_KEY"))
+			require.NoError(t, viper.BindEnv("elasticsearch.api_key", "ELASTICSEARCH_API_KEY"))
 			require.NoError(t, viper.BindEnv("log.level", "LOG_LEVEL"))
 
 			// Read config file
@@ -672,7 +673,7 @@ sources:
 				require.Equal(t, tt.envVars["APP_ENV"], appCfg.Environment)
 
 				esCfg := cfg.GetElasticsearchConfig()
-				require.Equal(t, tt.envVars["ELASTIC_API_KEY"], esCfg.APIKey)
+				require.Equal(t, tt.envVars["ELASTICSEARCH_API_KEY"], esCfg.APIKey)
 
 				logCfg := cfg.GetLogConfig()
 				require.Equal(t, tt.envVars["LOG_LEVEL"], logCfg.Level)

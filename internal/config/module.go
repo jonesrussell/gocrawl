@@ -290,7 +290,7 @@ func defaultEnvBindings() map[string]string {
 	return map[string]string{
 		"elasticsearch.username":        "ELASTIC_USERNAME",
 		"elasticsearch.password":        "ELASTIC_PASSWORD",
-		"elasticsearch.api_key":         "ELASTIC_API_KEY",
+		"elasticsearch.api_key":         "ELASTICSEARCH_API_KEY",
 		"elasticsearch.tls.skip_verify": "ELASTIC_SKIP_TLS",
 		"elasticsearch.tls.certificate": "ELASTIC_CERT_PATH",
 		"elasticsearch.tls.key":         "ELASTIC_KEY_PATH",

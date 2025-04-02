@@ -89,7 +89,8 @@ func ProvideElasticsearchClient(opts ModuleOptions, log common.Logger) (*es.Clie
 
 	log.Debug("Elasticsearch configuration",
 		"addresses", opts.Addresses,
-		"hasAPIKey", opts.APIKey != "")
+		"hasAPIKey", opts.APIKey != "",
+		"hasBasicAuth", opts.Username != "" && opts.Password != "")
 
 	transport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
@@ -129,12 +130,16 @@ func ProvideElasticsearchClient(opts ModuleOptions, log common.Logger) (*es.Clie
 		RetryBackoff:        func(i int) time.Duration { return time.Duration(i) * 100 * time.Millisecond },
 	}
 
-	// Configure API key authentication
+	// Configure authentication
 	if opts.APIKey != "" {
 		cfg.APIKey = opts.APIKey
 		log.Debug("Using API key authentication")
+	} else if opts.Username != "" && opts.Password != "" {
+		cfg.Username = opts.Username
+		cfg.Password = opts.Password
+		log.Debug("Using basic authentication")
 	} else {
-		return nil, errors.New("API key authentication is required")
+		return nil, errors.New("either API key or basic authentication is required")
 	}
 
 	client, err := es.NewClient(cfg)
