@@ -4,14 +4,21 @@ package crawl
 import (
 	"context"
 
+	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	mockutils "github.com/jonesrussell/gocrawl/internal/testutils"
 	"go.uber.org/fx"
 )
 
@@ -36,17 +43,113 @@ type CommandDeps struct {
 // Module provides the crawl command's dependencies.
 var Module = fx.Module("crawl",
 	crawler.Module,
+	sources.Module,
+	config.Module,
+	article.Module,
+	content.Module,
 	fx.Provide(
 		// Command-specific dependencies
-		func() chan struct{} {
-			return make(chan struct{})
-		},
-		func() chan *models.Article {
-			return make(chan *models.Article, crawler.ArticleChannelBufferSize)
-		},
+		fx.Annotate(
+			func() chan struct{} {
+				return make(chan struct{})
+			},
+			fx.ResultTags(`name:"shutdownChan"`),
+		),
+		fx.Annotate(
+			func() chan *models.Article {
+				return make(chan *models.Article, crawler.ArticleChannelBufferSize)
+			},
+			fx.ResultTags(`name:"crawlerArticleChannel"`),
+		),
+		// Provide logger with correct name
+		fx.Annotate(
+			func() common.Logger {
+				return logger.NewNoOp()
+			},
+			fx.ResultTags(`name:"logger"`),
+		),
+		// Provide debugger with correct name
+		fx.Annotate(
+			func(logger common.Logger) debug.Debugger {
+				return &debug.LogDebugger{
+					Output: crawler.NewDebugLogger(logger),
+				}
+			},
+			fx.ResultTags(`name:"debugger"`),
+		),
+		// Provide index manager with correct name
+		fx.Annotate(
+			func() api.IndexManager {
+				return &mockutils.MockIndexManager{}
+			},
+			fx.ResultTags(`name:"indexManager"`),
+		),
+		// Provide sources with correct name
+		fx.Annotate(
+			func() *sources.Sources {
+				return &sources.Sources{}
+			},
+			fx.ResultTags(`name:"sources"`),
+		),
+		// Provide event bus with correct name
+		fx.Annotate(
+			func() *events.Bus {
+				return events.NewBus()
+			},
+			fx.ResultTags(`name:"eventBus"`),
+		),
+		// Provide article processor with correct name
+		fx.Annotate(
+			func(
+				logger common.Logger,
+				storage storagetypes.Interface,
+				params struct {
+					fx.In
+					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
+					IndexName   string               `name:"indexName"`
+				},
+			) common.Processor {
+				return &article.ArticleProcessor{
+					Logger:      logger,
+					Storage:     storage,
+					IndexName:   params.IndexName,
+					ArticleChan: params.ArticleChan,
+				}
+			},
+			fx.ResultTags(`name:"startupArticleProcessor"`),
+		),
+		// Provide content processor with correct name
+		fx.Annotate(
+			func(
+				logger common.Logger,
+				storage storagetypes.Interface,
+				params struct {
+					fx.In
+					IndexName string `name:"contentIndex"`
+				},
+			) common.Processor {
+				return content.NewProcessor(nil, storage, logger, params.IndexName)
+			},
+			fx.ResultTags(`name:"startupContentProcessor"`),
+		),
+		// Provide index name
+		fx.Annotate(
+			func() string {
+				return "articles"
+			},
+			fx.ResultTags(`name:"indexName"`),
+		),
+		// Provide content index name
+		fx.Annotate(
+			func() string {
+				return "content"
+			},
+			fx.ResultTags(`name:"contentIndex"`),
+		),
 	),
 )
 
+// Params holds the crawl command's parameters
 type Params struct {
 	fx.In
 	Sources sources.Interface `json:"sources,omitempty"`

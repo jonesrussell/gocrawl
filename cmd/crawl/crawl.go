@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
-	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
@@ -49,7 +49,7 @@ You can specify the source to crawl using the --source flag.`,
 
 		// Initialize the Fx application
 		fxApp := fx.New(
-			crawler.Module,
+			Module,
 			storage.Module,
 			fx.Provide(
 				fx.Annotate(
@@ -67,10 +67,6 @@ You can specify the source to crawl using the --source flag.`,
 					func() *signal.SignalHandler { return handler },
 					fx.ResultTags(`name:"signalHandler"`),
 				),
-				fx.Annotate(
-					func() chan struct{} { return make(chan struct{}) },
-					fx.ResultTags(`name:"shutdownChan"`),
-				),
 				func() types.Logger { return logger.NewNoOp() },
 			),
 			fx.Invoke(func(lc fx.Lifecycle, p CommandDeps) {
@@ -79,15 +75,34 @@ You can specify the source to crawl using the --source flag.`,
 				lc.Append(fx.Hook{
 					OnStart: func(ctx context.Context) error {
 						// Test storage connection
-						if err := p.Storage.TestConnection(ctx); err != nil {
+						if err := p.Storage.TestConnection(p.Context); err != nil {
 							return fmt.Errorf("failed to connect to storage: %w", err)
 						}
 
 						// Start crawler
 						p.Logger.Info("Starting crawler...", "source", p.SourceName)
-						if err := p.Crawler.Start(ctx, p.SourceName); err != nil {
+						if err := p.Crawler.Start(p.Context, p.SourceName); err != nil {
 							return fmt.Errorf("failed to start crawler: %w", err)
 						}
+
+						// Process articles from the channel
+						go func() {
+							for article := range p.ArticleChan {
+								// Create a job for each article
+								job := &common.Job{
+									ID:        article.ID,
+									URL:       article.Source,
+									Status:    "pending",
+									CreatedAt: article.CreatedAt,
+									UpdatedAt: article.UpdatedAt,
+								}
+
+								// Process the article using each processor
+								for _, processor := range p.Processors {
+									processor.ProcessJob(p.Context, job)
+								}
+							}
+						}()
 
 						// Wait for crawler to complete
 						go func() {
@@ -101,7 +116,7 @@ You can specify the source to crawl using the --source flag.`,
 					},
 					OnStop: func(ctx context.Context) error {
 						// Stop crawler
-						if err := p.Crawler.Stop(ctx); err != nil {
+						if err := p.Crawler.Stop(p.Context); err != nil {
 							return fmt.Errorf("failed to stop crawler: %w", err)
 						}
 
@@ -117,7 +132,7 @@ You can specify the source to crawl using the --source flag.`,
 		)
 
 		// Start the application
-		if err := fxApp.Start(context.Background()); err != nil {
+		if err := fxApp.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start application: %w", err)
 		}
 
