@@ -61,43 +61,28 @@ var Module = fx.Module("crawl",
 			},
 			fx.ResultTags(`name:"crawlerArticleChannel"`),
 		),
-		// Provide logger with correct name
-		fx.Annotate(
-			func() common.Logger {
-				return logger.NewNoOp()
-			},
-			fx.ResultTags(`name:"logger"`),
-		),
-		// Provide debugger with correct name
-		fx.Annotate(
-			func(logger common.Logger) debug.Debugger {
-				return &debug.LogDebugger{
-					Output: crawler.NewDebugLogger(logger),
-				}
-			},
-			fx.ResultTags(`name:"debugger"`),
-		),
-		// Provide index manager with correct name
-		fx.Annotate(
-			func() api.IndexManager {
-				return &mockutils.MockIndexManager{}
-			},
-			fx.ResultTags(`name:"indexManager"`),
-		),
-		// Provide sources with correct name
-		fx.Annotate(
-			func() *sources.Sources {
-				return &sources.Sources{}
-			},
-			fx.ResultTags(`name:"sources"`),
-		),
-		// Provide event bus with correct name
-		fx.Annotate(
-			func() *events.Bus {
-				return events.NewBus()
-			},
-			fx.ResultTags(`name:"eventBus"`),
-		),
+		// Provide logger
+		func() common.Logger {
+			return logger.NewNoOp()
+		},
+		// Provide debugger
+		func(logger common.Logger) debug.Debugger {
+			return &debug.LogDebugger{
+				Output: crawler.NewDebugLogger(logger),
+			}
+		},
+		// Provide index manager
+		func() api.IndexManager {
+			return &mockutils.MockIndexManager{}
+		},
+		// Provide sources
+		func() *sources.Sources {
+			return &sources.Sources{}
+		},
+		// Provide event bus
+		func() *events.Bus {
+			return events.NewBus()
+		},
 		// Provide article processor with correct name
 		fx.Annotate(
 			func(
