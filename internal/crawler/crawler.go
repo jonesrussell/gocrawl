@@ -55,19 +55,13 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	}
 
 	// Set allowed domains only if not already configured (respect test configuration)
-	if c.collector.AllowedDomains == nil && c.collector.DisallowedDomains == nil {
-		// Extract host without port
-		host := sourceURL.Host
-		if i := strings.LastIndex(host, ":"); i != -1 {
-			host = host[:i]
-		}
-		c.collector.AllowedDomains = []string{host}
-		c.Logger.Info("Set allowed domain", "domain", host)
-	} else {
-		c.Logger.Info("Using pre-configured domain settings",
-			"allowed_domains", c.collector.AllowedDomains,
-			"disallowed_domains", c.collector.DisallowedDomains)
+	// Extract host without port
+	host := sourceURL.Host
+	if i := strings.LastIndex(host, ":"); i != -1 {
+		host = host[:i]
 	}
+	c.collector.AllowedDomains = []string{host}
+	c.Logger.Info("Set allowed domain", "domain", host)
 
 	// For testing, use the test server's URL for requests
 	if sourceURL.Host == "test.example.com" {
