@@ -65,9 +65,10 @@ var Module = fx.Module("crawl",
 			}
 		},
 		// Provide event bus
-		func() *events.Bus {
-			return events.NewBus()
-		},
+		fx.Annotate(
+			events.NewBus,
+			fx.ResultTags(`name:"eventBus"`),
+		),
 		// Provide startup processors
 		fx.Annotate(
 			func() common.Processor {

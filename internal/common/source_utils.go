@@ -18,7 +18,7 @@ func ConvertSourceConfig(source *sources.Config) *config.Source {
 		return nil
 	}
 
-	return sourceutils.ConvertToConfigSource((*sourceutils.SourceConfig)(source))
+	return sourceutils.ConvertToConfigSource(source)
 }
 
 // ExtractDomain extracts the domain from a URL string.

@@ -588,22 +588,40 @@ func TestEmptySources(t *testing.T) {
 	require.NotNil(t, emptySources)
 
 	tests := []struct {
-		name    string
-		source  string
-		wantErr bool
+		name     string
+		testFunc func(*testing.T)
 	}{
 		{
-			name:    "non-existing source",
-			source:  "test1",
-			wantErr: true,
+			name: "ListSources returns empty slice",
+			testFunc: func(t *testing.T) {
+				t.Parallel()
+				sources, err := emptySources.ListSources(t.Context())
+				require.NoError(t, err)
+				require.Empty(t, sources)
+			},
+		},
+		{
+			name: "FindByName returns error for non-existent source",
+			testFunc: func(t *testing.T) {
+				t.Parallel()
+				source, err := emptySources.FindByName("non-existent")
+				require.Error(t, err)
+				require.Nil(t, source)
+				require.Equal(t, sources.ErrSourceNotFound, err)
+			},
+		},
+		{
+			name: "GetSources returns empty slice",
+			testFunc: func(t *testing.T) {
+				t.Parallel()
+				sources, err := emptySources.GetSources()
+				require.NoError(t, err)
+				require.Empty(t, sources)
+			},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := emptySources.FindByName(tt.source)
-			require.Error(t, err)
-			require.Equal(t, sources.ErrSourceNotFound, err)
-		})
+		t.Run(tt.name, tt.testFunc)
 	}
 }

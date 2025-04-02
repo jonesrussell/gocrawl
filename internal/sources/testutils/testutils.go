@@ -3,9 +3,25 @@ package testutils
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"go.uber.org/zap"
+)
+
+const (
+	// DefaultArticleIndex is the default index name for articles
+	DefaultArticleIndex = "articles"
+	// DefaultContentIndex is the default index name for content
+	DefaultContentIndex = "content"
+	// ErrInvalidSourceName is the error message for invalid source name
+	ErrInvalidSourceName = "source name is required"
+	// ErrInvalidSourceURL is the error message for invalid source URL
+	ErrInvalidSourceURL = "source URL is required"
+	// ErrInvalidRateLimit is the error message for invalid rate limit
+	ErrInvalidRateLimit = "rate limit must be positive"
+	// ErrInvalidMaxDepth is the error message for invalid max depth
+	ErrInvalidMaxDepth = "max depth must be positive"
 )
 
 type zapWrapper struct {
@@ -59,10 +75,10 @@ func NewTestInterface(configs []sources.Config) sources.Interface {
 	// Set default index names for any config that doesn't have them
 	for i := range result {
 		if result[i].ArticleIndex == "" {
-			result[i].ArticleIndex = "articles"
+			result[i].ArticleIndex = DefaultArticleIndex
 		}
 		if result[i].Index == "" {
-			result[i].Index = "content"
+			result[i].Index = DefaultContentIndex
 		}
 	}
 
@@ -104,10 +120,10 @@ func (s *testSources) AddSource(ctx context.Context, source *sources.Config) err
 
 	// Set default index names if empty
 	if source.ArticleIndex == "" {
-		source.ArticleIndex = "articles"
+		source.ArticleIndex = DefaultArticleIndex
 	}
 	if source.Index == "" {
-		source.Index = "content"
+		source.Index = DefaultContentIndex
 	}
 
 	s.configs = append(s.configs, *source)
@@ -124,10 +140,10 @@ func (s *testSources) UpdateSource(ctx context.Context, source *sources.Config) 
 
 	// Set default index names if empty
 	if source.ArticleIndex == "" {
-		source.ArticleIndex = "articles"
+		source.ArticleIndex = DefaultArticleIndex
 	}
 	if source.Index == "" {
-		source.Index = "content"
+		source.Index = DefaultContentIndex
 	}
 
 	for i, config := range s.configs {
@@ -154,16 +170,16 @@ func (s *testSources) ValidateSource(source *sources.Config) error {
 		return sources.ErrInvalidSource
 	}
 	if source.Name == "" {
-		return sources.ErrInvalidSource
+		return errors.New(ErrInvalidSourceName)
 	}
 	if source.URL == "" {
-		return sources.ErrInvalidSource
+		return errors.New(ErrInvalidSourceURL)
 	}
 	if source.RateLimit <= 0 {
-		return sources.ErrInvalidSource
+		return errors.New(ErrInvalidRateLimit)
 	}
 	if source.MaxDepth <= 0 {
-		return sources.ErrInvalidSource
+		return errors.New(ErrInvalidMaxDepth)
 	}
 	return nil
 }

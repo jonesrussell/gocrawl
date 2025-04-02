@@ -77,9 +77,8 @@ func (m *MockProcessor) GetMetrics() *common.Metrics {
 }
 
 // Process implements common.Processor
-func (m *MockProcessor) Process(ctx context.Context, data interface{}) error {
-	args := m.Called(ctx, data)
-	return args.Error(0)
+func (m *MockProcessor) Process(ctx context.Context, data any) error {
+	return nil
 }
 
 // Start implements common.Processor

@@ -111,7 +111,8 @@ func LoadFromFile(path string, logger Logger) (*Sources, error) {
 			return nil, fmt.Errorf("failed to parse rate limit for source %s: %w", src.Name, parseErr)
 		}
 
-		configs = append(configs, Config{
+		// Create a config.Source from the loader config
+		configSource := config.Source{
 			Name:         src.Name,
 			URL:          src.URL,
 			RateLimit:    rateLimit,
@@ -119,8 +120,8 @@ func LoadFromFile(path string, logger Logger) (*Sources, error) {
 			Time:         src.Time,
 			ArticleIndex: src.ArticleIndex,
 			Index:        src.Index,
-			Selectors: SelectorConfig{
-				Article: ArticleSelectors{
+			Selectors: config.SourceSelectors{
+				Article: config.ArticleSelectors{
 					Container:     src.Selectors.Article.Container,
 					Title:         src.Selectors.Article.Title,
 					Body:          src.Selectors.Article.Body,
@@ -145,7 +146,9 @@ func LoadFromFile(path string, logger Logger) (*Sources, error) {
 					BylineName:    src.Selectors.Article.BylineName,
 				},
 			},
-		})
+		}
+
+		configs = append(configs, convertSourceConfig(configSource))
 	}
 
 	return &Sources{

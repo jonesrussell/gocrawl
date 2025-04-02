@@ -15,7 +15,7 @@ type Processor interface {
 	// ProcessHTML processes HTML content from a source.
 	ProcessHTML(e *colly.HTMLElement) error
 	// Process processes the given data.
-	Process(ctx context.Context, data interface{}) error
+	Process(ctx context.Context, data any) error
 	// Start starts the processor.
 	Start(ctx context.Context) error
 	// Stop stops the processor.
@@ -42,7 +42,7 @@ func (p *NoopProcessor) ProcessHTML(e *colly.HTMLElement) error {
 }
 
 // Process implements Processor.Process.
-func (p *NoopProcessor) Process(ctx context.Context, data interface{}) error {
+func (p *NoopProcessor) Process(ctx context.Context, data any) error {
 	return nil
 }
 

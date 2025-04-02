@@ -9,6 +9,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
@@ -56,15 +57,16 @@ var Module = fx.Module("processor",
 				},
 			) common.Processor {
 				// Create content service
-				contentService := NewContentService(logger)
+				contentService := content.NewService(logger)
 				logger.Debug("Created content service", "type", fmt.Sprintf("%T", contentService))
 
 				// Create content processor
 				contentProcessor := &ContentProcessor{
-					service:   contentService,
-					storage:   storage,
-					logger:    logger,
-					indexName: params.IndexName,
+					Logger:         logger,
+					Storage:        storage,
+					IndexName:      params.IndexName,
+					ContentService: contentService,
+					metrics:        &common.Metrics{},
 				}
 				logger.Debug("Created content processor", "type", fmt.Sprintf("%T", contentProcessor))
 				return contentProcessor

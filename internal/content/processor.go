@@ -148,8 +148,8 @@ func (p *ContentProcessor) ProcessContent(e *colly.HTMLElement) {
 	}
 }
 
-// Process implements common.Processor.Process.
-func (p *ContentProcessor) Process(ctx context.Context, data interface{}) error {
+// Process implements common.Processor
+func (p *ContentProcessor) Process(ctx context.Context, data any) error {
 	content, ok := data.(*models.Content)
 	if !ok {
 		return fmt.Errorf("invalid data type: expected *models.Content, got %T", data)

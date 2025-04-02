@@ -2,74 +2,81 @@ package processor
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// ContentService handles content extraction and processing.
-type ContentService struct {
-	logger common.Logger
-}
-
-// NewContentService creates a new content service.
-func NewContentService(logger common.Logger) *ContentService {
-	return &ContentService{
-		logger: logger,
-	}
-}
-
-// ContentProcessor implements the collector.Processor interface for general content.
+// ContentProcessor processes content from sources.
 type ContentProcessor struct {
-	service   *ContentService
-	storage   types.Interface
-	logger    common.Logger
-	indexName string
-
-	// Metrics
-	processedCount    int64
-	errorCount        int64
-	lastProcessedTime time.Time
-	processingTime    time.Duration
+	Logger         common.Logger
+	Storage        common.Storage
+	IndexName      string
+	ContentService content.Interface
+	metrics        *common.Metrics
 }
 
 // NewContentProcessor creates a new content processor.
 func NewContentProcessor(
-	service *ContentService,
-	storage types.Interface,
 	logger common.Logger,
+	storage common.Storage,
 	indexName string,
+	contentService content.Interface,
 ) *ContentProcessor {
 	return &ContentProcessor{
-		service:   service,
-		storage:   storage,
-		logger:    logger,
-		indexName: indexName,
+		Logger:         logger,
+		Storage:        storage,
+		IndexName:      indexName,
+		ContentService: contentService,
+		metrics:        &common.Metrics{},
 	}
 }
 
 // Process implements common.Processor
-func (p *ContentProcessor) Process(ctx context.Context, data interface{}) error {
-	e, ok := data.(*colly.HTMLElement)
+func (p *ContentProcessor) Process(ctx context.Context, data any) error {
+	content, ok := data.(*models.Content)
 	if !ok {
-		return fmt.Errorf("invalid data type: expected *colly.HTMLElement, got %T", data)
+		return fmt.Errorf("invalid data type: expected *models.Content, got %T", data)
 	}
-	return p.ProcessHTML(e)
+
+	// Process the content using the ContentService
+	processedContent := p.ContentService.Process(ctx, content.ID)
+	if processedContent == "" {
+		p.Logger.Error("Failed to process content",
+			"component", "content/processor",
+			"contentID", content.ID)
+		p.metrics.ErrorCount++
+		return errors.New("failed to process content: empty result")
+	}
+
+	// Store the processed content
+	if err := p.Storage.IndexDocument(ctx, p.IndexName, content.ID, content); err != nil {
+		p.Logger.Error("Failed to index content",
+			"component", "content/processor",
+			"contentID", content.ID,
+			"error", err)
+		p.metrics.ErrorCount++
+		return err
+	}
+
+	p.metrics.ProcessedCount++
+	p.metrics.LastProcessedTime = time.Now()
+	return nil
 }
 
 // ProcessHTML implements common.Processor
 func (p *ContentProcessor) ProcessHTML(e *colly.HTMLElement) error {
 	start := time.Now()
 	defer func() {
-		p.lastProcessedTime = time.Now()
-		atomic.AddInt64(&p.processedCount, 1)
-		p.processingTime += time.Since(start)
+		p.metrics.LastProcessedTime = time.Now()
+		p.metrics.ProcessedCount++
+		p.metrics.ProcessingDuration += time.Since(start)
 	}()
 
 	// Extract content data
@@ -83,8 +90,8 @@ func (p *ContentProcessor) ProcessHTML(e *colly.HTMLElement) error {
 	}
 
 	// Store content
-	if err := p.storage.IndexDocument(context.Background(), p.indexName, content.ID, content); err != nil {
-		atomic.AddInt64(&p.errorCount, 1)
+	if err := p.Storage.IndexDocument(context.Background(), p.IndexName, content.ID, content); err != nil {
+		p.metrics.ErrorCount++
 		return fmt.Errorf("failed to store content: %w", err)
 	}
 
@@ -93,33 +100,28 @@ func (p *ContentProcessor) ProcessHTML(e *colly.HTMLElement) error {
 
 // GetMetrics returns the current processor metrics.
 func (p *ContentProcessor) GetMetrics() *common.Metrics {
-	return &common.Metrics{
-		ProcessedCount:     atomic.LoadInt64(&p.processedCount),
-		ErrorCount:         atomic.LoadInt64(&p.errorCount),
-		LastProcessedTime:  p.lastProcessedTime,
-		ProcessingDuration: p.processingTime,
-	}
+	return p.metrics
 }
 
 // ProcessJob processes a job and its items.
 func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 	start := time.Now()
 	defer func() {
-		p.processingTime += time.Since(start)
+		p.metrics.ProcessingDuration += time.Since(start)
 	}()
 
 	// Check context cancellation
 	select {
 	case <-ctx.Done():
-		p.logger.Warn("Job processing cancelled",
+		p.Logger.Warn("Job processing cancelled",
 			"job_id", job.ID,
 			"error", ctx.Err(),
 		)
-		atomic.AddInt64(&p.errorCount, 1)
+		p.metrics.ErrorCount++
 		return
 	default:
 		// Process the job
-		p.logger.Info("Processing job",
+		p.Logger.Info("Processing job",
 			"job_id", job.ID,
 		)
 
@@ -130,18 +132,18 @@ func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 		// 3. Updating job status
 		// 4. Handling errors and retries
 
-		atomic.AddInt64(&p.processedCount, 1)
+		p.metrics.ProcessedCount++
 	}
 }
 
 // Start implements common.Processor
 func (p *ContentProcessor) Start(ctx context.Context) error {
-	p.logger.Info("Starting content processor")
+	p.Logger.Info("Starting content processor")
 	return nil
 }
 
 // Stop implements common.Processor
 func (p *ContentProcessor) Stop(ctx context.Context) error {
-	p.logger.Info("Stopping content processor")
+	p.Logger.Info("Stopping content processor")
 	return nil
 }

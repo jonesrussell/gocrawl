@@ -164,15 +164,13 @@ func (p *ArticleProcessor) ProcessContent(e *colly.HTMLElement) {
 		"url", e.Request.URL.String())
 }
 
-// Process implements common.Processor.Process.
-func (p *ArticleProcessor) Process(ctx context.Context, data interface{}) error {
-	article, ok := data.(*models.Article)
+// Process implements common.Processor
+func (p *ArticleProcessor) Process(ctx context.Context, data any) error {
+	e, ok := data.(*colly.HTMLElement)
 	if !ok {
-		return fmt.Errorf("invalid data type: expected *models.Article, got %T", data)
+		return fmt.Errorf("invalid data type: expected *colly.HTMLElement, got %T", data)
 	}
-
-	// Process the article using the ArticleService
-	return p.ArticleService.Process(article)
+	return p.ProcessHTML(e)
 }
 
 // Ensure ArticleProcessor implements common.Processor
