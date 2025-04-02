@@ -136,9 +136,10 @@ func TestCreateCommandArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockStore := &mockStorage{}
-			if tt.name == "invalid index name" {
+			switch tt.name {
+			case "invalid index name":
 				mockStore.On("CreateIndex", mock.Anything, "invalid/index/name", mock.Anything).Return(fmt.Errorf("failed to create index"))
-			} else if tt.name == "valid args" {
+			case "valid args":
 				mockStore.On("CreateIndex", mock.Anything, "index1", mock.Anything).Return(nil)
 			}
 
