@@ -30,6 +30,19 @@ type ArticleProcessor struct {
 
 // NewArticleProcessor creates a new article processor.
 func NewArticleProcessor(p ProcessorParams) *ArticleProcessor {
+	if p.Logger == nil {
+		panic("logger is required")
+	}
+	if p.Service == nil {
+		panic("article service is required")
+	}
+	if p.Storage == nil {
+		panic("storage is required")
+	}
+	if p.IndexName == "" {
+		panic("index name is required")
+	}
+
 	return &ArticleProcessor{
 		Logger:         p.Logger,
 		ArticleService: p.Service,
@@ -62,6 +75,16 @@ func (p *ArticleProcessor) Process(ctx context.Context, content any) error {
 
 // ProcessHTML implements HTMLProcessor.ProcessHTML
 func (p *ArticleProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
+	if p == nil {
+		return fmt.Errorf("article processor is nil")
+	}
+	if p.ArticleService == nil {
+		return fmt.Errorf("article service is nil")
+	}
+	if p.Logger == nil {
+		return fmt.Errorf("logger is nil")
+	}
+
 	start := time.Now()
 	defer func() {
 		p.metrics.ProcessingDuration += time.Since(start)

@@ -105,9 +105,13 @@ var Module = fx.Module("article",
 		// Provide the article processor
 		fx.Annotate(
 			func(p ProcessorParams) common.Processor {
-				return NewArticleProcessor(p)
+				processor := NewArticleProcessor(p)
+				if processor == nil {
+					panic("failed to create article processor")
+				}
+				return processor
 			},
-			fx.ResultTags(`group:"processors"`),
+			fx.ResultTags(`name:"articleProcessor"`),
 		),
 	),
 )

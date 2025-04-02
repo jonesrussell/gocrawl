@@ -36,8 +36,8 @@ var Module = fx.Module("crawler",
 				``,
 				``,
 				``,
-				`name:"startupArticleProcessor"`,
-				`name:"startupContentProcessor"`,
+				`name:"articleProcessor"`,
+				`name:"contentProcessor"`,
 				`name:"eventBus"`,
 			),
 		),
@@ -130,13 +130,6 @@ func NewCrawler(
 			"url", r.Request.URL.String(),
 			"status", r.StatusCode,
 			"error", err)
-	})
-
-	// Let Colly handle link discovery
-	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		if err := e.Request.Visit(e.Attr("href")); err != nil {
-			logger.Error("Failed to visit link", "url", e.Attr("href"), "error", err)
-		}
 	})
 
 	return crawler

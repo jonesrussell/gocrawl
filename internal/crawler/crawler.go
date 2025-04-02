@@ -116,9 +116,11 @@ func (c *Crawler) setupCallbacks() {
 			return
 		default:
 			if visitErr := e.Request.Visit(e.Attr("href")); visitErr != nil {
-				// Log "URL already visited" as debug instead of error
+				// Log expected cases as debug instead of error
 				if strings.Contains(visitErr.Error(), "URL already visited") {
 					c.Logger.Debug("URL already visited", "url", e.Attr("href"))
+				} else if strings.Contains(visitErr.Error(), "Forbidden domain") {
+					c.Logger.Debug("Skipping forbidden domain", "url", e.Attr("href"))
 				} else {
 					c.Logger.Error("Failed to visit link", "url", e.Attr("href"), "error", visitErr)
 				}

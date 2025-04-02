@@ -85,48 +85,24 @@ var Module = fx.Module("crawl",
 			func(
 				logger common.Logger,
 				storage storagetypes.Interface,
-				articleService article.Interface,
-				params struct {
-					fx.In
-					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
-					IndexName   string               `name:"indexName"`
-				},
-			) common.Processor {
-				return &article.ArticleProcessor{
-					Logger:         logger,
-					ArticleService: articleService,
-					Storage:        storage,
-					IndexName:      params.IndexName,
-					ArticleChan:    params.ArticleChan,
-				}
-			},
-			fx.ResultTags(`name:"startupArticleProcessor"`),
-		),
-		fx.Annotate(
-			func(
-				logger common.Logger,
-				storage storagetypes.Interface,
 				contentService content.Interface,
 				params struct {
 					fx.In
 					IndexName string `name:"contentIndex"`
 				},
 			) common.Processor {
-				return &content.ContentProcessor{
+				processor := &content.ContentProcessor{
 					Logger:         logger,
 					ContentService: contentService,
 					Storage:        storage,
 					IndexName:      params.IndexName,
 				}
+				if processor == nil {
+					panic("failed to create content processor")
+				}
+				return processor
 			},
-			fx.ResultTags(`name:"startupContentProcessor"`),
-		),
-		fx.Annotate(
-			func(articleProcessor common.Processor, contentProcessor common.Processor) []common.Processor {
-				return []common.Processor{articleProcessor, contentProcessor}
-			},
-			fx.ParamTags(`name:"startupArticleProcessor"`, `name:"startupContentProcessor"`),
-			fx.ResultTags(`group:"processors"`),
+			fx.ResultTags(`name:"contentProcessor"`),
 		),
 	),
 
