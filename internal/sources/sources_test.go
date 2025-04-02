@@ -494,12 +494,12 @@ func TestDefaultConfigIndexNames(t *testing.T) {
 	t.Parallel()
 
 	// Test NewConfig
-	newConfig := sources.Config{}
+	newConfig := sources.NewConfig()
 	require.Equal(t, "articles", newConfig.ArticleIndex, "NewConfig ArticleIndex mismatch")
 	require.Equal(t, "content", newConfig.Index, "NewConfig Index mismatch")
 
 	// Test DefaultConfig
-	defaultConfig := sources.Config{}
+	defaultConfig := sources.DefaultConfig()
 	require.Equal(t, "articles", defaultConfig.ArticleIndex, "DefaultConfig ArticleIndex mismatch")
 	require.Equal(t, "content", defaultConfig.Index, "DefaultConfig Index mismatch")
 }
@@ -518,7 +518,7 @@ func TestSourceIndexNamePersistence(t *testing.T) {
 	}
 
 	// Create a new Sources instance
-	s := testutils.NewTestInterface([]sources.Config{sourceConfig})
+	s := testutils.NewTestInterface(nil) // Start with no sources
 	require.NotNil(t, s)
 
 	// Add the source

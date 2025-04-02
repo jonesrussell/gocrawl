@@ -48,7 +48,7 @@ func ProvideSources(p ModuleParams) Interface {
 		configs = append(configs, *defaultConfig)
 	} else {
 		for _, src := range sources {
-			configs = append(configs, Config{
+			config := Config{
 				Name:         src.Name,
 				URL:          src.URL,
 				RateLimit:    src.RateLimit,
@@ -56,7 +56,15 @@ func ProvideSources(p ModuleParams) Interface {
 				Time:         src.Time,
 				ArticleIndex: src.ArticleIndex,
 				Index:        src.Index,
-			})
+			}
+			// Set default index names if empty
+			if config.ArticleIndex == "" {
+				config.ArticleIndex = "articles"
+			}
+			if config.Index == "" {
+				config.Index = "content"
+			}
+			configs = append(configs, config)
 		}
 	}
 	return &Sources{
@@ -94,7 +102,9 @@ func NewSources(cfg *Config, logger Logger) *Sources {
 // DefaultConfig returns the default source configuration.
 func DefaultConfig() *Config {
 	defaultConfig := &Config{
-		RateLimit: DefaultRateLimit,
+		RateLimit:    DefaultRateLimit,
+		ArticleIndex: "articles",
+		Index:        "content",
 	}
 	return defaultConfig
 }

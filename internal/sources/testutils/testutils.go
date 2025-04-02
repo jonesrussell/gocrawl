@@ -52,17 +52,22 @@ func NewTestLogger() sources.Logger {
 
 // NewTestInterface creates a new test sources interface implementation.
 func NewTestInterface(configs []sources.Config) sources.Interface {
+	// Create a copy of the configs slice to avoid modifying the original
+	result := make([]sources.Config, len(configs))
+	copy(result, configs)
+
 	// Set default index names for any config that doesn't have them
-	for i := range configs {
-		if configs[i].ArticleIndex == "" {
-			configs[i].ArticleIndex = "articles"
+	for i := range result {
+		if result[i].ArticleIndex == "" {
+			result[i].ArticleIndex = "articles"
 		}
-		if configs[i].Index == "" {
-			configs[i].Index = "content"
+		if result[i].Index == "" {
+			result[i].Index = "content"
 		}
 	}
+
 	return &testSources{
-		configs: configs,
+		configs: result,
 		logger:  NewTestLogger(),
 	}
 }
@@ -104,6 +109,14 @@ func (s *testSources) AddSource(ctx context.Context, source *sources.Config) err
 		}
 	}
 
+	// Set default index names if empty
+	if source.ArticleIndex == "" {
+		source.ArticleIndex = "articles"
+	}
+	if source.Index == "" {
+		source.Index = "content"
+	}
+
 	s.configs = append(s.configs, *source)
 	return nil
 }
@@ -115,6 +128,15 @@ func (s *testSources) UpdateSource(ctx context.Context, source *sources.Config) 
 	if err := s.ValidateSource(source); err != nil {
 		return err
 	}
+
+	// Set default index names if empty
+	if source.ArticleIndex == "" {
+		source.ArticleIndex = "articles"
+	}
+	if source.Index == "" {
+		source.Index = "content"
+	}
+
 	for i, config := range s.configs {
 		if config.Name == source.Name {
 			s.configs[i] = *source
