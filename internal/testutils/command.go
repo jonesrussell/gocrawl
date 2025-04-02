@@ -16,8 +16,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
-	mockutils "github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/fx"
 )
@@ -33,7 +32,7 @@ const (
 type CommandTestModule struct {
 	// Core dependencies
 	Sources  sources.Interface
-	Storage  storagetypes.Interface
+	Storage  storage.Interface
 	IndexMgr api.IndexManager
 	Config   config.Interface
 	Logger   logger.Logger
@@ -51,7 +50,7 @@ type CommandTestModule struct {
 // NewCommandTestModule creates a new command test module with default values.
 func NewCommandTestModule(t *testing.T) *CommandTestModule {
 	// Set up mock logger
-	mockLogger := &mockutils.MockLogger{}
+	mockLogger := &MockLogger{}
 	mockLogger.On("Info", mock.Anything).Return()
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Warn", mock.Anything).Return()
@@ -74,12 +73,12 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 	mockConfig := configtestutils.NewMockConfig()
 
 	// Set up mock crawler
-	mockCrawler := mockutils.NewMockCrawler()
+	mockCrawler := NewMockCrawler()
 
 	return &CommandTestModule{
 		Sources:        testSources,
-		Storage:        mockutils.NewMockStorage(),
-		IndexMgr:       mockutils.NewMockIndexManager(),
+		Storage:        NewMockStorage(),
+		IndexMgr:       NewMockIndexManager(),
 		Config:         mockConfig,
 		Logger:         mockLogger,
 		Crawler:        mockCrawler,
@@ -101,7 +100,7 @@ func (m *CommandTestModule) Module() fx.Option {
 			func() logger.Logger { return m.Logger },
 			func() crawler.Interface { return m.Crawler },
 			func() sources.Interface { return m.Sources },
-			func() storagetypes.Interface { return m.Storage },
+			func() storage.Interface { return m.Storage },
 			func() api.IndexManager { return m.IndexMgr },
 		),
 

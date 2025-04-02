@@ -11,8 +11,8 @@ import (
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -36,7 +36,7 @@ var Module = fx.Module("storage",
 		),
 		// Then provide the Elasticsearch client
 		fx.Annotate(
-			func(cfg config.Interface, logger types.Logger) (*es.Client, error) {
+			func(cfg config.Interface, logger logger.Logger) (*es.Client, error) {
 				esConfig := cfg.GetElasticsearchConfig()
 				if len(esConfig.Addresses) == 0 {
 					return nil, errors.New("elasticsearch addresses are required")
@@ -127,11 +127,11 @@ var Module = fx.Module("storage",
 			fx.ParamTags(`name:"config"`, ""),
 		),
 		// Then provide the index manager
-		func(client *es.Client, logger types.Logger) api.IndexManager {
+		func(client *es.Client, logger logger.Logger) api.IndexManager {
 			return NewIndexManager(client, logger)
 		},
 		// Finally provide the storage interface
-		func(client *es.Client, logger types.Logger, opts Options) storagetypes.Interface {
+		func(client *es.Client, logger logger.Logger, opts Options) storagetypes.Interface {
 			return NewStorage(client, logger, opts)
 		},
 	),

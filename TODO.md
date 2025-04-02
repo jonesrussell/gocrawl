@@ -2,91 +2,80 @@
 
 ## High Priority
 
-### 1. Dependency Injection Simplification
-- [x] Simplify Logger Implementation
-  - [x] Consolidate logger interfaces into single package
-    - [x] Move logger interface to internal/logger
-    - [x] Remove common/types logger interface
-    - [x] Update all imports to use new logger package
-  - [x] Simplify zap integration
-    - [x] Remove unnecessary wrapper layers
-    - [x] Use zap directly with minimal abstraction
-    - [x] Keep only essential logging methods
-  - [x] Remove fx module for logger
-    - [x] Create simple constructor function
-    - [x] Use environment-based configuration
-    - [x] Add proper error handling
-  - [ ] Update tests
-    - [ ] Simplify mock logger implementation
-    - [ ] Update test utilities
-    - [ ] Add proper test coverage
-- [ ] Remove Unnecessary Abstractions
-  - [x] Remove common/types package
-    - [x] Move interfaces to consuming packages
-    - [x] Update all imports
-    - [x] Update tests
-  - [x] Remove type aliases
-    - [x] Use direct type references
-    - [x] Update imports
-    - [x] Update tests
-  - [ ] Simplify module structure
-    - [ ] Reduce nesting levels
-    - [ ] Combine related modules
-    - [ ] Remove unnecessary modules
-- [ ] Simplify Dependency Injection
-  - [ ] Remove named dependencies
-    - [x] Remove fx.Annotate usage from testutils
-    - [x] Remove name tags from testutils struct fields
-    - [x] Use type-based injection in testutils
-    - [ ] Remove fx.Annotate usage from article module
-    - [ ] Remove name tags from article struct fields
-    - [ ] Use type-based injection in article module
-    - [ ] Remove fx.Annotate usage from crawler module
-    - [ ] Remove name tags from crawler struct fields
-    - [ ] Use type-based injection in crawler module
-    - [ ] Remove fx.Annotate usage from sources module
-    - [ ] Remove name tags from sources struct fields
-    - [ ] Use type-based injection in sources module
-    - [ ] Remove fx.Annotate usage from storage module
-    - [ ] Remove name tags from storage struct fields
-    - [ ] Use type-based injection in storage module
-    - [ ] Remove fx.Annotate usage from config module
-    - [ ] Remove name tags from config struct fields
-    - [ ] Use type-based injection in config module
-    - [ ] Remove fx.Annotate usage from logger module
-    - [ ] Remove name tags from logger struct fields
-    - [ ] Use type-based injection in logger module
-  - [ ] Use constructor injection
-    - [ ] Replace fx where appropriate
-    - [ ] Add proper error handling
-    - [ ] Update tests
-  - [ ] Keep fx for application composition only
-    - [ ] Remove unnecessary fx usage
-    - [ ] Simplify module structure
-    - [ ] Update tests
-- [ ] Review and Replace Cobra CLI
-  - [ ] Evaluate current CLI needs
-    - [ ] List required commands
-    - [ ] Document usage patterns
-    - [ ] Identify complexity points
-  - [ ] Design simpler CLI
-    - [ ] Use standard flag package
-    - [ ] Create simple command structure
-    - [ ] Add proper help messages
-  - [ ] Implement new CLI
-    - [ ] Create basic command structure
-    - [ ] Add command implementations
-    - [ ] Add proper error handling
-  - [ ] Update tests
-    - [ ] Add CLI tests
-    - [ ] Add integration tests
-    - [ ] Update existing tests
-  - [ ] Remove Cobra dependency
-    - [ ] Clean up imports
-    - [ ] Update documentation
-    - [ ] Update build scripts
+### 1. Code Cleanup and Reorganization
+- [x] Consolidate Test Utilities
+  - [x] Merge `cmd/common/testutil` and `cmd/common/testutils`
+  - [x] Move all test utilities to `internal/testutils`
+  - [x] Update imports across codebase
+  - [x] Remove duplicate test utilities
+  - [x] Add proper documentation
+- [x] Consolidate Types
+  - [x] Move `Job` and `Item` structs to `internal/models`
+  - [x] Move storage interface to `internal/storage`
+  - [x] Update all imports to use new type locations
+  - [x] Remove unused types
+  - [x] Add proper documentation
+- [ ] Remove Unused Code
+  - [ ] Remove `internal/app` package if unused
+  - [ ] Remove `internal/processor` package if unused
+  - [ ] Remove duplicate TODO files
+  - [ ] Clean up unused imports
+  - [ ] Remove deprecated code
+- [ ] Standardize Package Structure
+  - [ ] Move all interfaces to `interface.go`
+  - [ ] Move all types to `types.go`
+  - [ ] Move all constants to `constants.go`
+  - [ ] Move all errors to `errors.go`
+  - [ ] Move all tests to `_test` packages
+  - [ ] Add proper package documentation
+- [ ] Clean Up Documentation
+  - [ ] Consolidate all TODOs into main TODO.md
+  - [ ] Add proper package documentation
+  - [ ] Add proper function documentation
+  - [ ] Add proper type documentation
+  - [ ] Add proper interface documentation
+  - [ ] Add proper examples
 
-### 2. Module Reorganization
+### 2. Dependency Injection Simplification
+- [x] Simplify Logger Implementation
+  - [x] Move logger interface to `internal/logger`
+  - [x] Remove `common/types` logger interface
+  - [x] Update all imports to use new logger package
+  - [x] Simplify zap integration
+  - [x] Remove unnecessary wrapper layers
+  - [x] Create simple constructor function
+  - [x] Add proper error handling
+  - [x] Update tests to use new logger
+- [x] Remove Unnecessary Abstractions
+  - [x] Remove `common/types` package
+  - [x] Move types to appropriate packages
+  - [x] Remove type aliases
+  - [x] Simplify module structure
+  - [x] Remove named dependencies
+  - [x] Use constructor injection
+  - [x] Keep fx for application-level composition only
+- [x] Review and Replace Cobra CLI
+  - [x] Evaluate current CLI needs
+    - [x] List required commands
+    - [x] Document usage patterns
+    - [x] Identify complexity points
+  - [x] Design simpler CLI using standard flag package
+    - [x] Create simple command structure
+    - [x] Add proper help messages
+  - [x] Implement new CLI
+    - [x] Create basic command structure
+    - [x] Add command implementations
+    - [x] Add proper error handling
+  - [x] Update tests to use new command structure
+    - [x] Add CLI tests
+    - [x] Add integration tests
+    - [x] Update existing tests
+  - [x] Remove Cobra dependency
+    - [x] Clean up imports
+    - [x] Update documentation
+    - [x] Update build scripts
+
+### 3. Module Reorganization
 - [ ] Split common module into specific modules
   - [x] Create separate logger module
     - [x] Move logger interface to internal/logger
@@ -118,7 +107,7 @@
     - [ ] Add metrics tests
     - [ ] Update commands to use new metrics module
 
-### 3. Interface Organization and Naming
+### 4. Interface Organization and Naming
 - [x] Move interfaces to consuming packages
   - [x] Move `ContentProcessor` from `models` to `collector`
   - [x] Move `Logger` interface from `collector` to `common`
@@ -128,7 +117,7 @@
   - [x] `collector.ArticleProcessor` → `article.Processor`
   - [x] `collector.ContentProcessor` → `content.Processor`
 
-### 4. Error Handling
+### 5. Error Handling
 - [x] Standardize error handling
   - [x] Use `errors.New` for simple errors
   - [x] Use `fmt.Errorf` with `%w` for wrapped errors
@@ -150,7 +139,7 @@
 
 ## Medium Priority
 
-### 5. Testing
+### 6. Testing
 - [x] Improve test organization
   - [x] Move tests to separate `_test` packages
   - [x] Add proper test helpers
@@ -167,7 +156,7 @@
   - [x] Properly scope test dependencies
   - [x] Add test validation
 
-### 6. Code Organization
+### 7. Code Organization
 - [x] Split large files
   - [x] Split `collector.go`
   - [x] Split `crawler.go`
@@ -178,7 +167,7 @@
   - [x] Move common constants to `common`
   - [x] Move common utilities to `common`
 
-### 7. Documentation
+### 8. Documentation
 - [x] Improve documentation
   - [x] Add package documentation
   - [x] Add function documentation
@@ -192,7 +181,7 @@
 
 ## Low Priority
 
-### 8. Configuration
+### 9. Configuration
 - [x] Improve configuration
   - [x] Add proper validation
   - [x] Add proper defaults
@@ -204,7 +193,7 @@
   - [x] Add configuration validation
   - [x] Add configuration defaults
 
-### 9. Logging
+### 10. Logging
 - [x] Improve logging
   - [x] Add proper log levels
   - [x] Add proper log fields
@@ -216,7 +205,7 @@
   - [x] Add log filtering
   - [x] Add log formatting
 
-### 10. Metrics and Monitoring
+### 11. Metrics and Monitoring
 - [x] Add proper metrics
   - [x] Add counter metrics
   - [x] Add gauge metrics
@@ -228,7 +217,7 @@
   - [x] Add liveness checks
   - [x] Add metrics endpoint
 
-### 11. Security
+### 12. Security
 - [x] Improve security
   - [x] Add proper TLS configuration
   - [x] Add proper authentication
@@ -285,37 +274,21 @@
   - Added security headers
 
 ### In Progress
+- Code cleanup and reorganization
+  - [x] Identified duplicate test utilities
+  - [x] Identified unused packages
+  - [x] Identified scattered types
+  - [x] Created cleanup plan
+  - [ ] Started consolidation of test utilities
+  - [ ] Started removal of unused code
+  - [ ] Started standardization of package structure
 - HTTP client error handling improvements
-- Example code additions
-- Complete HTML processor implementation
-  - [x] Add extractList method for categories and tags
-  - [x] Add extractMetadata method for additional metadata
-  - [x] Complete extractTime method with time format parsing
-  - [x] Add tests for HTML parsing
-  - [x] Add tests for time parsing
-  - [x] Add tests for metadata extraction
-  - [x] Add tests for error cases
-  - [ ] Add metrics collection
-    - [ ] Track processing time
-    - [ ] Track number of elements processed
-    - [ ] Track number of errors
-  - [ ] Add context support
-    - [ ] Allow cancellation of long-running processing
-    - [ ] Support timeouts
-    - [ ] Support request-scoped values
-  - [ ] Add validation for configuration
-    - [ ] Validate selectors
-    - [ ] Validate time formats
-    - [ ] Validate required fields
-  - [ ] Add support for custom time formats
-    - [ ] Allow configuration of additional time formats
-    - [ ] Support timezone handling
 
 ### Next Up
-- Add usage examples for each major component
-- Add test examples demonstrating common patterns
-- Add error handling examples showing best practices
-- Add configuration examples for different scenarios
+- Consolidate test utilities
+- Remove unused packages
+- Standardize package structure
+- Clean up documentation
 
 ## Notes
 - Each task should be completed in a separate commit
@@ -323,72 +296,69 @@
 - Each commit should include documentation updates
 - Each commit should be reviewed before merging
 - Each commit should follow the project's coding standards
+- When removing code:
+  - Verify it's not used by other packages
+  - Update tests to remove dependencies
+  - Update documentation to reflect changes
+  - Keep git history clean with atomic commits
 
 # TODO List
 
 ## High Priority
-- [x] Fix dependency injection issues in API module
-- [x] Fix duplicate SearchManager provider
-- [x] Fix logger dependency in API module
-- [x] Fix config dependency in API module
-- [ ] Add command integration tests
-  - [x] Test HTTP server command
-    - [x] Test server startup
-    - [x] Test graceful shutdown
-    - [x] Test health check endpoint
-    - [x] Test search endpoint
-    - [x] Test error handling
-  - [ ] Test crawler command
-    - [ ] Test crawler startup
-    - [ ] Test crawler shutdown
-    - [ ] Test source validation
-    - [ ] Test error handling
-  - [ ] Test index command
-    - [ ] Test index creation
-    - [ ] Test index deletion
-    - [ ] Test index mapping
-    - [ ] Test error handling
-  - [ ] Test dry-run command
-    - [ ] Test configuration validation
-    - [ ] Test source validation
-    - [ ] Test error handling
-  - [ ] Test version command
-    - [ ] Test version output
-    - [ ] Test build info output
+- [x] Consolidate test utilities
+  - [x] Move test utilities to `internal/testutils`
+  - [x] Remove old testutils directory
+  - [x] Update imports in test files
+
+- [x] Consolidate types
+  - [x] Move Job and Item structs to `internal/models`
+  - [x] Move storage interface to `internal/storage`
+  - [x] Remove old types packages
+  - [x] Update imports in all files
+
+- [ ] Remove unused code
+  - [ ] Remove unused interfaces
+  - [ ] Remove unused types
+  - [ ] Remove unused functions
+  - [ ] Remove unused imports
 
 ## Medium Priority
-- [ ] Add more test cases for HTML processor
-  - [ ] Test malformed HTML handling
-  - [ ] Test concurrent processing
-  - [ ] Test memory usage
-  - [ ] Test error recovery
-- [ ] Improve error handling in storage module
-  - [ ] Add retry mechanism for failed operations
-  - [ ] Add circuit breaker for failing operations
-  - [ ] Add metrics for error rates
-  - [ ] Add error reporting
-- [ ] Add metrics collection
-  - [ ] Add Prometheus metrics
-  - [ ] Add Grafana dashboards
-  - [ ] Add alerting rules
-  - [ ] Add monitoring documentation
+- [ ] Improve error handling
+  - [ ] Add error wrapping
+  - [ ] Add error context
+  - [ ] Add error logging
+  - [ ] Add error recovery
+
+- [ ] Improve logging
+  - [ ] Add structured logging
+  - [ ] Add log levels
+  - [ ] Add log rotation
+  - [ ] Add log filtering
+
+- [ ] Improve testing
+  - [ ] Add more unit tests
+  - [ ] Add integration tests
+  - [ ] Add performance tests
+  - [ ] Add load tests
 
 ## Low Priority
-- [ ] Add more documentation
+- [ ] Improve documentation
   - [ ] Add API documentation
-  - [ ] Add configuration documentation
+  - [ ] Add usage examples
+  - [ ] Add architecture diagrams
   - [ ] Add deployment guide
-  - [ ] Add troubleshooting guide
-- [ ] Add more examples
-  - [ ] Add basic usage examples
-  - [ ] Add advanced usage examples
-  - [ ] Add integration examples
-  - [ ] Add deployment examples
-- [ ] Add more features
-  - [ ] Add rate limiting
-  - [ ] Add caching
-  - [ ] Add authentication
-  - [ ] Add authorization
+
+- [ ] Improve monitoring
+  - [ ] Add metrics
+  - [ ] Add tracing
+  - [ ] Add alerts
+  - [ ] Add dashboards
+
+- [ ] Improve deployment
+  - [ ] Add Docker support
+  - [ ] Add Kubernetes support
+  - [ ] Add CI/CD pipeline
+  - [ ] Add release automation
 
 ### 12. Remove Named Dependencies
 - [ ] Remove named fx dependencies across codebase

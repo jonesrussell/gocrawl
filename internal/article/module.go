@@ -7,11 +7,11 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 )
 
@@ -27,8 +27,8 @@ import (
 type ProcessorParams struct {
 	fx.In
 
-	Logger      types.Logger
-	Storage     storagetypes.Interface
+	Logger      logger.Logger
+	Storage     storage.Interface
 	IndexName   string               `name:"indexName"`
 	ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 	Service     Interface
@@ -48,10 +48,10 @@ type ProcessorParams struct {
 type ServiceParams struct {
 	fx.In
 
-	Logger    common.Logger
+	Logger    logger.Logger
 	Config    config.Interface
 	Sources   sources.Interface
-	Storage   storagetypes.Interface
+	Storage   storage.Interface
 	Source    string `name:"sourceName"`
 	IndexName string `name:"indexName"`
 }

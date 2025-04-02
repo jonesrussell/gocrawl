@@ -4,9 +4,9 @@ package crawl_test
 import (
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/cmd/common/testutils"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -59,18 +59,15 @@ func TestCommandDeps(t *testing.T) {
 			),
 		),
 		fx.Invoke(func(deps crawl.CommandDeps) {
-			require.NotNil(t, deps.Lifecycle)
+			require.NotNil(t, deps.Context)
 			require.NotNil(t, deps.Sources)
 			require.NotNil(t, deps.Crawler)
 			require.NotNil(t, deps.Logger)
 			require.NotNil(t, deps.Config)
 			require.NotNil(t, deps.Storage)
-			require.NotNil(t, deps.Done)
-			require.NotNil(t, deps.Context)
 			require.NotNil(t, deps.Processors)
 			require.NotEmpty(t, deps.SourceName)
 			require.NotNil(t, deps.ArticleChan)
-			require.NotNil(t, deps.Handler)
 		}),
 	)
 

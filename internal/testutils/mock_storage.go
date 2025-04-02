@@ -3,52 +3,52 @@ package testutils
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockStorage implements types.Interface for testing.
+// MockStorage implements storage.Interface for testing.
 type MockStorage struct {
 	mock.Mock
 }
 
-// IndexDocument implements types.Interface
+// IndexDocument implements storage.Interface
 func (m *MockStorage) IndexDocument(ctx context.Context, index string, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
-// GetDocument implements types.Interface
+// GetDocument implements storage.Interface
 func (m *MockStorage) GetDocument(ctx context.Context, index string, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
-// DeleteDocument implements types.Interface
+// DeleteDocument implements storage.Interface
 func (m *MockStorage) DeleteDocument(ctx context.Context, index string, id string) error {
 	args := m.Called(ctx, index, id)
 	return args.Error(0)
 }
 
-// BulkIndex implements types.Interface
+// BulkIndex implements storage.Interface
 func (m *MockStorage) BulkIndex(ctx context.Context, index string, documents []any) error {
 	args := m.Called(ctx, index, documents)
 	return args.Error(0)
 }
 
-// CreateIndex implements types.Interface
+// CreateIndex implements storage.Interface
 func (m *MockStorage) CreateIndex(ctx context.Context, index string, mapping map[string]any) error {
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }
 
-// DeleteIndex implements types.Interface
+// DeleteIndex implements storage.Interface
 func (m *MockStorage) DeleteIndex(ctx context.Context, index string) error {
 	args := m.Called(ctx, index)
 	return args.Error(0)
 }
 
-// ListIndices implements types.Interface
+// ListIndices implements storage.Interface
 func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	args := m.Called(ctx)
 	if err := args.Error(1); err != nil {
@@ -64,7 +64,7 @@ func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	return nil, ErrInvalidResult
 }
 
-// GetMapping implements types.Interface
+// GetMapping implements storage.Interface
 func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	args := m.Called(ctx, index)
 	if err := args.Error(1); err != nil {
@@ -80,19 +80,19 @@ func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]
 	return nil, ErrInvalidResult
 }
 
-// UpdateMapping implements types.Interface
+// UpdateMapping implements storage.Interface
 func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]any) error {
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }
 
-// IndexExists implements types.Interface
+// IndexExists implements storage.Interface
 func (m *MockStorage) IndexExists(ctx context.Context, index string) (bool, error) {
 	args := m.Called(ctx, index)
 	return args.Bool(0), args.Error(1)
 }
 
-// Search implements types.Interface
+// Search implements storage.Interface
 func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
 	if err := args.Error(1); err != nil {
@@ -108,13 +108,13 @@ func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]an
 	return nil, ErrInvalidResult
 }
 
-// GetIndexHealth implements types.Interface
+// GetIndexHealth implements storage.Interface
 func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
 	args := m.Called(ctx, index)
 	return args.String(0), args.Error(1)
 }
 
-// GetIndexDocCount implements types.Interface
+// GetIndexDocCount implements storage.Interface
 func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	args := m.Called(ctx, index)
 	if err := args.Error(1); err != nil {
@@ -130,25 +130,25 @@ func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64
 	return 0, ErrInvalidResult
 }
 
-// Ping implements types.Interface
+// Ping implements storage.Interface
 func (m *MockStorage) Ping(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-// TestConnection implements types.Interface
+// TestConnection implements storage.Interface
 func (m *MockStorage) TestConnection(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-// Aggregate implements types.Interface
+// Aggregate implements storage.Interface
 func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
 	args := m.Called(ctx, index, aggs)
 	return args.Get(0), args.Error(1)
 }
 
-// Count implements types.Interface
+// Count implements storage.Interface
 func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
 	if err := args.Error(1); err != nil {
@@ -164,14 +164,14 @@ func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64
 	return 0, ErrInvalidResult
 }
 
-// Close implements types.Interface
+// Close implements storage.Interface
 func (m *MockStorage) Close() error {
 	args := m.Called()
 	return args.Error(0)
 }
 
-// Ensure MockStorage implements types.Interface
-var _ types.Interface = (*MockStorage)(nil)
+// Ensure MockStorage implements storage.Interface
+var _ storage.Interface = (*MockStorage)(nil)
 
 // NewMockStorage creates a new MockStorage instance.
 func NewMockStorage() *MockStorage {

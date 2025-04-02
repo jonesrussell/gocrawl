@@ -1,19 +1,9 @@
-// Package types provides common type definitions used across the application.
-package types
+// Package models provides data models used across the application.
+package models
 
 import (
 	"time"
 )
-
-// Storage defines the interface for data storage operations.
-type Storage interface {
-	// Add your storage methods here
-}
-
-// Config defines the interface for configuration operations.
-type Config interface {
-	// Add your config methods here
-}
 
 // Job represents a crawling job.
 type Job struct {
