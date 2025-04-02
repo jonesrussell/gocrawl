@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -59,7 +60,6 @@ var TestAPIModule = fx.Module("testAPI",
 	}),
 	// Core modules used by most commands, excluding logger and sources.
 	config.TestModule,
-	logger.Module,
 	// Include the API module itself
 	api.Module,
 )
@@ -200,4 +200,89 @@ func TestSearchEndpoint(t *testing.T) {
 		assert.Contains(t, w.Body.String(), "Test Result")
 		assert.Contains(t, w.Body.String(), "https://test.com")
 	})
+}
+
+// TestLoggerDependencyRegression verifies that the logger dependency is properly provided and used.
+func TestLoggerDependencyRegression(t *testing.T) {
+	// Create a mock logger that we can verify is used
+	mockLog := setupMockLogger()
+
+	// Create test configuration
+	mockConfig := configtest.NewMockConfig().
+		WithServerConfig(&config.ServerConfig{
+			Address:      ":0",
+			ReadTimeout:  15 * time.Second,
+			WriteTimeout: 15 * time.Second,
+			IdleTimeout:  60 * time.Second,
+		}).
+		WithAppConfig(&config.AppConfig{
+			Environment: "test",
+		}).
+		WithLogConfig(&config.LogConfig{
+			Level: "info",
+			Debug: false,
+		})
+
+	// Create mock search manager
+	mockSearch := testutils.NewMockSearchManager()
+	mockSearch.On("Search", mock.Anything, "test", mock.Anything).Return([]any{
+		map[string]any{
+			"title": "Test Result",
+			"url":   "https://test.com",
+		},
+	}, nil)
+	mockSearch.On("Count", mock.Anything, "test", mock.Anything).Return(int64(1), nil)
+	mockSearch.On("Close").Return(nil)
+
+	// Create a test module that only includes the necessary components
+	testModule := fx.Module("testAPI",
+		fx.Provide(
+			// Provide the server and security middleware together to avoid circular dependencies
+			func(
+				log types.Logger,
+				searchManager api.SearchManager,
+				cfg common.Config,
+			) (*http.Server, middleware.SecurityMiddlewareInterface) {
+				// Use StartHTTPServer to create the server and security middleware
+				server, security, err := api.StartHTTPServer(log, searchManager, cfg)
+				if err != nil {
+					panic(err)
+				}
+				return server, security
+			},
+		),
+		fx.Invoke(api.ConfigureLifecycle),
+	)
+
+	// Create test application with just the test module
+	app := fxtest.New(t,
+		testModule,
+		fx.NopLogger,
+		fx.Supply(
+			fx.Annotate(
+				mockConfig,
+				fx.As(new(common.Config)),
+			),
+			fx.Annotate(
+				mockSearch,
+				fx.As(new(api.SearchManager)),
+			),
+			fx.Annotate(
+				t.Context(),
+				fx.As(new(context.Context)),
+			),
+			fx.Annotate(
+				mockLog,
+				fx.As(new(types.Logger)),
+			),
+		),
+	)
+
+	// Start the application
+	app.RequireStart()
+	defer app.RequireStop()
+
+	// Verify that the logger was used by checking if the expected log calls were made
+	mockLog.AssertCalled(t, "Info", "StartHTTPServer function called", mock.Anything)
+	mockLog.AssertCalled(t, "Info", "Server configuration", mock.Anything)
 }

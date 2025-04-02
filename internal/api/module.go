@@ -8,6 +8,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
 
@@ -53,4 +54,5 @@ var Module = fx.Module("api",
 		},
 	),
 	fx.Invoke(ConfigureLifecycle),
+	logger.Module,
 )
