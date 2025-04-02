@@ -35,10 +35,27 @@
     - [ ] Remove unnecessary modules
 - [ ] Simplify Dependency Injection
   - [ ] Remove named dependencies
-    - [ ] Remove fx.Annotate usage
-    - [ ] Remove name tags from struct fields
-    - [ ] Use type-based injection
-    - [ ] Update tests
+    - [x] Remove fx.Annotate usage from testutils
+    - [x] Remove name tags from testutils struct fields
+    - [x] Use type-based injection in testutils
+    - [ ] Remove fx.Annotate usage from article module
+    - [ ] Remove name tags from article struct fields
+    - [ ] Use type-based injection in article module
+    - [ ] Remove fx.Annotate usage from crawler module
+    - [ ] Remove name tags from crawler struct fields
+    - [ ] Use type-based injection in crawler module
+    - [ ] Remove fx.Annotate usage from sources module
+    - [ ] Remove name tags from sources struct fields
+    - [ ] Use type-based injection in sources module
+    - [ ] Remove fx.Annotate usage from storage module
+    - [ ] Remove name tags from storage struct fields
+    - [ ] Use type-based injection in storage module
+    - [ ] Remove fx.Annotate usage from config module
+    - [ ] Remove name tags from config struct fields
+    - [ ] Use type-based injection in config module
+    - [ ] Remove fx.Annotate usage from logger module
+    - [ ] Remove name tags from logger struct fields
+    - [ ] Use type-based injection in logger module
   - [ ] Use constructor injection
     - [ ] Replace fx where appropriate
     - [ ] Add proper error handling
@@ -375,11 +392,16 @@
 
 ### 12. Remove Named Dependencies
 - [ ] Remove named fx dependencies across codebase
-  - [ ] Audit all fx.Module declarations
-  - [ ] Remove fx.Annotate usage
-  - [ ] Update struct field tags
-  - [ ] Simplify dependency providers
-  - [ ] Update tests to use type-based injection
+  - [x] Audit all fx.Module declarations in testutils
+  - [x] Remove fx.Annotate usage from testutils
+  - [x] Update struct field tags in testutils
+  - [x] Simplify dependency providers in testutils
+  - [x] Update tests to use type-based injection in testutils
+  - [ ] Audit all fx.Module declarations in article module
+  - [ ] Remove fx.Annotate usage from article module
+  - [ ] Update struct field tags in article module
+  - [ ] Simplify dependency providers in article module
+  - [ ] Update tests to use type-based injection in article module
   - [ ] Verify all modules work together
 
 Steps for each module:
@@ -390,11 +412,10 @@ Steps for each module:
 5. Verify module integration
 
 Priority order:
-1. cmd/common/testutils
-2. internal/api
-3. internal/collector
-4. internal/crawler
-5. internal/storage
-6. internal/sources
-7. internal/config
-8. internal/logger
+1. [x] cmd/common/testutils
+2. [ ] internal/article
+3. [ ] internal/crawler
+4. [ ] internal/storage
+5. [ ] internal/sources
+6. [ ] internal/config
+7. [ ] internal/logger
