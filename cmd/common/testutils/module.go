@@ -9,10 +9,10 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
@@ -36,7 +36,7 @@ type CommandTestModule struct {
 	Storage  storagetypes.Interface
 	IndexMgr api.IndexManager
 	Config   config.Interface
-	Logger   types.Logger
+	Logger   logger.Logger
 	Crawler  crawler.Interface
 
 	// Command-specific dependencies
@@ -45,7 +45,7 @@ type CommandTestModule struct {
 	CommandDone    chan struct{}
 	ArticleChannel chan *models.Article
 	SignalHandler  *signal.SignalHandler
-	Processors     []common.Processor `group:"processors"`
+	Processors     []common.Processor
 }
 
 // NewCommandTestModule creates a new command test module with default values.
@@ -98,36 +98,20 @@ func (m *CommandTestModule) Module() fx.Option {
 		// Core dependencies
 		fx.Provide(
 			func() config.Interface { return m.Config },
-			func() types.Logger { return m.Logger },
+			func() logger.Logger { return m.Logger },
 			func() crawler.Interface { return m.Crawler },
 			func() sources.Interface { return m.Sources },
 			func() storagetypes.Interface { return m.Storage },
 			func() api.IndexManager { return m.IndexMgr },
 		),
 
-		// Provide all required dependencies
+		// Command-specific dependencies
 		fx.Provide(
-			// Command-specific dependencies
-			fx.Annotate(
-				func() context.Context { return m.Ctx },
-				fx.ResultTags(`name:"crawlContext"`),
-			),
-			fx.Annotate(
-				func() string { return m.SourceName },
-				fx.ResultTags(`name:"sourceName"`),
-			),
-			fx.Annotate(
-				func() chan struct{} { return m.CommandDone },
-				fx.ResultTags(`name:"shutdownChan"`),
-			),
-			fx.Annotate(
-				func() chan *models.Article { return m.ArticleChannel },
-				fx.ResultTags(`name:"crawlerArticleChannel"`),
-			),
-			fx.Annotate(
-				func() *signal.SignalHandler { return m.SignalHandler },
-				fx.ResultTags(`name:"signalHandler"`),
-			),
+			func() context.Context { return m.Ctx },
+			func() string { return m.SourceName },
+			func() chan struct{} { return m.CommandDone },
+			func() chan *models.Article { return m.ArticleChannel },
+			func() *signal.SignalHandler { return m.SignalHandler },
 		),
 		fx.Supply(m.Processors),
 	)
