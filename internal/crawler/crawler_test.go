@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
@@ -581,6 +580,24 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 	// Create a test context
 	ctx := context.Background()
 
+	// Create mock HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+			<html>
+				<body>
+					<article>
+						<h1>Test Article</h1>
+						<div class="content">
+							<p>Test content</p>
+						</div>
+					</article>
+				</body>
+			</html>
+		`))
+	}))
+	defer server.Close()
+
 	// Create test dependencies
 	mockLogger := &MockLogger{}
 	mockIndexManager := &MockIndexManager{}
@@ -599,38 +616,30 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 		mockContentProcessor,
 	)
 
-	// Create test HTML element
-	e := &colly.HTMLElement{
-		Request: &colly.Request{
-			URL: &url.URL{
-				Scheme: "http",
-				Host:   "example.com",
-				Path:   "/test",
-			},
-		},
-	}
-
-	// Set up expectations
-	mockArticleProcessor.On("ProcessHTML", ctx, e).Return(nil)
-	mockContentProcessor.On("ProcessHTML", ctx, e).Return(nil)
-
-	// Create a test collector
-	collector := colly.NewCollector()
+	// Create a test collector without domain restrictions
+	collector := colly.NewCollector(
+		colly.Async(true),
+		colly.IgnoreRobotsTxt(),
+	)
 	c.SetCollector(collector)
 
 	// Set up the crawler's HTML handlers
 	collector.OnHTML("article", func(e *colly.HTMLElement) {
+		// Set up expectations for the actual element being processed
+		mockArticleProcessor.On("ProcessHTML", ctx, e).Return(nil)
 		err := mockArticleProcessor.ProcessHTML(ctx, e)
 		require.NoError(t, err)
 	})
 
 	collector.OnHTML("div.content", func(e *colly.HTMLElement) {
+		// Set up expectations for the actual element being processed
+		mockContentProcessor.On("ProcessHTML", ctx, e).Return(nil)
 		err := mockContentProcessor.ProcessHTML(ctx, e)
 		require.NoError(t, err)
 	})
 
-	// Visit a test URL
-	err := collector.Visit("http://example.com/test")
+	// Visit the test server URL
+	err := collector.Visit(server.URL)
 	require.NoError(t, err)
 
 	// Wait for the crawler to finish
