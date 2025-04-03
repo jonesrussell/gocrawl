@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -117,6 +118,27 @@ func validateElasticsearchConfig(cfg ElasticsearchConfig) error {
 			Reason: "at least one Elasticsearch address must be provided",
 		}
 	}
+
+	// Validate each address
+	for _, addr := range cfg.Addresses {
+		if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
+			return &ConfigValidationError{
+				Field:  "elasticsearch.addresses",
+				Value:  addr,
+				Reason: "invalid Elasticsearch address",
+			}
+		}
+	}
+
+	// Validate credentials
+	if cfg.APIKey == "" && (cfg.Username == "" || cfg.Password == "") {
+		return &ConfigValidationError{
+			Field:  "elasticsearch.credentials",
+			Value:  "missing",
+			Reason: "either username/password or api_key must be provided",
+		}
+	}
+
 	if cfg.IndexName == "" {
 		return &ConfigValidationError{
 			Field:  "elasticsearch.index_name",
@@ -124,6 +146,7 @@ func validateElasticsearchConfig(cfg ElasticsearchConfig) error {
 			Reason: "index name cannot be empty",
 		}
 	}
+
 	if cfg.TLS.Enabled {
 		if cfg.TLS.CertFile == "" {
 			return &ConfigValidationError{
@@ -140,6 +163,32 @@ func validateElasticsearchConfig(cfg ElasticsearchConfig) error {
 			}
 		}
 	}
+
+	// Validate retry configuration if enabled
+	if cfg.Retry.Enabled {
+		if cfg.Retry.MaxRetries < 0 {
+			return &ConfigValidationError{
+				Field:  "elasticsearch.retry.max_retries",
+				Value:  cfg.Retry.MaxRetries,
+				Reason: "retry values must be non-negative",
+			}
+		}
+		if cfg.Retry.InitialWait < time.Second {
+			return &ConfigValidationError{
+				Field:  "elasticsearch.retry.initial_wait",
+				Value:  cfg.Retry.InitialWait,
+				Reason: "initial wait must be at least 1 second",
+			}
+		}
+		if cfg.Retry.MaxWait < cfg.Retry.InitialWait {
+			return &ConfigValidationError{
+				Field:  "elasticsearch.retry.max_wait",
+				Value:  cfg.Retry.MaxWait,
+				Reason: "max wait must be greater than or equal to initial wait",
+			}
+		}
+	}
+
 	return nil
 }
 

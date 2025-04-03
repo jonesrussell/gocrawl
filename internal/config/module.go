@@ -32,6 +32,9 @@ func New(log Logger) (Interface, error) {
 	if err := cfg.load(); err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
+	if err := ValidateConfig(cfg); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
 	return cfg, nil
 }
 

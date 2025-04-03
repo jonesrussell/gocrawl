@@ -3,6 +3,7 @@ package testutils
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -22,8 +23,17 @@ func SetupTestEnv(t *testing.T) func() {
 	viper.Reset()
 
 	// Get the absolute path to the testdata directory
-	testdataDir, err := filepath.Abs("testdata")
-	require.NoError(t, err)
+	_, filename, _, ok := runtime.Caller(1)
+	require.True(t, ok, "failed to get caller information")
+
+	// Walk up to find the config directory
+	dir := filepath.Dir(filename)
+	for filepath.Base(dir) != "config" && dir != "/" {
+		dir = filepath.Dir(dir)
+	}
+	require.NotEqual(t, "/", dir, "failed to find config directory")
+
+	testdataDir := filepath.Join(dir, "testdata")
 	configPath := filepath.Join(testdataDir, "config.yml")
 	sourcesPath := filepath.Join(testdataDir, "sources.yml")
 
@@ -34,6 +44,30 @@ func SetupTestEnv(t *testing.T) func() {
 	// Set environment variables
 	t.Setenv("CONFIG_FILE", configPath)
 	t.Setenv("CRAWLER_SOURCE_FILE", sourcesPath)
+	viper.Set("crawler.source_file", sourcesPath)
+
+	// Set default values for required fields
+	viper.Set("app.environment", "test")
+	viper.Set("app.name", "gocrawl-test")
+	viper.Set("app.version", "0.0.1")
+	viper.Set("crawler.base_url", "http://localhost:8080")
+	viper.Set("crawler.max_depth", 1)
+	viper.Set("crawler.rate_limit", "1s")
+	viper.Set("crawler.parallelism", 1)
+	viper.Set("server.address", ":8080")
+	viper.Set("server.read_timeout", "1s")
+	viper.Set("server.write_timeout", "1s")
+
+	// Initialize Viper with config file
+	viper.SetConfigFile(configPath)
+	if err := viper.ReadInConfig(); err != nil {
+		t.Fatalf("failed to read config file: %v", err)
+	}
+
+	// Set environment variables from config
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Return cleanup function
 	return func() {

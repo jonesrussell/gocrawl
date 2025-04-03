@@ -228,6 +228,30 @@ type Config struct {
 
 // load loads all configuration values from Viper
 func (c *Config) load() error {
+	// Debug: Print Viper values
+	fmt.Printf("Loading config from Viper:\n")
+	fmt.Printf("app.environment: %s\n", viper.GetString("app.environment"))
+	fmt.Printf("app.name: %s\n", viper.GetString("app.name"))
+	fmt.Printf("app.version: %s\n", viper.GetString("app.version"))
+	fmt.Printf("app.debug: %v\n", viper.GetBool("app.debug"))
+	fmt.Printf("log.level: %s\n", viper.GetString("log.level"))
+	fmt.Printf("log.debug: %v\n", viper.GetBool("log.debug"))
+	fmt.Printf("elasticsearch.addresses: %v\n", viper.GetStringSlice("elasticsearch.addresses"))
+	fmt.Printf("elasticsearch.username: %s\n", viper.GetString("elasticsearch.username"))
+	fmt.Printf("elasticsearch.password: %s\n", viper.GetString("elasticsearch.password"))
+	fmt.Printf("elasticsearch.api_key: %s\n", viper.GetString("elasticsearch.api_key"))
+	fmt.Printf("elasticsearch.index_name: %s\n", viper.GetString("elasticsearch.index_name"))
+	fmt.Printf("elasticsearch.cloud.id: %s\n", viper.GetString("elasticsearch.cloud.id"))
+	fmt.Printf("elasticsearch.cloud.api_key: %s\n", viper.GetString("elasticsearch.cloud.api_key"))
+	fmt.Printf("elasticsearch.tls.enabled: %v\n", viper.GetBool("elasticsearch.tls.enabled"))
+	fmt.Printf("elasticsearch.tls.certificate: %s\n", viper.GetString("elasticsearch.tls.certificate"))
+	fmt.Printf("elasticsearch.tls.key: %s\n", viper.GetString("elasticsearch.tls.key"))
+	fmt.Printf("elasticsearch.retry.enabled: %v\n", viper.GetBool("elasticsearch.retry.enabled"))
+	fmt.Printf("elasticsearch.retry.initial_wait: %s\n", viper.GetString("elasticsearch.retry.initial_wait"))
+	fmt.Printf("elasticsearch.retry.max_wait: %s\n", viper.GetString("elasticsearch.retry.max_wait"))
+	fmt.Printf("elasticsearch.retry.max_retries: %d\n", viper.GetInt("elasticsearch.retry.max_retries"))
+	fmt.Printf("crawler.source_file: %s\n", viper.GetString("crawler.source_file"))
+
 	// Load app config
 	c.App.Environment = viper.GetString("app.environment")
 	c.App.Name = viper.GetString("app.name")
@@ -239,7 +263,7 @@ func (c *Config) load() error {
 	c.Log.Debug = viper.GetBool("log.debug")
 
 	// Load Elasticsearch config
-	c.Elasticsearch = createElasticsearchConfig()
+	c.Elasticsearch = *createElasticsearchConfig()
 
 	// Load server config
 	c.Server = createServerConfig()

@@ -35,6 +35,9 @@ func loadSources(sourceFile string) ([]Source, error) {
 		return nil, fmt.Errorf("failed to load sources from %s: %w", sourceFile, err)
 	}
 
+	// Debug: Print the loaded config
+	fmt.Printf("Loaded sources config: %+v\n", sourcesConfig)
+
 	// Convert loader.Config to config.Source
 	var sources []Source
 	for i := range sourcesConfig {
