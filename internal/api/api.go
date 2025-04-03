@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/types"
 )
 
 // SearchManager defines the interface for search operations.
@@ -26,17 +27,6 @@ type SearchManager interface {
 
 	// Close closes any resources held by the search manager.
 	Close() error
-}
-
-// APIError represents an error response from the API.
-type APIError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Err     error  `json:"-"`
-}
-
-func (e *APIError) Error() string {
-	return e.Message
 }
 
 // Constants
@@ -99,9 +89,9 @@ func loggingMiddleware(log logger.Interface) gin.HandlerFunc {
 // handleSearch creates a handler for search requests
 func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req SearchRequest
+		var req types.SearchRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, APIError{
+			c.JSON(http.StatusBadRequest, types.APIError{
 				Code:    http.StatusBadRequest,
 				Message: "Invalid request payload",
 				Err:     err,
@@ -111,7 +101,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 
 		// Validate request
 		if strings.TrimSpace(req.Query) == "" {
-			c.JSON(http.StatusBadRequest, APIError{
+			c.JSON(http.StatusBadRequest, types.APIError{
 				Code:    http.StatusBadRequest,
 				Message: "Query cannot be empty",
 			})
@@ -131,7 +121,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 		// Use the search manager to perform the search
 		results, err := searchManager.Search(c.Request.Context(), req.Index, query)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, APIError{
+			c.JSON(http.StatusInternalServerError, types.APIError{
 				Code:    http.StatusInternalServerError,
 				Message: "Failed to perform search",
 				Err:     err,
@@ -148,7 +138,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 			},
 		})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, APIError{
+			c.JSON(http.StatusInternalServerError, types.APIError{
 				Code:    http.StatusInternalServerError,
 				Message: "Failed to get total count",
 				Err:     err,
@@ -157,7 +147,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 		}
 
 		// Prepare and send the response
-		response := SearchResponse{
+		response := types.SearchResponse{
 			Results: results,
 			Total:   int(total),
 		}

@@ -20,6 +20,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
+	apitypes "github.com/jonesrussell/gocrawl/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -223,14 +224,14 @@ func TestSearchEndpoint(t *testing.T) {
 		requestBody    string
 		apiKey         string
 		expectedStatus int
-		expectedError  *api.APIError
+		expectedError  *apitypes.APIError
 	}{
 		{
 			name:           "requires API key",
 			requestBody:    `{"query": "test"}`,
 			apiKey:         "",
 			expectedStatus: http.StatusUnauthorized,
-			expectedError: &api.APIError{
+			expectedError: &apitypes.APIError{
 				Code:    http.StatusUnauthorized,
 				Message: "API key is required",
 			},
@@ -246,7 +247,7 @@ func TestSearchEndpoint(t *testing.T) {
 			requestBody:    `{"query": "test", invalid json}`,
 			apiKey:         testAPIKey,
 			expectedStatus: http.StatusBadRequest,
-			expectedError: &api.APIError{
+			expectedError: &apitypes.APIError{
 				Code:    http.StatusBadRequest,
 				Message: "Invalid request payload",
 			},
@@ -256,7 +257,7 @@ func TestSearchEndpoint(t *testing.T) {
 			requestBody:    `{"query": "", "index": "test"}`,
 			apiKey:         testAPIKey,
 			expectedStatus: http.StatusBadRequest,
-			expectedError: &api.APIError{
+			expectedError: &apitypes.APIError{
 				Code:    http.StatusBadRequest,
 				Message: "Query cannot be empty",
 			},
@@ -277,13 +278,13 @@ func TestSearchEndpoint(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			if tt.expectedError != nil {
-				var errResp api.APIError
+				var errResp apitypes.APIError
 				err := json.NewDecoder(w.Body).Decode(&errResp)
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedError.Code, errResp.Code)
 				assert.Equal(t, tt.expectedError.Message, errResp.Message)
 			} else if tt.expectedStatus == http.StatusOK {
-				var resp api.SearchResponse
+				var resp apitypes.SearchResponse
 				err := json.NewDecoder(w.Body).Decode(&resp)
 				require.NoError(t, err)
 				assert.NotEmpty(t, resp.Results)

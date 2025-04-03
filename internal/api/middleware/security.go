@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/types"
 )
 
 // TimeProvider is an interface for getting the current time
@@ -81,19 +82,28 @@ func (m *SecurityMiddleware) Middleware() gin.HandlerFunc {
 
 		// Handle CORS
 		if err := m.handleCORS(c); err != nil {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			c.AbortWithStatusJSON(http.StatusForbidden, types.APIError{
+				Code:    http.StatusForbidden,
+				Message: err.Error(),
+			})
 			return
 		}
 
 		// Authenticate request first
 		if err := m.authenticate(c); err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, types.APIError{
+				Code:    http.StatusUnauthorized,
+				Message: err.Error(),
+			})
 			return
 		}
 
 		// Apply rate limiting after authentication
 		if err := m.rateLimit(c); err != nil {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, types.APIError{
+				Code:    http.StatusTooManyRequests,
+				Message: err.Error(),
+			})
 			return
 		}
 

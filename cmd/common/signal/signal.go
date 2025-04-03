@@ -22,9 +22,6 @@ type FXApp interface {
 	Stop(context.Context) error
 }
 
-// ExitFunc defines a function type for system exit
-type ExitFunc func(code int)
-
 // SignalHandler manages signal handling for graceful shutdown.
 type SignalHandler struct {
 	// sigChan receives OS signals
@@ -53,10 +50,10 @@ type SignalHandler struct {
 	cancel context.CancelFunc
 	// shutdown is a channel to signal shutdown
 	shutdown chan struct{}
-	// exitFunc is the function used to exit the program
-	exitFunc ExitFunc
 	// shutdownOnce ensures we only close the shutdown channel once
 	shutdownOnce sync.Once
+	// testMode indicates whether we're running in test mode
+	testMode bool
 }
 
 // GetState returns the current state of the signal handler.
@@ -82,7 +79,7 @@ func NewSignalHandler(logger logger.Interface) *SignalHandler {
 		logger:          logger,
 		state:           "initialized",
 		shutdown:        make(chan struct{}),
-		exitFunc:        os.Exit, // Set default exit function
+		testMode:        false,
 	}
 }
 
@@ -101,10 +98,9 @@ func (h *SignalHandler) SetLogger(logger logger.Interface) {
 	h.logger = logger
 }
 
-// SetExitFunc sets the function used to exit the program.
-// This is primarily used for testing to prevent actual program exit.
-func (h *SignalHandler) SetExitFunc(exit ExitFunc) {
-	h.exitFunc = exit
+// SetTestMode enables or disables test mode.
+func (h *SignalHandler) SetTestMode(enabled bool) {
+	h.testMode = enabled
 }
 
 // Setup initializes signal handling for the given context.
@@ -178,11 +174,6 @@ func (h *SignalHandler) handleShutdown() {
 
 	// Cancel the context to ensure cleanup runs
 	h.cancel()
-
-	// Call exit function if set
-	if h.exitFunc != nil {
-		h.exitFunc(0)
-	}
 }
 
 // SetCleanup sets a cleanup function to be called during shutdown.
@@ -196,16 +187,10 @@ func (h *SignalHandler) Wait() bool {
 	select {
 	case <-h.doneChan:
 		h.setState("completed")
-		if h.exitFunc != nil {
-			h.exitFunc(0)
-		}
 		return true
 	case <-h.ctx.Done():
 		h.setState("completed")
 		h.signalDone() // Ensure we signal done on context cancellation
-		if h.exitFunc != nil {
-			h.exitFunc(0)
-		}
 		return false
 	}
 }
