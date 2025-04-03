@@ -15,10 +15,10 @@
   - [x] Update all imports to use new type locations
   - [x] Remove unused types
   - [x] Add proper documentation
-- [ ] Remove Unused Code
-  - [ ] Remove `internal/app` package if unused
-  - [ ] Remove `internal/processor` package if unused
-  - [ ] Remove duplicate TODO files
+- [x] Remove Unused Code
+  - [x] Remove `internal/processor` package (redundant with `internal/content`)
+  - [x] Keep `internal/app` package (still used for collector setup)
+  - [x] Remove duplicate TODO files
   - [ ] Clean up unused imports
   - [ ] Remove deprecated code
 - [ ] Standardize Package Structure
@@ -29,7 +29,7 @@
   - [ ] Move all tests to `_test` packages
   - [ ] Add proper package documentation
 - [ ] Clean Up Documentation
-  - [ ] Consolidate all TODOs into main TODO.md
+  - [x] Consolidate all TODOs into main TODO.md
   - [ ] Add proper package documentation
   - [ ] Add proper function documentation
   - [ ] Add proper type documentation
@@ -229,6 +229,294 @@
   - [x] Add HSTS headers
   - [x] Add XSS headers
 
+## Crawler Package Tasks
+
+### 1. Core Crawler Responsibilities
+- [ ] Keep only crawling-related functionality
+- [ ] Move to event-based architecture for content discovery
+- [ ] Remove direct storage/processing dependencies
+
+### 2. Interface Changes
+- [ ] Update Crawler interface
+- [ ] Update CrawlerParams struct
+- [ ] Update CrawlerResult struct
+
+### 3. Dependencies to Move
+- [ ] Move article processing to `internal/processor`
+- [ ] Move index management to `internal/indexing`
+- [ ] Move storage operations to `internal/storage`
+- [ ] Move content processing to `internal/processor`
+
+### 4. New Structure
+- [ ] Create new interfaces for core crawler functionality
+- [ ] Remove article processing logic
+- [ ] Remove index management logic
+- [ ] Implement event-based content discovery
+- [ ] Update dependency injection
+- [ ] Add proper error handling and context support
+- [ ] Update tests for new structure
+
+### 5. CLI Integration
+- [ ] Update module providers for CLI commands
+- [ ] Add lifecycle hooks for graceful shutdown
+- [ ] Implement progress reporting for CLI
+- [ ] Add CLI-specific error handling
+- [ ] Support command-line options
+- [ ] Add signal handling (SIGINT, SIGTERM)
+
+## Sources Package Tasks
+
+### 1. Core Responsibilities
+- [ ] Focus on source configuration management
+- [ ] Focus on source lifecycle management
+
+### 2. Interface Definition
+- [ ] Update SourceManager interface
+- [ ] Update Config struct
+
+### 3. New Package Structure
+- [ ] Remove crawler dependency
+- [ ] Remove index manager dependency
+- [ ] Move validation logic to separate file
+- [ ] Implement configuration reloading
+- [ ] Add configuration validation
+- [ ] Update tests for new structure
+- [ ] Add proper error types
+- [ ] Update documentation
+
+### 4. Integration with CLI Commands
+- [ ] Update fx providers in module.go
+- [ ] Ensure proper lifecycle hooks for config loading
+- [ ] Add CLI-specific validation methods
+- [ ] Implement source listing for CLI commands
+- [ ] Add source validation command
+- [ ] Support configuration hot-reloading
+
+### 5. Error Handling
+- [ ] Add more specific error types for configuration issues
+- [ ] Implement validation for all YAML fields
+- [ ] Add error recovery for failed source loading
+- [ ] Improve error context in logging
+- [ ] Add validation for rate limit format
+- [ ] Add validation for URL format
+- [ ] Add validation for selector patterns
+
+### 6. Performance
+- [ ] Implement source configuration caching
+- [ ] Add parallel source processing
+- [ ] Optimize source lookup
+- [ ] Add metrics collection
+- [ ] Implement source health checks
+- [ ] Add performance monitoring
+- [ ] Optimize YAML parsing
+
+### 7. Configuration
+- [ ] Add support for environment variables
+- [ ] Implement configuration hot-reloading
+- [ ] Add support for multiple config files
+- [ ] Add support for config templates
+- [ ] Add validation for required fields
+- [ ] Add support for config inheritance
+- [ ] Add support for config overrides
+
+## Config Package Tasks
+
+### 1. Error Handling
+- [ ] Add more specific error types for each validation case
+- [ ] Implement better error messages with context
+- [ ] Add error recovery for missing environment variables
+- [ ] Improve validation error reporting
+- [ ] Add validation for URL formats
+- [ ] Add validation for time duration formats
+- [ ] Implement configuration error recovery
+
+### 2. Performance
+- [ ] Add configuration caching
+- [ ] Optimize validation checks
+- [ ] Improve environment variable loading
+- [ ] Add metrics for configuration loading
+- [ ] Optimize selector matching
+- [ ] Implement lazy loading for selectors
+- [ ] Add configuration preloading
+
+### 3. Configuration
+- [ ] Add support for JSON configuration
+- [ ] Implement configuration hot-reloading
+- [ ] Add support for multiple config files
+- [ ] Add support for config templates
+- [ ] Add validation for all fields
+- [ ] Add support for config inheritance
+- [ ] Add support for config overrides
+
+### 4. Testing
+- [ ] Add more integration tests
+- [ ] Add performance benchmarks
+- [ ] Add fuzzing tests for config parsing
+- [ ] Add tests for all error cases
+- [ ] Add tests for all selectors
+- [ ] Add tests for hot-reloading
+- [ ] Add tests for config inheritance
+- [ ] Add tests for config validation
+
+### 5. Documentation
+- [ ] Add more configuration examples
+- [ ] Document all environment variables
+- [ ] Add troubleshooting guide
+- [ ] Document error codes
+- [ ] Add architecture diagrams
+- [ ] Document validation rules
+- [ ] Add configuration best practices
+- [ ] Document selector patterns
+
+### 6. Features
+- [ ] Add support for config versioning
+- [ ] Implement config migration
+- [ ] Add support for config validation rules
+- [ ] Add support for custom validators
+- [ ] Add support for config templates
+- [ ] Implement config inheritance
+- [ ] Add support for config merging
+- [ ] Add support for config diffing
+
+### 7. Code Organization
+- [ ] Split large files into smaller components
+- [ ] Add more interface abstractions
+- [ ] Improve dependency injection
+- [ ] Add more logging points
+- [ ] Refactor validation logic
+- [ ] Improve error handling structure
+- [ ] Add more modular components
+- [ ] Improve code reusability
+
+### 8. Monitoring
+- [ ] Add configuration metrics
+- [ ] Implement config change tracking
+- [ ] Add performance monitoring
+- [ ] Add resource usage tracking
+- [ ] Add validation metrics
+- [ ] Add error rate tracking
+- [ ] Add success rate tracking
+- [ ] Add configuration health checks
+
+### 9. Development Experience
+- [ ] Add development tools
+- [ ] Improve error messages
+- [ ] Add more debug options
+- [ ] Add development mode
+- [ ] Add configuration linting
+- [ ] Add configuration formatting
+- [ ] Add development utilities
+- [ ] Add testing helpers
+
+### 10. Security
+- [ ] Add support for encrypted configs
+- [ ] Implement config signing
+- [ ] Add support for access control
+- [ ] Add support for audit logging
+- [ ] Add request signing
+- [ ] Add content validation
+- [ ] Add input sanitization
+- [ ] Add output sanitization
+
+## Common Package Tasks
+
+### 1. Error Handling
+- [ ] Add more specific error types
+- [ ] Implement error wrapping utilities
+- [ ] Add error categorization
+- [ ] Improve error context
+- [ ] Add error recovery helpers
+- [ ] Implement error reporting
+- [ ] Add error chain utilities
+
+### 2. Output Formatting
+- [ ] Add color support for different message types
+- [ ] Implement progress bar utilities
+- [ ] Add spinner for long operations
+- [ ] Improve table formatting
+- [ ] Add JSON output format
+- [ ] Support YAML output format
+- [ ] Add output templating
+
+### 3. Performance
+- [ ] Optimize output buffering
+- [ ] Add performance metrics
+- [ ] Improve timeout handling
+- [ ] Optimize type conversions
+- [ ] Add caching utilities
+- [ ] Implement resource pooling
+- [ ] Add performance monitoring
+
+### 4. Testing
+- [ ] Add more unit tests
+- [ ] Add integration tests
+- [ ] Add benchmark tests
+- [ ] Improve test coverage
+- [ ] Add test utilities
+- [ ] Add mock implementations
+- [ ] Add test fixtures
+- [ ] Add test documentation
+
+### 5. Documentation
+- [ ] Add more code examples
+- [ ] Improve function documentation
+- [ ] Add usage guidelines
+- [ ] Document best practices
+- [ ] Add architecture diagrams
+- [ ] Improve type documentation
+- [ ] Add troubleshooting guide
+- [ ] Document error handling
+
+### 6. Features
+- [ ] Add configuration utilities
+- [ ] Implement retry mechanisms
+- [ ] Add validation helpers
+- [ ] Add conversion utilities
+- [ ] Implement string helpers
+- [ ] Add time utilities
+- [ ] Add math utilities
+- [ ] Add encoding helpers
+
+### 7. Code Organization
+- [ ] Split large files
+- [ ] Add more interfaces
+- [ ] Improve package structure
+- [ ] Add more utilities
+- [ ] Refactor common code
+- [ ] Improve modularity
+- [ ] Add helper functions
+- [ ] Improve code reuse
+
+### 8. Monitoring
+- [ ] Add metrics collection
+- [ ] Implement health checks
+- [ ] Add status reporting
+- [ ] Add logging utilities
+- [ ] Add tracing support
+- [ ] Implement monitoring
+- [ ] Add alerting support
+- [ ] Add diagnostics
+
+### 9. Development Experience
+- [ ] Add development tools
+- [ ] Improve error messages
+- [ ] Add debug utilities
+- [ ] Add development mode
+- [ ] Add testing helpers
+- [ ] Improve documentation
+- [ ] Add code generation
+- [ ] Add development scripts
+
+### 10. Security
+- [ ] Add security utilities
+- [ ] Implement encryption
+- [ ] Add authentication
+- [ ] Add authorization
+- [ ] Implement auditing
+- [ ] Add security checks
+- [ ] Add secure defaults
+- [ ] Add security testing
+
 ## Progress Tracking
 
 ### Completed
@@ -279,16 +567,16 @@
   - [x] Identified unused packages
   - [x] Identified scattered types
   - [x] Created cleanup plan
-  - [ ] Started consolidation of test utilities
-  - [ ] Started removal of unused code
+  - [x] Started consolidation of test utilities
+  - [x] Started removal of unused code
   - [ ] Started standardization of package structure
 - HTTP client error handling improvements
 
 ### Next Up
-- Consolidate test utilities
-- Remove unused packages
 - Standardize package structure
 - Clean up documentation
+- Implement crawler package tasks
+- Implement sources package tasks
 
 ## Notes
 - Each task should be completed in a separate commit
