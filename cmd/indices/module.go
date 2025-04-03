@@ -4,11 +4,11 @@ package indices
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -36,10 +36,10 @@ var Module = fx.Module("indices",
 // NewIndices creates a new indices command.
 func NewIndices(p struct {
 	fx.In
-	Context      context.Context `name:"indicesContext"`
-	Config       config.Interface
-	Logger       logger.Interface
-	IndexManager api.IndexManager
+	Context context.Context `name:"indicesContext"`
+	Config  config.Interface
+	Logger  logger.Interface
+	Storage types.Interface
 }) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "indices",

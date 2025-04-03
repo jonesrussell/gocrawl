@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -20,10 +19,9 @@ import (
 
 // Lister implements the indices list command
 type Lister struct {
-	config       config.Interface
-	logger       logger.Interface
-	storage      types.Interface
-	indexManager api.IndexManager
+	config  config.Interface
+	logger  logger.Interface
+	storage types.Interface
 }
 
 // NewLister creates a new lister instance
@@ -31,13 +29,11 @@ func NewLister(
 	config config.Interface,
 	logger logger.Interface,
 	storage types.Interface,
-	indexManager api.IndexManager,
 ) *Lister {
 	return &Lister{
-		config:       config,
-		logger:       logger,
-		storage:      storage,
-		indexManager: indexManager,
+		config:  config,
+		logger:  logger,
+		storage: storage,
 	}
 }
 
