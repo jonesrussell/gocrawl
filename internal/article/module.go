@@ -102,8 +102,9 @@ var Module = fx.Module("article",
 
 			// Create service with selectors
 			service := &articleService{
-				storage: p.Storage,
-				log:     p.Logger,
+				storage:   p.Storage,
+				log:       p.Logger,
+				selectors: selectors,
 			}
 			p.Logger.Debug("Created article service", "type", fmt.Sprintf("%T", service))
 			return service, nil
@@ -124,8 +125,9 @@ var Module = fx.Module("article",
 
 // articleService provides article management functionality.
 type articleService struct {
-	storage storage.Interface
-	log     logger.Interface
+	storage   storage.Interface
+	log       logger.Interface
+	selectors config.ArticleSelectors
 }
 
 // ExtractArticle extracts article data from an HTML element.
