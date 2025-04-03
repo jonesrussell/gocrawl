@@ -175,9 +175,9 @@ func (c *Crawler) setupCallbacks() {
 // Start starts the crawler for the given source.
 func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Get source configuration
-	source, err := c.sources.FindByName(sourceName)
-	if err != nil {
-		return fmt.Errorf("error getting source: %w", err)
+	source := c.sources.FindByName(sourceName)
+	if source == nil {
+		return fmt.Errorf("source not found: %s", sourceName)
 	}
 
 	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)

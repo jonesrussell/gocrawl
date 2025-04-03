@@ -145,6 +145,14 @@ func (s *Sources) AddSource(ctx context.Context, source *sourceutils.SourceConfi
 		}
 	}
 
+	// Set default index names if not provided
+	if source.ArticleIndex == "" {
+		source.ArticleIndex = "articles"
+	}
+	if source.Index == "" {
+		source.Index = "content"
+	}
+
 	// Add the new source
 	s.sources = append(s.sources, *source)
 	s.metrics.SourceCount = int64(len(s.sources))
@@ -198,13 +206,18 @@ func (s *Sources) ValidateSource(source *sourceutils.SourceConfig) error {
 		return ErrInvalidSource
 	}
 
-	// Basic validation
+	// Validate required fields
 	if source.Name == "" {
 		return fmt.Errorf("%w: name is required", ErrInvalidSource)
 	}
-
 	if source.URL == "" {
 		return fmt.Errorf("%w: URL is required", ErrInvalidSource)
+	}
+	if source.RateLimit <= 0 {
+		return fmt.Errorf("%w: rate limit must be positive", ErrInvalidSource)
+	}
+	if source.MaxDepth <= 0 {
+		return fmt.Errorf("%w: max depth must be positive", ErrInvalidSource)
 	}
 
 	return nil
@@ -220,14 +233,14 @@ func (s *Sources) GetSources() ([]sourceutils.SourceConfig, error) {
 	return s.sources, nil
 }
 
-// FindByName finds a source by name.
-func (s *Sources) FindByName(name string) (*sourceutils.SourceConfig, error) {
+// FindByName finds a source by name. Returns nil if not found.
+func (s *Sources) FindByName(name string) *sourceutils.SourceConfig {
 	for i := range s.sources {
 		if s.sources[i].Name == name {
-			return &s.sources[i], nil
+			return &s.sources[i]
 		}
 	}
-	return nil, ErrSourceNotFound
+	return nil
 }
 
 // articleSelector represents the common structure of article selectors

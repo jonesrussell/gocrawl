@@ -10,6 +10,7 @@ import (
 // MockSourceManager is a mock implementation of sources.Interface
 type MockSourceManager struct {
 	mock.Mock
+	sources []sources.Config
 }
 
 // NewMockSourceManager creates a new instance of MockSourceManager
@@ -17,20 +18,14 @@ func NewMockSourceManager() *MockSourceManager {
 	return &MockSourceManager{}
 }
 
-// FindByName implements sources.Interface
-func (m *MockSourceManager) FindByName(name string) (*sources.Config, error) {
-	args := m.Called(name)
-	if err := args.Error(1); err != nil {
-		return nil, err
+// FindByName finds a source by name.
+func (m *MockSourceManager) FindByName(name string) *sources.Config {
+	for i := range m.sources {
+		if m.sources[i].Name == name {
+			return &m.sources[i]
+		}
 	}
-	result := args.Get(0)
-	if result == nil {
-		return nil, ErrInvalidResult
-	}
-	if val, ok := result.(*sources.Config); ok {
-		return val, nil
-	}
-	return nil, ErrInvalidResult
+	return nil
 }
 
 // GetSources implements sources.Interface

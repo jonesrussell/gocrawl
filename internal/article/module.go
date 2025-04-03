@@ -80,9 +80,9 @@ var Module = fx.Module("article",
 		// Provide the article service
 		func(p ServiceParams) (Interface, error) {
 			// Get source configuration
-			source, err := p.Sources.FindByName(p.Source)
-			if err != nil {
-				return nil, fmt.Errorf("failed to find source %s: %w", p.Source, err)
+			source := p.Sources.FindByName(p.Source)
+			if source == nil {
+				return nil, fmt.Errorf("source not found: %s", p.Source)
 			}
 
 			// Convert source selectors to article selectors

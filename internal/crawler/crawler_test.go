@@ -168,14 +168,16 @@ func (m *MockIndexManager) UpdateMapping(ctx context.Context, name string, mappi
 // MockSources is a mock implementation of sources.Interface
 type MockSources struct {
 	mock.Mock
+	sources []sources.Config
 }
 
-func (m *MockSources) FindByName(name string) (*sources.Config, error) {
-	args := m.Called(name)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *MockSources) FindByName(name string) *sources.Config {
+	for i := range m.sources {
+		if m.sources[i].Name == name {
+			return &m.sources[i]
+		}
 	}
-	return args.Get(0).(*sources.Config), args.Error(1)
+	return nil
 }
 
 func (m *MockSources) AddSource(ctx context.Context, source *sources.Config) error {

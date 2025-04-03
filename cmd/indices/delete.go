@@ -222,9 +222,9 @@ func confirmDeletion(indicesToDelete []string) error {
 func executeDelete(p *deleteParams) error {
 	// Resolve indices to delete
 	if deleteSourceName != "" {
-		source, err := p.sources.FindByName(deleteSourceName)
-		if err != nil {
-			return err
+		source := p.sources.FindByName(deleteSourceName)
+		if source == nil {
+			return fmt.Errorf("source not found: %s", deleteSourceName)
 		}
 		p.indices = []string{source.Index, source.ArticleIndex}
 	}

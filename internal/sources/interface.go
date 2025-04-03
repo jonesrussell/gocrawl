@@ -24,8 +24,8 @@ type Interface interface {
 	ValidateSource(source *sourceutils.SourceConfig) error
 	// GetMetrics returns the current metrics.
 	GetMetrics() Metrics
-	// FindByName finds a source by name.
-	FindByName(name string) (*sourceutils.SourceConfig, error)
+	// FindByName finds a source by name. Returns nil if not found.
+	FindByName(name string) *sourceutils.SourceConfig
 	// GetSources retrieves all source configurations.
 	GetSources() ([]sourceutils.SourceConfig, error)
 }

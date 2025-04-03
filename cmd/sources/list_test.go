@@ -13,6 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -47,54 +48,23 @@ func (m *mockLogger) Warn(msg string, args ...any) {
 
 // mockSourceManager implements sources.Interface for testing
 type mockSourceManager struct {
-	sources []sources.Config
-	err     error
+	sources []sourceutils.SourceConfig
 }
 
-func (m *mockSourceManager) GetSources() ([]sources.Config, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return m.sources, nil
-}
-
-func (m *mockSourceManager) FindByName(name string) (*sources.Config, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	for i := range m.sources {
-		if m.sources[i].Name == name {
-			return &m.sources[i], nil
-		}
-	}
-	return nil, ErrSourceNotFound
-}
-
-func (m *mockSourceManager) Validate(_ *sources.Config) error { return nil }
-
-func (m *mockSourceManager) ListSources(ctx context.Context) ([]*sources.Config, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	result := make([]*sources.Config, len(m.sources))
+func (m *mockSourceManager) ListSources(ctx context.Context) ([]*sourceutils.SourceConfig, error) {
+	result := make([]*sourceutils.SourceConfig, len(m.sources))
 	for i := range m.sources {
 		result[i] = &m.sources[i]
 	}
 	return result, nil
 }
 
-func (m *mockSourceManager) AddSource(ctx context.Context, source *sources.Config) error {
-	if m.err != nil {
-		return m.err
-	}
+func (m *mockSourceManager) AddSource(ctx context.Context, source *sourceutils.SourceConfig) error {
 	m.sources = append(m.sources, *source)
 	return nil
 }
 
-func (m *mockSourceManager) UpdateSource(ctx context.Context, source *sources.Config) error {
-	if m.err != nil {
-		return m.err
-	}
+func (m *mockSourceManager) UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error {
 	for i := range m.sources {
 		if m.sources[i].Name == source.Name {
 			m.sources[i] = *source
@@ -105,9 +75,6 @@ func (m *mockSourceManager) UpdateSource(ctx context.Context, source *sources.Co
 }
 
 func (m *mockSourceManager) DeleteSource(ctx context.Context, name string) error {
-	if m.err != nil {
-		return m.err
-	}
 	for i := range m.sources {
 		if m.sources[i].Name == name {
 			m.sources = append(m.sources[:i], m.sources[i+1:]...)
@@ -117,9 +84,9 @@ func (m *mockSourceManager) DeleteSource(ctx context.Context, name string) error
 	return sources.ErrSourceNotFound
 }
 
-func (m *mockSourceManager) ValidateSource(source *sources.Config) error {
-	if m.err != nil {
-		return m.err
+func (m *mockSourceManager) ValidateSource(source *sourceutils.SourceConfig) error {
+	if source == nil {
+		return sources.ErrInvalidSource
 	}
 	return nil
 }
@@ -127,8 +94,20 @@ func (m *mockSourceManager) ValidateSource(source *sources.Config) error {
 func (m *mockSourceManager) GetMetrics() sources.Metrics {
 	return sources.Metrics{
 		SourceCount: int64(len(m.sources)),
-		LastUpdated: time.Now(),
 	}
+}
+
+func (m *mockSourceManager) FindByName(name string) *sourceutils.SourceConfig {
+	for i := range m.sources {
+		if m.sources[i].Name == name {
+			return &m.sources[i]
+		}
+	}
+	return nil
+}
+
+func (m *mockSourceManager) GetSources() ([]sourceutils.SourceConfig, error) {
+	return m.sources, nil
 }
 
 // mockConfig implements config.Interface for testing
@@ -250,7 +229,7 @@ func Test_runList(t *testing.T) {
 
 				// Create mock source manager
 				sm := &mockSourceManager{
-					sources: []sources.Config{
+					sources: []sourceutils.SourceConfig{
 						{
 							Name:      "Test Source",
 							URL:       "https://test.com",
@@ -347,7 +326,7 @@ func Test_executeList(t *testing.T) {
 				ml.On("Info", "No sources found", mock.Anything).Return()
 
 				sm := &mockSourceManager{
-					sources: []sources.Config{
+					sources: []sourceutils.SourceConfig{
 						{
 							Name:         "Test Source",
 							URL:          "https://test.com",
@@ -379,7 +358,7 @@ func Test_executeList(t *testing.T) {
 				ml.On("Info", "No sources found", mock.Anything).Return()
 
 				sm := &mockSourceManager{
-					sources: []sources.Config{},
+					sources: []sourceutils.SourceConfig{},
 				}
 
 				mc := newMockConfig()
@@ -456,7 +435,14 @@ func Test_executeList_error(t *testing.T) {
 				ml.On("Sync").Return(nil)
 
 				sm := &mockSourceManager{
-					err: errors.New("failed to get sources"),
+					sources: []sourceutils.SourceConfig{
+						{
+							Name:      "Test Source",
+							URL:       "https://test.com",
+							RateLimit: time.Second,
+							MaxDepth:  2,
+						},
+					},
 				}
 
 				return cmdsrcs.Params{
@@ -487,13 +473,13 @@ func Test_printSources_error(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		sources []sources.Config
+		sources []sourceutils.SourceConfig
 		logger  logger.Interface
 		wantErr bool
 	}{
 		{
 			name: "invalid source data",
-			sources: []sources.Config{
+			sources: []sourceutils.SourceConfig{
 				{
 					Name:      "", // Empty name should cause formatting issues
 					URL:       "",
@@ -549,7 +535,7 @@ func TestCommand(t *testing.T) {
 
 func TestFindByName(t *testing.T) {
 	t.Parallel()
-	testConfigs := []sources.Config{
+	testConfigs := []sourceutils.SourceConfig{
 		{
 			Name:      "test1",
 			URL:       "https://example1.com",
@@ -586,12 +572,12 @@ func TestFindByName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			source, err := s.FindByName(tt.source)
+			source := s.FindByName(tt.source)
 			if tt.wantErr {
-				require.Error(t, err)
+				require.Nil(t, source)
 				return
 			}
-			require.NoError(t, err)
+			require.NotNil(t, source)
 			require.Equal(t, tt.source, source.Name)
 		})
 	}

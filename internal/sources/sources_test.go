@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/api/testutils"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
-	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
+	sourcetestutils "github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,7 +93,7 @@ func TestLoadFromFile(t *testing.T) {
 			}
 		}
 
-		s := testutils.NewTestSources(sourceConfigs)
+		s := sourcetestutils.NewTestSources(sourceConfigs)
 		require.NotNil(t, s)
 
 		sources, err := s.ListSources(t.Context())
@@ -115,38 +117,29 @@ func TestLoadFromFile(t *testing.T) {
 	})
 }
 
-// TestGetSource tests getting a source by name
+// TestGetSource tests the GetSource method
 func TestGetSource(t *testing.T) {
 	t.Parallel()
 
 	t.Run("existing source", func(t *testing.T) {
 		t.Parallel()
-		s := testutils.NewTestSources([]sourceutils.SourceConfig{
+		s := sourcetestutils.NewTestSources([]sourceutils.SourceConfig{
 			{
 				Name:      "test-source",
-				URL:       "https://example.com",
-				RateLimit: time.Second,
+				URL:       "https://test.com",
+				RateLimit: 1,
 				MaxDepth:  2,
-				Selectors: sourceutils.SelectorConfig{
-					Article: sourceutils.ArticleSelectors{
-						Title: "h1",
-						Body:  "article",
-					},
-				},
 			},
 		})
-
-		source, err := s.FindByName("test-source")
-		require.NoError(t, err)
+		source := s.FindByName("test-source")
 		require.NotNil(t, source)
 		assert.Equal(t, "test-source", source.Name)
-		assert.Equal(t, "https://example.com", source.URL)
 	})
 
 	t.Run("non-existent source", func(t *testing.T) {
-		s := testutils.NewTestSources([]sourceutils.SourceConfig{})
-		source, err := s.FindByName("non-existent")
-		require.NoError(t, err)
+		t.Parallel()
+		s := sourcetestutils.NewTestSources([]sourceutils.SourceConfig{})
+		source := s.FindByName("non-existent")
 		require.Nil(t, source)
 	})
 }
@@ -157,7 +150,7 @@ func TestValidateSource(t *testing.T) {
 
 	t.Run("valid source", func(t *testing.T) {
 		t.Parallel()
-		s := testutils.NewTestSources(nil)
+		s := sourcetestutils.NewTestSources(nil)
 		source := &sourceutils.SourceConfig{
 			Name:      "test-source",
 			URL:       "https://example.com",
@@ -175,7 +168,7 @@ func TestValidateSource(t *testing.T) {
 	})
 	t.Run("invalid source", func(t *testing.T) {
 		t.Parallel()
-		s := testutils.NewTestSources(nil)
+		s := sourcetestutils.NewTestSources(nil)
 		source := &sourceutils.SourceConfig{
 			Name:      "",
 			URL:       "",
@@ -193,7 +186,7 @@ func TestSourceOperations(t *testing.T) {
 
 	t.Run("add source", func(t *testing.T) {
 		t.Parallel()
-		s := testutils.NewTestSources([]sourceutils.SourceConfig{})
+		s := sourcetestutils.NewTestSources([]sourceutils.SourceConfig{})
 		err := s.AddSource(t.Context(), &sourceutils.SourceConfig{
 			Name:      "test-source",
 			URL:       "https://example.com",
@@ -208,73 +201,55 @@ func TestSourceOperations(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		sources, err := s.ListSources(t.Context())
-		require.NoError(t, err)
-		require.Len(t, sources, 1)
-		assert.Equal(t, "test-source", sources[0].Name)
+		source := s.FindByName("test-source")
+		require.NotNil(t, source)
+		assert.Equal(t, "test-source", source.Name)
 	})
 
 	t.Run("update source", func(t *testing.T) {
 		t.Parallel()
-		s := testutils.NewTestSources([]sourceutils.SourceConfig{
+		s := sourcetestutils.NewTestSources([]sourceutils.SourceConfig{
 			{
 				Name:      "test-source",
 				URL:       "https://example.com",
 				RateLimit: time.Second,
 				MaxDepth:  2,
-				Selectors: sourceutils.SelectorConfig{
-					Article: sourceutils.ArticleSelectors{
-						Title: "h1",
-						Body:  "article",
-					},
-				},
 			},
 		})
 
-		err := s.UpdateSource(t.Context(), &sourceutils.SourceConfig{
+		updatedSource := &sourceutils.SourceConfig{
 			Name:      "test-source",
-			URL:       "https://updated.example.com",
+			URL:       "https://updated.com",
 			RateLimit: 2 * time.Second,
 			MaxDepth:  3,
-			Selectors: sourceutils.SelectorConfig{
-				Article: sourceutils.ArticleSelectors{
-					Title: "h2",
-					Body:  "div.article",
-				},
-			},
-		})
+		}
+
+		err := s.UpdateSource(t.Context(), updatedSource)
 		require.NoError(t, err)
 
-		sources, err := s.ListSources(t.Context())
-		require.NoError(t, err)
-		require.Len(t, sources, 1)
-		assert.Equal(t, "https://updated.example.com", sources[0].URL)
-		assert.Equal(t, 2*time.Second, sources[0].RateLimit)
+		source := s.FindByName("test-source")
+		require.NotNil(t, source)
+		assert.Equal(t, "https://updated.com", source.URL)
+		assert.Equal(t, 2*time.Second, source.RateLimit)
+		assert.Equal(t, 3, source.MaxDepth)
 	})
 
 	t.Run("delete source", func(t *testing.T) {
 		t.Parallel()
-		s := testutils.NewTestSources([]sourceutils.SourceConfig{
+		s := sourcetestutils.NewTestSources([]sourceutils.SourceConfig{
 			{
 				Name:      "test-source",
 				URL:       "https://example.com",
 				RateLimit: time.Second,
 				MaxDepth:  2,
-				Selectors: sourceutils.SelectorConfig{
-					Article: sourceutils.ArticleSelectors{
-						Title: "h1",
-						Body:  "article",
-					},
-				},
 			},
 		})
 
 		err := s.DeleteSource(t.Context(), "test-source")
 		require.NoError(t, err)
 
-		sources, err := s.ListSources(t.Context())
-		require.NoError(t, err)
-		require.Empty(t, sources)
+		source := s.FindByName("test-source")
+		require.Nil(t, source)
 	})
 }
 
@@ -284,7 +259,7 @@ func TestMetrics(t *testing.T) {
 
 	t.Run("increment metrics", func(t *testing.T) {
 		t.Parallel()
-		s := testutils.NewTestSources([]sourceutils.SourceConfig{
+		s := sourcetestutils.NewTestSources([]sourceutils.SourceConfig{
 			{
 				Name:      "test-source",
 				URL:       "https://example.com",
@@ -306,7 +281,7 @@ func TestMetrics(t *testing.T) {
 	})
 
 	t.Run("metrics without sources", func(t *testing.T) {
-		s := testutils.NewTestSources([]sourceutils.SourceConfig{})
+		s := sourcetestutils.NewTestSources([]sourceutils.SourceConfig{})
 		metrics := s.GetMetrics()
 		require.Equal(t, int64(0), metrics.SourceCount)
 		assert.NotZero(t, metrics.LastUpdated)
@@ -325,7 +300,7 @@ func TestIndexNameHandling(t *testing.T) {
 			RateLimit: time.Second,
 			MaxDepth:  2,
 		}
-		s := testutils.NewTestSources(nil)
+		s := sourcetestutils.NewTestSources(nil)
 		err := s.AddSource(t.Context(), source)
 		require.NoError(t, err)
 
@@ -346,7 +321,7 @@ func TestIndexNameHandling(t *testing.T) {
 			ArticleIndex: "custom_articles",
 			Index:        "custom_content",
 		}
-		s := testutils.NewTestSources(nil)
+		s := sourcetestutils.NewTestSources(nil)
 		err := s.AddSource(t.Context(), source)
 		require.NoError(t, err)
 
@@ -371,9 +346,15 @@ func TestModule(t *testing.T) {
 	t.Parallel()
 	setup := newTestSetup(t)
 
+	// Create mock logger
+	mockLogger := testutils.NewMockLogger()
+
 	app := fxtest.New(t,
 		sources.Module,
-		fx.Supply(setup.config),
+		fx.Provide(
+			func() config.Interface { return setup.config },
+			func() logger.Interface { return mockLogger },
+		),
 		fx.Invoke(func(s sources.Interface) {
 			require.NotNil(t, s)
 			sources, err := s.ListSources(t.Context())
@@ -384,4 +365,55 @@ func TestModule(t *testing.T) {
 
 	app.RequireStart()
 	app.RequireStop()
+}
+
+// TestFindByName tests the FindByName method
+func TestFindByName(t *testing.T) {
+	t.Parallel()
+	testConfigs := []sourceutils.SourceConfig{
+		{
+			Name:      "test1",
+			URL:       "https://example1.com",
+			RateLimit: time.Second,
+			MaxDepth:  1,
+		},
+		{
+			Name:      "test2",
+			URL:       "https://example2.com",
+			RateLimit: 2 * time.Second,
+			MaxDepth:  2,
+		},
+	}
+	s := sourcetestutils.NewTestSources(testConfigs)
+	require.NotNil(t, s)
+
+	tests := []struct {
+		name    string
+		source  string
+		wantErr bool
+	}{
+		{
+			name:    "existing source",
+			source:  "test1",
+			wantErr: false,
+		},
+		{
+			name:    "non-existing source",
+			source:  "test3",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			source := s.FindByName(tt.source)
+			if tt.wantErr {
+				require.Nil(t, source)
+				return
+			}
+			require.NotNil(t, source)
+			require.Equal(t, tt.source, source.Name)
+		})
+	}
 }

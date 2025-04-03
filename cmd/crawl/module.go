@@ -66,9 +66,9 @@ var Module = fx.Module("crawl",
 	fx.Provide(
 		fx.Annotate(
 			func(sources sources.Interface, sourceName string) string {
-				source, err := sources.FindByName(sourceName)
-				if err != nil {
-					panic(fmt.Sprintf("failed to get source %s: %v", sourceName, err))
+				source := sources.FindByName(sourceName)
+				if source == nil {
+					panic(fmt.Sprintf("failed to get source %s: source not found", sourceName))
 				}
 				return source.ArticleIndex
 			},
@@ -77,9 +77,9 @@ var Module = fx.Module("crawl",
 		),
 		fx.Annotate(
 			func(sources sources.Interface, sourceName string) string {
-				source, err := sources.FindByName(sourceName)
-				if err != nil {
-					panic(fmt.Sprintf("failed to get source %s: %v", sourceName, err))
+				source := sources.FindByName(sourceName)
+				if source == nil {
+					panic(fmt.Sprintf("failed to get source %s: source not found", sourceName))
 				}
 				return source.Index
 			},

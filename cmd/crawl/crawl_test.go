@@ -431,15 +431,15 @@ func TestSourceValidation(t *testing.T) {
 	// Configure source manager to return error for invalid source
 	mockSourceManager := deps.SourceManager.(*testutils.MockSourceManager)
 	mockSourceManager.On("FindByName", deps.SourceName).
-		Return(nil, assert.AnError)
+		Return(nil)
 
 	// Create test app with startup hook
 	app := createTestApp(t, deps, fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			// Attempt to get source
-			_, err := deps.SourceManager.FindByName(deps.SourceName)
-			if err != nil {
-				return err
+			source := deps.SourceManager.FindByName(deps.SourceName)
+			if source == nil {
+				return assert.AnError
 			}
 			return nil
 		},
