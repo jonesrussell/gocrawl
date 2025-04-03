@@ -4,11 +4,12 @@ package indices_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/indices"
 	"github.com/jonesrussell/gocrawl/cmd/indices/test"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/config/testutils"
+	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
@@ -21,7 +22,7 @@ import (
 
 func TestDeleteCommand(t *testing.T) {
 	// Set up test environment
-	cleanup := testutils.SetupTestEnv(t)
+	cleanup := configtestutils.SetupTestEnv(t)
 	defer cleanup()
 
 	tests := []struct {
@@ -203,7 +204,6 @@ func TestDeleteCommand(t *testing.T) {
 			// Create test app
 			app := fx.New(
 				fx.NopLogger,
-				config.Module,
 				logger.Module,
 				fx.Provide(
 					fx.Annotate(
@@ -211,7 +211,7 @@ func TestDeleteCommand(t *testing.T) {
 						fx.ResultTags(`name:"test"`),
 					),
 					fx.Annotate(
-						testutils.NewTestLogger,
+						configtestutils.NewTestLogger,
 						fx.ParamTags(`name:"test"`),
 					),
 					func() logger.Config {
@@ -229,6 +229,44 @@ func TestDeleteCommand(t *testing.T) {
 								Encoding:    "console",
 							},
 						}
+					},
+					func() config.Interface {
+						mockCfg := &configtestutils.MockConfig{}
+						mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+							Environment: "test",
+							Name:        "gocrawl",
+							Version:     "1.0.0",
+							Debug:       true,
+						})
+						mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+							Level: "debug",
+							Debug: true,
+						})
+						mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+							Addresses: []string{"http://localhost:9200"},
+							IndexName: "test-index",
+						})
+						mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+							Address: ":8080",
+						})
+						mockCfg.On("GetSources").Return([]config.Source{}, nil)
+						mockCfg.On("GetCommand").Return("test")
+						mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+							Default: 1,
+							Rules:   []config.PriorityRule{},
+						})
+						mockCfg.On("GetCrawlerConfig").Return(&config.CrawlerConfig{
+							BaseURL:          "http://localhost",
+							MaxDepth:         2,
+							RateLimit:        time.Second * 2,
+							RandomDelay:      time.Second,
+							IndexName:        "test-index",
+							ContentIndexName: "test-content",
+							SourceFile:       "testdata/sources.yml",
+							Parallelism:      2,
+						})
+						mockCfg.On("Validate").Return(nil)
+						return mockCfg
 					},
 					func() storagetypes.Interface { return mockStore },
 					func() sources.Interface { return mockSources },

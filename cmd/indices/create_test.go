@@ -231,7 +231,7 @@ func TestCreateCommand(t *testing.T) {
 
 	cmd := indices.CreateCommand()
 	require.NotNil(t, cmd)
-	require.Equal(t, "create", cmd.Use)
+	require.Equal(t, "create [index-name]", cmd.Use)
 	require.NotEmpty(t, cmd.Short)
 	require.NotEmpty(t, cmd.Long)
 
