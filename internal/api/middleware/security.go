@@ -2,15 +2,14 @@ package middleware
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // TimeProvider allows mocking time in tests
@@ -28,7 +27,7 @@ func (r *realTimeProvider) Now() time.Time {
 // SecurityMiddleware provides security features for the API
 type SecurityMiddleware struct {
 	cfg    *config.ServerConfig
-	logger common.Logger
+	logger logger.Interface
 	time   TimeProvider
 	// rateLimiter tracks request counts per IP
 	rateLimiter struct {
@@ -54,7 +53,7 @@ const (
 )
 
 // NewSecurityMiddleware creates a new security middleware instance
-func NewSecurityMiddleware(cfg *config.ServerConfig, logger common.Logger) *SecurityMiddleware {
+func NewSecurityMiddleware(cfg *config.ServerConfig, logger logger.Interface) *SecurityMiddleware {
 	m := &SecurityMiddleware{
 		cfg:    cfg,
 		logger: logger,
@@ -202,31 +201,20 @@ func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
 	c.Header("Access-Control-Allow-Headers", m.joinStrings(m.cfg.Security.CORS.AllowedHeaders))
 	c.Header("Access-Control-Max-Age", strconv.Itoa(m.cfg.Security.CORS.MaxAge))
 
-	// Handle preflight requests
-	if c.Request.Method == http.MethodOptions {
-		c.AbortWithStatus(http.StatusNoContent)
-	}
-
 	return nil
 }
 
 // addSecurityHeaders adds security-related headers to the response
 func (m *SecurityMiddleware) addSecurityHeaders(c *gin.Context) {
-	// Prevent clickjacking
-	c.Header("X-Frame-Options", "DENY")
-	// Enable XSS protection
-	c.Header("X-XSS-Protection", "1; mode=block")
-	// Prevent MIME type sniffing
 	c.Header("X-Content-Type-Options", "nosniff")
-	// Enable HSTS
+	c.Header("X-Frame-Options", "DENY")
+	c.Header("X-XSS-Protection", "1; mode=block")
 	c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-	// Referrer policy
-	c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-	// Content security policy
 	c.Header("Content-Security-Policy", "default-src 'self'")
+	c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 }
 
-// joinStrings joins a slice of strings with commas
+// joinStrings joins strings with commas
 func (m *SecurityMiddleware) joinStrings(strs []string) string {
 	if len(strs) == 0 {
 		return ""
@@ -238,7 +226,7 @@ func (m *SecurityMiddleware) joinStrings(strs []string) string {
 	return result
 }
 
-// Cleanup removes expired rate limit entries
+// Cleanup performs periodic cleanup of rate limit data
 func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
 	m.cleanupWg.Add(1)
 	defer m.cleanupWg.Done()
@@ -246,59 +234,31 @@ func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
 	ticker := time.NewTicker(m.rateLimiter.window)
 	defer ticker.Stop()
 
-	// Create a done channel for cleanup
-	done := make(chan struct{})
-	defer close(done)
-
-	// Start cleanup goroutine
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				// Clean up any remaining rate limiter entries
-				m.rateLimiter.Lock()
-				m.rateLimiter.clients = make(map[string]*rateLimitInfo)
-				m.rateLimiter.Unlock()
-				return
-			case <-ticker.C:
-				m.rateLimiter.Lock()
-				now := m.time.Now()
-				for ip, info := range m.rateLimiter.clients {
-					if now.Sub(info.lastAccess) > m.rateLimiter.window {
-						delete(m.rateLimiter.clients, ip)
-					}
-				}
-				m.rateLimiter.Unlock()
-			case <-done:
-				return
-			}
+	for {
+		select {
+		case <-ctx.Done():
+			m.logger.Info("Cleanup context cancelled, stopping cleanup routine")
+			return
+		case <-ticker.C:
+			m.cleanupRateLimiter()
 		}
-	}()
-
-	// Wait for context cancellation
-	<-ctx.Done()
-}
-
-// WaitCleanup waits for the cleanup goroutine to finish
-func (m *SecurityMiddleware) WaitCleanup() {
-	done := make(chan struct{})
-	go func() {
-		m.cleanupWg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// Cleanup completed successfully
-	case <-time.After(cleanupTimeout):
-		// Timeout waiting for cleanup
 	}
 }
 
-// Error definitions
-var (
-	ErrMissingAPIKey     = errors.New("missing API key")
-	ErrInvalidAPIKey     = errors.New("invalid API key")
-	ErrRateLimitExceeded = errors.New("rate limit exceeded")
-	ErrOriginNotAllowed  = errors.New("origin not allowed")
-)
+// cleanupRateLimiter removes expired rate limit entries
+func (m *SecurityMiddleware) cleanupRateLimiter() {
+	now := m.time.Now()
+	m.rateLimiter.Lock()
+	defer m.rateLimiter.Unlock()
+
+	for ip, info := range m.rateLimiter.clients {
+		if now.Sub(info.lastAccess) > m.rateLimiter.window {
+			delete(m.rateLimiter.clients, ip)
+		}
+	}
+}
+
+// WaitCleanup waits for cleanup to complete
+func (m *SecurityMiddleware) WaitCleanup() {
+	m.cleanupWg.Wait()
+}

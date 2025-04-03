@@ -1,43 +1,39 @@
-// Package indices implements the command-line interface for managing Elasticsearch indices.
+// Package indices implements the indices command.
 package indices
 
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
-// DeleteDeps holds the dependencies for the delete command
-type DeleteDeps struct {
-	fx.In
-
-	Storage storagetypes.Interface
-	Sources sources.Interface `name:"sources"`
-	Logger  common.Logger
-}
-
-// CreateParams holds the parameters for creating an index
-type CreateParams struct {
-	fx.In
-
-	Context context.Context
-	Logger  types.Logger
-	Storage storagetypes.Interface
-	Config  config.Interface
-}
-
-// Module provides the indices command dependencies
+// Module provides the indices command dependencies.
 var Module = fx.Module("indices",
-	// Core dependencies
 	config.Module,
-	logger.Module,
-	sources.Module,
 	storage.Module,
 )
+
+// NewIndices creates a new indices command.
+func NewIndices(p struct {
+	fx.In
+	Context      context.Context `name:"indicesContext"`
+	Config       config.Interface
+	Logger       logger.Interface
+	IndexManager api.IndexManager
+}) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "indices",
+		Short: "Manage Elasticsearch indices",
+		Long:  `Manage Elasticsearch indices for the crawler.`,
+	}
+
+	cmd.AddCommand(listCommand())
+	cmd.AddCommand(deleteCommand())
+
+	return cmd
+}

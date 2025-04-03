@@ -2,58 +2,48 @@
 package testutils
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockLogger implements types.Logger for testing
+// MockLogger implements logger.Interface for testing
 type MockLogger struct {
 	mock.Mock
 }
 
-// Info implements types.Logger
+// Info implements logger.Interface
 func (m *MockLogger) Info(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Error implements types.Logger
+// Error implements logger.Interface
 func (m *MockLogger) Error(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Debug implements types.Logger
+// Debug implements logger.Interface
 func (m *MockLogger) Debug(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Warn implements types.Logger
+// Warn implements logger.Interface
 func (m *MockLogger) Warn(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Fatal implements types.Logger
+// Fatal implements logger.Interface
 func (m *MockLogger) Fatal(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Printf implements types.Logger
-func (m *MockLogger) Printf(format string, args ...any) {
-	m.Called(format, args)
+// With implements logger.Interface
+func (m *MockLogger) With(fields ...any) logger.Interface {
+	args := m.Called(fields)
+	return args.Get(0).(logger.Interface)
 }
 
-// Errorf implements types.Logger
-func (m *MockLogger) Errorf(format string, args ...any) {
-	m.Called(format, args)
-}
-
-// Sync implements types.Logger
-func (m *MockLogger) Sync() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-// Ensure MockLogger implements types.Logger
-var _ types.Logger = (*MockLogger)(nil)
+// Ensure MockLogger implements logger.Interface
+var _ logger.Interface = (*MockLogger)(nil)
 
 // NewMockLogger creates a new mock logger instance.
 func NewMockLogger() *MockLogger {

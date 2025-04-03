@@ -2,13 +2,14 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
 )
 
@@ -36,23 +37,34 @@ type SearchResponse struct {
 	Total   int   `json:"total"`
 }
 
-// Module provides API dependencies
+// Module provides the API dependencies.
 var Module = fx.Module("api",
+	config.Module,
+	storage.Module,
 	fx.Provide(
 		// Provide the server and security middleware together to avoid circular dependencies
-		func(
-			log types.Logger,
-			searchManager SearchManager,
-			cfg common.Config,
-		) (*http.Server, middleware.SecurityMiddlewareInterface) {
-			// Use StartHTTPServer to create the server and security middleware
-			server, security, err := StartHTTPServer(log, searchManager, cfg)
-			if err != nil {
-				panic(err)
-			}
-			return server, security
+		func(cfg config.Interface, log logger.Interface, searchManager SearchManager) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
+			return StartHTTPServer(log, searchManager, cfg)
 		},
+		NewLifecycle,
 	),
-	fx.Invoke(ConfigureLifecycle),
-	logger.Module,
 )
+
+// Params holds the dependencies required for the API.
+type Params struct {
+	fx.In
+	Context context.Context `name:"apiContext"`
+	Config  config.Interface
+	Logger  logger.Interface
+	Storage storage.Interface
+}
+
+// NewAPI creates a new API instance.
+func NewAPI(p Params) *Server {
+	return &Server{
+		Context: p.Context,
+		Config:  p.Config,
+		Logger:  p.Logger,
+		Storage: p.Storage,
+	}
+}

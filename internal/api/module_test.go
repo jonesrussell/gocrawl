@@ -12,10 +12,9 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -35,7 +34,7 @@ const (
 type testServer struct {
 	app    *fxtest.App
 	server *http.Server
-	logger common.Logger
+	logger logger.Interface
 }
 
 // setupMockLogger creates and configures a mock logger for testing.
@@ -46,9 +45,7 @@ func setupMockLogger() *testutils.MockLogger {
 	mockLog.On("Debug", mock.Anything, mock.Anything).Return()
 	mockLog.On("Warn", mock.Anything, mock.Anything).Return()
 	mockLog.On("Fatal", mock.Anything, mock.Anything).Return()
-	mockLog.On("Printf", mock.Anything, mock.Anything).Return()
-	mockLog.On("Errorf", mock.Anything, mock.Anything).Return()
-	mockLog.On("Sync").Return(nil)
+	mockLog.On("With", mock.Anything).Return(mockLog)
 	return mockLog
 }
 
@@ -58,8 +55,6 @@ var TestAPIModule = fx.Module("testAPI",
 	fx.WithLogger(func() fxevent.Logger {
 		return &fxevent.NopLogger
 	}),
-	// Core modules used by most commands, excluding logger and sources.
-	config.TestModule,
 	// Include the API module itself
 	api.Module,
 )
@@ -67,20 +62,23 @@ var TestAPIModule = fx.Module("testAPI",
 func setupTestApp(t *testing.T) *testServer {
 	ts := &testServer{}
 
-	// Set environment variables for test configuration
-	t.Setenv("CRAWLER_SOURCE_FILE", "testdata/sources.yml")
-	t.Setenv("CONFIG_FILE", "testdata/config.yaml")
-
 	// Create mock dependencies
 	mockLogger := setupMockLogger()
 	mockSearch := testutils.NewMockSearchManager()
+
+	// Create server config with security settings
+	serverConfig := &config.ServerConfig{
+		Address:      ":0", // Use random port for testing
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+	serverConfig.Security.Enabled = true
+	serverConfig.Security.APIKey = testAPIKey
+
+	// Create mock config with test settings
 	mockConfig := configtest.NewMockConfig().
-		WithServerConfig(&config.ServerConfig{
-			Address:      ":0", // Use random port for testing
-			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 15 * time.Second,
-			IdleTimeout:  60 * time.Second,
-		}).
+		WithServerConfig(serverConfig).
 		WithAppConfig(&config.AppConfig{
 			Environment: "test",
 		}).
@@ -108,18 +106,31 @@ func setupTestApp(t *testing.T) *testServer {
 
 	// Create and start the application
 	app := fxtest.New(t,
-		TestAPIModule,
 		fx.NopLogger,
 		fx.Supply(
-			mockConfig,
+			fx.Annotate(
+				mockConfig,
+				fx.As(new(config.Interface)),
+			),
 			fx.Annotate(
 				mockSearch,
 				fx.As(new(api.SearchManager)),
 			),
 			fx.Annotate(
+				mockLogger,
+				fx.As(new(logger.Interface)),
+			),
+			fx.Annotate(
 				t.Context(),
 				fx.As(new(context.Context)),
 			),
+		),
+		fx.Provide(
+			// Provide the server and security middleware together to avoid circular dependencies
+			func(cfg config.Interface, log logger.Interface, searchManager api.SearchManager) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
+				return api.StartHTTPServer(log, searchManager, cfg)
+			},
+			api.NewLifecycle,
 		),
 		fx.Invoke(func(s *http.Server) {
 			ts.server = s
@@ -239,9 +250,9 @@ func TestLoggerDependencyRegression(t *testing.T) {
 		fx.Provide(
 			// Provide the server and security middleware together to avoid circular dependencies
 			func(
-				log types.Logger,
+				log logger.Interface,
 				searchManager api.SearchManager,
-				cfg common.Config,
+				cfg config.Interface,
 			) (*http.Server, middleware.SecurityMiddlewareInterface) {
 				// Use StartHTTPServer to create the server and security middleware
 				server, security, err := api.StartHTTPServer(log, searchManager, cfg)
@@ -261,7 +272,7 @@ func TestLoggerDependencyRegression(t *testing.T) {
 		fx.Supply(
 			fx.Annotate(
 				mockConfig,
-				fx.As(new(common.Config)),
+				fx.As(new(config.Interface)),
 			),
 			fx.Annotate(
 				mockSearch,
@@ -273,7 +284,7 @@ func TestLoggerDependencyRegression(t *testing.T) {
 			),
 			fx.Annotate(
 				mockLog,
-				fx.As(new(types.Logger)),
+				fx.As(new(logger.Interface)),
 			),
 		),
 	)

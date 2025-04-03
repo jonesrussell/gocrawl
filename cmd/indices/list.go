@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -19,13 +19,23 @@ import (
 	"go.uber.org/fx"
 )
 
+// ListDeps holds the dependencies for the list command.
+type ListDeps struct {
+	fx.In
+
+	Context      context.Context `name:"indicesContext"`
+	Config       config.Interface
+	Logger       logger.Interface
+	IndexManager api.IndexManager
+}
+
 // Dependencies holds the list command's dependencies
 type Dependencies struct {
 	fx.In
 
 	Lifecycle fx.Lifecycle
 	Storage   storagetypes.Interface
-	Logger    types.Logger
+	Logger    logger.Interface
 	Context   context.Context `name:"crawlContext"`
 }
 
@@ -59,7 +69,7 @@ func renderIndicesTable(
 	ctx context.Context,
 	indices []string,
 	storage storagetypes.Interface,
-	logger types.Logger,
+	logger logger.Interface,
 ) error {
 	// Initialize table writer with stdout as output
 	t := table.NewWriter()
@@ -117,7 +127,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 				func() context.Context { return ctx },
 				fx.ResultTags(`name:"crawlContext"`),
 			),
-			func() types.Logger { return logger.NewNoOp() },
+			func() logger.Interface { return logger.NewNoOp() },
 		),
 		fx.Invoke(func(lc fx.Lifecycle, p Dependencies) {
 			lc.Append(fx.Hook{

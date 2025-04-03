@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // Constants
@@ -21,7 +21,7 @@ const (
 
 // SetupRouter creates and configures the Gin router with all routes
 func SetupRouter(
-	log common.Logger,
+	log logger.Interface,
 	searchManager SearchManager,
 	cfg config.Interface,
 ) (*gin.Engine, middleware.SecurityMiddlewareInterface) {
@@ -47,7 +47,7 @@ func SetupRouter(
 }
 
 // loggingMiddleware creates a middleware that logs HTTP requests
-func loggingMiddleware(log common.Logger) gin.HandlerFunc {
+func loggingMiddleware(log logger.Interface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
@@ -125,7 +125,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 
 // StartHTTPServer starts the HTTP server for search requests
 func StartHTTPServer(
-	log common.Logger,
+	log logger.Interface,
 	searchManager SearchManager,
 	cfg config.Interface,
 ) (*http.Server, middleware.SecurityMiddlewareInterface, error) {

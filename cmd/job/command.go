@@ -2,12 +2,29 @@
 package job
 
 import (
+	"context"
+
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
+	"go.uber.org/fx"
 )
 
+// CommandDeps holds the dependencies for the job command.
+type CommandDeps struct {
+	fx.In
+
+	Context context.Context `name:"jobContext"`
+	Config  config.Interface
+	Logger  logger.Interface
+	Storage storagetypes.Interface
+	Sources sources.Interface
+}
+
 // NewJobSubCommands returns the job subcommands.
-func NewJobSubCommands(log logger.Logger) *cobra.Command {
+func NewJobSubCommands(log logger.Interface) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "job",
 		Short: "Manage crawl jobs",
@@ -26,7 +43,7 @@ It allows you to schedule, list, and manage web crawling tasks.`,
 }
 
 // newScheduleCmd creates the schedule command.
-func newScheduleCmd(log logger.Logger) *cobra.Command {
+func newScheduleCmd(log logger.Interface) *cobra.Command {
 	return &cobra.Command{
 		Use:   "schedule",
 		Short: "Schedule a new crawl job",
@@ -40,7 +57,7 @@ The job will be executed according to the provided schedule.`,
 }
 
 // newListCmd creates the list command.
-func newListCmd(log logger.Logger) *cobra.Command {
+func newListCmd(log logger.Interface) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all crawl jobs",
@@ -54,7 +71,7 @@ This command shows the status and details of each job.`,
 }
 
 // newDeleteCmd creates the delete command.
-func newDeleteCmd(log logger.Logger) *cobra.Command {
+func newDeleteCmd(log logger.Interface) *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete",
 		Short: "Delete a crawl job",
