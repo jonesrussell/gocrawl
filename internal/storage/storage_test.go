@@ -27,6 +27,13 @@ func (t *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.Response, nil
 }
 
+// setupMockClient creates a new Elasticsearch client with mock transport
+func setupMockClient(transport http.RoundTripper) (*es.Client, error) {
+	return es.NewClient(es.Config{
+		Transport: transport,
+	})
+}
+
 func TestSearch_IndexNotFound(t *testing.T) {
 	// Create a mock transport that returns 404 for index existence check
 	transport := &mockTransport{
@@ -40,9 +47,7 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	}
 
 	// Create a client with the mock transport
-	mockClient, err := es.NewClient(es.Config{
-		Transport: transport,
-	})
+	mockClient, err := setupMockClient(transport)
 	require.NoError(t, err)
 
 	mockLogger := testutils.NewMockLogger()
@@ -57,10 +62,68 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	require.Contains(t, err.Error(), "non_existent_index")
 }
 
+func TestSearch_Success(t *testing.T) {
+	// Create a mock transport that returns a successful search response
+	transport := &mockTransport{
+		RoundTripFn: func(req *http.Request) (*http.Response, error) {
+			if req.URL.Path == "/_cluster/health" {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"status":"green"}`)),
+					Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+				}, nil
+			}
+			if req.URL.Path == "/test-index/_exists" {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
+					Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(bytes.NewBufferString(`{
+					"hits": {
+						"total": {"value": 1},
+						"hits": [{"_source": {"title": "Test Document"}}]
+					}
+				}`)),
+				Header: http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+			}, nil
+		},
+	}
+
+	mockClient, err := setupMockClient(transport)
+	require.NoError(t, err)
+
+	mockLogger := testutils.NewMockLogger()
+	s := storage.NewStorage(mockClient, mockLogger, storage.Options{
+		IndexName: "test-index",
+	})
+
+	results, err := s.Search(t.Context(), "test-index", map[string]any{
+		"query": map[string]any{
+			"match_all": map[string]any{},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, results)
+	require.Len(t, results, 1)
+}
+
 func TestNewStorage(t *testing.T) {
 	mockLogger := testutils.NewMockLogger()
-	mockClient, err := es.NewClient(es.Config{})
+	transport := &mockTransport{
+		Response: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
+			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+		},
+	}
+
+	mockClient, err := setupMockClient(transport)
 	require.NoError(t, err)
+
 	opts := storage.Options{
 		IndexName: "test-index",
 	}
@@ -68,4 +131,27 @@ func TestNewStorage(t *testing.T) {
 	store := storage.NewStorage(mockClient, mockLogger, opts)
 	assert.NotNil(t, store)
 	assert.Implements(t, (*types.Interface)(nil), store)
+}
+
+func TestStorage_TestConnection(t *testing.T) {
+	transport := &mockTransport{
+		RoundTripFn: func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"status":"green"}`)),
+				Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+			}, nil
+		},
+	}
+
+	mockClient, err := setupMockClient(transport)
+	require.NoError(t, err)
+
+	mockLogger := testutils.NewMockLogger()
+	s := storage.NewStorage(mockClient, mockLogger, storage.Options{
+		IndexName: "test-index",
+	})
+
+	err = s.TestConnection(t.Context())
+	require.NoError(t, err)
 }
