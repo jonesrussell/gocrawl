@@ -2,6 +2,8 @@ package testutils
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
@@ -35,6 +37,14 @@ func (s *TestSources) ListSources(ctx context.Context) ([]*sourceutils.SourceCon
 
 // AddSource adds a new source.
 func (s *TestSources) AddSource(ctx context.Context, source *sourceutils.SourceConfig) error {
+	// Set default index names if not provided
+	if source.ArticleIndex == "" {
+		source.ArticleIndex = "articles"
+	}
+	if source.Index == "" {
+		source.Index = "content"
+	}
+
 	s.sources = append(s.sources, *source)
 	return nil
 }
@@ -66,6 +76,21 @@ func (s *TestSources) ValidateSource(source *sourceutils.SourceConfig) error {
 	if source == nil {
 		return sources.ErrInvalidSource
 	}
+
+	// Validate required fields
+	if source.Name == "" {
+		return fmt.Errorf("%w: name is required", sources.ErrInvalidSource)
+	}
+	if source.URL == "" {
+		return fmt.Errorf("%w: URL is required", sources.ErrInvalidSource)
+	}
+	if source.RateLimit <= 0 {
+		return fmt.Errorf("%w: rate limit must be positive", sources.ErrInvalidSource)
+	}
+	if source.MaxDepth <= 0 {
+		return fmt.Errorf("%w: max depth must be positive", sources.ErrInvalidSource)
+	}
+
 	return nil
 }
 
@@ -73,6 +98,7 @@ func (s *TestSources) ValidateSource(source *sourceutils.SourceConfig) error {
 func (s *TestSources) GetMetrics() sources.Metrics {
 	return sources.Metrics{
 		SourceCount: int64(len(s.sources)),
+		LastUpdated: time.Now(),
 	}
 }
 
