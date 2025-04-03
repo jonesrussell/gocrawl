@@ -23,7 +23,7 @@ func SetupTestEnv(t *testing.T) func() {
 	viper.Reset()
 
 	// Get the absolute path to the testdata directory
-	_, filename, _, ok := runtime.Caller(1)
+	_, filename, _, ok := runtime.Caller(0)
 	require.True(t, ok, "failed to get caller information")
 
 	// Walk up to find the config directory
@@ -44,6 +44,19 @@ func SetupTestEnv(t *testing.T) func() {
 	// Set environment variables
 	t.Setenv("CONFIG_FILE", configPath)
 	t.Setenv("CRAWLER_SOURCE_FILE", sourcesPath)
+
+	// Initialize Viper with the config file
+	viper.SetConfigFile(configPath)
+	viper.SetConfigType("yaml")
+	err := viper.ReadInConfig()
+	require.NoError(t, err, "failed to read config file")
+
+	// Set environment variables from config
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Set environment variables
 	t.Setenv("APP_ENVIRONMENT", "development")
 	t.Setenv("APP_NAME", "gocrawl-test")
 	t.Setenv("APP_VERSION", "0.0.1")
@@ -64,11 +77,12 @@ func SetupTestEnv(t *testing.T) func() {
 	t.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
 	t.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
 
-	// Set viper values
+	// Set viper values explicitly
 	viper.Set("crawler.source_file", sourcesPath)
 	viper.Set("app.environment", "development")
 	viper.Set("app.name", "gocrawl-test")
 	viper.Set("app.version", "0.0.1")
+	viper.Set("app.debug", false)
 	viper.Set("crawler.base_url", "http://localhost:8080")
 	viper.Set("crawler.max_depth", 1)
 	viper.Set("crawler.rate_limit", "1s")
@@ -85,20 +99,6 @@ func SetupTestEnv(t *testing.T) func() {
 	viper.Set("elasticsearch.retry.initial_wait", "1s")
 	viper.Set("elasticsearch.retry.max_wait", "5s")
 	viper.Set("elasticsearch.retry.max_retries", 3)
-
-	// Initialize Viper with config file
-	viper.SetConfigFile(configPath)
-	if err := viper.ReadInConfig(); err != nil {
-		t.Fatalf("failed to read config file: %v", err)
-	}
-
-	// Set environment variables from config
-	viper.AutomaticEnv()
-	viper.SetEnvPrefix("")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// Ensure source file path is set after config is loaded
-	viper.Set("crawler.source_file", sourcesPath)
 
 	// Return cleanup function
 	return func() {
