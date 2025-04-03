@@ -58,8 +58,8 @@ func (s *testSourcesImpl) AddSource(ctx context.Context, source *sourceutils.Sou
 
 // UpdateSource updates an existing source
 func (s *testSourcesImpl) UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error {
-	for i, config := range s.configs {
-		if config.Name == source.Name {
+	for i := range s.configs {
+		if s.configs[i].Name == source.Name {
 			s.configs[i] = *source
 			return nil
 		}
@@ -69,8 +69,8 @@ func (s *testSourcesImpl) UpdateSource(ctx context.Context, source *sourceutils.
 
 // DeleteSource deletes a source by name
 func (s *testSourcesImpl) DeleteSource(ctx context.Context, name string) error {
-	for i, config := range s.configs {
-		if config.Name == name {
+	for i := range s.configs {
+		if s.configs[i].Name == name {
 			s.configs = append(s.configs[:i], s.configs[i+1:]...)
 			return nil
 		}
@@ -118,8 +118,8 @@ func (s *testSourcesImpl) GetSources() ([]sourceutils.SourceConfig, error) {
 
 // FindByName finds a source by name
 func (s *testSourcesImpl) FindByName(name string) (*sourceutils.SourceConfig, error) {
-	for i, source := range s.configs {
-		if source.Name == name {
+	for i := range s.configs {
+		if s.configs[i].Name == name {
 			return &s.configs[i], nil
 		}
 	}

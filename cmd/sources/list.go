@@ -151,8 +151,8 @@ func PrintSources(sources []sources.Config, logger logger.Interface) error {
 	}
 
 	logger.Info("Found sources", "count", len(sources))
-	for _, source := range sources {
-		logger.Info("Source", "name", source.Name, "url", source.URL)
+	for i := range sources {
+		logger.Info("Source", "name", sources[i].Name, "url", sources[i].URL)
 	}
 
 	return nil

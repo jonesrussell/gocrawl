@@ -45,8 +45,8 @@ sources:
 	// Convert loader.Config to sourceutils.SourceConfig
 	sourceConfigs := make([]sourceutils.SourceConfig, len(loaderConfigs))
 	for i, cfg := range loaderConfigs {
-		rateLimit, err := time.ParseDuration(cfg.RateLimit)
-		require.NoError(t, err)
+		rateLimit, parseErr := time.ParseDuration(cfg.RateLimit)
+		require.NoError(t, parseErr)
 
 		sourceConfigs[i] = sourceutils.SourceConfig{
 			Name:      cfg.Name,

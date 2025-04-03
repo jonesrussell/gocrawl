@@ -62,9 +62,9 @@ func (m *mockSourceManager) FindByName(name string) (*sources.Config, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	for _, s := range m.sources {
-		if s.Name == name {
-			return &s, nil
+	for i := range m.sources {
+		if m.sources[i].Name == name {
+			return &m.sources[i], nil
 		}
 	}
 	return nil, ErrSourceNotFound
@@ -95,8 +95,8 @@ func (m *mockSourceManager) UpdateSource(ctx context.Context, source *sources.Co
 	if m.err != nil {
 		return m.err
 	}
-	for i, s := range m.sources {
-		if s.Name == source.Name {
+	for i := range m.sources {
+		if m.sources[i].Name == source.Name {
 			m.sources[i] = *source
 			return nil
 		}
@@ -108,8 +108,8 @@ func (m *mockSourceManager) DeleteSource(ctx context.Context, name string) error
 	if m.err != nil {
 		return m.err
 	}
-	for i, s := range m.sources {
-		if s.Name == name {
+	for i := range m.sources {
+		if m.sources[i].Name == name {
 			m.sources = append(m.sources[:i], m.sources[i+1:]...)
 			return nil
 		}

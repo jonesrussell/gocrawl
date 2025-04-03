@@ -72,8 +72,8 @@ func LoadFromFile(path string) ([]Config, error) {
 	}
 
 	// Validate each config
-	for i, cfg := range fileConfig.Sources {
-		if validateErr := ValidateConfig(&cfg); validateErr != nil {
+	for i := range fileConfig.Sources {
+		if validateErr := ValidateConfig(&fileConfig.Sources[i]); validateErr != nil {
 			return nil, fmt.Errorf("invalid config at index %d: %w", i, validateErr)
 		}
 	}

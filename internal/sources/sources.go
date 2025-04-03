@@ -94,8 +94,8 @@ func NewSourcesFromConfig(cfg config.Interface, logger logger.Interface) Interfa
 
 	// Convert config sources to our source type
 	configs := make([]sourceutils.SourceConfig, 0, len(srcs))
-	for _, src := range srcs {
-		configs = append(configs, convertSourceConfig(src))
+	for i := range srcs {
+		configs = append(configs, convertSourceConfig(srcs[i]))
 	}
 
 	sources.SetSources(configs)
@@ -139,8 +139,8 @@ func (s *Sources) AddSource(ctx context.Context, source *sourceutils.SourceConfi
 	}
 
 	// Check if source already exists
-	for _, existing := range s.sources {
-		if existing.Name == source.Name {
+	for i := range s.sources {
+		if s.sources[i].Name == source.Name {
 			return ErrSourceExists
 		}
 	}
@@ -161,8 +161,8 @@ func (s *Sources) UpdateSource(ctx context.Context, source *sourceutils.SourceCo
 
 	// Find and update the source
 	found := false
-	for i, existing := range s.sources {
-		if existing.Name == source.Name {
+	for i := range s.sources {
+		if s.sources[i].Name == source.Name {
 			s.sources[i] = *source
 			found = true
 			break
@@ -180,8 +180,8 @@ func (s *Sources) UpdateSource(ctx context.Context, source *sourceutils.SourceCo
 // DeleteSource deletes a source by name.
 func (s *Sources) DeleteSource(ctx context.Context, name string) error {
 	// Find and remove the source
-	for i, existing := range s.sources {
-		if existing.Name == name {
+	for i := range s.sources {
+		if s.sources[i].Name == name {
 			s.sources = append(s.sources[:i], s.sources[i+1:]...)
 			s.metrics.SourceCount = int64(len(s.sources))
 			s.metrics.LastUpdated = time.Now()
@@ -222,8 +222,8 @@ func (s *Sources) GetSources() ([]sourceutils.SourceConfig, error) {
 
 // FindByName finds a source by name.
 func (s *Sources) FindByName(name string) (*sourceutils.SourceConfig, error) {
-	for i, source := range s.sources {
-		if source.Name == name {
+	for i := range s.sources {
+		if s.sources[i].Name == name {
 			return &s.sources[i], nil
 		}
 	}

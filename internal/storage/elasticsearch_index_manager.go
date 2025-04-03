@@ -158,13 +158,13 @@ func (m *ElasticsearchIndexManager) GetMapping(ctx context.Context, name string)
 	}
 
 	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode mapping: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("failed to decode mapping: %w", decodeErr)
 	}
 
 	// Extract the mapping from the response
 	if mappings, ok := result[name].(map[string]any); ok {
-		if mapping, ok := mappings["mappings"].(map[string]any); ok {
+		if mapping, mappingOk := mappings["mappings"].(map[string]any); mappingOk {
 			return mapping, nil
 		}
 	}

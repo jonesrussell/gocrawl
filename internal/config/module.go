@@ -492,44 +492,44 @@ func createConfig() (*Impl, error) {
 
 	// Convert loader.Config to config.Source
 	var sources []Source
-	for _, src := range sourcesConfig {
-		rateLimit, parseErr := ParseRateLimit(src.RateLimit)
+	for i := range sourcesConfig {
+		rateLimit, parseErr := ParseRateLimit(sourcesConfig[i].RateLimit)
 		if parseErr != nil {
-			return nil, fmt.Errorf("failed to parse rate limit for source %s: %w", src.Name, parseErr)
+			return nil, fmt.Errorf("failed to parse rate limit for source %s: %w", sourcesConfig[i].Name, parseErr)
 		}
 
 		sources = append(sources, Source{
-			Name:         src.Name,
-			URL:          src.URL,
+			Name:         sourcesConfig[i].Name,
+			URL:          sourcesConfig[i].URL,
 			RateLimit:    rateLimit,
-			MaxDepth:     src.MaxDepth,
-			Time:         src.Time,
-			ArticleIndex: src.ArticleIndex,
-			Index:        src.Index,
+			MaxDepth:     sourcesConfig[i].MaxDepth,
+			Time:         sourcesConfig[i].Time,
+			ArticleIndex: sourcesConfig[i].ArticleIndex,
+			Index:        sourcesConfig[i].Index,
 			Selectors: SourceSelectors{
 				Article: ArticleSelectors{
-					Container:     src.Selectors.Article.Container,
-					Title:         src.Selectors.Article.Title,
-					Body:          src.Selectors.Article.Body,
-					Intro:         src.Selectors.Article.Intro,
-					Byline:        src.Selectors.Article.Byline,
-					PublishedTime: src.Selectors.Article.PublishedTime,
-					TimeAgo:       src.Selectors.Article.TimeAgo,
-					JSONLD:        src.Selectors.Article.JSONLD,
-					Section:       src.Selectors.Article.Section,
-					Keywords:      src.Selectors.Article.Keywords,
-					Description:   src.Selectors.Article.Description,
-					OGTitle:       src.Selectors.Article.OGTitle,
-					OGDescription: src.Selectors.Article.OGDescription,
-					OGImage:       src.Selectors.Article.OGImage,
-					OgURL:         src.Selectors.Article.OgURL,
-					Canonical:     src.Selectors.Article.Canonical,
-					WordCount:     src.Selectors.Article.WordCount,
-					PublishDate:   src.Selectors.Article.PublishDate,
-					Category:      src.Selectors.Article.Category,
-					Tags:          src.Selectors.Article.Tags,
-					Author:        src.Selectors.Article.Author,
-					BylineName:    src.Selectors.Article.BylineName,
+					Container:     sourcesConfig[i].Selectors.Article.Container,
+					Title:         sourcesConfig[i].Selectors.Article.Title,
+					Body:          sourcesConfig[i].Selectors.Article.Body,
+					Intro:         sourcesConfig[i].Selectors.Article.Intro,
+					Byline:        sourcesConfig[i].Selectors.Article.Byline,
+					PublishedTime: sourcesConfig[i].Selectors.Article.PublishedTime,
+					TimeAgo:       sourcesConfig[i].Selectors.Article.TimeAgo,
+					JSONLD:        sourcesConfig[i].Selectors.Article.JSONLD,
+					Section:       sourcesConfig[i].Selectors.Article.Section,
+					Keywords:      sourcesConfig[i].Selectors.Article.Keywords,
+					Description:   sourcesConfig[i].Selectors.Article.Description,
+					OGTitle:       sourcesConfig[i].Selectors.Article.OGTitle,
+					OGDescription: sourcesConfig[i].Selectors.Article.OGDescription,
+					OGImage:       sourcesConfig[i].Selectors.Article.OGImage,
+					OgURL:         sourcesConfig[i].Selectors.Article.OgURL,
+					Canonical:     sourcesConfig[i].Selectors.Article.Canonical,
+					WordCount:     sourcesConfig[i].Selectors.Article.WordCount,
+					PublishDate:   sourcesConfig[i].Selectors.Article.PublishDate,
+					Category:      sourcesConfig[i].Selectors.Article.Category,
+					Tags:          sourcesConfig[i].Selectors.Article.Tags,
+					Author:        sourcesConfig[i].Selectors.Article.Author,
+					BylineName:    sourcesConfig[i].Selectors.Article.BylineName,
 				},
 			},
 		})

@@ -89,8 +89,8 @@ func Execute() {
 		search.Command(),               // For searching content in Elasticsearch
 	)
 
-	if err := rootCmd.Execute(); err != nil {
-		log.Error("Failed to execute command", "error", err)
+	if executeErr := rootCmd.Execute(); executeErr != nil {
+		log.Error("Failed to execute command", "error", executeErr)
 		os.Exit(1)
 	}
 }

@@ -124,16 +124,16 @@ func (s *Scheduler) runJobs(ctx context.Context) error {
 		return fmt.Errorf("failed to get sources: %w", sourceErr)
 	}
 	s.logger.Info("Running jobs for sources", "count", len(sources))
-	for _, source := range sources {
+	for i := range sources {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			s.logger.Info("Starting crawler for source", "source", source.Name)
-			if err := s.crawler.Start(ctx, source.Name); err != nil {
-				s.logger.Error("Failed to start crawler for source", "source", source.Name, "error", err)
+			s.logger.Info("Starting crawler for source", "source", sources[i].Name)
+			if err := s.crawler.Start(ctx, sources[i].Name); err != nil {
+				s.logger.Error("Failed to start crawler for source", "source", sources[i].Name, "error", err)
 			} else {
-				s.logger.Info("Successfully started crawler for source", "source", source.Name)
+				s.logger.Info("Successfully started crawler for source", "source", sources[i].Name)
 			}
 		}
 	}
