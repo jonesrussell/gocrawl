@@ -106,7 +106,7 @@ func WaitForHealth(ctx context.Context, serverAddr string, interval, timeout tim
 		case <-healthCtx.Done():
 			return fmt.Errorf("server failed to become healthy within %v", timeout)
 		case <-ticker.C:
-			req, err := http.NewRequestWithContext(healthCtx, http.MethodGet, fmt.Sprintf("http://%s/health", serverAddr), nil)
+			req, err := http.NewRequestWithContext(healthCtx, http.MethodGet, fmt.Sprintf("http://%s/health", serverAddr), http.NoBody)
 			if err != nil {
 				continue
 			}
