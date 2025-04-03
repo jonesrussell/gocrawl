@@ -114,30 +114,18 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 	return client, nil
 }
 
-// Module provides the storage module.
+// Module provides the storage module
 var Module = fx.Module("storage",
 	fx.Provide(
-		// Provide http.RoundTripper
-		func() http.RoundTripper {
-			return http.DefaultTransport
-		},
-		NewOptionsFromConfig,
-		NewElasticsearchClient,
-		NewElasticsearchIndexManager,
-		// Provide types.Interface first
-		func(
-			client *es.Client,
-			log logger.Interface,
-			opts Options,
-		) types.Interface {
-			return NewStorage(client, log, opts)
-		},
-		// Then provide SearchManager implementation
-		func(
-			storage types.Interface,
-			log logger.Interface,
-		) api.SearchManager {
-			return NewSearchManager(storage, log)
-		},
+		// Provide storage client
+		fx.Annotate(
+			NewStorage,
+			fx.As(new(types.Interface)),
+		),
+		// Provide search manager
+		fx.Annotate(
+			NewSearchManager,
+			fx.As(new(api.SearchManager)),
+		),
 	),
 )

@@ -106,14 +106,14 @@ func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]an
 }
 
 // GetIndexHealth implements storage.Interface.
-func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (int64, error) {
+func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
 	args := m.Called(ctx, index)
 	if err := args.Error(1); err != nil {
-		return 0, err
+		return "", err
 	}
-	result, ok := args.Get(0).(int64)
+	result, ok := args.Get(0).(string)
 	if !ok {
-		return 0, errors.New("invalid health result type")
+		return "", errors.New("invalid health result type")
 	}
 	return result, nil
 }
