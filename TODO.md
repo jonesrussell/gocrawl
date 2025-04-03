@@ -22,6 +22,42 @@
   - [ ] Add configuration versioning
   - [ ] Add schema validation
   - [ ] Add hot reload support
+- [x] Split config_test.go into focused test files
+  - [x] Create app_test.go for app configuration tests
+    - [x] Move TestNew
+    - [x] Move TestConfigurationPriority
+    - [x] Move TestRequiredConfigurationValidation
+  - [x] Create crawler_test.go for crawler configuration tests
+    - [x] Move TestSetMaxDepth
+    - [x] Move TestSetRateLimit
+    - [x] Move TestSetBaseURL
+    - [x] Move TestSetIndexName
+    - [x] Move TestCrawlerConfig_Setters
+    - [x] Move TestParseRateLimit
+  - [x] Create elasticsearch_test.go for Elasticsearch configuration tests
+    - [x] Move Elasticsearch-related tests
+    - [x] Move TLS configuration tests
+    - [x] Add cloud configuration tests
+    - [x] Add retry configuration tests
+    - [x] Add basic auth configuration tests
+    - [x] Add validation tests for required fields
+  - [x] Create loader_test.go for configuration loading tests
+    - [x] Move TestLoadConfig
+    - [x] Move TestDefaultArticleSelectors
+    - [x] Fix linter errors by removing duplicate test declarations from config_test.go
+  - [x] Create module_test.go for dependency injection tests
+    - [x] Move TestModule
+    - [x] Move TestNewNoOp
+  - [x] Create transport_test.go for HTTP transport tests
+    - [x] Move TestNewHTTPTransport
+  - [x] Create priority_test.go for configuration priority tests
+    - [x] Move TestConfigurationPriority
+  - [x] Create testutils/logger_test.go for test utilities
+    - [x] Move testLogger and related utilities
+  - [ ] Move remaining test utilities to testutils package
+    - [ ] Move setupTestEnv to testutils
+    - [ ] Move testLogger to testutils
+    - [ ] Move newTestLogger to testutils
 - [ ] Enhance Testing
   - [ ] Add edge cases to TestParseRateLimit
   - [ ] Add configuration validation tests
