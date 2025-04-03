@@ -44,6 +44,12 @@ type deleteParams struct {
 	force   bool
 }
 
+// filteredIndices holds the result of filtering indices
+type filteredIndices struct {
+	toDelete []string
+	missing  []string
+}
+
 // deleteModule provides the delete command dependencies
 var deleteModule = fx.Module("delete",
 	// Core dependencies
@@ -161,10 +167,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 }
 
 // filterIndices filters out non-existent indices and returns lists of indices to delete and missing indices.
-// First return value is the list of indices to delete, second return value is the list of missing indices.
-// Note: We're using unnamed return values to comply with nonamedreturns linter,
-// which takes precedence over gocritic's unnamedResult.
-func filterIndices(p *deleteParams, existingIndices []string) ([]string, []string) {
+func filterIndices(p *deleteParams, existingIndices []string) filteredIndices {
 	// Create map of existing indices
 	existingMap := make(map[string]bool)
 	for _, idx := range existingIndices {
@@ -172,17 +175,20 @@ func filterIndices(p *deleteParams, existingIndices []string) ([]string, []strin
 	}
 
 	// Filter and report non-existent indices
-	indicesToDelete := make([]string, 0)
-	missingIndices := make([]string, 0)
+	result := filteredIndices{
+		toDelete: make([]string, 0, len(p.indices)),
+		missing:  make([]string, 0, len(p.indices)),
+	}
+
 	for _, index := range p.indices {
 		if !existingMap[index] {
-			missingIndices = append(missingIndices, index)
+			result.missing = append(result.missing, index)
 		} else {
-			indicesToDelete = append(indicesToDelete, index)
+			result.toDelete = append(result.toDelete, index)
 		}
 	}
 
-	return indicesToDelete, missingIndices
+	return result
 }
 
 // reportMissingIndices prints a list of indices that do not exist.
@@ -230,24 +236,24 @@ func executeDelete(p *deleteParams) error {
 	}
 
 	// Filter indices
-	indicesToDelete, missingIndices := filterIndices(p, existingIndices)
+	filtered := filterIndices(p, existingIndices)
 
 	// Report missing indices
-	reportMissingIndices(missingIndices)
+	reportMissingIndices(filtered.missing)
 
-	if len(indicesToDelete) == 0 {
+	if len(filtered.toDelete) == 0 {
 		return nil
 	}
 
 	// Confirm deletion if needed
 	if !p.force {
-		if confirmErr := confirmDeletion(indicesToDelete); confirmErr != nil {
+		if confirmErr := confirmDeletion(filtered.toDelete); confirmErr != nil {
 			return confirmErr
 		}
 	}
 
 	// Delete indices
-	for _, index := range indicesToDelete {
+	for _, index := range filtered.toDelete {
 		if deleteErr := p.storage.DeleteIndex(p.ctx, index); deleteErr != nil {
 			return deleteErr
 		}
