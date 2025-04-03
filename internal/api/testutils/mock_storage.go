@@ -3,6 +3,7 @@ package testutils
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -56,13 +57,27 @@ func (m *MockStorage) DeleteIndex(ctx context.Context, index string) error {
 // ListIndices implements storage.Interface.
 func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	args := m.Called(ctx)
-	return args.Get(0).([]string), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	result, ok := args.Get(0).([]string)
+	if !ok {
+		return nil, errors.New("invalid indices result type")
+	}
+	return result, nil
 }
 
 // GetMapping implements storage.Interface.
 func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(map[string]any), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	result, ok := args.Get(0).(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid mapping result type")
+	}
+	return result, nil
 }
 
 // UpdateMapping implements storage.Interface.
@@ -80,19 +95,40 @@ func (m *MockStorage) IndexExists(ctx context.Context, index string) (bool, erro
 // Search implements storage.Interface.
 func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).([]any), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	result, ok := args.Get(0).([]any)
+	if !ok {
+		return nil, errors.New("invalid search result type")
+	}
+	return result, nil
 }
 
 // GetIndexHealth implements storage.Interface.
-func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
+func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (int64, error) {
 	args := m.Called(ctx, index)
-	return args.String(0), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	result, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, errors.New("invalid health result type")
+	}
+	return result, nil
 }
 
 // GetIndexDocCount implements storage.Interface.
 func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(int64), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	result, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, errors.New("invalid doc count result type")
+	}
+	return result, nil
 }
 
 // Ping implements storage.Interface.
