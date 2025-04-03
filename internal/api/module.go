@@ -8,6 +8,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"go.uber.org/fx"
@@ -47,24 +48,27 @@ var Module = fx.Module("api",
 			return StartHTTPServer(log, searchManager, cfg)
 		},
 		NewLifecycle,
+		NewServer,
 	),
 )
 
 // Params holds the dependencies required for the API.
 type Params struct {
 	fx.In
-	Context context.Context `name:"apiContext"`
-	Config  config.Interface
-	Logger  logger.Interface
-	Storage storage.Interface
+	Context      context.Context `name:"apiContext"`
+	Config       config.Interface
+	Logger       logger.Interface
+	Storage      storage.Interface
+	IndexManager interfaces.IndexManager
 }
 
 // NewAPI creates a new API instance.
 func NewAPI(p Params) *Server {
 	return &Server{
-		Context: p.Context,
-		Config:  p.Config,
-		Logger:  p.Logger,
-		Storage: p.Storage,
+		Context:      p.Context,
+		Config:       p.Config,
+		Logger:       p.Logger,
+		Storage:      p.Storage,
+		IndexManager: p.IndexManager,
 	}
 }

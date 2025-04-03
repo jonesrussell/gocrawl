@@ -55,8 +55,11 @@ var TestAPIModule = fx.Module("testAPI",
 	fx.WithLogger(func() fxevent.Logger {
 		return &fxevent.NopLogger
 	}),
-	// Include the API module itself
-	api.Module,
+	// Include only the necessary components from the API module
+	fx.Provide(
+		api.NewServer,
+		api.NewLifecycle,
+	),
 )
 
 func setupTestApp(t *testing.T) *testServer {
