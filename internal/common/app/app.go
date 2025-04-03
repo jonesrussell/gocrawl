@@ -23,6 +23,14 @@ const (
 	DefaultChannelBufferSize = 100
 )
 
+// App represents the main application structure.
+type App struct {
+	// Logger for application operations
+	Logger logger.Interface
+	// Context for application lifecycle
+	Context context.Context
+}
+
 // Params contains the parameters for creating a new application.
 type Params struct {
 	fx.In
@@ -150,10 +158,12 @@ var Module = fx.Module("app",
 		config.LoadConfig,
 		// Provide logger
 		func() (logger.Interface, error) {
-			return logger.NewCustomLogger(nil, logger.Params{
-				Debug:  true,
-				Level:  "info",
-				AppEnv: "development",
+			return logger.Constructor(logger.Params{
+				Config: &logger.Config{
+					Level:       logger.InfoLevel,
+					Development: true,
+					Encoding:    "console",
+				},
 			})
 		},
 		// Provide event bus
@@ -164,11 +174,23 @@ var Module = fx.Module("app",
 )
 
 // ProvideLogger provides a logger for the application.
-func ProvideLogger() logger.Interface {
-	return log
+func ProvideLogger() (logger.Interface, error) {
+	return logger.Constructor(logger.Params{
+		Config: &logger.Config{
+			Level:       logger.InfoLevel,
+			Development: true,
+			Encoding:    "console",
+		},
+	})
 }
 
 // NewLogger creates a new logger.
 func NewLogger() (logger.Interface, error) {
-	// ... existing code ...
+	return logger.Constructor(logger.Params{
+		Config: &logger.Config{
+			Level:       logger.InfoLevel,
+			Development: true,
+			Encoding:    "console",
+		},
+	})
 }
