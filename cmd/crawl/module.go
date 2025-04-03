@@ -23,9 +23,9 @@ import (
 type CommandDeps struct {
 	fx.In
 
-	Context     context.Context  `name:"crawlContext"`
-	SourceName  string           `name:"sourceName"`
-	Config      config.Interface `name:"config"`
+	Context     context.Context `name:"crawlContext"`
+	SourceName  string          `name:"sourceName"`
+	Config      config.Interface
 	Logger      logger.Interface
 	Storage     storagetypes.Interface
 	Crawler     crawler.Interface

@@ -89,7 +89,7 @@ func createTestApp(t *testing.T, deps *testDeps, hooks ...fx.Hook) *fx.App {
 		func() config.Interface { return deps.Config },
 		fx.Annotate(
 			func() config.Interface { return deps.Config },
-			fx.ResultTags(`name:"config"`),
+			fx.ResultTags(),
 		),
 		func() sources.Interface { return deps.SourceManager },
 		fx.Annotate(
@@ -212,7 +212,7 @@ func TestCommandExecution(t *testing.T) {
 			func() config.Interface { return mockConfig },
 			fx.Annotate(
 				func() config.Interface { return mockConfig },
-				fx.ResultTags(`name:"config"`),
+				fx.ResultTags(),
 			),
 			func() sources.Interface { return mockSourceManager },
 			fx.Annotate(

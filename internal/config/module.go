@@ -160,7 +160,6 @@ var Module = fx.Options(
 				}
 				return New()
 			},
-			fx.ResultTags(`name:"config"`),
 		),
 		NewHTTPTransport, // Provides HTTP transport configuration
 	),

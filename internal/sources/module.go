@@ -21,10 +21,7 @@ const (
 // Module provides the sources module for dependency injection.
 var Module = fx.Module("sources",
 	fx.Provide(
-		fx.Annotate(
-			NewSourcesFromConfig,
-			fx.ParamTags(`name:"config"`, ""),
-		),
+		NewSourcesFromConfig,
 	),
 )
 
@@ -32,7 +29,7 @@ var Module = fx.Module("sources",
 type ModuleParams struct {
 	fx.In
 
-	Config config.Interface `name:"config"`
+	Config config.Interface
 	Logger logger.Interface
 }
 

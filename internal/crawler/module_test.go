@@ -75,7 +75,7 @@ var TestConfigModule = fx.Module("testConfig",
 				mockCfg.On("GetCommand").Return("test")
 				return mockCfg
 			},
-			fx.ResultTags(`name:"config"`),
+			fx.ResultTags(),
 		),
 	),
 )

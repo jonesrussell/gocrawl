@@ -34,7 +34,7 @@ type ProcessorParams struct {
 	IndexName   string               `name:"indexName"`
 	ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 	Service     Interface
-	Config      config.Interface `name:"config"`
+	Config      config.Interface
 	Sources     sources.Interface
 	Source      string `name:"sourceName"`
 }
