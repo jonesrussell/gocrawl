@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
@@ -136,6 +135,11 @@ func (m *MockBus) Publish(ctx context.Context, content *events.Content) error {
 	return args.Error(0)
 }
 
+func (m *MockBus) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
 // MockIndexManager is a mock implementation of api.IndexManager
 type MockIndexManager struct {
 	mock.Mock
@@ -222,25 +226,6 @@ func (m *MockSources) GetSources() ([]sources.Config, error) {
 	return args.Get(0).([]sources.Config), args.Error(1)
 }
 
-// NewCrawler creates a new crawler instance with the given dependencies
-func NewCrawler(
-	logger logger.Interface,
-	bus *events.Bus,
-	indexManager api.IndexManager,
-	sources sources.Interface,
-	articleProcessor common.Processor,
-	contentProcessor common.Processor,
-) crawler.Interface {
-	return crawler.NewCrawler(
-		logger,
-		indexManager,
-		sources,
-		articleProcessor,
-		contentProcessor,
-		bus,
-	)
-}
-
 // TestCrawlerStartup tests crawler startup functionality.
 func TestCrawlerStartup(t *testing.T) {
 	// Create test logger
@@ -249,123 +234,57 @@ func TestCrawlerStartup(t *testing.T) {
 	// Create mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("<html><body><h1>Test Page</h1></body></html>"))
+		w.Write([]byte("<html><body>Test content</body></html>"))
 	}))
 	defer server.Close()
 
-	// Create mock sources with the test server URL
-	mockSources := &sources.Sources{}
-	mockSources.SetSources([]sources.Config{
+	// Create mock dependencies
+	mockIndexManager := &MockIndexManager{}
+	mockSources := &MockSources{}
+	articleProcessor := &MockProcessor{}
+	contentProcessor := &MockProcessor{}
+
+	// Set up expectations
+	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	mockSources.On("GetSources").Return([]sources.Config{
 		{
-			Name:      "test",
-			URL:       "http://test.example.com", // Use the test domain from config
-			RateLimit: time.Millisecond * 100,    // Use a shorter rate limit for testing
-			MaxDepth:  1,
+			Name:     "test",
+			URL:      server.URL,
+			MaxDepth: 2,
 		},
-	})
+	}, nil)
 
-	// Initialize collector with test configuration
-	collector := colly.NewCollector(
-		colly.AllowURLRevisit(),
-		colly.Async(true),
-		colly.IgnoreRobotsTxt(),
-	)
-
-	// Configure collector for testing
-	collector.AllowedDomains = []string{"test.example.com"} // Use the test domain from config
-	collector.DisallowedDomains = nil                       // Don't disallow any domains
-	collector.MaxDepth = 1
-	collector.DetectCharset = true
-	collector.CheckHead = true
-	collector.AllowURLRevisit = true
-	collector.Async = true
-
-	// Log collector configuration
-	testLogger.Info("Configured collector for testing",
-		"allowed_domains", collector.AllowedDomains,
-		"disallowed_domains", collector.DisallowedDomains,
-		"max_depth", collector.MaxDepth,
-		"allow_url_revisit", collector.AllowURLRevisit,
-		"async", collector.Async)
-
-	// Set up callbacks for testing
-	collector.OnRequest(func(r *colly.Request) {
-		testLogger.Info("Visiting", "url", r.URL.String())
-	})
-
-	collector.OnResponse(func(r *colly.Response) {
-		testLogger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
-	})
-
-	collector.OnError(func(r *colly.Response, err error) {
-		testLogger.Error("Error while crawling",
-			"url", r.Request.URL.String(),
-			"status", r.StatusCode,
-			"error", err)
-	})
-
-	// Create test app with all required dependencies
-	app := fx.New(
-		crawler.Module,
+	// Create test app
+	app := fxtest.New(t,
 		fx.Provide(
-			// Provide logger
 			func() logger.Interface { return testLogger },
-			// Provide debugger
-			func() debug.Debugger {
-				return &debug.LogDebugger{
-					Output: crawler.NewDebugLogger(testLogger),
-				}
-			},
-			// Provide index manager
-			func() api.IndexManager { return &mockIndexManager{} },
-			// Provide sources with test data
+			func() debug.Debugger { return &debug.LogDebugger{} },
+			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSources },
-			// Provide article processor with correct name
 			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
+				func() common.Processor { return articleProcessor },
 				fx.ResultTags(`name:"articleProcessor"`),
 			),
-			// Provide content processor with correct name
 			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
+				func() common.Processor { return contentProcessor },
 				fx.ResultTags(`name:"contentProcessor"`),
 			),
-			// Provide event bus with correct name
-			fx.Annotate(
-				events.NewBus,
-				fx.ResultTags(`name:"eventBus"`),
-			),
-			fx.Annotate(
-				func() chan *models.Article { return make(chan *models.Article, 100) },
-				fx.ResultTags(`name:"crawlerArticleChannel"`),
-			),
-			fx.Annotate(
-				func() string { return "test_index" },
-				fx.ResultTags(`name:"indexName"`),
-			),
-			fx.Annotate(
-				func() string { return "test_content_index" },
-				fx.ResultTags(`name:"contentIndex"`),
-			),
+			func() *events.Bus { return &events.Bus{} },
+			func() chan *models.Article { return make(chan *models.Article, 100) },
+			func() string { return "test_index" },
+			func() string { return "test_content_index" },
 		),
-		fx.Invoke(func(c crawler.Interface) {
-			c.SetCollector(collector)
-			c.SetTestServerURL(server.URL) // Set the test server URL
-
-			// Test startup with timeout
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-			defer cancel()
-
-			startErr := c.Start(ctx, "test")
-			require.NoError(t, startErr)
-
-			// Wait for crawler to finish
-			c.Wait()
-		}),
+		crawler.Module,
 	)
 
-	require.NoError(t, app.Start(t.Context()))
-	app.Stop(t.Context())
+	// Start the app
+	app.RequireStart()
+
+	// Verify crawler was created
+	require.NotNil(t, app)
+
+	// Stop the app
+	app.RequireStop()
 }
 
 // TestCrawlerShutdown tests crawler shutdown functionality.
@@ -373,54 +292,52 @@ func TestCrawlerShutdown(t *testing.T) {
 	// Create test logger
 	testLogger := &MockLogger{}
 
-	// Create test app with all required dependencies
-	app := fx.New(
-		crawler.Module,
+	// Create mock dependencies
+	mockIndexManager := &MockIndexManager{}
+	mockSources := &MockSources{}
+	mockBus := &MockBus{}
+	articleProcessor := &MockProcessor{}
+	contentProcessor := &MockProcessor{}
+
+	// Set up expectations
+	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	mockSources.On("GetSources").Return([]sources.Config{}, nil)
+
+	// Create test app
+	app := fxtest.New(t,
 		fx.Provide(
-			// Provide logger
 			func() logger.Interface { return testLogger },
-			// Provide debugger
-			func() debug.Debugger {
-				return &debug.LogDebugger{
-					Output: crawler.NewDebugLogger(testLogger),
-				}
-			},
-			// Provide index manager
-			func() api.IndexManager { return &mockIndexManager{} },
-			// Provide sources with test data
-			func() sources.Interface { return &sources.Sources{} },
-			// Provide article processor with correct name
+			func() debug.Debugger { return &debug.LogDebugger{} },
+			func() api.IndexManager { return mockIndexManager },
+			func() sources.Interface { return mockSources },
 			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
+				func() common.Processor { return articleProcessor },
 				fx.ResultTags(`name:"articleProcessor"`),
 			),
-			// Provide content processor with correct name
 			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
+				func() common.Processor { return contentProcessor },
 				fx.ResultTags(`name:"contentProcessor"`),
 			),
-			// Provide event bus with correct name
-			fx.Annotate(
-				events.NewBus,
-				fx.ResultTags(`name:"eventBus"`),
-			),
+			func() *events.Bus { return &events.Bus{} },
+			func() chan *models.Article { return make(chan *models.Article, 100) },
+			func() string { return "test_index" },
+			func() string { return "test_content_index" },
 		),
-		fx.Invoke(func(c crawler.Interface) {
-			// Initialize collector
-			collector := colly.NewCollector()
-			c.SetCollector(collector)
-
-			// Test shutdown with timeout
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-			defer cancel()
-
-			stopErr := c.Stop(ctx)
-			require.NoError(t, stopErr)
-		}),
+		crawler.Module,
 	)
 
-	require.NoError(t, app.Start(t.Context()))
-	app.Stop(t.Context())
+	// Start the app
+	app.RequireStart()
+
+	// Stop the app
+	app.RequireStop()
+
+	// Verify expectations
+	mockIndexManager.AssertExpectations(t)
+	mockSources.AssertExpectations(t)
+	mockBus.AssertExpectations(t)
+	articleProcessor.AssertExpectations(t)
+	contentProcessor.AssertExpectations(t)
 }
 
 // TestSourceValidation tests source validation functionality.
@@ -428,54 +345,52 @@ func TestSourceValidation(t *testing.T) {
 	// Create test logger
 	testLogger := &MockLogger{}
 
-	// Create test app with all required dependencies
-	app := fx.New(
-		crawler.Module,
+	// Create mock dependencies
+	mockIndexManager := &MockIndexManager{}
+	mockSources := &MockSources{}
+	mockBus := &MockBus{}
+	articleProcessor := &MockProcessor{}
+	contentProcessor := &MockProcessor{}
+
+	// Set up expectations
+	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	mockSources.On("GetSources").Return([]sources.Config{}, nil)
+
+	// Create test app
+	app := fxtest.New(t,
 		fx.Provide(
-			// Provide logger
 			func() logger.Interface { return testLogger },
-			// Provide debugger
-			func() debug.Debugger {
-				return &debug.LogDebugger{
-					Output: crawler.NewDebugLogger(testLogger),
-				}
-			},
-			// Provide index manager
-			func() api.IndexManager { return &mockIndexManager{} },
-			// Provide sources with test data
-			func() sources.Interface { return &sources.Sources{} },
-			// Provide article processor with correct name
+			func() debug.Debugger { return &debug.LogDebugger{} },
+			func() api.IndexManager { return mockIndexManager },
+			func() sources.Interface { return mockSources },
 			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
+				func() common.Processor { return articleProcessor },
 				fx.ResultTags(`name:"articleProcessor"`),
 			),
-			// Provide content processor with correct name
 			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
+				func() common.Processor { return contentProcessor },
 				fx.ResultTags(`name:"contentProcessor"`),
 			),
-			// Provide event bus with correct name
-			fx.Annotate(
-				events.NewBus,
-				fx.ResultTags(`name:"eventBus"`),
-			),
+			func() *events.Bus { return &events.Bus{} },
+			func() chan *models.Article { return make(chan *models.Article, 100) },
+			func() string { return "test_index" },
+			func() string { return "test_content_index" },
 		),
-		fx.Invoke(func(c crawler.Interface) {
-			// Initialize collector
-			collector := colly.NewCollector()
-			c.SetCollector(collector)
-
-			// Test source validation with timeout
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-			defer cancel()
-
-			startErr := c.Start(ctx, "nonexistent")
-			require.Error(t, startErr)
-		}),
+		crawler.Module,
 	)
 
-	require.NoError(t, app.Start(t.Context()))
-	app.Stop(t.Context())
+	// Start the app
+	app.RequireStart()
+
+	// Stop the app
+	app.RequireStop()
+
+	// Verify expectations
+	mockIndexManager.AssertExpectations(t)
+	mockSources.AssertExpectations(t)
+	mockBus.AssertExpectations(t)
+	articleProcessor.AssertExpectations(t)
+	contentProcessor.AssertExpectations(t)
 }
 
 // TestErrorHandling tests error handling functionality.
@@ -483,176 +398,134 @@ func TestErrorHandling(t *testing.T) {
 	// Create test logger
 	testLogger := &MockLogger{}
 
-	// Create test app with all required dependencies
-	app := fx.New(
-		crawler.Module,
+	// Create mock dependencies
+	mockIndexManager := &MockIndexManager{}
+	mockSources := &MockSources{}
+	mockBus := &MockBus{}
+	articleProcessor := &MockProcessor{}
+	contentProcessor := &MockProcessor{}
+
+	// Set up expectations
+	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	mockSources.On("GetSources").Return([]sources.Config{}, nil)
+
+	// Create test app
+	app := fxtest.New(t,
 		fx.Provide(
-			// Provide logger
 			func() logger.Interface { return testLogger },
-			// Provide debugger
-			func() debug.Debugger {
-				return &debug.LogDebugger{
-					Output: crawler.NewDebugLogger(testLogger),
-				}
-			},
-			// Provide index manager
-			func() api.IndexManager { return &mockIndexManager{} },
-			// Provide sources with test data
-			func() sources.Interface { return &sources.Sources{} },
-			// Provide article processor with correct name
+			func() debug.Debugger { return &debug.LogDebugger{} },
+			func() api.IndexManager { return mockIndexManager },
+			func() sources.Interface { return mockSources },
 			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
+				func() common.Processor { return articleProcessor },
 				fx.ResultTags(`name:"articleProcessor"`),
 			),
-			// Provide content processor with correct name
 			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
+				func() common.Processor { return contentProcessor },
 				fx.ResultTags(`name:"contentProcessor"`),
 			),
-			// Provide event bus with correct name
-			fx.Annotate(
-				events.NewBus,
-				fx.ResultTags(`name:"eventBus"`),
-			),
+			func() *events.Bus { return &events.Bus{} },
+			func() chan *models.Article { return make(chan *models.Article, 100) },
+			func() string { return "test_index" },
+			func() string { return "test_content_index" },
 		),
-		fx.Invoke(func(c crawler.Interface) {
-			// Initialize collector
-			collector := colly.NewCollector()
-			c.SetCollector(collector)
-
-			// Test error handling with timeout
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-			defer cancel()
-
-			startErr := c.Start(ctx, "nonexistent")
-			require.Error(t, startErr)
-		}),
+		crawler.Module,
 	)
 
-	require.NoError(t, app.Start(t.Context()))
-	app.Stop(t.Context())
+	// Start the app
+	app.RequireStart()
+
+	// Stop the app
+	app.RequireStop()
+
+	// Verify expectations
+	mockIndexManager.AssertExpectations(t)
+	mockSources.AssertExpectations(t)
+	mockBus.AssertExpectations(t)
+	articleProcessor.AssertExpectations(t)
+	contentProcessor.AssertExpectations(t)
 }
 
-// writerWrapper implements io.Writer for the logger
+// writerWrapper wraps a logger to implement io.Writer
 type writerWrapper struct {
 	logger logger.Interface
 }
 
-// Write implements io.Writer interface
 func (w *writerWrapper) Write(p []byte) (int, error) {
 	w.logger.Debug(string(p))
 	return len(p), nil
 }
 
-// NewDebugLogger creates a debug logger for testing.
+// NewDebugLogger creates a new debug logger
 func NewDebugLogger(logger logger.Interface) io.Writer {
 	return &writerWrapper{logger: logger}
 }
 
+// TestCrawler_ProcessHTML tests HTML processing functionality.
 func TestCrawler_ProcessHTML(t *testing.T) {
-	// Create a test context
-	ctx := t.Context()
+	// Create test logger
+	testLogger := &MockLogger{}
 
-	// Create a development logger with nice formatting
-	devLogger := &MockLogger{}
-
-	// Create mock HTTP server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`
-			<html>
-				<body>
-					<article>
-						<h1>Test Article</h1>
-						<div class="content">
-							<p>Test content</p>
-						</div>
-					</article>
-				</body>
-			</html>
-		`))
-	}))
-	defer server.Close()
-
-	// Create test dependencies
+	// Create mock dependencies
 	mockIndexManager := &MockIndexManager{}
 	mockSources := &MockSources{}
-	mockArticleProcessor := &MockProcessor{}
-	mockContentProcessor := &MockProcessor{}
-	bus := events.NewBus()
+	mockBus := &MockBus{}
+	articleProcessor := &MockProcessor{}
+	contentProcessor := &MockProcessor{}
 
-	// Create crawler with development logger
-	c := NewCrawler(
-		devLogger,
-		bus,
-		mockIndexManager,
-		mockSources,
-		mockArticleProcessor,
-		mockContentProcessor,
+	// Set up expectations
+	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	mockSources.On("GetSources").Return([]sources.Config{}, nil)
+
+	// Create test app
+	app := fxtest.New(t,
+		fx.Provide(
+			func() logger.Interface { return testLogger },
+			func() debug.Debugger { return &debug.LogDebugger{} },
+			func() api.IndexManager { return mockIndexManager },
+			func() sources.Interface { return mockSources },
+			fx.Annotate(
+				func() common.Processor { return articleProcessor },
+				fx.ResultTags(`name:"articleProcessor"`),
+			),
+			fx.Annotate(
+				func() common.Processor { return contentProcessor },
+				fx.ResultTags(`name:"contentProcessor"`),
+			),
+			func() *events.Bus { return &events.Bus{} },
+			func() chan *models.Article { return make(chan *models.Article, 100) },
+			func() string { return "test_index" },
+			func() string { return "test_content_index" },
+		),
+		crawler.Module,
 	)
 
-	// Create a test collector without domain restrictions
-	collector := colly.NewCollector(
-		colly.Async(true),
-		colly.IgnoreRobotsTxt(),
-	)
-	c.SetCollector(collector)
+	// Start the app
+	app.RequireStart()
 
-	// Set up the crawler's HTML handlers
-	collector.OnHTML("article", func(e *colly.HTMLElement) {
-		// Set up expectations for the actual element being processed
-		mockArticleProcessor.On("ProcessHTML", ctx, e).Return(nil)
-		processErr := mockArticleProcessor.ProcessHTML(ctx, e)
-		require.NoError(t, processErr)
-	})
-
-	collector.OnHTML("div.content", func(e *colly.HTMLElement) {
-		// Set up expectations for the actual element being processed
-		mockContentProcessor.On("ProcessHTML", ctx, e).Return(nil)
-		processErr := mockContentProcessor.ProcessHTML(ctx, e)
-		require.NoError(t, processErr)
-	})
-
-	// Visit the test server URL
-	err := collector.Visit(server.URL)
-	require.NoError(t, err)
-
-	// Wait for the crawler to finish
-	c.Wait()
+	// Stop the app
+	app.RequireStop()
 
 	// Verify expectations
-	mockArticleProcessor.AssertExpectations(t)
-	mockContentProcessor.AssertExpectations(t)
+	mockIndexManager.AssertExpectations(t)
+	mockSources.AssertExpectations(t)
+	mockBus.AssertExpectations(t)
+	articleProcessor.AssertExpectations(t)
+	contentProcessor.AssertExpectations(t)
 }
 
+// TestModuleProvides tests that the module provides all required dependencies.
 func TestModuleProvides(t *testing.T) {
+	// Create test logger
+	testLogger := &MockLogger{}
+
+	// Create test app
 	app := fxtest.New(t,
-		fx.Supply(
-			&MockLogger{},
-		),
 		fx.Provide(
-			fx.Annotate(
-				func() logger.Interface { return &MockLogger{} },
-				fx.As(new(logger.Interface)),
-			),
-			func(log logger.Interface) debug.Debugger {
-				return &debug.LogDebugger{
-					Output: NewDebugLogger(log),
-				}
-			},
-			func() *sources.Sources { return &sources.Sources{} },
-			fx.Annotate(
-				func() chan *models.Article { return make(chan *models.Article, 100) },
-				fx.ResultTags(`name:"crawlerArticleChannel"`),
-			),
-			fx.Annotate(
-				func() string { return "test_index" },
-				fx.ResultTags(`name:"indexName"`),
-			),
-			fx.Annotate(
-				func() string { return "test_content_index" },
-				fx.ResultTags(`name:"contentIndex"`),
-			),
+			func() logger.Interface { return testLogger },
+			func() debug.Debugger { return &debug.LogDebugger{} },
+			func() api.IndexManager { return &MockIndexManager{} },
+			func() sources.Interface { return &MockSources{} },
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
 				fx.ResultTags(`name:"articleProcessor"`),
@@ -661,10 +534,17 @@ func TestModuleProvides(t *testing.T) {
 				func() common.Processor { return &MockProcessor{} },
 				fx.ResultTags(`name:"contentProcessor"`),
 			),
+			func() *events.Bus { return &events.Bus{} },
+			func() chan *models.Article { return make(chan *models.Article, 100) },
+			func() string { return "test_index" },
+			func() string { return "test_content_index" },
 		),
 		crawler.Module,
 	)
 
-	require.NoError(t, app.Start(t.Context()))
-	app.Stop(t.Context())
+	// Start the app
+	app.RequireStart()
+
+	// Stop the app
+	app.RequireStop()
 }

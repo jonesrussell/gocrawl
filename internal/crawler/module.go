@@ -42,7 +42,7 @@ var Module = fx.Module("crawler",
 		// Provide the event bus
 		events.NewBus,
 		// Provide the crawler
-		NewCrawler,
+		ProvideCrawler,
 	),
 )
 

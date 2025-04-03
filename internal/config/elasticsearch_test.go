@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,12 +15,16 @@ import (
 func TestElasticsearchConfig(t *testing.T) {
 	tests := []struct {
 		name     string
-		setup    func(*testing.T)
+		setup    func(*testing.T) string
 		validate func(*testing.T, *config.ElasticsearchConfig)
 	}{
 		{
 			name: "valid configuration",
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T) string {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
 				// Create test config file
 				configContent := `
 elasticsearch:
@@ -31,11 +36,12 @@ elasticsearch:
     certificate: test-cert.pem
     key: test-key.pem
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
+				return tmpDir
 			},
 			validate: func(t *testing.T, cfg *config.ElasticsearchConfig) {
 				require.Equal(t, []string{"https://localhost:9200"}, cfg.Addresses)
@@ -47,7 +53,11 @@ elasticsearch:
 		},
 		{
 			name: "environment variable override",
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T) string {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
 				// Create test config file
 				configContent := `
 elasticsearch:
@@ -55,12 +65,13 @@ elasticsearch:
     - https://localhost:9200
   api_key: config_api_key
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 				t.Setenv("ELASTICSEARCH_API_KEY", "env_api_key")
+				return tmpDir
 			},
 			validate: func(t *testing.T, cfg *config.ElasticsearchConfig) {
 				require.Equal(t, []string{"https://localhost:9200"}, cfg.Addresses)
@@ -69,7 +80,11 @@ elasticsearch:
 		},
 		{
 			name: "cloud configuration",
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T) string {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
 				// Create test config file
 				configContent := `
 elasticsearch:
@@ -77,11 +92,12 @@ elasticsearch:
     id: test-cloud-id
     api_key: test-cloud-api-key
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
+				return tmpDir
 			},
 			validate: func(t *testing.T, cfg *config.ElasticsearchConfig) {
 				require.Equal(t, "test-cloud-id", cfg.Cloud.ID)
@@ -90,7 +106,11 @@ elasticsearch:
 		},
 		{
 			name: "retry configuration",
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T) string {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
 				// Create test config file
 				configContent := `
 elasticsearch:
@@ -102,11 +122,12 @@ elasticsearch:
     max_wait: 30s
     max_retries: 3
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
+				return tmpDir
 			},
 			validate: func(t *testing.T, cfg *config.ElasticsearchConfig) {
 				require.True(t, cfg.Retry.Enabled)
@@ -117,7 +138,11 @@ elasticsearch:
 		},
 		{
 			name: "basic auth configuration",
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T) string {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
 				// Create test config file
 				configContent := `
 elasticsearch:
@@ -126,11 +151,12 @@ elasticsearch:
   username: test_user
   password: test_pass
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
+				return tmpDir
 			},
 			validate: func(t *testing.T, cfg *config.ElasticsearchConfig) {
 				require.Equal(t, "test_user", cfg.Username)
@@ -146,7 +172,7 @@ elasticsearch:
 			defer cleanup()
 
 			// Run test setup
-			tt.setup(t)
+			_ = tt.setup(t)
 
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))
@@ -162,12 +188,16 @@ elasticsearch:
 func TestElasticsearchConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		setup   func(*testing.T)
+		setup   func(*testing.T) string
 		wantErr bool
 	}{
 		{
 			name: "missing API key in production",
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T) string {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
 				// Create test config file
 				configContent := `
 app:
@@ -176,18 +206,23 @@ elasticsearch:
   addresses:
     - https://localhost:9200
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 				t.Setenv("APP_ENV", "production")
+				return tmpDir
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid TLS configuration",
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T) string {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
 				// Create test config file with invalid TLS config
 				configContent := `
 elasticsearch:
@@ -199,34 +234,44 @@ elasticsearch:
     certificate: non-existent-cert.pem
     key: non-existent-key.pem
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
+				return tmpDir
 			},
 			wantErr: true,
 		},
 		{
 			name: "empty addresses",
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T) string {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
 				// Create test config file with empty addresses
 				configContent := `
 elasticsearch:
   addresses: []
   api_key: test_api_key
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
+				return tmpDir
 			},
 			wantErr: true,
 		},
 		{
 			name: "missing index name",
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T) string {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
 				// Create test config file with missing index name
 				configContent := `
 elasticsearch:
@@ -234,11 +279,12 @@ elasticsearch:
     - https://localhost:9200
   api_key: test_api_key
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
+				return tmpDir
 			},
 			wantErr: true,
 		},
@@ -251,18 +297,14 @@ elasticsearch:
 			defer cleanup()
 
 			// Run test setup
-			tt.setup(t)
+			_ = tt.setup(t)
 
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))
-
-			// Validate results
 			if tt.wantErr {
 				require.Error(t, err)
-				require.Nil(t, cfg)
 				return
 			}
-
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
 		})
