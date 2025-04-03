@@ -5,7 +5,6 @@ package sources
 import (
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"go.uber.org/fx"
 )
@@ -22,7 +21,21 @@ const (
 var Module = fx.Module("sources",
 	fx.Provide(
 		fx.Annotate(
-			func(cfg config.Interface, logger types.Logger) Interface {
+			func(cfg config.Interface, logger interface {
+				Debug(msg string, fields ...any)
+				Info(msg string, fields ...any)
+				Warn(msg string, fields ...any)
+				Error(msg string, fields ...any)
+				Fatal(msg string, fields ...any)
+				With(fields ...any) interface {
+					Debug(msg string, fields ...any)
+					Info(msg string, fields ...any)
+					Warn(msg string, fields ...any)
+					Error(msg string, fields ...any)
+					Fatal(msg string, fields ...any)
+					With(fields ...any) interface{}
+				}
+			}) Interface {
 				return NewSourcesFromConfig(cfg, logger)
 			},
 			fx.ParamTags(`name:"config"`, ""),
@@ -35,7 +48,21 @@ type ModuleParams struct {
 	fx.In
 
 	Config config.Interface `name:"config"`
-	Logger types.Logger
+	Logger interface {
+		Debug(msg string, fields ...any)
+		Info(msg string, fields ...any)
+		Warn(msg string, fields ...any)
+		Error(msg string, fields ...any)
+		Fatal(msg string, fields ...any)
+		With(fields ...any) interface {
+			Debug(msg string, fields ...any)
+			Info(msg string, fields ...any)
+			Warn(msg string, fields ...any)
+			Error(msg string, fields ...any)
+			Fatal(msg string, fields ...any)
+			With(fields ...any) interface{}
+		}
+	}
 }
 
 // Result defines the sources module's output.
@@ -65,7 +92,21 @@ func NewConfig() *Config {
 }
 
 // NewSources creates a new sources instance.
-func NewSources(cfg *Config, logger types.Logger) *Sources {
+func NewSources(cfg *Config, logger interface {
+	Debug(msg string, fields ...any)
+	Info(msg string, fields ...any)
+	Warn(msg string, fields ...any)
+	Error(msg string, fields ...any)
+	Fatal(msg string, fields ...any)
+	With(fields ...any) interface {
+		Debug(msg string, fields ...any)
+		Info(msg string, fields ...any)
+		Warn(msg string, fields ...any)
+		Error(msg string, fields ...any)
+		Fatal(msg string, fields ...any)
+		With(fields ...any) interface{}
+	}
+}) *Sources {
 	return &Sources{
 		sources: []Config{*cfg},
 		logger:  logger,

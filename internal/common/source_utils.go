@@ -7,13 +7,12 @@ import (
 	"strings"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 )
 
-// ConvertSourceConfig converts a sources.Config to a config.Source.
+// ConvertSourceConfig converts a sourceutils.SourceConfig to a config.Source.
 // It handles the conversion of fields between the two types.
-func ConvertSourceConfig(source *sources.Config) *config.Source {
+func ConvertSourceConfig(source *sourceutils.SourceConfig) *config.Source {
 	if source == nil {
 		return nil
 	}
