@@ -87,22 +87,22 @@ func setupTestApp(t *testing.T) *testServer {
 	mockIndexManager := testutils.NewMockIndexManager()
 
 	// Set up mock search expectations
-	expectedQuery := map[string]interface{}{
-		"query": map[string]interface{}{
-			"match": map[string]interface{}{
+	expectedQuery := map[string]any{
+		"query": map[string]any{
+			"match": map[string]any{
 				"content": "test",
 			},
 		},
 		"size": 10,
 	}
-	mockSearch.On("Search", mock.Anything, "test", expectedQuery).Return([]interface{}{
-		map[string]interface{}{
+	mockSearch.On("Search", mock.Anything, "test", expectedQuery).Return([]any{
+		map[string]any{
 			"title": "Test Result",
 			"url":   "https://test.com",
 		},
 	}, nil)
 	mockSearch.On("Count", mock.Anything, "test", expectedQuery).Return(int64(1), nil)
-	mockSearch.On("Aggregate", mock.Anything, "test", mock.Anything).Return(map[string]interface{}{}, nil)
+	mockSearch.On("Aggregate", mock.Anything, "test", mock.Anything).Return(map[string]any{}, nil)
 	mockSearch.On("Close").Return(nil)
 
 	// Create server config with security settings
@@ -131,8 +131,8 @@ func setupTestApp(t *testing.T) *testServer {
 		})
 
 	// Set up mock storage expectations
-	mockStorage.On("Search", mock.Anything, "test", mock.Anything).Return([]interface{}{
-		map[string]interface{}{
+	mockStorage.On("Search", mock.Anything, "test", mock.Anything).Return([]any{
+		map[string]any{
 			"title": "Test Result",
 			"url":   "https://test.com",
 		},
@@ -358,11 +358,11 @@ func TestSecurityMiddleware(t *testing.T) {
 		{"missing key", "", true},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			// Create test request
-			req := httptest.NewRequest("GET", "/test", nil)
-			req.Header.Set("X-Api-Key", tt.apiKey)
+			req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+			req.Header.Set("X-Api-Key", test.apiKey)
 
 			// ... rest of the test ...
 		})

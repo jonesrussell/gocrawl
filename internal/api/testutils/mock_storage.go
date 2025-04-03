@@ -146,7 +146,14 @@ func (m *MockStorage) TestConnection(ctx context.Context) error {
 // Aggregate implements storage.Interface.
 func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
 	args := m.Called(ctx, index, aggs)
-	return args.Get(0), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	result := args.Get(0)
+	if result == nil {
+		return nil, errors.New("nil aggregation result")
+	}
+	return result, nil
 }
 
 // Count implements storage.Interface.
@@ -199,10 +206,14 @@ func (m *MockIndexManager) IndexExists(ctx context.Context, index string) (bool,
 // GetMapping implements interfaces.IndexManager.
 func (m *MockIndexManager) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	args := m.Called(ctx, index)
-	if result, ok := args.Get(0).(map[string]any); ok {
-		return result, args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
 	}
-	return nil, args.Error(1)
+	result, ok := args.Get(0).(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid mapping result type")
+	}
+	return result, nil
 }
 
 // UpdateMapping implements interfaces.IndexManager.
