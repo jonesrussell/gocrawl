@@ -20,6 +20,8 @@ var Module = fx.Module("indices",
 	sources.Module,
 	fx.Provide(
 		NewDeleter,
+		NewCreator,
+		NewLister,
 		func() *logger.Config {
 			return &logger.Config{
 				Level:       logger.InfoLevel,
@@ -47,6 +49,7 @@ func NewIndices(p struct {
 
 	cmd.AddCommand(listCommand())
 	cmd.AddCommand(deleteCommand())
+	cmd.AddCommand(createCommand())
 
 	return cmd
 }

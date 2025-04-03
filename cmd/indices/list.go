@@ -13,64 +13,71 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
-// ListDeps holds the dependencies for the list command.
-type ListDeps struct {
-	fx.In
-
-	Context      context.Context `name:"indicesContext"`
-	Config       config.Interface
-	Logger       logger.Interface
-	IndexManager api.IndexManager
+// Lister implements the indices list command
+type Lister struct {
+	config       config.Interface
+	logger       logger.Interface
+	storage      types.Interface
+	indexManager api.IndexManager
 }
 
-// Dependencies holds the list command's dependencies
-type Dependencies struct {
-	fx.In
-
-	Lifecycle fx.Lifecycle
-	Storage   storagetypes.Interface
-	Logger    logger.Interface
-	Context   context.Context `name:"crawlContext"`
-}
-
-// listModule provides the list command dependencies
-var listModule = fx.Module("list",
-	// Core dependencies
-	config.Module,
-	storage.Module,
-)
-
-// listCommand creates and returns the list command that displays all indices.
-// It integrates with the Cobra command framework and sets up the command
-// structure with appropriate usage information and examples.
-//
-// Returns:
-//   - *cobra.Command: A configured Cobra command ready to be added to the root command
-func listCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List all Elasticsearch indices",
-		Long: `Display a list of all indices in the Elasticsearch cluster.
-
-Example:
-  gocrawl indices list`,
-		RunE: runList,
+// NewLister creates a new lister instance
+func NewLister(
+	config config.Interface,
+	logger logger.Interface,
+	storage types.Interface,
+	indexManager api.IndexManager,
+) *Lister {
+	return &Lister{
+		config:       config,
+		logger:       logger,
+		storage:      storage,
+		indexManager: indexManager,
 	}
 }
 
+// Start executes the list operation
+func (l *Lister) Start(ctx context.Context) error {
+	l.logger.Info("Listing indices")
+
+	// Test storage connection
+	if err := l.storage.TestConnection(ctx); err != nil {
+		l.logger.Error("Failed to connect to storage", "error", err)
+		return fmt.Errorf("failed to connect to storage: %w", err)
+	}
+
+	// List indices
+	indices, err := l.storage.ListIndices(ctx)
+	if err != nil {
+		l.logger.Error("Failed to list indices", "error", err)
+		return fmt.Errorf("failed to list indices: %w", err)
+	}
+
+	// Filter out internal indices (those starting with '.')
+	var filteredIndices []string
+	for _, index := range indices {
+		if !strings.HasPrefix(index, ".") {
+			filteredIndices = append(filteredIndices, index)
+		}
+	}
+
+	// Handle the case where no indices are found
+	if len(filteredIndices) == 0 {
+		l.logger.Info("No indices found")
+		return nil
+	}
+
+	// Render the indices table
+	return l.renderIndicesTable(ctx, filteredIndices)
+}
+
 // renderIndicesTable formats and displays the indices in a table format.
-func renderIndicesTable(
-	ctx context.Context,
-	indices []string,
-	storage storagetypes.Interface,
-	logger logger.Interface,
-) error {
+func (l *Lister) renderIndicesTable(ctx context.Context, indices []string) error {
 	// Initialize table writer with stdout as output
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -79,14 +86,14 @@ func renderIndicesTable(
 	// Process each index and gather its metadata
 	for _, index := range indices {
 		// Get health status with error handling
-		healthStatus, healthErr := storage.GetIndexHealth(ctx, index)
+		healthStatus, healthErr := l.storage.GetIndexHealth(ctx, index)
 		if healthErr != nil {
-			logger.Error("Error getting health for index", "index", index, "error", healthErr)
+			l.logger.Error("Error getting health for index", "index", index, "error", healthErr)
 			continue
 		}
 
 		// Get document count with fallback to 0 on error
-		docCount, docErr := storage.GetIndexDocCount(ctx, index)
+		docCount, docErr := l.storage.GetIndexDocCount(ctx, index)
 		if docErr != nil {
 			docCount = 0
 		}
@@ -109,76 +116,51 @@ func renderIndicesTable(
 	return nil
 }
 
-// runList executes the list command and displays all indices.
-// It:
-// - Initializes the Fx application with required modules
-// - Handles application lifecycle and error cases
-// - Displays the indices list in a formatted table
-func runList(cmd *cobra.Command, _ []string) error {
-	// Create a context
-	ctx := cmd.Context()
+// listCommand creates and returns the list command that displays all indices.
+func listCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List all Elasticsearch indices",
+		Long: `Display a list of all indices in the Elasticsearch cluster.
 
-	// Initialize the Fx application
-	fxApp := fx.New(
-		fx.NopLogger,
-		listModule,
-		fx.Provide(
-			fx.Annotate(
-				func() context.Context { return ctx },
-				fx.ResultTags(`name:"crawlContext"`),
-			),
-			logger.NewNoOp,
-		),
-		fx.Invoke(func(lc fx.Lifecycle, p Dependencies) {
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					// Test storage connection
-					if err := p.Storage.TestConnection(ctx); err != nil {
-						return fmt.Errorf("failed to connect to storage: %w", err)
-					}
+Example:
+  gocrawl indices list`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Create a context
+			ctx := cmd.Context()
 
-					// List indices
-					indices, err := p.Storage.ListIndices(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to list indices: %w", err)
-					}
+			// Initialize the Fx application
+			fxApp := fx.New(
+				fx.NopLogger,
+				Module,
+				fx.Provide(
+					func() context.Context { return ctx },
+				),
+				fx.Invoke(func(lc fx.Lifecycle, lister *Lister) {
+					lc.Append(fx.Hook{
+						OnStart: func(ctx context.Context) error {
+							return lister.Start(ctx)
+						},
+						OnStop: func(context.Context) error {
+							return nil
+						},
+					})
+				}),
+			)
 
-					// Filter out internal indices (those starting with '.')
-					var filteredIndices []string
-					for _, index := range indices {
-						if !strings.HasPrefix(index, ".") {
-							filteredIndices = append(filteredIndices, index)
-						}
-					}
+			// Start the application
+			if err := fxApp.Start(ctx); err != nil {
+				return fmt.Errorf("error starting application: %w", err)
+			}
 
-					// Handle the case where no indices are found
-					if len(filteredIndices) == 0 {
-						p.Logger.Info("No indices found")
-						return nil
-					}
+			// Stop the application
+			if err := fxApp.Stop(ctx); err != nil {
+				return fmt.Errorf("error stopping application: %w", err)
+			}
 
-					// Render the indices table
-					return renderIndicesTable(ctx, filteredIndices, p.Storage, p.Logger)
-				},
-				OnStop: func(ctx context.Context) error {
-					p.Logger.Info("Stopping...")
-					return nil
-				},
-			})
-		}),
-	)
-
-	// Start the application
-	if err := fxApp.Start(ctx); err != nil {
-		return fmt.Errorf("error starting application: %w", err)
+			return nil
+		},
 	}
-
-	// Stop the application immediately after starting
-	if err := fxApp.Stop(ctx); err != nil {
-		return fmt.Errorf("error stopping application: %w", err)
-	}
-
-	return nil
 }
 
 // getIngestionStatus maps Elasticsearch health status to human-readable ingestion status.
