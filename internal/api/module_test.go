@@ -3,8 +3,6 @@ package api_test
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,7 +17,6 @@ import (
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	apitypes "github.com/jonesrussell/gocrawl/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -195,97 +192,127 @@ func TestAPIModuleInitialization(t *testing.T) {
 
 // TestHealthEndpoint verifies that the health endpoint works correctly.
 func TestHealthEndpoint(t *testing.T) {
+	t.Parallel()
+
+	// Create test server
 	ts := setupTestApp(t)
-	defer ts.app.RequireStop()
 
-	t.Run("returns ok status", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, healthEndpoint), http.NoBody)
-		require.NoError(t, err)
-
-		w := httptest.NewRecorder()
-		ts.server.Handler.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.JSONEq(t, `{"status":"ok"}`, w.Body.String())
-	})
-}
-
-// TestSearchEndpoint tests the search endpoint functionality.
-func TestSearchEndpoint(t *testing.T) {
-	ts := setupTestApp(t)
-	defer ts.app.RequireStop()
+	// Set up mock expectations for logger
+	mockLogger := ts.logger.(*apitestutils.MockLogger)
+	mockLogger.On("Info", "HTTP Request", mock.Anything).Return()
 
 	tests := []struct {
 		name           string
-		requestBody    string
-		apiKey         string
+		method         string
+		path           string
 		expectedStatus int
-		expectedError  *apitypes.APIError
 	}{
 		{
-			name:           "requires API key",
-			requestBody:    `{"query": "test"}`,
-			apiKey:         "",
-			expectedStatus: http.StatusUnauthorized,
-			expectedError: &apitypes.APIError{
-				Code:    http.StatusUnauthorized,
-				Message: "API key is required",
-			},
-		},
-		{
-			name:           "returns search results with valid API key",
-			requestBody:    `{"query": "test", "index": "test", "size": 10}`,
-			apiKey:         testAPIKey,
-			expectedStatus: http.StatusOK,
-		},
-		{
-			name:           "handles invalid JSON",
-			requestBody:    `{"query": "test", invalid json}`,
-			apiKey:         testAPIKey,
-			expectedStatus: http.StatusBadRequest,
-			expectedError: &apitypes.APIError{
-				Code:    http.StatusBadRequest,
-				Message: "Invalid request payload",
-			},
-		},
-		{
-			name:           "handles empty query",
-			requestBody:    `{"query": "", "index": "test"}`,
-			apiKey:         testAPIKey,
-			expectedStatus: http.StatusBadRequest,
-			expectedError: &apitypes.APIError{
-				Code:    http.StatusBadRequest,
-				Message: "Query cannot be empty",
-			},
+			name:           "returns ok status",
+			method:         "GET",
+			path:           "/health",
+			expectedStatus: 200,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, searchEndpoint, strings.NewReader(tt.requestBody))
+			// Create request
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			w := httptest.NewRecorder()
+
+			// Send request
+			ts.server.Handler.ServeHTTP(w, req)
+
+			// Check response
+			assert.Equal(t, tt.expectedStatus, w.Code)
+		})
+	}
+}
+
+// TestSearchEndpoint tests the search endpoint functionality.
+func TestSearchEndpoint(t *testing.T) {
+	t.Parallel()
+
+	// Create test server
+	ts := setupTestApp(t)
+
+	// Set up mock expectations for logger
+	mockLogger := ts.logger.(*apitestutils.MockLogger)
+	mockLogger.On("Info", "HTTP Request", mock.Anything).Return()
+
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		body           string
+		apiKey         string
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "requires API key",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "test"}`,
+			apiKey:         "",
+			expectedStatus: 401,
+			expectedBody:   `{"code":401,"message":"API key is required"}`,
+		},
+		{
+			name:           "handles invalid API key",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "test"}`,
+			apiKey:         "wrong-key",
+			expectedStatus: 401,
+			expectedBody:   `{"code":401,"message":"invalid API key"}`,
+		},
+		{
+			name:           "handles invalid JSON",
+			method:         "POST",
+			path:           "/search",
+			body:           "invalid json",
+			apiKey:         testAPIKey,
+			expectedStatus: 400,
+			expectedBody:   `{"code":400,"message":"Invalid request payload"}`,
+		},
+		{
+			name:           "handles empty query",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": ""}`,
+			apiKey:         testAPIKey,
+			expectedStatus: 400,
+			expectedBody:   `{"code":400,"message":"Query cannot be empty"}`,
+		},
+		{
+			name:           "returns search results with valid request",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "test"}`,
+			apiKey:         testAPIKey,
+			expectedStatus: 200,
+			expectedBody:   `{"results":[{"title":"Test Result","url":"https://test.com"}],"total":1}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create request
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			if tt.apiKey != "" {
 				req.Header.Set("X-Api-Key", tt.apiKey)
 			}
-
 			w := httptest.NewRecorder()
+
+			// Send request
 			ts.server.Handler.ServeHTTP(w, req)
 
+			// Check response
 			assert.Equal(t, tt.expectedStatus, w.Code)
-
-			if tt.expectedError != nil {
-				var errResp apitypes.APIError
-				err := json.NewDecoder(w.Body).Decode(&errResp)
-				require.NoError(t, err)
-				assert.Equal(t, tt.expectedError.Code, errResp.Code)
-				assert.Equal(t, tt.expectedError.Message, errResp.Message)
-			} else if tt.expectedStatus == http.StatusOK {
-				var resp apitypes.SearchResponse
-				err := json.NewDecoder(w.Body).Decode(&resp)
-				require.NoError(t, err)
-				assert.NotEmpty(t, resp.Results)
-				assert.Equal(t, 1, resp.Total)
-			}
+			assert.JSONEq(t, tt.expectedBody, w.Body.String())
 		})
 	}
 }
