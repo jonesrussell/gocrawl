@@ -5,6 +5,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 )
 
@@ -15,7 +16,7 @@ type TestInterface interface {
 	UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error
 	DeleteSource(ctx context.Context, name string) error
 	ValidateSource(source *sourceutils.SourceConfig) error
-	GetMetrics() interface{}
+	GetMetrics() sources.Metrics
 	FindByName(name string) (*sourceutils.SourceConfig, error)
 	GetSources() ([]sourceutils.SourceConfig, error)
 }
@@ -103,11 +104,8 @@ func (s *testSourcesImpl) ValidateSource(source *sourceutils.SourceConfig) error
 }
 
 // GetMetrics returns the current metrics
-func (s *testSourcesImpl) GetMetrics() interface{} {
-	return struct {
-		SourceCount int64
-		LastUpdated interface{}
-	}{
+func (s *testSourcesImpl) GetMetrics() sources.Metrics {
+	return sources.Metrics{
 		SourceCount: int64(len(s.configs)),
 		LastUpdated: time.Now(),
 	}
