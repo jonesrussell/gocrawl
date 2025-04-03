@@ -39,7 +39,7 @@ crawler:
   rate_limit: 2s
   parallelism: 2
   source_file: ` + sourcesPath + `
-logging:
+log:
   level: debug
   debug: true
 elasticsearch:
