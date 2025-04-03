@@ -2,10 +2,16 @@ package testutils
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
+)
+
+var (
+	// ErrInvalidMappingType is returned when the mapping type is invalid.
+	ErrInvalidMappingType = errors.New("invalid mapping type")
 )
 
 // MockStorage is a mock implementation of the storage interface.
@@ -77,7 +83,7 @@ func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]
 	}
 	val, ok := args.Get(0).(map[string]any)
 	if !ok {
-		return nil, nil
+		return nil, ErrInvalidMappingType
 	}
 	return val, nil
 }

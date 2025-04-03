@@ -67,6 +67,7 @@ func TestLoadFromFile(t *testing.T) {
 	setup := newTestSetup(t)
 
 	t.Run("valid sources file", func(t *testing.T) {
+		t.Parallel()
 		loaderConfigs, err := loader.LoadFromFile(setup.sourcesFile)
 		require.NoError(t, err)
 		require.Len(t, loaderConfigs, 1)
@@ -119,6 +120,7 @@ func TestGetSource(t *testing.T) {
 	t.Parallel()
 
 	t.Run("existing source", func(t *testing.T) {
+		t.Parallel()
 		s := testutils.NewTestSources([]sourceutils.SourceConfig{
 			{
 				Name:      "test-source",
@@ -154,6 +156,7 @@ func TestValidateSource(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid source", func(t *testing.T) {
+		t.Parallel()
 		s := testutils.NewTestSources(nil)
 		source := &sourceutils.SourceConfig{
 			Name:      "test-source",
@@ -171,6 +174,7 @@ func TestValidateSource(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("invalid source", func(t *testing.T) {
+		t.Parallel()
 		s := testutils.NewTestSources(nil)
 		source := &sourceutils.SourceConfig{
 			Name:      "",
@@ -188,6 +192,7 @@ func TestSourceOperations(t *testing.T) {
 	t.Parallel()
 
 	t.Run("add source", func(t *testing.T) {
+		t.Parallel()
 		s := testutils.NewTestSources([]sourceutils.SourceConfig{})
 		err := s.AddSource(t.Context(), &sourceutils.SourceConfig{
 			Name:      "test-source",
@@ -210,6 +215,7 @@ func TestSourceOperations(t *testing.T) {
 	})
 
 	t.Run("update source", func(t *testing.T) {
+		t.Parallel()
 		s := testutils.NewTestSources([]sourceutils.SourceConfig{
 			{
 				Name:      "test-source",
@@ -247,6 +253,7 @@ func TestSourceOperations(t *testing.T) {
 	})
 
 	t.Run("delete source", func(t *testing.T) {
+		t.Parallel()
 		s := testutils.NewTestSources([]sourceutils.SourceConfig{
 			{
 				Name:      "test-source",
@@ -276,6 +283,7 @@ func TestMetrics(t *testing.T) {
 	t.Parallel()
 
 	t.Run("increment metrics", func(t *testing.T) {
+		t.Parallel()
 		s := testutils.NewTestSources([]sourceutils.SourceConfig{
 			{
 				Name:      "test-source",
@@ -310,6 +318,7 @@ func TestIndexNameHandling(t *testing.T) {
 	t.Parallel()
 
 	t.Run("default index name", func(t *testing.T) {
+		t.Parallel()
 		source := &sourceutils.SourceConfig{
 			Name:      "Test Source",
 			URL:       "https://test.com",
@@ -328,6 +337,7 @@ func TestIndexNameHandling(t *testing.T) {
 	})
 
 	t.Run("custom index names", func(t *testing.T) {
+		t.Parallel()
 		source := &sourceutils.SourceConfig{
 			Name:         "Test Source",
 			URL:          "https://test.com",
