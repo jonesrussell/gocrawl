@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Logger defines the interface for structured logging.
-type Logger interface {
+// LegacyLogger defines the interface for structured logging (legacy).
+type LegacyLogger interface {
 	Info(msg string, fields ...interface{})
 	Error(msg string, fields ...interface{})
 	Debug(msg string, fields ...interface{})
@@ -22,23 +22,23 @@ type Logger interface {
 	Sync() error
 }
 
-// Config holds logger configuration.
-type Config struct {
+// LegacyConfig holds legacy logger configuration.
+type LegacyConfig struct {
 	Level  string
 	Debug  bool
 	Output string
 }
 
-// DefaultConfig returns default logger configuration.
-func DefaultConfig() Config {
-	return Config{
+// DefaultConfig returns default legacy logger configuration.
+func DefaultConfig() LegacyConfig {
+	return LegacyConfig{
 		Level:  "info",
 		Debug:  false,
 		Output: "stdout",
 	}
 }
 
-// zapLogger implements Logger using zap.
+// zapLogger implements LegacyLogger using zap.
 type zapLogger struct {
 	*zap.Logger
 }
@@ -71,8 +71,8 @@ func (l *zapLogger) Errorf(format string, v ...interface{}) {
 	l.Logger.Error(fmt.Sprintf(format, v...))
 }
 
-// New creates a new logger with the given configuration.
-func New(cfg Config) (Logger, error) {
+// New creates a new legacy logger with the given configuration.
+func New(cfg LegacyConfig) (LegacyLogger, error) {
 	config := zap.NewProductionConfig()
 	if cfg.Debug {
 		config = zap.NewDevelopmentConfig()
@@ -107,11 +107,11 @@ func New(cfg Config) (Logger, error) {
 }
 
 // NewNoOp creates a no-op logger that discards all messages.
-func NewNoOp() Logger {
+func NewNoOp() LegacyLogger {
 	return &noOpLogger{}
 }
 
-// noOpLogger implements Logger but discards all messages.
+// noOpLogger implements LegacyLogger but discards all messages.
 type noOpLogger struct{}
 
 func (l *noOpLogger) Info(msg string, fields ...interface{})  {}
@@ -197,13 +197,13 @@ func isSensitiveField(field string) bool {
 }
 
 // WithContext adds a logger to the context.
-func WithContext(ctx context.Context, logger Logger) context.Context {
+func WithContext(ctx context.Context, logger LegacyLogger) context.Context {
 	return context.WithValue(ctx, contextKey{}, logger)
 }
 
 // FromContext retrieves the logger from the context.
-func FromContext(ctx context.Context) Logger {
-	logger, ok := ctx.Value(contextKey{}).(Logger)
+func FromContext(ctx context.Context) LegacyLogger {
+	logger, ok := ctx.Value(contextKey{}).(LegacyLogger)
 	if !ok {
 		return NewNoOp()
 	}
@@ -211,12 +211,6 @@ func FromContext(ctx context.Context) Logger {
 }
 
 type contextKey struct{}
-
-// logger implements the Interface using zap.
-type logger struct {
-	*zap.Logger
-	config *Config
-}
 
 // Debug logs a debug message.
 func (l *logger) Debug(msg string, fields ...interface{}) {

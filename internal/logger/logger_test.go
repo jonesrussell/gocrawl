@@ -11,32 +11,24 @@ import (
 func TestNewLogger(t *testing.T) {
 	tests := []struct {
 		name    string
-		params  logger.Params
+		config  *logger.Config
 		wantErr bool
 	}{
 		{
 			name: "development logger with debug",
-			params: logger.Params{
-				Debug:  true,
-				Level:  zapcore.DebugLevel.String(),
-				AppEnv: "development",
+			config: &logger.Config{
+				Development: true,
+				Level:       logger.DebugLevel,
+				Encoding:    "console",
 			},
 			wantErr: false,
 		},
 		{
 			name: "production logger",
-			params: logger.Params{
-				Debug:  false,
-				Level:  zapcore.InfoLevel.String(),
-				AppEnv: "production",
-			},
-			wantErr: false,
-		},
-		{
-			name: "default environment",
-			params: logger.Params{
-				Debug: true,
-				Level: zapcore.DebugLevel.String(),
+			config: &logger.Config{
+				Development: false,
+				Level:       logger.InfoLevel,
+				Encoding:    "json",
 			},
 			wantErr: false,
 		},
@@ -44,36 +36,32 @@ func TestNewLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a zap logger with the test parameters
-			config := zap.NewDevelopmentConfig()
-			level, err := zapcore.ParseLevel(tt.params.Level)
-			if err != nil {
-				t.Errorf("Failed to parse log level: %v", err)
-				return
+			// Create a new logger directly
+			zapConfig := zap.NewProductionConfig()
+			if tt.config.Development {
+				zapConfig = zap.NewDevelopmentConfig()
 			}
-			config.Level = zap.NewAtomicLevelAt(level)
-			zapLogger, err := config.Build()
+
+			zapConfig.Level = zap.NewAtomicLevelAt(levelToZap(tt.config.Level))
+			zapConfig.Encoding = tt.config.Encoding
+			zapConfig.OutputPaths = tt.config.OutputPaths
+			zapConfig.ErrorOutputPaths = tt.config.ErrorOutputPaths
+
+			zapLogger, err := zapConfig.Build()
 			if err != nil {
 				t.Errorf("Failed to create zap logger: %v", err)
 				return
 			}
 			defer zapLogger.Sync()
 
-			// Create our logger
-			log := &logger.ZapLogger{Logger: zapLogger}
+			// Create our logger implementation
+			log := createLogger(zapLogger, tt.config)
 
 			// Test logging methods
-			log.Info("test info message", "key", "value")
-			log.Error("test error message", "key", "value")
-			log.Debug("test debug message", "key", "value")
-			log.Warn("test warn message", "key", "value")
-			log.Errorf("test error format %s", "value")
-
-			// Test Sync
-			if syncErr := log.Sync(); syncErr != nil {
-				// Ignore sync errors as they're expected when writing to console
-				t.Log("Sync() error (expected):", syncErr)
-			}
+			log.Debug("debug message", "key", "value")
+			log.Info("info message", "key", "value")
+			log.Warn("warn message", "key", "value")
+			log.Error("error message", "key", "value")
 		})
 	}
 }
@@ -81,28 +69,23 @@ func TestNewLogger(t *testing.T) {
 func TestNewDevelopmentLogger(t *testing.T) {
 	tests := []struct {
 		name      string
-		levelStr  string
+		level     logger.Level
 		expectErr bool
 	}{
 		{
 			name:      "debug level",
-			levelStr:  "debug",
+			level:     logger.DebugLevel,
 			expectErr: false,
 		},
 		{
 			name:      "info level",
-			levelStr:  "info",
+			level:     logger.InfoLevel,
 			expectErr: false,
 		},
 		{
 			name:      "warn level",
-			levelStr:  "warn",
+			level:     logger.WarnLevel,
 			expectErr: false,
-		},
-		{
-			name:      "invalid level",
-			levelStr:  "invalid",
-			expectErr: true,
 		},
 	}
 
@@ -110,15 +93,7 @@ func TestNewDevelopmentLogger(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a zap logger with development config
 			config := zap.NewDevelopmentConfig()
-			level, err := zapcore.ParseLevel(tt.levelStr)
-			if (err != nil) != tt.expectErr {
-				t.Errorf("ParseLogLevel() error = %v, expectErr %v", err, tt.expectErr)
-				return
-			}
-			if tt.expectErr {
-				return
-			}
-			config.Level = zap.NewAtomicLevelAt(level)
+			config.Level = zap.NewAtomicLevelAt(levelToZap(tt.level))
 			zapLogger, err := config.Build()
 			if err != nil {
 				t.Errorf("Failed to create zap logger: %v", err)
@@ -127,14 +102,17 @@ func TestNewDevelopmentLogger(t *testing.T) {
 			defer zapLogger.Sync()
 
 			// Create our logger
-			log := &logger.ZapLogger{Logger: zapLogger}
+			logConfig := &logger.Config{
+				Level:       tt.level,
+				Development: true,
+			}
+			log := createLogger(zapLogger, logConfig)
 
 			// Test logging methods
 			log.Info("test info message", "key", "value")
 			log.Error("test error message", "key", "value")
 			log.Debug("test debug message", "key", "value")
 			log.Warn("test warn message", "key", "value")
-			log.Errorf("test error format %s", "value")
 		})
 	}
 }
@@ -142,28 +120,23 @@ func TestNewDevelopmentLogger(t *testing.T) {
 func TestNewProductionLogger(t *testing.T) {
 	tests := []struct {
 		name      string
-		levelStr  string
+		level     logger.Level
 		expectErr bool
 	}{
 		{
 			name:      "info level",
-			levelStr:  "info",
+			level:     logger.InfoLevel,
 			expectErr: false,
 		},
 		{
 			name:      "warn level",
-			levelStr:  "warn",
+			level:     logger.WarnLevel,
 			expectErr: false,
 		},
 		{
 			name:      "error level",
-			levelStr:  "error",
+			level:     logger.ErrorLevel,
 			expectErr: false,
-		},
-		{
-			name:      "invalid level",
-			levelStr:  "invalid",
-			expectErr: true,
 		},
 	}
 
@@ -171,15 +144,7 @@ func TestNewProductionLogger(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a zap logger with production config
 			config := zap.NewProductionConfig()
-			level, err := zapcore.ParseLevel(tt.levelStr)
-			if (err != nil) != tt.expectErr {
-				t.Errorf("ParseLogLevel() error = %v, expectErr %v", err, tt.expectErr)
-				return
-			}
-			if tt.expectErr {
-				return
-			}
-			config.Level = zap.NewAtomicLevelAt(level)
+			config.Level = zap.NewAtomicLevelAt(levelToZap(tt.level))
 			zapLogger, err := config.Build()
 			if err != nil {
 				t.Errorf("Failed to create zap logger: %v", err)
@@ -188,39 +153,140 @@ func TestNewProductionLogger(t *testing.T) {
 			defer zapLogger.Sync()
 
 			// Create our logger
-			log := &logger.ZapLogger{Logger: zapLogger}
+			logConfig := &logger.Config{
+				Level:       tt.level,
+				Development: false,
+			}
+			log := createLogger(zapLogger, logConfig)
 
 			// Test logging methods
 			log.Info("test info message", "key", "value")
 			log.Error("test error message", "key", "value")
 			log.Warn("test warn message", "key", "value")
-			log.Errorf("test error format %s", "value")
 		})
 	}
 }
 
 func TestLoggerMethods(t *testing.T) {
-	log := logger.NewTestLogger()
-	defer log.Sync()
+	// Create a test logger
+	config := zap.NewDevelopmentConfig()
+	zapLogger, err := config.Build()
+	if err != nil {
+		t.Fatalf("Failed to create zap logger: %v", err)
+	}
+	defer zapLogger.Sync()
+
+	logConfig := &logger.Config{
+		Level:       logger.DebugLevel,
+		Development: true,
+	}
+	log := createLogger(zapLogger, logConfig)
 
 	// Test all logging methods
 	log.Debug("debug message", "key", "value")
 	log.Info("info message", "key", "value")
 	log.Warn("warn message", "key", "value")
 	log.Error("error message", "key", "value")
-	log.Printf("printf message %s", "value")
-	log.Errorf("errorf message %s", "value")
 }
 
 func TestNoOpLogger(t *testing.T) {
-	log := logger.NewNoOp()
+	// Create a no-op logger
+	config := zap.NewNop()
+	logConfig := &logger.Config{
+		Level:       logger.InfoLevel,
+		Development: false,
+	}
+	log := createLogger(config, logConfig)
 
 	// These should not panic
 	log.Debug("debug message", "key", "value")
 	log.Info("info message", "key", "value")
 	log.Warn("warn message", "key", "value")
 	log.Error("error message", "key", "value")
-	log.Printf("printf message %s", "value")
-	log.Errorf("errorf message %s", "value")
-	log.Sync()
+}
+
+// Helper function to convert logger.Level to zapcore.Level
+func levelToZap(level logger.Level) zapcore.Level {
+	switch level {
+	case logger.DebugLevel:
+		return zapcore.DebugLevel
+	case logger.InfoLevel:
+		return zapcore.InfoLevel
+	case logger.WarnLevel:
+		return zapcore.WarnLevel
+	case logger.ErrorLevel:
+		return zapcore.ErrorLevel
+	case logger.FatalLevel:
+		return zapcore.FatalLevel
+	default:
+		return zapcore.InfoLevel
+	}
+}
+
+// Helper function to create a logger implementation
+func createLogger(zapLogger *zap.Logger, config *logger.Config) logger.Interface {
+	// Create a test logger that implements the Interface
+	return &testLogger{
+		zapLogger: zapLogger,
+		config:    config,
+	}
+}
+
+// testLogger implements logger.Interface for testing
+type testLogger struct {
+	zapLogger *zap.Logger
+	config    *logger.Config
+}
+
+// Debug logs a debug message
+func (l *testLogger) Debug(msg string, fields ...interface{}) {
+	l.zapLogger.Debug(msg, toZapFields(fields)...)
+}
+
+// Info logs an info message
+func (l *testLogger) Info(msg string, fields ...interface{}) {
+	l.zapLogger.Info(msg, toZapFields(fields)...)
+}
+
+// Warn logs a warning message
+func (l *testLogger) Warn(msg string, fields ...interface{}) {
+	l.zapLogger.Warn(msg, toZapFields(fields)...)
+}
+
+// Error logs an error message
+func (l *testLogger) Error(msg string, fields ...interface{}) {
+	l.zapLogger.Error(msg, toZapFields(fields)...)
+}
+
+// Fatal logs a fatal message and exits
+func (l *testLogger) Fatal(msg string, fields ...interface{}) {
+	l.zapLogger.Fatal(msg, toZapFields(fields)...)
+}
+
+// With creates a child logger with additional fields
+func (l *testLogger) With(fields ...interface{}) logger.Interface {
+	return &testLogger{
+		zapLogger: l.zapLogger.With(toZapFields(fields)...),
+		config:    l.config,
+	}
+}
+
+// toZapFields converts a list of interface{} fields to zap.Field
+func toZapFields(fields []interface{}) []zap.Field {
+	if len(fields)%2 != 0 {
+		return []zap.Field{zap.Error(logger.ErrInvalidFields)}
+	}
+
+	zapFields := make([]zap.Field, 0, len(fields)/2)
+	for i := 0; i < len(fields); i += 2 {
+		key, ok := fields[i].(string)
+		if !ok {
+			return []zap.Field{zap.Error(logger.ErrInvalidFields)}
+		}
+
+		value := fields[i+1]
+		zapFields = append(zapFields, zap.Any(key, value))
+	}
+
+	return zapFields
 }

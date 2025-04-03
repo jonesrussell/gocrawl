@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Params contains the dependencies required to create a logger.
@@ -66,20 +67,20 @@ var Module = fx.Module("logger",
 	),
 )
 
-// levelToZap converts a logger.Level to a zap.Level.
-func levelToZap(level Level) zap.Level {
+// levelToZap converts a logger.Level to a zapcore.Level.
+func levelToZap(level Level) zapcore.Level {
 	switch level {
 	case DebugLevel:
-		return zap.DebugLevel
+		return zapcore.DebugLevel
 	case InfoLevel:
-		return zap.InfoLevel
+		return zapcore.InfoLevel
 	case WarnLevel:
-		return zap.WarnLevel
+		return zapcore.WarnLevel
 	case ErrorLevel:
-		return zap.ErrorLevel
+		return zapcore.ErrorLevel
 	case FatalLevel:
-		return zap.FatalLevel
+		return zapcore.FatalLevel
 	default:
-		return zap.InfoLevel
+		return zapcore.InfoLevel
 	}
 }
