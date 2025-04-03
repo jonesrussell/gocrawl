@@ -5,10 +5,10 @@ app:
   debug: false
 
 crawler:
-  base_url: http://localhost:8080
-  max_depth: 1
-  rate_limit: 1s
-  parallelism: 1
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
   source_file: testdata/sources.yml
 
 log:

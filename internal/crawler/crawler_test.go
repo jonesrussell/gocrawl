@@ -261,24 +261,11 @@ func TestCrawlerStartup(t *testing.T) {
 			func() debug.Debugger { return &debug.LogDebugger{} },
 			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSources },
-			fx.Annotate(
-				func() common.Processor { return articleProcessor },
-				fx.ResultTags(`name:"articleProcessor"`),
-			),
-			fx.Annotate(
-				func() common.Processor { return contentProcessor },
-				fx.ResultTags(`name:"contentProcessor"`),
-			),
+			func() []common.Processor {
+				return []common.Processor{articleProcessor, contentProcessor}
+			},
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			fx.Annotate(
-				func() string { return "test_index" },
-				fx.ResultTags(`name:"indexName"`),
-			),
-			fx.Annotate(
-				func() string { return "test_content_index" },
-				fx.ResultTags(`name:"contentIndex"`),
-			),
 		),
 		crawler.Module,
 	)
@@ -300,14 +287,31 @@ func TestCrawlerShutdown(t *testing.T) {
 
 	// Create mock dependencies
 	mockIndexManager := &MockIndexManager{}
-	mockSources := &MockSources{}
+	mockSources := &MockSources{
+		sources: []sources.Config{
+			{
+				Name:         "test",
+				URL:          "http://test.example.com",
+				ArticleIndex: "test_articles",
+				Index:        "test_content",
+			},
+		},
+	}
 	mockBus := &MockBus{}
 	articleProcessor := &MockProcessor{}
 	contentProcessor := &MockProcessor{}
 
 	// Set up expectations
-	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-	mockSources.On("GetSources").Return([]sources.Config{}, nil)
+	mockIndexManager.On("IndexExists", mock.Anything, "test_articles").Return(true, nil)
+	mockIndexManager.On("IndexExists", mock.Anything, "test_content").Return(true, nil)
+	mockSources.On("GetSources").Return([]sources.Config{
+		{
+			Name:         "test",
+			URL:          "http://test.example.com",
+			ArticleIndex: "test_articles",
+			Index:        "test_content",
+		},
+	}, nil)
 
 	// Create test app
 	app := fxtest.New(t,
@@ -316,26 +320,17 @@ func TestCrawlerShutdown(t *testing.T) {
 			func() debug.Debugger { return &debug.LogDebugger{} },
 			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSources },
-			fx.Annotate(
-				func() common.Processor { return articleProcessor },
-				fx.ResultTags(`name:"articleProcessor"`),
-			),
-			fx.Annotate(
-				func() common.Processor { return contentProcessor },
-				fx.ResultTags(`name:"contentProcessor"`),
-			),
+			func() []common.Processor {
+				return []common.Processor{articleProcessor, contentProcessor}
+			},
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			fx.Annotate(
-				func() string { return "test_index" },
-				fx.ResultTags(`name:"indexName"`),
-			),
-			fx.Annotate(
-				func() string { return "test_content_index" },
-				fx.ResultTags(`name:"contentIndex"`),
-			),
 		),
 		crawler.Module,
+		fx.Invoke(func(c crawler.Interface) error {
+			// Start the crawler
+			return c.Start(context.Background(), "test")
+		}),
 	)
 
 	// Start the app
@@ -375,24 +370,11 @@ func TestSourceValidation(t *testing.T) {
 			func() debug.Debugger { return &debug.LogDebugger{} },
 			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSources },
-			fx.Annotate(
-				func() common.Processor { return articleProcessor },
-				fx.ResultTags(`name:"articleProcessor"`),
-			),
-			fx.Annotate(
-				func() common.Processor { return contentProcessor },
-				fx.ResultTags(`name:"contentProcessor"`),
-			),
+			func() []common.Processor {
+				return []common.Processor{articleProcessor, contentProcessor}
+			},
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			fx.Annotate(
-				func() string { return "test_index" },
-				fx.ResultTags(`name:"indexName"`),
-			),
-			fx.Annotate(
-				func() string { return "test_content_index" },
-				fx.ResultTags(`name:"contentIndex"`),
-			),
 		),
 		crawler.Module,
 	)
@@ -434,24 +416,11 @@ func TestErrorHandling(t *testing.T) {
 			func() debug.Debugger { return &debug.LogDebugger{} },
 			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSources },
-			fx.Annotate(
-				func() common.Processor { return articleProcessor },
-				fx.ResultTags(`name:"articleProcessor"`),
-			),
-			fx.Annotate(
-				func() common.Processor { return contentProcessor },
-				fx.ResultTags(`name:"contentProcessor"`),
-			),
+			func() []common.Processor {
+				return []common.Processor{articleProcessor, contentProcessor}
+			},
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			fx.Annotate(
-				func() string { return "test_index" },
-				fx.ResultTags(`name:"indexName"`),
-			),
-			fx.Annotate(
-				func() string { return "test_content_index" },
-				fx.ResultTags(`name:"contentIndex"`),
-			),
 		),
 		crawler.Module,
 	)
@@ -508,24 +477,11 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 			func() debug.Debugger { return &debug.LogDebugger{} },
 			func() api.IndexManager { return mockIndexManager },
 			func() sources.Interface { return mockSources },
-			fx.Annotate(
-				func() common.Processor { return articleProcessor },
-				fx.ResultTags(`name:"articleProcessor"`),
-			),
-			fx.Annotate(
-				func() common.Processor { return contentProcessor },
-				fx.ResultTags(`name:"contentProcessor"`),
-			),
+			func() []common.Processor {
+				return []common.Processor{articleProcessor, contentProcessor}
+			},
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			fx.Annotate(
-				func() string { return "test_index" },
-				fx.ResultTags(`name:"indexName"`),
-			),
-			fx.Annotate(
-				func() string { return "test_content_index" },
-				fx.ResultTags(`name:"contentIndex"`),
-			),
 		),
 		crawler.Module,
 	)
@@ -556,24 +512,11 @@ func TestModuleProvides(t *testing.T) {
 			func() debug.Debugger { return &debug.LogDebugger{} },
 			func() api.IndexManager { return &MockIndexManager{} },
 			func() sources.Interface { return &MockSources{} },
-			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"articleProcessor"`),
-			),
-			fx.Annotate(
-				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"contentProcessor"`),
-			),
+			func() []common.Processor {
+				return []common.Processor{&MockProcessor{}, &MockProcessor{}}
+			},
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			fx.Annotate(
-				func() string { return "test_index" },
-				fx.ResultTags(`name:"indexName"`),
-			),
-			fx.Annotate(
-				func() string { return "test_content_index" },
-				fx.ResultTags(`name:"contentIndex"`),
-			),
 		),
 		crawler.Module,
 	)

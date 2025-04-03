@@ -181,6 +181,29 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		return fmt.Errorf("source not found: %s", sourceName)
 	}
 
+	// Validate that required indices exist
+	exists, err := c.indexManager.IndexExists(ctx, source.ArticleIndex)
+	if err != nil {
+		return fmt.Errorf("failed to check article index: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("article index %s does not exist", source.ArticleIndex)
+	}
+
+	exists, err = c.indexManager.IndexExists(ctx, source.Index)
+	if err != nil {
+		return fmt.Errorf("failed to check content index: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("content index %s does not exist", source.Index)
+	}
+
+	// Get list of sources to validate configuration
+	_, err = c.sources.GetSources()
+	if err != nil {
+		return fmt.Errorf("failed to get sources: %w", err)
+	}
+
 	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
 
 	// Create a cancellable context for the crawler
