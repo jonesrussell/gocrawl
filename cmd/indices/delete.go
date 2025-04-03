@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -18,9 +17,9 @@ import (
 	"go.uber.org/fx"
 )
 
-// deleteSourceName holds the name of the source whose indices should be deleted
+// DeleteSourceName holds the name of the source whose indices should be deleted
 // when the --source flag is used
-var deleteSourceName string
+var DeleteSourceName string
 
 // Deleter implements the indices delete command
 type Deleter struct {
@@ -53,7 +52,7 @@ func NewDeleter(
 
 // Start executes the delete operation
 func (d *Deleter) Start(ctx context.Context) error {
-	d.logger.Info("Starting index deletion", "indices", d.indices, "source", deleteSourceName)
+	d.logger.Info("Starting index deletion", "indices", d.indices, "source", DeleteSourceName)
 
 	// Test storage connection
 	if err := d.storage.TestConnection(ctx); err != nil {
@@ -62,10 +61,10 @@ func (d *Deleter) Start(ctx context.Context) error {
 	}
 
 	// Resolve indices to delete
-	if deleteSourceName != "" {
-		source := d.sources.FindByName(deleteSourceName)
+	if DeleteSourceName != "" {
+		source := d.sources.FindByName(DeleteSourceName)
 		if source == nil {
-			return fmt.Errorf("source not found: %s", deleteSourceName)
+			return fmt.Errorf("source not found: %s", DeleteSourceName)
 		}
 		d.indices = []string{source.Index, source.ArticleIndex}
 		d.logger.Info("Resolved source indices", "indices", d.indices)
@@ -189,22 +188,18 @@ Example:
 
 	// Add command-line flags
 	cmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
-	cmd.Flags().StringVar(&deleteSourceName, "source", "", "Delete indices for a specific source")
+	cmd.Flags().StringVar(&DeleteSourceName, "source", "", "Delete indices for a specific source")
 
 	return cmd
 }
 
 // validateDeleteArgs validates the command arguments to ensure they are valid.
 func validateDeleteArgs(_ *cobra.Command, args []string) error {
-	if deleteSourceName == "" && len(args) == 0 {
+	if DeleteSourceName == "" && len(args) == 0 {
 		return errors.New("either specify indices or use --source flag")
 	}
-	if deleteSourceName != "" && len(args) > 0 {
+	if DeleteSourceName != "" && len(args) > 0 {
 		return errors.New("cannot specify both indices and --source flag")
-	}
-	// Trim quotes from source name if present
-	if deleteSourceName != "" {
-		deleteSourceName = strings.Trim(deleteSourceName, "\"")
 	}
 	return nil
 }
