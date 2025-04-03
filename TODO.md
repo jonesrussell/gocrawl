@@ -21,6 +21,12 @@
   - [x] Remove duplicate TODO files
   - [ ] Clean up unused imports
   - [ ] Remove deprecated code
+- [ ] Consolidate Index Managers
+  - [ ] Keep ElasticsearchIndexManager as primary implementation
+  - [ ] Remove IndexManager implementation
+  - [ ] Update all references to use ElasticsearchIndexManager
+  - [ ] Update tests to use ElasticsearchIndexManager
+  - [ ] Update documentation
 - [ ] Standardize Package Structure
   - [ ] Move all interfaces to `interface.go`
   - [ ] Move all types to `types.go`
