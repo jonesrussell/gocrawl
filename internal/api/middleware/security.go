@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -125,7 +126,7 @@ func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
 	c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key")
 
-	if c.Request.Method == "OPTIONS" {
+	if c.Request.Method == http.MethodOptions {
 		c.AbortWithStatus(http.StatusOK)
 	}
 
@@ -164,7 +165,7 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 		info.count = 1
 		info.lastAccess = now
 	} else if info.count >= m.config.Security.RateLimit {
-		return fmt.Errorf("rate limit exceeded")
+		return errors.New("rate limit exceeded")
 	} else {
 		info.count++
 		info.lastAccess = now
@@ -177,11 +178,11 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 func (m *SecurityMiddleware) authenticate(c *gin.Context) error {
 	apiKey := c.GetHeader("X-Api-Key")
 	if apiKey == "" {
-		return fmt.Errorf("missing API key")
+		return errors.New("missing API key")
 	}
 
 	if apiKey != m.config.Security.APIKey {
-		return fmt.Errorf("invalid API key")
+		return errors.New("invalid API key")
 	}
 
 	return nil
