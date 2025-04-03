@@ -234,6 +234,9 @@ You can specify one or more indices to delete, or use the --source flag to delet
 
 // ValidateDeleteArgs validates the command arguments to ensure they are valid.
 func ValidateDeleteArgs(sourceName string, args []string) error {
+	if sourceName == "" && len(args) == 0 {
+		return errors.New("either specify indices or use --source flag")
+	}
 	if sourceName != "" && len(args) > 0 {
 		return errors.New("cannot specify both indices and --source flag")
 	}

@@ -126,14 +126,12 @@ var Module = fx.Module("storage",
 			}
 		},
 		// Provide storage client
-		fx.Annotate(
-			NewStorage,
-			fx.As(new(types.Interface)),
-		),
+		func(client *es.Client, logger logger.Interface, opts Options) types.Interface {
+			return NewStorage(client, logger, opts)
+		},
 		// Provide search manager
-		fx.Annotate(
-			NewSearchManager,
-			fx.As(new(api.SearchManager)),
-		),
+		func(storage types.Interface, logger logger.Interface) api.SearchManager {
+			return NewSearchManager(storage, logger)
+		},
 	),
 )

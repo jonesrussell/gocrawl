@@ -19,7 +19,6 @@ var Module = fx.Module("indices",
 	storage.Module,
 	sources.Module,
 	fx.Provide(
-		NewDeleter,
 		NewCreator,
 		NewLister,
 		func() *logger.Config {

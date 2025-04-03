@@ -8,6 +8,8 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/indices"
 	"github.com/jonesrussell/gocrawl/cmd/indices/test"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/testutils"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -18,7 +20,9 @@ import (
 )
 
 func TestDeleteCommand(t *testing.T) {
-	t.Parallel()
+	// Set up test environment
+	cleanup := testutils.SetupTestEnv(t)
+	defer cleanup()
 
 	tests := []struct {
 		name        string
@@ -183,8 +187,6 @@ func TestDeleteCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			setupMocks := func() (*test.MockStorage, *test.MockSources) {
 				mockStore := &test.MockStorage{}
 				mockSources := &test.MockSources{}
@@ -201,13 +203,39 @@ func TestDeleteCommand(t *testing.T) {
 			// Create test app
 			app := fx.New(
 				fx.NopLogger,
-				indices.Module,
+				config.Module,
+				logger.Module,
 				fx.Provide(
+					fx.Annotate(
+						func() *testing.T { return t },
+						fx.ResultTags(`name:"test"`),
+					),
+					fx.Annotate(
+						testutils.NewTestLogger,
+						fx.ParamTags(`name:"test"`),
+					),
+					func() logger.Config {
+						return logger.Config{
+							Level:       logger.DebugLevel,
+							Development: true,
+							Encoding:    "console",
+						}
+					},
+					func() logger.Params {
+						return logger.Params{
+							Config: &logger.Config{
+								Level:       logger.DebugLevel,
+								Development: true,
+								Encoding:    "console",
+							},
+						}
+					},
 					func() storagetypes.Interface { return mockStore },
 					func() sources.Interface { return mockSources },
 					func() []string { return tt.indices },
 					func() bool { return tt.force },
 					func() string { return tt.sourceName },
+					func() context.Context { return t.Context() },
 					indices.NewDeleter,
 				),
 				fx.Invoke(func(lc fx.Lifecycle, deleter *indices.Deleter, ctx context.Context) {
@@ -219,10 +247,10 @@ func TestDeleteCommand(t *testing.T) {
 								if tt.errContains != "" {
 									require.Contains(t, err.Error(), tt.errContains)
 								}
-							} else {
-								require.NoError(t, err)
+								return err // Propagate the error when we expect it
 							}
-							return err
+							require.NoError(t, err)
+							return nil
 						},
 						OnStop: func(ctx context.Context) error {
 							return nil
@@ -231,8 +259,23 @@ func TestDeleteCommand(t *testing.T) {
 				}),
 			)
 
-			require.NoError(t, app.Start(t.Context()))
-			defer app.Stop(t.Context())
+			if err := app.Start(context.Background()); err != nil {
+				if tt.wantErr {
+					require.Error(t, err)
+					if tt.errContains != "" {
+						require.Contains(t, err.Error(), tt.errContains)
+					}
+					return
+				}
+				require.NoError(t, err)
+			}
+
+			// Ensure app is stopped properly
+			defer func() {
+				if err := app.Stop(context.Background()); err != nil {
+					t.Logf("Error stopping application: %v", err)
+				}
+			}()
 		})
 	}
 }

@@ -1,7 +1,0 @@
-
-crawler:
-  base_url: http://test.example.com
-  max_depth: 2
-  rate_limit: 0s
-  parallelism: 2
-  source_file: internal/config/testdata/sources.yml
