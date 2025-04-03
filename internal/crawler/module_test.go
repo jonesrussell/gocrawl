@@ -8,13 +8,13 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -53,24 +53,22 @@ var TestCommonModule = fx.Module("testCommon",
 var TestConfigModule = fx.Module("testConfig",
 	fx.Provide(
 		func() config.Interface {
-			mockCfg := &testutils.MockConfig{}
-			mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+			mockCfg := testutils.NewMockConfig()
+			mockCfg.WithAppConfig(&config.AppConfig{
 				Environment: "test",
 				Name:        "gocrawl",
 				Version:     "1.0.0",
 				Debug:       true,
 			})
-			mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+			mockCfg.WithLogConfig(&config.LogConfig{
 				Level: "debug",
 				Debug: true,
 			})
-			mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+			mockCfg.WithElasticsearchConfig(&config.ElasticsearchConfig{
 				Addresses: []string{"http://localhost:9200"},
 				IndexName: "test-index",
 			})
-			mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
-			mockCfg.On("GetSources").Return([]config.Source{}, nil)
-			mockCfg.On("GetCommand").Return("test")
+			mockCfg.WithSources([]config.Source{})
 			return mockCfg
 		},
 	),

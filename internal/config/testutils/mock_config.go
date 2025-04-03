@@ -16,12 +16,13 @@ const (
 
 // MockConfig is a mock implementation of the config.Interface for testing.
 type MockConfig struct {
-	sources       []config.Source
-	crawlerConfig *config.CrawlerConfig
-	logConfig     *config.LogConfig
-	appConfig     *config.AppConfig
-	esConfig      *config.ElasticsearchConfig
-	serverConfig  *config.ServerConfig
+	sources        []config.Source
+	crawlerConfig  *config.CrawlerConfig
+	logConfig      *config.LogConfig
+	appConfig      *config.AppConfig
+	esConfig       *config.ElasticsearchConfig
+	serverConfig   *config.ServerConfig
+	priorityConfig *config.PriorityConfig
 }
 
 // NewMockConfig creates a new mock config with default values.
@@ -50,6 +51,10 @@ func NewMockConfig() *MockConfig {
 			ReadTimeout:  defaultReadTimeout,
 			WriteTimeout: defaultWriteTimeout,
 			IdleTimeout:  defaultIdleTimeout,
+		},
+		priorityConfig: &config.PriorityConfig{
+			Default: 1,
+			Rules:   []config.PriorityRule{},
 		},
 	}
 }
@@ -135,6 +140,11 @@ func (m *MockConfig) GetServerConfig() *config.ServerConfig {
 // GetCommand implements config.Interface.
 func (m *MockConfig) GetCommand() string {
 	return "test"
+}
+
+// GetPriorityConfig implements config.Interface.
+func (m *MockConfig) GetPriorityConfig() *config.PriorityConfig {
+	return m.priorityConfig
 }
 
 // Ensure MockConfig implements config.Interface

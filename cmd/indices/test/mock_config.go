@@ -39,3 +39,10 @@ func (m *MockConfig) GetSources() []config.Source {
 func (m *MockConfig) GetCrawlerConfig() *config.CrawlerConfig {
 	return nil
 }
+
+func (m *MockConfig) GetPriorityConfig() *config.PriorityConfig {
+	return &config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	}
+}
