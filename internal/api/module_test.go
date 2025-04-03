@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api"
@@ -92,6 +91,23 @@ func setupTestApp(t *testing.T) *testServer {
 	})
 	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
 		Address: ":8080",
+		Security: struct {
+			Enabled   bool   `yaml:"enabled"`
+			APIKey    string `yaml:"api_key"`
+			RateLimit int    `yaml:"rate_limit"`
+			CORS      struct {
+				Enabled        bool     `yaml:"enabled"`
+				AllowedOrigins []string `yaml:"allowed_origins"`
+				AllowedMethods []string `yaml:"allowed_methods"`
+				AllowedHeaders []string `yaml:"allowed_headers"`
+				MaxAge         int      `yaml:"max_age"`
+			} `yaml:"cors"`
+			TLS config.TLSConfig `yaml:"tls"`
+		}{
+			Enabled:   true,
+			APIKey:    testAPIKey,
+			RateLimit: 100,
+		},
 	})
 	mockConfig.On("GetSources").Return([]config.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
@@ -111,26 +127,20 @@ func setupTestApp(t *testing.T) *testServer {
 				"content": "test",
 			},
 		},
-		"size": 10,
+		"size": 0,
 	}
-	mockSearch.On("Search", mock.Anything, "test", expectedQuery).Return([]any{
+	t.Logf("Setting up mock expectations with query: %+v", expectedQuery)
+	mockSearch.On("Search", t.Context(), "", expectedQuery).Return([]any{
 		map[string]any{
 			"title": "Test Result",
 			"url":   "https://test.com",
 		},
-	}, nil)
-	mockSearch.On("Count", mock.Anything, "test", expectedQuery).Return(int64(1), nil)
-
-	// Configure server security
-	serverConfig := &config.ServerConfig{
-		Address:      ":0", // Use random port for testing
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-	serverConfig.Security.Enabled = true
-	serverConfig.Security.APIKey = testAPIKey
-	serverConfig.Security.RateLimit = 100 // High rate limit for tests
+	}, nil).Run(func(args mock.Arguments) {
+		t.Logf("Search called with args: %+v", args)
+	})
+	mockSearch.On("Count", t.Context(), "", expectedQuery).Return(int64(1), nil).Run(func(args mock.Arguments) {
+		t.Logf("Count called with args: %+v", args)
+	})
 
 	ts := &testServer{
 		logger: mockLogger,
@@ -163,10 +173,6 @@ func setupTestApp(t *testing.T) *testServer {
 			fx.Annotate(
 				t.Context(),
 				fx.As(new(context.Context)),
-			),
-			fx.Annotate(
-				serverConfig,
-				fx.As(new(*config.ServerConfig)),
 			),
 		),
 		api.Module,
@@ -257,7 +263,7 @@ func TestSearchEndpoint(t *testing.T) {
 			body:           `{"query": "test"}`,
 			apiKey:         "",
 			expectedStatus: 401,
-			expectedBody:   `{"code":401,"message":"API key is required"}`,
+			expectedBody:   `{"code":401,"message":"missing API key"}`,
 		},
 		{
 			name:           "handles invalid API key",
