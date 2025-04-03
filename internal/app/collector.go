@@ -49,8 +49,7 @@ func SetupCollector(
 		log,
 		indexManager,
 		sources,
-		processors[0], // First processor is for articles
-		processors[1], // Second processor is for content
+		processors,
 		bus,
 	)
 

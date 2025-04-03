@@ -360,8 +360,16 @@ func TestSourceValidation(t *testing.T) {
 	contentProcessor := &MockProcessor{}
 
 	// Set up expectations
-	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-	mockSources.On("GetSources").Return([]sources.Config{}, nil)
+	mockIndexManager.On("IndexExists", mock.Anything, "test_articles").Return(true, nil)
+	mockIndexManager.On("IndexExists", mock.Anything, "test_content").Return(true, nil)
+	mockSources.On("GetSources").Return([]sources.Config{
+		{
+			Name:         "test",
+			URL:          "http://test.example.com",
+			ArticleIndex: "test_articles",
+			Index:        "test_content",
+		},
+	}, nil)
 
 	// Create test app
 	app := fxtest.New(t,
@@ -377,6 +385,10 @@ func TestSourceValidation(t *testing.T) {
 			func() chan *models.Article { return make(chan *models.Article, 100) },
 		),
 		crawler.Module,
+		fx.Invoke(func(c crawler.Interface) error {
+			// Start the crawler
+			return c.Start(context.Background(), "test")
+		}),
 	)
 
 	// Start the app
@@ -406,8 +418,16 @@ func TestErrorHandling(t *testing.T) {
 	contentProcessor := &MockProcessor{}
 
 	// Set up expectations
-	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-	mockSources.On("GetSources").Return([]sources.Config{}, nil)
+	mockIndexManager.On("IndexExists", mock.Anything, "test_articles").Return(true, nil)
+	mockIndexManager.On("IndexExists", mock.Anything, "test_content").Return(true, nil)
+	mockSources.On("GetSources").Return([]sources.Config{
+		{
+			Name:         "test",
+			URL:          "http://test.example.com",
+			ArticleIndex: "test_articles",
+			Index:        "test_content",
+		},
+	}, nil)
 
 	// Create test app
 	app := fxtest.New(t,
@@ -423,6 +443,10 @@ func TestErrorHandling(t *testing.T) {
 			func() chan *models.Article { return make(chan *models.Article, 100) },
 		),
 		crawler.Module,
+		fx.Invoke(func(c crawler.Interface) error {
+			// Start the crawler
+			return c.Start(context.Background(), "test")
+		}),
 	)
 
 	// Start the app
@@ -467,8 +491,16 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 	contentProcessor := &MockProcessor{}
 
 	// Set up expectations
-	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-	mockSources.On("GetSources").Return([]sources.Config{}, nil)
+	mockIndexManager.On("IndexExists", mock.Anything, "test_articles").Return(true, nil)
+	mockIndexManager.On("IndexExists", mock.Anything, "test_content").Return(true, nil)
+	mockSources.On("GetSources").Return([]sources.Config{
+		{
+			Name:         "test",
+			URL:          "http://test.example.com",
+			ArticleIndex: "test_articles",
+			Index:        "test_content",
+		},
+	}, nil)
 
 	// Create test app
 	app := fxtest.New(t,
@@ -484,6 +516,10 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 			func() chan *models.Article { return make(chan *models.Article, 100) },
 		),
 		crawler.Module,
+		fx.Invoke(func(c crawler.Interface) error {
+			// Start the crawler
+			return c.Start(context.Background(), "test")
+		}),
 	)
 
 	// Start the app

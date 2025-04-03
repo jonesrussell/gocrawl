@@ -27,6 +27,39 @@ type Result struct {
 	Crawler Interface
 }
 
+// ProvideCrawler creates a new crawler instance with the given dependencies.
+func ProvideCrawler(
+	logger logger.Interface,
+	indexManager api.IndexManager,
+	sources sources.Interface,
+	processors []common.Processor,
+	bus *events.Bus,
+) Result {
+	// Find article and content processors
+	var articleProcessor, contentProcessor common.Processor
+	for _, p := range processors {
+		if p.ContentType() == common.ContentTypeArticle {
+			articleProcessor = p
+		} else if p.ContentType() == common.ContentTypePage {
+			contentProcessor = p
+		}
+	}
+
+	crawler := NewCrawler(
+		logger,
+		indexManager,
+		sources,
+		articleProcessor,
+		contentProcessor,
+		bus,
+	)
+
+	logger.Info("Created crawler instance")
+	return Result{
+		Crawler: crawler,
+	}
+}
+
 // Module provides the crawler module for dependency injection.
 var Module = fx.Module("crawler",
 	fx.Provide(
@@ -40,37 +73,7 @@ var Module = fx.Module("crawler",
 			)
 		},
 		// Provide the crawler
-		func(
-			logger logger.Interface,
-			indexManager api.IndexManager,
-			sources sources.Interface,
-			processors []common.Processor,
-			bus *events.Bus,
-		) Result {
-			// Find article and content processors
-			var articleProcessor, contentProcessor common.Processor
-			for _, p := range processors {
-				if p.ContentType() == common.ContentTypeArticle {
-					articleProcessor = p
-				} else if p.ContentType() == common.ContentTypePage {
-					contentProcessor = p
-				}
-			}
-
-			crawler := NewCrawler(
-				logger,
-				indexManager,
-				sources,
-				articleProcessor,
-				contentProcessor,
-				bus,
-			)
-
-			logger.Info("Created crawler instance")
-			return Result{
-				Crawler: crawler,
-			}
-		},
+		ProvideCrawler,
 	),
 )
 
