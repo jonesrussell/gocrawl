@@ -71,12 +71,7 @@ linters:
     - usetesting
     - wastedassign
     - whitespace
-    - gosimple
-    - ineffassign
     - misspell
-    - stylecheck
-    - varcheck
-    - whitespace
   settings:
     cyclop:
       max-complexity: 30
