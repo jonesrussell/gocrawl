@@ -1,8 +1,8 @@
 package config_test
 
 import (
-	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +14,26 @@ import (
 
 // TestModule provides tests for the config module's dependency injection.
 func TestModule(t *testing.T) {
+	// Create temporary test directory
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yml")
+	sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+	// Create test sources file
+	sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+	err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+	require.NoError(t, err)
+
 	// Create test config file
 	configContent := `
 app:
@@ -26,7 +46,7 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: internal/config/testdata/sources.yml
+  source_file: ` + sourcesPath + `
 logging:
   level: debug
   debug: true
@@ -39,41 +59,17 @@ elasticsearch:
     certificate: test-cert.pem
     key: test-key.pem
 `
-	err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+	err = os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)
-	defer os.Remove("internal/config/testdata/config.yml")
-
-	// Create test sources file
-	sourcesContent := `
-sources:
-  test_source:
-    url: http://test.example.com
-    rate_limit: 2s
-    max_depth: 2
-    article_index: test_articles
-    content_index: test_content
-    selectors:
-      title: h1
-      content: article
-      author: .author
-      date: .date
-`
-	err = os.WriteFile("internal/config/testdata/sources.yml", []byte(sourcesContent), 0644)
-	require.NoError(t, err)
-	defer os.Remove("internal/config/testdata/sources.yml")
 
 	// Set environment variables
-	t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+	t.Setenv("CONFIG_FILE", configPath)
 
 	// Create test application
 	app := fxtest.New(t,
 		fx.Provide(
-			func() config.Interface {
-				cfg, err := config.New(newTestLogger(t))
-				require.NoError(t, err)
-				return cfg
-			},
 			newTestLogger,
+			config.New,
 		),
 		fx.Invoke(func(cfg config.Interface) {
 			require.NotNil(t, cfg)
@@ -126,22 +122,68 @@ func TestNewNoOp(t *testing.T) {
 
 // TestModuleLifecycle tests the module's lifecycle hooks.
 func TestModuleLifecycle(t *testing.T) {
+	// Create temporary test directory
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yml")
+	sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+	// Create test sources file
+	sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+	err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+	require.NoError(t, err)
+
+	// Create test config file
+	configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: ` + sourcesPath + `
+logging:
+  level: debug
+  debug: true
+elasticsearch:
+  addresses:
+    - https://localhost:9200
+  api_key: test_api_key
+  tls:
+    enabled: true
+    certificate: test-cert.pem
+    key: test-key.pem
+`
+	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	// Set environment variables
+	t.Setenv("CONFIG_FILE", configPath)
+
 	app := fxtest.New(t,
 		fx.Provide(
-			func() config.Interface {
-				return config.NewNoOp()
-			},
+			newTestLogger,
+			config.New,
 		),
-		fx.Invoke(func(lc fx.Lifecycle, cfg config.Interface) {
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					require.NotNil(t, cfg)
-					return nil
-				},
-				OnStop: func(ctx context.Context) error {
-					return nil
-				},
-			})
+		fx.Invoke(func(cfg config.Interface) {
+			require.NotNil(t, cfg)
+			appCfg := cfg.GetAppConfig()
+			require.Equal(t, "test", appCfg.Environment)
+			require.Equal(t, "gocrawl", appCfg.Name)
+			require.Equal(t, "1.0.0", appCfg.Version)
 		}),
 	)
 

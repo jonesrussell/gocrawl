@@ -271,8 +271,14 @@ func TestCrawlerStartup(t *testing.T) {
 			),
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			func() string { return "test_index" },
-			func() string { return "test_content_index" },
+			fx.Annotate(
+				func() string { return "test_index" },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() string { return "test_content_index" },
+				fx.ResultTags(`name:"contentIndex"`),
+			),
 		),
 		crawler.Module,
 	)
@@ -320,8 +326,14 @@ func TestCrawlerShutdown(t *testing.T) {
 			),
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			func() string { return "test_index" },
-			func() string { return "test_content_index" },
+			fx.Annotate(
+				func() string { return "test_index" },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() string { return "test_content_index" },
+				fx.ResultTags(`name:"contentIndex"`),
+			),
 		),
 		crawler.Module,
 	)
@@ -373,8 +385,14 @@ func TestSourceValidation(t *testing.T) {
 			),
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			func() string { return "test_index" },
-			func() string { return "test_content_index" },
+			fx.Annotate(
+				func() string { return "test_index" },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() string { return "test_content_index" },
+				fx.ResultTags(`name:"contentIndex"`),
+			),
 		),
 		crawler.Module,
 	)
@@ -426,8 +444,14 @@ func TestErrorHandling(t *testing.T) {
 			),
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			func() string { return "test_index" },
-			func() string { return "test_content_index" },
+			fx.Annotate(
+				func() string { return "test_index" },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() string { return "test_content_index" },
+				fx.ResultTags(`name:"contentIndex"`),
+			),
 		),
 		crawler.Module,
 	)
@@ -494,8 +518,14 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 			),
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			func() string { return "test_index" },
-			func() string { return "test_content_index" },
+			fx.Annotate(
+				func() string { return "test_index" },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() string { return "test_content_index" },
+				fx.ResultTags(`name:"contentIndex"`),
+			),
 		),
 		crawler.Module,
 	)
@@ -536,8 +566,14 @@ func TestModuleProvides(t *testing.T) {
 			),
 			func() *events.Bus { return &events.Bus{} },
 			func() chan *models.Article { return make(chan *models.Article, 100) },
-			func() string { return "test_index" },
-			func() string { return "test_content_index" },
+			fx.Annotate(
+				func() string { return "test_index" },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() string { return "test_content_index" },
+				fx.ResultTags(`name:"contentIndex"`),
+			),
 		),
 		crawler.Module,
 	)

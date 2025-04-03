@@ -99,6 +99,10 @@ func provideConfig(envFile string) func(setupConfig) (Interface, error) {
 // the application for dependency injection.
 var Module = fx.Module("config",
 	fx.Provide(
-		provideConfig(""),
+		fx.Annotate(
+			provideConfig(""),
+			fx.As(new(Interface)),
+			fx.ResultTags(`optional:"true"`),
+		),
 	),
 )

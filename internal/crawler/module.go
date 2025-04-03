@@ -39,8 +39,6 @@ var Module = fx.Module("crawler",
 				colly.ParseHTTPErrorResponse(),
 			)
 		},
-		// Provide the event bus
-		events.NewBus,
 		// Provide the crawler
 		ProvideCrawler,
 	),

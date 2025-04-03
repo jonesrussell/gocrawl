@@ -46,7 +46,7 @@ var Module = fx.Module("content",
 		) (Interface, error) {
 			return NewService(log, storage), nil
 		},
-		// Provide content processor for the group
+		// Provide content processor with both group and name tags
 		fx.Annotate(
 			func(p ProcessorParams) common.Processor {
 				// Create processor
@@ -54,17 +54,7 @@ var Module = fx.Module("content",
 				p.Logger.Debug("Created content processor", "type", fmt.Sprintf("%T", processor))
 				return processor
 			},
-			fx.ResultTags(`group:"processors"`),
-		),
-		// Provide content processor with name
-		fx.Annotate(
-			func(p ProcessorParams) common.Processor {
-				// Create processor
-				processor := NewContentProcessor(p)
-				p.Logger.Debug("Created content processor", "type", fmt.Sprintf("%T", processor))
-				return processor
-			},
-			fx.ResultTags(`name:"contentProcessor"`),
+			fx.ResultTags(`group:"processors"`, `name:"contentProcessor"`),
 		),
 	),
 )

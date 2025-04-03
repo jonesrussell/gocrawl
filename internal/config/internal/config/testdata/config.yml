@@ -1,9 +1,0 @@
-
-app:
-  environment: test
-  name: gocrawl
-  version: 1.0.0
-server:
-  security:
-    enabled: true
-    api_key: "invalid"

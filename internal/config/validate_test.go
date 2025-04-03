@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,151 +20,337 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "valid_config",
 			setup: func(t *testing.T) {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
 				// Create test config file
 				configContent := `
 app:
   environment: test
   name: gocrawl
   version: 1.0.0
+log:
+  level: info
 crawler:
-  base_url: http://test.example.com
+  source_file: ` + sourcesPath + `
   max_depth: 2
-  rate_limit: 2s
-  source_file: internal/config/testdata/sources.yml
-logging:
-  level: debug
-elasticsearch:
-  addresses:
-    - https://localhost:9200
-  api_key: test_api_key
+  parallelism: 4
+  rate_limit: 100ms
+  index_name: test-articles
+  content_index_name: test-content
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 			},
 			wantErr: false,
 		},
 		{
 			name: "invalid_app_environment",
 			setup: func(t *testing.T) {
-				// Create test config file with invalid environment
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
 				configContent := `
 app:
   environment: invalid
   name: gocrawl
   version: 1.0.0
+log:
+  level: info
+crawler:
+  source_file: ` + sourcesPath + `
+  max_depth: 2
+  parallelism: 4
+  rate_limit: 100ms
+  index_name: test-articles
+  content_index_name: test-content
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid_log_level",
 			setup: func(t *testing.T) {
-				// Create test config file with invalid log level
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
 				configContent := `
 app:
   environment: test
   name: gocrawl
   version: 1.0.0
-logging:
+log:
   level: invalid
+crawler:
+  source_file: ` + sourcesPath + `
+  max_depth: 2
+  parallelism: 4
+  rate_limit: 100ms
+  index_name: test-articles
+  content_index_name: test-content
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid_crawler_max_depth",
 			setup: func(t *testing.T) {
-				// Create test config file with invalid max depth
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
 				configContent := `
 app:
   environment: test
   name: gocrawl
   version: 1.0.0
+log:
+  level: info
 crawler:
-  max_depth: 0
+  source_file: ` + sourcesPath + `
+  max_depth: -1
+  parallelism: 4
+  rate_limit: 100ms
+  index_name: test-articles
+  content_index_name: test-content
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid_crawler_parallelism",
 			setup: func(t *testing.T) {
-				// Create test config file with invalid parallelism
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
 				configContent := `
 app:
   environment: test
   name: gocrawl
   version: 1.0.0
+log:
+  level: info
 crawler:
+  source_file: ` + sourcesPath + `
+  max_depth: 2
   parallelism: 0
+  rate_limit: 100ms
+  index_name: test-articles
+  content_index_name: test-content
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 			},
 			wantErr: true,
 		},
 		{
 			name: "server_security_enabled_without_API_key",
 			setup: func(t *testing.T) {
-				// Create test config file with security enabled but no API key
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
 				configContent := `
 app:
   environment: test
   name: gocrawl
   version: 1.0.0
+log:
+  level: info
 server:
   security:
     enabled: true
     api_key: ""
+crawler:
+  source_file: ` + sourcesPath + `
+  max_depth: 2
+  parallelism: 4
+  rate_limit: 100ms
+  index_name: test-articles
+  content_index_name: test-content
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 			},
 			wantErr: true,
 		},
 		{
 			name: "server_security_enabled_with_invalid_API_key",
 			setup: func(t *testing.T) {
-				// Create test config file with security enabled but invalid API key
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
 				configContent := `
 app:
   environment: test
   name: gocrawl
   version: 1.0.0
+log:
+  level: info
 server:
   security:
     enabled: true
-    api_key: "invalid"
+    api_key: "invalid-key"
+crawler:
+  source_file: ` + sourcesPath + `
+  max_depth: 2
+  parallelism: 4
+  rate_limit: 100ms
+  index_name: test-articles
+  content_index_name: test-content
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 			},
 			wantErr: true,
 		},

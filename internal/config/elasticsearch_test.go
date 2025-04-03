@@ -24,9 +24,14 @@ func TestElasticsearchConfig(t *testing.T) {
 				// Create temporary test directory
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
 				// Create test config file
 				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
 elasticsearch:
   addresses:
     - https://localhost:9200
@@ -35,8 +40,25 @@ elasticsearch:
     enabled: true
     certificate: test-cert.pem
     key: test-key.pem
+crawler:
+  source_file: ` + sourcesPath + `
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
@@ -57,15 +79,37 @@ elasticsearch:
 				// Create temporary test directory
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
 				// Create test config file
 				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
 elasticsearch:
   addresses:
     - https://localhost:9200
   api_key: config_api_key
+crawler:
+  source_file: ` + sourcesPath + `
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
@@ -84,15 +128,37 @@ elasticsearch:
 				// Create temporary test directory
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
 				// Create test config file
 				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
 elasticsearch:
   cloud:
     id: test-cloud-id
     api_key: test-cloud-api-key
+crawler:
+  source_file: ` + sourcesPath + `
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
@@ -110,9 +176,14 @@ elasticsearch:
 				// Create temporary test directory
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
 				// Create test config file
 				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
 elasticsearch:
   addresses:
     - https://localhost:9200
@@ -121,8 +192,25 @@ elasticsearch:
     initial_wait: 1s
     max_wait: 30s
     max_retries: 3
+crawler:
+  source_file: ` + sourcesPath + `
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
@@ -142,16 +230,38 @@ elasticsearch:
 				// Create temporary test directory
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
 				// Create test config file
 				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
 elasticsearch:
   addresses:
     - https://localhost:9200
   username: test_user
   password: test_pass
+crawler:
+  source_file: ` + sourcesPath + `
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
@@ -188,103 +298,181 @@ elasticsearch:
 func TestElasticsearchConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		setup   func(*testing.T) string
+		setup   func(*testing.T)
 		wantErr bool
 	}{
 		{
 			name: "missing API key in production",
-			setup: func(t *testing.T) string {
+			setup: func(t *testing.T) {
 				// Create temporary test directory
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
 				// Create test config file
 				configContent := `
 app:
   environment: production
+  name: gocrawl
+  version: 1.0.0
 elasticsearch:
   addresses:
     - https://localhost:9200
+crawler:
+  source_file: ` + sourcesPath + `
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				require.NoError(t, err)
+
 				// Set environment variables
 				t.Setenv("CONFIG_FILE", configPath)
-				t.Setenv("APP_ENV", "production")
-				return tmpDir
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid TLS configuration",
-			setup: func(t *testing.T) string {
+			setup: func(t *testing.T) {
 				// Create temporary test directory
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
-				// Create test config file with invalid TLS config
+				// Create test config file
 				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
 elasticsearch:
   addresses:
     - https://localhost:9200
-  api_key: test_api_key
   tls:
     enabled: true
-    certificate: non-existent-cert.pem
-    key: non-existent-key.pem
+    certificate: ""
+    key: ""
+crawler:
+  source_file: ` + sourcesPath + `
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				require.NoError(t, err)
+
 				// Set environment variables
 				t.Setenv("CONFIG_FILE", configPath)
-				return tmpDir
 			},
 			wantErr: true,
 		},
 		{
 			name: "empty addresses",
-			setup: func(t *testing.T) string {
+			setup: func(t *testing.T) {
 				// Create temporary test directory
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
-				// Create test config file with empty addresses
+				// Create test config file
 				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
 elasticsearch:
   addresses: []
-  api_key: test_api_key
+crawler:
+  source_file: ` + sourcesPath + `
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				require.NoError(t, err)
+
 				// Set environment variables
 				t.Setenv("CONFIG_FILE", configPath)
-				return tmpDir
 			},
 			wantErr: true,
 		},
 		{
 			name: "missing index name",
-			setup: func(t *testing.T) string {
+			setup: func(t *testing.T) {
 				// Create temporary test directory
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
-				// Create test config file with missing index name
+				// Create test config file
 				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
 elasticsearch:
   addresses:
     - https://localhost:9200
-  api_key: test_api_key
+crawler:
+  source_file: ` + sourcesPath + `
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				require.NoError(t, err)
+
 				// Set environment variables
 				t.Setenv("CONFIG_FILE", configPath)
-				return tmpDir
 			},
 			wantErr: true,
 		},
@@ -297,14 +485,18 @@ elasticsearch:
 			defer cleanup()
 
 			// Run test setup
-			_ = tt.setup(t)
+			tt.setup(t)
 
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))
+
+			// Validate results
 			if tt.wantErr {
 				require.Error(t, err)
+				require.Nil(t, cfg)
 				return
 			}
+
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
 		})

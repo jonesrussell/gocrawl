@@ -2,11 +2,10 @@ package config_test
 
 import (
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -31,27 +30,6 @@ func newTestLogger(t *testing.T) config.Logger {
 	return testLogger{t: t}
 }
 
-// setupTestEnv sets up the test environment and returns a cleanup function
-func setupTestEnv(t *testing.T) func() {
-	// Save current environment
-	originalEnv := os.Environ()
-
-	// Clear environment and viper config
-	os.Clearenv()
-	viper.Reset()
-
-	// Return cleanup function
-	return func() {
-		// Restore environment
-		os.Clearenv()
-		for _, e := range originalEnv {
-			k, v, _ := strings.Cut(e, "=")
-			t.Setenv(k, v)
-		}
-		viper.Reset()
-	}
-}
-
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -61,6 +39,11 @@ func TestNew(t *testing.T) {
 		{
 			name: "valid configuration",
 			setup: func(t *testing.T) {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
 				// Create test config file
 				configContent := `
 app:
@@ -73,7 +56,7 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: internal/config/testdata/sources.yml
+  source_file: ` + sourcesPath + `
 logging:
   level: debug
   debug: true
@@ -85,8 +68,13 @@ elasticsearch:
     enabled: true
     certificate: test-cert.pem
     key: test-key.pem
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
 `
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Create test sources file
@@ -104,11 +92,11 @@ sources:
       author: .author
       date: .date
 `
-				err = os.WriteFile("internal/config/testdata/sources.yml", []byte(sourcesContent), 0644)
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.NoError(t, err)
