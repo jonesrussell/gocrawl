@@ -2,7 +2,6 @@ package config_test
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -23,13 +22,12 @@ func TestValidateConfig(t *testing.T) {
 			setup: func(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
-				t.Setenv("CONFIG_FILE", filepath.Join("testdata", "config.yml"))
-				t.Setenv("CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
-				t.Setenv("APP_ENVIRONMENT", "development")
-				t.Setenv("LOG_LEVEL", "info")
-				t.Setenv("CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("CRAWLER_PARALLELISM", "2")
-				t.Setenv("SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
 			wantErr: false,
 		},
@@ -38,10 +36,12 @@ func TestValidateConfig(t *testing.T) {
 			setup: func(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
-				t.Setenv("CONFIG_FILE", filepath.Join("testdata", "config.yml"))
-				t.Setenv("CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
-				t.Setenv("APP_ENVIRONMENT", "invalid")
-				t.Setenv("SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "invalid")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
 			wantErr:     true,
 			errContains: "invalid environment",
@@ -51,11 +51,12 @@ func TestValidateConfig(t *testing.T) {
 			setup: func(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
-				t.Setenv("CONFIG_FILE", filepath.Join("testdata", "config.yml"))
-				t.Setenv("CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
-				t.Setenv("APP_ENVIRONMENT", "development")
-				t.Setenv("LOG_LEVEL", "invalid")
-				t.Setenv("SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "invalid")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
 			wantErr:     true,
 			errContains: "invalid log level",
@@ -65,12 +66,12 @@ func TestValidateConfig(t *testing.T) {
 			setup: func(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
-				t.Setenv("CONFIG_FILE", filepath.Join("testdata", "config.yml"))
-				t.Setenv("CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
-				t.Setenv("APP_ENVIRONMENT", "development")
-				t.Setenv("LOG_LEVEL", "info")
-				t.Setenv("CRAWLER_MAX_DEPTH", "-1")
-				t.Setenv("SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "-1")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
 			wantErr:     true,
 			errContains: "max depth must be greater than 0",
@@ -80,13 +81,12 @@ func TestValidateConfig(t *testing.T) {
 			setup: func(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
-				t.Setenv("CONFIG_FILE", filepath.Join("testdata", "config.yml"))
-				t.Setenv("CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
-				t.Setenv("APP_ENVIRONMENT", "development")
-				t.Setenv("LOG_LEVEL", "info")
-				t.Setenv("CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("CRAWLER_PARALLELISM", "0")
-				t.Setenv("SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "0")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
 			wantErr:     true,
 			errContains: "parallelism must be greater than 0",
@@ -96,14 +96,12 @@ func TestValidateConfig(t *testing.T) {
 			setup: func(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
-				t.Setenv("CONFIG_FILE", filepath.Join("testdata", "config.yml"))
-				t.Setenv("CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
-				t.Setenv("APP_ENVIRONMENT", "development")
-				t.Setenv("LOG_LEVEL", "info")
-				t.Setenv("CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("CRAWLER_PARALLELISM", "2")
-				t.Setenv("SERVER_SECURITY_ENABLED", "true")
-				t.Setenv("SERVER_SECURITY_API_KEY", "")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
 			wantErr:     true,
 			errContains: "API key is required when security is enabled",
@@ -113,14 +111,12 @@ func TestValidateConfig(t *testing.T) {
 			setup: func(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
-				t.Setenv("CONFIG_FILE", filepath.Join("testdata", "config.yml"))
-				t.Setenv("CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
-				t.Setenv("APP_ENVIRONMENT", "development")
-				t.Setenv("LOG_LEVEL", "info")
-				t.Setenv("CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("CRAWLER_PARALLELISM", "2")
-				t.Setenv("SERVER_SECURITY_ENABLED", "true")
-				t.Setenv("SERVER_SECURITY_API_KEY", "invalid-key")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "invalid-key")
 			},
 			wantErr:     true,
 			errContains: "invalid API key format",
@@ -139,7 +135,7 @@ func TestValidateConfig(t *testing.T) {
 			}
 
 			// Create config
-			cfg, err := config.New(testutils.NewTestLogger(t))
+			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errContains != "" {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
 	httpdcmd "github.com/jonesrussell/gocrawl/cmd/httpd"
@@ -38,9 +39,20 @@ It provides a flexible and extensible framework for building custom crawlers.`,
 )
 
 // setupConfig handles configuration file setup for all commands.
-// It ensures the config file path is absolute and sets it in the environment.
+// It ensures the config file path is absolute and configures Viper.
 func setupConfig(_ *cobra.Command, _ []string) error {
-	// If config file is provided via flag, use absolute path
+	// Initialize Viper
+	v := viper.New()
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+
+	// Add standard config paths
+	v.AddConfigPath(".")
+	v.AddConfigPath("./config")
+	v.AddConfigPath("$HOME/.gocrawl")
+	v.AddConfigPath("/etc/gocrawl")
+
+	// If config file is provided via flag, use it
 	if cfgFile != "" {
 		if !os.IsPathSeparator(cfgFile[0]) {
 			// Convert relative path to absolute
@@ -50,20 +62,26 @@ func setupConfig(_ *cobra.Command, _ []string) error {
 			}
 			cfgFile = filepath.Join(wd, cfgFile)
 		}
-		err := os.Setenv("CONFIG_FILE", cfgFile)
-		if err != nil {
-			return err
+		v.SetConfigFile(cfgFile)
+	}
+
+	// Set environment variable prefix
+	v.SetEnvPrefix("GOCRAWL")
+	v.AutomaticEnv()
+
+	// Read config file
+	if err := v.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return fmt.Errorf("failed to read config: %w", err)
 		}
+		// Config file not found, use defaults
+		fmt.Println("No config file found, using defaults")
 	}
 
 	// Set debug mode if enabled
 	if debug {
-		if err := os.Setenv("APP_DEBUG", "true"); err != nil {
-			return fmt.Errorf("failed to set debug environment variable: %w", err)
-		}
-		if err := os.Setenv("LOG_DEBUG", "true"); err != nil {
-			return fmt.Errorf("failed to set debug environment variable: %w", err)
-		}
+		v.Set("app.debug", true)
+		v.Set("log.debug", true)
 	}
 
 	return nil

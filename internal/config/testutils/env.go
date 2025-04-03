@@ -48,49 +48,34 @@ func SetupTestEnv(t *testing.T) func() {
 	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
 
 	// Configure Viper
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(testdataDir)
+	viper.SetEnvPrefix("GOCRAWL")
 	viper.AutomaticEnv()
-	viper.SetEnvPrefix("")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Set config file
-	viper.SetConfigFile(configPath)
-	viper.SetConfigType("yaml")
+	// Read config file
 	err := viper.ReadInConfig()
 	require.NoError(t, err, "failed to read config file")
 
 	// Set required environment variables
-	os.Setenv("CONFIG_FILE", configPath)
-	t.Setenv("CONFIG_FILE", configPath)
-	os.Setenv("CRAWLER_SOURCE_FILE", sourcesPath)
-	t.Setenv("CRAWLER_SOURCE_FILE", sourcesPath)
+	t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
 
 	// Set default environment variables for testing
-	os.Setenv("APP_ENVIRONMENT", "development")
-	t.Setenv("APP_ENVIRONMENT", "development")
-	os.Setenv("APP_NAME", "gocrawl-test")
-	t.Setenv("APP_NAME", "gocrawl-test")
-	os.Setenv("APP_VERSION", "0.0.1")
-	t.Setenv("APP_VERSION", "0.0.1")
-	os.Setenv("APP_DEBUG", "false")
-	t.Setenv("APP_DEBUG", "false")
-	os.Setenv("LOG_LEVEL", "info")
-	t.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LOG_DEBUG", "false")
-	t.Setenv("LOG_DEBUG", "false")
-	os.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-	t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-	os.Setenv("ELASTICSEARCH_INDEX_NAME", "test-index")
-	t.Setenv("ELASTICSEARCH_INDEX_NAME", "test-index")
-	os.Setenv("ELASTICSEARCH_API_KEY", "test_api_key")
-	t.Setenv("ELASTICSEARCH_API_KEY", "test_api_key")
-	os.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
-	t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
-	os.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
-	t.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
-	os.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
-	t.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
-	os.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
-	t.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
+	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
+	t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
+	t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
+	t.Setenv("GOCRAWL_APP_DEBUG", "false")
+	t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+	t.Setenv("GOCRAWL_LOG_DEBUG", "false")
+	t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+	t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+	t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "test_api_key")
+	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_ENABLED", "true")
+	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
+	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
+	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
 
 	// Return cleanup function
 	return func() {
@@ -120,13 +105,9 @@ func TestSetupTestEnv(t *testing.T) {
 	}
 
 	// Verify test files are set
-	configFile := os.Getenv("CONFIG_FILE")
-	if configFile == "" {
-		t.Error("CONFIG_FILE should be set")
-	}
-	sourcesFile := os.Getenv("CRAWLER_SOURCE_FILE")
+	sourcesFile := os.Getenv("GOCRAWL_CRAWLER_SOURCE_FILE")
 	if sourcesFile == "" {
-		t.Error("CRAWLER_SOURCE_FILE should be set")
+		t.Error("GOCRAWL_CRAWLER_SOURCE_FILE should be set")
 	}
 
 	// Set a new test variable
@@ -148,12 +129,8 @@ func TestSetupTestEnv(t *testing.T) {
 	}
 
 	// Verify test files are cleared
-	configFile = os.Getenv("CONFIG_FILE")
-	if configFile != "" {
-		t.Error("CONFIG_FILE should be cleared")
-	}
-	sourcesFile = os.Getenv("CRAWLER_SOURCE_FILE")
+	sourcesFile = os.Getenv("GOCRAWL_CRAWLER_SOURCE_FILE")
 	if sourcesFile != "" {
-		t.Error("CRAWLER_SOURCE_FILE should be cleared")
+		t.Error("GOCRAWL_CRAWLER_SOURCE_FILE should be cleared")
 	}
 }

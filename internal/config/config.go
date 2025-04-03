@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -229,57 +228,64 @@ type Config struct {
 
 // load loads all configuration values from Viper
 func (c *Config) load() error {
-	// Get config file path from environment
-	configFile := os.Getenv("CONFIG_FILE")
-	if configFile == "" {
-		return fmt.Errorf("CONFIG_FILE environment variable is not set")
-	}
+	// Initialize Viper
+	v := viper.New()
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
 
-	// Initialize Viper with the config file
-	viper.SetConfigFile(configFile)
-	viper.SetConfigType("yaml")
-	if err := viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
+	// Add standard config paths
+	v.AddConfigPath(".")
+	v.AddConfigPath("./config")
+	v.AddConfigPath("$HOME/.gocrawl")
+	v.AddConfigPath("/etc/gocrawl")
 
-	// Set up environment variable binding
-	viper.AutomaticEnv()
-	viper.SetEnvPrefix("")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	// Set environment variable prefix
+	v.SetEnvPrefix("GOCRAWL")
+	v.AutomaticEnv()
+
+	// Read config file
+	if err := v.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return fmt.Errorf("failed to read config: %w", err)
+		}
+		// Config file not found, use defaults
+		c.logger.Info("No config file found, using defaults")
+	}
 
 	// Debug: Print Viper values
-	fmt.Printf("Loading config from Viper:\n")
-	fmt.Printf("app.environment: %s\n", viper.GetString("app.environment"))
-	fmt.Printf("app.name: %s\n", viper.GetString("app.name"))
-	fmt.Printf("app.version: %s\n", viper.GetString("app.version"))
-	fmt.Printf("app.debug: %v\n", viper.GetBool("app.debug"))
-	fmt.Printf("log.level: %s\n", viper.GetString("log.level"))
-	fmt.Printf("log.debug: %v\n", viper.GetBool("log.debug"))
-	fmt.Printf("elasticsearch.addresses: %v\n", viper.GetStringSlice("elasticsearch.addresses"))
-	fmt.Printf("elasticsearch.username: %s\n", viper.GetString("elasticsearch.username"))
-	fmt.Printf("elasticsearch.password: %s\n", viper.GetString("elasticsearch.password"))
-	fmt.Printf("elasticsearch.api_key: %s\n", viper.GetString("elasticsearch.api_key"))
-	fmt.Printf("elasticsearch.index_name: %s\n", viper.GetString("elasticsearch.index_name"))
-	fmt.Printf("elasticsearch.cloud.id: %s\n", viper.GetString("elasticsearch.cloud.id"))
-	fmt.Printf("elasticsearch.cloud.api_key: %s\n", viper.GetString("elasticsearch.cloud.api_key"))
-	fmt.Printf("elasticsearch.tls.enabled: %v\n", viper.GetBool("elasticsearch.tls.enabled"))
-	fmt.Printf("elasticsearch.tls.certificate: %s\n", viper.GetString("elasticsearch.tls.certificate"))
-	fmt.Printf("elasticsearch.tls.key: %s\n", viper.GetString("elasticsearch.tls.key"))
-	fmt.Printf("elasticsearch.retry.enabled: %v\n", viper.GetBool("elasticsearch.retry.enabled"))
-	fmt.Printf("elasticsearch.retry.initial_wait: %s\n", viper.GetString("elasticsearch.retry.initial_wait"))
-	fmt.Printf("elasticsearch.retry.max_wait: %s\n", viper.GetString("elasticsearch.retry.max_wait"))
-	fmt.Printf("elasticsearch.retry.max_retries: %d\n", viper.GetInt("elasticsearch.retry.max_retries"))
-	fmt.Printf("crawler.source_file: %s\n", viper.GetString("crawler.source_file"))
+	c.logger.Info("Loading config from Viper",
+		String("app.environment", v.GetString("app.environment")),
+		String("app.name", v.GetString("app.name")),
+		String("app.version", v.GetString("app.version")),
+		String("app.debug", fmt.Sprintf("%v", v.GetBool("app.debug"))),
+		String("log.level", v.GetString("log.level")),
+		String("log.debug", fmt.Sprintf("%v", v.GetBool("log.debug"))),
+		String("elasticsearch.addresses", fmt.Sprintf("%v", v.GetStringSlice("elasticsearch.addresses"))),
+		String("elasticsearch.username", v.GetString("elasticsearch.username")),
+		String("elasticsearch.password", v.GetString("elasticsearch.password")),
+		String("elasticsearch.api_key", v.GetString("elasticsearch.api_key")),
+		String("elasticsearch.index_name", v.GetString("elasticsearch.index_name")),
+		String("elasticsearch.cloud.id", v.GetString("elasticsearch.cloud.id")),
+		String("elasticsearch.cloud.api_key", v.GetString("elasticsearch.cloud.api_key")),
+		String("elasticsearch.tls.enabled", fmt.Sprintf("%v", v.GetBool("elasticsearch.tls.enabled"))),
+		String("elasticsearch.tls.certificate", v.GetString("elasticsearch.tls.certificate")),
+		String("elasticsearch.tls.key", v.GetString("elasticsearch.tls.key")),
+		String("elasticsearch.retry.enabled", fmt.Sprintf("%v", v.GetBool("elasticsearch.retry.enabled"))),
+		String("elasticsearch.retry.initial_wait", v.GetString("elasticsearch.retry.initial_wait")),
+		String("elasticsearch.retry.max_wait", v.GetString("elasticsearch.retry.max_wait")),
+		String("elasticsearch.retry.max_retries", fmt.Sprintf("%d", v.GetInt("elasticsearch.retry.max_retries"))),
+		String("crawler.source_file", v.GetString("crawler.source_file")),
+	)
 
 	// Load app config
-	c.App.Environment = viper.GetString("app.environment")
-	c.App.Name = viper.GetString("app.name")
-	c.App.Version = viper.GetString("app.version")
-	c.App.Debug = viper.GetBool("app.debug")
+	c.App.Environment = v.GetString("app.environment")
+	c.App.Name = v.GetString("app.name")
+	c.App.Version = v.GetString("app.version")
+	c.App.Debug = v.GetBool("app.debug")
 
 	// Load log config
-	c.Log.Level = viper.GetString("log.level")
-	c.Log.Debug = viper.GetBool("log.debug")
+	c.Log.Level = v.GetString("log.level")
+	c.Log.Debug = v.GetBool("log.debug")
 
 	// Load Elasticsearch config
 	c.Elasticsearch = *createElasticsearchConfig()
@@ -498,13 +504,69 @@ func (c *NoOpConfig) GetCrawlerConfig() *CrawlerConfig {
 	}
 }
 
-// DefaultConfig returns the default configuration.
-func DefaultConfig() *CrawlerConfig {
-	return &CrawlerConfig{
-		MaxDepth:    DefaultMaxDepth,
-		RateLimit:   DefaultRateLimit,
-		Parallelism: DefaultParallelism,
+// DefaultConfig returns a new Config with default values
+func DefaultConfig() *Config {
+	return &Config{
+		App: AppConfig{
+			Environment: envDevelopment,
+			Name:        "gocrawl",
+			Version:     "1.0.0",
+			Debug:       false,
+		},
+		Log: LogConfig{
+			Level: "info",
+			Debug: false,
+		},
+		Elasticsearch: ElasticsearchConfig{
+			Addresses: []string{"http://localhost:9200"},
+			IndexName: "gocrawl",
+		},
+		Server: ServerConfig{
+			Address: ":8080",
+		},
 	}
+}
+
+// NewConfig creates a new Config instance
+func NewConfig(logger Logger) (Interface, error) {
+	// Create Viper instance
+	v := viper.New()
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+
+	// Add standard config paths
+	v.AddConfigPath(".")
+	v.AddConfigPath("./config")
+	v.AddConfigPath("$HOME/.gocrawl")
+	v.AddConfigPath("/etc/gocrawl")
+
+	// Set environment variable prefix
+	v.SetEnvPrefix("GOCRAWL")
+	v.AutomaticEnv()
+
+	// Read config file
+	if err := v.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, fmt.Errorf("failed to read config: %w", err)
+		}
+		// Config file not found, use defaults
+		logger.Info("No config file found, using defaults")
+	}
+
+	// Create config instance
+	cfg := DefaultConfig()
+
+	// Load values from Viper
+	if err := v.Unmarshal(cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	// Validate config
+	if err := ValidateConfig(cfg); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	return cfg, nil
 }
 
 // Params holds the parameters for creating a config.

@@ -3,7 +3,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
@@ -19,8 +18,18 @@ func setupViper(log Logger) error {
 	defer viperMutex.Unlock()
 
 	// Configure Viper
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+
+	// Add standard config paths
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("./config")
+	viper.AddConfigPath("$HOME/.gocrawl")
+	viper.AddConfigPath("/etc/gocrawl")
+
+	// Set environment variable prefix
+	viper.SetEnvPrefix("GOCRAWL")
 	viper.AutomaticEnv()
-	viper.SetEnvPrefix("")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Bind environment variables
@@ -28,17 +37,14 @@ func setupViper(log Logger) error {
 		return fmt.Errorf("failed to bind environment variables: %w", err)
 	}
 
-	// Read config file if specified
-	if configFile := viper.GetString("config_file"); configFile != "" {
-		viper.SetConfigFile(configFile)
-		if err := viper.ReadInConfig(); err != nil {
-			if !os.IsNotExist(err) {
-				log.Warn("Error reading config file",
-					String("file", configFile),
-					Error(err))
-				return fmt.Errorf("failed to read config file: %w", err)
-			}
+	// Read config file
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			log.Warn("Error reading config file", Error(err))
+			return fmt.Errorf("failed to read config: %w", err)
 		}
+		// Config file not found, use defaults
+		log.Info("No config file found, using defaults")
 	}
 
 	// Set default values only if not already set
