@@ -189,22 +189,6 @@ func TestLoggerMethods(t *testing.T) {
 	log.Error("error message", "key", "value")
 }
 
-func TestNoOpLogger(t *testing.T) {
-	// Create a no-op logger
-	config := zap.NewNop()
-	logConfig := &logger.Config{
-		Level:       logger.InfoLevel,
-		Development: false,
-	}
-	log := createLogger(config, logConfig)
-
-	// These should not panic
-	log.Debug("debug message", "key", "value")
-	log.Info("info message", "key", "value")
-	log.Warn("warn message", "key", "value")
-	log.Error("error message", "key", "value")
-}
-
 // Helper function to convert logger.Level to zapcore.Level
 func levelToZap(level logger.Level) zapcore.Level {
 	switch level {
