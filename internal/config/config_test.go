@@ -172,7 +172,9 @@ sources:
 				esCfg := cfg.GetElasticsearchConfig()
 				require.Equal(t, []string{"https://localhost:9200"}, esCfg.Addresses)
 				require.Equal(t, "test_api_key", esCfg.APIKey)
-				require.True(t, esCfg.TLS.SkipVerify)
+				require.True(t, esCfg.TLS.Enabled)
+				require.Equal(t, "test-cert.pem", esCfg.TLS.CertFile)
+				require.Equal(t, "test-key.pem", esCfg.TLS.KeyFile)
 			},
 		},
 	}
@@ -770,7 +772,7 @@ sources:
 			Command:     "test",
 		}),
 		ConfigTestModule,
-		fx.Invoke(func(c config.Interface) {
+		fx.Invoke(func(c *config.Config) {
 			// Test that we can get a config instance
 			assert.NotNil(t, c)
 

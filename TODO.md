@@ -11,7 +11,40 @@
   - [ ] Add proper interface documentation
   - [ ] Add proper examples
 
-### 2. HTTP Client Error Handling
+### 2. Config Package Improvements
+- [ ] Split module.go into focused files
+  - [ ] Create viper.go for Viper setup
+  - [ ] Create server.go for server config
+  - [ ] Create elasticsearch.go for ES config
+  - [ ] Create crawler.go for crawler config
+  - [ ] Move constants to constants.go
+  - [ ] Add proper error types in errors.go
+  - [ ] Add configuration versioning
+  - [ ] Add schema validation
+  - [ ] Add hot reload support
+- [ ] Enhance Testing
+  - [ ] Add edge cases to TestParseRateLimit
+  - [ ] Add configuration validation tests
+  - [ ] Add benchmarks for performance-critical functions
+  - [ ] Add concurrent access tests
+  - [ ] Add hot reload tests
+- [ ] Improve Error Handling
+  - [ ] Add specific error types
+  - [ ] Add error wrapping for Viper errors
+  - [ ] Add context to error messages
+  - [ ] Add validation error details
+- [ ] Enhance Documentation
+  - [ ] Add usage examples
+  - [ ] Add configuration examples
+  - [ ] Add error handling examples
+  - [ ] Add hot reload documentation
+- [ ] Add Monitoring
+  - [ ] Add metrics for config changes
+  - [ ] Add metrics for validation errors
+  - [ ] Add metrics for hot reload events
+  - [ ] Add tracing for config operations
+
+### 3. HTTP Client Error Handling
 - [ ] Add proper response body closure
   - [ ] Add defer statements
   - [ ] Add error handling
@@ -25,7 +58,7 @@
   - [ ] Add timeout errors
   - [ ] Add tests
 
-### 3. Module Reorganization
+### 4. Module Reorganization
 - [ ] Create separate storage module
   - [ ] Move storage interface to internal/storage
   - [ ] Create storage module for dependency injection

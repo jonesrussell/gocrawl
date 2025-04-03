@@ -105,11 +105,7 @@ func NewTestServerConfig() *config.ServerConfig {
 				AllowedHeaders []string `yaml:"allowed_headers"`
 				MaxAge         int      `yaml:"max_age"`
 			} `yaml:"cors"`
-			TLS struct {
-				Enabled     bool   `yaml:"enabled"`
-				Certificate string `yaml:"certificate"`
-				Key         string `yaml:"key"`
-			} `yaml:"tls"`
+			TLS config.TLSConfig `yaml:"tls"`
 		}{
 			Enabled:   true,
 			APIKey:    "test-key",
@@ -126,6 +122,11 @@ func NewTestServerConfig() *config.ServerConfig {
 				AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 				AllowedHeaders: []string{"Content-Type", "Authorization", "X-API-Key"},
 				MaxAge:         defaultMaxAge,
+			},
+			TLS: config.TLSConfig{
+				Enabled:  true,
+				CertFile: "test-cert.pem",
+				KeyFile:  "test-key.pem",
 			},
 		},
 	}
@@ -161,11 +162,7 @@ func NewMockConfig() *config.Config {
 					AllowedHeaders []string `yaml:"allowed_headers"`
 					MaxAge         int      `yaml:"max_age"`
 				} `yaml:"cors"`
-				TLS struct {
-					Enabled     bool   `yaml:"enabled"`
-					Certificate string `yaml:"certificate"`
-					Key         string `yaml:"key"`
-				} `yaml:"tls"`
+				TLS config.TLSConfig `yaml:"tls"`
 			}{
 				Enabled:   true,
 				APIKey:    "test-key",
@@ -182,6 +179,11 @@ func NewMockConfig() *config.Config {
 					AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 					AllowedHeaders: []string{"*"},
 					MaxAge:         defaultMaxAge,
+				},
+				TLS: config.TLSConfig{
+					Enabled:  true,
+					CertFile: "test-cert.pem",
+					KeyFile:  "test-key.pem",
 				},
 			},
 		},

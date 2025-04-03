@@ -112,11 +112,7 @@ func TestValidateConfig(t *testing.T) {
 							AllowedHeaders []string `yaml:"allowed_headers"`
 							MaxAge         int      `yaml:"max_age"`
 						} `yaml:"cors"`
-						TLS struct {
-							Enabled     bool   `yaml:"enabled"`
-							Certificate string `yaml:"certificate"`
-							Key         string `yaml:"key"`
-						} `yaml:"tls"`
+						TLS config.TLSConfig `yaml:"tls"`
 					}{
 						Enabled: true,
 					},
@@ -149,11 +145,7 @@ func TestValidateConfig(t *testing.T) {
 							AllowedHeaders []string `yaml:"allowed_headers"`
 							MaxAge         int      `yaml:"max_age"`
 						} `yaml:"cors"`
-						TLS struct {
-							Enabled     bool   `yaml:"enabled"`
-							Certificate string `yaml:"certificate"`
-							Key         string `yaml:"key"`
-						} `yaml:"tls"`
+						TLS config.TLSConfig `yaml:"tls"`
 					}{
 						Enabled: true,
 						APIKey:  "invalid-key",

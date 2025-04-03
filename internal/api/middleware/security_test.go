@@ -115,11 +115,7 @@ func TestAPIKeyAuthentication(t *testing.T) {
 						AllowedHeaders []string `yaml:"allowed_headers"`
 						MaxAge         int      `yaml:"max_age"`
 					} `yaml:"cors"`
-					TLS struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					} `yaml:"tls"`
+					TLS config.TLSConfig `yaml:"tls"`
 				}{
 					Enabled: true,
 					APIKey:  tt.apiKey,
@@ -154,11 +150,7 @@ func TestRateLimiting(t *testing.T) {
 				AllowedHeaders []string `yaml:"allowed_headers"`
 				MaxAge         int      `yaml:"max_age"`
 			} `yaml:"cors"`
-			TLS struct {
-				Enabled     bool   `yaml:"enabled"`
-				Certificate string `yaml:"certificate"`
-				Key         string `yaml:"key"`
-			} `yaml:"tls"`
+			TLS config.TLSConfig `yaml:"tls"`
 		}{
 			Enabled:   true,
 			APIKey:    "test-key",
@@ -275,11 +267,7 @@ func TestCORS(t *testing.T) {
 						AllowedHeaders []string `yaml:"allowed_headers"`
 						MaxAge         int      `yaml:"max_age"`
 					} `yaml:"cors"`
-					TLS struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					} `yaml:"tls"`
+					TLS config.TLSConfig `yaml:"tls"`
 				}{
 					Enabled: true,
 					CORS: struct {
@@ -335,11 +323,7 @@ func TestSecurityHeaders(t *testing.T) {
 				AllowedHeaders []string `yaml:"allowed_headers"`
 				MaxAge         int      `yaml:"max_age"`
 			} `yaml:"cors"`
-			TLS struct {
-				Enabled     bool   `yaml:"enabled"`
-				Certificate string `yaml:"certificate"`
-				Key         string `yaml:"key"`
-			} `yaml:"tls"`
+			TLS config.TLSConfig `yaml:"tls"`
 		}{
 			Enabled: true,
 		},

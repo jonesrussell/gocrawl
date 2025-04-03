@@ -119,18 +119,7 @@ type ElasticsearchConfig struct {
 		APIKey string `yaml:"api_key"`
 	} `yaml:"cloud"`
 	// TLS configuration
-	TLS struct {
-		// Enabled indicates whether to use TLS
-		Enabled bool `yaml:"enabled"`
-		// SkipVerify indicates whether to skip TLS certificate verification
-		SkipVerify bool `yaml:"skip_verify"`
-		// Certificate is the path to the client certificate
-		Certificate string `yaml:"certificate"`
-		// Key is the path to the client key
-		Key string `yaml:"key"`
-		// CA is the path to the CA certificate
-		CA string `yaml:"ca"`
-	} `yaml:"tls"`
+	TLS TLSConfig `yaml:"tls"`
 	// Retry configuration
 	Retry struct {
 		// Enabled indicates whether to enable retries
@@ -213,14 +202,7 @@ type ServerConfig struct {
 			MaxAge int `yaml:"max_age"`
 		} `yaml:"cors"`
 		// TLS contains TLS configuration
-		TLS struct {
-			// Enabled indicates whether TLS is enabled
-			Enabled bool `yaml:"enabled"`
-			// Certificate is the path to the certificate file
-			Certificate string `yaml:"certificate"`
-			// Key is the path to the private key file
-			Key string `yaml:"key"`
-		} `yaml:"tls"`
+		TLS TLSConfig `yaml:"tls"`
 	} `yaml:"security"`
 }
 
@@ -241,16 +223,67 @@ type Config struct {
 	Sources []Source `yaml:"sources"`
 	// Command is the command being run (e.g., "httpd", "job")
 	Command string `yaml:"-"`
+	logger  Logger
 }
 
-// GetCrawlerConfig implements Interface
+// load loads all configuration values from Viper
+func (c *Config) load() error {
+	// Load app config
+	c.App.Environment = viper.GetString("app.environment")
+	c.App.Name = viper.GetString("app.name")
+	c.App.Version = viper.GetString("app.version")
+	c.App.Debug = viper.GetBool("app.debug")
+
+	// Load log config
+	c.Log.Level = viper.GetString("log.level")
+	c.Log.Debug = viper.GetBool("log.debug")
+
+	// Load Elasticsearch config
+	c.Elasticsearch = createElasticsearchConfig()
+
+	// Load server config
+	c.Server = createServerConfig()
+
+	// Load crawler config
+	var err error
+	c.Crawler, err = createCrawlerConfig()
+	if err != nil {
+		return fmt.Errorf("failed to create crawler config: %w", err)
+	}
+
+	// Load sources
+	sources, err := loadSources(c.Crawler.SourceFile)
+	if err != nil {
+		return fmt.Errorf("failed to load sources: %w", err)
+	}
+	c.Sources = sources
+
+	return nil
+}
+
+// GetAppConfig returns the application configuration
+func (c *Config) GetAppConfig() *AppConfig {
+	return &c.App
+}
+
+// GetCrawlerConfig returns the crawler configuration
 func (c *Config) GetCrawlerConfig() *CrawlerConfig {
 	return &c.Crawler
 }
 
-// GetElasticsearchConfig implements Interface
+// GetElasticsearchConfig returns the Elasticsearch configuration
 func (c *Config) GetElasticsearchConfig() *ElasticsearchConfig {
 	return &c.Elasticsearch
+}
+
+// GetServerConfig returns the server configuration
+func (c *Config) GetServerConfig() *ServerConfig {
+	return &c.Server
+}
+
+// GetLogger returns the logger
+func (c *Config) GetLogger() Logger {
+	return c.logger
 }
 
 // GetLogConfig implements Interface
@@ -258,19 +291,9 @@ func (c *Config) GetLogConfig() *LogConfig {
 	return &c.Log
 }
 
-// GetAppConfig implements Interface
-func (c *Config) GetAppConfig() *AppConfig {
-	return &c.App
-}
-
 // GetSources implements Interface
 func (c *Config) GetSources() []Source {
 	return c.Sources
-}
-
-// GetServerConfig implements Interface
-func (c *Config) GetServerConfig() *ServerConfig {
-	return &c.Server
 }
 
 // GetCommand implements Interface
