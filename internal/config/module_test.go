@@ -12,7 +12,7 @@ import (
 // This module should only be used in tests.
 var ConfigTestModule = fx.Options(
 	fx.Provide(
-		func(t *testing.T) config.Logger { return newTestLogger(t) },
+		newTestLogger,
 		config.New,
 	),
 )
