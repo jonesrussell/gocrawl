@@ -16,13 +16,13 @@ import (
 // SearchManager defines the interface for search operations.
 type SearchManager interface {
 	// Search performs a search query.
-	Search(ctx context.Context, index string, query map[string]interface{}) ([]interface{}, error)
+	Search(ctx context.Context, index string, query map[string]any) ([]any, error)
 
 	// Count returns the number of documents matching a query.
-	Count(ctx context.Context, index string, query map[string]interface{}) (int64, error)
+	Count(ctx context.Context, index string, query map[string]any) (int64, error)
 
 	// Aggregate performs an aggregation query.
-	Aggregate(ctx context.Context, index string, aggs map[string]interface{}) (map[string]interface{}, error)
+	Aggregate(ctx context.Context, index string, aggs map[string]any) (map[string]any, error)
 
 	// Close closes any resources held by the search manager.
 	Close() error
@@ -121,9 +121,9 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 		}
 
 		// Build the search query
-		query := map[string]interface{}{
-			"query": map[string]interface{}{
-				"match": map[string]interface{}{
+		query := map[string]any{
+			"query": map[string]any{
+				"match": map[string]any{
 					"content": req.Query,
 				},
 			},
@@ -142,9 +142,9 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 		}
 
 		// Get the total count using a wrapped query
-		total, err := searchManager.Count(c.Request.Context(), req.Index, map[string]interface{}{
-			"query": map[string]interface{}{
-				"match": map[string]interface{}{
+		total, err := searchManager.Count(c.Request.Context(), req.Index, map[string]any{
+			"query": map[string]any{
+				"match": map[string]any{
 					"content": req.Query,
 				},
 			},
