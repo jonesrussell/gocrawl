@@ -25,7 +25,11 @@ func (m *MockSources) ListSources(ctx context.Context) ([]*sourceutils.SourceCon
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*sourceutils.SourceConfig), args.Error(1)
+	val, ok := args.Get(0).([]*sourceutils.SourceConfig)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 func (m *MockSources) AddSource(ctx context.Context, source *sourceutils.SourceConfig) error {
@@ -50,7 +54,11 @@ func (m *MockSources) ValidateSource(source *sourceutils.SourceConfig) error {
 
 func (m *MockSources) GetMetrics() sources.Metrics {
 	args := m.Called()
-	return args.Get(0).(sources.Metrics)
+	val, ok := args.Get(0).(sources.Metrics)
+	if !ok {
+		return sources.Metrics{}
+	}
+	return val
 }
 
 func (m *MockSources) FindByName(name string) *sourceutils.SourceConfig {
@@ -58,7 +66,11 @@ func (m *MockSources) FindByName(name string) *sourceutils.SourceConfig {
 	if args.Get(0) == nil {
 		return nil
 	}
-	return args.Get(0).(*sourceutils.SourceConfig)
+	val, ok := args.Get(0).(*sourceutils.SourceConfig)
+	if !ok {
+		return nil
+	}
+	return val
 }
 
 func (m *MockSources) GetSource(ctx context.Context, name string) (*sourceutils.SourceConfig, error) {
@@ -66,7 +78,11 @@ func (m *MockSources) GetSource(ctx context.Context, name string) (*sourceutils.
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*sourceutils.SourceConfig), args.Error(1)
+	val, ok := args.Get(0).(*sourceutils.SourceConfig)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 func (m *MockSources) GetSources() ([]sourceutils.SourceConfig, error) {
@@ -74,7 +90,11 @@ func (m *MockSources) GetSources() ([]sourceutils.SourceConfig, error) {
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]sourceutils.SourceConfig), args.Error(1)
+	val, ok := args.Get(0).([]sourceutils.SourceConfig)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 func (m *MockSources) CreateSource(ctx context.Context, source *sourceutils.SourceConfig) error {

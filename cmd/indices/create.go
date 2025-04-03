@@ -84,9 +84,10 @@ func (c *Creator) Start(ctx context.Context) error {
 		return fmt.Errorf("index %s already exists", c.index)
 	}
 
-	if err := c.storage.CreateIndex(ctx, c.index, DefaultMapping); err != nil {
-		c.logger.Error("Failed to create index", "index", c.index, "error", err)
-		return fmt.Errorf("failed to create index %s: %w", c.index, err)
+	// Create the index
+	if createErr := c.storage.CreateIndex(ctx, c.index, DefaultMapping); createErr != nil {
+		c.logger.Error("Failed to create index", "index", c.index, "error", createErr)
+		return fmt.Errorf("failed to create index %s: %w", c.index, createErr)
 	}
 
 	c.logger.Info("Successfully created index", "index", c.index)

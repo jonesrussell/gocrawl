@@ -20,12 +20,10 @@ const (
 
 // Manager handles article processing and management.
 type Manager struct {
-	logger    logger.Interface
-	config    config.Interface
-	sources   sources.Interface
-	storage   types.Interface
-	service   Interface
-	processor *ArticleProcessor
+	logger  logger.Interface
+	config  config.Interface
+	sources sources.Interface
+	storage types.Interface
 }
 
 // Module provides article-related dependencies.

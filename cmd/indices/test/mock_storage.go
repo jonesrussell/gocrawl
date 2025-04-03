@@ -56,7 +56,11 @@ func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]string), args.Error(1)
+	val, ok := args.Get(0).([]string)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 // GetMapping mocks the GetMapping method
@@ -65,7 +69,11 @@ func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(map[string]any), args.Error(1)
+	val, ok := args.Get(0).(map[string]any)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 // UpdateMapping mocks the UpdateMapping method
@@ -77,7 +85,11 @@ func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping m
 // IndexExists mocks the IndexExists method
 func (m *MockStorage) IndexExists(ctx context.Context, index string) (bool, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(bool), args.Error(1)
+	val, ok := args.Get(0).(bool)
+	if !ok {
+		return false, args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 // Search mocks the Search method
@@ -86,19 +98,31 @@ func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]an
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]any), args.Error(1)
+	val, ok := args.Get(0).([]any)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 // GetIndexHealth mocks the GetIndexHealth method
 func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(string), args.Error(1)
+	val, ok := args.Get(0).(string)
+	if !ok {
+		return "", args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 // GetIndexDocCount mocks the GetIndexDocCount method
 func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(int64), args.Error(1)
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 // Ping mocks the Ping method
@@ -125,7 +149,11 @@ func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (an
 // Count mocks the Count method
 func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).(int64), args.Error(1)
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, args.Error(1)
+	}
+	return val, args.Error(1)
 }
 
 // Close mocks the Close method
