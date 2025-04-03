@@ -19,19 +19,19 @@ func NewMockStorage() *MockStorage {
 }
 
 // IndexDocument implements storage.Interface.
-func (m *MockStorage) IndexDocument(ctx context.Context, index string, id string, document any) error {
+func (m *MockStorage) IndexDocument(ctx context.Context, index, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
 // GetDocument implements storage.Interface.
-func (m *MockStorage) GetDocument(ctx context.Context, index string, id string, document any) error {
+func (m *MockStorage) GetDocument(ctx context.Context, index, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
 // DeleteDocument implements storage.Interface.
-func (m *MockStorage) DeleteDocument(ctx context.Context, index string, id string) error {
+func (m *MockStorage) DeleteDocument(ctx context.Context, index, id string) error {
 	args := m.Called(ctx, index, id)
 	return args.Error(0)
 }
@@ -152,7 +152,14 @@ func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (an
 // Count implements storage.Interface.
 func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).(int64), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	result, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, errors.New("invalid count result type")
+	}
+	return result, nil
 }
 
 // Close implements storage.Interface.
