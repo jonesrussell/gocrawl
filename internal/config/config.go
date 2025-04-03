@@ -209,21 +209,24 @@ type ServerConfig struct {
 // Config represents the complete application configuration.
 // It combines all configuration components into a single structure.
 type Config struct {
-	// App contains application-specific settings
+	// App contains application-level configuration
 	App AppConfig `yaml:"app"`
 	// Log contains logging configuration
 	Log LogConfig `yaml:"log"`
-	// Elasticsearch contains Elasticsearch connection settings
+	// Elasticsearch contains Elasticsearch configuration
 	Elasticsearch ElasticsearchConfig `yaml:"elasticsearch"`
-	// Server contains HTTP server settings
+	// Server contains server configuration
 	Server ServerConfig `yaml:"server"`
-	// Crawler contains crawler-specific settings
+	// Crawler contains crawler configuration
 	Crawler CrawlerConfig `yaml:"crawler"`
-	// Sources contains the list of news sources to crawl
+	// Sources contains the list of sources
 	Sources []Source `yaml:"sources"`
-	// Command is the command being run (e.g., "httpd", "job")
-	Command string `yaml:"-"`
-	logger  Logger
+	// Priority contains priority configuration
+	Priority PriorityConfig `yaml:"priority"`
+	// Command is the current command being run
+	Command string
+	// logger is the logger instance
+	logger Logger
 }
 
 // load loads all configuration values from Viper
@@ -348,6 +351,11 @@ func (c *Config) GetSources() []Source {
 // GetCommand implements Interface
 func (c *Config) GetCommand() string {
 	return c.Command
+}
+
+// GetPriorityConfig returns the priority configuration
+func (c *Config) GetPriorityConfig() *PriorityConfig {
+	return &c.Priority
 }
 
 // Ensure Config implements Interface
@@ -501,6 +509,13 @@ func (c *NoOpConfig) GetCrawlerConfig() *CrawlerConfig {
 		RateLimit:   DefaultRateLimit,
 		RandomDelay: time.Second,
 		Parallelism: DefaultParallelism,
+	}
+}
+
+func (c *NoOpConfig) GetPriorityConfig() *PriorityConfig {
+	return &PriorityConfig{
+		Default: 1,
+		Rules:   []PriorityRule{},
 	}
 }
 

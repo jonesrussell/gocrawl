@@ -17,4 +17,6 @@ type Interface interface {
 	GetCommand() string
 	// GetCrawlerConfig returns the crawler configuration.
 	GetCrawlerConfig() *CrawlerConfig
+	// GetPriorityConfig returns the priority configuration.
+	GetPriorityConfig() *PriorityConfig
 }
