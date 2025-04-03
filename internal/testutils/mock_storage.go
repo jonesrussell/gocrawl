@@ -75,7 +75,11 @@ func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]
 	if err := args.Error(1); err != nil {
 		return nil, err
 	}
-	return args.Get(0).(map[string]any), nil
+	val, ok := args.Get(0).(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
 }
 
 // UpdateMapping updates the mapping for an index.
@@ -90,7 +94,11 @@ func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]an
 	if err := args.Error(1); err != nil {
 		return nil, err
 	}
-	return args.Get(0).([]any), nil
+	val, ok := args.Get(0).([]any)
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
 }
 
 // Count counts documents matching a query.
@@ -99,7 +107,11 @@ func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64
 	if err := args.Error(1); err != nil {
 		return 0, err
 	}
-	return args.Get(0).(int64), nil
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, nil
+	}
+	return val, nil
 }
 
 // Aggregate performs an aggregation query.
@@ -126,7 +138,11 @@ func (m *MockStorage) SearchArticles(ctx context.Context, query string, size int
 	if err := args.Error(1); err != nil {
 		return nil, err
 	}
-	return args.Get(0).([]any), nil
+	val, ok := args.Get(0).([]any)
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
 }
 
 // GetIndexDocCount gets the document count for an index.
@@ -135,7 +151,11 @@ func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64
 	if err := args.Error(1); err != nil {
 		return 0, err
 	}
-	return args.Get(0).(int64), nil
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, nil
+	}
+	return val, nil
 }
 
 // GetIndexHealth gets the health status of an index.
@@ -150,7 +170,11 @@ func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	if err := args.Error(1); err != nil {
 		return nil, err
 	}
-	return args.Get(0).([]string), nil
+	val, ok := args.Get(0).([]string)
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
 }
 
 // Ping pings the Elasticsearch cluster.
