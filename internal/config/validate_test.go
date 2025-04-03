@@ -1,156 +1,169 @@
 package config_test
 
 import (
+	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 )
 
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  *config.Config
+		setup   func(*testing.T)
 		wantErr bool
 	}{
 		{
-			name: "valid config",
-			config: &config.Config{
-				App: config.AppConfig{
-					Environment: "development",
-				},
-				Log: config.LogConfig{
-					Level: "info",
-				},
-				Elasticsearch: config.ElasticsearchConfig{
-					Addresses: []string{"http://localhost:9200"},
-				},
-				Crawler: config.CrawlerConfig{
-					Parallelism: 2,
-					MaxDepth:    2,
-					RateLimit:   time.Second,
-					RandomDelay: time.Second,
-				},
+			name: "valid_config",
+			setup: func(t *testing.T) {
+				// Create test config file
+				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  source_file: internal/config/testdata/sources.yml
+logging:
+  level: debug
+elasticsearch:
+  addresses:
+    - https://localhost:9200
+  api_key: test_api_key
+`
+				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Set environment variables
+				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: false,
 		},
 		{
-			name: "invalid app environment",
-			config: &config.Config{
-				App: config.AppConfig{
-					Environment: "invalid",
-				},
+			name: "invalid_app_environment",
+			setup: func(t *testing.T) {
+				// Create test config file with invalid environment
+				configContent := `
+app:
+  environment: invalid
+  name: gocrawl
+  version: 1.0.0
+`
+				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Set environment variables
+				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: true,
 		},
 		{
-			name: "invalid log level",
-			config: &config.Config{
-				App: config.AppConfig{
-					Environment: "development",
-				},
-				Log: config.LogConfig{
-					Level: "invalid",
-				},
+			name: "invalid_log_level",
+			setup: func(t *testing.T) {
+				// Create test config file with invalid log level
+				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+logging:
+  level: invalid
+`
+				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Set environment variables
+				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: true,
 		},
 		{
-			name: "invalid crawler max depth",
-			config: &config.Config{
-				App: config.AppConfig{
-					Environment: "development",
-				},
-				Log: config.LogConfig{
-					Level: "info",
-				},
-				Crawler: config.CrawlerConfig{
-					MaxDepth: 0,
-				},
+			name: "invalid_crawler_max_depth",
+			setup: func(t *testing.T) {
+				// Create test config file with invalid max depth
+				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+crawler:
+  max_depth: 0
+`
+				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Set environment variables
+				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: true,
 		},
 		{
-			name: "invalid crawler parallelism",
-			config: &config.Config{
-				App: config.AppConfig{
-					Environment: "development",
-				},
-				Log: config.LogConfig{
-					Level: "info",
-				},
-				Crawler: config.CrawlerConfig{
-					Parallelism: 0,
-				},
+			name: "invalid_crawler_parallelism",
+			setup: func(t *testing.T) {
+				// Create test config file with invalid parallelism
+				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+crawler:
+  parallelism: 0
+`
+				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Set environment variables
+				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: true,
 		},
 		{
-			name: "server security enabled without API key",
-			config: &config.Config{
-				App: config.AppConfig{
-					Environment: "development",
-				},
-				Log: config.LogConfig{
-					Level: "info",
-				},
-				Crawler: config.CrawlerConfig{
-					MaxDepth:    2,
-					Parallelism: 2,
-				},
-				Server: config.ServerConfig{
-					Security: struct {
-						Enabled   bool   `yaml:"enabled"`
-						APIKey    string `yaml:"api_key"`
-						RateLimit int    `yaml:"rate_limit"`
-						CORS      struct {
-							Enabled        bool     `yaml:"enabled"`
-							AllowedOrigins []string `yaml:"allowed_origins"`
-							AllowedMethods []string `yaml:"allowed_methods"`
-							AllowedHeaders []string `yaml:"allowed_headers"`
-							MaxAge         int      `yaml:"max_age"`
-						} `yaml:"cors"`
-						TLS config.TLSConfig `yaml:"tls"`
-					}{
-						Enabled: true,
-					},
-				},
+			name: "server_security_enabled_without_API_key",
+			setup: func(t *testing.T) {
+				// Create test config file with security enabled but no API key
+				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+server:
+  security:
+    enabled: true
+    api_key: ""
+`
+				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Set environment variables
+				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: true,
 		},
 		{
-			name: "server security enabled with invalid API key",
-			config: &config.Config{
-				App: config.AppConfig{
-					Environment: "development",
-				},
-				Log: config.LogConfig{
-					Level: "info",
-				},
-				Crawler: config.CrawlerConfig{
-					MaxDepth:    2,
-					Parallelism: 2,
-				},
-				Server: config.ServerConfig{
-					Security: struct {
-						Enabled   bool   `yaml:"enabled"`
-						APIKey    string `yaml:"api_key"`
-						RateLimit int    `yaml:"rate_limit"`
-						CORS      struct {
-							Enabled        bool     `yaml:"enabled"`
-							AllowedOrigins []string `yaml:"allowed_origins"`
-							AllowedMethods []string `yaml:"allowed_methods"`
-							AllowedHeaders []string `yaml:"allowed_headers"`
-							MaxAge         int      `yaml:"max_age"`
-						} `yaml:"cors"`
-						TLS config.TLSConfig `yaml:"tls"`
-					}{
-						Enabled: true,
-						APIKey:  "invalid-key",
-					},
-				},
+			name: "server_security_enabled_with_invalid_API_key",
+			setup: func(t *testing.T) {
+				// Create test config file with security enabled but invalid API key
+				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+server:
+  security:
+    enabled: true
+    api_key: "invalid"
+`
+				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Set environment variables
+				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: true,
 		},
@@ -158,12 +171,25 @@ func TestValidateConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := config.ValidateConfig(tt.config)
+			// Setup test environment
+			cleanup := testutils.SetupTestEnv(t)
+			defer cleanup()
+
+			// Run test setup
+			tt.setup(t)
+
+			// Create config
+			cfg, err := config.New(testutils.NewTestLogger(t))
+
+			// Validate results
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+				require.Nil(t, cfg)
+				return
 			}
+
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
 		})
 	}
 }

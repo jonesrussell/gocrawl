@@ -7,9 +7,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 )
 
 func TestConfigurationPriority(t *testing.T) {
+	// Setup test environment
+	cleanup := testutils.SetupTestEnv(t)
+	defer cleanup()
+
 	// Create test config file
 	configContent := `
 app:
@@ -55,7 +60,7 @@ sources:
 	t.Setenv("ELASTICSEARCH_API_KEY", "env_api_key")
 
 	// Create config
-	cfg, err := config.New(newTestLogger(t))
+	cfg, err := config.New(testutils.NewTestLogger(t))
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 

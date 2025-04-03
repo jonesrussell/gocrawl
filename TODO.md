@@ -54,10 +54,10 @@
     - [x] Move TestConfigurationPriority
   - [x] Create testutils/logger_test.go for test utilities
     - [x] Move testLogger and related utilities
-  - [ ] Move remaining test utilities to testutils package
-    - [ ] Move setupTestEnv to testutils
-    - [ ] Move testLogger to testutils
-    - [ ] Move newTestLogger to testutils
+  - [x] Move remaining test utilities to testutils package
+    - [x] Move setupTestEnv to testutils
+    - [x] Move testLogger to testutils
+    - [x] Move newTestLogger to testutils
 - [ ] Enhance Testing
   - [ ] Add edge cases to TestParseRateLimit
   - [ ] Add configuration validation tests
@@ -105,6 +105,33 @@
   - [ ] Create metrics module for dependency injection
   - [ ] Add metrics tests
   - [ ] Update commands to use new metrics module
+
+### 5. Test Utilities Enhancement
+- [x] Implement MockProcessor for testing
+  - [x] Add Process method
+  - [x] Add CanProcess method
+  - [x] Add ContentType method
+  - [x] Add GetMetrics method
+  - [x] Add ProcessHTML method
+  - [x] Add ProcessJob method
+  - [x] Add Start method
+  - [x] Add Stop method
+  - [x] Add constructor and provider functions
+- [ ] Add test utilities for other interfaces
+  - [ ] Create MockStorage for storage tests
+  - [ ] Create MockMetrics for metrics tests
+  - [ ] Create MockLogger for logging tests
+  - [ ] Create MockEventBus for event bus tests
+- [ ] Add test helpers for common scenarios
+  - [ ] Add helper for creating test jobs
+  - [ ] Add helper for creating test articles
+  - [ ] Add helper for creating test HTML content
+  - [ ] Add helper for creating test configurations
+- [ ] Add test fixtures
+  - [ ] Add HTML fixtures for content processing
+  - [ ] Add configuration fixtures
+  - [ ] Add job fixtures
+  - [ ] Add article fixtures
 
 ## Medium Priority
 
