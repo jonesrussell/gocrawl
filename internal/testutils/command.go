@@ -35,7 +35,7 @@ type CommandTestModule struct {
 	Storage  storage.Interface
 	IndexMgr api.IndexManager
 	Config   config.Interface
-	Logger   logger.Logger
+	Logger   logger.Interface
 	Crawler  crawler.Interface
 
 	// Command-specific dependencies
@@ -97,7 +97,7 @@ func (m *CommandTestModule) Module() fx.Option {
 		// Core dependencies
 		fx.Provide(
 			func() config.Interface { return m.Config },
-			func() logger.Logger { return m.Logger },
+			func() logger.Interface { return m.Logger },
 			func() crawler.Interface { return m.Crawler },
 			func() sources.Interface { return m.Sources },
 			func() storage.Interface { return m.Storage },

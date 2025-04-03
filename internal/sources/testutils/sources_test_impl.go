@@ -2,6 +2,7 @@
 package testutils
 
 import (
+	"context"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
@@ -9,10 +10,10 @@ import (
 
 // TestInterface defines the interface for source management operations in tests
 type TestInterface interface {
-	ListSources(ctx interface{}) ([]*sourceutils.SourceConfig, error)
-	AddSource(ctx interface{}, source *sourceutils.SourceConfig) error
-	UpdateSource(ctx interface{}, source *sourceutils.SourceConfig) error
-	DeleteSource(ctx interface{}, name string) error
+	ListSources(ctx context.Context) ([]*sourceutils.SourceConfig, error)
+	AddSource(ctx context.Context, source *sourceutils.SourceConfig) error
+	UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error
+	DeleteSource(ctx context.Context, name string) error
 	ValidateSource(source *sourceutils.SourceConfig) error
 	GetMetrics() interface{}
 	FindByName(name string) (*sourceutils.SourceConfig, error)
@@ -40,7 +41,7 @@ func (s *testSourcesImpl) SetSources(configs []sourceutils.SourceConfig) {
 }
 
 // ListSources retrieves all sources
-func (s *testSourcesImpl) ListSources(ctx interface{}) ([]*sourceutils.SourceConfig, error) {
+func (s *testSourcesImpl) ListSources(ctx context.Context) ([]*sourceutils.SourceConfig, error) {
 	result := make([]*sourceutils.SourceConfig, 0, len(s.configs))
 	for i := range s.configs {
 		result = append(result, &s.configs[i])
@@ -49,46 +50,30 @@ func (s *testSourcesImpl) ListSources(ctx interface{}) ([]*sourceutils.SourceCon
 }
 
 // AddSource adds a new source
-func (s *testSourcesImpl) AddSource(ctx interface{}, source *sourceutils.SourceConfig) error {
-	if source == nil {
-		return nil
-	}
-
-	for _, existing := range s.configs {
-		if existing.Name == source.Name {
-			return nil
-		}
-	}
-
+func (s *testSourcesImpl) AddSource(ctx context.Context, source *sourceutils.SourceConfig) error {
 	s.configs = append(s.configs, *source)
 	return nil
 }
 
 // UpdateSource updates an existing source
-func (s *testSourcesImpl) UpdateSource(ctx interface{}, source *sourceutils.SourceConfig) error {
-	if source == nil {
-		return nil
-	}
-
-	for i, existing := range s.configs {
-		if existing.Name == source.Name {
+func (s *testSourcesImpl) UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error {
+	for i, config := range s.configs {
+		if config.Name == source.Name {
 			s.configs[i] = *source
 			return nil
 		}
 	}
-
 	return nil
 }
 
 // DeleteSource deletes a source by name
-func (s *testSourcesImpl) DeleteSource(ctx interface{}, name string) error {
-	for i, existing := range s.configs {
-		if existing.Name == name {
+func (s *testSourcesImpl) DeleteSource(ctx context.Context, name string) error {
+	for i, config := range s.configs {
+		if config.Name == name {
 			s.configs = append(s.configs[:i], s.configs[i+1:]...)
 			return nil
 		}
 	}
-
 	return nil
 }
 
