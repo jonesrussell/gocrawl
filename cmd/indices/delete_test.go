@@ -42,7 +42,6 @@ func TestDeleteCommand(t *testing.T) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{"test-index"}, nil)
 				ms.On("DeleteIndex", mock.Anything, "test-index").Return(nil)
-				msrc.On("FindByName", "").Return(nil)
 			},
 			wantErr: false,
 		},
