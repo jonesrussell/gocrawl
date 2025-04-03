@@ -18,6 +18,8 @@ import (
 )
 
 func TestDeleteCommand(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		source      *config.Source
@@ -181,6 +183,8 @@ func TestDeleteCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			setupMocks := func() (*test.MockStorage, *test.MockSources) {
 				mockStore := &test.MockStorage{}
 				mockSources := &test.MockSources{}
@@ -264,7 +268,6 @@ func TestDeleteCommandArgs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
