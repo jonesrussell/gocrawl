@@ -67,7 +67,7 @@ func createServerSecurityConfig() struct {
 		} `yaml:"cors"`
 		TLS TLSConfig `yaml:"tls"`
 	}{
-		Enabled:   true,
+		Enabled:   viper.GetBool("server.security.enabled"),
 		APIKey:    viper.GetString("server.security.api_key"),
 		RateLimit: defaultRateLimitPerMinute,
 		CORS: struct {

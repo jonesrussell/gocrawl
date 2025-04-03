@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -22,6 +23,8 @@ func TestValidateConfig(t *testing.T) {
 				// Setup test environment with valid config
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
+				// Give time for environment variables to be set
+				time.Sleep(100 * time.Millisecond)
 			},
 			wantErr: false,
 		},
@@ -31,6 +34,7 @@ func TestValidateConfig(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
 				t.Setenv("APP_ENVIRONMENT", "invalid")
+				time.Sleep(100 * time.Millisecond)
 			},
 			wantErr: true,
 		},
@@ -40,6 +44,7 @@ func TestValidateConfig(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
 				t.Setenv("LOG_LEVEL", "invalid")
+				time.Sleep(100 * time.Millisecond)
 			},
 			wantErr: true,
 		},
@@ -49,6 +54,7 @@ func TestValidateConfig(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
 				t.Setenv("CRAWLER_MAX_DEPTH", "-1")
+				time.Sleep(100 * time.Millisecond)
 			},
 			wantErr: true,
 		},
@@ -58,6 +64,7 @@ func TestValidateConfig(t *testing.T) {
 				cleanup := testutils.SetupTestEnv(t)
 				defer cleanup()
 				t.Setenv("CRAWLER_PARALLELISM", "0")
+				time.Sleep(100 * time.Millisecond)
 			},
 			wantErr: true,
 		},
@@ -68,6 +75,7 @@ func TestValidateConfig(t *testing.T) {
 				defer cleanup()
 				t.Setenv("SERVER_SECURITY_ENABLED", "true")
 				t.Setenv("SERVER_SECURITY_API_KEY", "")
+				time.Sleep(100 * time.Millisecond)
 			},
 			wantErr: true,
 		},
@@ -78,6 +86,7 @@ func TestValidateConfig(t *testing.T) {
 				defer cleanup()
 				t.Setenv("SERVER_SECURITY_ENABLED", "true")
 				t.Setenv("SERVER_SECURITY_API_KEY", "invalid-key")
+				time.Sleep(100 * time.Millisecond)
 			},
 			wantErr: true,
 		},

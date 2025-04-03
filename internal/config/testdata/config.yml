@@ -34,4 +34,6 @@ server:
   address: :8080
   read_timeout: 1s
   write_timeout: 1s
-  api_key: test_api_key 
+  security:
+    enabled: true
+    api_key: test_api_key 

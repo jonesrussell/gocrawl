@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -228,6 +229,24 @@ type Config struct {
 
 // load loads all configuration values from Viper
 func (c *Config) load() error {
+	// Get config file path from environment
+	configFile := os.Getenv("CONFIG_FILE")
+	if configFile == "" {
+		return fmt.Errorf("CONFIG_FILE environment variable is not set")
+	}
+
+	// Initialize Viper with the config file
+	viper.SetConfigFile(configFile)
+	viper.SetConfigType("yaml")
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	// Set up environment variable binding
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
 	// Debug: Print Viper values
 	fmt.Printf("Loading config from Viper:\n")
 	fmt.Printf("app.environment: %s\n", viper.GetString("app.environment"))

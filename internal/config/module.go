@@ -6,8 +6,10 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
 
@@ -26,6 +28,13 @@ func (l defaultLogger) Warn(msg string, fields ...Field) {}
 
 // New creates a new Config instance
 func New(log Logger) (Interface, error) {
+	// Initialize Viper if no config file is set
+	if viper.GetViper().ConfigFileUsed() == "" {
+		viper.AutomaticEnv()
+		viper.SetEnvPrefix("")
+		viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	}
+
 	cfg := &Config{
 		logger: log,
 	}
