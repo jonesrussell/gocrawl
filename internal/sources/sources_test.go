@@ -2,7 +2,6 @@
 package sources_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -94,7 +93,7 @@ func TestLoadFromFile(t *testing.T) {
 		s := testutils.NewTestSources(sourceConfigs)
 		require.NotNil(t, s)
 
-		sources, err := s.ListSources(context.Background())
+		sources, err := s.ListSources(t.Context())
 		require.NoError(t, err)
 		require.Len(t, sources, 1)
 		assert.Equal(t, "test-source", sources[0].Name)
@@ -115,7 +114,7 @@ func TestLoadFromFile(t *testing.T) {
 	})
 }
 
-// TestGetSource tests source retrieval functionality
+// TestGetSource tests getting a source by name
 func TestGetSource(t *testing.T) {
 	t.Parallel()
 
@@ -154,50 +153,34 @@ func TestGetSource(t *testing.T) {
 func TestValidateSource(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name    string
-		source  *sourceutils.SourceConfig
-		wantErr bool
-	}{
-		{
-			name: "valid source",
-			source: &sourceutils.SourceConfig{
-				Name:      "test-source",
-				URL:       "https://example.com",
-				RateLimit: time.Second,
-				MaxDepth:  2,
-				Selectors: sourceutils.SelectorConfig{
-					Article: sourceutils.ArticleSelectors{
-						Title: "h1",
-						Body:  "article",
-					},
+	t.Run("valid source", func(t *testing.T) {
+		s := testutils.NewTestSources(nil)
+		source := &sourceutils.SourceConfig{
+			Name:      "test-source",
+			URL:       "https://example.com",
+			RateLimit: time.Second,
+			MaxDepth:  2,
+			Selectors: sourceutils.SelectorConfig{
+				Article: sourceutils.ArticleSelectors{
+					Title: "h1",
+					Body:  "article",
 				},
 			},
-			wantErr: false,
-		},
-		{
-			name: "invalid source",
-			source: &sourceutils.SourceConfig{
-				Name:      "",
-				URL:       "",
-				RateLimit: 0,
-				MaxDepth:  0,
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := testutils.NewTestSources([]sourceutils.SourceConfig{})
-			err := s.ValidateSource(tt.source)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
+		}
+		err := s.ValidateSource(source)
+		require.NoError(t, err)
+	})
+	t.Run("invalid source", func(t *testing.T) {
+		s := testutils.NewTestSources(nil)
+		source := &sourceutils.SourceConfig{
+			Name:      "",
+			URL:       "",
+			RateLimit: 0,
+			MaxDepth:  0,
+		}
+		err := s.ValidateSource(source)
+		require.Error(t, err)
+	})
 }
 
 // TestSourceOperations tests source CRUD operations
@@ -206,7 +189,7 @@ func TestSourceOperations(t *testing.T) {
 
 	t.Run("add source", func(t *testing.T) {
 		s := testutils.NewTestSources([]sourceutils.SourceConfig{})
-		err := s.AddSource(context.Background(), &sourceutils.SourceConfig{
+		err := s.AddSource(t.Context(), &sourceutils.SourceConfig{
 			Name:      "test-source",
 			URL:       "https://example.com",
 			RateLimit: time.Second,
@@ -220,7 +203,7 @@ func TestSourceOperations(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		sources, err := s.ListSources(context.Background())
+		sources, err := s.ListSources(t.Context())
 		require.NoError(t, err)
 		require.Len(t, sources, 1)
 		assert.Equal(t, "test-source", sources[0].Name)
@@ -242,7 +225,7 @@ func TestSourceOperations(t *testing.T) {
 			},
 		})
 
-		err := s.UpdateSource(context.Background(), &sourceutils.SourceConfig{
+		err := s.UpdateSource(t.Context(), &sourceutils.SourceConfig{
 			Name:      "test-source",
 			URL:       "https://updated.example.com",
 			RateLimit: 2 * time.Second,
@@ -256,7 +239,7 @@ func TestSourceOperations(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		sources, err := s.ListSources(context.Background())
+		sources, err := s.ListSources(t.Context())
 		require.NoError(t, err)
 		require.Len(t, sources, 1)
 		assert.Equal(t, "https://updated.example.com", sources[0].URL)
@@ -279,20 +262,20 @@ func TestSourceOperations(t *testing.T) {
 			},
 		})
 
-		err := s.DeleteSource(context.Background(), "test-source")
+		err := s.DeleteSource(t.Context(), "test-source")
 		require.NoError(t, err)
 
-		sources, err := s.ListSources(context.Background())
+		sources, err := s.ListSources(t.Context())
 		require.NoError(t, err)
 		require.Empty(t, sources)
 	})
 }
 
-// TestMetrics tests source metrics functionality
+// TestMetrics tests source metrics
 func TestMetrics(t *testing.T) {
 	t.Parallel()
 
-	t.Run("metrics with sources", func(t *testing.T) {
+	t.Run("increment metrics", func(t *testing.T) {
 		s := testutils.NewTestSources([]sourceutils.SourceConfig{
 			{
 				Name:      "test-source",
@@ -326,51 +309,43 @@ func TestMetrics(t *testing.T) {
 func TestIndexNameHandling(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name            string
-		source          *sourceutils.SourceConfig
-		expectedArticle string
-		expectedContent string
-	}{
-		{
-			name: "empty index names",
-			source: &sourceutils.SourceConfig{
-				Name:      "Test Source",
-				URL:       "https://test.com",
-				RateLimit: time.Second,
-				MaxDepth:  2,
-			},
-			expectedArticle: "articles",
-			expectedContent: "content",
-		},
-		{
-			name: "custom index names",
-			source: &sourceutils.SourceConfig{
-				Name:         "Test Source",
-				URL:          "https://test.com",
-				RateLimit:    time.Second,
-				MaxDepth:     2,
-				ArticleIndex: "custom_articles",
-				Index:        "custom_content",
-			},
-			expectedArticle: "custom_articles",
-			expectedContent: "custom_content",
-		},
-	}
+	t.Run("default index name", func(t *testing.T) {
+		source := &sourceutils.SourceConfig{
+			Name:      "Test Source",
+			URL:       "https://test.com",
+			RateLimit: time.Second,
+			MaxDepth:  2,
+		}
+		s := testutils.NewTestSources(nil)
+		err := s.AddSource(t.Context(), source)
+		require.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := testutils.NewTestSources(nil)
-			err := s.AddSource(context.Background(), tt.source)
-			require.NoError(t, err)
+		sources, err := s.ListSources(t.Context())
+		require.NoError(t, err)
+		require.Len(t, sources, 1)
+		assert.Equal(t, "articles", sources[0].ArticleIndex)
+		assert.Equal(t, "content", sources[0].Index)
+	})
 
-			sources, err := s.ListSources(context.Background())
-			require.NoError(t, err)
-			require.Len(t, sources, 1)
-			assert.Equal(t, tt.expectedArticle, sources[0].ArticleIndex)
-			assert.Equal(t, tt.expectedContent, sources[0].Index)
-		})
-	}
+	t.Run("custom index names", func(t *testing.T) {
+		source := &sourceutils.SourceConfig{
+			Name:         "Test Source",
+			URL:          "https://test.com",
+			RateLimit:    time.Second,
+			MaxDepth:     2,
+			ArticleIndex: "custom_articles",
+			Index:        "custom_content",
+		}
+		s := testutils.NewTestSources(nil)
+		err := s.AddSource(t.Context(), source)
+		require.NoError(t, err)
+
+		sources, err := s.ListSources(t.Context())
+		require.NoError(t, err)
+		require.Len(t, sources, 1)
+		assert.Equal(t, "custom_articles", sources[0].ArticleIndex)
+		assert.Equal(t, "custom_content", sources[0].Index)
+	})
 }
 
 // TestDefaultConfig tests default configuration
@@ -391,7 +366,7 @@ func TestModule(t *testing.T) {
 		fx.Supply(setup.config),
 		fx.Invoke(func(s sources.Interface) {
 			require.NotNil(t, s)
-			sources, err := s.ListSources(context.Background())
+			sources, err := s.ListSources(t.Context())
 			require.NoError(t, err)
 			require.NotNil(t, sources)
 		}),

@@ -686,15 +686,15 @@ func marshalJSON(v any) ([]byte, error) {
 
 // SearchArticles searches for articles in Elasticsearch
 func (s *Storage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
-	if s.opts.IndexName == "" {
-		return nil, errors.New("index name is not configured")
+	if s.client == nil {
+		return nil, errors.New("elasticsearch client is not initialized")
 	}
 
 	body, err := json.Marshal(map[string]any{
 		"query": map[string]any{
 			"multi_match": map[string]any{
 				"query":  query,
-				"fields": []string{"title^3", "content", "description^2"},
+				"fields": []string{"title^2", "content"},
 			},
 		},
 		"size": size,
@@ -725,9 +725,9 @@ func (s *Storage) SearchArticles(ctx context.Context, query string, size int) ([
 	}
 
 	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		s.logger.Error("Failed to decode search result", "error", err)
-		return nil, fmt.Errorf("error decoding search result: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		s.logger.Error("Failed to decode search result", "error", decodeErr)
+		return nil, fmt.Errorf("error decoding search result: %w", decodeErr)
 	}
 
 	hits, ok := result["hits"].(map[string]any)
@@ -744,19 +744,19 @@ func (s *Storage) SearchArticles(ctx context.Context, query string, size int) ([
 
 	articles := make([]*models.Article, 0, len(hitsArray))
 	for _, hit := range hitsArray {
-		hitMap, ok := hit.(map[string]any)
-		if !ok {
+		hitMap, hitOk := hit.(map[string]any)
+		if !hitOk {
 			continue
 		}
 
-		source, ok := hitMap["_source"].(map[string]any)
-		if !ok {
+		source, sourceOk := hitMap["_source"].(map[string]any)
+		if !sourceOk {
 			continue
 		}
 
 		article := &models.Article{}
-		if err := mapstructure.Decode(source, article); err != nil {
-			s.logger.Error("Failed to decode article", "error", err)
+		if decodeErr := mapstructure.Decode(source, article); decodeErr != nil {
+			s.logger.Error("Failed to decode article", "error", decodeErr)
 			continue
 		}
 
@@ -781,14 +781,14 @@ func (s *Storage) Aggregate(ctx context.Context, index string, aggs any) (any, e
 		return nil, fmt.Errorf("error marshaling aggregation query: %w", err)
 	}
 
-	res, err := s.client.Search(
+	res, searchErr := s.client.Search(
 		s.client.Search.WithContext(ctx),
 		s.client.Search.WithIndex(index),
 		s.client.Search.WithBody(bytes.NewReader(body)),
 	)
-	if err != nil {
-		s.logger.Error("Failed to execute aggregation", "error", err)
-		return nil, fmt.Errorf("error executing aggregation: %w", err)
+	if searchErr != nil {
+		s.logger.Error("Failed to execute aggregation", "error", searchErr)
+		return nil, fmt.Errorf("error executing aggregation: %w", searchErr)
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
@@ -802,9 +802,9 @@ func (s *Storage) Aggregate(ctx context.Context, index string, aggs any) (any, e
 	}
 
 	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		s.logger.Error("Failed to decode aggregation result", "error", err)
-		return nil, fmt.Errorf("error decoding aggregation result: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		s.logger.Error("Failed to decode aggregation result", "error", decodeErr)
+		return nil, fmt.Errorf("error decoding aggregation result: %w", decodeErr)
 	}
 
 	s.logger.Info("Executed aggregation successfully", "index", index)
@@ -830,18 +830,18 @@ func (s *Storage) Count(ctx context.Context, index string, query any) (int64, er
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
 	defer cancel()
 
-	body, err := marshalJSON(query)
-	if err != nil {
-		return 0, fmt.Errorf("error marshaling count query: %w", err)
+	body, marshalErr := marshalJSON(query)
+	if marshalErr != nil {
+		return 0, fmt.Errorf("error marshaling count query: %w", marshalErr)
 	}
 
-	res, err := s.client.Count(
+	res, countErr := s.client.Count(
 		s.client.Count.WithContext(ctx),
 		s.client.Count.WithIndex(index),
 		s.client.Count.WithBody(bytes.NewReader(body)),
 	)
-	if err != nil {
-		return 0, fmt.Errorf("failed to execute count: %w", err)
+	if countErr != nil {
+		return 0, fmt.Errorf("failed to execute count: %w", countErr)
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
@@ -850,19 +850,23 @@ func (s *Storage) Count(ctx context.Context, index string, query any) (int64, er
 	}()
 
 	if res.IsError() {
-		return 0, fmt.Errorf("count request failed: %s", res.String())
+		s.logger.Error("Failed to execute count", "error", res.String())
+		return 0, fmt.Errorf("error executing count: %s", res.String())
 	}
 
 	var result map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		return 0, fmt.Errorf("error decoding count response: %w", decodeErr)
+		s.logger.Error("Failed to decode count result", "error", decodeErr)
+		return 0, fmt.Errorf("error decoding count result: %w", decodeErr)
 	}
 
 	count, ok := result["count"].(float64)
 	if !ok {
-		return 0, errors.New("invalid count response format")
+		s.logger.Error("Failed to decode count result", "error", "invalid count result format")
+		return 0, errors.New("invalid count result format")
 	}
 
+	s.logger.Info("Executed count successfully", "index", index)
 	return int64(count), nil
 }
 

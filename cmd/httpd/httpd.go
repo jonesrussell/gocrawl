@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	// DefaultShutdownTimeout is the default timeout for graceful shutdown
+	// DefaultShutdownTimeout is the default timeout for graceful server shutdown.
 	DefaultShutdownTimeout = 5 * time.Second
 )
 
@@ -94,8 +94,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 // WaitForHealth waits for the server to become healthy
 func WaitForHealth(ctx context.Context, serverAddr string, interval, timeout time.Duration) error {
-	healthCtx, healthCancel := context.WithTimeout(ctx, timeout)
-	defer healthCancel()
+	healthCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -106,7 +106,11 @@ func WaitForHealth(ctx context.Context, serverAddr string, interval, timeout tim
 		case <-healthCtx.Done():
 			return fmt.Errorf("server failed to become healthy within %v", timeout)
 		case <-ticker.C:
-			resp, err := client.Get(fmt.Sprintf("http://%s/health", serverAddr))
+			req, err := http.NewRequestWithContext(healthCtx, http.MethodGet, fmt.Sprintf("http://%s/health", serverAddr), nil)
+			if err != nil {
+				continue
+			}
+			resp, err := client.Do(req)
 			if err != nil {
 				continue
 			}
@@ -120,7 +124,7 @@ func WaitForHealth(ctx context.Context, serverAddr string, interval, timeout tim
 
 // Shutdown gracefully shuts down the server.
 func Shutdown(ctx context.Context, server *http.Server) error {
-	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil &&

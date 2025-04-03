@@ -350,7 +350,7 @@ func TestModule(t *testing.T) {
 
 	app := fx.New(
 		fx.Provide(
-			context.Background,
+			func() context.Context { return t.Context() },
 			func() config.Interface { return mockConfig },
 			func() logger.Interface { return mockLogger },
 			func() types.Interface { return mockStorage },

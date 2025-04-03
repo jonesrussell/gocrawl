@@ -175,15 +175,18 @@ func TestCommandExecution(t *testing.T) {
 }
 
 func TestSearchCommand(t *testing.T) {
+	deps := setupTestDeps(t)
+	app := createTestApp(t, deps)
+	runTestApp(t, app)
+
 	cmd := search.Command()
-	assert.NotNil(t, cmd)
 	assert.Equal(t, "search", cmd.Use)
 	assert.Equal(t, "Search content in Elasticsearch", cmd.Short)
 	assert.NotNil(t, cmd.RunE)
 
 	// Test flags
 	err := cmd.Execute()
-	assert.Error(t, err, "Command should fail without required query flag")
+	require.Error(t, err, "Command should fail without required query flag")
 
 	// Test flag defaults
 	assert.Equal(t, "articles", cmd.Flag("index").DefValue)

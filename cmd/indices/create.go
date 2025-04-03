@@ -55,7 +55,13 @@ type CreateParams struct {
 }
 
 // CreateIndex creates a new index in Elasticsearch.
-func CreateIndex(ctx context.Context, cfg config.Interface, log logger.Interface, storage types.Interface, indexName string) error {
+func CreateIndex(
+	ctx context.Context,
+	cfg config.Interface,
+	log logger.Interface,
+	storage types.Interface,
+	indexName string,
+) error {
 	mapping := map[string]any{
 		"mappings": map[string]any{
 			"properties": map[string]any{
