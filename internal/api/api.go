@@ -69,9 +69,7 @@ func SetupRouter(
 	// Define protected routes
 	protected := router.Group("")
 	protected.Use(security.Middleware())
-	{
-		protected.POST("/search", handleSearch(searchManager))
-	}
+	protected.POST("/search", handleSearch(searchManager))
 
 	return router, security
 }
