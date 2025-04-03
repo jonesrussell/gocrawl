@@ -12,8 +12,8 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 )
 
@@ -40,7 +40,7 @@ var (
 // Crawler implements the crawler interface
 type Crawler struct {
 	collector        *colly.Collector
-	Logger           types.Logger
+	Logger           logger.Interface
 	bus              *events.Bus
 	indexManager     api.IndexManager
 	sources          sources.Interface

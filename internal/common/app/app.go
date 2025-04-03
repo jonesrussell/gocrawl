@@ -23,18 +23,28 @@ const (
 	DefaultChannelBufferSize = 100
 )
 
-// Params holds the parameters for creating an application.
+// Params contains the parameters for creating a new application.
 type Params struct {
 	fx.In
 
-	Config config.Interface
-	Logger common.Logger
+	// Logger for application operations
+	Logger logger.Interface
+	// Context for application lifecycle
+	Context context.Context
+}
+
+// New creates a new application.
+func New(log logger.Interface, ctx context.Context) *App {
+	return &App{
+		Logger:  log,
+		Context: ctx,
+	}
 }
 
 // SetupCollector creates and configures a new collector for the given source.
 func SetupCollector(
 	ctx context.Context,
-	log common.Logger,
+	log logger.Interface,
 	source sources.Config,
 	processors []common.Processor,
 	done chan struct{},
@@ -76,7 +86,7 @@ func SetupCollector(
 	app := fx.New(
 		fx.Provide(
 			fx.Annotate(
-				func() common.Logger { return log },
+				func() logger.Interface { return log },
 				fx.ResultTags(`name:"logger"`),
 			),
 			fx.Annotate(
@@ -139,7 +149,7 @@ var Module = fx.Module("app",
 		// Provide configuration
 		config.LoadConfig,
 		// Provide logger
-		func() (common.Logger, error) {
+		func() (logger.Interface, error) {
 			return logger.NewCustomLogger(nil, logger.Params{
 				Debug:  true,
 				Level:  "info",
@@ -152,3 +162,13 @@ var Module = fx.Module("app",
 		crawler.ProvideCrawler,
 	),
 )
+
+// ProvideLogger provides a logger for the application.
+func ProvideLogger() logger.Interface {
+	return log
+}
+
+// NewLogger creates a new logger.
+func NewLogger() (logger.Interface, error) {
+	// ... existing code ...
+}

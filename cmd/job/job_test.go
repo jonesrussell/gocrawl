@@ -13,6 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/job"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	storage "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/fx"
@@ -82,7 +83,7 @@ func (m *mockStorage) Aggregate(context.Context, string, any) (any, error) {
 }
 func (m *mockStorage) Count(context.Context, string, any) (int64, error) { return 0, nil }
 
-// mockLogger implements common.Logger for testing
+// mockLogger implements logger.Interface for testing
 type mockLogger struct {
 	mock.Mock
 }
@@ -107,21 +108,13 @@ func (m *mockLogger) Fatal(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-func (m *mockLogger) Printf(format string, args ...any) {
-	m.Called(format, args)
+func (m *mockLogger) With(fields ...any) logger.Interface {
+	args := m.Called(fields)
+	return args.Get(0).(logger.Interface)
 }
 
-func (m *mockLogger) Errorf(format string, args ...any) {
-	m.Called(format, args)
-}
-
-func (m *mockLogger) Sync() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-// Ensure mockLogger implements common.Logger
-var _ common.Logger = (*mockLogger)(nil)
+// Ensure mockLogger implements logger.Interface
+var _ logger.Interface = (*mockLogger)(nil)
 
 func TestModuleProvides(t *testing.T) {
 	mockLogger := &mockLogger{}

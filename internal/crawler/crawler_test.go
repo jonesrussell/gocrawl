@@ -2,7 +2,6 @@ package crawler_test
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +19,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxtest"
 )
 
 // mockIndexManager implements api.IndexManager for testing
@@ -107,50 +107,16 @@ func (m *MockProcessor) ContentType() common.ContentType {
 // Ensure MockProcessor implements common.Processor
 var _ common.Processor = (*MockProcessor)(nil)
 
-// MockLogger is a mock implementation of common.Logger
-type MockLogger struct {
-	mock.Mock
-	logs []string
-}
+// MockLogger is a mock implementation of logger.Interface
+type MockLogger struct{}
 
-// Info implements Logger.Info
-func (m *MockLogger) Info(msg string, args ...any) {
-	m.logs = append(m.logs, fmt.Sprintf("INFO: %s", msg))
-}
-
-// Error implements Logger.Error
-func (m *MockLogger) Error(msg string, args ...any) {
-	m.logs = append(m.logs, fmt.Sprintf("ERROR: %s", msg))
-}
-
-// Debug implements Logger.Debug
-func (m *MockLogger) Debug(msg string, args ...any) {
-	m.logs = append(m.logs, fmt.Sprintf("DEBUG: %s", msg))
-}
-
-// Warn implements Logger.Warn
-func (m *MockLogger) Warn(msg string, args ...any) {
-	m.logs = append(m.logs, fmt.Sprintf("WARN: %s", msg))
-}
-
-// Errorf implements Logger.Errorf
-func (m *MockLogger) Errorf(format string, args ...any) {
-	m.logs = append(m.logs, fmt.Sprintf("ERROR: %s", format))
-}
-
-// Fatal implements Logger.Fatal
-func (m *MockLogger) Fatal(msg string, args ...any) {
-	m.logs = append(m.logs, fmt.Sprintf("FATAL: %s", msg))
-}
-
-// Printf implements Logger.Printf
-func (m *MockLogger) Printf(format string, args ...any) {
-	m.logs = append(m.logs, fmt.Sprintf("PRINT: %s", format))
-}
-
-func (m *MockLogger) Sync() error {
-	args := m.Called()
-	return args.Error(0)
+func (m *MockLogger) Debug(msg string, fields ...any) {}
+func (m *MockLogger) Info(msg string, fields ...any)  {}
+func (m *MockLogger) Warn(msg string, fields ...any)  {}
+func (m *MockLogger) Error(msg string, fields ...any) {}
+func (m *MockLogger) Fatal(msg string, fields ...any) {}
+func (m *MockLogger) With(fields ...any) logger.Interface {
+	return m
 }
 
 // MockBus is a mock implementation of events.Bus
@@ -255,7 +221,7 @@ func (m *MockSources) GetSources() ([]sources.Config, error) {
 
 // NewCrawler creates a new crawler instance with the given dependencies
 func NewCrawler(
-	logger common.Logger,
+	logger logger.Interface,
 	bus *events.Bus,
 	indexManager api.IndexManager,
 	sources sources.Interface,
@@ -275,12 +241,7 @@ func NewCrawler(
 // TestCrawlerStartup tests crawler startup functionality.
 func TestCrawlerStartup(t *testing.T) {
 	// Create test logger
-	testLogger, initErr := logger.NewCustomLogger(nil, logger.Params{
-		Debug:  true,
-		Level:  "info",
-		AppEnv: "development",
-	})
-	require.NoError(t, initErr)
+	testLogger := &MockLogger{}
 
 	// Create mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -345,7 +306,7 @@ func TestCrawlerStartup(t *testing.T) {
 		crawler.Module,
 		fx.Provide(
 			// Provide logger
-			func() common.Logger { return testLogger },
+			func() logger.Interface { return testLogger },
 			// Provide debugger
 			func() debug.Debugger {
 				return &debug.LogDebugger{
@@ -395,19 +356,14 @@ func TestCrawlerStartup(t *testing.T) {
 // TestCrawlerShutdown tests crawler shutdown functionality.
 func TestCrawlerShutdown(t *testing.T) {
 	// Create test logger
-	testLogger, initErr := logger.NewCustomLogger(nil, logger.Params{
-		Debug:  true,
-		Level:  "info",
-		AppEnv: "development",
-	})
-	require.NoError(t, initErr)
+	testLogger := &MockLogger{}
 
 	// Create test app with all required dependencies
 	app := fx.New(
 		crawler.Module,
 		fx.Provide(
 			// Provide logger
-			func() common.Logger { return testLogger },
+			func() logger.Interface { return testLogger },
 			// Provide debugger
 			func() debug.Debugger {
 				return &debug.LogDebugger{
@@ -455,19 +411,14 @@ func TestCrawlerShutdown(t *testing.T) {
 // TestSourceValidation tests source validation functionality.
 func TestSourceValidation(t *testing.T) {
 	// Create test logger
-	testLogger, initErr := logger.NewCustomLogger(nil, logger.Params{
-		Debug:  true,
-		Level:  "info",
-		AppEnv: "development",
-	})
-	require.NoError(t, initErr)
+	testLogger := &MockLogger{}
 
 	// Create test app with all required dependencies
 	app := fx.New(
 		crawler.Module,
 		fx.Provide(
 			// Provide logger
-			func() common.Logger { return testLogger },
+			func() logger.Interface { return testLogger },
 			// Provide debugger
 			func() debug.Debugger {
 				return &debug.LogDebugger{
@@ -515,19 +466,14 @@ func TestSourceValidation(t *testing.T) {
 // TestErrorHandling tests error handling functionality.
 func TestErrorHandling(t *testing.T) {
 	// Create test logger
-	testLogger, initErr := logger.NewCustomLogger(nil, logger.Params{
-		Debug:  true,
-		Level:  "info",
-		AppEnv: "development",
-	})
-	require.NoError(t, initErr)
+	testLogger := &MockLogger{}
 
 	// Create test app with all required dependencies
 	app := fx.New(
 		crawler.Module,
 		fx.Provide(
 			// Provide logger
-			func() common.Logger { return testLogger },
+			func() logger.Interface { return testLogger },
 			// Provide debugger
 			func() debug.Debugger {
 				return &debug.LogDebugger{
@@ -574,7 +520,7 @@ func TestErrorHandling(t *testing.T) {
 
 // writerWrapper implements io.Writer for the logger
 type writerWrapper struct {
-	logger common.Logger
+	logger logger.Interface
 }
 
 // Write implements io.Writer interface
@@ -584,7 +530,7 @@ func (w *writerWrapper) Write(p []byte) (int, error) {
 }
 
 // NewDebugLogger creates a debug logger for testing.
-func NewDebugLogger(logger common.Logger) io.Writer {
+func NewDebugLogger(logger logger.Interface) io.Writer {
 	return &writerWrapper{logger: logger}
 }
 
@@ -593,12 +539,7 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 	ctx := t.Context()
 
 	// Create a development logger with nice formatting
-	devLogger, err := logger.NewCustomLogger(nil, logger.Params{
-		Debug:  true,
-		Level:  "debug",
-		AppEnv: "development",
-	})
-	require.NoError(t, err)
+	devLogger := &MockLogger{}
 
 	// Create mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -658,7 +599,7 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 	})
 
 	// Visit the test server URL
-	err = collector.Visit(server.URL)
+	err := collector.Visit(server.URL)
 	require.NoError(t, err)
 
 	// Wait for the crawler to finish
@@ -667,4 +608,19 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 	// Verify expectations
 	mockArticleProcessor.AssertExpectations(t)
 	mockContentProcessor.AssertExpectations(t)
+}
+
+func TestModuleProvides(t *testing.T) {
+	testLogger := &MockLogger{}
+
+	app := fxtest.New(t,
+		fx.Supply(testLogger),
+		fx.Provide(
+			fx.Annotate(func() logger.Interface { return testLogger }, fx.As(new(logger.Interface))),
+		),
+		Module,
+	)
+
+	app.RequireStart()
+	app.RequireStop()
 }

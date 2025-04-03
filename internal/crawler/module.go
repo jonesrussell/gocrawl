@@ -8,8 +8,8 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"go.uber.org/fx"
 )
@@ -31,7 +31,7 @@ type Result struct {
 var Module = fx.Module("crawler",
 	fx.Provide(
 		// Provide the collector
-		func(logger types.Logger, debugger debug.Debugger) *colly.Collector {
+		func(logger logger.Interface, debugger debug.Debugger) *colly.Collector {
 			return colly.NewCollector(
 				colly.MaxDepth(DefaultMaxDepth),
 				colly.Async(true),
@@ -47,7 +47,7 @@ var Module = fx.Module("crawler",
 		// Provide the crawler
 		fx.Annotate(
 			func(
-				logger types.Logger,
+				logger logger.Interface,
 				indexManager api.IndexManager,
 				sources sources.Interface,
 				articleProcessor common.Processor,
@@ -70,7 +70,7 @@ var Module = fx.Module("crawler",
 
 // ProvideCrawler creates a new crawler instance.
 func ProvideCrawler(
-	logger types.Logger,
+	logger logger.Interface,
 	indexManager api.IndexManager,
 	sources sources.Interface,
 	articleProcessor common.Processor,
@@ -94,7 +94,7 @@ func ProvideCrawler(
 
 // NewCrawler creates a new crawler instance.
 func NewCrawler(
-	logger types.Logger,
+	logger logger.Interface,
 	indexManager api.IndexManager,
 	sources sources.Interface,
 	articleProcessor common.Processor,

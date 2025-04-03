@@ -12,6 +12,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/require"
@@ -179,4 +180,16 @@ func TestModuleProvides(t *testing.T) {
 // httpdTestStorage implements storagetypes.Interface for testing
 type httpdTestStorage struct {
 	storagetypes.Interface
+}
+
+// mockLogger implements logger.Interface for testing
+type mockLogger struct{}
+
+func (m *mockLogger) Debug(msg string, fields ...any) {}
+func (m *mockLogger) Info(msg string, fields ...any)  {}
+func (m *mockLogger) Warn(msg string, fields ...any)  {}
+func (m *mockLogger) Error(msg string, fields ...any) {}
+func (m *mockLogger) Fatal(msg string, fields ...any) {}
+func (m *mockLogger) With(fields ...any) logger.Interface {
+	return m
 }

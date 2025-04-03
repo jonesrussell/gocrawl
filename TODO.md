@@ -27,12 +27,12 @@
   - [x] Update all references to use ElasticsearchIndexManager
   - [x] Update tests to use ElasticsearchIndexManager
   - [x] Update documentation
-- [ ] Update Logger References
-  - [ ] Replace all `common.Logger` with `logger.Interface`
-  - [ ] Update imports to use `internal/logger` package
-  - [ ] Update tests to use `logger.Interface`
-  - [ ] Update documentation to reflect changes
-  - [ ] Remove `common.Logger` type alias
+- [x] Update Logger References
+  - [x] Replace all `common.Logger` with `logger.Interface`
+  - [x] Update imports to use `internal/logger` package
+  - [x] Update tests to use `logger.Interface`
+  - [x] Update documentation to reflect changes
+  - [x] Remove `common.Logger` type alias
 - [ ] Standardize Package Structure
   - [ ] Move all interfaces to `interface.go`
   - [ ] Move all types to `types.go`
@@ -564,6 +564,8 @@
   - Added proper log levels and fields
   - Added proper log context and formatting
   - Added log configuration options
+  - Removed common.Logger in favor of logger.Interface
+  - Updated all packages to use logger.Interface directly
 - Metrics and Monitoring
   - Added proper metrics collection
   - Added health checks and monitoring
@@ -615,6 +617,12 @@
   - [x] Move storage interface to `internal/storage`
   - [x] Remove old types packages
   - [x] Update imports in all files
+
+- [x] Update logger references
+  - [x] Remove common.Logger from internal/common/types.go
+  - [x] Update all packages to use logger.Interface directly
+  - [x] Update tests to use logger.Interface
+  - [x] Update documentation to reflect changes
 
 - [ ] Remove unused code
   - [ ] Remove unused interfaces

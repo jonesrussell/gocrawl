@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
@@ -22,7 +23,7 @@ const (
 // Service implements article processing operations.
 type Service struct {
 	// Logger for article operations
-	Logger common.Logger
+	Logger logger.Interface
 	// Selectors for article extraction
 	Selectors config.ArticleSelectors
 	// Storage for article persistence
@@ -35,7 +36,7 @@ type Service struct {
 
 // NewService creates a new article service.
 func NewService(
-	logger common.Logger,
+	logger logger.Interface,
 	selectors config.ArticleSelectors,
 	storage types.Interface,
 	indexName string,
@@ -282,7 +283,7 @@ func (s *Service) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle)
 	return parseDate(datesToTry, s.Logger)
 }
 
-func parseDate(dates []string, logger common.Logger) time.Time {
+func parseDate(dates []string, logger logger.Interface) time.Time {
 	var publishedDate time.Time
 	timeFormats := []string{
 		time.RFC3339,

@@ -114,17 +114,8 @@ func (m *ElasticsearchIndexManager) IndexExists(ctx context.Context, name string
 	return exists, nil
 }
 
-// UpdateMapping updates the mapping for an existing index.
-func (m *ElasticsearchIndexManager) UpdateMapping(ctx context.Context, name string, mapping any) error {
-	exists, err := m.IndexExists(ctx, name)
-	if err != nil {
-		return fmt.Errorf("failed to check index existence: %w", err)
-	}
-
-	if !exists {
-		return fmt.Errorf("index %s not found", name)
-	}
-
+// UpdateMapping updates the mapping for an index.
+func (m *ElasticsearchIndexManager) UpdateMapping(ctx context.Context, name string, mapping map[string]any) error {
 	body, err := json.Marshal(mapping)
 	if err != nil {
 		return fmt.Errorf("failed to marshal mapping: %w", err)
@@ -137,18 +128,45 @@ func (m *ElasticsearchIndexManager) UpdateMapping(ctx context.Context, name stri
 
 	res, err := req.Do(ctx, m.client)
 	if err != nil {
-		return fmt.Errorf("failed to update mapping for index %s: %w", name, err)
+		return fmt.Errorf("failed to update mapping: %w", err)
 	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			m.logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
+	defer res.Body.Close()
 
 	if res.IsError() {
-		return fmt.Errorf("failed to update mapping for index %s: status: %s", name, res.Status())
+		return fmt.Errorf("failed to update mapping: %s", res.String())
 	}
 
-	m.logger.Info("Updated mapping", "index", name)
+	m.logger.Info("Successfully updated mapping", "index", name)
 	return nil
+}
+
+// GetMapping gets the mapping for an index.
+func (m *ElasticsearchIndexManager) GetMapping(ctx context.Context, name string) (map[string]any, error) {
+	req := esapi.IndicesGetMappingRequest{
+		Index: []string{name},
+	}
+
+	res, err := req.Do(ctx, m.client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mapping: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("failed to get mapping: %s", res.String())
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode mapping: %w", err)
+	}
+
+	// Extract the mapping from the response
+	if mappings, ok := result[name].(map[string]any); ok {
+		if mapping, ok := mappings["mappings"].(map[string]any); ok {
+			return mapping, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unexpected mapping format")
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	"github.com/google/uuid"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
@@ -26,14 +26,16 @@ type Interface interface {
 
 // Service implements the Interface
 type Service struct {
-	Logger common.Logger
+	Logger    logger.Interface
+	Storage   Storage
+	IndexName string
 }
 
 // Ensure Service implements Interface
 var _ Interface = (*Service)(nil)
 
 // NewService creates a new Service instance
-func NewService(logger common.Logger) Interface {
+func NewService(logger logger.Interface) Interface {
 	return &Service{Logger: logger}
 }
 
@@ -201,7 +203,7 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
 }
 
 // parseDate attempts to parse a date string using multiple formats
-func (s *Service) parseDate(logger common.Logger, dateStr string) time.Time {
+func (s *Service) parseDate(logger logger.Interface, dateStr string) time.Time {
 	logger.Debug("Trying to parse date", "value", dateStr)
 
 	for _, format := range timeFormats {

@@ -19,11 +19,24 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
+	"go.uber.org/fx/fxtest"
 )
 
 // mockSources implements sources.Interface for testing.
 type mockSources struct {
 	sources.Interface
+}
+
+// mockLogger implements logger.Interface for testing
+type mockLogger struct{}
+
+func (m *mockLogger) Debug(msg string, fields ...any) {}
+func (m *mockLogger) Info(msg string, fields ...any)  {}
+func (m *mockLogger) Warn(msg string, fields ...any)  {}
+func (m *mockLogger) Error(msg string, fields ...any) {}
+func (m *mockLogger) Fatal(msg string, fields ...any) {}
+func (m *mockLogger) With(fields ...any) logger.Interface {
+	return m
 }
 
 // TestCommonModule provides a test-specific common module that excludes the logger module.
@@ -186,4 +199,19 @@ func TestModuleLifecycle(t *testing.T) {
 	app := setupTestApp()
 	require.NoError(t, app.Start(t.Context()))
 	require.NoError(t, app.Stop(t.Context()))
+}
+
+func TestModuleProvides(t *testing.T) {
+	log := &mockLogger{}
+
+	app := fxtest.New(t,
+		fx.Supply(log),
+		fx.Provide(
+			fx.Annotate(func() logger.Interface { return log }, fx.As(new(logger.Interface))),
+		),
+		TestCrawlerModule,
+	)
+
+	app.RequireStart()
+	app.RequireStop()
 }

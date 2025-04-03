@@ -10,6 +10,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
@@ -17,7 +18,7 @@ import (
 // ContentProcessor handles content processing.
 type ContentProcessor struct {
 	// Logger for content processing operations
-	Logger common.Logger
+	Logger logger.Interface
 	// ContentService for content operations
 	ContentService Interface
 	// Storage for content persistence

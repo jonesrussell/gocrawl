@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -16,7 +17,7 @@ import (
 type ProcessorParams struct {
 	fx.In
 
-	Logger    common.Logger
+	Logger    logger.Interface
 	Service   Interface
 	Storage   types.Interface
 	IndexName string `name:"contentIndex"`
@@ -28,7 +29,9 @@ type ProcessorParams struct {
 type Params struct {
 	fx.In
 
-	Logger common.Logger
+	Logger    logger.Interface
+	Storage   types.Interface
+	IndexName string `name:"contentIndexName"`
 }
 
 // Module provides the content module's dependencies.

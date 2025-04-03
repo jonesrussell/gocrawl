@@ -21,9 +21,6 @@ type (
 	// Config represents the configuration interface.
 	Config interface{}
 
-	// Logger represents the logging interface.
-	Logger interface{}
-
 	// Storage represents the storage interface.
 	Storage interface{}
 )

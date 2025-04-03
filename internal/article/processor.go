@@ -8,6 +8,7 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
@@ -15,7 +16,7 @@ import (
 // ArticleProcessor handles article content processing.
 type ArticleProcessor struct {
 	// Logger for article processing operations
-	Logger common.Logger
+	Logger logger.Interface
 	// ArticleService for article operations
 	ArticleService Interface
 	// Storage for article persistence

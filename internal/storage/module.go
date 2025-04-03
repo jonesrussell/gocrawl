@@ -10,8 +10,8 @@ import (
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
@@ -127,7 +127,7 @@ var Module = fx.Module("storage",
 			fx.ParamTags(`name:"config"`, ""),
 		),
 		// Then provide the index manager
-		func(client *es.Client, logger logger.Interface) api.IndexManager {
+		func(client *es.Client, logger logger.Interface) interfaces.IndexManager {
 			return NewElasticsearchIndexManager(client, logger)
 		},
 		// Finally provide the storage interface

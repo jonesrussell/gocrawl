@@ -10,9 +10,9 @@ import (
 	"time"
 
 	cmdsrcs "github.com/jonesrussell/gocrawl/cmd/sources"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
@@ -24,10 +24,10 @@ import (
 // ErrSourceNotFound is returned when a source is not found
 var ErrSourceNotFound = errors.New("source not found")
 
-// mockLogger implements common.Logger for testing
+// mockLogger implements logger.Interface for testing
 type mockLogger struct {
 	mock.Mock
-	common.Logger
+	logger.Interface
 	infoMessages  []string
 	errorMessages []string
 }
@@ -401,7 +401,7 @@ func Test_executeList(t *testing.T) {
 				fx.Supply(t.Context()),
 				fx.Provide(
 					func() sources.Interface { return sm },
-					func() common.Logger { return ml },
+					func() logger.Interface { return ml },
 					fx.Annotate(
 						func() config.Interface { return mc },
 						fx.As(new(config.Interface)),
@@ -598,4 +598,19 @@ func TestFindByName(t *testing.T) {
 			require.Equal(t, tt.source, source.Name)
 		})
 	}
+}
+
+func TestModuleProvides(t *testing.T) {
+	ml := &mockLogger{}
+
+	app := fxtest.New(t,
+		fx.Supply(ml),
+		fx.Provide(
+			fx.Annotate(func() logger.Interface { return ml }, fx.As(new(logger.Interface))),
+		),
+		Module,
+	)
+
+	app.RequireStart()
+	app.RequireStop()
 }
