@@ -161,6 +161,9 @@ func runDelete(cmd *cobra.Command, args []string) error {
 }
 
 // filterIndices filters out non-existent indices and returns lists of indices to delete and missing indices.
+// First return value is the list of indices to delete, second return value is the list of missing indices.
+// Note: We're using unnamed return values to comply with nonamedreturns linter,
+// which takes precedence over gocritic's unnamedResult.
 func filterIndices(p *deleteParams, existingIndices []string) ([]string, []string) {
 	// Create map of existing indices
 	existingMap := make(map[string]bool)
@@ -169,17 +172,17 @@ func filterIndices(p *deleteParams, existingIndices []string) ([]string, []strin
 	}
 
 	// Filter and report non-existent indices
-	toDelete := make([]string, 0)
-	missing := make([]string, 0)
+	indicesToDelete := make([]string, 0)
+	missingIndices := make([]string, 0)
 	for _, index := range p.indices {
 		if !existingMap[index] {
-			missing = append(missing, index)
+			missingIndices = append(missingIndices, index)
 		} else {
-			toDelete = append(toDelete, index)
+			indicesToDelete = append(indicesToDelete, index)
 		}
 	}
 
-	return toDelete, missing
+	return indicesToDelete, missingIndices
 }
 
 // reportMissingIndices prints a list of indices that do not exist.
