@@ -49,7 +49,7 @@ type rateLimitInfo struct {
 
 // Constants
 const (
-	cleanupTimeout = 5 * time.Second // Timeout for waiting for cleanup to complete
+// No constants needed
 )
 
 // NewSecurityMiddleware creates a new security middleware instance

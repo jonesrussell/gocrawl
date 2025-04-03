@@ -2,6 +2,4 @@
 package types
 
 // Source defines the interface for data sources.
-type Source interface {
-	// Add your source methods here
-}
+type Source any

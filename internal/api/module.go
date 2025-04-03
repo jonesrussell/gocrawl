@@ -44,7 +44,11 @@ var Module = fx.Module("api",
 	storage.Module,
 	fx.Provide(
 		// Provide the server and security middleware together to avoid circular dependencies
-		func(cfg config.Interface, log logger.Interface, searchManager SearchManager) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			searchManager SearchManager,
+		) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
 			return StartHTTPServer(log, searchManager, cfg)
 		},
 		NewLifecycle,

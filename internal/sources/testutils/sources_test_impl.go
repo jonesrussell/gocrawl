@@ -3,6 +3,7 @@ package testutils
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -123,5 +124,5 @@ func (s *testSourcesImpl) FindByName(name string) (*sourceutils.SourceConfig, er
 			return &s.configs[i], nil
 		}
 	}
-	return nil, nil
+	return nil, fmt.Errorf("source not found: %s", name)
 }

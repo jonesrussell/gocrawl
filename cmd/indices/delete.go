@@ -161,7 +161,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 }
 
 // filterIndices filters out non-existent indices and returns lists of indices to delete and missing indices.
-func filterIndices(p *deleteParams, existingIndices []string) (indicesToDelete, missingIndices []string) {
+func filterIndices(p *deleteParams, existingIndices []string) ([]string, []string) {
 	// Create map of existing indices
 	existingMap := make(map[string]bool)
 	for _, idx := range existingIndices {
@@ -169,6 +169,8 @@ func filterIndices(p *deleteParams, existingIndices []string) (indicesToDelete, 
 	}
 
 	// Filter and report non-existent indices
+	indicesToDelete := []string{}
+	missingIndices := []string{}
 	for _, index := range p.indices {
 		if !existingMap[index] {
 			missingIndices = append(missingIndices, index)

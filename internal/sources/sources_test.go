@@ -144,7 +144,7 @@ func TestAddSource(t *testing.T) {
 	require.NotNil(t, s)
 
 	// Test AddSource
-	err := s.AddSource(context.Background(), &sourceutils.SourceConfig{
+	err := s.AddSource(context.TODO(), &sourceutils.SourceConfig{
 		Name:      "test-source",
 		URL:       "https://example.com",
 		RateLimit: time.Second,
@@ -159,7 +159,7 @@ func TestAddSource(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify source was added
-	sources, err := s.ListSources(context.Background())
+	sources, err := s.ListSources(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	assert.Equal(t, "test-source", sources[0].Name)
@@ -184,7 +184,7 @@ func TestUpdateSource(t *testing.T) {
 	require.NotNil(t, s)
 
 	// Test UpdateSource
-	err := s.UpdateSource(context.Background(), &sourceutils.SourceConfig{
+	err := s.UpdateSource(context.TODO(), &sourceutils.SourceConfig{
 		Name:      "test-source",
 		URL:       "https://updated.example.com",
 		RateLimit: 2 * time.Second,
@@ -199,7 +199,7 @@ func TestUpdateSource(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify source was updated
-	sources, err := s.ListSources(context.Background())
+	sources, err := s.ListSources(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	assert.Equal(t, "https://updated.example.com", sources[0].URL)
@@ -304,11 +304,11 @@ func TestIndexNameHandling(t *testing.T) {
 		RateLimit: time.Second,
 		MaxDepth:  2,
 	}
-	err := s.AddSource(nil, source)
+	err := s.AddSource(context.TODO(), source)
 	require.NoError(t, err)
 
 	// Verify default index names were set
-	sources, err := s.ListSources(nil)
+	sources, err := s.ListSources(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "articles", sources[0].ArticleIndex)
@@ -336,11 +336,11 @@ func TestSourceIndexNamePersistence(t *testing.T) {
 		ArticleIndex: "custom_articles",
 		Index:        "custom_content",
 	}
-	err := s.AddSource(nil, source)
+	err := s.AddSource(context.TODO(), source)
 	require.NoError(t, err)
 
 	// Verify custom index names were set
-	sources, err := s.ListSources(nil)
+	sources, err := s.ListSources(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "custom_articles", sources[0].ArticleIndex)
@@ -355,11 +355,11 @@ func TestSourceIndexNamePersistence(t *testing.T) {
 		ArticleIndex: "updated_articles",
 		Index:        "updated_content",
 	}
-	err = s.UpdateSource(nil, updatedSource)
+	err = s.UpdateSource(context.TODO(), updatedSource)
 	require.NoError(t, err)
 
 	// Verify index names were updated
-	sources, err = s.ListSources(nil)
+	sources, err = s.ListSources(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "updated_articles", sources[0].ArticleIndex)
@@ -380,11 +380,11 @@ func TestProvideSourcesIndexNames(t *testing.T) {
 		ArticleIndex: "custom_articles",
 		Index:        "custom_content",
 	}
-	err := s.AddSource(nil, source)
+	err := s.AddSource(context.TODO(), source)
 	require.NoError(t, err)
 
 	// Verify custom index names were set
-	sources, err := s.ListSources(nil)
+	sources, err := s.ListSources(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "custom_articles", sources[0].ArticleIndex)
@@ -399,11 +399,11 @@ func TestProvideSourcesIndexNames(t *testing.T) {
 		ArticleIndex: "updated_articles",
 		Index:        "updated_content",
 	}
-	err = s.UpdateSource(nil, updatedSource)
+	err = s.UpdateSource(context.TODO(), updatedSource)
 	require.NoError(t, err)
 
 	// Verify index names were updated
-	sources, err = s.ListSources(nil)
+	sources, err = s.ListSources(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "updated_articles", sources[0].ArticleIndex)
@@ -416,14 +416,14 @@ func TestEmptySources(t *testing.T) {
 	require.NotNil(t, s)
 
 	// Test ListSources with empty sources
-	sources, err := s.ListSources(nil)
+	sources, err := s.ListSources(context.TODO())
 	require.NoError(t, err)
-	require.Len(t, sources, 0)
+	require.Empty(t, sources)
 
 	// Test GetSources with empty sources
 	configs, err := s.GetSources()
 	require.NoError(t, err)
-	require.Len(t, configs, 0)
+	require.Empty(t, configs)
 
 	// Test GetMetrics with empty sources
 	metrics := s.GetMetrics()

@@ -232,7 +232,7 @@ func NewJobCommand(log logger.Interface) *cobra.Command {
 			defer cleanup()
 
 			// Initialize the Fx application
-			fxApp := setupFXApp(log)
+			fxApp := setupFXApp()
 
 			// Set the fx app for coordinated shutdown
 			handler.SetFXApp(fxApp)
@@ -267,9 +267,7 @@ func Command() *cobra.Command {
 }
 
 // setupFXApp creates and configures the fx application with all required dependencies.
-func setupFXApp(
-	log logger.Interface,
-) *fx.App {
+func setupFXApp() *fx.App {
 	return fx.New(
 		fx.Provide(
 			fx.Annotate(

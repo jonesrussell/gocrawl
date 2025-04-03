@@ -15,12 +15,12 @@ type (
 	Item = jobtypes.Item
 )
 
-// These types are defined as interface{} to avoid import cycles.
+// These types are defined as any to avoid import cycles.
 // They will be used by other packages that need these types.
 type (
 	// Config represents the configuration interface.
-	Config interface{}
+	Config any
 
 	// Storage represents the storage interface.
-	Storage interface{}
+	Storage any
 )

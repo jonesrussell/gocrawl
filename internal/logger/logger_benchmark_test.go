@@ -23,13 +23,13 @@ func BenchmarkLogger(b *testing.B) {
 	log := createLogger(zapLogger, logConfig)
 
 	b.Run("Info", func(b *testing.B) {
-		for _ = range b.N {
+		for range b.N {
 			log.Info("benchmark message", "key", "value")
 		}
 	})
 
 	b.Run("InfoWithFields", func(b *testing.B) {
-		for _ = range b.N {
+		for range b.N {
 			log.Info("benchmark message",
 				"key1", "value1",
 				"key2", "value2",
@@ -39,14 +39,14 @@ func BenchmarkLogger(b *testing.B) {
 	})
 
 	b.Run("With", func(b *testing.B) {
-		for _ = range b.N {
+		for range b.N {
 			child := log.With("key", "value")
 			child.Info("benchmark message")
 		}
 	})
 
 	b.Run("Error", func(b *testing.B) {
-		for _ = range b.N {
+		for range b.N {
 			log.Error("benchmark error", "error", "test error")
 		}
 	})

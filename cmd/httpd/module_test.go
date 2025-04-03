@@ -180,15 +180,3 @@ func TestModuleProvides(t *testing.T) {
 type httpdTestStorage struct {
 	storagetypes.Interface
 }
-
-// mockLogger implements logger.Interface for testing
-type mockLogger struct{}
-
-func (m *mockLogger) Debug(msg string, fields ...any) {}
-func (m *mockLogger) Info(msg string, fields ...any)  {}
-func (m *mockLogger) Warn(msg string, fields ...any)  {}
-func (m *mockLogger) Error(msg string, fields ...any) {}
-func (m *mockLogger) Fatal(msg string, fields ...any) {}
-func (m *mockLogger) With(fields ...any) logger.Interface {
-	return m
-}
