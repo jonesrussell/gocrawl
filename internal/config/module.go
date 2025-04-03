@@ -178,10 +178,10 @@ func provideConfig(envFile string) func(setupConfig) (Interface, error) {
 // Module provides the config module and its dependencies using fx.
 // It sets up the configuration providers that can be used throughout
 // the application for dependency injection.
-var Module = fx.Options(
+var Module = fx.Module("config",
+	TransportModule,
 	fx.Provide(
 		provideConfig(""), // Provide the config interface
-		NewHTTPTransport,  // Provides HTTP transport configuration
 	),
 )
 

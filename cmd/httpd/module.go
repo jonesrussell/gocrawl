@@ -12,5 +12,6 @@ import (
 var Module = fx.Module("httpd",
 	api.Module,
 	storage.Module,
+	config.TransportModule,
 	config.Module,
 )

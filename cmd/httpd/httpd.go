@@ -92,6 +92,47 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(shutdownCtx)
 }
 
+// WaitForHealth waits for the server to become healthy
+func WaitForHealth(ctx context.Context, serverAddr string, interval time.Duration, timeout time.Duration) error {
+	healthCtx, healthCancel := context.WithTimeout(ctx, timeout)
+	defer healthCancel()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	client := &http.Client{Timeout: interval}
+	for {
+		select {
+		case <-healthCtx.Done():
+			return fmt.Errorf("server failed to become healthy within %v", timeout)
+		case <-ticker.C:
+			resp, err := client.Get(fmt.Sprintf("http://%s/health", serverAddr))
+			if err != nil {
+				continue
+			}
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+		}
+	}
+}
+
+// GracefulShutdown performs a graceful shutdown of the HTTP server
+func GracefulShutdown(ctx context.Context, server *http.Server, logger logger.Interface) error {
+	shutdownCtx, cancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
+	defer cancel()
+
+	logger.Info("Initiating graceful shutdown...")
+	if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		logger.Error("Error during server shutdown", "error", err)
+		return fmt.Errorf("error during server shutdown: %w", err)
+	}
+
+	logger.Info("Shutdown complete")
+	return nil
+}
+
 // Cmd represents the HTTP server command
 var Cmd = &cobra.Command{
 	Use:   "httpd",
@@ -145,37 +186,12 @@ You can send POST requests to /search with a JSON body containing the search par
 							}
 						}()
 
-						// Wait for server to be ready
-						healthCtx, healthCancel := context.WithTimeout(ctx, api.HealthCheckTimeout)
-						defer healthCancel()
-
-						ticker := time.NewTicker(api.HealthCheckInterval)
-						defer ticker.Stop()
-
-						for {
-							select {
-							case <-healthCtx.Done():
-								return fmt.Errorf("server failed to become healthy within %v", api.HealthCheckTimeout)
-							case <-ticker.C:
-								client := &http.Client{
-									Timeout: api.HealthCheckInterval,
-								}
-
-								resp, err := client.Get(fmt.Sprintf("http://%s/health", p.Server.Addr))
-								if err != nil {
-									continue // Server not ready yet
-								}
-								resp.Body.Close()
-
-								if resp.StatusCode == http.StatusOK {
-									return nil
-								}
-							case err := <-errChan:
-								return err
-							case <-ctx.Done():
-								return ctx.Err()
-							}
+						// Wait for server to be healthy
+						if err := WaitForHealth(ctx, p.Server.Addr, api.HealthCheckInterval, api.HealthCheckTimeout); err != nil {
+							return err
 						}
+
+						return nil
 					},
 					OnStop: func(ctx context.Context) error {
 						state.mu.Lock()
@@ -186,31 +202,15 @@ You can send POST requests to /search with a JSON body containing the search par
 						state.shutdown = true
 						state.mu.Unlock()
 
-						p.Logger.Info("Initiating graceful shutdown...")
-
-						// Create timeout context for shutdown
-						shutdownCtx, shutdownCancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
-						defer shutdownCancel()
-
-						// Shutdown HTTP server
-						p.Logger.Info("Shutting down HTTP server...")
-						if err := p.Server.Shutdown(shutdownCtx); err != nil {
-							if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-								p.Logger.Error("Error during server shutdown", "error", err)
-								return fmt.Errorf("error during server shutdown: %w", err)
-							}
-						}
-
 						// Wait for server goroutine to exit
 						select {
 						case <-state.serverDone:
 							p.Logger.Info("HTTP server goroutine exited")
-						case <-shutdownCtx.Done():
+						case <-ctx.Done():
 							p.Logger.Warn("Timeout waiting for server goroutine to exit")
 						}
 
-						p.Logger.Info("Shutdown complete")
-						return nil
+						return GracefulShutdown(ctx, p.Server, p.Logger)
 					},
 				})
 			}),

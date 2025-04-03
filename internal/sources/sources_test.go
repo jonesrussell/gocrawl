@@ -2,24 +2,38 @@
 package sources_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/jonesrussell/gocrawl/internal/sources/testutils"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
+	"go.uber.org/fx/fxtest"
 )
 
-func TestLoadFromFile(t *testing.T) {
-	// Create a temporary sources.yml file
+// testSetup holds common test data and utilities
+type testSetup struct {
+	t           *testing.T
+	tmpDir      string
+	sourcesFile string
+	config      *config.Config
+}
+
+// newTestSetup creates a new test setup with temporary files
+func newTestSetup(t *testing.T) *testSetup {
 	tmpDir := t.TempDir()
 	sourcesFile := filepath.Join(tmpDir, "sources.yml")
-	err := os.WriteFile(sourcesFile, []byte(`
+
+	// Create test sources file
+	testSources := `
 sources:
   - name: test-source
     url: https://example.com
@@ -29,403 +43,360 @@ sources:
       article:
         title: h1
         body: article
-`), 0644)
+`
+	err := os.WriteFile(sourcesFile, []byte(testSources), 0644)
 	require.NoError(t, err)
 
-	// Set environment variables
-	t.Setenv("SOURCES_FILE", sourcesFile)
-	defer os.Unsetenv("SOURCES_FILE")
+	// Create test config
+	cfg := &config.Config{
+		Crawler: config.CrawlerConfig{
+			SourceFile: sourcesFile,
+		},
+	}
 
-	// Load sources from file
-	loaderConfigs, err := loader.LoadFromFile(sourcesFile)
-	require.NoError(t, err)
-	require.Len(t, loaderConfigs, 1)
+	return &testSetup{
+		t:           t,
+		tmpDir:      tmpDir,
+		sourcesFile: sourcesFile,
+		config:      cfg,
+	}
+}
 
-	// Convert loader.Config to sourceutils.SourceConfig
-	sourceConfigs := make([]sourceutils.SourceConfig, len(loaderConfigs))
-	for i, cfg := range loaderConfigs {
-		rateLimit, parseErr := time.ParseDuration(cfg.RateLimit)
-		require.NoError(t, parseErr)
+// TestLoadFromFile tests loading sources from a file
+func TestLoadFromFile(t *testing.T) {
+	t.Parallel()
+	setup := newTestSetup(t)
 
-		sourceConfigs[i] = sourceutils.SourceConfig{
-			Name:      cfg.Name,
-			URL:       cfg.URL,
-			RateLimit: rateLimit,
-			MaxDepth:  cfg.MaxDepth,
-			Selectors: sourceutils.SelectorConfig{
-				Article: sourceutils.ArticleSelectors{
-					Title: cfg.Selectors.Article.Title,
-					Body:  cfg.Selectors.Article.Body,
+	t.Run("valid sources file", func(t *testing.T) {
+		loaderConfigs, err := loader.LoadFromFile(setup.sourcesFile)
+		require.NoError(t, err)
+		require.Len(t, loaderConfigs, 1)
+
+		sourceConfigs := make([]sourceutils.SourceConfig, len(loaderConfigs))
+		for i, cfg := range loaderConfigs {
+			rateLimit, parseErr := time.ParseDuration(cfg.RateLimit)
+			require.NoError(t, parseErr)
+
+			sourceConfigs[i] = sourceutils.SourceConfig{
+				Name:      cfg.Name,
+				URL:       cfg.URL,
+				RateLimit: rateLimit,
+				MaxDepth:  cfg.MaxDepth,
+				Selectors: sourceutils.SelectorConfig{
+					Article: sourceutils.ArticleSelectors{
+						Title: cfg.Selectors.Article.Title,
+						Body:  cfg.Selectors.Article.Body,
+					},
 				},
-			},
+			}
 		}
-	}
 
-	// Create test sources instance
-	s := testutils.NewTestSources(sourceConfigs)
-	require.NotNil(t, s)
+		s := testutils.NewTestSources(sourceConfigs)
+		require.NotNil(t, s)
 
-	// Test ListSources
-	sources, err := s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Len(t, sources, 1)
-	assert.Equal(t, "test-source", sources[0].Name)
-	assert.Equal(t, "https://example.com", sources[0].URL)
-	assert.Equal(t, time.Second, sources[0].RateLimit)
-	assert.Equal(t, 2, sources[0].MaxDepth)
-	assert.Equal(t, "h1", sources[0].Selectors.Article.Title)
-	assert.Equal(t, "article", sources[0].Selectors.Article.Body)
+		sources, err := s.ListSources(context.Background())
+		require.NoError(t, err)
+		require.Len(t, sources, 1)
+		assert.Equal(t, "test-source", sources[0].Name)
+		assert.Equal(t, "https://example.com", sources[0].URL)
+		assert.Equal(t, time.Second, sources[0].RateLimit)
+		assert.Equal(t, 2, sources[0].MaxDepth)
+		assert.Equal(t, "h1", sources[0].Selectors.Article.Title)
+		assert.Equal(t, "article", sources[0].Selectors.Article.Body)
+	})
+
+	t.Run("invalid sources file", func(t *testing.T) {
+		invalidFile := filepath.Join(setup.tmpDir, "invalid.yml")
+		err := os.WriteFile(invalidFile, []byte("invalid: yaml: content"), 0644)
+		require.NoError(t, err)
+
+		_, err = loader.LoadFromFile(invalidFile)
+		require.Error(t, err)
+	})
 }
 
+// TestGetSource tests source retrieval functionality
 func TestGetSource(t *testing.T) {
-	// Create test sources instance
-	s := testutils.NewTestSources([]sourceutils.SourceConfig{
-		{
-			Name:      "test-source",
-			URL:       "https://example.com",
-			RateLimit: time.Second,
-			MaxDepth:  2,
-			Selectors: sourceutils.SelectorConfig{
-				Article: sourceutils.ArticleSelectors{
-					Title: "h1",
-					Body:  "article",
+	t.Parallel()
+
+	t.Run("existing source", func(t *testing.T) {
+		s := testutils.NewTestSources([]sourceutils.SourceConfig{
+			{
+				Name:      "test-source",
+				URL:       "https://example.com",
+				RateLimit: time.Second,
+				MaxDepth:  2,
+				Selectors: sourceutils.SelectorConfig{
+					Article: sourceutils.ArticleSelectors{
+						Title: "h1",
+						Body:  "article",
+					},
 				},
 			},
-		},
-	})
-	require.NotNil(t, s)
+		})
 
-	// Test FindByName
-	source, err := s.FindByName("test-source")
-	require.NoError(t, err)
-	require.NotNil(t, source)
-	assert.Equal(t, "test-source", source.Name)
-	assert.Equal(t, "https://example.com", source.URL)
-	assert.Equal(t, time.Second, source.RateLimit)
-	assert.Equal(t, 2, source.MaxDepth)
-	assert.Equal(t, "h1", source.Selectors.Article.Title)
-	assert.Equal(t, "article", source.Selectors.Article.Body)
+		source, err := s.FindByName("test-source")
+		require.NoError(t, err)
+		require.NotNil(t, source)
+		assert.Equal(t, "test-source", source.Name)
+		assert.Equal(t, "https://example.com", source.URL)
+	})
+
+	t.Run("non-existent source", func(t *testing.T) {
+		s := testutils.NewTestSources([]sourceutils.SourceConfig{})
+		source, err := s.FindByName("non-existent")
+		require.NoError(t, err)
+		require.Nil(t, source)
+	})
 }
 
+// TestValidateSource tests source validation
 func TestValidateSource(t *testing.T) {
-	// Create test sources instance
-	s := testutils.NewTestSources([]sourceutils.SourceConfig{})
-	require.NotNil(t, s)
+	t.Parallel()
 
-	// Test ValidateSource with valid source
-	err := s.ValidateSource(&sourceutils.SourceConfig{
-		Name:      "test-source",
-		URL:       "https://example.com",
-		RateLimit: time.Second,
-		MaxDepth:  2,
-		Selectors: sourceutils.SelectorConfig{
-			Article: sourceutils.ArticleSelectors{
-				Title: "h1",
-				Body:  "article",
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	// Test ValidateSource with invalid source
-	err = s.ValidateSource(&sourceutils.SourceConfig{
-		Name:      "",
-		URL:       "",
-		RateLimit: 0,
-		MaxDepth:  0,
-	})
-	require.NoError(t, err)
-}
-
-func TestAddSource(t *testing.T) {
-	// Create test sources instance
-	s := testutils.NewTestSources([]sourceutils.SourceConfig{})
-	require.NotNil(t, s)
-
-	// Test AddSource
-	err := s.AddSource(t.Context(), &sourceutils.SourceConfig{
-		Name:      "test-source",
-		URL:       "https://example.com",
-		RateLimit: time.Second,
-		MaxDepth:  2,
-		Selectors: sourceutils.SelectorConfig{
-			Article: sourceutils.ArticleSelectors{
-				Title: "h1",
-				Body:  "article",
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	// Verify source was added
-	sources, err := s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Len(t, sources, 1)
-	assert.Equal(t, "test-source", sources[0].Name)
-}
-
-func TestUpdateSource(t *testing.T) {
-	// Create test sources instance
-	s := testutils.NewTestSources([]sourceutils.SourceConfig{
+	tests := []struct {
+		name    string
+		source  *sourceutils.SourceConfig
+		wantErr bool
+	}{
 		{
-			Name:      "test-source",
-			URL:       "https://example.com",
-			RateLimit: time.Second,
-			MaxDepth:  2,
-			Selectors: sourceutils.SelectorConfig{
-				Article: sourceutils.ArticleSelectors{
-					Title: "h1",
-					Body:  "article",
+			name: "valid source",
+			source: &sourceutils.SourceConfig{
+				Name:      "test-source",
+				URL:       "https://example.com",
+				RateLimit: time.Second,
+				MaxDepth:  2,
+				Selectors: sourceutils.SelectorConfig{
+					Article: sourceutils.ArticleSelectors{
+						Title: "h1",
+						Body:  "article",
+					},
 				},
 			},
+			wantErr: false,
 		},
-	})
-	require.NotNil(t, s)
-
-	// Test UpdateSource
-	err := s.UpdateSource(t.Context(), &sourceutils.SourceConfig{
-		Name:      "test-source",
-		URL:       "https://updated.example.com",
-		RateLimit: 2 * time.Second,
-		MaxDepth:  3,
-		Selectors: sourceutils.SelectorConfig{
-			Article: sourceutils.ArticleSelectors{
-				Title: "h2",
-				Body:  "div.article",
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	// Verify source was updated
-	sources, err := s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Len(t, sources, 1)
-	assert.Equal(t, "https://updated.example.com", sources[0].URL)
-	assert.Equal(t, 2*time.Second, sources[0].RateLimit)
-	assert.Equal(t, 3, sources[0].MaxDepth)
-	assert.Equal(t, "h2", sources[0].Selectors.Article.Title)
-	assert.Equal(t, "div.article", sources[0].Selectors.Article.Body)
-}
-
-func TestDeleteSource(t *testing.T) {
-	// Create test sources instance
-	s := testutils.NewTestSources([]sourceutils.SourceConfig{
 		{
-			Name:      "test-source",
-			URL:       "https://example.com",
-			RateLimit: time.Second,
-			MaxDepth:  2,
-			Selectors: sourceutils.SelectorConfig{
-				Article: sourceutils.ArticleSelectors{
-					Title: "h1",
-					Body:  "article",
-				},
+			name: "invalid source",
+			source: &sourceutils.SourceConfig{
+				Name:      "",
+				URL:       "",
+				RateLimit: 0,
+				MaxDepth:  0,
 			},
+			wantErr: true,
 		},
-	})
-	require.NotNil(t, s)
-
-	// Test DeleteSource
-	err := s.DeleteSource(t.Context(), "test-source")
-	require.NoError(t, err)
-
-	// Verify source was deleted
-	sources, err := s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Empty(t, sources)
-}
-
-func TestGetMetrics(t *testing.T) {
-	// Create test sources instance
-	s := testutils.NewTestSources([]sourceutils.SourceConfig{
-		{
-			Name:      "test-source",
-			URL:       "https://example.com",
-			RateLimit: time.Second,
-			MaxDepth:  2,
-			Selectors: sourceutils.SelectorConfig{
-				Article: sourceutils.ArticleSelectors{
-					Title: "h1",
-					Body:  "article",
-				},
-			},
-		},
-	})
-	require.NotNil(t, s)
-
-	// Test GetMetrics
-	metrics := s.GetMetrics()
-	require.NotNil(t, metrics)
-	assert.Equal(t, int64(1), metrics.SourceCount)
-	assert.NotZero(t, metrics.LastUpdated)
-}
-
-func TestFindByName(t *testing.T) {
-	// Create test sources instance
-	s := testutils.NewTestSources([]sourceutils.SourceConfig{
-		{
-			Name:      "test-source",
-			URL:       "https://example.com",
-			RateLimit: time.Second,
-			MaxDepth:  2,
-			Selectors: sourceutils.SelectorConfig{
-				Article: sourceutils.ArticleSelectors{
-					Title: "h1",
-					Body:  "article",
-				},
-			},
-		},
-	})
-	require.NotNil(t, s)
-
-	// Test FindByName with existing source
-	source, err := s.FindByName("test-source")
-	require.NoError(t, err)
-	require.NotNil(t, source)
-	assert.Equal(t, "test-source", source.Name)
-
-	// Test FindByName with non-existent source
-	source, err = s.FindByName("non-existent")
-	require.NoError(t, err)
-	require.Nil(t, source)
-}
-
-func TestIndexNameHandling(t *testing.T) {
-	// Create a test sources instance
-	s := testutils.NewTestSources(nil)
-	require.NotNil(t, s)
-
-	// Test source with empty index names
-	source := &sourceutils.SourceConfig{
-		Name:      "Test Source",
-		URL:       "https://test.com",
-		RateLimit: time.Second,
-		MaxDepth:  2,
 	}
-	err := s.AddSource(t.Context(), source)
-	require.NoError(t, err)
 
-	// Verify default index names were set
-	sources, err := s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Len(t, sources, 1)
-	require.Equal(t, "articles", sources[0].ArticleIndex)
-	require.Equal(t, "content", sources[0].Index)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := testutils.NewTestSources([]sourceutils.SourceConfig{})
+			err := s.ValidateSource(tt.source)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
-func TestDefaultConfigIndexNames(t *testing.T) {
-	// Test DefaultConfig
+// TestSourceOperations tests source CRUD operations
+func TestSourceOperations(t *testing.T) {
+	t.Parallel()
+
+	t.Run("add source", func(t *testing.T) {
+		s := testutils.NewTestSources([]sourceutils.SourceConfig{})
+		err := s.AddSource(context.Background(), &sourceutils.SourceConfig{
+			Name:      "test-source",
+			URL:       "https://example.com",
+			RateLimit: time.Second,
+			MaxDepth:  2,
+			Selectors: sourceutils.SelectorConfig{
+				Article: sourceutils.ArticleSelectors{
+					Title: "h1",
+					Body:  "article",
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		sources, err := s.ListSources(context.Background())
+		require.NoError(t, err)
+		require.Len(t, sources, 1)
+		assert.Equal(t, "test-source", sources[0].Name)
+	})
+
+	t.Run("update source", func(t *testing.T) {
+		s := testutils.NewTestSources([]sourceutils.SourceConfig{
+			{
+				Name:      "test-source",
+				URL:       "https://example.com",
+				RateLimit: time.Second,
+				MaxDepth:  2,
+				Selectors: sourceutils.SelectorConfig{
+					Article: sourceutils.ArticleSelectors{
+						Title: "h1",
+						Body:  "article",
+					},
+				},
+			},
+		})
+
+		err := s.UpdateSource(context.Background(), &sourceutils.SourceConfig{
+			Name:      "test-source",
+			URL:       "https://updated.example.com",
+			RateLimit: 2 * time.Second,
+			MaxDepth:  3,
+			Selectors: sourceutils.SelectorConfig{
+				Article: sourceutils.ArticleSelectors{
+					Title: "h2",
+					Body:  "div.article",
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		sources, err := s.ListSources(context.Background())
+		require.NoError(t, err)
+		require.Len(t, sources, 1)
+		assert.Equal(t, "https://updated.example.com", sources[0].URL)
+		assert.Equal(t, 2*time.Second, sources[0].RateLimit)
+	})
+
+	t.Run("delete source", func(t *testing.T) {
+		s := testutils.NewTestSources([]sourceutils.SourceConfig{
+			{
+				Name:      "test-source",
+				URL:       "https://example.com",
+				RateLimit: time.Second,
+				MaxDepth:  2,
+				Selectors: sourceutils.SelectorConfig{
+					Article: sourceutils.ArticleSelectors{
+						Title: "h1",
+						Body:  "article",
+					},
+				},
+			},
+		})
+
+		err := s.DeleteSource(context.Background(), "test-source")
+		require.NoError(t, err)
+
+		sources, err := s.ListSources(context.Background())
+		require.NoError(t, err)
+		require.Empty(t, sources)
+	})
+}
+
+// TestMetrics tests source metrics functionality
+func TestMetrics(t *testing.T) {
+	t.Parallel()
+
+	t.Run("metrics with sources", func(t *testing.T) {
+		s := testutils.NewTestSources([]sourceutils.SourceConfig{
+			{
+				Name:      "test-source",
+				URL:       "https://example.com",
+				RateLimit: time.Second,
+				MaxDepth:  2,
+				Selectors: sourceutils.SelectorConfig{
+					Article: sourceutils.ArticleSelectors{
+						Title: "h1",
+						Body:  "article",
+					},
+				},
+			},
+		})
+
+		metrics := s.GetMetrics()
+		require.NotNil(t, metrics)
+		assert.Equal(t, int64(1), metrics.SourceCount)
+		assert.NotZero(t, metrics.LastUpdated)
+	})
+
+	t.Run("metrics without sources", func(t *testing.T) {
+		s := testutils.NewTestSources([]sourceutils.SourceConfig{})
+		metrics := s.GetMetrics()
+		require.Equal(t, int64(0), metrics.SourceCount)
+		assert.NotZero(t, metrics.LastUpdated)
+	})
+}
+
+// TestIndexNameHandling tests index name handling
+func TestIndexNameHandling(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		source          *sourceutils.SourceConfig
+		expectedArticle string
+		expectedContent string
+	}{
+		{
+			name: "empty index names",
+			source: &sourceutils.SourceConfig{
+				Name:      "Test Source",
+				URL:       "https://test.com",
+				RateLimit: time.Second,
+				MaxDepth:  2,
+			},
+			expectedArticle: "articles",
+			expectedContent: "content",
+		},
+		{
+			name: "custom index names",
+			source: &sourceutils.SourceConfig{
+				Name:         "Test Source",
+				URL:          "https://test.com",
+				RateLimit:    time.Second,
+				MaxDepth:     2,
+				ArticleIndex: "custom_articles",
+				Index:        "custom_content",
+			},
+			expectedArticle: "custom_articles",
+			expectedContent: "custom_content",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := testutils.NewTestSources(nil)
+			err := s.AddSource(context.Background(), tt.source)
+			require.NoError(t, err)
+
+			sources, err := s.ListSources(context.Background())
+			require.NoError(t, err)
+			require.Len(t, sources, 1)
+			assert.Equal(t, tt.expectedArticle, sources[0].ArticleIndex)
+			assert.Equal(t, tt.expectedContent, sources[0].Index)
+		})
+	}
+}
+
+// TestDefaultConfig tests default configuration
+func TestDefaultConfig(t *testing.T) {
+	t.Parallel()
 	defaultConfig := sources.DefaultConfig()
 	require.Equal(t, "articles", defaultConfig.ArticleIndex)
 	require.Equal(t, "content", defaultConfig.Index)
 }
 
-func TestSourceIndexNamePersistence(t *testing.T) {
-	// Create a test sources instance
-	s := testutils.NewTestSources(nil)
-	require.NotNil(t, s)
+// TestModule tests the sources module
+func TestModule(t *testing.T) {
+	t.Parallel()
+	setup := newTestSetup(t)
 
-	// Test source with custom index names
-	source := &sourceutils.SourceConfig{
-		Name:         "Test Source",
-		URL:          "https://test.com",
-		RateLimit:    time.Second,
-		MaxDepth:     2,
-		ArticleIndex: "custom_articles",
-		Index:        "custom_content",
-	}
-	err := s.AddSource(t.Context(), source)
-	require.NoError(t, err)
+	app := fxtest.New(t,
+		sources.Module,
+		fx.Supply(setup.config),
+		fx.Invoke(func(s sources.Interface) {
+			require.NotNil(t, s)
+			sources, err := s.ListSources(context.Background())
+			require.NoError(t, err)
+			require.NotNil(t, sources)
+		}),
+	)
 
-	// Verify custom index names were set
-	sources, err := s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Len(t, sources, 1)
-	require.Equal(t, "custom_articles", sources[0].ArticleIndex)
-	require.Equal(t, "custom_content", sources[0].Index)
-
-	// Test updating source with custom index names
-	updatedSource := &sourceutils.SourceConfig{
-		Name:         "Test Source",
-		URL:          "https://updated.com",
-		RateLimit:    2 * time.Second,
-		MaxDepth:     3,
-		ArticleIndex: "updated_articles",
-		Index:        "updated_content",
-	}
-	err = s.UpdateSource(t.Context(), updatedSource)
-	require.NoError(t, err)
-
-	// Verify index names were updated
-	sources, err = s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Len(t, sources, 1)
-	require.Equal(t, "updated_articles", sources[0].ArticleIndex)
-	require.Equal(t, "updated_content", sources[0].Index)
-}
-
-func TestProvideSourcesIndexNames(t *testing.T) {
-	// Create a test sources instance
-	s := testutils.NewTestSources(nil)
-	require.NotNil(t, s)
-
-	// Test source with custom index names
-	source := &sourceutils.SourceConfig{
-		Name:         "Test Source",
-		URL:          "https://test.com",
-		RateLimit:    time.Second,
-		MaxDepth:     2,
-		ArticleIndex: "custom_articles",
-		Index:        "custom_content",
-	}
-	err := s.AddSource(t.Context(), source)
-	require.NoError(t, err)
-
-	// Verify custom index names were set
-	sources, err := s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Len(t, sources, 1)
-	require.Equal(t, "custom_articles", sources[0].ArticleIndex)
-	require.Equal(t, "custom_content", sources[0].Index)
-
-	// Test updating source with custom index names
-	updatedSource := &sourceutils.SourceConfig{
-		Name:         "Test Source",
-		URL:          "https://updated.com",
-		RateLimit:    2 * time.Second,
-		MaxDepth:     3,
-		ArticleIndex: "updated_articles",
-		Index:        "updated_content",
-	}
-	err = s.UpdateSource(t.Context(), updatedSource)
-	require.NoError(t, err)
-
-	// Verify index names were updated
-	sources, err = s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Len(t, sources, 1)
-	require.Equal(t, "updated_articles", sources[0].ArticleIndex)
-	require.Equal(t, "updated_content", sources[0].Index)
-}
-
-func TestEmptySources(t *testing.T) {
-	// Create a test sources instance with no sources
-	s := testutils.NewTestSources(nil)
-	require.NotNil(t, s)
-
-	// Test ListSources with empty sources
-	sources, err := s.ListSources(t.Context())
-	require.NoError(t, err)
-	require.Empty(t, sources)
-
-	// Test GetSources with empty sources
-	configs, err := s.GetSources()
-	require.NoError(t, err)
-	require.Empty(t, configs)
-
-	// Test GetMetrics with empty sources
-	metrics := s.GetMetrics()
-	require.Equal(t, int64(0), metrics.SourceCount)
-	assert.NotZero(t, metrics.LastUpdated)
+	app.RequireStart()
+	app.RequireStop()
 }

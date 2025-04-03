@@ -113,6 +113,7 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 
 // Module provides the storage module for dependency injection
 var Module = fx.Module("storage",
+	config.TransportModule,
 	fx.Provide(
 		// Provide options from config
 		fx.Annotate(

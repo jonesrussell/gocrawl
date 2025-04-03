@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"crypto/tls"
 	"net/http"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -34,22 +33,12 @@ func DefaultOptions() Options {
 }
 
 // NewOptionsFromConfig creates Options from a config
-func NewOptionsFromConfig(cfg config.Interface) Options {
+func NewOptionsFromConfig(cfg config.Interface, transport http.RoundTripper) Options {
 	opts := DefaultOptions()
 	esConfig := cfg.GetElasticsearchConfig()
 
-	// Create transport with TLS config if needed
-	if esConfig.TLS.SkipVerify {
-		// Clone the default transport to preserve other settings
-		if defaultTransport, ok := http.DefaultTransport.(*http.Transport); ok {
-			transport := defaultTransport.Clone()
-			transport.TLSClientConfig = &tls.Config{
-				//nolint:gosec // We are using the SkipVerify setting from the config
-				InsecureSkipVerify: true,
-			}
-			opts.Transport = transport
-		}
-	}
+	// Use the provided transport
+	opts.Transport = transport
 
 	// Set values from config
 	opts.Addresses = esConfig.Addresses
