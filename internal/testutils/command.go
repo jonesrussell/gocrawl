@@ -16,7 +16,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	sourcestest "github.com/jonesrussell/gocrawl/internal/sources/testutils"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/fx"
 )
@@ -32,7 +32,7 @@ const (
 type CommandTestModule struct {
 	// Core dependencies
 	Sources  sources.Interface
-	Storage  storage.Interface
+	Storage  types.Interface
 	IndexMgr api.IndexManager
 	Config   config.Interface
 	Logger   logger.Interface
@@ -77,7 +77,7 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 
 	return &CommandTestModule{
 		Sources:        testSources,
-		Storage:        NewMockStorage(),
+		Storage:        NewMockStorage(mockLogger),
 		IndexMgr:       NewMockIndexManager(),
 		Config:         mockConfig,
 		Logger:         mockLogger,
@@ -100,7 +100,7 @@ func (m *CommandTestModule) Module() fx.Option {
 			func() logger.Interface { return m.Logger },
 			func() crawler.Interface { return m.Crawler },
 			func() sources.Interface { return m.Sources },
-			func() storage.Interface { return m.Storage },
+			func() types.Interface { return m.Storage },
 			func() api.IndexManager { return m.IndexMgr },
 		),
 
@@ -114,4 +114,20 @@ func (m *CommandTestModule) Module() fx.Option {
 		),
 		fx.Supply(m.Processors),
 	)
+}
+
+// Command represents a test command.
+type Command struct {
+	Context context.Context
+	Logger  logger.Interface
+	Storage types.Interface
+}
+
+// NewCommand creates a new test command.
+func NewCommand(ctx context.Context, log logger.Interface, storage types.Interface) *Command {
+	return &Command{
+		Context: ctx,
+		Logger:  log,
+		Storage: storage,
+	}
 }

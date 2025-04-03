@@ -7,8 +7,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -50,7 +51,35 @@ type CreateParams struct {
 	fx.In
 	Context context.Context
 	Logger  logger.Interface
-	Storage storage.Interface
+	Storage types.Interface
+}
+
+// CreateIndex creates a new index in Elasticsearch.
+func CreateIndex(ctx context.Context, cfg config.Interface, log logger.Interface, storage types.Interface, indexName string) error {
+	mapping := map[string]any{
+		"mappings": map[string]any{
+			"properties": map[string]any{
+				"title": map[string]any{
+					"type": "text",
+				},
+				"content": map[string]any{
+					"type": "text",
+				},
+				"url": map[string]any{
+					"type": "keyword",
+				},
+				"created_at": map[string]any{
+					"type": "date",
+				},
+			},
+		},
+	}
+
+	if err := storage.CreateIndex(ctx, indexName, mapping); err != nil {
+		return fmt.Errorf("failed to create index: %w", err)
+	}
+	log.Info("Created index", "index", indexName)
+	return nil
 }
 
 // createCommand creates and returns the command for creating an Elasticsearch index.

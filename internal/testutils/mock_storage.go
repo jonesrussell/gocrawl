@@ -3,13 +3,22 @@ package testutils
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockStorage implements storage.Interface for testing.
+// MockStorage is a mock implementation of the storage interface.
 type MockStorage struct {
 	mock.Mock
+	logger logger.Interface
+}
+
+// NewMockStorage creates a new mock storage.
+func NewMockStorage(log logger.Interface) types.Interface {
+	return &MockStorage{
+		logger: log,
+	}
 }
 
 // IndexDocument implements storage.Interface
@@ -171,9 +180,4 @@ func (m *MockStorage) Close() error {
 }
 
 // Ensure MockStorage implements storage.Interface
-var _ storage.Interface = (*MockStorage)(nil)
-
-// NewMockStorage creates a new MockStorage instance.
-func NewMockStorage() *MockStorage {
-	return &MockStorage{}
-}
+var _ types.Interface = (*MockStorage)(nil)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
@@ -38,10 +39,12 @@ type Params struct {
 var Module = fx.Module("content",
 	fx.Provide(
 		// Provide the content service
-		func(p Params) (Interface, error) {
-			service := NewService(p.Logger)
-			p.Logger.Debug("Created content service", "type", fmt.Sprintf("%T", service))
-			return service, nil
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			storage types.Interface,
+		) (Interface, error) {
+			return NewService(log, storage), nil
 		},
 		// Provide content processor for the group
 		fx.Annotate(
