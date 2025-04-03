@@ -12,10 +12,12 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
+	"github.com/jonesrussell/gocrawl/internal/api/testutils"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -68,6 +70,8 @@ func setupTestApp(t *testing.T) *testServer {
 	// Create mock dependencies
 	mockLogger := setupMockLogger()
 	mockSearch := testutils.NewMockSearchManager()
+	mockStorage := testutils.NewMockStorage()
+	mockIndexManager := testutils.NewMockIndexManager()
 
 	// Create server config with security settings
 	serverConfig := &config.ServerConfig{
@@ -102,7 +106,25 @@ func setupTestApp(t *testing.T) *testServer {
 		},
 	}, nil)
 	mockSearch.On("Count", mock.Anything, "test", mock.Anything).Return(int64(1), nil)
+	mockSearch.On("Aggregate", mock.Anything, "test", mock.Anything).Return(map[string]any{}, nil)
 	mockSearch.On("Close").Return(nil)
+
+	// Set up mock storage expectations
+	mockStorage.On("Search", mock.Anything, "test", mock.Anything, mock.Anything).Return([]any{
+		map[string]any{
+			"title": "Test Result",
+			"url":   "https://test.com",
+		},
+	}, nil)
+	mockStorage.On("Count", mock.Anything, "test", mock.Anything).Return(int64(1), nil)
+	mockStorage.On("Close").Return(nil)
+
+	// Set up mock index manager expectations
+	mockIndexManager.On("EnsureIndex", mock.Anything, mock.Anything).Return(nil)
+	mockIndexManager.On("DeleteIndex", mock.Anything, mock.Anything).Return(nil)
+	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	mockIndexManager.On("GetMapping", mock.Anything, mock.Anything).Return(map[string]any{}, nil)
+	mockIndexManager.On("UpdateMapping", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Store references for test assertions
 	ts.logger = mockLogger
@@ -124,17 +146,19 @@ func setupTestApp(t *testing.T) *testServer {
 				fx.As(new(logger.Interface)),
 			),
 			fx.Annotate(
+				mockStorage,
+				fx.As(new(storage.Interface)),
+			),
+			fx.Annotate(
+				mockIndexManager,
+				fx.As(new(interfaces.IndexManager)),
+			),
+			fx.Annotate(
 				t.Context(),
 				fx.As(new(context.Context)),
 			),
 		),
-		fx.Provide(
-			// Provide the server and security middleware together to avoid circular dependencies
-			func(cfg config.Interface, log logger.Interface, searchManager api.SearchManager) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
-				return api.StartHTTPServer(log, searchManager, cfg)
-			},
-			api.NewLifecycle,
-		),
+		TestAPIModule,
 		fx.Invoke(func(s *http.Server) {
 			ts.server = s
 		}),

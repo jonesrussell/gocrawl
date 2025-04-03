@@ -7,11 +7,11 @@ import (
 
 // Module provides the job command module.
 type Module struct {
-	logger logger.Logger
+	logger logger.Interface
 }
 
 // NewModule creates a new job module.
-func NewModule(log logger.Logger) *Module {
+func NewModule(log logger.Interface) *Module {
 	return &Module{
 		logger: log,
 	}

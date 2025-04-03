@@ -2,8 +2,69 @@
 package logger
 
 import (
+	"os"
+
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
+
+// DefaultConfig returns a default configuration for the logger.
+func DefaultConfig() *Config {
+	return &Config{
+		Level:            InfoLevel,
+		Development:      true,
+		Encoding:         "console",
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
+}
+
+// New creates a new logger with the given configuration.
+func New(cfg *Config) (Interface, error) {
+	// Set default values if not provided
+	if cfg == nil {
+		cfg = DefaultConfig()
+	}
+
+	// Create encoder config
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "ts",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		FunctionKey:    zapcore.OmitKey,
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+	}
+
+	// Create core
+	var core zapcore.Core
+	if cfg.Encoding == "json" {
+		core = zapcore.NewCore(
+			zapcore.NewJSONEncoder(encoderConfig),
+			zapcore.AddSync(os.Stdout),
+			zapcore.InfoLevel,
+		)
+	} else {
+		core = zapcore.NewCore(
+			zapcore.NewConsoleEncoder(encoderConfig),
+			zapcore.AddSync(os.Stdout),
+			zapcore.InfoLevel,
+		)
+	}
+
+	// Create logger
+	zapLogger := zap.New(core)
+	return &logger{
+		zapLogger: zapLogger,
+		config:    cfg,
+	}, nil
+}
 
 // fieldPairSize represents the number of elements in a key-value pair.
 const fieldPairSize = 2

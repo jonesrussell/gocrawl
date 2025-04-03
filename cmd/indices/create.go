@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -42,6 +44,14 @@ var CreateModule = fx.Module("create",
 	// Core dependencies
 	Module,
 )
+
+// CreateParams contains the dependencies for the create command
+type CreateParams struct {
+	fx.In
+	Context context.Context
+	Logger  logger.Interface
+	Storage storage.Interface
+}
 
 // createCommand creates and returns the command for creating an Elasticsearch index.
 // It:

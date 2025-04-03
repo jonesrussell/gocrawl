@@ -12,7 +12,6 @@ import (
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -26,7 +25,7 @@ import (
 type Params struct {
 	fx.In
 	Sources sources.Interface
-	Logger  types.Logger
+	Logger  logger.Interface
 
 	// Lifecycle manages the application's startup and shutdown hooks
 	Lifecycle fx.Lifecycle
@@ -61,14 +60,14 @@ const (
 // JobCommandDeps holds the dependencies for the job command
 type JobCommandDeps struct {
 	// Core dependencies
-	Logger     types.Logger
+	Logger     logger.Interface
 	Processors []common.Processor `group:"processors" json:"processors,omitempty"`
 }
 
 // runScheduler manages the execution of scheduled jobs.
 func runScheduler(
 	ctx context.Context,
-	log types.Logger,
+	log logger.Interface,
 	sources sources.Interface,
 	c crawler.Interface,
 	processors []common.Processor,
@@ -100,7 +99,7 @@ func runScheduler(
 // executeCrawl performs the crawl operation for a single source.
 func executeCrawl(
 	ctx context.Context,
-	log types.Logger,
+	log logger.Interface,
 	c crawler.Interface,
 	source sources.Config,
 	processors []common.Processor,
@@ -141,7 +140,7 @@ func executeCrawl(
 // checkAndRunJobs evaluates and executes scheduled jobs.
 func checkAndRunJobs(
 	ctx context.Context,
-	log types.Logger,
+	log logger.Interface,
 	sources sources.Interface,
 	c crawler.Interface,
 	now time.Time,
@@ -215,7 +214,7 @@ func startJob(p Params) error {
 }
 
 // NewJobCommand creates a new job command with the given dependencies
-func NewJobCommand(log types.Logger) *cobra.Command {
+func NewJobCommand(log logger.Interface) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "job",
 		Short: "Start the job scheduler",
@@ -232,7 +231,7 @@ func NewJobCommand(log types.Logger) *cobra.Command {
 			defer cleanup()
 
 			// Initialize the Fx application
-			fxApp := setupFXApp()
+			fxApp := setupFXApp(log)
 
 			// Set the fx app for coordinated shutdown
 			handler.SetFXApp(fxApp)
@@ -267,33 +266,35 @@ func Command() *cobra.Command {
 }
 
 // setupFXApp creates and configures the fx application with all required dependencies.
-func setupFXApp() *fx.App {
-	// Create the fx app with all required dependencies
-	options := []fx.Option{
-		fx.Supply(
-			config.Params{
-				Environment: "development",
-				Debug:       true,
-				Command:     "job",
-			},
-			logger.Params{
-				Debug:  true,
-				Level:  "debug",
-				AppEnv: "development",
-			},
+func setupFXApp(
+	log logger.Interface,
+) *fx.App {
+	return fx.New(
+		fx.Provide(
+			fx.Annotate(
+				func() context.Context { return context.Background() },
+				fx.ResultTags(`name:"jobContext"`),
+			),
+			fx.Annotate(
+				func() *logger.Config {
+					return &logger.Config{
+						Level:       logger.InfoLevel,
+						Development: false,
+						Encoding:    "json",
+					}
+				},
+				fx.ResultTags(`group:"loggerConfig"`),
+			),
 		),
-		config.Module, // Provide config first
-		Module,        // Then job module
-		crawler.Module,
+		config.Module,
+		logger.Module,
 		sources.Module,
+		crawler.Module,
 		storage.Module,
-		fx.NopLogger,
 		fx.Invoke(func(p Params) {
 			if err := startJob(p); err != nil {
 				p.Logger.Error("Error starting job scheduler", "error", err)
 			}
 		}),
-	}
-
-	return fx.New(options...)
+	)
 }
