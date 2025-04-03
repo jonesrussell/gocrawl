@@ -11,8 +11,9 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -45,7 +46,7 @@ func (m *mockSearchManager) Count(ctx context.Context, index string, query any) 
 
 // testDeps holds all the dependencies needed for testing
 type testDeps struct {
-	Storage       storagetypes.Interface
+	Storage       types.Interface
 	Logger        logger.Interface
 	Config        config.Interface
 	Handler       *signal.SignalHandler
@@ -58,8 +59,8 @@ func setupTestDeps(t *testing.T) *testDeps {
 	t.Helper()
 
 	// Create mock dependencies
-	mockStorage := testutils.NewMockStorage()
-	mockLogger := logger.NewNoOp()
+	mockLogger := testutils.NewMockLogger()
+	mockStorage := testutils.NewMockStorage(mockLogger)
 	mockHandler := signal.NewSignalHandler(mockLogger)
 	mockConfig := testutils.NewMockConfig()
 	mockSearchManager := &mockSearchManager{}
@@ -80,7 +81,7 @@ func createTestApp(t *testing.T, deps *testDeps) *fx.App {
 
 	providers := []any{
 		// Core dependencies
-		func() storagetypes.Interface { return deps.Storage },
+		func() types.Interface { return deps.Storage },
 		func() logger.Interface { return deps.Logger },
 		func() config.Interface { return deps.Config },
 		func() *signal.SignalHandler { return deps.Handler },
@@ -171,4 +172,13 @@ func TestCommandExecution(t *testing.T) {
 
 	// Verify mock expectations
 	deps.SearchManager.(*mockSearchManager).AssertExpectations(t)
+}
+
+func TestSearchCommand(t *testing.T) {
+	mockLogger := testutils.NewMockLogger()
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	mockStorage.(*mock.Mock).On("SearchArticles", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+
+	cmd := search.NewSearchCommand(context.Background(), mockLogger, mockStorage)
+	assert.NotNil(t, cmd)
 }

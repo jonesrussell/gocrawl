@@ -17,7 +17,7 @@ import (
 	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -147,7 +147,7 @@ func setupTestApp(t *testing.T) *testServer {
 			),
 			fx.Annotate(
 				mockStorage,
-				fx.As(new(storage.Interface)),
+				fx.As(new(types.Interface)),
 			),
 			fx.Annotate(
 				mockIndexManager,
@@ -323,4 +323,29 @@ func TestLoggerDependencyRegression(t *testing.T) {
 	// Verify that the logger was used by checking if the expected log calls were made
 	mockLog.AssertCalled(t, "Info", "StartHTTPServer function called", mock.Anything)
 	mockLog.AssertCalled(t, "Info", "Server configuration", mock.Anything)
+}
+
+// TestModule tests the API module.
+func TestModule(t *testing.T) {
+	mockLogger := testutils.NewMockLogger()
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	mockIndexManager := testutils.NewMockIndexManager()
+	mockConfig := &testutils.MockConfig{}
+
+	app := fx.New(
+		fx.Provide(
+			func() context.Context { return context.Background() },
+			func() config.Interface { return mockConfig },
+			func() logger.Interface { return mockLogger },
+			func() types.Interface { return mockStorage },
+			func() interfaces.IndexManager { return mockIndexManager },
+		),
+		api.Module,
+	)
+
+	err := app.Start(context.Background())
+	assert.NoError(t, err)
+
+	err = app.Stop(context.Background())
+	assert.NoError(t, err)
 }

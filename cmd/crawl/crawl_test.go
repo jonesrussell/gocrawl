@@ -41,7 +41,7 @@ func setupTestDeps(t *testing.T) *testDeps {
 
 	// Create mock dependencies
 	mockCrawler := testutils.NewMockCrawler()
-	mockStorage := testutils.NewMockStorage()
+	mockStorage := testutils.NewMockStorage(testutils.NewMockLogger())
 	mockLogger := logger.NewNoOp()
 	mockHandler := signal.NewSignalHandler(mockLogger)
 	mockConfig := testutils.NewMockConfig()
@@ -587,4 +587,13 @@ func TestMaxDepthConfiguration(t *testing.T) {
 
 	// Verify all expectations were met
 	mockCrawler.AssertExpectations(t)
+}
+
+func TestCrawlCommand(t *testing.T) {
+	mockLogger := testutils.NewMockLogger()
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	mockStorage.(*mock.Mock).On("TestConnection", mock.Anything).Return(nil)
+
+	cmd := crawl.NewCrawlCommand(context.Background(), mockLogger, mockStorage)
+	assert.NotNil(t, cmd)
 }

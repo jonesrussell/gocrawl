@@ -8,7 +8,9 @@ import (
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	testutils "github.com/jonesrussell/gocrawl/internal/storage/testing"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,4 +55,16 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, storage.ErrIndexNotFound)
 	require.Contains(t, err.Error(), "non_existent_index")
+}
+
+func TestNewStorage(t *testing.T) {
+	mockLogger := testutils.NewMockLogger()
+	mockClient := &storage.MockElasticsearchClient{}
+	opts := storage.Options{
+		IndexName: "test-index",
+	}
+
+	store := storage.NewStorage(mockClient, mockLogger, opts)
+	assert.NotNil(t, store)
+	assert.Implements(t, (*types.Interface)(nil), store)
 }

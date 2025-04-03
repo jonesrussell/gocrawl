@@ -233,3 +233,12 @@ func TestService_ProcessWithMetadata(t *testing.T) {
 	result := svc.ProcessWithMetadata(t.Context(), input, metadata)
 	assert.Equal(t, "Hello world", result)
 }
+
+func TestNewService(t *testing.T) {
+	mockLogger := testutils.NewMockLogger()
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	service := content.NewService(mockLogger, mockStorage)
+	assert.NotNil(t, service)
+	assert.Equal(t, mockLogger, service.Logger)
+	assert.Equal(t, mockStorage, service.Storage)
+}
