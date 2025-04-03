@@ -378,7 +378,7 @@ func TestSecurityMiddleware(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/test", http.NoBody)
+			req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 			if tt.apiKey != "" {
 				req.Header.Set("X-Api-Key", tt.apiKey)
 			}
