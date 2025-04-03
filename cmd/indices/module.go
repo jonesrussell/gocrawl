@@ -7,6 +7,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -16,6 +17,18 @@ import (
 var Module = fx.Module("indices",
 	config.Module,
 	storage.Module,
+	sources.Module,
+	fx.Provide(
+		NewDeleter,
+		func() *logger.Config {
+			return &logger.Config{
+				Level:       logger.InfoLevel,
+				Development: true,
+				Encoding:    "console",
+			}
+		},
+		logger.New,
+	),
 )
 
 // NewIndices creates a new indices command.
