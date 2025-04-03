@@ -16,7 +16,8 @@ import (
 
 func TestExtractContent(t *testing.T) {
 	mockLogger := &testutils.MockLogger{}
-	svc := content.NewService(mockLogger)
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	svc := content.NewService(mockLogger, mockStorage)
 
 	// Create a test HTML document
 	html := `<!DOCTYPE html>
@@ -77,7 +78,8 @@ func TestExtractContent(t *testing.T) {
 
 func TestExtractMetadata(t *testing.T) {
 	mockLogger := &testutils.MockLogger{}
-	service := content.NewService(mockLogger)
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	service := content.NewService(mockLogger, mockStorage)
 
 	// Create a test HTML element
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(`
@@ -162,7 +164,9 @@ func TestDetermineContentType(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			svc := content.NewService(nil)
+			mockLogger := &testutils.MockLogger{}
+			mockStorage := testutils.NewMockStorage(mockLogger)
+			svc := content.NewService(mockLogger, mockStorage)
 			result := svc.DetermineContentType(tc.url, tc.metadata, tc.jsonLDType)
 			assert.Equal(t, tc.expected, result)
 		})
@@ -171,7 +175,8 @@ func TestDetermineContentType(t *testing.T) {
 
 func TestService_Process(t *testing.T) {
 	mockLogger := &testutils.MockLogger{}
-	svc := content.NewService(mockLogger)
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	svc := content.NewService(mockLogger, mockStorage)
 
 	testCases := []struct {
 		name     string
@@ -202,7 +207,8 @@ func TestService_Process(t *testing.T) {
 
 func TestService_ProcessBatch(t *testing.T) {
 	mockLogger := &testutils.MockLogger{}
-	svc := content.NewService(mockLogger)
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	svc := content.NewService(mockLogger, mockStorage)
 
 	input := []string{"<p>Hello</p>", "<div>World</div>"}
 	expected := []string{"Hello", "World"}
@@ -218,7 +224,8 @@ func TestService_ProcessBatch(t *testing.T) {
 
 func TestService_ProcessWithMetadata(t *testing.T) {
 	mockLogger := &testutils.MockLogger{}
-	svc := content.NewService(mockLogger)
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	svc := content.NewService(mockLogger, mockStorage)
 
 	input := "<p>Hello world</p>"
 	metadata := map[string]string{
@@ -239,6 +246,5 @@ func TestNewService(t *testing.T) {
 	mockStorage := testutils.NewMockStorage(mockLogger)
 	service := content.NewService(mockLogger, mockStorage)
 	assert.NotNil(t, service)
-	assert.Equal(t, mockLogger, service.Logger)
-	assert.Equal(t, mockStorage, service.Storage)
+	assert.Implements(t, (*content.Interface)(nil), service)
 }

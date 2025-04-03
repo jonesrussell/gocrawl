@@ -175,10 +175,17 @@ func TestCommandExecution(t *testing.T) {
 }
 
 func TestSearchCommand(t *testing.T) {
-	mockLogger := testutils.NewMockLogger()
-	mockStorage := testutils.NewMockStorage(mockLogger)
-	mockStorage.(*mock.Mock).On("SearchArticles", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-
-	cmd := search.NewSearchCommand(context.Background(), mockLogger, mockStorage)
+	cmd := search.Command()
 	assert.NotNil(t, cmd)
+	assert.Equal(t, "search", cmd.Use)
+	assert.Equal(t, "Search content in Elasticsearch", cmd.Short)
+	assert.NotNil(t, cmd.RunE)
+
+	// Test flags
+	err := cmd.Execute()
+	assert.Error(t, err, "Command should fail without required query flag")
+
+	// Test flag defaults
+	assert.Equal(t, "articles", cmd.Flag("index").DefValue)
+	assert.Equal(t, "10", cmd.Flag("size").DefValue)
 }

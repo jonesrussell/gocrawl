@@ -328,9 +328,36 @@ func TestLoggerDependencyRegression(t *testing.T) {
 // TestModule tests the API module.
 func TestModule(t *testing.T) {
 	mockLogger := testutils.NewMockLogger()
-	mockStorage := testutils.NewMockStorage(mockLogger)
+	mockStorage := testutils.NewMockStorage()
 	mockIndexManager := testutils.NewMockIndexManager()
-	mockConfig := &testutils.MockConfig{}
+	mockConfig := configtest.NewMockConfig()
+
+	// Set up mock storage expectations
+	mockStorage.On("Search", mock.Anything, mock.Anything, mock.Anything).Return([]any{}, nil)
+	mockStorage.On("Count", mock.Anything, mock.Anything, mock.Anything).Return(int64(0), nil)
+	mockStorage.On("Aggregate", mock.Anything, mock.Anything, mock.Anything).Return(map[string]any{}, nil)
+	mockStorage.On("IndexDocument", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("GetDocument", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("DeleteDocument", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("BulkIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("CreateIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("DeleteIndex", mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("ListIndices", mock.Anything).Return([]string{}, nil)
+	mockStorage.On("GetMapping", mock.Anything, mock.Anything).Return(map[string]any{}, nil)
+	mockStorage.On("UpdateMapping", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	mockStorage.On("GetIndexHealth", mock.Anything, mock.Anything).Return("green", nil)
+	mockStorage.On("GetIndexDocCount", mock.Anything, mock.Anything).Return(int64(0), nil)
+	mockStorage.On("Ping", mock.Anything).Return(nil)
+	mockStorage.On("TestConnection", mock.Anything).Return(nil)
+	mockStorage.On("Close").Return(nil)
+
+	// Set up mock index manager expectations
+	mockIndexManager.On("EnsureIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockIndexManager.On("DeleteIndex", mock.Anything, mock.Anything).Return(nil)
+	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
+	mockIndexManager.On("GetMapping", mock.Anything, mock.Anything).Return(map[string]any{}, nil)
+	mockIndexManager.On("UpdateMapping", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	app := fx.New(
 		fx.Provide(
