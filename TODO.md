@@ -21,12 +21,18 @@
   - [x] Remove duplicate TODO files
   - [ ] Clean up unused imports
   - [ ] Remove deprecated code
-- [ ] Consolidate Index Managers
-  - [ ] Keep ElasticsearchIndexManager as primary implementation
-  - [ ] Remove IndexManager implementation
-  - [ ] Update all references to use ElasticsearchIndexManager
-  - [ ] Update tests to use ElasticsearchIndexManager
-  - [ ] Update documentation
+- [x] Consolidate Index Managers
+  - [x] Keep ElasticsearchIndexManager as primary implementation
+  - [x] Remove IndexManager implementation
+  - [x] Update all references to use ElasticsearchIndexManager
+  - [x] Update tests to use ElasticsearchIndexManager
+  - [x] Update documentation
+- [ ] Update Logger References
+  - [ ] Replace all `common.Logger` with `logger.Interface`
+  - [ ] Update imports to use `internal/logger` package
+  - [ ] Update tests to use `logger.Interface`
+  - [ ] Update documentation to reflect changes
+  - [ ] Remove `common.Logger` type alias
 - [ ] Standardize Package Structure
   - [ ] Move all interfaces to `interface.go`
   - [ ] Move all types to `types.go`

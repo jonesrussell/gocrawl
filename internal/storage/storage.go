@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
@@ -26,12 +26,12 @@ const (
 // Impl implements the Interface
 type Impl struct {
 	ESClient *elasticsearch.Client
-	Logger   common.Logger
+	Logger   logger.Interface
 	opts     Options
 }
 
 // NewStorage creates a new storage implementation
-func NewStorage(client *elasticsearch.Client, logger common.Logger, opts Options) types.Interface {
+func NewStorage(client *elasticsearch.Client, logger logger.Interface, opts Options) types.Interface {
 	return &Impl{
 		ESClient: client,
 		Logger:   logger,
