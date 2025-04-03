@@ -19,7 +19,6 @@ import (
 	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/internal/testutils"
 	apitypes "github.com/jonesrussell/gocrawl/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -76,13 +75,13 @@ var TestAPIModule = fx.Module("testAPI",
 )
 
 func setupTestApp(t *testing.T) *testServer {
-	ts := &testServer{}
+	t.Helper()
 
 	// Create mock dependencies
 	mockLogger := setupMockLogger()
 	mockSearch := apitestutils.NewMockSearchManager()
 	mockStorage := apitestutils.NewMockStorage()
-	mockIndexManager := testutils.NewMockIndexManager()
+	mockIndexManager := apitestutils.NewMockIndexManager()
 
 	// Set up mock search expectations
 	expectedQuery := map[string]any{
@@ -100,10 +99,8 @@ func setupTestApp(t *testing.T) *testServer {
 		},
 	}, nil)
 	mockSearch.On("Count", mock.Anything, "test", expectedQuery).Return(int64(1), nil)
-	mockSearch.On("Aggregate", mock.Anything, "test", mock.Anything).Return(map[string]any{}, nil)
-	mockSearch.On("Close").Return(nil)
 
-	// Create server config with security settings
+	// Configure server security
 	serverConfig := &config.ServerConfig{
 		Address:      ":0", // Use random port for testing
 		ReadTimeout:  15 * time.Second,
@@ -112,8 +109,9 @@ func setupTestApp(t *testing.T) *testServer {
 	}
 	serverConfig.Security.Enabled = true
 	serverConfig.Security.APIKey = testAPIKey
+	serverConfig.Security.RateLimit = 100 // High rate limit for tests
 
-	// Create mock config with test settings
+	// Create mock config
 	mockConfig := configtest.NewMockConfig().
 		WithServerConfig(serverConfig).
 		WithAppConfig(&config.AppConfig{
@@ -122,30 +120,11 @@ func setupTestApp(t *testing.T) *testServer {
 		WithLogConfig(&config.LogConfig{
 			Level: "info",
 			Debug: false,
-		}).
-		WithElasticsearchConfig(&config.ElasticsearchConfig{
-			Addresses: []string{"http://localhost:9200"},
-			IndexName: "test_index",
 		})
 
-	// Set up mock storage expectations
-	mockStorage.On("Search", mock.Anything, "test", mock.Anything).Return([]any{
-		map[string]any{
-			"title": "Test Result",
-			"url":   "https://test.com",
-		},
-	}, nil)
-	mockStorage.On("Count", mock.Anything, "test", mock.Anything).Return(int64(1), nil)
-	mockStorage.On("Close").Return(nil)
-
-	// Set up mock index manager expectations
-	mockIndexManager.On("EnsureIndex", mock.Anything, mock.Anything).Return(nil)
-	mockIndexManager.On("DeleteIndex", mock.Anything, mock.Anything).Return(nil)
-	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-	mockIndexManager.On("UpdateMapping", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	// Store references for test assertions
-	ts.logger = mockLogger
+	ts := &testServer{
+		logger: mockLogger,
+	}
 
 	// Create and start the application
 	app := fxtest.New(t,
@@ -176,7 +155,7 @@ func setupTestApp(t *testing.T) *testServer {
 				fx.As(new(context.Context)),
 			),
 		),
-		TestAPIModule,
+		api.Module,
 		fx.Invoke(func(s *http.Server) {
 			ts.server = s
 		}),

@@ -193,7 +193,7 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 func (m *SecurityMiddleware) authenticate(c *gin.Context) error {
 	apiKey := c.GetHeader("X-Api-Key")
 	if apiKey == "" {
-		return errors.New("missing API key")
+		return errors.New("API key is required")
 	}
 
 	if apiKey != m.config.Security.APIKey {
