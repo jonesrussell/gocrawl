@@ -7,7 +7,6 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -26,7 +25,7 @@ type CommandDeps struct {
 	Context     context.Context  `name:"crawlContext"`
 	SourceName  string           `name:"sourceName"`
 	Config      config.Interface `name:"config"`
-	Logger      types.Logger
+	Logger      logger.Interface
 	Storage     storagetypes.Interface
 	Crawler     crawler.Interface
 	Sources     sources.Interface
@@ -92,7 +91,7 @@ var Module = fx.Module("crawl",
 type Params struct {
 	fx.In
 	Sources sources.Interface `json:"sources,omitempty"`
-	Logger  types.Logger
+	Logger  logger.Interface
 
 	// Lifecycle manages the application's startup and shutdown hooks
 	Lifecycle fx.Lifecycle `json:"lifecycle,omitempty"`

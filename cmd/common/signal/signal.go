@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 const (
@@ -40,7 +40,7 @@ type SignalHandler struct {
 	// shutdownTimeout is the maximum time to wait for graceful shutdown
 	shutdownTimeout time.Duration
 	// logger is the application logger
-	logger common.Logger
+	logger logger.Interface
 	// once ensures we only close doneChan once
 	once sync.Once
 	// state tracks the current state of the handler
@@ -74,7 +74,7 @@ func (h *SignalHandler) setState(state string) {
 }
 
 // NewSignalHandler creates a new SignalHandler instance.
-func NewSignalHandler(logger common.Logger) *SignalHandler {
+func NewSignalHandler(logger logger.Interface) *SignalHandler {
 	return &SignalHandler{
 		sigChan:         make(chan os.Signal, 1),
 		doneChan:        make(chan struct{}),
@@ -97,7 +97,7 @@ func (h *SignalHandler) SetFXApp(app FXApp) {
 }
 
 // SetLogger updates the logger used by the signal handler
-func (h *SignalHandler) SetLogger(logger common.Logger) {
+func (h *SignalHandler) SetLogger(logger logger.Interface) {
 	h.logger = logger
 }
 
