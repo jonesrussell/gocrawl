@@ -35,7 +35,7 @@ sources:
 	// Create test config file
 	configContent := `
 app:
-  environment: test
+  environment: development
   name: gocrawl
   version: 1.0.0
 elasticsearch:
@@ -44,6 +44,8 @@ elasticsearch:
   api_key: test_api_key
 crawler:
   source_file: ` + sourcesPath + `
+  base_url: http://test.example.com
+  max_depth: 1
 `
 	err = os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)

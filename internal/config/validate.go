@@ -12,6 +12,9 @@ func ValidateConfig(cfg *Config) error {
 	if err := validateAppConfig(cfg.App); err != nil {
 		return err
 	}
+	if err := validateLogConfig(cfg.Log); err != nil {
+		return err
+	}
 	if err := validateCrawlerConfig(cfg.Crawler); err != nil {
 		return err
 	}
@@ -49,7 +52,7 @@ func validateAppConfig(cfg AppConfig) error {
 		return &ConfigValidationError{
 			Field:  "app.environment",
 			Value:  cfg.Environment,
-			Reason: fmt.Sprintf("environment must be one of: %v", validEnvs),
+			Reason: "invalid environment",
 		}
 	}
 	if cfg.Name == "" {
@@ -64,6 +67,26 @@ func validateAppConfig(cfg AppConfig) error {
 			Field:  "app.version",
 			Value:  cfg.Version,
 			Reason: "version cannot be empty",
+		}
+	}
+	return nil
+}
+
+// validateLogConfig validates the log configuration
+func validateLogConfig(cfg LogConfig) error {
+	validLevels := []string{"debug", "info", "warn", "error"}
+	isValidLevel := false
+	for _, level := range validLevels {
+		if strings.ToLower(cfg.Level) == level {
+			isValidLevel = true
+			break
+		}
+	}
+	if !isValidLevel {
+		return &ConfigValidationError{
+			Field:  "log.level",
+			Value:  cfg.Level,
+			Reason: "invalid log level",
 		}
 	}
 	return nil
@@ -198,35 +221,14 @@ func validateServerConfig(cfg ServerConfig) error {
 		return &ConfigValidationError{
 			Field:  "server.address",
 			Value:  cfg.Address,
-			Reason: "server address cannot be empty",
+			Reason: "address cannot be empty",
 		}
 	}
-	if cfg.ReadTimeout < time.Second {
-		return &ConfigValidationError{
-			Field:  "server.read_timeout",
-			Value:  cfg.ReadTimeout,
-			Reason: "read timeout must be at least 1 second",
-		}
+
+	if err := validateServerSecurity(cfg.Security); err != nil {
+		return err
 	}
-	if cfg.WriteTimeout < time.Second {
-		return &ConfigValidationError{
-			Field:  "server.write_timeout",
-			Value:  cfg.WriteTimeout,
-			Reason: "write timeout must be at least 1 second",
-		}
-	}
-	if cfg.IdleTimeout < time.Second {
-		return &ConfigValidationError{
-			Field:  "server.idle_timeout",
-			Value:  cfg.IdleTimeout,
-			Reason: "idle timeout must be at least 1 second",
-		}
-	}
-	if cfg.Security.Enabled {
-		if err := validateServerSecurity(cfg.Security); err != nil {
-			return err
-		}
-	}
+
 	return nil
 }
 
@@ -249,16 +251,71 @@ func validateServerSecurity(security struct {
 			return &ConfigValidationError{
 				Field:  "server.security.api_key",
 				Value:  security.APIKey,
-				Reason: "API key cannot be empty when security is enabled",
+				Reason: "API key is required when security is enabled",
+			}
+		}
+		if !isValidAPIKey(security.APIKey) {
+			return &ConfigValidationError{
+				Field:  "server.security.api_key",
+				Value:  security.APIKey,
+				Reason: "invalid API key format",
 			}
 		}
 	}
+
+	if security.RateLimit < 0 {
+		return &ConfigValidationError{
+			Field:  "server.security.rate_limit",
+			Value:  security.RateLimit,
+			Reason: "rate limit must be non-negative",
+		}
+	}
+
+	if security.CORS.Enabled {
+		if len(security.CORS.AllowedOrigins) == 0 {
+			return &ConfigValidationError{
+				Field:  "server.security.cors.allowed_origins",
+				Value:  security.CORS.AllowedOrigins,
+				Reason: "at least one allowed origin must be specified when CORS is enabled",
+			}
+		}
+		if len(security.CORS.AllowedMethods) == 0 {
+			return &ConfigValidationError{
+				Field:  "server.security.cors.allowed_methods",
+				Value:  security.CORS.AllowedMethods,
+				Reason: "at least one allowed method must be specified when CORS is enabled",
+			}
+		}
+		if security.CORS.MaxAge < 0 {
+			return &ConfigValidationError{
+				Field:  "server.security.cors.max_age",
+				Value:  security.CORS.MaxAge,
+				Reason: "max age must be non-negative",
+			}
+		}
+	}
+
 	if security.TLS.Enabled {
 		if err := validateServerTLS(security.TLS); err != nil {
 			return err
 		}
 	}
+
 	return nil
+}
+
+// isValidAPIKey checks if the API key has a valid format
+func isValidAPIKey(key string) bool {
+	// API key must be at least 32 characters long and contain only alphanumeric characters
+	if len(key) < 32 {
+		return false
+	}
+	for _, c := range key {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+			return false
+		}
+	}
+	return true
 }
 
 // validateServerTLS validates the server TLS configuration

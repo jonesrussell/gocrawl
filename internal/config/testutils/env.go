@@ -47,12 +47,6 @@ func SetupTestEnv(t *testing.T) func() {
 	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
 	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
 
-	// Set required environment variables
-	os.Setenv("CONFIG_FILE", configPath)
-	t.Setenv("CONFIG_FILE", configPath)
-	os.Setenv("CRAWLER_SOURCE_FILE", sourcesPath)
-	t.Setenv("CRAWLER_SOURCE_FILE", sourcesPath)
-
 	// Configure Viper
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("")
@@ -63,6 +57,40 @@ func SetupTestEnv(t *testing.T) func() {
 	viper.SetConfigType("yaml")
 	err := viper.ReadInConfig()
 	require.NoError(t, err, "failed to read config file")
+
+	// Set required environment variables
+	os.Setenv("CONFIG_FILE", configPath)
+	t.Setenv("CONFIG_FILE", configPath)
+	os.Setenv("CRAWLER_SOURCE_FILE", sourcesPath)
+	t.Setenv("CRAWLER_SOURCE_FILE", sourcesPath)
+
+	// Set default environment variables for testing
+	os.Setenv("APP_ENVIRONMENT", "development")
+	t.Setenv("APP_ENVIRONMENT", "development")
+	os.Setenv("APP_NAME", "gocrawl-test")
+	t.Setenv("APP_NAME", "gocrawl-test")
+	os.Setenv("APP_VERSION", "0.0.1")
+	t.Setenv("APP_VERSION", "0.0.1")
+	os.Setenv("APP_DEBUG", "false")
+	t.Setenv("APP_DEBUG", "false")
+	os.Setenv("LOG_LEVEL", "info")
+	t.Setenv("LOG_LEVEL", "info")
+	os.Setenv("LOG_DEBUG", "false")
+	t.Setenv("LOG_DEBUG", "false")
+	os.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+	t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+	os.Setenv("ELASTICSEARCH_INDEX_NAME", "test-index")
+	t.Setenv("ELASTICSEARCH_INDEX_NAME", "test-index")
+	os.Setenv("ELASTICSEARCH_API_KEY", "test_api_key")
+	t.Setenv("ELASTICSEARCH_API_KEY", "test_api_key")
+	os.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
+	t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
+	os.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
+	t.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
+	os.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
+	t.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
+	os.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
+	t.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
 
 	// Return cleanup function
 	return func() {
