@@ -18,24 +18,6 @@ func setupViper(log Logger) error {
 	viperMutex.Lock()
 	defer viperMutex.Unlock()
 
-	// Set default values
-	viper.SetDefault("app.environment", defaultAppEnv)
-	viper.SetDefault("app.name", defaultAppName)
-	viper.SetDefault("app.version", defaultAppVersion)
-	viper.SetDefault("app.debug", false)
-	viper.SetDefault("log.level", DefaultLogLevel)
-	viper.SetDefault("log.debug", false)
-	viper.SetDefault("crawler.max_depth", defaultMaxDepth)
-	viper.SetDefault("crawler.parallelism", defaultParallelism)
-	viper.SetDefault("crawler.rate_limit", defaultCrawlerRateLimit)
-	viper.SetDefault("crawler.random_delay", defaultRandomDelay)
-	viper.SetDefault("elasticsearch.addresses", []string{defaultESAddress})
-	viper.SetDefault("elasticsearch.index_name", defaultESIndex)
-	viper.SetDefault("server.address", ":"+DefaultServerPort)
-	viper.SetDefault("server.read_timeout", DefaultReadTimeout)
-	viper.SetDefault("server.write_timeout", DefaultWriteTimeout)
-	viper.SetDefault("server.idle_timeout", DefaultIdleTimeout)
-
 	// Configure Viper
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("")
@@ -52,6 +34,56 @@ func setupViper(log Logger) error {
 				return fmt.Errorf("failed to read config file: %w", err)
 			}
 		}
+	}
+
+	// Set default values only if not already set
+	if !viper.IsSet("app.environment") {
+		viper.SetDefault("app.environment", defaultAppEnv)
+	}
+	if !viper.IsSet("app.name") {
+		viper.SetDefault("app.name", defaultAppName)
+	}
+	if !viper.IsSet("app.version") {
+		viper.SetDefault("app.version", defaultAppVersion)
+	}
+	if !viper.IsSet("app.debug") {
+		viper.SetDefault("app.debug", false)
+	}
+	if !viper.IsSet("log.level") {
+		viper.SetDefault("log.level", DefaultLogLevel)
+	}
+	if !viper.IsSet("log.debug") {
+		viper.SetDefault("log.debug", false)
+	}
+	if !viper.IsSet("crawler.max_depth") {
+		viper.SetDefault("crawler.max_depth", defaultMaxDepth)
+	}
+	if !viper.IsSet("crawler.parallelism") {
+		viper.SetDefault("crawler.parallelism", defaultParallelism)
+	}
+	if !viper.IsSet("crawler.rate_limit") {
+		viper.SetDefault("crawler.rate_limit", defaultCrawlerRateLimit)
+	}
+	if !viper.IsSet("crawler.random_delay") {
+		viper.SetDefault("crawler.random_delay", defaultRandomDelay)
+	}
+	if !viper.IsSet("elasticsearch.addresses") {
+		viper.SetDefault("elasticsearch.addresses", []string{defaultESAddress})
+	}
+	if !viper.IsSet("elasticsearch.index_name") {
+		viper.SetDefault("elasticsearch.index_name", defaultESIndex)
+	}
+	if !viper.IsSet("server.address") {
+		viper.SetDefault("server.address", ":"+DefaultServerPort)
+	}
+	if !viper.IsSet("server.read_timeout") {
+		viper.SetDefault("server.read_timeout", DefaultReadTimeout)
+	}
+	if !viper.IsSet("server.write_timeout") {
+		viper.SetDefault("server.write_timeout", DefaultWriteTimeout)
+	}
+	if !viper.IsSet("server.idle_timeout") {
+		viper.SetDefault("server.idle_timeout", DefaultIdleTimeout)
 	}
 
 	return nil

@@ -61,12 +61,12 @@ func TestAppConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Run test setup first to set environment variables
+			tt.setup(t)
+
 			// Setup test environment
 			cleanup := testutils.SetupTestEnv(t)
 			defer cleanup()
-
-			// Run test setup
-			tt.setup(t)
 
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))
@@ -166,12 +166,12 @@ sources:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Run test setup first to set environment variables
+			tt.setup(t)
+
 			// Setup test environment
 			cleanup := testutils.SetupTestEnv(t)
 			defer cleanup()
-
-			// Run test setup
-			tt.setup(t)
 
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))

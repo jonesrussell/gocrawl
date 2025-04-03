@@ -18,9 +18,24 @@ func SetupTestEnv(t *testing.T) func() {
 	// Save current environment
 	originalEnv := os.Environ()
 
+	// Save test environment variables before clearing
+	testEnv := make(map[string]string)
+	for _, e := range originalEnv {
+		k, v, _ := strings.Cut(e, "=")
+		if strings.HasPrefix(k, "TEST_") || strings.HasPrefix(k, "APP_") {
+			testEnv[k] = v
+		}
+	}
+
 	// Clear environment and viper config
 	os.Clearenv()
 	viper.Reset()
+
+	// Restore test environment variables
+	for k, v := range testEnv {
+		os.Setenv(k, v)
+		t.Setenv(k, v)
+	}
 
 	// Get the absolute path to the testdata directory
 	_, filename, _, ok := runtime.Caller(0)
@@ -67,87 +82,135 @@ func SetupTestEnv(t *testing.T) func() {
 	// Debug: Print Viper config file info
 	t.Logf("Viper config file: %s", viper.GetViper().ConfigFileUsed())
 
+	// Debug: Print initial Viper values after reading config
+	t.Logf("Initial Viper values after reading config:")
+	t.Logf("app.environment: %s", viper.GetString("app.environment"))
+	t.Logf("app.name: %s", viper.GetString("app.name"))
+
 	// Set environment variables from config
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Set environment variables and Viper values
-	os.Setenv("APP_NAME", "gocrawl-test")
-	t.Setenv("APP_NAME", "gocrawl-test")
-	viper.Set("app.name", "gocrawl-test")
+	// Debug: Print environment variables before setting
+	t.Logf("Environment variables before setting:")
+	t.Logf("APP_ENVIRONMENT: %s", os.Getenv("APP_ENVIRONMENT"))
+	t.Logf("APP_NAME: %s", os.Getenv("APP_NAME"))
 
-	os.Setenv("APP_VERSION", "0.0.1")
-	t.Setenv("APP_VERSION", "0.0.1")
-	viper.Set("app.version", "0.0.1")
+	// Set environment variables and Viper values only if not already set in Viper
+	if !viper.IsSet("app.name") && os.Getenv("APP_NAME") == "" {
+		os.Setenv("APP_NAME", "gocrawl-test")
+		t.Setenv("APP_NAME", "gocrawl-test")
+		viper.Set("app.name", "gocrawl-test")
+	}
 
-	os.Setenv("APP_DEBUG", "false")
-	t.Setenv("APP_DEBUG", "false")
-	viper.Set("app.debug", false)
+	if !viper.IsSet("app.version") && os.Getenv("APP_VERSION") == "" {
+		os.Setenv("APP_VERSION", "0.0.1")
+		t.Setenv("APP_VERSION", "0.0.1")
+		viper.Set("app.version", "0.0.1")
+	}
 
-	os.Setenv("CRAWLER_BASE_URL", "http://localhost:8080")
-	t.Setenv("CRAWLER_BASE_URL", "http://localhost:8080")
-	viper.Set("crawler.base_url", "http://localhost:8080")
+	if !viper.IsSet("app.debug") && os.Getenv("APP_DEBUG") == "" {
+		os.Setenv("APP_DEBUG", "false")
+		t.Setenv("APP_DEBUG", "false")
+		viper.Set("app.debug", false)
+	}
 
-	os.Setenv("CRAWLER_MAX_DEPTH", "1")
-	t.Setenv("CRAWLER_MAX_DEPTH", "1")
-	viper.Set("crawler.max_depth", 1)
+	if !viper.IsSet("crawler.base_url") && os.Getenv("CRAWLER_BASE_URL") == "" {
+		os.Setenv("CRAWLER_BASE_URL", "http://localhost:8080")
+		t.Setenv("CRAWLER_BASE_URL", "http://localhost:8080")
+		viper.Set("crawler.base_url", "http://localhost:8080")
+	}
 
-	os.Setenv("CRAWLER_RATE_LIMIT", "1s")
-	t.Setenv("CRAWLER_RATE_LIMIT", "1s")
-	viper.Set("crawler.rate_limit", "1s")
+	if !viper.IsSet("crawler.max_depth") && os.Getenv("CRAWLER_MAX_DEPTH") == "" {
+		os.Setenv("CRAWLER_MAX_DEPTH", "1")
+		t.Setenv("CRAWLER_MAX_DEPTH", "1")
+		viper.Set("crawler.max_depth", 1)
+	}
 
-	os.Setenv("CRAWLER_PARALLELISM", "1")
-	t.Setenv("CRAWLER_PARALLELISM", "1")
-	viper.Set("crawler.parallelism", 1)
+	if !viper.IsSet("crawler.rate_limit") && os.Getenv("CRAWLER_RATE_LIMIT") == "" {
+		os.Setenv("CRAWLER_RATE_LIMIT", "1s")
+		t.Setenv("CRAWLER_RATE_LIMIT", "1s")
+		viper.Set("crawler.rate_limit", "1s")
+	}
 
-	os.Setenv("SERVER_ADDRESS", ":8080")
-	t.Setenv("SERVER_ADDRESS", ":8080")
-	viper.Set("server.address", ":8080")
+	if !viper.IsSet("crawler.parallelism") && os.Getenv("CRAWLER_PARALLELISM") == "" {
+		os.Setenv("CRAWLER_PARALLELISM", "1")
+		t.Setenv("CRAWLER_PARALLELISM", "1")
+		viper.Set("crawler.parallelism", 1)
+	}
 
-	os.Setenv("SERVER_READ_TIMEOUT", "1s")
-	t.Setenv("SERVER_READ_TIMEOUT", "1s")
-	viper.Set("server.read_timeout", "1s")
+	if !viper.IsSet("server.address") && os.Getenv("SERVER_ADDRESS") == "" {
+		os.Setenv("SERVER_ADDRESS", ":8080")
+		t.Setenv("SERVER_ADDRESS", ":8080")
+		viper.Set("server.address", ":8080")
+	}
 
-	os.Setenv("SERVER_WRITE_TIMEOUT", "1s")
-	t.Setenv("SERVER_WRITE_TIMEOUT", "1s")
-	viper.Set("server.write_timeout", "1s")
+	if !viper.IsSet("server.read_timeout") && os.Getenv("SERVER_READ_TIMEOUT") == "" {
+		os.Setenv("SERVER_READ_TIMEOUT", "1s")
+		t.Setenv("SERVER_READ_TIMEOUT", "1s")
+		viper.Set("server.read_timeout", "1s")
+	}
 
-	os.Setenv("SERVER_SECURITY_ENABLED", "false")
-	t.Setenv("SERVER_SECURITY_ENABLED", "false")
-	viper.Set("server.security.enabled", false)
+	if !viper.IsSet("server.write_timeout") && os.Getenv("SERVER_WRITE_TIMEOUT") == "" {
+		os.Setenv("SERVER_WRITE_TIMEOUT", "1s")
+		t.Setenv("SERVER_WRITE_TIMEOUT", "1s")
+		viper.Set("server.write_timeout", "1s")
+	}
 
-	os.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-	t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-	viper.Set("elasticsearch.addresses", []string{"http://localhost:9200"})
+	if !viper.IsSet("server.security.enabled") && os.Getenv("SERVER_SECURITY_ENABLED") == "" {
+		os.Setenv("SERVER_SECURITY_ENABLED", "false")
+		t.Setenv("SERVER_SECURITY_ENABLED", "false")
+		viper.Set("server.security.enabled", false)
+	}
 
-	os.Setenv("ELASTICSEARCH_USERNAME", "elastic")
-	t.Setenv("ELASTICSEARCH_USERNAME", "elastic")
-	viper.Set("elasticsearch.username", "elastic")
+	if !viper.IsSet("elasticsearch.addresses") && os.Getenv("ELASTICSEARCH_ADDRESSES") == "" {
+		os.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+		t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+		viper.Set("elasticsearch.addresses", []string{"http://localhost:9200"})
+	}
 
-	os.Setenv("ELASTICSEARCH_PASSWORD", "changeme")
-	t.Setenv("ELASTICSEARCH_PASSWORD", "changeme")
-	viper.Set("elasticsearch.password", "changeme")
+	if !viper.IsSet("elasticsearch.username") && os.Getenv("ELASTICSEARCH_USERNAME") == "" {
+		os.Setenv("ELASTICSEARCH_USERNAME", "elastic")
+		t.Setenv("ELASTICSEARCH_USERNAME", "elastic")
+		viper.Set("elasticsearch.username", "elastic")
+	}
 
-	os.Setenv("ELASTICSEARCH_INDEX_NAME", "test-index")
-	t.Setenv("ELASTICSEARCH_INDEX_NAME", "test-index")
-	viper.Set("elasticsearch.index_name", "test-index")
+	if !viper.IsSet("elasticsearch.password") && os.Getenv("ELASTICSEARCH_PASSWORD") == "" {
+		os.Setenv("ELASTICSEARCH_PASSWORD", "changeme")
+		t.Setenv("ELASTICSEARCH_PASSWORD", "changeme")
+		viper.Set("elasticsearch.password", "changeme")
+	}
 
-	os.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
-	t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
-	viper.Set("elasticsearch.retry.enabled", true)
+	if !viper.IsSet("elasticsearch.index_name") && os.Getenv("ELASTICSEARCH_INDEX_NAME") == "" {
+		os.Setenv("ELASTICSEARCH_INDEX_NAME", "test-index")
+		t.Setenv("ELASTICSEARCH_INDEX_NAME", "test-index")
+		viper.Set("elasticsearch.index_name", "test-index")
+	}
 
-	os.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
-	t.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
-	viper.Set("elasticsearch.retry.initial_wait", "1s")
+	if !viper.IsSet("elasticsearch.retry.enabled") && os.Getenv("ELASTICSEARCH_RETRY_ENABLED") == "" {
+		os.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
+		t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
+		viper.Set("elasticsearch.retry.enabled", true)
+	}
 
-	os.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
-	t.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
-	viper.Set("elasticsearch.retry.max_wait", "5s")
+	if !viper.IsSet("elasticsearch.retry.initial_wait") && os.Getenv("ELASTICSEARCH_RETRY_INITIAL_WAIT") == "" {
+		os.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
+		t.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
+		viper.Set("elasticsearch.retry.initial_wait", "1s")
+	}
 
-	os.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
-	t.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
-	viper.Set("elasticsearch.retry.max_retries", 3)
+	if !viper.IsSet("elasticsearch.retry.max_wait") && os.Getenv("ELASTICSEARCH_RETRY_MAX_WAIT") == "" {
+		os.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
+		t.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
+		viper.Set("elasticsearch.retry.max_wait", "5s")
+	}
+
+	if !viper.IsSet("elasticsearch.retry.max_retries") && os.Getenv("ELASTICSEARCH_RETRY_MAX_RETRIES") == "" {
+		os.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
+		t.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
+		viper.Set("elasticsearch.retry.max_retries", 3)
+	}
 
 	// Debug: Print final Viper values
 	t.Logf("Final Viper values:")
