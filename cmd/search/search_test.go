@@ -24,24 +24,45 @@ type mockSearchManager struct {
 	mock.Mock
 }
 
-func (m *mockSearchManager) Search(ctx context.Context, index string, query any) ([]any, error) {
+func (m *mockSearchManager) Search(ctx context.Context, index string, query map[string]interface{}) ([]interface{}, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).([]any), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	val, ok := args.Get(0).([]interface{})
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
 }
 
-func (m *mockSearchManager) Aggregate(ctx context.Context, index string, query any) (any, error) {
+func (m *mockSearchManager) Count(ctx context.Context, index string, query map[string]interface{}) (int64, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, nil
+	}
+	return val, nil
+}
+
+func (m *mockSearchManager) Aggregate(ctx context.Context, index string, aggs map[string]interface{}) (map[string]interface{}, error) {
+	args := m.Called(ctx, index, aggs)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	val, ok := args.Get(0).(map[string]interface{})
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
 }
 
 func (m *mockSearchManager) Close() error {
 	args := m.Called()
 	return args.Error(0)
-}
-
-func (m *mockSearchManager) Count(ctx context.Context, index string, query any) (int64, error) {
-	args := m.Called(ctx, index, query)
-	return args.Get(0).(int64), args.Error(1)
 }
 
 // testDeps holds all the dependencies needed for testing
@@ -155,15 +176,15 @@ func TestCommandExecution(t *testing.T) {
 	deps := setupTestDeps(t)
 
 	// Set up search manager expectations
-	expectedQuery := map[string]any{
-		"query": map[string]any{
-			"match": map[string]any{
+	expectedQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
 				"content": "test query",
 			},
 		},
 		"size": 10,
 	}
-	deps.SearchManager.(*mockSearchManager).On("Search", mock.Anything, "test-index", expectedQuery).Return([]any{}, nil)
+	deps.SearchManager.(*mockSearchManager).On("Search", mock.Anything, "test-index", expectedQuery).Return([]interface{}{}, nil)
 	deps.SearchManager.(*mockSearchManager).On("Close").Return(nil)
 
 	// Create and run test app

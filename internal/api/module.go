@@ -45,7 +45,7 @@ var Module = fx.Module("api",
 		func(
 			cfg config.Interface,
 			log logger.Interface,
-			searchManager interfaces.SearchManager,
+			searchManager SearchManager,
 		) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
 			return StartHTTPServer(log, searchManager, cfg)
 		},

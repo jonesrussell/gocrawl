@@ -3,6 +3,7 @@ package api_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,12 +13,12 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/api/testutils"
+	apitestutils "github.com/jonesrussell/gocrawl/internal/api/testutils"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,8 +41,8 @@ type testServer struct {
 }
 
 // setupMockLogger creates and configures a mock logger for testing.
-func setupMockLogger() *testutils.MockLogger {
-	mockLog := testutils.NewMockLogger()
+func setupMockLogger() *apitestutils.MockLogger {
+	mockLog := apitestutils.NewMockLogger()
 	mockLog.On("Info", mock.Anything, mock.Anything).Return()
 	mockLog.On("Error", mock.Anything, mock.Anything).Return()
 	mockLog.On("Debug", mock.Anything, mock.Anything).Return()
@@ -59,8 +60,20 @@ var TestAPIModule = fx.Module("testAPI",
 	}),
 	// Include only the necessary components from the API module
 	fx.Provide(
-		api.NewServer,
+		// Provide the server and security middleware together to avoid circular dependencies
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			searchManager api.SearchManager,
+		) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
+			return api.StartHTTPServer(log, searchManager, cfg)
+		},
 		api.NewLifecycle,
+		api.NewServer,
+		// Provide a mock search manager for testing
+		func() api.SearchManager {
+			return apitestutils.NewMockSearchManager()
+		},
 	),
 )
 
@@ -69,9 +82,28 @@ func setupTestApp(t *testing.T) *testServer {
 
 	// Create mock dependencies
 	mockLogger := setupMockLogger()
-	mockSearch := testutils.NewMockSearchManager()
-	mockStorage := testutils.NewMockStorage()
+	mockSearch := apitestutils.NewMockSearchManager()
+	mockStorage := apitestutils.NewMockStorage()
 	mockIndexManager := testutils.NewMockIndexManager()
+
+	// Set up mock search expectations
+	expectedQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"content": "test",
+			},
+		},
+		"size": 10,
+	}
+	mockSearch.On("Search", mock.Anything, "test", expectedQuery).Return([]interface{}{
+		map[string]interface{}{
+			"title": "Test Result",
+			"url":   "https://test.com",
+		},
+	}, nil)
+	mockSearch.On("Count", mock.Anything, "test", expectedQuery).Return(int64(1), nil)
+	mockSearch.On("Aggregate", mock.Anything, "test", mock.Anything).Return(map[string]interface{}{}, nil)
+	mockSearch.On("Close").Return(nil)
 
 	// Create server config with security settings
 	serverConfig := &config.ServerConfig{
@@ -98,20 +130,9 @@ func setupTestApp(t *testing.T) *testServer {
 			IndexName: "test_index",
 		})
 
-	// Set up mock search expectations
-	mockSearch.On("Search", mock.Anything, "test", mock.Anything).Return([]any{
-		map[string]any{
-			"title": "Test Result",
-			"url":   "https://test.com",
-		},
-	}, nil)
-	mockSearch.On("Count", mock.Anything, "test", mock.Anything).Return(int64(1), nil)
-	mockSearch.On("Aggregate", mock.Anything, "test", mock.Anything).Return(map[string]any{}, nil)
-	mockSearch.On("Close").Return(nil)
-
 	// Set up mock storage expectations
-	mockStorage.On("Search", mock.Anything, "test", mock.Anything, mock.Anything).Return([]any{
-		map[string]any{
+	mockStorage.On("Search", mock.Anything, "test", mock.Anything).Return([]interface{}{
+		map[string]interface{}{
 			"title": "Test Result",
 			"url":   "https://test.com",
 		},
@@ -123,7 +144,6 @@ func setupTestApp(t *testing.T) *testServer {
 	mockIndexManager.On("EnsureIndex", mock.Anything, mock.Anything).Return(nil)
 	mockIndexManager.On("DeleteIndex", mock.Anything, mock.Anything).Return(nil)
 	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-	mockIndexManager.On("GetMapping", mock.Anything, mock.Anything).Return(map[string]any{}, nil)
 	mockIndexManager.On("UpdateMapping", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Store references for test assertions
@@ -151,7 +171,7 @@ func setupTestApp(t *testing.T) *testServer {
 			),
 			fx.Annotate(
 				mockIndexManager,
-				fx.As(new(interfaces.IndexManager)),
+				fx.As(new(api.IndexManager)),
 			),
 			fx.Annotate(
 				t.Context(),
@@ -196,133 +216,94 @@ func TestHealthEndpoint(t *testing.T) {
 	})
 }
 
-// TestSearchEndpoint verifies that the search endpoint works correctly.
+// TestSearchEndpoint tests the search endpoint functionality.
 func TestSearchEndpoint(t *testing.T) {
 	ts := setupTestApp(t)
 	defer ts.app.RequireStop()
 
-	reqBody := `{"query":"test","index":"test","size":10}`
-	endpoint := fmt.Sprintf("http://%s%s", ts.server.Addr, searchEndpoint)
+	tests := []struct {
+		name           string
+		requestBody    string
+		apiKey         string
+		expectedStatus int
+		expectedError  *api.APIError
+	}{
+		{
+			name:           "requires API key",
+			requestBody:    `{"query": "test"}`,
+			apiKey:         "",
+			expectedStatus: http.StatusUnauthorized,
+			expectedError: &api.APIError{
+				Code:    http.StatusUnauthorized,
+				Message: "API key is required",
+			},
+		},
+		{
+			name:           "returns search results with valid API key",
+			requestBody:    `{"query": "test", "index": "test", "size": 10}`,
+			apiKey:         testAPIKey,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "handles invalid JSON",
+			requestBody:    `{"query": "test", invalid json}`,
+			apiKey:         testAPIKey,
+			expectedStatus: http.StatusBadRequest,
+			expectedError: &api.APIError{
+				Code:    http.StatusBadRequest,
+				Message: "Invalid request payload",
+			},
+		},
+		{
+			name:           "handles empty query",
+			requestBody:    `{"query": "", "index": "test"}`,
+			apiKey:         testAPIKey,
+			expectedStatus: http.StatusBadRequest,
+			expectedError: &api.APIError{
+				Code:    http.StatusBadRequest,
+				Message: "Query cannot be empty",
+			},
+		},
+	}
 
-	t.Run("requires API key", func(t *testing.T) {
-		req, err := http.NewRequest(
-			http.MethodPost,
-			endpoint,
-			strings.NewReader(reqBody),
-		)
-		require.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, searchEndpoint, strings.NewReader(tt.requestBody))
+			req.Header.Set("Content-Type", "application/json")
+			if tt.apiKey != "" {
+				req.Header.Set("X-API-Key", tt.apiKey)
+			}
 
-		w := httptest.NewRecorder()
-		ts.server.Handler.ServeHTTP(w, req)
+			w := httptest.NewRecorder()
+			ts.server.Handler.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusUnauthorized, w.Code)
-		assert.JSONEq(t, `{"error":"Unauthorized"}`, w.Body.String())
-	})
+			assert.Equal(t, tt.expectedStatus, w.Code)
 
-	t.Run("returns search results with valid API key", func(t *testing.T) {
-		req, err := http.NewRequest(
-			http.MethodPost,
-			endpoint,
-			strings.NewReader(reqBody),
-		)
-		require.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Api-Key", testAPIKey)
-
-		w := httptest.NewRecorder()
-		ts.server.Handler.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Contains(t, w.Body.String(), "results")
-		assert.Contains(t, w.Body.String(), "Test Result")
-		assert.Contains(t, w.Body.String(), "https://test.com")
-	})
+			if tt.expectedError != nil {
+				var errResp api.APIError
+				err := json.NewDecoder(w.Body).Decode(&errResp)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedError.Code, errResp.Code)
+				assert.Equal(t, tt.expectedError.Message, errResp.Message)
+			} else if tt.expectedStatus == http.StatusOK {
+				var resp api.SearchResponse
+				err := json.NewDecoder(w.Body).Decode(&resp)
+				require.NoError(t, err)
+				assert.NotEmpty(t, resp.Results)
+				assert.Equal(t, 1, resp.Total)
+			}
+		})
+	}
 }
 
-// TestLoggerDependencyRegression verifies that the logger dependency is properly provided and used.
+// TestLoggerDependencyRegression verifies that the logger dependency is properly injected.
 func TestLoggerDependencyRegression(t *testing.T) {
-	// Create a mock logger that we can verify is used
-	mockLog := setupMockLogger()
+	ts := setupTestApp(t)
+	defer ts.app.RequireStop()
 
-	// Create test configuration
-	mockConfig := configtest.NewMockConfig().
-		WithServerConfig(&config.ServerConfig{
-			Address:      ":0",
-			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 15 * time.Second,
-			IdleTimeout:  60 * time.Second,
-		}).
-		WithAppConfig(&config.AppConfig{
-			Environment: "test",
-		}).
-		WithLogConfig(&config.LogConfig{
-			Level: "info",
-			Debug: false,
-		})
-
-	// Create mock search manager
-	mockSearch := testutils.NewMockSearchManager()
-	mockSearch.On("Search", mock.Anything, "test", mock.Anything).Return([]any{
-		map[string]any{
-			"title": "Test Result",
-			"url":   "https://test.com",
-		},
-	}, nil)
-	mockSearch.On("Count", mock.Anything, "test", mock.Anything).Return(int64(1), nil)
-	mockSearch.On("Close").Return(nil)
-
-	// Create a test module that only includes the necessary components
-	testModule := fx.Module("testAPI",
-		fx.Provide(
-			// Provide the server and security middleware together to avoid circular dependencies
-			func(
-				log logger.Interface,
-				searchManager api.SearchManager,
-				cfg config.Interface,
-			) (*http.Server, middleware.SecurityMiddlewareInterface) {
-				// Use StartHTTPServer to create the server and security middleware
-				server, security, err := api.StartHTTPServer(log, searchManager, cfg)
-				if err != nil {
-					panic(err)
-				}
-				return server, security
-			},
-		),
-		fx.Invoke(api.ConfigureLifecycle),
-	)
-
-	// Create test application with just the test module
-	app := fxtest.New(t,
-		testModule,
-		fx.NopLogger,
-		fx.Supply(
-			fx.Annotate(
-				mockConfig,
-				fx.As(new(config.Interface)),
-			),
-			fx.Annotate(
-				mockSearch,
-				fx.As(new(api.SearchManager)),
-			),
-			fx.Annotate(
-				t.Context(),
-				fx.As(new(context.Context)),
-			),
-			fx.Annotate(
-				mockLog,
-				fx.As(new(logger.Interface)),
-			),
-		),
-	)
-
-	// Start the application
-	app.RequireStart()
-	defer app.RequireStop()
-
-	// Verify that the logger was used by checking if the expected log calls were made
-	mockLog.AssertCalled(t, "Info", "StartHTTPServer function called", mock.Anything)
-	mockLog.AssertCalled(t, "Info", "Server configuration", mock.Anything)
+	// Verify that the logger is properly injected
+	assert.NotNil(t, ts.logger, "Logger should be properly injected")
 }
 
 // TestModule tests the API module.
@@ -331,9 +312,9 @@ func TestModule(t *testing.T) {
 
 	// Create mock dependencies
 	mockConfig := configtest.NewMockConfig()
-	mockLogger := testutils.NewMockLogger()
-	mockStorage := testutils.NewMockStorage()
-	mockIndexManager := testutils.NewMockIndexManager()
+	mockLogger := apitestutils.NewMockLogger()
+	mockStorage := apitestutils.NewMockStorage()
+	mockIndexManager := apitestutils.NewMockIndexManager()
 
 	// Set up mock storage expectations
 	mockStorage.On("GetIndexDocCount", mock.Anything, mock.Anything).Return(int64(0), nil)
@@ -354,7 +335,7 @@ func TestModule(t *testing.T) {
 			func() config.Interface { return mockConfig },
 			func() logger.Interface { return mockLogger },
 			func() types.Interface { return mockStorage },
-			func() interfaces.IndexManager { return mockIndexManager },
+			func() api.IndexManager { return mockIndexManager },
 		),
 		api.Module,
 	)

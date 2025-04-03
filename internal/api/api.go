@@ -2,6 +2,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -9,9 +10,34 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
+
+// SearchManager defines the interface for search operations.
+type SearchManager interface {
+	// Search performs a search query.
+	Search(ctx context.Context, index string, query map[string]interface{}) ([]interface{}, error)
+
+	// Count returns the number of documents matching a query.
+	Count(ctx context.Context, index string, query map[string]interface{}) (int64, error)
+
+	// Aggregate performs an aggregation query.
+	Aggregate(ctx context.Context, index string, aggs map[string]interface{}) (map[string]interface{}, error)
+
+	// Close closes any resources held by the search manager.
+	Close() error
+}
+
+// APIError represents an error response from the API.
+type APIError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Err     error  `json:"-"`
+}
+
+func (e *APIError) Error() string {
+	return e.Message
+}
 
 // Constants
 const (
@@ -22,7 +48,7 @@ const (
 // SetupRouter creates and configures the Gin router with all routes
 func SetupRouter(
 	log logger.Interface,
-	searchManager interfaces.SearchManager,
+	searchManager SearchManager,
 	cfg config.Interface,
 ) (*gin.Engine, middleware.SecurityMiddlewareInterface) {
 	// Disable Gin's default logging
@@ -34,14 +60,18 @@ func SetupRouter(
 
 	// Create security middleware
 	security := middleware.NewSecurityMiddleware(cfg.GetServerConfig(), log)
-	router.Use(security.Middleware())
 
-	// Define routes
+	// Define public routes
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	router.POST("/search", handleSearch(searchManager))
+	// Define protected routes
+	protected := router.Group("")
+	protected.Use(security.Middleware())
+	{
+		protected.POST("/search", handleSearch(searchManager))
+	}
 
 	return router, security
 }
@@ -69,24 +99,31 @@ func loggingMiddleware(log logger.Interface) gin.HandlerFunc {
 }
 
 // handleSearch creates a handler for search requests
-func handleSearch(searchManager interfaces.SearchManager) gin.HandlerFunc {
+func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req SearchRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+			c.JSON(http.StatusBadRequest, APIError{
+				Code:    http.StatusBadRequest,
+				Message: "Invalid request payload",
+				Err:     err,
+			})
 			return
 		}
 
 		// Validate request
 		if strings.TrimSpace(req.Query) == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Query cannot be empty"})
+			c.JSON(http.StatusBadRequest, APIError{
+				Code:    http.StatusBadRequest,
+				Message: "Query cannot be empty",
+			})
 			return
 		}
 
 		// Build the search query
-		query := map[string]any{
-			"query": map[string]any{
-				"match": map[string]any{
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"match": map[string]interface{}{
 					"content": req.Query,
 				},
 			},
@@ -96,20 +133,28 @@ func handleSearch(searchManager interfaces.SearchManager) gin.HandlerFunc {
 		// Use the search manager to perform the search
 		results, err := searchManager.Search(c.Request.Context(), req.Index, query)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, APIError{
+				Code:    http.StatusInternalServerError,
+				Message: "Failed to perform search",
+				Err:     err,
+			})
 			return
 		}
 
 		// Get the total count using a wrapped query
-		total, err := searchManager.Count(c.Request.Context(), req.Index, map[string]any{
-			"query": map[string]any{
-				"match": map[string]any{
+		total, err := searchManager.Count(c.Request.Context(), req.Index, map[string]interface{}{
+			"query": map[string]interface{}{
+				"match": map[string]interface{}{
 					"content": req.Query,
 				},
 			},
 		})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, APIError{
+				Code:    http.StatusInternalServerError,
+				Message: "Failed to get total count",
+				Err:     err,
+			})
 			return
 		}
 
@@ -126,7 +171,7 @@ func handleSearch(searchManager interfaces.SearchManager) gin.HandlerFunc {
 // StartHTTPServer starts the HTTP server for search requests
 func StartHTTPServer(
 	log logger.Interface,
-	searchManager interfaces.SearchManager,
+	searchManager SearchManager,
 	cfg config.Interface,
 ) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
 	router, security := SetupRouter(log, searchManager, cfg)

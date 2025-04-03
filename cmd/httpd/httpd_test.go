@@ -36,9 +36,33 @@ func (m *mockStorage) Search(ctx context.Context, index string, query any) ([]an
 	}
 	val, ok := args.Get(0).([]any)
 	if !ok {
-		return nil, nil
+		return nil, errors.New("invalid search result type")
 	}
 	return val, nil
+}
+
+func (m *mockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
+	args := m.Called(ctx, index, query)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, errors.New("invalid count result type")
+	}
+	return val, nil
+}
+
+func (m *mockStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
+	args := m.Called(ctx, index, aggs)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	result := args.Get(0)
+	if result == nil {
+		return nil, errors.New("aggregation result is nil")
+	}
+	return result, nil
 }
 
 func (m *mockStorage) Close() error {
@@ -56,8 +80,36 @@ type searchManagerWrapper struct {
 	storagetypes.Interface
 }
 
+func (w *searchManagerWrapper) Search(ctx context.Context, index string, query map[string]any) ([]any, error) {
+	result, err := w.Interface.Search(ctx, index, query)
+	if err != nil {
+		return nil, err
+	}
+	converted := make([]any, len(result))
+	copy(converted, result)
+	return converted, nil
+}
+
+func (w *searchManagerWrapper) Count(ctx context.Context, index string, query map[string]any) (int64, error) {
+	return w.Interface.Count(ctx, index, query)
+}
+
+func (w *searchManagerWrapper) Aggregate(ctx context.Context, index string, aggs map[string]any) (map[string]any, error) {
+	result, err := w.Interface.Aggregate(ctx, index, aggs)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, errors.New("aggregation result is nil")
+	}
+	if converted, ok := result.(map[string]any); ok {
+		return converted, nil
+	}
+	return nil, errors.New("invalid aggregation result type")
+}
+
 func (w *searchManagerWrapper) Close() error {
-	return nil
+	return w.Interface.Close()
 }
 
 // TestConfigModule provides a test-specific config module that doesn't try to load files.

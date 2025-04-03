@@ -18,16 +18,16 @@ func NewMockSearchManager() *MockSearchManager {
 }
 
 // Search implements api.SearchManager.
-func (m *MockSearchManager) Search(ctx context.Context, index string, query any) ([]any, error) {
+func (m *MockSearchManager) Search(ctx context.Context, index string, query map[string]interface{}) ([]interface{}, error) {
 	args := m.Called(ctx, index, query)
-	if result, ok := args.Get(0).([]any); ok {
+	if result, ok := args.Get(0).([]interface{}); ok {
 		return result, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
 // Count implements api.SearchManager.
-func (m *MockSearchManager) Count(ctx context.Context, index string, query any) (int64, error) {
+func (m *MockSearchManager) Count(ctx context.Context, index string, query map[string]interface{}) (int64, error) {
 	args := m.Called(ctx, index, query)
 	if result, ok := args.Get(0).(int64); ok {
 		return result, args.Error(1)
@@ -36,9 +36,12 @@ func (m *MockSearchManager) Count(ctx context.Context, index string, query any) 
 }
 
 // Aggregate implements api.SearchManager.
-func (m *MockSearchManager) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
+func (m *MockSearchManager) Aggregate(ctx context.Context, index string, aggs map[string]interface{}) (map[string]interface{}, error) {
 	args := m.Called(ctx, index, aggs)
-	return args.Get(0), args.Error(1)
+	if result, ok := args.Get(0).(map[string]interface{}); ok {
+		return result, args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 // Close implements api.SearchManager.

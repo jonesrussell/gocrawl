@@ -55,7 +55,15 @@ func setupTestRouter(t *testing.T, securityConfig *config.ServerConfig) (*gin.En
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
-	securityMiddleware := middleware.NewSecurityMiddleware(securityConfig, &mockLogger{})
+	mockLog := &mockLogger{}
+	mockLog.On("Info", mock.Anything, mock.Anything).Return()
+	mockLog.On("Error", mock.Anything, mock.Anything).Return()
+	mockLog.On("Debug", mock.Anything, mock.Anything).Return()
+	mockLog.On("Warn", mock.Anything, mock.Anything).Return()
+	mockLog.On("Fatal", mock.Anything, mock.Anything).Return()
+	mockLog.On("With", mock.Anything).Return(mockLog)
+
+	securityMiddleware := middleware.NewSecurityMiddleware(securityConfig, mockLog)
 	router.Use(securityMiddleware.Middleware())
 
 	router.POST("/test", func(c *gin.Context) {

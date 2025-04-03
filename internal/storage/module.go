@@ -1,3 +1,4 @@
+// Package storage implements the storage layer for the application.
 package storage
 
 import (
@@ -10,8 +11,8 @@ import (
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
@@ -113,16 +114,7 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 	return client, nil
 }
 
-// searchManagerWrapper wraps types.Interface to implement interfaces.SearchManager
-type searchManagerWrapper struct {
-	types.Interface
-}
-
-// NewSearchManager creates a new search manager from a storage interface
-func NewSearchManager(storage types.Interface) interfaces.SearchManager {
-	return &searchManagerWrapper{storage}
-}
-
+// Module provides the storage module.
 var Module = fx.Module("storage",
 	fx.Provide(
 		// Provide http.RoundTripper
@@ -133,12 +125,19 @@ var Module = fx.Module("storage",
 		NewElasticsearchClient,
 		NewElasticsearchIndexManager,
 		// Provide types.Interface first
-		NewStorage,
+		func(
+			client *es.Client,
+			log logger.Interface,
+			opts Options,
+		) types.Interface {
+			return NewStorage(client, log, opts)
+		},
 		// Then provide SearchManager implementation
-		NewSearchManager,
+		func(
+			storage types.Interface,
+			log logger.Interface,
+		) api.SearchManager {
+			return NewSearchManager(storage, log)
+		},
 	),
 )
-
-func (w *searchManagerWrapper) Close() error {
-	return nil
-}

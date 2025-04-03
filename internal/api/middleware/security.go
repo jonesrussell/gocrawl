@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,12 +13,12 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
-// TimeProvider allows mocking time in tests
+// TimeProvider is an interface for getting the current time
 type TimeProvider interface {
 	Now() time.Time
 }
 
-// realTimeProvider provides actual time
+// realTimeProvider is the default implementation of TimeProvider
 type realTimeProvider struct{}
 
 func (r *realTimeProvider) Now() time.Time {
@@ -26,16 +27,21 @@ func (r *realTimeProvider) Now() time.Time {
 
 // SecurityMiddleware provides security features for the API
 type SecurityMiddleware struct {
-	cfg    *config.ServerConfig
-	logger logger.Interface
-	time   TimeProvider
+	cfg             *config.ServerConfig
+	log             logger.Interface
+	mu              sync.RWMutex
+	requests        map[string]map[time.Time]struct{}
+	timeProvider    TimeProvider
+	rateLimitWindow time.Duration
+	cleanupCtx      context.Context
+	cleanupCancel   context.CancelFunc
+	cleanupWg       sync.WaitGroup
 	// rateLimiter tracks request counts per IP
 	rateLimiter struct {
 		sync.RWMutex
 		clients map[string]*rateLimitInfo
 		window  time.Duration // Rate limit window
 	}
-	cleanupWg sync.WaitGroup
 }
 
 // Ensure SecurityMiddleware implements SecurityMiddlewareInterface
@@ -50,66 +56,102 @@ type rateLimitInfo struct {
 // Constants
 // No constants needed
 
-// NewSecurityMiddleware creates a new security middleware instance
-func NewSecurityMiddleware(cfg *config.ServerConfig, logger logger.Interface) *SecurityMiddleware {
-	m := &SecurityMiddleware{
-		cfg:    cfg,
-		logger: logger,
-		time:   &realTimeProvider{},
+// NewSecurityMiddleware creates a new security middleware
+func NewSecurityMiddleware(cfg *config.ServerConfig, log logger.Interface) *SecurityMiddleware {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &SecurityMiddleware{
+		cfg:             cfg,
+		log:             log,
+		requests:        make(map[string]map[time.Time]struct{}),
+		timeProvider:    &realTimeProvider{},
+		rateLimitWindow: 5 * time.Second,
+		cleanupCtx:      ctx,
+		cleanupCancel:   cancel,
 	}
-	m.rateLimiter.clients = make(map[string]*rateLimitInfo)
-	m.rateLimiter.window = time.Minute // Default to 1 minute
-	return m
 }
 
 // SetTimeProvider sets a custom time provider for testing
 func (m *SecurityMiddleware) SetTimeProvider(provider TimeProvider) {
-	m.time = provider
+	m.timeProvider = provider
 }
 
-// SetRateLimitWindow sets the rate limit window for testing
+// SetRateLimitWindow sets the rate limit window duration
 func (m *SecurityMiddleware) SetRateLimitWindow(window time.Duration) {
-	m.rateLimiter.Lock()
-	defer m.rateLimiter.Unlock()
-	m.rateLimiter.window = window
+	m.rateLimitWindow = window
 }
 
 // Middleware returns the security middleware function
 func (m *SecurityMiddleware) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Skip security checks for health endpoint
-		if c.Request.URL.Path == "/health" {
-			c.Next()
+		// Handle CORS preflight requests
+		if c.Request.Method == http.MethodOptions {
+			if m.cfg.Security.CORS.Enabled {
+				origin := c.Request.Header.Get("Origin")
+				if m.isOriginAllowed(origin) {
+					m.setCORSHeaders(c, origin)
+					c.Status(http.StatusNoContent)
+					return
+				}
+				c.Status(http.StatusForbidden)
+				return
+			}
+			c.Status(http.StatusMethodNotAllowed)
 			return
 		}
 
-		// Skip security checks if disabled
-		if !m.cfg.Security.Enabled {
-			c.Next()
-			return
+		// Handle API key authentication
+		if m.cfg.Security.Enabled {
+			apiKey := c.GetHeader("X-Api-Key")
+			if apiKey != m.cfg.Security.APIKey {
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
 		}
 
-		// Apply security features in order
-		if err := m.authenticate(c); err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-			return
+		// Handle rate limiting
+		if m.cfg.Security.RateLimit > 0 {
+			ip := c.ClientIP()
+			if !m.isRequestAllowed(ip) {
+				c.AbortWithStatus(http.StatusTooManyRequests)
+				return
+			}
 		}
 
-		if err := m.rateLimit(c); err != nil {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Rate limit exceeded"})
-			return
-		}
+		// Set security headers
+		m.setSecurityHeaders(c)
 
-		if err := m.handleCORS(c); err != nil {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "CORS error"})
-			return
+		// Handle CORS for non-preflight requests
+		if m.cfg.Security.CORS.Enabled {
+			origin := c.Request.Header.Get("Origin")
+			if m.isOriginAllowed(origin) {
+				m.setCORSHeaders(c, origin)
+			} else if origin != "" {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
 		}
-
-		// Add security headers
-		m.addSecurityHeaders(c)
 
 		c.Next()
 	}
+}
+
+func (m *SecurityMiddleware) setCORSHeaders(c *gin.Context, origin string) {
+	c.Header("Access-Control-Allow-Origin", origin)
+	c.Header("Access-Control-Allow-Methods", strings.Join(m.cfg.Security.CORS.AllowedMethods, ", "))
+	c.Header("Access-Control-Allow-Headers", strings.Join(m.cfg.Security.CORS.AllowedHeaders, ", "))
+	c.Header("Access-Control-Max-Age", strconv.Itoa(m.cfg.Security.CORS.MaxAge))
+}
+
+func (m *SecurityMiddleware) isOriginAllowed(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	for _, allowed := range m.cfg.Security.CORS.AllowedOrigins {
+		if origin == allowed {
+			return true
+		}
+	}
+	return false
 }
 
 // authenticate checks for valid API key
@@ -137,7 +179,7 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 	}
 
 	clientIP := c.ClientIP()
-	now := m.time.Now()
+	now := m.timeProvider.Now()
 
 	m.rateLimiter.Lock()
 	defer m.rateLimiter.Unlock()
@@ -224,35 +266,79 @@ func (m *SecurityMiddleware) joinStrings(strs []string) string {
 	return result
 }
 
-// Cleanup performs periodic cleanup of rate limit data
+// Cleanup periodically removes expired rate limit entries
 func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
-	m.cleanupWg.Add(1)
-	defer m.cleanupWg.Done()
-
-	ticker := time.NewTicker(m.rateLimiter.window)
+	ticker := time.NewTicker(time.Second) // Run cleanup every second
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			m.logger.Info("Cleanup context cancelled, stopping cleanup routine")
+			m.log.Info("Cleanup context cancelled, stopping cleanup routine")
 			return
 		case <-ticker.C:
-			m.cleanupRateLimiter()
+			m.mu.Lock()
+			now := m.timeProvider.Now()
+			window := now.Add(-m.rateLimitWindow)
+
+			// Clean up old requests
+			for ip, requests := range m.requests {
+				for t := range requests {
+					if t.Before(window) {
+						delete(requests, t)
+					}
+				}
+				if len(requests) == 0 {
+					delete(m.requests, ip)
+				}
+			}
+			m.mu.Unlock()
 		}
 	}
 }
 
-// cleanupRateLimiter removes expired rate limit entries
-func (m *SecurityMiddleware) cleanupRateLimiter() {
-	now := m.time.Now()
-	m.rateLimiter.Lock()
-	defer m.rateLimiter.Unlock()
+func (m *SecurityMiddleware) isRequestAllowed(ip string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	for ip, info := range m.rateLimiter.clients {
-		if now.Sub(info.lastAccess) > m.rateLimiter.window {
-			delete(m.rateLimiter.clients, ip)
+	now := m.timeProvider.Now()
+	window := now.Add(-m.rateLimitWindow)
+
+	// Clean up old requests
+	if m.requests[ip] == nil {
+		m.requests[ip] = make(map[time.Time]struct{})
+	}
+
+	// Remove expired requests
+	for t := range m.requests[ip] {
+		if t.Before(window) {
+			delete(m.requests[ip], t)
 		}
+	}
+
+	// Check if rate limit is exceeded
+	if len(m.requests[ip]) >= m.cfg.Security.RateLimit {
+		return false
+	}
+
+	// Add current request
+	m.requests[ip][now] = struct{}{}
+	return true
+}
+
+func (m *SecurityMiddleware) setSecurityHeaders(c *gin.Context) {
+	// Set security headers
+	headers := map[string]string{
+		"X-Frame-Options":           "DENY",
+		"X-XSS-Protection":          "1; mode=block",
+		"X-Content-Type-Options":    "nosniff",
+		"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+		"Referrer-Policy":           "strict-origin-when-cross-origin",
+		"Content-Security-Policy":   "default-src 'self'",
+	}
+
+	for header, value := range headers {
+		c.Header(header, value)
 	}
 }
 
