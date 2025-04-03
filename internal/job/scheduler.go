@@ -21,6 +21,18 @@ type Interface interface {
 	Stop() error
 }
 
+// Metrics holds scheduler metrics.
+type Metrics struct {
+	// TotalJobs is the total number of jobs processed.
+	TotalJobs int64
+	// ActiveJobs is the number of currently active jobs.
+	ActiveJobs int64
+	// FailedJobs is the number of failed jobs.
+	FailedJobs int64
+	// LastUpdated is the timestamp of the last metrics update.
+	LastUpdated time.Time
+}
+
 // Scheduler implements the job scheduler.
 type Scheduler struct {
 	logger   logger.Interface
