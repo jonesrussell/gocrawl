@@ -45,10 +45,10 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	s := &storage.Impl{
-		ESClient: mockClient,
-		Logger:   testutils.NewNopLogger(),
-	}
+	mockLogger := testutils.NewMockLogger()
+	s := storage.NewStorage(mockClient, mockLogger, storage.Options{
+		IndexName: "test-index",
+	})
 
 	// Test searching a non-existent index
 	_, err = s.Search(t.Context(), "non_existent_index", nil)
@@ -59,7 +59,8 @@ func TestSearch_IndexNotFound(t *testing.T) {
 
 func TestNewStorage(t *testing.T) {
 	mockLogger := testutils.NewMockLogger()
-	mockClient := &storage.MockElasticsearchClient{}
+	mockClient, err := es.NewClient(es.Config{})
+	require.NoError(t, err)
 	opts := storage.Options{
 		IndexName: "test-index",
 	}

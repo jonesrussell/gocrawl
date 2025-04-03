@@ -173,9 +173,10 @@ func TestCommandExecution(t *testing.T) {
 	t.Parallel()
 
 	// Create mock dependencies
-	mockCrawler := testutils.NewMockCrawler()
-	mockStorage := testutils.NewMockStorage()
 	mockLogger := logger.NewNoOp()
+	mockCrawler := testutils.NewMockCrawler()
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	mockStorageMock := mockStorage.(*testutils.MockStorage)
 	mockHandler := signal.NewSignalHandler(mockLogger)
 	mockConfig := testutils.NewMockConfig()
 	mockSourceManager := testutils.NewMockSourceManager()
@@ -185,7 +186,7 @@ func TestCommandExecution(t *testing.T) {
 	articleChannel := make(chan *models.Article)
 
 	// Set up expectations
-	mockStorage.On("TestConnection", mock.Anything).Return(nil)
+	mockStorageMock.On("TestConnection", mock.Anything).Return(nil)
 	mockCrawler.On("Start", mock.Anything, "test-source").Return(nil)
 	mockCrawler.On("Stop", mock.Anything).Return(nil)
 	mockCrawler.On("Wait").Return()
@@ -230,6 +231,10 @@ func TestCommandExecution(t *testing.T) {
 			fx.Annotate(
 				func() string { return "test-source" },
 				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() []common.Processor { return []common.Processor{} },
+				fx.ResultTags(`group:"processors"`),
 			),
 			fx.Annotate(
 				func() chan struct{} { return commandDone },
@@ -283,9 +288,9 @@ func TestCommandExecution(t *testing.T) {
 	close(commandDone)
 	close(articleChannel)
 
-	// Verify all expectations were met
+	// Verify mock expectations
 	mockCrawler.AssertExpectations(t)
-	mockStorage.AssertExpectations(t)
+	mockStorageMock.AssertExpectations(t)
 }
 
 func TestCommandErrorHandling(t *testing.T) {
@@ -592,8 +597,9 @@ func TestMaxDepthConfiguration(t *testing.T) {
 func TestCrawlCommand(t *testing.T) {
 	mockLogger := testutils.NewMockLogger()
 	mockStorage := testutils.NewMockStorage(mockLogger)
-	mockStorage.(*mock.Mock).On("TestConnection", mock.Anything).Return(nil)
+	mockStorageMock := mockStorage.(*testutils.MockStorage)
+	mockStorageMock.On("TestConnection", mock.Anything).Return(nil)
 
-	cmd := crawl.NewCrawlCommand(context.Background(), mockLogger, mockStorage)
+	cmd := crawl.Command()
 	assert.NotNil(t, cmd)
 }

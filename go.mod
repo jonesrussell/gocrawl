@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/joho/godotenv v1.5.1
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
@@ -146,7 +147,6 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mgechev/revive v1.6.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/moricho/tparallel v0.3.2 // indirect
