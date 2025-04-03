@@ -17,18 +17,15 @@ import (
 	"go.uber.org/fx"
 )
 
-// DeleteSourceName holds the name of the source whose indices should be deleted
-// when the --source flag is used
-var DeleteSourceName string
-
 // Deleter implements the indices delete command
 type Deleter struct {
-	config  config.Interface
-	logger  logger.Interface
-	storage storagetypes.Interface
-	sources sources.Interface
-	indices []string
-	force   bool
+	config     config.Interface
+	logger     logger.Interface
+	storage    storagetypes.Interface
+	sources    sources.Interface
+	indices    []string
+	force      bool
+	sourceName string
 }
 
 // NewDeleter creates a new deleter instance
@@ -39,20 +36,22 @@ func NewDeleter(
 	sources sources.Interface,
 	indices []string,
 	force bool,
+	sourceName string,
 ) *Deleter {
 	return &Deleter{
-		config:  config,
-		logger:  logger,
-		storage: storage,
-		sources: sources,
-		indices: indices,
-		force:   force,
+		config:     config,
+		logger:     logger,
+		storage:    storage,
+		sources:    sources,
+		indices:    indices,
+		force:      force,
+		sourceName: sourceName,
 	}
 }
 
 // Start executes the delete operation
 func (d *Deleter) Start(ctx context.Context) error {
-	d.logger.Info("Starting index deletion", "indices", d.indices, "source", DeleteSourceName)
+	d.logger.Info("Starting index deletion", "indices", d.indices, "source", d.sourceName)
 
 	// Test storage connection
 	if err := d.storage.TestConnection(ctx); err != nil {
@@ -61,10 +60,10 @@ func (d *Deleter) Start(ctx context.Context) error {
 	}
 
 	// Resolve indices to delete
-	if DeleteSourceName != "" {
-		source := d.sources.FindByName(DeleteSourceName)
+	if d.sourceName != "" {
+		source := d.sources.FindByName(d.sourceName)
 		if source == nil {
-			return fmt.Errorf("source not found: %s", DeleteSourceName)
+			return fmt.Errorf("source not found: %s", d.sourceName)
 		}
 		d.indices = []string{source.Index, source.ArticleIndex}
 		d.logger.Info("Resolved source indices", "indices", d.indices)
@@ -173,82 +172,64 @@ func (d *Deleter) confirmDeletion(indicesToDelete []string) error {
 	return nil
 }
 
-// deleteCommand creates and returns the delete command that removes indices.
+// deleteCommand creates and returns the command for deleting Elasticsearch indices.
 func deleteCommand() *cobra.Command {
+	var (
+		force      bool
+		sourceName string
+	)
+
 	cmd := &cobra.Command{
 		Use:   "delete [indices...]",
 		Short: "Delete one or more Elasticsearch indices",
-		Long: `Delete one or more Elasticsearch indices from the cluster.
-If --source is specified, deletes the indices associated with that source.
+		Long: `Delete one or more Elasticsearch indices.
+		
+You can specify one or more indices to delete, or use the --source flag to delete indices for a specific source.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := ValidateDeleteArgs(sourceName, args); err != nil {
+				return err
+			}
 
-Example:
-  gocrawl indices delete my_index
-  gocrawl indices delete index1 index2 index3
-  gocrawl indices delete --source "Elliot Lake Today"`,
-		Args: ValidateDeleteArgs,
-		RunE: runDelete,
+			app := fx.New(
+				fx.NopLogger,
+				Module,
+				fx.Provide(
+					func() []string { return args },
+					func() bool { return force },
+					func() string { return sourceName },
+					NewDeleter,
+				),
+				fx.Invoke(func(lc fx.Lifecycle, deleter *Deleter, ctx context.Context) {
+					lc.Append(fx.Hook{
+						OnStart: func(ctx context.Context) error {
+							return deleter.Start(ctx)
+						},
+						OnStop: func(ctx context.Context) error {
+							return nil
+						},
+					})
+				}),
+			)
+
+			if err := app.Start(cmd.Context()); err != nil {
+				return err
+			}
+			defer app.Stop(cmd.Context())
+
+			return nil
+		},
 	}
 
-	// Add command-line flags
-	cmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
-	cmd.Flags().StringVar(&DeleteSourceName, "source", "", "Delete indices for a specific source")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion without confirmation")
+	cmd.Flags().StringVarP(&sourceName, "source", "s", "", "Delete indices for a specific source")
 
 	return cmd
 }
 
 // ValidateDeleteArgs validates the command arguments to ensure they are valid.
-func ValidateDeleteArgs(_ *cobra.Command, args []string) error {
-	if DeleteSourceName == "" && len(args) == 0 {
-		return errors.New("either specify indices or use --source flag")
-	}
-	if DeleteSourceName != "" && len(args) > 0 {
+func ValidateDeleteArgs(sourceName string, args []string) error {
+	if sourceName != "" && len(args) > 0 {
 		return errors.New("cannot specify both indices and --source flag")
 	}
-	return nil
-}
-
-// runDelete executes the delete command and removes the specified indices.
-func runDelete(cmd *cobra.Command, args []string) error {
-	force, _ := cmd.Flags().GetBool("force")
-
-	// Create a cancellable context
-	ctx, cancel := context.WithCancel(cmd.Context())
-	defer cancel()
-
-	// Initialize the Fx application
-	fxApp := fx.New(
-		fx.NopLogger,
-		Module,
-		fx.Provide(
-			func() context.Context { return ctx },
-			func() []string { return args },
-			func() bool { return force },
-		),
-		fx.Invoke(func(lc fx.Lifecycle, deleter *Deleter) {
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					if err := deleter.Start(ctx); err != nil {
-						deleter.logger.Error("Error executing delete", "error", err)
-						return err
-					}
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					return nil
-				},
-			})
-		}),
-	)
-
-	// Start the application
-	if err := fxApp.Start(ctx); err != nil {
-		return fmt.Errorf("error starting application: %w", err)
-	}
-
-	// Stop the application
-	if err := fxApp.Stop(ctx); err != nil {
-		return fmt.Errorf("error stopping application: %w", err)
-	}
-
 	return nil
 }

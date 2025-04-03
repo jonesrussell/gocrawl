@@ -189,9 +189,6 @@ func TestDeleteCommand(t *testing.T) {
 			// Setup mock expectations
 			tt.setupMocks(mockStore, mockSources)
 
-			// Set the source name for this test
-			indices.DeleteSourceName = tt.sourceName
-
 			// Create test app
 			app := fxtest.New(t,
 				fx.NopLogger,
@@ -201,6 +198,7 @@ func TestDeleteCommand(t *testing.T) {
 					func() sources.Interface { return mockSources },
 					func() []string { return tt.indices },
 					func() bool { return tt.force },
+					func() string { return tt.sourceName },
 					indices.NewDeleter,
 				),
 				fx.Invoke(func(lc fx.Lifecycle, deleter *indices.Deleter, ctx context.Context) {
@@ -267,14 +265,12 @@ func TestDeleteCommandArgs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Reset the source name before each test
-			indices.DeleteSourceName = tt.sourceName
-
 			// Call ValidateDeleteArgs directly instead of executing the command
-			err := indices.ValidateDeleteArgs(nil, tt.args)
+			err := indices.ValidateDeleteArgs(tt.sourceName, tt.args)
 
 			if tt.wantErr {
 				require.Error(t, err)
