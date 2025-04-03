@@ -324,67 +324,38 @@ func parseDate(dates []string, logger logger.Interface) time.Time {
 	return publishedDate
 }
 
-// Process handles the processing of an article
+// Process processes an article.
 func (s *Service) Process(article *models.Article) error {
 	if article == nil {
-		s.Logger.Debug("No article to process",
-			"component", "article/service")
 		return nil
 	}
 
-	s.Logger.Debug("Processing article",
-		"component", "article/service",
-		"source", article.Source)
-
-	// Index the article
-	if err := s.Storage.IndexDocument(context.Background(), s.IndexName, article.ID, article); err != nil {
-		s.Logger.Error("Failed to index article",
-			"component", "article/service",
+	// Store the article
+	err := s.Storage.IndexDocument(context.Background(), s.IndexName, article.ID, article)
+	if err != nil {
+		s.Logger.Error("Failed to store article",
+			"error", err,
 			"articleID", article.ID,
-			"error", err)
-		return err
-	}
-
-	return nil
-}
-
-// GetMetrics returns the current processing metrics.
-func (s *Service) GetMetrics() *common.Metrics {
-	return s.metrics
-}
-
-// ProcessHTML processes HTML content from a source.
-func (s *Service) ProcessHTML(e *colly.HTMLElement) error {
-	start := time.Now()
-	defer func() {
-		s.metrics.ProcessingDuration += time.Since(start)
-	}()
-
-	article := s.ExtractArticle(e)
-	if article == nil {
-		s.Logger.Debug("No article found in HTML element",
-			"component", "article/service",
-			"url", e.Request.URL.String())
-		return nil
-	}
-
-	if err := s.Process(article); err != nil {
-		s.Logger.Error("Failed to process article",
-			"component", "article/service",
-			"articleID", article.ID,
-			"error", err)
+			"url", article.Source)
 		s.metrics.ErrorCount++
 		return err
 	}
 
 	s.metrics.ProcessedCount++
 	s.metrics.LastProcessedTime = time.Now()
-
 	return nil
 }
 
 // ProcessJob processes a job and its items.
 func (s *Service) ProcessJob(ctx context.Context, job *common.Job) {
+	if job == nil {
+		return
+	}
+
+	s.Logger.Info("Processing job",
+		"jobID", job.ID,
+		"url", job.URL)
+
 	start := time.Now()
 	defer func() {
 		s.metrics.ProcessingDuration += time.Since(start)
@@ -394,24 +365,32 @@ func (s *Service) ProcessJob(ctx context.Context, job *common.Job) {
 	select {
 	case <-ctx.Done():
 		s.Logger.Warn("Job processing cancelled",
-			"job_id", job.ID,
-			"error", ctx.Err(),
-		)
+			"jobID", job.ID,
+			"error", ctx.Err())
 		s.metrics.ErrorCount++
 		return
 	default:
-		// Process the job
-		s.Logger.Info("Processing job",
-			"job_id", job.ID,
-		)
-
-		// TODO: Implement job processing logic
-		// This would typically involve:
-		// 1. Fetching items associated with the job
-		// 2. Processing each item
-		// 3. Updating job status
-		// 4. Handling errors and retries
-
-		s.metrics.ProcessedCount++
+		// Continue processing
 	}
+}
+
+// ProcessHTML processes HTML content from a source.
+func (s *Service) ProcessHTML(e *colly.HTMLElement) error {
+	if e == nil {
+		return nil
+	}
+
+	article := s.ExtractArticle(e)
+	if article == nil {
+		s.Logger.Debug("No article extracted",
+			"url", e.Request.URL.String())
+		return nil
+	}
+
+	return s.Process(article)
+}
+
+// GetMetrics returns the current processing metrics.
+func (s *Service) GetMetrics() *common.Metrics {
+	return s.metrics
 }

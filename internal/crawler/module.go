@@ -40,15 +40,9 @@ var Module = fx.Module("crawler",
 			)
 		},
 		// Provide the event bus
-		fx.Annotate(
-			events.NewBus,
-			fx.ResultTags(`name:"eventBus"`),
-		),
+		events.NewBus,
 		// Provide the crawler
-		fx.Annotate(
-			NewCrawler,
-			fx.ResultTags(`group:"crawler"`),
-		),
+		NewCrawler,
 	),
 )
 

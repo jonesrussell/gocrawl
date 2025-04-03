@@ -14,6 +14,20 @@ import (
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
+// ProcessorParams defines the parameters for creating a new article processor.
+type ProcessorParams struct {
+	// Logger for article processing operations
+	Logger logger.Interface
+	// Service for article operations
+	Service Interface
+	// Storage for article persistence
+	Storage storagetypes.Interface
+	// IndexName is the name of the article index
+	IndexName string
+	// ArticleChan is the channel for sending processed articles
+	ArticleChan chan *models.Article
+}
+
 // ArticleProcessor handles article content processing.
 type ArticleProcessor struct {
 	// Logger for article processing operations

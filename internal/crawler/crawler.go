@@ -15,6 +15,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 )
 
 const (
@@ -59,7 +60,7 @@ type Crawler struct {
 var _ Interface = (*Crawler)(nil)
 
 // configureCollector configures the collector with the given source settings
-func (c *Crawler) configureCollector(source *sources.Config) error {
+func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) error {
 	// Parse the source URL to get the domain
 	sourceURL, err := url.Parse(source.URL)
 	if err != nil {
