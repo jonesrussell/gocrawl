@@ -11,6 +11,7 @@ import (
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
@@ -111,12 +112,25 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 	return client, nil
 }
 
-// Module provides the storage module for dependency injection
+// Module provides the storage dependencies.
 var Module = fx.Module("storage",
 	fx.Provide(
 		NewOptionsFromConfig,
 		NewElasticsearchClient,
 		NewElasticsearchIndexManager,
 		NewStorage,
+		// Provide SearchManager implementation
+		func(storage Interface) interfaces.SearchManager {
+			return &searchManagerWrapper{storage}
+		},
 	),
 )
+
+// searchManagerWrapper wraps storage.Interface to implement interfaces.SearchManager
+type searchManagerWrapper struct {
+	Interface
+}
+
+func (w *searchManagerWrapper) Close() error {
+	return nil
+}

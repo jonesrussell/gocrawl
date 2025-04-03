@@ -40,14 +40,12 @@ type SearchResponse struct {
 
 // Module provides the API dependencies.
 var Module = fx.Module("api",
-	config.Module,
-	storage.Module,
 	fx.Provide(
 		// Provide the server and security middleware together to avoid circular dependencies
 		func(
 			cfg config.Interface,
 			log logger.Interface,
-			searchManager SearchManager,
+			searchManager interfaces.SearchManager,
 		) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
 			return StartHTTPServer(log, searchManager, cfg)
 		},

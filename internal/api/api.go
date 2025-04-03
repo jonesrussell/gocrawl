@@ -2,7 +2,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
@@ -22,7 +22,7 @@ const (
 // SetupRouter creates and configures the Gin router with all routes
 func SetupRouter(
 	log logger.Interface,
-	searchManager SearchManager,
+	searchManager interfaces.SearchManager,
 	cfg config.Interface,
 ) (*gin.Engine, middleware.SecurityMiddlewareInterface) {
 	// Disable Gin's default logging
@@ -68,8 +68,8 @@ func loggingMiddleware(log logger.Interface) gin.HandlerFunc {
 	}
 }
 
-// handleSearch processes search requests
-func handleSearch(searchManager SearchManager) gin.HandlerFunc {
+// handleSearch creates a handler for search requests
+func handleSearch(searchManager interfaces.SearchManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req SearchRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -126,31 +126,19 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 // StartHTTPServer starts the HTTP server for search requests
 func StartHTTPServer(
 	log logger.Interface,
-	searchManager SearchManager,
+	searchManager interfaces.SearchManager,
 	cfg config.Interface,
 ) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
-	log.Info("StartHTTPServer function called")
-
-	// Setup router
 	router, security := SetupRouter(log, searchManager, cfg)
 
-	// Get server config
-	serverCfg := cfg.GetServerConfig()
-	if serverCfg == nil {
-		return nil, nil, errors.New("server configuration is required")
-	}
-
-	log.Info("Server configuration", "address", serverCfg.Address)
-
-	// Create server
-	server := &http.Server{
-		Addr:              serverCfg.Address,
+	srv := &http.Server{
+		Addr:              cfg.GetServerConfig().Address,
 		Handler:           router,
-		ReadTimeout:       serverCfg.ReadTimeout,
-		WriteTimeout:      serverCfg.WriteTimeout,
-		IdleTimeout:       serverCfg.IdleTimeout,
 		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       cfg.GetServerConfig().ReadTimeout,
+		WriteTimeout:      cfg.GetServerConfig().WriteTimeout,
+		IdleTimeout:       cfg.GetServerConfig().IdleTimeout,
 	}
 
-	return server, security, nil
+	return srv, security, nil
 }
