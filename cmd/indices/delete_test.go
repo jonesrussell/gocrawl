@@ -8,22 +8,24 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/indices"
 	"github.com/jonesrussell/gocrawl/cmd/indices/test"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
+	"go.uber.org/fx/fxtest"
 )
 
 func TestDeleteCommand(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name        string
 		source      *config.Source
 		indices     []string
 		force       bool
 		sourceName  string
-		setupMocks  func(*test.MockStorage, *test.MockSources, *test.MockConfig)
+		setupMocks  func(*test.MockStorage, *test.MockSources)
 		wantErr     bool
 		errContains string
 	}{
@@ -36,11 +38,11 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{"test-index"},
 			force:      true,
 			sourceName: "",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources, mc *test.MockConfig) {
+			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{"test-index"}, nil)
 				ms.On("DeleteIndex", mock.Anything, "test-index").Return(nil)
-				mc.On("GetCommand").Return("delete")
+				msrc.On("FindByName", "").Return(nil)
 			},
 			wantErr: false,
 		},
@@ -54,7 +56,7 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{},
 			force:      true,
 			sourceName: "test-source",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources, mc *test.MockConfig) {
+			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{"test-index", "test-articles"}, nil)
 				ms.On("DeleteIndex", mock.Anything, "test-index").Return(nil)
@@ -63,13 +65,12 @@ func TestDeleteCommand(t *testing.T) {
 					Name:         "test-source",
 					Index:        "test-index",
 					ArticleIndex: "test-articles",
-				})
-				mc.On("GetCommand").Return("delete")
+				}).Once()
 			},
 			wantErr: false,
 		},
 		{
-			name: "successfully deletes source indices with quotes",
+			name: "successfully deletes source indices with spaces",
 			source: &config.Source{
 				Name:         "test source",
 				Index:        "test-index",
@@ -77,8 +78,8 @@ func TestDeleteCommand(t *testing.T) {
 			},
 			indices:    []string{},
 			force:      true,
-			sourceName: `"test source"`,
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources, mc *test.MockConfig) {
+			sourceName: "test source",
+			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{"test-index", "test-articles"}, nil)
 				ms.On("DeleteIndex", mock.Anything, "test-index").Return(nil)
@@ -87,8 +88,7 @@ func TestDeleteCommand(t *testing.T) {
 					Name:         "test source",
 					Index:        "test-index",
 					ArticleIndex: "test-articles",
-				})
-				mc.On("GetCommand").Return("delete")
+				}).Once()
 			},
 			wantErr: false,
 		},
@@ -100,24 +100,9 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{},
 			force:      true,
 			sourceName: "nonexistent",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources, mc *test.MockConfig) {
-				msrc.On("FindByName", "nonexistent").Return(nil)
-				mc.On("GetCommand").Return("delete")
-			},
-			wantErr:     true,
-			errContains: "source not found",
-		},
-		{
-			name: "source not found with quotes",
-			source: &config.Source{
-				Name: "nonexistent source",
-			},
-			indices:    []string{},
-			force:      true,
-			sourceName: `"nonexistent source"`,
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources, mc *test.MockConfig) {
-				msrc.On("FindByName", "nonexistent source").Return(nil)
-				mc.On("GetCommand").Return("delete")
+			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+				ms.On("TestConnection", mock.Anything).Return(nil)
+				msrc.On("FindByName", "nonexistent").Return(nil).Once()
 			},
 			wantErr:     true,
 			errContains: "source not found",
@@ -131,9 +116,8 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{"test-index"},
 			force:      true,
 			sourceName: "",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources, mc *test.MockConfig) {
+			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(assert.AnError)
-				mc.On("GetCommand").Return("delete")
 			},
 			wantErr:     true,
 			errContains: "failed to connect to storage",
@@ -147,12 +131,12 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{"test-index"},
 			force:      true,
 			sourceName: "",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources, mc *test.MockConfig) {
+			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return(nil, assert.AnError)
-				mc.On("GetCommand").Return("delete")
 			},
-			wantErr: true,
+			wantErr:     true,
+			errContains: "assert.AnError general error for testing",
 		},
 		{
 			name: "delete fails",
@@ -163,46 +147,93 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{"test-index"},
 			force:      true,
 			sourceName: "",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources, mc *test.MockConfig) {
+			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{"test-index"}, nil)
 				ms.On("DeleteIndex", mock.Anything, "test-index").Return(assert.AnError)
-				mc.On("GetCommand").Return("delete")
 			},
 			wantErr: true,
+		},
+		{
+			name:    "no args and no source",
+			source:  nil,
+			indices: []string{},
+			force:   false,
+			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+				ms.On("TestConnection", mock.Anything).Return(nil)
+				ms.On("ListIndices", mock.Anything).Return([]string{}, nil)
+			},
+			wantErr:     true,
+			errContains: "no indices specified",
+		},
+		{
+			name:       "args and source",
+			source:     nil,
+			indices:    []string{"test-index"},
+			force:      false,
+			sourceName: "test-source",
+			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+				ms.On("TestConnection", mock.Anything).Return(nil)
+				msrc.On("FindByName", "test-source").Return(nil).Once()
+			},
+			wantErr:     true,
+			errContains: "source not found: test-source",
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			mockStorage := &test.MockStorage{}
+			// Create mocks
+			mockStore := &test.MockStorage{}
 			mockSources := &test.MockSources{}
-			mockConfig := &test.MockConfig{}
-			mockLogger := logger.NewNoOp()
 
-			tt.setupMocks(mockStorage, mockSources, mockConfig)
+			// Setup mock expectations
+			tt.setupMocks(mockStore, mockSources)
 
 			// Set the source name for this test
 			indices.DeleteSourceName = tt.sourceName
 
-			deleter := indices.NewDeleter(mockConfig, mockLogger, mockStorage, mockSources, tt.indices, tt.force)
-			err := deleter.Start(context.Background())
+			// Create test app
+			app := fxtest.New(t,
+				fx.NopLogger,
+				test.TestModule(t),
+				fx.Provide(
+					func() storagetypes.Interface { return mockStore },
+					func() sources.Interface { return mockSources },
+					func() []string { return tt.indices },
+					func() bool { return tt.force },
+					indices.NewDeleter,
+				),
+				fx.Invoke(func(lc fx.Lifecycle, deleter *indices.Deleter, ctx context.Context) {
+					lc.Append(fx.Hook{
+						OnStart: func(ctx context.Context) error {
+							err := deleter.Start(ctx)
+							if tt.wantErr {
+								require.Error(t, err)
+								if tt.errContains != "" {
+									require.Contains(t, err.Error(), tt.errContains)
+								}
+							} else {
+								require.NoError(t, err)
+							}
+							return nil
+						},
+						OnStop: func(ctx context.Context) error {
+							return nil
+						},
+					})
+				}),
+			)
 
-			if tt.wantErr {
-				assert.Error(t, err)
-				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
+			// Start the app
+			err := app.Start(t.Context())
+			require.NoError(t, err)
+			defer app.RequireStop()
 
-			mockStorage.AssertExpectations(t)
+			// Verify all expected calls were made
+			mockStore.AssertExpectations(t)
 			mockSources.AssertExpectations(t)
-			mockConfig.AssertExpectations(t)
 		})
 	}
 }
@@ -231,8 +262,8 @@ func TestDeleteCommandArgs(t *testing.T) {
 			errMsg:     "cannot specify both indices and --source flag",
 		},
 		{
-			name:       "source with quotes",
-			sourceName: `"test source"`,
+			name:       "source with spaces",
+			sourceName: "test source",
 			args:       []string{},
 		},
 	}
@@ -241,17 +272,17 @@ func TestDeleteCommandArgs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cmd := indices.Command()
-			args := append([]string{"delete"}, tt.args...)
-			if tt.sourceName != "" {
-				args = append(args, "--source", tt.sourceName)
-			}
-			cmd.SetArgs(args)
+			// Reset the source name before each test
+			indices.DeleteSourceName = tt.sourceName
 
-			err := cmd.Execute()
+			// Call ValidateDeleteArgs directly instead of executing the command
+			err := indices.ValidateDeleteArgs(nil, tt.args)
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}

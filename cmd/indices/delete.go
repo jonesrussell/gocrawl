@@ -78,6 +78,11 @@ func (d *Deleter) Start(ctx context.Context) error {
 	}
 	d.logger.Debug("Found existing indices", "indices", existingIndices)
 
+	// Check for empty indices
+	if len(d.indices) == 0 {
+		return errors.New("no indices specified")
+	}
+
 	// Filter indices
 	filtered := d.filterIndices(existingIndices)
 
@@ -182,7 +187,7 @@ Example:
   gocrawl indices delete my_index
   gocrawl indices delete index1 index2 index3
   gocrawl indices delete --source "Elliot Lake Today"`,
-		Args: validateDeleteArgs,
+		Args: ValidateDeleteArgs,
 		RunE: runDelete,
 	}
 
@@ -193,8 +198,8 @@ Example:
 	return cmd
 }
 
-// validateDeleteArgs validates the command arguments to ensure they are valid.
-func validateDeleteArgs(_ *cobra.Command, args []string) error {
+// ValidateDeleteArgs validates the command arguments to ensure they are valid.
+func ValidateDeleteArgs(_ *cobra.Command, args []string) error {
 	if DeleteSourceName == "" && len(args) == 0 {
 		return errors.New("either specify indices or use --source flag")
 	}
