@@ -46,24 +46,8 @@ var Module = fx.Module("crawler",
 		),
 		// Provide the crawler
 		fx.Annotate(
-			func(
-				logger logger.Interface,
-				indexManager api.IndexManager,
-				sources sources.Interface,
-				articleProcessor common.Processor,
-				contentProcessor common.Processor,
-				eventBus *events.Bus,
-			) Interface {
-				return NewCrawler(
-					logger,
-					indexManager,
-					sources,
-					articleProcessor,
-					contentProcessor,
-					eventBus,
-				)
-			},
-			fx.ParamTags("", "", "", `name:"articleProcessor"`, `name:"contentProcessor"`, `name:"eventBus"`),
+			NewCrawler,
+			fx.ResultTags(`group:"crawler"`),
 		),
 	),
 )

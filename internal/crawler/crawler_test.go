@@ -350,7 +350,7 @@ func TestCrawlerStartup(t *testing.T) {
 	)
 
 	require.NoError(t, app.Start(t.Context()))
-	defer app.Stop(t.Context())
+	app.Stop(t.Context())
 }
 
 // TestCrawlerShutdown tests crawler shutdown functionality.
@@ -405,7 +405,7 @@ func TestCrawlerShutdown(t *testing.T) {
 	)
 
 	require.NoError(t, app.Start(t.Context()))
-	defer app.Stop(t.Context())
+	app.Stop(t.Context())
 }
 
 // TestSourceValidation tests source validation functionality.
@@ -460,7 +460,7 @@ func TestSourceValidation(t *testing.T) {
 	)
 
 	require.NoError(t, app.Start(t.Context()))
-	defer app.Stop(t.Context())
+	app.Stop(t.Context())
 }
 
 // TestErrorHandling tests error handling functionality.
@@ -515,7 +515,7 @@ func TestErrorHandling(t *testing.T) {
 	)
 
 	require.NoError(t, app.Start(t.Context()))
-	defer app.Stop(t.Context())
+	app.Stop(t.Context())
 }
 
 // writerWrapper implements io.Writer for the logger

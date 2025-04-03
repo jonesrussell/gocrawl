@@ -294,35 +294,68 @@ func getArticleSelectorsFromProvider(p articleSelectorProvider) ArticleSelectors
 	return p.GetArticleSelectors()
 }
 
+// extractArticleSelectorsFromLoader creates an articleSelector from loader.ArticleSelectors
+func extractArticleSelectorsFromLoader(selectors loader.ArticleSelectors) articleSelector {
+	return articleSelector{
+		Container:     selectors.Container,
+		Title:         selectors.Title,
+		Body:          selectors.Body,
+		Intro:         selectors.Intro,
+		Byline:        selectors.Byline,
+		PublishedTime: selectors.PublishedTime,
+		TimeAgo:       selectors.TimeAgo,
+		JSONLD:        selectors.JSONLD,
+		Section:       selectors.Section,
+		Keywords:      selectors.Keywords,
+		Description:   selectors.Description,
+		OGTitle:       selectors.OGTitle,
+		OGDescription: selectors.OGDescription,
+		OGImage:       selectors.OGImage,
+		OgURL:         selectors.OgURL,
+		Canonical:     selectors.Canonical,
+		WordCount:     selectors.WordCount,
+		PublishDate:   selectors.PublishDate,
+		Category:      selectors.Category,
+		Tags:          selectors.Tags,
+		Author:        selectors.Author,
+		BylineName:    selectors.BylineName,
+	}
+}
+
+// extractArticleSelectorsFromConfig creates an articleSelector from config.ArticleSelectors
+func extractArticleSelectorsFromConfig(selectors config.ArticleSelectors) articleSelector {
+	return articleSelector{
+		Container:     selectors.Container,
+		Title:         selectors.Title,
+		Body:          selectors.Body,
+		Intro:         selectors.Intro,
+		Byline:        selectors.Byline,
+		PublishedTime: selectors.PublishedTime,
+		TimeAgo:       selectors.TimeAgo,
+		JSONLD:        selectors.JSONLD,
+		Section:       selectors.Section,
+		Keywords:      selectors.Keywords,
+		Description:   selectors.Description,
+		OGTitle:       selectors.OGTitle,
+		OGDescription: selectors.OGDescription,
+		OGImage:       selectors.OGImage,
+		OgURL:         selectors.OgURL,
+		Canonical:     selectors.Canonical,
+		WordCount:     selectors.WordCount,
+		PublishDate:   selectors.PublishDate,
+		Category:      selectors.Category,
+		Tags:          selectors.Tags,
+		Author:        selectors.Author,
+		BylineName:    selectors.BylineName,
+	}
+}
+
 type loaderConfigWrapper struct {
 	loader.Config
 }
 
 func (w loaderConfigWrapper) GetArticleSelectors() ArticleSelectors {
-	return getArticleSelectorsFromSelector(articleSelector{
-		Container:     w.Selectors.Article.Container,
-		Title:         w.Selectors.Article.Title,
-		Body:          w.Selectors.Article.Body,
-		Intro:         w.Selectors.Article.Intro,
-		Byline:        w.Selectors.Article.Byline,
-		PublishedTime: w.Selectors.Article.PublishedTime,
-		TimeAgo:       w.Selectors.Article.TimeAgo,
-		JSONLD:        w.Selectors.Article.JSONLD,
-		Section:       w.Selectors.Article.Section,
-		Keywords:      w.Selectors.Article.Keywords,
-		Description:   w.Selectors.Article.Description,
-		OGTitle:       w.Selectors.Article.OGTitle,
-		OGDescription: w.Selectors.Article.OGDescription,
-		OGImage:       w.Selectors.Article.OGImage,
-		OgURL:         w.Selectors.Article.OgURL,
-		Canonical:     w.Selectors.Article.Canonical,
-		WordCount:     w.Selectors.Article.WordCount,
-		PublishDate:   w.Selectors.Article.PublishDate,
-		Category:      w.Selectors.Article.Category,
-		Tags:          w.Selectors.Article.Tags,
-		Author:        w.Selectors.Article.Author,
-		BylineName:    w.Selectors.Article.BylineName,
-	})
+	return getArticleSelectorsFromSelector(extractArticleSelectorsFromLoader(w.Selectors.Article))
 }
 
 type sourceWrapper struct {
@@ -330,30 +363,7 @@ type sourceWrapper struct {
 }
 
 func (w sourceWrapper) GetArticleSelectors() ArticleSelectors {
-	return getArticleSelectorsFromSelector(articleSelector{
-		Container:     w.Selectors.Article.Container,
-		Title:         w.Selectors.Article.Title,
-		Body:          w.Selectors.Article.Body,
-		Intro:         w.Selectors.Article.Intro,
-		Byline:        w.Selectors.Article.Byline,
-		PublishedTime: w.Selectors.Article.PublishedTime,
-		TimeAgo:       w.Selectors.Article.TimeAgo,
-		JSONLD:        w.Selectors.Article.JSONLD,
-		Section:       w.Selectors.Article.Section,
-		Keywords:      w.Selectors.Article.Keywords,
-		Description:   w.Selectors.Article.Description,
-		OGTitle:       w.Selectors.Article.OGTitle,
-		OGDescription: w.Selectors.Article.OGDescription,
-		OGImage:       w.Selectors.Article.OGImage,
-		OgURL:         w.Selectors.Article.OgURL,
-		Canonical:     w.Selectors.Article.Canonical,
-		WordCount:     w.Selectors.Article.WordCount,
-		PublishDate:   w.Selectors.Article.PublishDate,
-		Category:      w.Selectors.Article.Category,
-		Tags:          w.Selectors.Article.Tags,
-		Author:        w.Selectors.Article.Author,
-		BylineName:    w.Selectors.Article.BylineName,
-	})
+	return getArticleSelectorsFromSelector(extractArticleSelectorsFromConfig(w.Selectors.Article))
 }
 
 // newArticleSelectorsFromFields creates an ArticleSelectors from a map of field names to values

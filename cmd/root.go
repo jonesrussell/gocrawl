@@ -5,6 +5,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
@@ -47,7 +48,7 @@ func setupConfig(_ *cobra.Command, _ []string) error {
 			if err != nil {
 				return fmt.Errorf("failed to get working directory: %w", err)
 			}
-			cfgFile = wd + string(os.PathSeparator) + cfgFile
+			cfgFile = filepath.Join(wd, cfgFile)
 		}
 		err := os.Setenv("CONFIG_FILE", cfgFile)
 		if err != nil {

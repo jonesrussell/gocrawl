@@ -120,7 +120,7 @@ func TestAPIKeyAuthentication(t *testing.T) {
 			router, _ := setupTestRouter(t, cfg)
 
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPost, "/test", nil)
+			req, err := http.NewRequest(http.MethodPost, "/test", http.NoBody)
 			require.NoError(t, err)
 
 			if tt.requestKey != "" {
@@ -180,7 +180,7 @@ func TestRateLimiting(t *testing.T) {
 
 	// Make requests from the same IP
 	w := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodPost, "/test", nil)
+	req, err := http.NewRequest(http.MethodPost, "/test", http.NoBody)
 	require.NoError(t, err)
 	req.Header.Set("X-Api-Key", "test-key")
 	req.RemoteAddr = "127.0.0.1"
@@ -292,7 +292,7 @@ func TestCORS(t *testing.T) {
 			router, _ := setupTestRouter(t, cfg)
 
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(tt.method, "/test", nil)
+			req, err := http.NewRequest(tt.method, "/test", http.NoBody)
 			require.NoError(t, err)
 
 			if tt.origin != "" {
@@ -339,7 +339,7 @@ func TestSecurityHeaders(t *testing.T) {
 	router, _ := setupTestRouter(t, cfg)
 
 	w := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodPost, "/test", nil)
+	req, err := http.NewRequest(http.MethodPost, "/test", http.NoBody)
 	require.NoError(t, err)
 	req.Header.Set("X-Api-Key", "test-key")
 

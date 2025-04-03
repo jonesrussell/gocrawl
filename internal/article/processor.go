@@ -3,6 +3,7 @@ package article
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -77,13 +78,13 @@ func (p *ArticleProcessor) Process(ctx context.Context, content any) error {
 // ProcessHTML implements HTMLProcessor.ProcessHTML
 func (p *ArticleProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
 	if p == nil {
-		return fmt.Errorf("article processor is nil")
+		return errors.New("article processor is nil")
 	}
 	if p.ArticleService == nil {
-		return fmt.Errorf("article service is nil")
+		return errors.New("article service is nil")
 	}
 	if p.Logger == nil {
-		return fmt.Errorf("logger is nil")
+		return errors.New("logger is nil")
 	}
 
 	start := time.Now()

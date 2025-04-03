@@ -22,9 +22,7 @@ const (
 var Module = fx.Module("sources",
 	fx.Provide(
 		fx.Annotate(
-			func(cfg config.Interface, logger logger.Interface) Interface {
-				return NewSourcesFromConfig(cfg, logger)
-			},
+			NewSourcesFromConfig,
 			fx.ParamTags(`name:"config"`, ""),
 		),
 	),

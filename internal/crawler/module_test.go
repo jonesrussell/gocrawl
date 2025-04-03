@@ -191,7 +191,7 @@ func TestDependencyInjection(t *testing.T) {
 func TestModuleConstruction(t *testing.T) {
 	app := setupTestApp()
 	require.NoError(t, app.Start(t.Context()))
-	defer app.Stop(t.Context())
+	app.Stop(t.Context())
 }
 
 // TestModuleLifecycle verifies that the crawler module can be started and stopped correctly.

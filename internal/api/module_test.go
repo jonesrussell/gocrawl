@@ -185,7 +185,7 @@ func TestHealthEndpoint(t *testing.T) {
 	defer ts.app.RequireStop()
 
 	t.Run("returns ok status", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, healthEndpoint), nil)
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s%s", ts.server.Addr, healthEndpoint), http.NoBody)
 		require.NoError(t, err)
 
 		w := httptest.NewRecorder()

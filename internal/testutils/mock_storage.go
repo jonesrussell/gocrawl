@@ -13,19 +13,19 @@ type MockStorage struct {
 }
 
 // IndexDocument implements storage.Interface
-func (m *MockStorage) IndexDocument(ctx context.Context, index string, id string, document any) error {
+func (m *MockStorage) IndexDocument(ctx context.Context, index, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
 // GetDocument implements storage.Interface
-func (m *MockStorage) GetDocument(ctx context.Context, index string, id string, document any) error {
+func (m *MockStorage) GetDocument(ctx context.Context, index, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
 // DeleteDocument implements storage.Interface
-func (m *MockStorage) DeleteDocument(ctx context.Context, index string, id string) error {
+func (m *MockStorage) DeleteDocument(ctx context.Context, index, id string) error {
 	args := m.Called(ctx, index, id)
 	return args.Error(0)
 }

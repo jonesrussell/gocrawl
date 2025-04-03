@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -168,5 +169,5 @@ func (m *ElasticsearchIndexManager) GetMapping(ctx context.Context, name string)
 		}
 	}
 
-	return nil, fmt.Errorf("unexpected mapping format")
+	return nil, errors.New("unexpected mapping format")
 }
