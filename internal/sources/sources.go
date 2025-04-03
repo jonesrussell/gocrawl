@@ -230,8 +230,58 @@ func (s *Sources) FindByName(name string) (*sourceutils.SourceConfig, error) {
 	return nil, ErrSourceNotFound
 }
 
-type selectorSource interface {
-	GetArticleSelectors() ArticleSelectors
+// articleSelector represents the common structure of article selectors
+type articleSelector struct {
+	Container     string `yaml:"container"`
+	Title         string `yaml:"title"`
+	Body          string `yaml:"body"`
+	Intro         string `yaml:"intro"`
+	Byline        string `yaml:"byline"`
+	PublishedTime string `yaml:"published_time"`
+	TimeAgo       string `yaml:"time_ago"`
+	JSONLD        string `yaml:"jsonld"`
+	Section       string `yaml:"section"`
+	Keywords      string `yaml:"keywords"`
+	Description   string `yaml:"description"`
+	OGTitle       string `yaml:"og_title"`
+	OGDescription string `yaml:"og_description"`
+	OGImage       string `yaml:"og_image"`
+	OgURL         string `yaml:"og_url"`
+	Canonical     string `yaml:"canonical"`
+	WordCount     string `yaml:"word_count"`
+	PublishDate   string `yaml:"publish_date"`
+	Category      string `yaml:"category"`
+	Tags          string `yaml:"tags"`
+	Author        string `yaml:"author"`
+	BylineName    string `yaml:"byline_name"`
+}
+
+// getArticleSelectorsFromSelector creates ArticleSelectors from an articleSelector
+func getArticleSelectorsFromSelector(s articleSelector) ArticleSelectors {
+	return ArticleSelectors{
+		Container:     s.Container,
+		Title:         s.Title,
+		Body:          s.Body,
+		Intro:         s.Intro,
+		Byline:        s.Byline,
+		PublishedTime: s.PublishedTime,
+		TimeAgo:       s.TimeAgo,
+		JSONLD:        s.JSONLD,
+		Section:       s.Section,
+		Keywords:      s.Keywords,
+		Description:   s.Description,
+		OGTitle:       s.OGTitle,
+		OGDescription: s.OGDescription,
+		OGImage:       s.OGImage,
+		OgURL:         s.OgURL,
+		Canonical:     s.Canonical,
+		WordCount:     s.WordCount,
+		PublishDate:   s.PublishDate,
+		Category:      s.Category,
+		Tags:          s.Tags,
+		Author:        s.Author,
+		BylineName:    s.BylineName,
+	}
 }
 
 type loaderConfigWrapper struct {
@@ -239,7 +289,7 @@ type loaderConfigWrapper struct {
 }
 
 func (w loaderConfigWrapper) GetArticleSelectors() ArticleSelectors {
-	return ArticleSelectors{
+	return getArticleSelectorsFromSelector(articleSelector{
 		Container:     w.Selectors.Article.Container,
 		Title:         w.Selectors.Article.Title,
 		Body:          w.Selectors.Article.Body,
@@ -262,7 +312,7 @@ func (w loaderConfigWrapper) GetArticleSelectors() ArticleSelectors {
 		Tags:          w.Selectors.Article.Tags,
 		Author:        w.Selectors.Article.Author,
 		BylineName:    w.Selectors.Article.BylineName,
-	}
+	})
 }
 
 type sourceWrapper struct {
@@ -270,7 +320,7 @@ type sourceWrapper struct {
 }
 
 func (w sourceWrapper) GetArticleSelectors() ArticleSelectors {
-	return ArticleSelectors{
+	return getArticleSelectorsFromSelector(articleSelector{
 		Container:     w.Selectors.Article.Container,
 		Title:         w.Selectors.Article.Title,
 		Body:          w.Selectors.Article.Body,
@@ -293,18 +343,42 @@ func (w sourceWrapper) GetArticleSelectors() ArticleSelectors {
 		Tags:          w.Selectors.Article.Tags,
 		Author:        w.Selectors.Article.Author,
 		BylineName:    w.Selectors.Article.BylineName,
-	}
+	})
 }
 
-func newArticleSelectors(src selectorSource) ArticleSelectors {
-	return src.GetArticleSelectors()
+// newArticleSelectorsFromFields creates an ArticleSelectors from a map of field names to values
+func newArticleSelectorsFromFields(fields map[string]string) ArticleSelectors {
+	return ArticleSelectors{
+		Container:     fields["Container"],
+		Title:         fields["Title"],
+		Body:          fields["Body"],
+		Intro:         fields["Intro"],
+		Byline:        fields["Byline"],
+		PublishedTime: fields["PublishedTime"],
+		TimeAgo:       fields["TimeAgo"],
+		JSONLD:        fields["JSONLD"],
+		Section:       fields["Section"],
+		Keywords:      fields["Keywords"],
+		Description:   fields["Description"],
+		OGTitle:       fields["OGTitle"],
+		OGDescription: fields["OGDescription"],
+		OGImage:       fields["OGImage"],
+		OgURL:         fields["OgURL"],
+		Canonical:     fields["Canonical"],
+		WordCount:     fields["WordCount"],
+		PublishDate:   fields["PublishDate"],
+		Category:      fields["Category"],
+		Tags:          fields["Tags"],
+		Author:        fields["Author"],
+		BylineName:    fields["BylineName"],
+	}
 }
 
 // NewSelectorConfigFromLoader creates a new SelectorConfig from a loader.Config.
 func NewSelectorConfigFromLoader(src loader.Config) SelectorConfig {
 	wrapper := loaderConfigWrapper{src}
 	return SelectorConfig{
-		Article: newArticleSelectors(wrapper),
+		Article: wrapper.GetArticleSelectors(),
 	}
 }
 
@@ -312,6 +386,6 @@ func NewSelectorConfigFromLoader(src loader.Config) SelectorConfig {
 func NewSelectorConfigFromSource(src config.Source) SelectorConfig {
 	wrapper := sourceWrapper{src}
 	return SelectorConfig{
-		Article: newArticleSelectors(wrapper),
+		Article: wrapper.GetArticleSelectors(),
 	}
 }
