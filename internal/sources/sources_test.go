@@ -2,7 +2,6 @@
 package sources_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -34,7 +33,7 @@ sources:
 	require.NoError(t, err)
 
 	// Set environment variables
-	os.Setenv("SOURCES_FILE", sourcesFile)
+	t.Setenv("SOURCES_FILE", sourcesFile)
 	defer os.Unsetenv("SOURCES_FILE")
 
 	// Load sources from file
@@ -67,7 +66,7 @@ sources:
 	require.NotNil(t, s)
 
 	// Test ListSources
-	sources, err := s.ListSources(context.Background())
+	sources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	assert.Equal(t, "test-source", sources[0].Name)
@@ -144,7 +143,7 @@ func TestAddSource(t *testing.T) {
 	require.NotNil(t, s)
 
 	// Test AddSource
-	err := s.AddSource(context.TODO(), &sourceutils.SourceConfig{
+	err := s.AddSource(t.Context(), &sourceutils.SourceConfig{
 		Name:      "test-source",
 		URL:       "https://example.com",
 		RateLimit: time.Second,
@@ -159,7 +158,7 @@ func TestAddSource(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify source was added
-	sources, err := s.ListSources(context.TODO())
+	sources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	assert.Equal(t, "test-source", sources[0].Name)
@@ -184,7 +183,7 @@ func TestUpdateSource(t *testing.T) {
 	require.NotNil(t, s)
 
 	// Test UpdateSource
-	err := s.UpdateSource(context.TODO(), &sourceutils.SourceConfig{
+	err := s.UpdateSource(t.Context(), &sourceutils.SourceConfig{
 		Name:      "test-source",
 		URL:       "https://updated.example.com",
 		RateLimit: 2 * time.Second,
@@ -199,7 +198,7 @@ func TestUpdateSource(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify source was updated
-	sources, err := s.ListSources(context.TODO())
+	sources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	assert.Equal(t, "https://updated.example.com", sources[0].URL)
@@ -228,11 +227,11 @@ func TestDeleteSource(t *testing.T) {
 	require.NotNil(t, s)
 
 	// Test DeleteSource
-	err := s.DeleteSource(context.Background(), "test-source")
+	err := s.DeleteSource(t.Context(), "test-source")
 	require.NoError(t, err)
 
 	// Verify source was deleted
-	sources, err := s.ListSources(context.Background())
+	sources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Empty(t, sources)
 }
@@ -304,11 +303,11 @@ func TestIndexNameHandling(t *testing.T) {
 		RateLimit: time.Second,
 		MaxDepth:  2,
 	}
-	err := s.AddSource(context.TODO(), source)
+	err := s.AddSource(t.Context(), source)
 	require.NoError(t, err)
 
 	// Verify default index names were set
-	sources, err := s.ListSources(context.TODO())
+	sources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "articles", sources[0].ArticleIndex)
@@ -336,11 +335,11 @@ func TestSourceIndexNamePersistence(t *testing.T) {
 		ArticleIndex: "custom_articles",
 		Index:        "custom_content",
 	}
-	err := s.AddSource(context.TODO(), source)
+	err := s.AddSource(t.Context(), source)
 	require.NoError(t, err)
 
 	// Verify custom index names were set
-	sources, err := s.ListSources(context.TODO())
+	sources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "custom_articles", sources[0].ArticleIndex)
@@ -355,11 +354,11 @@ func TestSourceIndexNamePersistence(t *testing.T) {
 		ArticleIndex: "updated_articles",
 		Index:        "updated_content",
 	}
-	err = s.UpdateSource(context.TODO(), updatedSource)
+	err = s.UpdateSource(t.Context(), updatedSource)
 	require.NoError(t, err)
 
 	// Verify index names were updated
-	sources, err = s.ListSources(context.TODO())
+	sources, err = s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "updated_articles", sources[0].ArticleIndex)
@@ -380,11 +379,11 @@ func TestProvideSourcesIndexNames(t *testing.T) {
 		ArticleIndex: "custom_articles",
 		Index:        "custom_content",
 	}
-	err := s.AddSource(context.TODO(), source)
+	err := s.AddSource(t.Context(), source)
 	require.NoError(t, err)
 
 	// Verify custom index names were set
-	sources, err := s.ListSources(context.TODO())
+	sources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "custom_articles", sources[0].ArticleIndex)
@@ -399,11 +398,11 @@ func TestProvideSourcesIndexNames(t *testing.T) {
 		ArticleIndex: "updated_articles",
 		Index:        "updated_content",
 	}
-	err = s.UpdateSource(context.TODO(), updatedSource)
+	err = s.UpdateSource(t.Context(), updatedSource)
 	require.NoError(t, err)
 
 	// Verify index names were updated
-	sources, err = s.ListSources(context.TODO())
+	sources, err = s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Len(t, sources, 1)
 	require.Equal(t, "updated_articles", sources[0].ArticleIndex)
@@ -416,7 +415,7 @@ func TestEmptySources(t *testing.T) {
 	require.NotNil(t, s)
 
 	// Test ListSources with empty sources
-	sources, err := s.ListSources(context.TODO())
+	sources, err := s.ListSources(t.Context())
 	require.NoError(t, err)
 	require.Empty(t, sources)
 

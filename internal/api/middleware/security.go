@@ -48,9 +48,7 @@ type rateLimitInfo struct {
 }
 
 // Constants
-const (
 // No constants needed
-)
 
 // NewSecurityMiddleware creates a new security middleware instance
 func NewSecurityMiddleware(cfg *config.ServerConfig, logger logger.Interface) *SecurityMiddleware {

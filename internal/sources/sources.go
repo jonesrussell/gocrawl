@@ -284,16 +284,6 @@ func getArticleSelectorsFromSelector(s articleSelector) ArticleSelectors {
 	}
 }
 
-// articleSelectorProvider defines the interface for types that can provide article selectors
-type articleSelectorProvider interface {
-	GetArticleSelectors() ArticleSelectors
-}
-
-// getArticleSelectorsFromProvider extracts article selectors from any type that implements articleSelectorProvider
-func getArticleSelectorsFromProvider(p articleSelectorProvider) ArticleSelectors {
-	return p.GetArticleSelectors()
-}
-
 // extractArticleSelectorsFromLoader creates an articleSelector from loader.ArticleSelectors
 func extractArticleSelectorsFromLoader(selectors loader.ArticleSelectors) articleSelector {
 	return articleSelector{
@@ -364,34 +354,6 @@ type sourceWrapper struct {
 
 func (w sourceWrapper) GetArticleSelectors() ArticleSelectors {
 	return getArticleSelectorsFromSelector(extractArticleSelectorsFromConfig(w.Selectors.Article))
-}
-
-// newArticleSelectorsFromFields creates an ArticleSelectors from a map of field names to values
-func newArticleSelectorsFromFields(fields map[string]string) ArticleSelectors {
-	return ArticleSelectors{
-		Container:     fields["Container"],
-		Title:         fields["Title"],
-		Body:          fields["Body"],
-		Intro:         fields["Intro"],
-		Byline:        fields["Byline"],
-		PublishedTime: fields["PublishedTime"],
-		TimeAgo:       fields["TimeAgo"],
-		JSONLD:        fields["JSONLD"],
-		Section:       fields["Section"],
-		Keywords:      fields["Keywords"],
-		Description:   fields["Description"],
-		OGTitle:       fields["OGTitle"],
-		OGDescription: fields["OGDescription"],
-		OGImage:       fields["OGImage"],
-		OgURL:         fields["OgURL"],
-		Canonical:     fields["Canonical"],
-		WordCount:     fields["WordCount"],
-		PublishDate:   fields["PublishDate"],
-		Category:      fields["Category"],
-		Tags:          fields["Tags"],
-		Author:        fields["Author"],
-		BylineName:    fields["BylineName"],
-	}
 }
 
 // NewSelectorConfigFromLoader creates a new SelectorConfig from a loader.Config.
