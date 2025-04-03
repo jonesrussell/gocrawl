@@ -74,35 +74,6 @@ var Module = fx.Module("crawler",
 	),
 )
 
-// ProcessorParams defines the parameters for the ProvideCrawler function.
-type ProcessorParams struct {
-	fx.In
-
-	Logger           logger.Interface
-	IndexManager     api.IndexManager
-	Sources          sources.Interface
-	ArticleProcessor common.Processor `name:"articleProcessor"`
-	ContentProcessor common.Processor `name:"contentProcessor"`
-	Bus              *events.Bus
-}
-
-// ProvideCrawler creates a new crawler instance.
-func ProvideCrawler(params ProcessorParams) Result {
-	crawler := NewCrawler(
-		params.Logger,
-		params.IndexManager,
-		params.Sources,
-		params.ArticleProcessor,
-		params.ContentProcessor,
-		params.Bus,
-	)
-
-	params.Logger.Info("Created crawler instance")
-	return Result{
-		Crawler: crawler,
-	}
-}
-
 // NewCrawler creates a new crawler instance.
 func NewCrawler(
 	logger logger.Interface,

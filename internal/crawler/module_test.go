@@ -52,30 +52,27 @@ var TestCommonModule = fx.Module("testCommon",
 // TestConfigModule provides a test-specific config module that doesn't try to load files.
 var TestConfigModule = fx.Module("testConfig",
 	fx.Provide(
-		fx.Annotate(
-			func() config.Interface {
-				mockCfg := &testutils.MockConfig{}
-				mockCfg.On("GetAppConfig").Return(&config.AppConfig{
-					Environment: "test",
-					Name:        "gocrawl",
-					Version:     "1.0.0",
-					Debug:       true,
-				})
-				mockCfg.On("GetLogConfig").Return(&config.LogConfig{
-					Level: "debug",
-					Debug: true,
-				})
-				mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
-					Addresses: []string{"http://localhost:9200"},
-					IndexName: "test-index",
-				})
-				mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
-				mockCfg.On("GetSources").Return([]config.Source{}, nil)
-				mockCfg.On("GetCommand").Return("test")
-				return mockCfg
-			},
-			fx.ResultTags(),
-		),
+		func() config.Interface {
+			mockCfg := &testutils.MockConfig{}
+			mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+				Environment: "test",
+				Name:        "gocrawl",
+				Version:     "1.0.0",
+				Debug:       true,
+			})
+			mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+				Level: "debug",
+				Debug: true,
+			})
+			mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test-index",
+			})
+			mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+			mockCfg.On("GetSources").Return([]config.Source{}, nil)
+			mockCfg.On("GetCommand").Return("test")
+			return mockCfg
+		},
 	),
 )
 
@@ -94,73 +91,34 @@ var TestCrawlerModule = fx.Module("crawler",
 		func() *sources.Sources {
 			return &sources.Sources{}
 		},
-		// Article channel named instance
-		fx.Annotate(
-			func() chan *models.Article {
-				return make(chan *models.Article, crawler.ArticleChannelBufferSize)
-			},
-			fx.ResultTags(`name:"crawlerArticleChannel"`),
-		),
-		// Article index name
-		fx.Annotate(
-			func() string {
-				return "articles"
-			},
-			fx.ResultTags(`name:"indexName"`),
-		),
-		// Content index name
-		fx.Annotate(
-			func() string {
-				return "content"
-			},
-			fx.ResultTags(`name:"contentIndex"`),
-		),
-		// Article processor
-		fx.Annotate(
-			func(
-				log logger.Interface,
-				articleService article.Interface,
-				storage types.Interface,
-				params struct {
-					fx.In
-					ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
-					IndexName   string               `name:"indexName"`
-				},
-			) common.Processor {
-				log.Debug("Providing article processor")
-				return &article.ArticleProcessor{
-					Logger:         log,
-					ArticleService: articleService,
-					Storage:        storage,
-					IndexName:      params.IndexName,
-					ArticleChan:    params.ArticleChan,
-				}
-			},
-			fx.ResultTags(`name:"articleProcessor"`),
-		),
-		// Content processor
-		fx.Annotate(
-			func(
-				log logger.Interface,
-				contentService content.Interface,
-				storage types.Interface,
-				params struct {
-					fx.In
-					IndexName string `name:"contentIndex"`
-				},
-			) common.Processor {
-				log.Debug("Providing content processor")
-				return content.NewContentProcessor(content.ProcessorParams{
-					Logger:    log,
-					Service:   contentService,
-					Storage:   storage,
-					IndexName: params.IndexName,
-				})
-			},
-			fx.ResultTags(`name:"contentProcessor"`),
-		),
-		// Provide crawler
-		crawler.ProvideCrawler,
+		// Article channel
+		func() chan *models.Article {
+			return make(chan *models.Article, crawler.ArticleChannelBufferSize)
+		},
+		// Processors
+		func(
+			log logger.Interface,
+			articleService article.Interface,
+			contentService content.Interface,
+			storage types.Interface,
+			articleChan chan *models.Article,
+		) []common.Processor {
+			log.Debug("Providing processors")
+			articleProcessor := &article.ArticleProcessor{
+				Logger:         log,
+				ArticleService: articleService,
+				Storage:        storage,
+				IndexName:      "articles",
+				ArticleChan:    articleChan,
+			}
+			contentProcessor := content.NewContentProcessor(content.ProcessorParams{
+				Logger:    log,
+				Service:   contentService,
+				Storage:   storage,
+				IndexName: "content",
+			})
+			return []common.Processor{articleProcessor, contentProcessor}
+		},
 	),
 )
 
