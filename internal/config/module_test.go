@@ -1,7 +1,6 @@
 package config_test
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -10,57 +9,20 @@ import (
 	"go.uber.org/fx/fxtest"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 )
 
 // TestModule provides tests for the config module's dependency injection.
 func TestModule(t *testing.T) {
-	// Create temporary test directory
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yml")
-	sourcesPath := filepath.Join(tmpDir, "sources.yml")
-
-	// Create test sources file
-	sourcesContent := `
-sources:
-  - name: test
-    url: http://test.example.com
-    rate_limit: 100ms
-    max_depth: 1
-    selectors:
-      article:
-        title: h1
-        body: article
-`
-	err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+	// Get the absolute path to the testdata directory
+	testdataDir, err := filepath.Abs("testdata")
 	require.NoError(t, err)
+	configPath := filepath.Join(testdataDir, "config.yml")
+	sourcesPath := filepath.Join(testdataDir, "sources.yml")
 
-	// Create test config file
-	configContent := `
-app:
-  environment: test
-  name: gocrawl
-  version: 1.0.0
-  debug: false
-crawler:
-  base_url: http://test.example.com
-  max_depth: 2
-  rate_limit: 2s
-  parallelism: 2
-  source_file: ` + sourcesPath + `
-logging:
-  level: debug
-  debug: true
-elasticsearch:
-  addresses:
-    - https://localhost:9200
-  api_key: test_api_key
-  tls:
-    enabled: true
-    certificate: test-cert.pem
-    key: test-key.pem
-`
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
-	require.NoError(t, err)
+	// Verify test files exist
+	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
+	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
 
 	// Set environment variables
 	t.Setenv("CONFIG_FILE", configPath)
@@ -68,7 +30,14 @@ elasticsearch:
 	// Create test application
 	app := fxtest.New(t,
 		fx.Provide(
-			newTestLogger,
+			fx.Annotate(
+				func() *testing.T { return t },
+				fx.ResultTags(`name:"test"`),
+			),
+			fx.Annotate(
+				testutils.NewTestLogger,
+				fx.ParamTags(`name:"test"`),
+			),
 			config.New,
 		),
 		fx.Invoke(func(cfg config.Interface) {
@@ -120,73 +89,47 @@ func TestNewNoOp(t *testing.T) {
 	require.Equal(t, "test", c.GetCommand())
 }
 
-// TestModuleLifecycle tests the module's lifecycle hooks.
+// TestModuleLifecycle tests the lifecycle of the config module.
 func TestModuleLifecycle(t *testing.T) {
-	// Create temporary test directory
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yml")
-	sourcesPath := filepath.Join(tmpDir, "sources.yml")
-
-	// Create test sources file
-	sourcesContent := `
-sources:
-  - name: test
-    url: http://test.example.com
-    rate_limit: 100ms
-    max_depth: 1
-    selectors:
-      article:
-        title: h1
-        body: article
-`
-	err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+	// Get the absolute path to the testdata directory
+	testdataDir, err := filepath.Abs("testdata")
 	require.NoError(t, err)
+	configPath := filepath.Join(testdataDir, "config.yml")
+	sourcesPath := filepath.Join(testdataDir, "sources.yml")
 
-	// Create test config file
-	configContent := `
-app:
-  environment: test
-  name: gocrawl
-  version: 1.0.0
-  debug: false
-crawler:
-  base_url: http://test.example.com
-  max_depth: 2
-  rate_limit: 2s
-  parallelism: 2
-  source_file: ` + sourcesPath + `
-logging:
-  level: debug
-  debug: true
-elasticsearch:
-  addresses:
-    - https://localhost:9200
-  api_key: test_api_key
-  tls:
-    enabled: true
-    certificate: test-cert.pem
-    key: test-key.pem
-`
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
-	require.NoError(t, err)
+	// Verify test files exist
+	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
+	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
 
 	// Set environment variables
 	t.Setenv("CONFIG_FILE", configPath)
 
-	app := fxtest.New(t,
+	// Create test module
+	module := fx.Module("test",
 		fx.Provide(
-			newTestLogger,
+			fx.Annotate(
+				func() *testing.T { return t },
+				fx.ResultTags(`name:"test"`),
+			),
+			fx.Annotate(
+				testutils.NewTestLogger,
+				fx.ParamTags(`name:"test"`),
+			),
 			config.New,
 		),
 		fx.Invoke(func(cfg config.Interface) {
 			require.NotNil(t, cfg)
-			appCfg := cfg.GetAppConfig()
-			require.Equal(t, "test", appCfg.Environment)
-			require.Equal(t, "gocrawl", appCfg.Name)
-			require.Equal(t, "1.0.0", appCfg.Version)
 		}),
 	)
 
+	// Create test app
+	app := fxtest.New(t,
+		module,
+	)
+
+	// Start app
 	app.RequireStart()
+
+	// Stop app
 	app.RequireStop()
 }

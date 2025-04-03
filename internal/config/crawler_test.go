@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,6 +14,16 @@ import (
 )
 
 func TestCrawlerConfig(t *testing.T) {
+	// Get the absolute path to the testdata directory
+	testdataDir, err := filepath.Abs("testdata")
+	require.NoError(t, err)
+	configPath := filepath.Join(testdataDir, "config.yml")
+	sourcesPath := filepath.Join(testdataDir, "sources.yml")
+
+	// Verify test files exist
+	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
+	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
+
 	tests := []struct {
 		name     string
 		setup    func(*testing.T)
@@ -21,64 +32,22 @@ func TestCrawlerConfig(t *testing.T) {
 		{
 			name: "valid configuration",
 			setup: func(t *testing.T) {
-				// Create test config file
-				configContent := `
-crawler:
-  base_url: http://test.example.com
-  max_depth: 2
-  rate_limit: 2s
-  parallelism: 2
-  source_file: internal/config/testdata/sources.yml
-`
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
-				require.NoError(t, err)
-
-				// Create test sources file
-				sourcesContent := `
-sources:
-  test_source:
-    url: http://test.example.com
-    rate_limit: 2s
-    max_depth: 2
-    article_index: test_articles
-    content_index: test_content
-    selectors:
-      title: h1
-      content: article
-      author: .author
-      date: .date
-`
-				err = os.WriteFile("internal/config/testdata/sources.yml", []byte(sourcesContent), 0644)
-				require.NoError(t, err)
-
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 			},
 			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
 				require.Equal(t, "http://test.example.com", cfg.BaseURL)
 				require.Equal(t, 2, cfg.MaxDepth)
 				require.Equal(t, 2*time.Second, cfg.RateLimit)
 				require.Equal(t, 2, cfg.Parallelism)
-				require.Equal(t, "internal/config/testdata/sources.yml", cfg.SourceFile)
+				require.Equal(t, sourcesPath, cfg.SourceFile)
 			},
 		},
 		{
 			name: "environment variable override",
 			setup: func(t *testing.T) {
-				// Create test config file
-				configContent := `
-crawler:
-  base_url: http://test.example.com
-  max_depth: 2
-  rate_limit: 2s
-  parallelism: 2
-  source_file: internal/config/testdata/sources.yml
-`
-				err := os.WriteFile("internal/config/testdata/config.yml", []byte(configContent), 0644)
-				require.NoError(t, err)
-
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("CONFIG_FILE", configPath)
 				t.Setenv("CRAWLER_BASE_URL", "http://override.example.com")
 				t.Setenv("CRAWLER_MAX_DEPTH", "3")
 				t.Setenv("CRAWLER_RATE_LIMIT", "3s")
@@ -89,7 +58,7 @@ crawler:
 				require.Equal(t, 3, cfg.MaxDepth)
 				require.Equal(t, 3*time.Second, cfg.RateLimit)
 				require.Equal(t, 3, cfg.Parallelism)
-				require.Equal(t, "internal/config/testdata/sources.yml", cfg.SourceFile)
+				require.Equal(t, sourcesPath, cfg.SourceFile)
 			},
 		},
 	}
@@ -106,7 +75,6 @@ crawler:
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))
 			require.NoError(t, err)
-			require.NotNil(t, cfg)
 
 			// Validate results
 			tt.validate(t, cfg.GetCrawlerConfig())

@@ -9,7 +9,7 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: internal/config/testdata/sources.yml
+  source_file: testdata/sources.yml
 
 logging:
   level: debug

@@ -1,13 +1,12 @@
 sources:
-  - name: test_source
+  test_source:
     url: http://test.example.com
     rate_limit: 2s
     max_depth: 2
     article_index: test_articles
     index: test_content
     selectors:
-      article:
-        title: h1
-        content: article
-        author: .author
-        date: .date 
+      title: h1
+      content: article
+      author: .author
+      date: .date 

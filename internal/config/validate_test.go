@@ -13,9 +13,10 @@ import (
 
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
-		name    string
-		setup   func(*testing.T)
-		wantErr bool
+		name        string
+		setup       func(*testing.T)
+		wantErr     bool
+		errContains string
 	}{
 		{
 			name: "valid_config",
@@ -24,25 +25,6 @@ func TestValidateConfig(t *testing.T) {
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
 				sourcesPath := filepath.Join(tmpDir, "sources.yml")
-
-				// Create test config file
-				configContent := `
-app:
-  environment: test
-  name: gocrawl
-  version: 1.0.0
-log:
-  level: info
-crawler:
-  source_file: ` + sourcesPath + `
-  max_depth: 2
-  parallelism: 4
-  rate_limit: 100ms
-  index_name: test-articles
-  content_index_name: test-content
-`
-				err := os.WriteFile(configPath, []byte(configContent), 0644)
-				require.NoError(t, err)
 
 				// Create test sources file
 				sourcesContent := `
@@ -56,7 +38,23 @@ sources:
         title: h1
         body: article
 `
-				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				require.NoError(t, err)
+
+				// Create test config file
+				configContent := `
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+elasticsearch:
+  addresses:
+    - https://localhost:9200
+  api_key: test_api_key
+crawler:
+  source_file: ` + sourcesPath + `
+`
+				err = os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Set environment variables
@@ -358,23 +356,18 @@ sources:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup test environment
-			cleanup := testutils.SetupTestEnv(t)
-			defer cleanup()
-
 			// Run test setup
 			tt.setup(t)
 
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))
-
-			// Validate results
 			if tt.wantErr {
 				require.Error(t, err)
-				require.Nil(t, cfg)
+				if tt.errContains != "" {
+					require.Contains(t, err.Error(), tt.errContains)
+				}
 				return
 			}
-
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
 		})

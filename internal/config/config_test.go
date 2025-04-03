@@ -12,24 +12,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 )
 
-// testLogger implements config.Logger for testing
-type testLogger struct {
-	t *testing.T
-}
-
-func (l testLogger) Info(msg string, fields ...config.Field) {
-	l.t.Logf("INFO: %s %v", msg, fields)
-}
-
-func (l testLogger) Warn(msg string, fields ...config.Field) {
-	l.t.Logf("WARN: %s %v", msg, fields)
-}
-
-// newTestLogger creates a new test logger
-func newTestLogger(t *testing.T) config.Logger {
-	return testLogger{t: t}
-}
-
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name     string

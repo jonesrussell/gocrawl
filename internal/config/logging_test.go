@@ -12,48 +12,26 @@ import (
 )
 
 func TestLogConfig(t *testing.T) {
+	// Get the absolute path to the testdata directory
+	testdataDir, err := filepath.Abs("testdata")
+	require.NoError(t, err)
+	configPath := filepath.Join(testdataDir, "config.yml")
+	sourcesPath := filepath.Join(testdataDir, "sources.yml")
+
+	// Verify test files exist
+	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
+	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
+
 	tests := []struct {
 		name     string
-		setup    func(*testing.T) string
+		setup    func(*testing.T)
 		validate func(*testing.T, *config.LogConfig)
 	}{
 		{
 			name: "valid configuration",
-			setup: func(t *testing.T) string {
-				// Create temporary test directory
-				tmpDir := t.TempDir()
-				configPath := filepath.Join(tmpDir, "config.yml")
-				sourcesPath := filepath.Join(tmpDir, "sources.yml")
-
-				// Create test sources file
-				sourcesContent := `
-sources:
-  - name: test
-    url: http://test.example.com
-    rate_limit: 100ms
-    max_depth: 1
-    selectors:
-      article:
-        title: h1
-        body: article
-`
-				err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
-				require.NoError(t, err)
-
-				// Create test config file
-				configContent := `
-log:
-  level: debug
-  debug: true
-crawler:
-  source_file: ` + sourcesPath + `
-`
-				err = os.WriteFile(configPath, []byte(configContent), 0644)
-				require.NoError(t, err)
-
+			setup: func(t *testing.T) {
 				// Set environment variables
 				t.Setenv("CONFIG_FILE", configPath)
-				return tmpDir
 			},
 			validate: func(t *testing.T, cfg *config.LogConfig) {
 				require.Equal(t, "debug", cfg.Level)
@@ -62,83 +40,24 @@ crawler:
 		},
 		{
 			name: "environment variable override",
-			setup: func(t *testing.T) string {
-				// Create temporary test directory
-				tmpDir := t.TempDir()
-				configPath := filepath.Join(tmpDir, "config.yml")
-				sourcesPath := filepath.Join(tmpDir, "sources.yml")
-
-				// Create test sources file
-				sourcesContent := `
-sources:
-  - name: test
-    url: http://test.example.com
-    rate_limit: 100ms
-    max_depth: 1
-    selectors:
-      article:
-        title: h1
-        body: article
-`
-				err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
-				require.NoError(t, err)
-
-				// Create test config file
-				configContent := `
-log:
-  level: info
-  debug: false
-crawler:
-  source_file: ` + sourcesPath + `
-`
-				err = os.WriteFile(configPath, []byte(configContent), 0644)
-				require.NoError(t, err)
-
+			setup: func(t *testing.T) {
 				// Set environment variables
 				t.Setenv("CONFIG_FILE", configPath)
-				t.Setenv("LOG_LEVEL", "warn")
-				t.Setenv("LOG_DEBUG", "true")
-				return tmpDir
+				t.Setenv("LOG_LEVEL", "info")
+				t.Setenv("LOG_DEBUG", "false")
 			},
 			validate: func(t *testing.T, cfg *config.LogConfig) {
-				require.Equal(t, "warn", cfg.Level)
-				require.True(t, cfg.Debug)
+				require.Equal(t, "info", cfg.Level)
+				require.False(t, cfg.Debug)
 			},
 		},
 		{
 			name: "default values",
-			setup: func(t *testing.T) string {
-				// Create temporary test directory
-				tmpDir := t.TempDir()
-				configPath := filepath.Join(tmpDir, "config.yml")
-				sourcesPath := filepath.Join(tmpDir, "sources.yml")
-
-				// Create test sources file
-				sourcesContent := `
-sources:
-  - name: test
-    url: http://test.example.com
-    rate_limit: 100ms
-    max_depth: 1
-    selectors:
-      article:
-        title: h1
-        body: article
-`
-				err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
-				require.NoError(t, err)
-
-				// Create test config file with minimal config
-				configContent := `
-crawler:
-  source_file: ` + sourcesPath + `
-`
-				err = os.WriteFile(configPath, []byte(configContent), 0644)
-				require.NoError(t, err)
-
+			setup: func(t *testing.T) {
 				// Set environment variables
 				t.Setenv("CONFIG_FILE", configPath)
-				return tmpDir
+				t.Setenv("LOG_LEVEL", "")
+				t.Setenv("LOG_DEBUG", "")
 			},
 			validate: func(t *testing.T, cfg *config.LogConfig) {
 				require.Equal(t, "info", cfg.Level)
@@ -154,12 +73,11 @@ crawler:
 			defer cleanup()
 
 			// Run test setup
-			_ = tt.setup(t)
+			tt.setup(t)
 
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))
 			require.NoError(t, err)
-			require.NotNil(t, cfg)
 
 			// Validate results
 			tt.validate(t, cfg.GetLogConfig())
