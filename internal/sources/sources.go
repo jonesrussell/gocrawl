@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 )
@@ -25,21 +25,7 @@ type ArticleSelectors = sourceutils.ArticleSelectors
 // Sources manages a collection of source configurations.
 type Sources struct {
 	sources []sourceutils.SourceConfig
-	logger  interface {
-		Debug(msg string, fields ...any)
-		Info(msg string, fields ...any)
-		Warn(msg string, fields ...any)
-		Error(msg string, fields ...any)
-		Fatal(msg string, fields ...any)
-		With(fields ...any) interface {
-			Debug(msg string, fields ...any)
-			Info(msg string, fields ...any)
-			Warn(msg string, fields ...any)
-			Error(msg string, fields ...any)
-			Fatal(msg string, fields ...any)
-			With(fields ...any) interface{}
-		}
-	}
+	logger  logger.Interface
 	metrics Metrics
 }
 
@@ -56,22 +42,46 @@ func ConvertSourceConfig(source *Config) *config.Source {
 	return sourceutils.ConvertToConfigSource(source)
 }
 
-// NewSourcesFromConfig creates a new Sources instance from a config.
-func NewSourcesFromConfig(cfg config.Interface, logger interface {
-	Debug(msg string, fields ...any)
-	Info(msg string, fields ...any)
-	Warn(msg string, fields ...any)
-	Error(msg string, fields ...any)
-	Fatal(msg string, fields ...any)
-	With(fields ...any) interface {
-		Debug(msg string, fields ...any)
-		Info(msg string, fields ...any)
-		Warn(msg string, fields ...any)
-		Error(msg string, fields ...any)
-		Fatal(msg string, fields ...any)
-		With(fields ...any) interface{}
+// convertSourceConfig converts a config.Source to a sourceutils.SourceConfig
+func convertSourceConfig(src config.Source) sourceutils.SourceConfig {
+	return sourceutils.SourceConfig{
+		Name:         src.Name,
+		URL:          src.URL,
+		RateLimit:    src.RateLimit,
+		MaxDepth:     src.MaxDepth,
+		ArticleIndex: src.ArticleIndex,
+		Index:        src.Index,
+		Selectors: sourceutils.SelectorConfig{
+			Article: sourceutils.ArticleSelectors{
+				Container:     src.Selectors.Article.Container,
+				Title:         src.Selectors.Article.Title,
+				Body:          src.Selectors.Article.Body,
+				Intro:         src.Selectors.Article.Intro,
+				Byline:        src.Selectors.Article.Byline,
+				PublishedTime: src.Selectors.Article.PublishedTime,
+				TimeAgo:       src.Selectors.Article.TimeAgo,
+				JSONLD:        src.Selectors.Article.JSONLD,
+				Section:       src.Selectors.Article.Section,
+				Keywords:      src.Selectors.Article.Keywords,
+				Description:   src.Selectors.Article.Description,
+				OGTitle:       src.Selectors.Article.OGTitle,
+				OGDescription: src.Selectors.Article.OGDescription,
+				OGImage:       src.Selectors.Article.OGImage,
+				OgURL:         src.Selectors.Article.OgURL,
+				Canonical:     src.Selectors.Article.Canonical,
+				WordCount:     src.Selectors.Article.WordCount,
+				PublishDate:   src.Selectors.Article.PublishDate,
+				Category:      src.Selectors.Article.Category,
+				Tags:          src.Selectors.Article.Tags,
+				Author:        src.Selectors.Article.Author,
+				BylineName:    src.Selectors.Article.BylineName,
+			},
+		},
 	}
-}) Interface {
+}
+
+// NewSourcesFromConfig creates a new Sources instance from a config.
+func NewSourcesFromConfig(cfg config.Interface, logger logger.Interface) Interface {
 	sources := &Sources{
 		logger: logger,
 		metrics: Metrics{
@@ -80,11 +90,7 @@ func NewSourcesFromConfig(cfg config.Interface, logger interface {
 	}
 
 	// Load sources from config
-	srcs, err := cfg.GetSources()
-	if err != nil {
-		logger.Error("Failed to get sources from config", "error", err)
-		return sources
-	}
+	srcs := cfg.GetSources()
 
 	// Convert config sources to our source type
 	configs := make([]sourceutils.SourceConfig, 0, len(srcs))
@@ -100,7 +106,7 @@ func NewSourcesFromConfig(cfg config.Interface, logger interface {
 }
 
 // LoadFromFile loads sources from a YAML file.
-func LoadFromFile(path string, logger common.Logger) (*Sources, error) {
+func LoadFromFile(path string, logger logger.Interface) (*Sources, error) {
 	// Implementation details...
 	return &Sources{
 		logger: logger,
@@ -133,7 +139,7 @@ func (s *Sources) AddSource(ctx context.Context, source *sourceutils.SourceConfi
 	}
 
 	// Check if source already exists
-	for i, existing := range s.sources {
+	for _, existing := range s.sources {
 		if existing.Name == source.Name {
 			return ErrSourceExists
 		}
@@ -234,28 +240,28 @@ type loaderConfigWrapper struct {
 
 func (w loaderConfigWrapper) GetArticleSelectors() ArticleSelectors {
 	return ArticleSelectors{
-		Container:     w.Container,
-		Title:         w.Title,
-		Body:          w.Body,
-		Intro:         w.Intro,
-		Byline:        w.Byline,
-		PublishedTime: w.PublishedTime,
-		TimeAgo:       w.TimeAgo,
-		JSONLD:        w.JSONLD,
-		Section:       w.Section,
-		Keywords:      w.Keywords,
-		Description:   w.Description,
-		OGTitle:       w.OGTitle,
-		OGDescription: w.OGDescription,
-		OGImage:       w.OGImage,
-		OgURL:         w.OgURL,
-		Canonical:     w.Canonical,
-		WordCount:     w.WordCount,
-		PublishDate:   w.PublishDate,
-		Category:      w.Category,
-		Tags:          w.Tags,
-		Author:        w.Author,
-		BylineName:    w.BylineName,
+		Container:     w.Selectors.Article.Container,
+		Title:         w.Selectors.Article.Title,
+		Body:          w.Selectors.Article.Body,
+		Intro:         w.Selectors.Article.Intro,
+		Byline:        w.Selectors.Article.Byline,
+		PublishedTime: w.Selectors.Article.PublishedTime,
+		TimeAgo:       w.Selectors.Article.TimeAgo,
+		JSONLD:        w.Selectors.Article.JSONLD,
+		Section:       w.Selectors.Article.Section,
+		Keywords:      w.Selectors.Article.Keywords,
+		Description:   w.Selectors.Article.Description,
+		OGTitle:       w.Selectors.Article.OGTitle,
+		OGDescription: w.Selectors.Article.OGDescription,
+		OGImage:       w.Selectors.Article.OGImage,
+		OgURL:         w.Selectors.Article.OgURL,
+		Canonical:     w.Selectors.Article.Canonical,
+		WordCount:     w.Selectors.Article.WordCount,
+		PublishDate:   w.Selectors.Article.PublishDate,
+		Category:      w.Selectors.Article.Category,
+		Tags:          w.Selectors.Article.Tags,
+		Author:        w.Selectors.Article.Author,
+		BylineName:    w.Selectors.Article.BylineName,
 	}
 }
 

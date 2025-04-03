@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
 
@@ -21,21 +22,7 @@ const (
 var Module = fx.Module("sources",
 	fx.Provide(
 		fx.Annotate(
-			func(cfg config.Interface, logger interface {
-				Debug(msg string, fields ...any)
-				Info(msg string, fields ...any)
-				Warn(msg string, fields ...any)
-				Error(msg string, fields ...any)
-				Fatal(msg string, fields ...any)
-				With(fields ...any) interface {
-					Debug(msg string, fields ...any)
-					Info(msg string, fields ...any)
-					Warn(msg string, fields ...any)
-					Error(msg string, fields ...any)
-					Fatal(msg string, fields ...any)
-					With(fields ...any) interface{}
-				}
-			}) Interface {
+			func(cfg config.Interface, logger logger.Interface) Interface {
 				return NewSourcesFromConfig(cfg, logger)
 			},
 			fx.ParamTags(`name:"config"`, ""),
@@ -48,21 +35,7 @@ type ModuleParams struct {
 	fx.In
 
 	Config config.Interface `name:"config"`
-	Logger interface {
-		Debug(msg string, fields ...any)
-		Info(msg string, fields ...any)
-		Warn(msg string, fields ...any)
-		Error(msg string, fields ...any)
-		Fatal(msg string, fields ...any)
-		With(fields ...any) interface {
-			Debug(msg string, fields ...any)
-			Info(msg string, fields ...any)
-			Warn(msg string, fields ...any)
-			Error(msg string, fields ...any)
-			Fatal(msg string, fields ...any)
-			With(fields ...any) interface{}
-		}
-	}
+	Logger logger.Interface
 }
 
 // Result defines the sources module's output.
@@ -92,21 +65,7 @@ func NewConfig() *Config {
 }
 
 // NewSources creates a new sources instance.
-func NewSources(cfg *Config, logger interface {
-	Debug(msg string, fields ...any)
-	Info(msg string, fields ...any)
-	Warn(msg string, fields ...any)
-	Error(msg string, fields ...any)
-	Fatal(msg string, fields ...any)
-	With(fields ...any) interface {
-		Debug(msg string, fields ...any)
-		Info(msg string, fields ...any)
-		Warn(msg string, fields ...any)
-		Error(msg string, fields ...any)
-		Fatal(msg string, fields ...any)
-		With(fields ...any) interface{}
-	}
-}) *Sources {
+func NewSources(cfg *Config, logger logger.Interface) *Sources {
 	return &Sources{
 		sources: []Config{*cfg},
 		logger:  logger,

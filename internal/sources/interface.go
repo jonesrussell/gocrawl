@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 )
 
@@ -32,21 +33,7 @@ type Interface interface {
 // Params contains the parameters for creating a new source manager.
 type Params struct {
 	// Logger is the logger to use.
-	Logger interface {
-		Debug(msg string, fields ...any)
-		Info(msg string, fields ...any)
-		Warn(msg string, fields ...any)
-		Error(msg string, fields ...any)
-		Fatal(msg string, fields ...any)
-		With(fields ...any) interface {
-			Debug(msg string, fields ...any)
-			Info(msg string, fields ...any)
-			Warn(msg string, fields ...any)
-			Error(msg string, fields ...any)
-			Fatal(msg string, fields ...any)
-			With(fields ...any) interface{}
-		}
-	}
+	Logger logger.Interface
 }
 
 // Metrics contains metrics about the source manager.
