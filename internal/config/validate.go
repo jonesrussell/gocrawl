@@ -244,11 +244,13 @@ func validateServerSecurity(security struct {
 	} `yaml:"cors"`
 	TLS TLSConfig `yaml:"tls"`
 }) error {
-	if security.APIKey == "" {
-		return &ConfigValidationError{
-			Field:  "server.security.api_key",
-			Value:  security.APIKey,
-			Reason: "API key cannot be empty when security is enabled",
+	if security.Enabled {
+		if security.APIKey == "" {
+			return &ConfigValidationError{
+				Field:  "server.security.api_key",
+				Value:  security.APIKey,
+				Reason: "API key cannot be empty when security is enabled",
+			}
 		}
 	}
 	if security.TLS.Enabled {

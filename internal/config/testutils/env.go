@@ -44,10 +44,29 @@ func SetupTestEnv(t *testing.T) func() {
 	// Set environment variables
 	t.Setenv("CONFIG_FILE", configPath)
 	t.Setenv("CRAWLER_SOURCE_FILE", sourcesPath)
-	viper.Set("crawler.source_file", sourcesPath)
+	t.Setenv("APP_ENVIRONMENT", "development")
+	t.Setenv("APP_NAME", "gocrawl-test")
+	t.Setenv("APP_VERSION", "0.0.1")
+	t.Setenv("CRAWLER_BASE_URL", "http://localhost:8080")
+	t.Setenv("CRAWLER_MAX_DEPTH", "1")
+	t.Setenv("CRAWLER_RATE_LIMIT", "1s")
+	t.Setenv("CRAWLER_PARALLELISM", "1")
+	t.Setenv("SERVER_ADDRESS", ":8080")
+	t.Setenv("SERVER_READ_TIMEOUT", "1s")
+	t.Setenv("SERVER_WRITE_TIMEOUT", "1s")
+	t.Setenv("SERVER_SECURITY_ENABLED", "false")
+	t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+	t.Setenv("ELASTICSEARCH_USERNAME", "elastic")
+	t.Setenv("ELASTICSEARCH_PASSWORD", "changeme")
+	t.Setenv("ELASTICSEARCH_INDEX_NAME", "test-index")
+	t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
+	t.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
+	t.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
+	t.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
 
-	// Set default values for required fields
-	viper.Set("app.environment", "test")
+	// Set viper values
+	viper.Set("crawler.source_file", sourcesPath)
+	viper.Set("app.environment", "development")
 	viper.Set("app.name", "gocrawl-test")
 	viper.Set("app.version", "0.0.1")
 	viper.Set("crawler.base_url", "http://localhost:8080")
@@ -57,6 +76,15 @@ func SetupTestEnv(t *testing.T) func() {
 	viper.Set("server.address", ":8080")
 	viper.Set("server.read_timeout", "1s")
 	viper.Set("server.write_timeout", "1s")
+	viper.Set("server.security.enabled", false)
+	viper.Set("elasticsearch.addresses", []string{"http://localhost:9200"})
+	viper.Set("elasticsearch.username", "elastic")
+	viper.Set("elasticsearch.password", "changeme")
+	viper.Set("elasticsearch.index_name", "test-index")
+	viper.Set("elasticsearch.retry.enabled", true)
+	viper.Set("elasticsearch.retry.initial_wait", "1s")
+	viper.Set("elasticsearch.retry.max_wait", "5s")
+	viper.Set("elasticsearch.retry.max_retries", 3)
 
 	// Initialize Viper with config file
 	viper.SetConfigFile(configPath)
@@ -68,6 +96,9 @@ func SetupTestEnv(t *testing.T) func() {
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Ensure source file path is set after config is loaded
+	viper.Set("crawler.source_file", sourcesPath)
 
 	// Return cleanup function
 	return func() {

@@ -24,8 +24,9 @@ func TestModule(t *testing.T) {
 	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
 	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
 
-	// Set environment variables
-	t.Setenv("CONFIG_FILE", configPath)
+	// Set up test environment
+	cleanup := testutils.SetupTestEnv(t)
+	defer cleanup()
 
 	// Create test application
 	app := fxtest.New(t,
@@ -43,9 +44,9 @@ func TestModule(t *testing.T) {
 		fx.Invoke(func(cfg config.Interface) {
 			require.NotNil(t, cfg)
 			appCfg := cfg.GetAppConfig()
-			require.Equal(t, "test", appCfg.Environment)
-			require.Equal(t, "gocrawl", appCfg.Name)
-			require.Equal(t, "1.0.0", appCfg.Version)
+			require.Equal(t, "development", appCfg.Environment)
+			require.Equal(t, "gocrawl-test", appCfg.Name)
+			require.Equal(t, "0.0.1", appCfg.Version)
 		}),
 	)
 
@@ -101,8 +102,9 @@ func TestModuleLifecycle(t *testing.T) {
 	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
 	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
 
-	// Set environment variables
-	t.Setenv("CONFIG_FILE", configPath)
+	// Set up test environment
+	cleanup := testutils.SetupTestEnv(t)
+	defer cleanup()
 
 	// Create test module
 	module := fx.Module("test",

@@ -223,6 +223,46 @@ func TestElasticsearchConfigValidation(t *testing.T) {
 			expectedErr: "retry values must be non-negative",
 		},
 		{
+			name: "invalid retry initial wait",
+			setup: func(t *testing.T) {
+				// Debug: Print environment variables
+				t.Logf("Setting up environment variables for invalid retry initial wait test")
+				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
+				t.Logf("ELASTICSEARCH_USERNAME: %s", os.Getenv("ELASTICSEARCH_USERNAME"))
+				t.Logf("ELASTICSEARCH_PASSWORD: %s", os.Getenv("ELASTICSEARCH_PASSWORD"))
+				t.Logf("ELASTICSEARCH_RETRY_ENABLED: %s", os.Getenv("ELASTICSEARCH_RETRY_ENABLED"))
+				t.Logf("ELASTICSEARCH_RETRY_INITIAL_WAIT: %s", os.Getenv("ELASTICSEARCH_RETRY_INITIAL_WAIT"))
+
+				t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				t.Setenv("ELASTICSEARCH_USERNAME", "user")
+				t.Setenv("ELASTICSEARCH_PASSWORD", "pass")
+				t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
+				t.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "500ms")
+			},
+			expectedErr: "initial wait must be at least 1 second",
+		},
+		{
+			name: "invalid retry max wait",
+			setup: func(t *testing.T) {
+				// Debug: Print environment variables
+				t.Logf("Setting up environment variables for invalid retry max wait test")
+				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
+				t.Logf("ELASTICSEARCH_USERNAME: %s", os.Getenv("ELASTICSEARCH_USERNAME"))
+				t.Logf("ELASTICSEARCH_PASSWORD: %s", os.Getenv("ELASTICSEARCH_PASSWORD"))
+				t.Logf("ELASTICSEARCH_RETRY_ENABLED: %s", os.Getenv("ELASTICSEARCH_RETRY_ENABLED"))
+				t.Logf("ELASTICSEARCH_RETRY_INITIAL_WAIT: %s", os.Getenv("ELASTICSEARCH_RETRY_INITIAL_WAIT"))
+				t.Logf("ELASTICSEARCH_RETRY_MAX_WAIT: %s", os.Getenv("ELASTICSEARCH_RETRY_MAX_WAIT"))
+
+				t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				t.Setenv("ELASTICSEARCH_USERNAME", "user")
+				t.Setenv("ELASTICSEARCH_PASSWORD", "pass")
+				t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
+				t.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "2s")
+				t.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "1s")
+			},
+			expectedErr: "max wait must be greater than or equal to initial wait",
+		},
+		{
 			name: "missing index name",
 			setup: func(t *testing.T) {
 				// Debug: Print environment variables
