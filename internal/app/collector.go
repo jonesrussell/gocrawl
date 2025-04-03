@@ -8,10 +8,10 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 )
@@ -32,7 +32,7 @@ import (
 //   - error: Any error that occurred during setup
 func SetupCollector(
 	ctx context.Context,
-	log types.Logger,
+	log logger.Interface,
 	source sources.Config,
 	processors []common.Processor,
 	done chan struct{},

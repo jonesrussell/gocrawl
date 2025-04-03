@@ -7,7 +7,7 @@ import (
 )
 
 // NewSourcesCommand returns the sources command.
-func NewSourcesCommand(log logger.Logger) *cobra.Command {
+func NewSourcesCommand(log logger.Interface) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sources",
 		Short: "Manage content sources",
@@ -26,7 +26,7 @@ It allows you to add, list, and configure web content sources for crawling.`,
 }
 
 // newAddCmd creates the add command.
-func newAddCmd(log logger.Logger) *cobra.Command {
+func newAddCmd(log logger.Interface) *cobra.Command {
 	return &cobra.Command{
 		Use:   "add",
 		Short: "Add a new content source",
@@ -40,7 +40,7 @@ The source will be used for future crawling operations.`,
 }
 
 // newListCmd creates the list command.
-func newListCmd(log logger.Logger) *cobra.Command {
+func newListCmd(log logger.Interface) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all content sources",
@@ -54,7 +54,7 @@ This command shows the details of each source.`,
 }
 
 // newDeleteCmd creates the delete command.
-func newDeleteCmd(log logger.Logger) *cobra.Command {
+func newDeleteCmd(log logger.Interface) *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete",
 		Short: "Delete a content source",

@@ -8,7 +8,6 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -27,7 +26,7 @@ import (
 type testDeps struct {
 	Crawler       crawler.Interface
 	Storage       storagetypes.Interface
-	Logger        types.Logger
+	Logger        logger.Interface
 	Config        config.Interface
 	SourceManager sources.Interface
 	Handler       *signal.SignalHandler
@@ -82,9 +81,9 @@ func createTestApp(t *testing.T, deps *testDeps, hooks ...fx.Hook) *fx.App {
 			func() storagetypes.Interface { return deps.Storage },
 			fx.ResultTags(`name:"storage"`),
 		),
-		func() types.Logger { return deps.Logger },
+		func() logger.Interface { return deps.Logger },
 		fx.Annotate(
-			func() types.Logger { return deps.Logger },
+			func() logger.Interface { return deps.Logger },
 			fx.ResultTags(`name:"logger"`),
 		),
 		func() config.Interface { return deps.Config },
@@ -205,9 +204,9 @@ func TestCommandExecution(t *testing.T) {
 				func() storagetypes.Interface { return mockStorage },
 				fx.ResultTags(`name:"storage"`),
 			),
-			func() types.Logger { return mockLogger },
+			func() logger.Interface { return mockLogger },
 			fx.Annotate(
-				func() types.Logger { return mockLogger },
+				func() logger.Interface { return mockLogger },
 				fx.ResultTags(`name:"logger"`),
 			),
 			func() config.Interface { return mockConfig },

@@ -2,17 +2,10 @@
 package sources
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"go.uber.org/fx"
 )
 
-// Module provides the sources command module.
-type Module struct {
-	logger logger.Logger
-}
-
-// NewModule creates a new sources module.
-func NewModule(log logger.Logger) *Module {
-	return &Module{
-		logger: log,
-	}
-}
+// Module provides the sources command functionality.
+var Module = fx.Module("sources",
+	fx.Provide(NewSourcesCommand),
+)

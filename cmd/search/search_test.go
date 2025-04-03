@@ -9,7 +9,6 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/cmd/search"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -47,7 +46,7 @@ func (m *mockSearchManager) Count(ctx context.Context, index string, query any) 
 // testDeps holds all the dependencies needed for testing
 type testDeps struct {
 	Storage       storagetypes.Interface
-	Logger        types.Logger
+	Logger        logger.Interface
 	Config        config.Interface
 	Handler       *signal.SignalHandler
 	Context       context.Context
@@ -82,7 +81,7 @@ func createTestApp(t *testing.T, deps *testDeps) *fx.App {
 	providers := []any{
 		// Core dependencies
 		func() storagetypes.Interface { return deps.Storage },
-		func() types.Logger { return deps.Logger },
+		func() logger.Interface { return deps.Logger },
 		func() config.Interface { return deps.Config },
 		func() *signal.SignalHandler { return deps.Handler },
 		func() context.Context { return deps.Context },

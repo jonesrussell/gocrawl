@@ -10,7 +10,6 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -75,8 +74,8 @@ func createTestModule(mockStore *httpdTestStorage) fx.Option {
 
 // createServerAndSecurity creates the HTTP server and security middleware
 func createServerAndSecurity(
-	log common.Logger,
-	cfg common.Config,
+	log logger.Interface,
+	cfg config.Interface,
 	lc fx.Lifecycle,
 ) (*http.Server, middleware.SecurityMiddlewareInterface) {
 	// Create router and security middleware
@@ -167,8 +166,8 @@ func TestModuleProvides(t *testing.T) {
 		// Provide mock logger directly
 		fx.Provide(
 			fx.Annotate(
-				func() common.Logger { return mockLogger },
-				fx.As(new(common.Logger)),
+				func() logger.Interface { return mockLogger },
+				fx.As(new(logger.Interface)),
 			),
 		),
 		testModule,

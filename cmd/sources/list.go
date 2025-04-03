@@ -10,7 +10,6 @@ import (
 
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -21,7 +20,7 @@ import (
 type Params struct {
 	fx.In
 	SourceManager sources.Interface
-	Logger        types.Logger
+	Logger        logger.Interface
 }
 
 // ListCommand creates and returns the list command that displays all sources.
@@ -59,7 +58,7 @@ func RunList(cmd *cobra.Command, _ []string) error {
 		fx.Invoke(func(p struct {
 			fx.In
 			Sources sources.Interface
-			Logger  types.Logger
+			Logger  logger.Interface
 			LC      fx.Lifecycle
 		}) {
 			// Update the signal handler with the real logger
@@ -145,7 +144,7 @@ func ExecuteList(params Params, ctx context.Context) error {
 }
 
 // PrintSources prints the list of sources.
-func PrintSources(sources []sources.Config, logger types.Logger) error {
+func PrintSources(sources []sources.Config, logger logger.Interface) error {
 	if len(sources) == 0 {
 		logger.Info("No sources found")
 		return nil

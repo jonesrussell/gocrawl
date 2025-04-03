@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/jonesrussell/gocrawl/cmd/indices"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -58,7 +57,7 @@ var testModule = func(t *testing.T) fx.Option {
 		fx.Provide(
 			func() context.Context { return t.Context() },
 			func() config.Interface { return configtestutils.NewMockConfig() },
-			func() types.Logger { return logger.NewNoOp() },
+			func() logger.Interface { return logger.NewNoOp() },
 		),
 	)
 }
@@ -77,7 +76,7 @@ func TestCreateCommand(t *testing.T) {
 		fx.Provide(
 			func() storagetypes.Interface { return mockStore },
 		),
-		fx.Invoke(func(lc fx.Lifecycle, ctx context.Context, logger types.Logger, storage storagetypes.Interface) {
+		fx.Invoke(func(lc fx.Lifecycle, ctx context.Context, logger logger.Interface, storage storagetypes.Interface) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
 					// Create the index with default mapping
@@ -170,7 +169,7 @@ func TestCreateCommandArgs(t *testing.T) {
 					func() storagetypes.Interface { return mockStore },
 					func() *cobra.Command { return cmd },
 				),
-				fx.Invoke(func(lc fx.Lifecycle, ctx context.Context, logger types.Logger, storage storagetypes.Interface) {
+				fx.Invoke(func(lc fx.Lifecycle, ctx context.Context, logger logger.Interface, storage storagetypes.Interface) {
 					lc.Append(fx.Hook{
 						OnStart: func(ctx context.Context) error {
 							indexName := tt.args[0]

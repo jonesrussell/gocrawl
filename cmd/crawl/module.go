@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -29,8 +30,9 @@ type CommandDeps struct {
 	Storage     storagetypes.Interface
 	Crawler     crawler.Interface
 	Sources     sources.Interface
-	ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
-	Processors  []common.Processor   `group:"processors"`
+	Handler     *signal.SignalHandler `name:"signalHandler"`
+	ArticleChan chan *models.Article  `name:"crawlerArticleChannel"`
+	Processors  []common.Processor    `group:"processors"`
 }
 
 // Module provides the crawl command's dependencies.

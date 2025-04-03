@@ -12,8 +12,8 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	commontypes "github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -127,8 +127,8 @@ func TestHTTPCommand(t *testing.T) {
 		// Provide mock logger directly
 		fx.Provide(
 			fx.Annotate(
-				func() commontypes.Logger { return mockLogger },
-				fx.As(new(commontypes.Logger)),
+				func() logger.Interface { return mockLogger },
+				fx.As(new(logger.Interface)),
 			),
 		),
 		fx.Supply(
@@ -199,8 +199,8 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 		// Provide mock logger directly
 		fx.Provide(
 			fx.Annotate(
-				func() commontypes.Logger { return mockLogger },
-				fx.As(new(commontypes.Logger)),
+				func() logger.Interface { return mockLogger },
+				fx.As(new(logger.Interface)),
 			),
 		),
 		fx.Supply(
@@ -373,8 +373,8 @@ func TestServerHealthCheck(t *testing.T) {
 		fx.NopLogger,
 		fx.Provide(
 			fx.Annotate(
-				func() commontypes.Logger { return mockLogger },
-				fx.As(new(commontypes.Logger)),
+				func() logger.Interface { return mockLogger },
+				fx.As(new(logger.Interface)),
 			),
 		),
 		fx.Supply(
@@ -473,8 +473,8 @@ func TestServerStorageConnection(t *testing.T) {
 		fx.NopLogger,
 		fx.Provide(
 			fx.Annotate(
-				func() commontypes.Logger { return mockLogger },
-				fx.As(new(commontypes.Logger)),
+				func() logger.Interface { return mockLogger },
+				fx.As(new(logger.Interface)),
 			),
 		),
 		fx.Supply(
@@ -566,8 +566,8 @@ func TestServerErrorHandling(t *testing.T) {
 		fx.NopLogger,
 		fx.Provide(
 			fx.Annotate(
-				func() commontypes.Logger { return mockLogger },
-				fx.As(new(commontypes.Logger)),
+				func() logger.Interface { return mockLogger },
+				fx.As(new(logger.Interface)),
 			),
 		),
 		fx.Supply(
@@ -656,8 +656,8 @@ func TestServerTimeoutHandling(t *testing.T) {
 		fx.NopLogger,
 		fx.Provide(
 			fx.Annotate(
-				func() commontypes.Logger { return mockLogger },
-				fx.As(new(commontypes.Logger)),
+				func() logger.Interface { return mockLogger },
+				fx.As(new(logger.Interface)),
 			),
 		),
 		fx.Supply(

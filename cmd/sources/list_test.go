@@ -10,7 +10,6 @@ import (
 	"time"
 
 	cmdsrcs "github.com/jonesrussell/gocrawl/cmd/sources"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -180,7 +179,7 @@ func (m *mockConfig) GetCommand() string                    { return "list" }
 type TestParams struct {
 	fx.In
 	Sources sources.Interface
-	Logger  types.Logger
+	Logger  logger.Interface
 }
 
 // TestConfigModule provides test configuration
@@ -230,12 +229,12 @@ func Test_runList(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		setup   func(t *testing.T) (*cobra.Command, sources.Interface, types.Logger)
+		setup   func(t *testing.T) (*cobra.Command, sources.Interface, logger.Interface)
 		wantErr bool
 	}{
 		{
 			name: "successful execution",
-			setup: func(t *testing.T) (*cobra.Command, sources.Interface, types.Logger) {
+			setup: func(t *testing.T) (*cobra.Command, sources.Interface, logger.Interface) {
 				cmd := &cobra.Command{}
 				cmd.SetContext(t.Context())
 
@@ -248,20 +247,18 @@ func Test_runList(t *testing.T) {
 				ml.On("Fatal", mock.Anything, mock.Anything).Return()
 				ml.On("Printf", mock.Anything, mock.Anything).Return()
 				ml.On("Errorf", mock.Anything, mock.Anything).Return()
-				ml.On("Sync").Return(nil)
 
 				// Create mock source manager
-				sourceConfigs := []sources.Config{
-					{
-						Name:         "Test Source",
-						URL:          "https://test.com",
-						RateLimit:    time.Second,
-						MaxDepth:     2,
-						Index:        "test_content",
-						ArticleIndex: "test_articles",
+				sm := &mockSourceManager{
+					sources: []sources.Config{
+						{
+							Name:      "Test Source",
+							URL:       "https://test.com",
+							RateLimit: time.Second,
+							MaxDepth:  2,
+						},
 					},
 				}
-				sm := &mockSourceManager{sources: sourceConfigs}
 
 				return cmd, sm, ml
 			},
@@ -284,14 +281,14 @@ func Test_runList(t *testing.T) {
 						fx.As(new(sources.Interface)),
 					),
 					fx.Annotate(
-						func() types.Logger { return ml },
-						fx.As(new(types.Logger)),
+						func() logger.Interface { return ml },
+						fx.As(new(logger.Interface)),
 					),
 				),
 				fx.Invoke(func(p struct {
 					fx.In
 					Sources sources.Interface
-					Logger  types.Logger
+					Logger  logger.Interface
 					LC      fx.Lifecycle
 				}) {
 					p.LC.Append(fx.Hook{
@@ -491,7 +488,7 @@ func Test_printSources_error(t *testing.T) {
 	tests := []struct {
 		name    string
 		sources []sources.Config
-		logger  types.Logger
+		logger  logger.Interface
 		wantErr bool
 	}{
 		{
@@ -608,7 +605,7 @@ func TestModuleProvides(t *testing.T) {
 		fx.Provide(
 			fx.Annotate(func() logger.Interface { return ml }, fx.As(new(logger.Interface))),
 		),
-		Module,
+		cmdsrcs.Module,
 	)
 
 	app.RequireStart()
