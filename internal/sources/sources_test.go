@@ -258,11 +258,8 @@ func TestGetMetrics(t *testing.T) {
 	// Test GetMetrics
 	metrics := s.GetMetrics()
 	require.NotNil(t, metrics)
-	m := metrics.(struct {
-		SourceCount int64
-		LastUpdated interface{}
-	})
-	assert.Equal(t, int64(1), m.SourceCount)
+	assert.Equal(t, int64(1), metrics.SourceCount)
+	assert.NotZero(t, metrics.LastUpdated)
 }
 
 func TestFindByName(t *testing.T) {
@@ -430,9 +427,6 @@ func TestEmptySources(t *testing.T) {
 
 	// Test GetMetrics with empty sources
 	metrics := s.GetMetrics()
-	m := metrics.(struct {
-		SourceCount int64
-		LastUpdated interface{}
-	})
-	require.Equal(t, int64(0), m.SourceCount)
+	require.Equal(t, int64(0), metrics.SourceCount)
+	assert.NotZero(t, metrics.LastUpdated)
 }

@@ -86,9 +86,9 @@ var TestCrawlerModule = fx.Module("crawler",
 	content.Module,
 	fx.Provide(
 		// Provide debugger
-		func(logger common.Logger) debug.Debugger {
+		func(log logger.Interface) debug.Debugger {
 			return &debug.LogDebugger{
-				Output: crawler.NewDebugLogger(logger),
+				Output: crawler.NewDebugLogger(log),
 			}
 		},
 		// Provide event bus
@@ -121,7 +121,7 @@ var TestCrawlerModule = fx.Module("crawler",
 		// Article processor
 		fx.Annotate(
 			func(
-				log common.Logger,
+				log logger.Interface,
 				articleService article.Interface,
 				storage types.Interface,
 				params struct {
@@ -144,7 +144,7 @@ var TestCrawlerModule = fx.Module("crawler",
 		// Content processor
 		fx.Annotate(
 			func(
-				log common.Logger,
+				log logger.Interface,
 				contentService content.Interface,
 				storage types.Interface,
 				params struct {
@@ -201,7 +201,7 @@ func TestModuleLifecycle(t *testing.T) {
 	require.NoError(t, app.Stop(t.Context()))
 }
 
-func TestModuleProvides(t *testing.T) {
+func TestModuleProvidesLogger(t *testing.T) {
 	log := &mockLogger{}
 
 	app := fxtest.New(t,

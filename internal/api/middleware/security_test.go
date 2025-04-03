@@ -13,6 +13,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -29,6 +30,13 @@ func (m *mockLogger) Fatal(msg string, fields ...any)   { m.Called(msg, fields) 
 func (m *mockLogger) Printf(format string, args ...any) { m.Called(format, args) }
 func (m *mockLogger) Errorf(format string, args ...any) { m.Called(format, args) }
 func (m *mockLogger) Sync() error                       { return m.Called().Error(0) }
+func (m *mockLogger) With(fields ...any) logger.Interface {
+	args := m.Called(fields)
+	if args.Get(0) == nil {
+		return m
+	}
+	return args.Get(0).(logger.Interface)
+}
 
 // mockTimeProvider implements TimeProvider for testing
 type mockTimeProvider struct {
