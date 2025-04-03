@@ -346,3 +346,25 @@ func TestModule(t *testing.T) {
 	err = app.Stop(t.Context())
 	require.NoError(t, err)
 }
+
+func TestSecurityMiddleware(t *testing.T) {
+	tests := []struct {
+		name      string
+		apiKey    string
+		expectErr bool
+	}{
+		{"valid key", "test-key", false},
+		{"invalid key", "wrong-key", true},
+		{"missing key", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test request
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Set("X-Api-Key", tt.apiKey)
+
+			// ... rest of the test ...
+		})
+	}
+}

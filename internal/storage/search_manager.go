@@ -3,6 +3,8 @@ package storage
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -23,23 +25,33 @@ func NewSearchManager(storage types.Interface, logger logger.Interface) api.Sear
 	}
 }
 
-// Search implements api.SearchManager
-func (m *SearchManager) Search(ctx context.Context, index string, query map[string]interface{}) ([]interface{}, error) {
-	return m.storage.Search(ctx, index, query)
+// Search performs a search query.
+func (m *SearchManager) Search(ctx context.Context, index string, query map[string]any) ([]any, error) {
+	result, err := m.storage.Search(ctx, index, query)
+	if err != nil {
+		return nil, fmt.Errorf("search failed: %w", err)
+	}
+	return result, nil
 }
 
-// Count implements api.SearchManager
-func (m *SearchManager) Count(ctx context.Context, index string, query map[string]interface{}) (int64, error) {
+// Count returns the number of documents matching a query.
+func (m *SearchManager) Count(ctx context.Context, index string, query map[string]any) (int64, error) {
 	return m.storage.Count(ctx, index, query)
 }
 
-// Aggregate implements api.SearchManager
-func (m *SearchManager) Aggregate(ctx context.Context, index string, aggs map[string]interface{}) (map[string]interface{}, error) {
+// Aggregate performs an aggregation query.
+func (m *SearchManager) Aggregate(ctx context.Context, index string, aggs map[string]any) (map[string]any, error) {
 	result, err := m.storage.Aggregate(ctx, index, aggs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("aggregation failed: %w", err)
 	}
-	return result.(map[string]interface{}), nil
+	if result == nil {
+		return nil, errors.New("aggregation result is nil")
+	}
+	if converted, ok := result.(map[string]any); ok {
+		return converted, nil
+	}
+	return nil, errors.New("invalid aggregation result type")
 }
 
 // Close implements api.SearchManager
