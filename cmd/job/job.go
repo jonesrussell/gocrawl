@@ -273,7 +273,7 @@ func setupFXApp(
 	return fx.New(
 		fx.Provide(
 			fx.Annotate(
-				func() context.Context { return context.Background() },
+				context.Background,
 				fx.ResultTags(`name:"jobContext"`),
 			),
 			fx.Annotate(

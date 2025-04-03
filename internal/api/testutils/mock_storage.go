@@ -18,7 +18,7 @@ func NewMockStorage() *MockStorage {
 }
 
 // Search implements storage.Interface.
-func (m *MockStorage) Search(ctx context.Context, query string, index string, size int) ([]any, error) {
+func (m *MockStorage) Search(ctx context.Context, query, index string, size int) ([]any, error) {
 	args := m.Called(ctx, query, index, size)
 	if result, ok := args.Get(0).([]any); ok {
 		return result, args.Error(1)
@@ -27,7 +27,7 @@ func (m *MockStorage) Search(ctx context.Context, query string, index string, si
 }
 
 // Count implements storage.Interface.
-func (m *MockStorage) Count(ctx context.Context, query string, index string) (int64, error) {
+func (m *MockStorage) Count(ctx context.Context, query, index string) (int64, error) {
 	args := m.Called(ctx, query, index)
 	if result, ok := args.Get(0).(int64); ok {
 		return result, args.Error(1)

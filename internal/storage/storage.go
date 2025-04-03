@@ -48,7 +48,7 @@ func (s *Impl) createContextWithTimeout(
 }
 
 // IndexDocument indexes a document in Elasticsearch
-func (s *Impl) IndexDocument(ctx context.Context, index string, id string, document any) error {
+func (s *Impl) IndexDocument(ctx context.Context, index, id string, document any) error {
 	if s.ESClient == nil {
 		return errors.New("elasticsearch client is not initialized")
 	}
@@ -217,7 +217,7 @@ func (s *Impl) Search(ctx context.Context, index string, query any) ([]any, erro
 	return documents, nil
 }
 
-// CreateIndex creates a new index with optional mapping
+// CreateIndex creates a new index with the specified mapping
 func (s *Impl) CreateIndex(
 	ctx context.Context,
 	index string,
@@ -287,11 +287,10 @@ func (s *Impl) DeleteIndex(ctx context.Context, index string) error {
 	return nil
 }
 
-// UpdateDocument updates an existing document
+// UpdateDocument updates a document in Elasticsearch
 func (s *Impl) UpdateDocument(
 	ctx context.Context,
-	index string,
-	docID string,
+	index, docID string,
 	update map[string]any,
 ) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
@@ -330,8 +329,8 @@ func (s *Impl) UpdateDocument(
 	return nil
 }
 
-// DeleteDocument deletes a document
-func (s *Impl) DeleteDocument(ctx context.Context, index string, docID string) error {
+// DeleteDocument deletes a document from Elasticsearch
+func (s *Impl) DeleteDocument(ctx context.Context, index, docID string) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
 	defer cancel()
 
@@ -377,8 +376,8 @@ func (s *Impl) IndexExists(ctx context.Context, indexName string) (bool, error) 
 	return res.StatusCode == http.StatusOK, nil
 }
 
-// GetDocument implements Interface
-func (s *Impl) GetDocument(ctx context.Context, index string, id string, document any) error {
+// GetDocument retrieves a document from Elasticsearch
+func (s *Impl) GetDocument(ctx context.Context, index, id string, document any) error {
 	res, err := s.ESClient.Get(
 		index,
 		id,
@@ -404,11 +403,10 @@ func (s *Impl) GetDocument(ctx context.Context, index string, id string, documen
 	return nil
 }
 
-// SearchDocuments implements Interface
+// SearchDocuments searches for documents in Elasticsearch
 func (s *Impl) SearchDocuments(
 	ctx context.Context,
-	index string,
-	query string,
+	index, query string,
 ) ([]map[string]any, error) {
 	searchQuery := map[string]any{
 		"query": map[string]any{
@@ -540,7 +538,7 @@ func (s *Impl) ListIndices(ctx context.Context) ([]string, error) {
 	return result, nil
 }
 
-// GetMapping gets the mapping for an index
+// GetMapping retrieves the mapping for an index
 func (s *Impl) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	res, err := s.ESClient.Indices.GetMapping(
 		s.ESClient.Indices.GetMapping.WithContext(ctx),
@@ -599,7 +597,7 @@ func (s *Impl) UpdateMapping(ctx context.Context, index string, mapping map[stri
 	return nil
 }
 
-// GetIndexHealth gets the health status of an index
+// GetIndexHealth retrieves the health status of an index
 func (s *Impl) GetIndexHealth(ctx context.Context, index string) (string, error) {
 	res, err := s.ESClient.Cluster.Health(
 		s.ESClient.Cluster.Health.WithContext(ctx),
@@ -636,7 +634,7 @@ func (s *Impl) GetIndexHealth(ctx context.Context, index string) (string, error)
 	return status, nil
 }
 
-// GetIndexDocCount gets the document count of an index
+// GetIndexDocCount retrieves the document count for an index
 func (s *Impl) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	res, err := s.ESClient.Count(
 		s.ESClient.Count.WithContext(ctx),
@@ -682,7 +680,7 @@ func marshalJSON(v any) ([]byte, error) {
 	return data, nil
 }
 
-// SearchArticles implements Interface
+// SearchArticles searches for articles in Elasticsearch
 func (s *Impl) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
 	if s.opts.IndexName == "" {
 		return nil, errors.New("index name is not configured")
@@ -795,7 +793,7 @@ func (s *Impl) Aggregate(ctx context.Context, index string, aggs any) (any, erro
 	return aggregations, nil
 }
 
-// Count returns the number of documents matching a query
+// Count counts documents in an index
 func (s *Impl) Count(ctx context.Context, index string, query any) (int64, error) {
 	if s.ESClient == nil {
 		return 0, errors.New("elasticsearch client is not initialized")
