@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	signal "github.com/jonesrussell/gocrawl/cmd/common/signal"
+	signalHandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -29,18 +29,19 @@ type Dependencies struct {
 	fx.In
 
 	Lifecycle    fx.Lifecycle
-	Logger       types.Logger
+	Logger       logger.Interface
 	Config       config.Interface
 	Storage      storagetypes.Interface
 	IndexManager api.IndexManager
 	Context      context.Context
+	Sources      sources.Interface
 }
 
 // Params holds the parameters required for running the HTTP server.
 type Params struct {
 	fx.In
 	Server  *http.Server
-	Logger  types.Logger
+	Logger  logger.Interface
 	Storage storagetypes.Interface
 	Config  config.Interface
 }
@@ -57,7 +58,7 @@ type serverState struct {
 // Server implements the HTTP server
 type Server struct {
 	config config.Interface
-	Logger types.Logger
+	Logger logger.Interface
 	server *http.Server
 }
 
@@ -102,8 +103,8 @@ You can send POST requests to /search with a JSON body containing the search par
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Set up signal handling with a no-op logger initially
-		handler := signal.NewSignalHandler(logger.NewNoOp())
+		// Set up signal handling
+		handler := signalHandler.NewSignalHandler(logger.NewNoOp())
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
