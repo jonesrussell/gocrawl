@@ -2,10 +2,13 @@
 package crawl_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
@@ -56,6 +59,34 @@ func TestCommandDeps(t *testing.T) {
 					return []common.Processor{}
 				},
 				fx.ResultTags(`group:"processors"`),
+			),
+			// Provide named context
+			fx.Annotate(
+				func() context.Context {
+					return context.Background()
+				},
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			// Provide source name
+			fx.Annotate(
+				func() string {
+					return "test-source"
+				},
+				fx.ResultTags(`name:"sourceName"`),
+			),
+			// Provide signal handler
+			fx.Annotate(
+				func() *signal.SignalHandler {
+					return &signal.SignalHandler{}
+				},
+				fx.ResultTags(`name:"signalHandler"`),
+			),
+			// Provide article channel
+			fx.Annotate(
+				func() chan *models.Article {
+					return make(chan *models.Article)
+				},
+				fx.ResultTags(`name:"crawlerArticleChannel"`),
 			),
 		),
 		fx.Invoke(func(deps crawl.CommandDeps) {
