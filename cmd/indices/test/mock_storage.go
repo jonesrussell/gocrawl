@@ -4,130 +4,131 @@ package test
 import (
 	"context"
 
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockStorage implements storage.Interface for testing
+// MockStorage is a mock implementation of the storage interface
 type MockStorage struct {
 	mock.Mock
-	storagetypes.Interface
+	types.Interface
 }
 
-func (m *MockStorage) CreateIndex(ctx context.Context, name string, mapping map[string]any) error {
-	args := m.Called(ctx, name, mapping)
-	return args.Error(0)
-}
-
-func (m *MockStorage) DeleteIndex(ctx context.Context, name string) error {
-	args := m.Called(ctx, name)
-	return args.Error(0)
-}
-
-func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
-	args := m.Called(ctx)
-	if err := args.Error(1); err != nil {
-		return nil, err
-	}
-	val, ok := args.Get(0).([]string)
-	if !ok {
-		return nil, nil
-	}
-	return val, nil
-}
-
-func (m *MockStorage) IndexExists(ctx context.Context, name string) (bool, error) {
-	args := m.Called(ctx, name)
-	if err := args.Error(1); err != nil {
-		return false, err
-	}
-	val, ok := args.Get(0).(bool)
-	if !ok {
-		return false, nil
-	}
-	return val, nil
-}
-
-func (m *MockStorage) TestConnection(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *MockStorage) GetIndexHealth(ctx context.Context, name string) (string, error) {
-	args := m.Called(ctx, name)
-	if err := args.Error(1); err != nil {
-		return "", err
-	}
-	val, ok := args.Get(0).(string)
-	if !ok {
-		return "", nil
-	}
-	return val, nil
-}
-
-func (m *MockStorage) GetIndexDocCount(ctx context.Context, name string) (int64, error) {
-	args := m.Called(ctx, name)
-	if err := args.Error(1); err != nil {
-		return 0, err
-	}
-	val, ok := args.Get(0).(int64)
-	if !ok {
-		return 0, nil
-	}
-	return val, nil
-}
-
-// Required interface methods
-func (m *MockStorage) IndexDocument(ctx context.Context, index string, id string, document any) error {
+// IndexDocument mocks the IndexDocument method
+func (m *MockStorage) IndexDocument(ctx context.Context, index, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
-func (m *MockStorage) GetDocument(ctx context.Context, index string, id string, document any) error {
+// GetDocument mocks the GetDocument method
+func (m *MockStorage) GetDocument(ctx context.Context, index, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
-func (m *MockStorage) DeleteDocument(ctx context.Context, index string, id string) error {
+// DeleteDocument mocks the DeleteDocument method
+func (m *MockStorage) DeleteDocument(ctx context.Context, index, id string) error {
 	args := m.Called(ctx, index, id)
 	return args.Error(0)
 }
 
+// BulkIndex mocks the BulkIndex method
 func (m *MockStorage) BulkIndex(ctx context.Context, index string, documents []any) error {
 	args := m.Called(ctx, index, documents)
 	return args.Error(0)
 }
 
+// CreateIndex mocks the CreateIndex method
+func (m *MockStorage) CreateIndex(ctx context.Context, index string, mapping map[string]any) error {
+	args := m.Called(ctx, index, mapping)
+	return args.Error(0)
+}
+
+// DeleteIndex mocks the DeleteIndex method
+func (m *MockStorage) DeleteIndex(ctx context.Context, index string) error {
+	args := m.Called(ctx, index)
+	return args.Error(0)
+}
+
+// ListIndices mocks the ListIndices method
+func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+// GetMapping mocks the GetMapping method
 func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	args := m.Called(ctx, index)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(map[string]any), args.Error(1)
 }
 
+// UpdateMapping mocks the UpdateMapping method
 func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]any) error {
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }
 
+// IndexExists mocks the IndexExists method
+func (m *MockStorage) IndexExists(ctx context.Context, index string) (bool, error) {
+	args := m.Called(ctx, index)
+	return args.Get(0).(bool), args.Error(1)
+}
+
+// Search mocks the Search method
 func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).([]any), args.Error(1)
 }
 
+// GetIndexHealth mocks the GetIndexHealth method
+func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
+	args := m.Called(ctx, index)
+	return args.Get(0).(string), args.Error(1)
+}
+
+// GetIndexDocCount mocks the GetIndexDocCount method
+func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
+	args := m.Called(ctx, index)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+// Ping mocks the Ping method
 func (m *MockStorage) Ping(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
+// TestConnection mocks the TestConnection method
+func (m *MockStorage) TestConnection(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+// Aggregate mocks the Aggregate method
 func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
 	args := m.Called(ctx, index, aggs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0), args.Error(1)
 }
 
+// Count mocks the Count method
 func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
 	return args.Get(0).(int64), args.Error(1)
 }
 
+// Close mocks the Close method
 func (m *MockStorage) Close() error {
 	args := m.Called()
 	return args.Error(0)

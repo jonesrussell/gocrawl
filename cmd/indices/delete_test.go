@@ -277,10 +277,10 @@ func TestDeleteCommandArgs(t *testing.T) {
 			err := indices.ValidateDeleteArgs(nil, tt.args)
 
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.errMsg)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

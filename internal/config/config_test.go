@@ -702,8 +702,6 @@ sources:
 
 // TestModule provides tests for the config module's dependency injection.
 func TestModule(t *testing.T) {
-	t.Parallel()
-
 	// Create test sources file
 	testSources := `
 sources:

@@ -13,6 +13,11 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// ArticleChannelBufferSize is the size of the buffer for the article channel.
+	ArticleChannelBufferSize = 100
+)
+
 // Manager handles article processing and management.
 type Manager struct {
 	logger    logger.Interface
@@ -85,29 +90,7 @@ func ProvideArticleProcessor(
 		ArticleService: service,
 		Storage:        storage,
 		IndexName:      "articles",
-		ArticleChan:    make(chan *models.Article, 100),
+		ArticleChan:    make(chan *models.Article, ArticleChannelBufferSize),
 		metrics:        &common.Metrics{},
 	}
-}
-
-// isEmptySelectors checks if the article selectors are empty.
-// It returns true if all selector fields are empty strings.
-// This is used to determine if default selectors should be used.
-func isEmptySelectors(s config.ArticleSelectors) bool {
-	return s.Container == "" &&
-		s.Title == "" &&
-		s.Body == "" &&
-		s.Intro == "" &&
-		s.Byline == "" &&
-		s.PublishedTime == "" &&
-		s.TimeAgo == "" &&
-		s.JSONLD == "" &&
-		s.Section == "" &&
-		s.Keywords == "" &&
-		s.Description == "" &&
-		s.OGTitle == "" &&
-		s.OGDescription == "" &&
-		s.OGImage == "" &&
-		s.OgURL == "" &&
-		s.Canonical == ""
 }

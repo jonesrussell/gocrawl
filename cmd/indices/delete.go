@@ -71,10 +71,10 @@ func (d *Deleter) Start(ctx context.Context) error {
 	}
 
 	// Get existing indices
-	existingIndices, err := d.storage.ListIndices(ctx)
-	if err != nil {
-		d.logger.Error("Failed to list indices", "error", err)
-		return err
+	existingIndices, listErr := d.storage.ListIndices(ctx)
+	if listErr != nil {
+		d.logger.Error("Failed to list indices", "error", listErr)
+		return listErr
 	}
 	d.logger.Debug("Found existing indices", "indices", existingIndices)
 
@@ -105,15 +105,13 @@ func (d *Deleter) Start(ctx context.Context) error {
 
 	// Delete indices
 	for _, index := range filtered.toDelete {
-		d.logger.Info("Deleting index", "index", index)
 		if err := d.storage.DeleteIndex(ctx, index); err != nil {
 			d.logger.Error("Failed to delete index", "index", index, "error", err)
-			return err
+			return fmt.Errorf("failed to delete index %s: %w", index, err)
 		}
 		d.logger.Info("Successfully deleted index", "index", index)
 	}
 
-	d.logger.Info("Index deletion completed successfully")
 	return nil
 }
 

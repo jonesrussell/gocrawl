@@ -323,17 +323,29 @@ func TestCrawlerStartup(t *testing.T) {
 			// Provide article processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"startupArticleProcessor"`),
+				fx.ResultTags(`name:"articleProcessor"`),
 			),
 			// Provide content processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"startupContentProcessor"`),
+				fx.ResultTags(`name:"contentProcessor"`),
 			),
 			// Provide event bus with correct name
 			fx.Annotate(
 				events.NewBus,
 				fx.ResultTags(`name:"eventBus"`),
+			),
+			fx.Annotate(
+				func() chan *models.Article { return make(chan *models.Article, 100) },
+				fx.ResultTags(`name:"crawlerArticleChannel"`),
+			),
+			fx.Annotate(
+				func() string { return "test_index" },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() string { return "test_content_index" },
+				fx.ResultTags(`name:"contentIndex"`),
 			),
 		),
 		fx.Invoke(func(c crawler.Interface) {
@@ -380,12 +392,12 @@ func TestCrawlerShutdown(t *testing.T) {
 			// Provide article processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"startupArticleProcessor"`),
+				fx.ResultTags(`name:"articleProcessor"`),
 			),
 			// Provide content processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"startupContentProcessor"`),
+				fx.ResultTags(`name:"contentProcessor"`),
 			),
 			// Provide event bus with correct name
 			fx.Annotate(
@@ -435,12 +447,12 @@ func TestSourceValidation(t *testing.T) {
 			// Provide article processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"startupArticleProcessor"`),
+				fx.ResultTags(`name:"articleProcessor"`),
 			),
 			// Provide content processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"startupContentProcessor"`),
+				fx.ResultTags(`name:"contentProcessor"`),
 			),
 			// Provide event bus with correct name
 			fx.Annotate(
@@ -490,12 +502,12 @@ func TestErrorHandling(t *testing.T) {
 			// Provide article processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"startupArticleProcessor"`),
+				fx.ResultTags(`name:"articleProcessor"`),
 			),
 			// Provide content processor with correct name
 			fx.Annotate(
 				func() common.Processor { return &MockProcessor{} },
-				fx.ResultTags(`name:"startupContentProcessor"`),
+				fx.ResultTags(`name:"contentProcessor"`),
 			),
 			// Provide event bus with correct name
 			fx.Annotate(

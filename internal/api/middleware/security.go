@@ -85,15 +85,15 @@ func (m *SecurityMiddleware) Middleware() gin.HandlerFunc {
 			return
 		}
 
-		// Apply rate limiting
-		if err := m.rateLimit(c); err != nil {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		// Authenticate request first
+		if err := m.authenticate(c); err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
-		// Authenticate request
-		if err := m.authenticate(c); err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		// Apply rate limiting after authentication
+		if err := m.rateLimit(c); err != nil {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -108,6 +108,7 @@ func (m *SecurityMiddleware) addSecurityHeaders(c *gin.Context) {
 	c.Header("X-XSS-Protection", "1; mode=block")
 	c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 	c.Header("Content-Security-Policy", "default-src 'self'")
+	c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 }
 
 // handleCORS handles CORS headers and preflight requests
@@ -125,9 +126,13 @@ func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
 	c.Header("Access-Control-Allow-Origin", origin)
 	c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key")
+	c.Header("Access-Control-Max-Age", "86400") // 24 hours
 
+	// Handle preflight requests
 	if c.Request.Method == http.MethodOptions {
-		c.AbortWithStatus(http.StatusOK)
+		c.Header("Access-Control-Allow-Credentials", "true")
+		c.AbortWithStatus(http.StatusNoContent) // Use 204 for preflight
+		return nil
 	}
 
 	return nil

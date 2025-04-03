@@ -61,10 +61,23 @@ func (m *MockSources) FindByName(name string) *sourceutils.SourceConfig {
 	return args.Get(0).(*sourceutils.SourceConfig)
 }
 
+func (m *MockSources) GetSource(ctx context.Context, name string) (*sourceutils.SourceConfig, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*sourceutils.SourceConfig), args.Error(1)
+}
+
 func (m *MockSources) GetSources() ([]sourceutils.SourceConfig, error) {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]sourceutils.SourceConfig), args.Error(1)
+}
+
+func (m *MockSources) CreateSource(ctx context.Context, source *sourceutils.SourceConfig) error {
+	args := m.Called(ctx, source)
+	return args.Error(0)
 }
