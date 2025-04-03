@@ -167,6 +167,10 @@ func setupTestApp(t *testing.T) *testServer {
 				t.Context(),
 				fx.As(new(context.Context)),
 			),
+			fx.Annotate(
+				serverConfig,
+				fx.As(new(*config.ServerConfig)),
+			),
 		),
 		api.Module,
 		fx.Invoke(func(s *http.Server) {
