@@ -103,34 +103,50 @@ func bindEnvs(bindings map[string]string) error {
 	return nil
 }
 
+// setupConfig holds configuration setup dependencies
+type setupConfig struct {
+	fx.In
+
+	Logger Logger `optional:"true"`
+}
+
+// defaultLogger provides a no-op logger when no logger is injected
+type defaultLogger struct{}
+
+func (l defaultLogger) Info(msg string, fields ...Field) {}
+func (l defaultLogger) Warn(msg string, fields ...Field) {}
+
 // loadEnvFile loads an environment file if it exists and logs any errors
-func loadEnvFile(envFile string) error {
+func loadEnvFile(log Logger, envFile string) error {
 	if err := godotenv.Load(envFile); err != nil {
 		if !os.IsNotExist(err) {
-			defaultLog.Warn("Error loading environment file", "file", envFile, "error", err)
+			log.Warn("Error loading environment file",
+				String("file", envFile),
+				Error(err))
 			return err
 		}
 		return nil
 	}
-	defaultLog.Info("Loaded environment file", "file", envFile)
+	log.Info("Loaded environment file",
+		String("file", envFile))
 	return nil
 }
 
 // SetupConfig initializes the configuration system with an optional environment file
 func SetupConfig(envFile string) error {
 	// Initialize Viper configuration
-	if err := setupViper(); err != nil {
+	if err := setupViper(nil); err != nil {
 		return fmt.Errorf("failed to setup Viper: %w", err)
 	}
 
 	// Load environment file
 	if envFile != "" {
-		if err := loadEnvFile(envFile); err != nil {
+		if err := loadEnvFile(nil, envFile); err != nil {
 			return fmt.Errorf("failed to load environment file: %w", err)
 		}
 	} else {
 		// Load default .env file if it exists
-		if err := loadEnvFile(".env"); err != nil {
+		if err := loadEnvFile(nil, ".env"); err != nil {
 			return fmt.Errorf("failed to load default .env file: %w", err)
 		}
 	}
@@ -143,94 +159,38 @@ func SetupConfig(envFile string) error {
 	return nil
 }
 
+// provideConfig creates and initializes the configuration provider
+func provideConfig(envFile string) func(setupConfig) (Interface, error) {
+	return func(setup setupConfig) (Interface, error) {
+		// Use injected logger or fallback to default
+		log := setup.Logger
+		if log == nil {
+			log = defaultLogger{}
+		}
+
+		if err := SetupConfig(envFile); err != nil {
+			return nil, err
+		}
+		return New(log)
+	}
+}
+
 // Module provides the config module and its dependencies using fx.
 // It sets up the configuration providers that can be used throughout
 // the application for dependency injection.
-//
-// The module provides:
-// - Interface instance via the New constructor
-// - HTTP transport configuration via NewHTTPTransport
 var Module = fx.Options(
 	fx.Provide(
-		// Provide the config interface
-		fx.Annotate(
-			func() (Interface, error) {
-				if err := SetupConfig(""); err != nil {
-					return nil, err
-				}
-				return New()
-			},
-		),
-		NewHTTPTransport, // Provides HTTP transport configuration
+		provideConfig(""), // Provide the config interface
+		NewHTTPTransport,  // Provides HTTP transport configuration
 	),
 )
-
-// TestModule provides a test configuration module that loads the test environment file
-var TestModule = fx.Options(
-	fx.Provide(
-		// Provide the config interface for tests
-		func() (Interface, error) {
-			if err := SetupConfig(".env.test"); err != nil {
-				return nil, err
-			}
-			return New()
-		},
-		NewHTTPTransport,
-	),
-)
-
-// defaultLog implements the logger interface using standard logging
-var defaultLog = struct {
-	Info func(msg string, args ...any)
-	Warn func(msg string, args ...any)
-}{
-	Info: func(msg string, args ...any) {
-		if len(args) > 0 {
-			// Format key-value pairs
-			formattedArgs := make([]any, 0, len(args))
-			for i := 0; i < len(args); i += 2 {
-				if i+1 < len(args) {
-					formattedArgs = append(formattedArgs, args[i], args[i+1])
-				}
-			}
-			_, err := fmt.Fprintf(os.Stdout, "INFO: %s %v\n", msg, formattedArgs)
-			if err != nil {
-				return
-			}
-		} else {
-			_, err := fmt.Fprintf(os.Stdout, "INFO: %s\n", msg)
-			if err != nil {
-				return
-			}
-		}
-	},
-	Warn: func(msg string, args ...any) {
-		if len(args) > 0 {
-			// Format key-value pairs
-			formattedArgs := make([]any, 0, len(args))
-			for i := 0; i < len(args); i += 2 {
-				if i+1 < len(args) {
-					formattedArgs = append(formattedArgs, args[i], args[i+1])
-				}
-			}
-			_, err := fmt.Fprintf(os.Stderr, "WARN: %s %v\n", msg, formattedArgs)
-			if err != nil {
-				return
-			}
-		} else {
-			_, err := fmt.Fprintf(os.Stderr, "WARN: %s\n", msg)
-			if err != nil {
-				return
-			}
-		}
-	},
-}
 
 // setupViper initializes Viper with default configuration
-func setupViper() error {
+func setupViper(log Logger) error {
 	// Load config file from environment if specified
 	if cfgFile := os.Getenv("CONFIG_FILE"); cfgFile != "" {
-		defaultLog.Info("Using config file from environment", "file", cfgFile)
+		log.Info("Using config file from environment",
+			String("file", cfgFile))
 		viper.SetConfigFile(cfgFile)
 	} else {
 		// Look for config file in current directory
@@ -247,15 +207,17 @@ func setupViper() error {
 		if !errors.As(err, &configFileNotFoundError) {
 			return fmt.Errorf("error reading config file: %w", err)
 		}
-		defaultLog.Warn("No config file found, using defaults")
+		log.Warn("No config file found, using defaults")
 	} else {
-		defaultLog.Info("Configuration loaded from", "file", viper.ConfigFileUsed())
+		log.Info("Configuration loaded from",
+			String("file", viper.ConfigFileUsed()))
 	}
 
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		if !os.IsNotExist(err) {
-			defaultLog.Warn("Error loading .env file", "error", err)
+			log.Warn("Error loading .env file",
+				Error(err))
 		}
 	}
 
@@ -562,12 +524,13 @@ func createConfig() (*Impl, error) {
 }
 
 // New creates a new config provider
-func New() (*Impl, error) {
+func New(log Logger) (*Impl, error) {
 	// Load .env file in development mode
 	if os.Getenv("APP_ENV") != envProduction {
-		if loadErr := godotenv.Load(); loadErr != nil {
+		if err := godotenv.Load(); err != nil {
 			// Only log a warning as .env file is optional
-			defaultLog.Warn("Error loading .env file", "error", loadErr)
+			log.Warn("Error loading .env file",
+				Error(err))
 		}
 	}
 

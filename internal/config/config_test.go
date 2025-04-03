@@ -15,6 +15,24 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 )
 
+// testLogger implements config.Logger for testing
+type testLogger struct {
+	t *testing.T
+}
+
+func (l testLogger) Info(msg string, fields ...config.Field) {
+	l.t.Logf("INFO: %s %v", msg, fields)
+}
+
+func (l testLogger) Warn(msg string, fields ...config.Field) {
+	l.t.Logf("WARN: %s %v", msg, fields)
+}
+
+// newTestLogger creates a new test logger
+func newTestLogger(t *testing.T) config.Logger {
+	return testLogger{t: t}
+}
+
 func TestNew(t *testing.T) {
 	// Save current environment and use t.Setenv for automatic cleanup
 	t.Setenv("APP_ENV", "")
@@ -139,7 +157,7 @@ sources:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup(t)
-			cfg, err := config.New()
+			cfg, err := config.New(newTestLogger(t))
 			tt.validate(t, cfg, err)
 		})
 	}
@@ -500,7 +518,7 @@ sources:
 	require.NoError(t, viper.ReadInConfig())
 
 	// Create config
-	cfg, err := config.New()
+	cfg, err := config.New(newTestLogger(t))
 	require.NoError(t, err)
 
 	// Verify environment variables take precedence over config file values
@@ -659,7 +677,7 @@ sources:
 			require.NoError(t, readErr)
 
 			// Initialize config
-			cfg, initErr := config.New()
+			cfg, initErr := config.New(newTestLogger(t))
 
 			if tt.expectError {
 				require.Error(t, initErr)
@@ -696,6 +714,7 @@ func TestModule(t *testing.T) {
 			Command:     "test",
 		}),
 		config.TestModule,
+		fx.Supply(newTestLogger(t)), // Provide test logger
 		fx.Invoke(func(c config.Interface) {
 			// Test that we can get a config instance
 			assert.NotNil(t, c)
