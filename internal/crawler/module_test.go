@@ -3,12 +3,13 @@ package crawler_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/config/testutils"
+	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -19,6 +20,12 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/fx/fxtest"
+)
+
+const (
+	defaultReadTimeout  = 15 * time.Second
+	defaultWriteTimeout = 15 * time.Second
+	defaultIdleTimeout  = 60 * time.Second
 )
 
 // mockSources implements sources.Interface for testing.
@@ -53,22 +60,33 @@ var TestCommonModule = fx.Module("testCommon",
 var TestConfigModule = fx.Module("testConfig",
 	fx.Provide(
 		func() config.Interface {
-			mockCfg := testutils.NewMockConfig()
-			mockCfg.WithAppConfig(&config.AppConfig{
+			mockCfg := &configtestutils.MockConfig{}
+			mockCfg.On("GetAppConfig").Return(&config.AppConfig{
 				Environment: "test",
 				Name:        "gocrawl",
 				Version:     "1.0.0",
 				Debug:       true,
 			})
-			mockCfg.WithLogConfig(&config.LogConfig{
+			mockCfg.On("GetLogConfig").Return(&config.LogConfig{
 				Level: "debug",
 				Debug: true,
 			})
-			mockCfg.WithElasticsearchConfig(&config.ElasticsearchConfig{
+			mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 				Addresses: []string{"http://localhost:9200"},
 				IndexName: "test-index",
 			})
-			mockCfg.WithSources([]config.Source{})
+			mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+				Address:      ":8080",
+				ReadTimeout:  defaultReadTimeout,
+				WriteTimeout: defaultWriteTimeout,
+				IdleTimeout:  defaultIdleTimeout,
+			})
+			mockCfg.On("GetSources").Return([]config.Source{})
+			mockCfg.On("GetCommand").Return("test")
+			mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+				Default: 1,
+				Rules:   []config.PriorityRule{},
+			})
 			return mockCfg
 		},
 	),

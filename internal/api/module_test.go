@@ -112,15 +112,25 @@ func setupTestApp(t *testing.T) *testServer {
 	serverConfig.Security.RateLimit = 100 // High rate limit for tests
 
 	// Create mock config
-	mockConfig := configtest.NewMockConfig().
-		WithServerConfig(serverConfig).
-		WithAppConfig(&config.AppConfig{
-			Environment: "test",
-		}).
-		WithLogConfig(&config.LogConfig{
-			Level: "info",
-			Debug: false,
-		})
+	mockConfig := &configtest.MockConfig{}
+	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+		Environment: "test",
+	})
+	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+		Level: "info",
+		Debug: false,
+	})
+	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockConfig.On("GetServerConfig").Return(serverConfig)
+	mockConfig.On("GetSources").Return([]config.Source{}, nil)
+	mockConfig.On("GetCommand").Return("test")
+	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 
 	ts := &testServer{
 		logger: mockLogger,

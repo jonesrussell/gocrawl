@@ -13,6 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
@@ -21,6 +22,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
+)
+
+const (
+	defaultReadTimeout  = 15 * time.Second
+	defaultWriteTimeout = 15 * time.Second
+	defaultIdleTimeout  = 60 * time.Second
 )
 
 // mockStorage implements storagetypes.Interface for testing
@@ -121,7 +128,7 @@ var TestConfigModule = fx.Module("testConfig",
 	fx.Replace(
 		fx.Annotate(
 			func() config.Interface {
-				mockCfg := &testutils.MockConfig{}
+				mockCfg := &configtestutils.MockConfig{}
 				mockCfg.On("GetAppConfig").Return(&config.AppConfig{
 					Environment: "test",
 					Name:        "gocrawl",
@@ -141,6 +148,10 @@ var TestConfigModule = fx.Module("testConfig",
 				})
 				mockCfg.On("GetSources").Return([]config.Source{}, nil)
 				mockCfg.On("GetCommand").Return("test")
+				mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+					Default: 1,
+					Rules:   []config.PriorityRule{},
+				})
 				return mockCfg
 			},
 			fx.As(new(config.Interface)),
@@ -155,7 +166,7 @@ func TestHTTPCommand(t *testing.T) {
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := &testutils.MockConfig{}
+	mockCfg := &configtestutils.MockConfig{}
 	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
 		Environment: "test",
 		Name:        "gocrawl",
@@ -170,9 +181,18 @@ func TestHTTPCommand(t *testing.T) {
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
-	mockCfg.On("GetSources").Return([]config.Source{}, nil)
+	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+		Address:      ":8080",
+		ReadTimeout:  defaultReadTimeout,
+		WriteTimeout: defaultWriteTimeout,
+		IdleTimeout:  defaultIdleTimeout,
+	})
+	mockCfg.On("GetSources").Return([]config.Source{})
 	mockCfg.On("GetCommand").Return("test")
+	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 
 	mockStore := &mockStorage{}
 	mockSecurity := &testutils.MockSecurityMiddleware{}
@@ -227,7 +247,7 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := &testutils.MockConfig{}
+	mockCfg := &configtestutils.MockConfig{}
 	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
 		Environment: "test",
 		Name:        "gocrawl",
@@ -242,9 +262,18 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+		Address:      ":8080",
+		ReadTimeout:  defaultReadTimeout,
+		WriteTimeout: defaultWriteTimeout,
+		IdleTimeout:  defaultIdleTimeout,
+	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
+	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 
 	mockStore := &mockStorage{}
 	mockSecurity := &testutils.MockSecurityMiddleware{}
@@ -399,7 +428,7 @@ func TestServerHealthCheck(t *testing.T) {
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := &testutils.MockConfig{}
+	mockCfg := &configtestutils.MockConfig{}
 	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
 		Environment: "test",
 		Name:        "gocrawl",
@@ -419,6 +448,10 @@ func TestServerHealthCheck(t *testing.T) {
 	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
+	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 
 	mockStore := &mockStorage{}
 	mockStore.On("TestConnection", mock.Anything).Return(nil)
@@ -501,7 +534,7 @@ func TestServerStorageConnection(t *testing.T) {
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := &testutils.MockConfig{}
+	mockCfg := &configtestutils.MockConfig{}
 	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
 		Environment: "test",
 		Name:        "gocrawl",
@@ -516,9 +549,18 @@ func TestServerStorageConnection(t *testing.T) {
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+		Address:      ":8080",
+		ReadTimeout:  defaultReadTimeout,
+		WriteTimeout: defaultWriteTimeout,
+		IdleTimeout:  defaultIdleTimeout,
+	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
+	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 
 	mockStore := &mockStorage{}
 	mockStore.On("TestConnection", mock.Anything).Return(nil)
@@ -594,7 +636,7 @@ func TestServerErrorHandling(t *testing.T) {
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := &testutils.MockConfig{}
+	mockCfg := &configtestutils.MockConfig{}
 	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
 		Environment: "test",
 		Name:        "gocrawl",
@@ -609,9 +651,18 @@ func TestServerErrorHandling(t *testing.T) {
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+		Address:      ":8080",
+		ReadTimeout:  defaultReadTimeout,
+		WriteTimeout: defaultWriteTimeout,
+		IdleTimeout:  defaultIdleTimeout,
+	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
+	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 
 	mockStore := &mockStorage{}
 	mockStore.On("TestConnection", mock.Anything).Return(errors.New("storage connection failed"))
@@ -684,7 +735,7 @@ func TestServerTimeoutHandling(t *testing.T) {
 	mockLogger.On("Info", mock.Anything, mock.Anything, mock.Anything).Return()
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
-	mockCfg := &testutils.MockConfig{}
+	mockCfg := &configtestutils.MockConfig{}
 	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
 		Environment: "test",
 		Name:        "gocrawl",
@@ -699,9 +750,18 @@ func TestServerTimeoutHandling(t *testing.T) {
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+		Address:      ":8080",
+		ReadTimeout:  defaultReadTimeout,
+		WriteTimeout: defaultWriteTimeout,
+		IdleTimeout:  defaultIdleTimeout,
+	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
+	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 
 	mockStore := &mockStorage{}
 	mockStore.On("TestConnection", mock.Anything).Return(nil)

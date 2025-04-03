@@ -9,6 +9,7 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -44,7 +45,30 @@ func setupTestDeps(t *testing.T) *testDeps {
 	mockStorage := testutils.NewMockStorage(testutils.NewMockLogger())
 	mockLogger := logger.NewNoOp()
 	mockHandler := signal.NewSignalHandler(mockLogger)
-	mockConfig := testutils.NewMockConfig()
+	mockConfig := &configtestutils.MockConfig{}
+	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
+	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+		Level: "debug",
+		Debug: true,
+	})
+	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+		Address: ":8080",
+	})
+	mockConfig.On("GetSources").Return([]config.Source{}, nil)
+	mockConfig.On("GetCommand").Return("test")
+	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 	mockSourceManager := testutils.NewMockSourceManager()
 
 	// Set up basic expectations
@@ -595,11 +619,40 @@ func TestMaxDepthConfiguration(t *testing.T) {
 }
 
 func TestCrawlCommand(t *testing.T) {
+	// Create mock dependencies
 	mockLogger := testutils.NewMockLogger()
 	mockStorage := testutils.NewMockStorage(mockLogger)
 	mockStorageMock := mockStorage.(*testutils.MockStorage)
 	mockStorageMock.On("TestConnection", mock.Anything).Return(nil)
 
+	mockConfig := &configtestutils.MockConfig{}
+	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
+	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+		Level: "debug",
+		Debug: true,
+	})
+	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+		Address: ":8080",
+	})
+	mockConfig.On("GetSources").Return([]config.Source{}, nil)
+	mockConfig.On("GetCommand").Return("test")
+	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
+
 	cmd := crawl.Command()
-	assert.NotNil(t, cmd)
+	require.NotNil(t, cmd)
+	require.Equal(t, "crawl", cmd.Use)
+	require.NotEmpty(t, cmd.Short)
+	require.NotEmpty(t, cmd.Long)
 }

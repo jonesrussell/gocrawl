@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/jonesrussell/gocrawl/internal/testutils"
@@ -19,16 +20,52 @@ import (
 	"go.uber.org/fx/fxtest"
 )
 
+// TestConfigModule provides a test-specific config module that doesn't try to load files.
+var TestConfigModule = fx.Module("testConfig",
+	fx.Replace(
+		fx.Annotate(
+			func() config.Interface {
+				mockCfg := &configtestutils.MockConfig{}
+				mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+					Environment: "test",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+					Debug:       true,
+				})
+				mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+					Level: "debug",
+					Debug: true,
+				})
+				mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+					Addresses: []string{"http://localhost:9200"},
+					IndexName: "test-index",
+				})
+				mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+					Address: ":invalid_port",
+				})
+				mockCfg.On("GetSources").Return([]config.Source{}, nil)
+				mockCfg.On("GetCommand").Return("test")
+				mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+					Default: 1,
+					Rules:   []config.PriorityRule{},
+				})
+				return mockCfg
+			},
+			fx.As(new(config.Interface)),
+		),
+	),
+)
+
 // setupTestDependencies creates and configures all test dependencies
 func setupTestDependencies() (
 	*testutils.MockLogger,
-	*testutils.MockConfig,
+	*configtestutils.MockConfig,
 	*httpdTestStorage,
 	*testutils.MockSearchManager,
 	*testutils.MockSecurityMiddleware,
 ) {
 	mockLogger := &testutils.MockLogger{}
-	mockCfg := &testutils.MockConfig{}
+	mockCfg := &configtestutils.MockConfig{}
 	mockStore := &httpdTestStorage{}
 	mockSearch := &testutils.MockSearchManager{}
 	mockSecurity := &testutils.MockSecurityMiddleware{}
@@ -48,9 +85,15 @@ func setupTestDependencies() (
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(testutils.NewTestServerConfig())
+	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+		Address: ":8080",
+	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
+	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 
 	return mockLogger, mockCfg, mockStore, mockSearch, mockSecurity
 }
