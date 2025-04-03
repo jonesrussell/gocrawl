@@ -618,7 +618,7 @@ func TestModuleProvides(t *testing.T) {
 		fx.Provide(
 			fx.Annotate(func() logger.Interface { return testLogger }, fx.As(new(logger.Interface))),
 		),
-		Module,
+		crawler.Module,
 	)
 
 	app.RequireStart()

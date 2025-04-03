@@ -71,13 +71,10 @@ linters:
     - usetesting
     - wastedassign
     - whitespace
-    - gofmt
-    - goimports
     - gosimple
     - ineffassign
     - misspell
     - stylecheck
-    - typecheck
     - varcheck
     - whitespace
   settings:
@@ -314,6 +311,9 @@ linters:
 issues:
   max-same-issues: 50
 formatters:
+  enable:
+    - gofmt
+    - goimports
   exclusions:
     generated: lax
     paths:
