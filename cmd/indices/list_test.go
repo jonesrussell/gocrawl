@@ -72,6 +72,7 @@ func TestListCommand(t *testing.T) {
 			mockStore := new(test.MockStorage)
 
 			// Setup expectations
+			mockStore.On("TestConnection", mock.Anything).Return(nil)
 			mockStore.On("ListIndices", mock.Anything).Return(tt.indices, nil)
 			for _, index := range tt.indices {
 				mockStore.On("GetIndexHealth", mock.Anything, index).Return(tt.healthStatus[index], nil)
@@ -139,6 +140,7 @@ func TestListCommandErrors(t *testing.T) {
 			mockStore := new(test.MockStorage)
 
 			// Setup expectations
+			mockStore.On("TestConnection", mock.Anything).Return(nil)
 			mockStore.On("ListIndices", mock.Anything).Return([]string{"test"}, tt.listError)
 			if tt.listError == nil {
 				mockStore.On("GetIndexHealth", mock.Anything, "test").Return("green", tt.healthError)

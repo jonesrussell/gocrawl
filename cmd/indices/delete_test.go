@@ -7,6 +7,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/indices"
 	"github.com/jonesrussell/gocrawl/cmd/indices/test"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -53,6 +54,7 @@ func TestDeleteCommand(t *testing.T) {
 			mockStore := new(test.MockStorage)
 
 			// Setup expectations
+			mockStore.On("TestConnection", mock.Anything).Return(nil)
 			mockStore.On("ListIndices", mock.Anything).Return(tt.indices, tt.listError)
 			if tt.listError == nil {
 				for _, index := range tt.indices {
@@ -66,6 +68,9 @@ func TestDeleteCommand(t *testing.T) {
 				testModule(t),
 				fx.Provide(
 					func() storagetypes.Interface { return mockStore },
+					func() sources.Interface { return nil },
+					func() []string { return tt.indices },
+					func() bool { return false },
 					indices.NewDeleter,
 				),
 				fx.Invoke(func(deleter *indices.Deleter) {

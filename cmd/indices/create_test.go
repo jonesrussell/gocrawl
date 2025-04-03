@@ -24,7 +24,6 @@ var testModule = func(t *testing.T) fx.Option {
 			func() context.Context { return t.Context() },
 			func() config.Interface { return configtestutils.NewMockConfig() },
 			logger.NewNoOp,
-			indices.NewCreator,
 		),
 	)
 }
@@ -110,6 +109,7 @@ func TestCreateCommand(t *testing.T) {
 			mockStore := new(test.MockStorage)
 
 			// Setup expectations
+			mockStore.On("TestConnection", mock.Anything).Return(nil)
 			mockStore.On("IndexExists", mock.Anything, tt.index).Return(tt.exists, tt.existsErr)
 			if !tt.exists && tt.existsErr == nil {
 				mockStore.On("CreateIndex", mock.Anything, tt.index, tt.mapping).Return(tt.createErr)
