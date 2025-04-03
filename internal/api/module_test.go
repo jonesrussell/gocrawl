@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	apitestutils "github.com/jonesrussell/gocrawl/internal/api/testutils"
@@ -267,12 +268,11 @@ func TestSearchEndpoint(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, searchEndpoint, strings.NewReader(tt.requestBody))
 			req.Header.Set("Content-Type", "application/json")
 			if tt.apiKey != "" {
-				req.Header.Set("X-API-Key", tt.apiKey)
+				req.Header.Set("X-Api-Key", tt.apiKey)
 			}
 
 			w := httptest.NewRecorder()
@@ -348,23 +348,42 @@ func TestModule(t *testing.T) {
 }
 
 func TestSecurityMiddleware(t *testing.T) {
+	// Create test dependencies
+	serverConfig := &config.ServerConfig{}
+	serverConfig.Security.Enabled = true
+	serverConfig.Security.APIKey = testAPIKey
+	mockLogger := setupMockLogger()
+
+	// Create security middleware
+	securityMiddleware := middleware.NewSecurityMiddleware(serverConfig, mockLogger)
+
+	// Create Gin router
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(securityMiddleware.Middleware())
+	router.GET("/test", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
 	tests := []struct {
-		name      string
-		apiKey    string
-		expectErr bool
+		name     string
+		apiKey   string
+		expected int
 	}{
-		{"valid key", "test-key", false},
-		{"invalid key", "wrong-key", true},
-		{"missing key", "", true},
+		{"valid key", testAPIKey, http.StatusOK},
+		{"invalid key", "wrong-key", http.StatusUnauthorized},
+		{"missing key", "", http.StatusUnauthorized},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Create test request
-			req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
-			req.Header.Set("X-Api-Key", test.apiKey)
-
-			// ... rest of the test ...
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/test", http.NoBody)
+			if tt.apiKey != "" {
+				req.Header.Set("X-Api-Key", tt.apiKey)
+			}
+			router.ServeHTTP(w, req)
+			assert.Equal(t, tt.expected, w.Code)
 		})
 	}
 }
