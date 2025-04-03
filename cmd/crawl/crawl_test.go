@@ -202,7 +202,30 @@ func TestCommandExecution(t *testing.T) {
 	mockStorage := testutils.NewMockStorage(mockLogger)
 	mockStorageMock := mockStorage.(*testutils.MockStorage)
 	mockHandler := signal.NewSignalHandler(mockLogger)
-	mockConfig := testutils.NewMockConfig()
+	mockConfig := &configtestutils.MockConfig{}
+	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
+	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+		Level: "debug",
+		Debug: true,
+	})
+	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+		Address: ":8080",
+	})
+	mockConfig.On("GetSources").Return([]config.Source{}, nil)
+	mockConfig.On("GetCommand").Return("test")
+	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
 	mockSourceManager := testutils.NewMockSourceManager()
 
 	// Create channels

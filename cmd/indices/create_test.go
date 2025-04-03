@@ -12,6 +12,7 @@ import (
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,23 +21,23 @@ import (
 	"go.uber.org/fx/fxtest"
 )
 
-// mockStorage implements storage.Interface for testing
-type mockStorage struct {
+// MockStorage implements storage.Interface for testing
+type MockStorage struct {
 	mock.Mock
 	storagetypes.Interface
 }
 
-func (m *mockStorage) CreateIndex(ctx context.Context, name string, mapping map[string]any) error {
+func (m *MockStorage) CreateIndex(ctx context.Context, name string, mapping map[string]any) error {
 	args := m.Called(ctx, name, mapping)
 	return args.Error(0)
 }
 
-func (m *mockStorage) DeleteIndex(ctx context.Context, name string) error {
+func (m *MockStorage) DeleteIndex(ctx context.Context, name string) error {
 	args := m.Called(ctx, name)
 	return args.Error(0)
 }
 
-func (m *mockStorage) ListIndices(ctx context.Context) ([]string, error) {
+func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	args := m.Called(ctx)
 	if err := args.Error(1); err != nil {
 		return nil, err
@@ -48,7 +49,7 @@ func (m *mockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	return val, nil
 }
 
-func (m *mockStorage) IndexExists(ctx context.Context, name string) (bool, error) {
+func (m *MockStorage) IndexExists(ctx context.Context, name string) (bool, error) {
 	args := m.Called(ctx, name)
 	if err := args.Error(1); err != nil {
 		return false, err
@@ -60,8 +61,102 @@ func (m *mockStorage) IndexExists(ctx context.Context, name string) (bool, error
 	return val, nil
 }
 
-func (m *mockStorage) TestConnection(ctx context.Context) error {
+func (m *MockStorage) TestConnection(ctx context.Context) error {
 	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+// Add missing interface methods
+func (m *MockStorage) IndexDocument(ctx context.Context, index, id string, document any) error {
+	args := m.Called(ctx, index, id, document)
+	return args.Error(0)
+}
+
+func (m *MockStorage) GetDocument(ctx context.Context, index, id string, document any) error {
+	args := m.Called(ctx, index, id, document)
+	return args.Error(0)
+}
+
+func (m *MockStorage) DeleteDocument(ctx context.Context, index, id string) error {
+	args := m.Called(ctx, index, id)
+	return args.Error(0)
+}
+
+func (m *MockStorage) BulkIndex(ctx context.Context, index string, documents []any) error {
+	args := m.Called(ctx, index, documents)
+	return args.Error(0)
+}
+
+func (m *MockStorage) GetMapping(ctx context.Context, index string) (map[string]any, error) {
+	args := m.Called(ctx, index)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	val, ok := args.Get(0).(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
+}
+
+func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping map[string]any) error {
+	args := m.Called(ctx, index, mapping)
+	return args.Error(0)
+}
+
+func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
+	args := m.Called(ctx, index, query)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	val, ok := args.Get(0).([]any)
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
+}
+
+func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string, error) {
+	args := m.Called(ctx, index)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
+	args := m.Called(ctx, index)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, nil
+	}
+	return val, nil
+}
+
+func (m *MockStorage) Ping(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
+	args := m.Called(ctx, index, aggs)
+	return args.Get(0), args.Error(1)
+}
+
+func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
+	args := m.Called(ctx, index, query)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, nil
+	}
+	return val, nil
+}
+
+func (m *MockStorage) Close() error {
+	args := m.Called()
 	return args.Error(0)
 }
 
@@ -70,13 +165,76 @@ var testModule = func(t *testing.T) fx.Option {
 	return fx.Module("test",
 		fx.Provide(
 			func() context.Context { return t.Context() },
-			func() config.Interface { return configtestutils.NewMockConfig() },
+			func() config.Interface {
+				mockCfg := &configtestutils.MockConfig{}
+				mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+					Environment: "test",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+					Debug:       true,
+				})
+				mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+					Level: "debug",
+					Debug: true,
+				})
+				mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+					Addresses: []string{"http://localhost:9200"},
+					IndexName: "test-index",
+				})
+				mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+					Address: ":8080",
+				})
+				mockCfg.On("GetSources").Return([]config.Source{}, nil)
+				mockCfg.On("GetCommand").Return("test")
+				mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+					Default: 1,
+					Rules:   []config.PriorityRule{},
+				})
+				return mockCfg
+			},
 			logger.NewNoOp,
 		),
 	)
 }
 
 func TestCreateCommand(t *testing.T) {
+	// Create mock dependencies
+	mockLogger := testutils.NewMockLogger()
+	mockStorage := testutils.NewMockStorage(mockLogger)
+	mockStorageMock := mockStorage.(*testutils.MockStorage)
+	mockStorageMock.On("TestConnection", mock.Anything).Return(nil)
+
+	mockConfig := &configtestutils.MockConfig{}
+	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
+	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+		Level: "debug",
+		Debug: true,
+	})
+	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+		Address: ":8080",
+	})
+	mockConfig.On("GetSources").Return([]config.Source{}, nil)
+	mockConfig.On("GetCommand").Return("test")
+	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
+
+	cmd := indices.CreateCommand()
+	require.NotNil(t, cmd)
+	require.Equal(t, "create", cmd.Use)
+	require.NotEmpty(t, cmd.Short)
+	require.NotEmpty(t, cmd.Long)
+
 	t.Parallel()
 
 	tests := []struct {
@@ -121,7 +279,7 @@ func TestCreateCommand(t *testing.T) {
 			t.Parallel()
 
 			// Create mock storage
-			mockStore := &mockStorage{}
+			mockStore := &MockStorage{}
 
 			// Setup expectations
 			mockStore.On("TestConnection", mock.Anything).Return(nil)
@@ -215,7 +373,7 @@ func TestCreateCommandArgs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockStore := &mockStorage{}
+			mockStore := &MockStorage{}
 			switch tt.name {
 			case "invalid index name":
 				mockStore.On("CreateIndex", mock.Anything, "invalid/index/name", mock.Anything).

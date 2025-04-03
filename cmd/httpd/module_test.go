@@ -20,8 +20,8 @@ import (
 	"go.uber.org/fx/fxtest"
 )
 
-// TestConfigModule provides a test-specific config module that doesn't try to load files.
-var TestConfigModule = fx.Module("testConfig",
+// ModuleTestConfig provides a test-specific config module that doesn't try to load files.
+var ModuleTestConfig = fx.Module("testConfig",
 	fx.Replace(
 		fx.Annotate(
 			func() config.Interface {

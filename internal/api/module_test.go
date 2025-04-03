@@ -16,7 +16,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	apitestutils "github.com/jonesrussell/gocrawl/internal/api/testutils"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
+	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	apitypes "github.com/jonesrussell/gocrawl/internal/types"
@@ -78,7 +78,31 @@ func setupTestApp(t *testing.T) *testServer {
 	t.Helper()
 
 	// Create mock dependencies
-	mockLogger := setupMockLogger()
+	mockConfig := &configtestutils.MockConfig{}
+	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
+	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+		Level: "debug",
+		Debug: true,
+	})
+	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+		Address: ":8080",
+	})
+	mockConfig.On("GetSources").Return([]config.Source{}, nil)
+	mockConfig.On("GetCommand").Return("test")
+	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
+		Default: 1,
+		Rules:   []config.PriorityRule{},
+	})
+	mockLogger := apitestutils.NewMockLogger()
 	mockSearch := apitestutils.NewMockSearchManager()
 	mockStorage := apitestutils.NewMockStorage()
 	mockIndexManager := apitestutils.NewMockIndexManager()
@@ -110,27 +134,6 @@ func setupTestApp(t *testing.T) *testServer {
 	serverConfig.Security.Enabled = true
 	serverConfig.Security.APIKey = testAPIKey
 	serverConfig.Security.RateLimit = 100 // High rate limit for tests
-
-	// Create mock config
-	mockConfig := &configtest.MockConfig{}
-	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
-		Environment: "test",
-	})
-	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
-		Level: "info",
-		Debug: false,
-	})
-	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
-		Addresses: []string{"http://localhost:9200"},
-		IndexName: "test-index",
-	})
-	mockConfig.On("GetServerConfig").Return(serverConfig)
-	mockConfig.On("GetSources").Return([]config.Source{}, nil)
-	mockConfig.On("GetCommand").Return("test")
-	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
-		Default: 1,
-		Rules:   []config.PriorityRule{},
-	})
 
 	ts := &testServer{
 		logger: mockLogger,
@@ -297,7 +300,7 @@ func TestModule(t *testing.T) {
 	t.Parallel()
 
 	// Create mock dependencies
-	mockConfig := configtest.NewMockConfig()
+	mockConfig := &configtestutils.MockConfig{}
 	mockLogger := apitestutils.NewMockLogger()
 	mockStorage := apitestutils.NewMockStorage()
 	mockIndexManager := apitestutils.NewMockIndexManager()

@@ -48,7 +48,7 @@ func NewIndices(p struct {
 
 	cmd.AddCommand(listCommand())
 	cmd.AddCommand(deleteCommand())
-	cmd.AddCommand(createCommand())
+	cmd.AddCommand(CreateCommand())
 
 	return cmd
 }
