@@ -104,7 +104,11 @@ func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64
 	if err := args.Error(1); err != nil {
 		return 0, err
 	}
-	return args.Get(0).(int64), nil
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, nil
+	}
+	return val, nil
 }
 
 // Ping implements types.Interface.
@@ -131,7 +135,11 @@ func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64
 	if err := args.Error(1); err != nil {
 		return 0, err
 	}
-	return args.Get(0).(int64), nil
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, nil
+	}
+	return val, nil
 }
 
 // Close implements types.Interface.
