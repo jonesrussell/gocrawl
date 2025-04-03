@@ -239,40 +239,40 @@ type testLogger struct {
 }
 
 // Debug logs a debug message
-func (l *testLogger) Debug(msg string, fields ...interface{}) {
+func (l *testLogger) Debug(msg string, fields ...any) {
 	l.zapLogger.Debug(msg, toZapFields(fields)...)
 }
 
 // Info logs an info message
-func (l *testLogger) Info(msg string, fields ...interface{}) {
+func (l *testLogger) Info(msg string, fields ...any) {
 	l.zapLogger.Info(msg, toZapFields(fields)...)
 }
 
 // Warn logs a warning message
-func (l *testLogger) Warn(msg string, fields ...interface{}) {
+func (l *testLogger) Warn(msg string, fields ...any) {
 	l.zapLogger.Warn(msg, toZapFields(fields)...)
 }
 
 // Error logs an error message
-func (l *testLogger) Error(msg string, fields ...interface{}) {
+func (l *testLogger) Error(msg string, fields ...any) {
 	l.zapLogger.Error(msg, toZapFields(fields)...)
 }
 
 // Fatal logs a fatal message and exits
-func (l *testLogger) Fatal(msg string, fields ...interface{}) {
+func (l *testLogger) Fatal(msg string, fields ...any) {
 	l.zapLogger.Fatal(msg, toZapFields(fields)...)
 }
 
 // With creates a child logger with additional fields
-func (l *testLogger) With(fields ...interface{}) logger.Interface {
+func (l *testLogger) With(fields ...any) logger.Interface {
 	return &testLogger{
 		zapLogger: l.zapLogger.With(toZapFields(fields)...),
 		config:    l.config,
 	}
 }
 
-// toZapFields converts a list of interface{} fields to zap.Field
-func toZapFields(fields []interface{}) []zap.Field {
+// toZapFields converts a list of any fields to zap.Field
+func toZapFields(fields []any) []zap.Field {
 	if len(fields)%2 != 0 {
 		return []zap.Field{zap.Error(logger.ErrInvalidFields)}
 	}

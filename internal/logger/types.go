@@ -1,39 +1,32 @@
 // Package logger provides logging functionality for the application.
 package logger
 
-import "go.uber.org/zap"
-
-// Level represents a logging level.
+// Level represents the logging level.
 type Level string
 
-// Available logging levels.
 const (
+	// DebugLevel logs debug messages.
 	DebugLevel Level = "debug"
-	InfoLevel  Level = "info"
-	WarnLevel  Level = "warn"
+	// InfoLevel logs info messages.
+	InfoLevel Level = "info"
+	// WarnLevel logs warning messages.
+	WarnLevel Level = "warn"
+	// ErrorLevel logs error messages.
 	ErrorLevel Level = "error"
+	// FatalLevel logs fatal messages and exits.
 	FatalLevel Level = "fatal"
 )
 
-// Config holds configuration for the logger.
+// Config represents the logger configuration.
 type Config struct {
-	// Level is the minimum level to log.
+	// Level is the minimum logging level.
 	Level Level `yaml:"level" json:"level"`
 	// Development enables development mode.
 	Development bool `yaml:"development" json:"development"`
-	// Encoding is the log encoding format (json or console).
+	// Encoding sets the logger's encoding.
 	Encoding string `yaml:"encoding" json:"encoding"`
-	// OutputPaths is a list of paths to write log output to.
-	OutputPaths []string `yaml:"output_paths" json:"output_paths"`
-	// ErrorOutputPaths is a list of paths to write internal logger errors to.
-	ErrorOutputPaths []string `yaml:"error_output_paths" json:"error_output_paths"`
+	// OutputPaths is a list of URLs or file paths to write logging output to.
+	OutputPaths []string `yaml:"outputPaths" json:"outputPaths"`
+	// ErrorOutputPaths is a list of URLs to write internal logger errors to.
+	ErrorOutputPaths []string `yaml:"errorOutputPaths" json:"errorOutputPaths"`
 }
-
-// Logger wraps a zap logger with additional functionality.
-type logger struct {
-	*zap.Logger
-	config *Config
-}
-
-// Ensure logger implements Interface
-var _ Interface = (*logger)(nil)
