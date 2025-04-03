@@ -55,6 +55,12 @@ func NewDeleter(
 func (d *Deleter) Start(ctx context.Context) error {
 	d.logger.Info("Starting index deletion", "indices", d.indices, "source", deleteSourceName)
 
+	// Test storage connection
+	if err := d.storage.TestConnection(ctx); err != nil {
+		d.logger.Error("Failed to connect to storage", "error", err)
+		return fmt.Errorf("failed to connect to storage: %w", err)
+	}
+
 	// Resolve indices to delete
 	if deleteSourceName != "" {
 		source := d.sources.FindByName(deleteSourceName)
