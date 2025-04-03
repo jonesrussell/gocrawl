@@ -48,6 +48,7 @@ var Module = fx.Module("crawl",
 
 	// Provide command channels
 	fx.Provide(
+		NewCrawler,
 		fx.Annotate(
 			func() chan struct{} {
 				return make(chan struct{})

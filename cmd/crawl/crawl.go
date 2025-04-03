@@ -152,7 +152,6 @@ Specify the source name as an argument.`,
 
 		// Initialize the Fx application
 		fxApp := fx.New(
-			Module,
 			fx.Provide(
 				func() context.Context { return ctx },
 				func() string { return sourceName },

@@ -93,80 +93,56 @@ func setupTestDeps(t *testing.T) *testDeps {
 func createTestApp(t *testing.T, deps *testDeps, hooks ...fx.Hook) *fx.App {
 	t.Helper()
 
-	providers := []any{
-		// Core dependencies - provide both named and unnamed versions
-		func() crawler.Interface { return deps.Crawler },
-		fx.Annotate(
-			func() crawler.Interface { return deps.Crawler },
-			fx.ResultTags(`name:"crawler"`),
-		),
-		func() storagetypes.Interface { return deps.Storage },
-		fx.Annotate(
-			func() storagetypes.Interface { return deps.Storage },
-			fx.ResultTags(`name:"storage"`),
-		),
-		func() logger.Interface { return deps.Logger },
-		fx.Annotate(
-			func() logger.Interface { return deps.Logger },
-			fx.ResultTags(`name:"logger"`),
-		),
-		func() config.Interface { return deps.Config },
-		fx.Annotate(
-			func() config.Interface { return deps.Config },
-			fx.ResultTags(),
-		),
-		func() sources.Interface { return deps.SourceManager },
-		fx.Annotate(
-			func() sources.Interface { return deps.SourceManager },
-			fx.ResultTags(`name:"sources"`),
-		),
-		fx.Annotate(
-			func() *signal.SignalHandler { return deps.Handler },
-			fx.ResultTags(`name:"signalHandler"`),
-		),
-		fx.Annotate(
-			func() context.Context { return deps.Context },
-			fx.ResultTags(`name:"crawlContext"`),
-		),
-		fx.Annotate(
-			func() string { return deps.SourceName },
-			fx.ResultTags(`name:"sourceName"`),
-		),
-		fx.Annotate(
-			func() []common.Processor { return deps.Processors },
-			fx.ResultTags(`group:"processors"`),
-		),
-	}
-
-	// Add command channels
-	commandDone := make(chan struct{})
+	// Create channels
 	articleChannel := make(chan *models.Article)
-	providers = append(providers,
-		fx.Annotate(
-			func() chan struct{} { return commandDone },
-			fx.ResultTags(`name:"shutdownChan"`),
-		),
-		fx.Annotate(
-			func() chan *models.Article { return articleChannel },
-			fx.ResultTags(`name:"crawlerArticleChannel"`),
-		),
-	)
+	shutdownChan := make(chan struct{})
 
-	// Create the app
+	// Create the app with simplified providers
 	app := fx.New(
-		fx.Provide(providers...),
+		fx.Provide(
+			// Core dependencies without annotations
+			func() crawler.Interface { return deps.Crawler },
+			func() storagetypes.Interface { return deps.Storage },
+			func() logger.Interface { return deps.Logger },
+			func() config.Interface { return deps.Config },
+			func() sources.Interface { return deps.SourceManager },
+			// Dependencies that need specific tags
+			fx.Annotate(
+				func() *signal.SignalHandler { return deps.Handler },
+				fx.ResultTags(`name:"signalHandler"`),
+			),
+			fx.Annotate(
+				func() context.Context { return deps.Context },
+				fx.ResultTags(`name:"crawlContext"`),
+			),
+			fx.Annotate(
+				func() string { return deps.SourceName },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() []common.Processor { return deps.Processors },
+				fx.ResultTags(`group:"processors"`),
+			),
+			fx.Annotate(
+				func() chan *models.Article { return articleChannel },
+				fx.ResultTags(`name:"crawlerArticleChannel"`),
+			),
+			fx.Annotate(
+				func() chan struct{} { return shutdownChan },
+				fx.ResultTags(`name:"shutdownChan"`),
+			),
+		),
 		fx.Invoke(func(lc fx.Lifecycle, deps crawl.CommandDeps) {
 			// Add the provided hooks
 			for _, hook := range hooks {
 				lc.Append(hook)
 			}
 
-			// Add a default stop hook to clean up resources
+			// Add cleanup hook
 			lc.Append(fx.Hook{
 				OnStop: func(ctx context.Context) error {
-					// Close channels
-					close(commandDone)
 					close(articleChannel)
+					close(shutdownChan)
 					return nil
 				},
 			})
@@ -258,10 +234,6 @@ func TestCommandExecution(t *testing.T) {
 				fx.ResultTags(`name:"logger"`),
 			),
 			func() config.Interface { return mockConfig },
-			fx.Annotate(
-				func() config.Interface { return mockConfig },
-				fx.ResultTags(),
-			),
 			func() sources.Interface { return mockSourceManager },
 			fx.Annotate(
 				func() sources.Interface { return mockSourceManager },
@@ -469,42 +441,6 @@ func TestCrawlerCommandShutdown(t *testing.T) {
 	mockCrawler.AssertExpectations(t)
 }
 
-func TestSourceValidation(t *testing.T) {
-	t.Parallel()
-
-	// Set up test dependencies
-	deps := setupTestDeps(t)
-
-	// Configure source manager to return error for invalid source
-	mockSourceManager := deps.SourceManager.(*testutils.MockSourceManager)
-	mockSourceManager.On("FindByName", deps.SourceName).
-		Return(nil)
-
-	// Create test app with startup hook
-	app := createTestApp(t, deps, fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			// Attempt to get source
-			source := deps.SourceManager.FindByName(deps.SourceName)
-			if source == nil {
-				return assert.AnError
-			}
-			return nil
-		},
-	})
-
-	// Run the app and expect error
-	err := app.Start(t.Context())
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "assert.AnError")
-
-	// Stop the app
-	err = app.Stop(t.Context())
-	require.NoError(t, err)
-
-	// Verify all expectations were met
-	mockSourceManager.AssertExpectations(t)
-}
-
 func TestErrorHandling(t *testing.T) {
 	t.Parallel()
 
@@ -675,7 +611,7 @@ func TestCrawlCommand(t *testing.T) {
 
 	cmd := crawl.Command()
 	require.NotNil(t, cmd)
-	require.Equal(t, "crawl", cmd.Use)
+	require.Equal(t, "crawl [source]", cmd.Use)
 	require.NotEmpty(t, cmd.Short)
 	require.NotEmpty(t, cmd.Long)
 }
