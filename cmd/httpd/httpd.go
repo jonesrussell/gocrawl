@@ -93,7 +93,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 // WaitForHealth waits for the server to become healthy
-func WaitForHealth(ctx context.Context, serverAddr string, interval time.Duration, timeout time.Duration) error {
+func WaitForHealth(ctx context.Context, serverAddr string, interval, timeout time.Duration) error {
 	healthCtx, healthCancel := context.WithTimeout(ctx, timeout)
 	defer healthCancel()
 
@@ -118,18 +118,16 @@ func WaitForHealth(ctx context.Context, serverAddr string, interval time.Duratio
 	}
 }
 
-// GracefulShutdown performs a graceful shutdown of the HTTP server
-func GracefulShutdown(ctx context.Context, server *http.Server, logger logger.Interface) error {
-	shutdownCtx, cancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
+// Shutdown gracefully shuts down the server.
+func Shutdown(ctx context.Context, server *http.Server) error {
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	logger.Info("Initiating graceful shutdown...")
-	if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-		logger.Error("Error during server shutdown", "error", err)
-		return fmt.Errorf("error during server shutdown: %w", err)
+	if err := server.Shutdown(shutdownCtx); err != nil &&
+		!errors.Is(err, context.Canceled) &&
+		!errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("error shutting down server: %w", err)
 	}
-
-	logger.Info("Shutdown complete")
 	return nil
 }
 
@@ -210,7 +208,7 @@ You can send POST requests to /search with a JSON body containing the search par
 							p.Logger.Warn("Timeout waiting for server goroutine to exit")
 						}
 
-						return GracefulShutdown(ctx, p.Server, p.Logger)
+						return Shutdown(ctx, p.Server)
 					},
 				})
 			}),

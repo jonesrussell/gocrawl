@@ -101,10 +101,10 @@ func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string,
 // GetIndexDocCount implements types.Interface.
 func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	args := m.Called(ctx, index)
-	if args.Get(0) == nil {
-		return 0, args.Error(1)
+	if err := args.Error(1); err != nil {
+		return 0, err
 	}
-	return args.Get(0).(int64), args.Error(1)
+	return args.Get(0).(int64), nil
 }
 
 // Ping implements types.Interface.
@@ -128,10 +128,10 @@ func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (an
 // Count implements types.Interface.
 func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
-	if args.Get(0) == nil {
-		return 0, args.Error(1)
+	if err := args.Error(1); err != nil {
+		return 0, err
 	}
-	return args.Get(0).(int64), args.Error(1)
+	return args.Get(0).(int64), nil
 }
 
 // Close implements types.Interface.

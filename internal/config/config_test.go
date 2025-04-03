@@ -702,40 +702,7 @@ sources:
 
 // TestModule provides tests for the config module's dependency injection.
 func TestModule(t *testing.T) {
-	// Ensure testdata directory exists
-	err := os.MkdirAll("internal/config/testdata", 0755)
-	require.NoError(t, err)
-
-	// Create test config file
-	testConfig := `
-app:
-  environment: test
-  name: gocrawl
-  version: 1.0.0
-  debug: false
-crawler:
-  base_url: http://test.example.com
-  max_depth: 2
-  rate_limit: 2s
-  parallelism: 2
-  source_file: internal/config/testdata/sources.yml
-log:
-  level: debug
-  debug: true
-elasticsearch:
-  addresses:
-    - https://localhost:9200
-  api_key: test_api_key
-  tls:
-    skip_verify: true
-`
-	err = os.WriteFile("internal/config/testdata/config.yml", []byte(testConfig), 0644)
-	require.NoError(t, err)
-	defer func() {
-		if removeErr := os.Remove("internal/config/testdata/config.yml"); removeErr != nil {
-			t.Errorf("Error removing config file: %v", removeErr)
-		}
-	}()
+	t.Parallel()
 
 	// Create test sources file
 	testSources := `
@@ -753,7 +720,7 @@ sources:
         author: .author
         date: .date
 `
-	err = os.WriteFile("internal/config/testdata/sources.yml", []byte(testSources), 0644)
+	err := os.WriteFile("internal/config/testdata/sources.yml", []byte(testSources), 0644)
 	require.NoError(t, err)
 	defer func() {
 		if removeErr := os.Remove("internal/config/testdata/sources.yml"); removeErr != nil {
@@ -772,7 +739,7 @@ sources:
 			Debug:       true,
 			Command:     "test",
 		}),
-		config.TestModule,
+		ConfigTestModule,
 		fx.Provide(
 			func() config.Logger {
 				return newTestLogger(t)
