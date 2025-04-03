@@ -113,7 +113,16 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 	return client, nil
 }
 
-// Module provides the storage dependencies.
+// searchManagerWrapper wraps types.Interface to implement interfaces.SearchManager
+type searchManagerWrapper struct {
+	types.Interface
+}
+
+// NewSearchManager creates a new search manager from a storage interface
+func NewSearchManager(storage types.Interface) interfaces.SearchManager {
+	return &searchManagerWrapper{storage}
+}
+
 var Module = fx.Module("storage",
 	fx.Provide(
 		// Provide http.RoundTripper
@@ -124,20 +133,11 @@ var Module = fx.Module("storage",
 		NewElasticsearchClient,
 		NewElasticsearchIndexManager,
 		// Provide types.Interface first
-		func(client *es.Client, logger logger.Interface, opts Options) types.Interface {
-			return NewStorage(client, logger, opts)
-		},
+		NewStorage,
 		// Then provide SearchManager implementation
-		func(storage types.Interface) interfaces.SearchManager {
-			return &searchManagerWrapper{storage}
-		},
+		NewSearchManager,
 	),
 )
-
-// searchManagerWrapper wraps types.Interface to implement interfaces.SearchManager
-type searchManagerWrapper struct {
-	types.Interface
-}
 
 func (w *searchManagerWrapper) Close() error {
 	return nil

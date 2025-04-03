@@ -18,19 +18,19 @@ func NewMockStorage() *MockStorage {
 }
 
 // IndexDocument implements types.Interface.
-func (m *MockStorage) IndexDocument(ctx context.Context, index string, id string, document any) error {
+func (m *MockStorage) IndexDocument(ctx context.Context, index, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
 // GetDocument implements types.Interface.
-func (m *MockStorage) GetDocument(ctx context.Context, index string, id string, document any) error {
+func (m *MockStorage) GetDocument(ctx context.Context, index, id string, document any) error {
 	args := m.Called(ctx, index, id, document)
 	return args.Error(0)
 }
 
 // DeleteDocument implements types.Interface.
-func (m *MockStorage) DeleteDocument(ctx context.Context, index string, id string) error {
+func (m *MockStorage) DeleteDocument(ctx context.Context, index, id string) error {
 	args := m.Called(ctx, index, id)
 	return args.Error(0)
 }
@@ -101,6 +101,9 @@ func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string,
 // GetIndexDocCount implements types.Interface.
 func (m *MockStorage) GetIndexDocCount(ctx context.Context, index string) (int64, error) {
 	args := m.Called(ctx, index)
+	if args.Get(0) == nil {
+		return 0, args.Error(1)
+	}
 	return args.Get(0).(int64), args.Error(1)
 }
 
@@ -125,6 +128,9 @@ func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (an
 // Count implements types.Interface.
 func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
+	if args.Get(0) == nil {
+		return 0, args.Error(1)
+	}
 	return args.Get(0).(int64), args.Error(1)
 }
 

@@ -13,7 +13,7 @@ type Field struct {
 }
 
 // String creates a Field with a string value.
-func String(key string, value string) Field {
+func String(key, value string) Field {
 	return Field{Key: key, Value: value}
 }
 
