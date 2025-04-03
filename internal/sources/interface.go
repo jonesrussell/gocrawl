@@ -6,10 +6,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common/types"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
-// Interface defines the interface for source management.
+// Interface defines the interface for source management operations.
 type Interface interface {
 	// ListSources retrieves all sources.
 	ListSources(ctx context.Context) ([]*Config, error)
@@ -29,13 +29,13 @@ type Interface interface {
 	GetSources() ([]Config, error)
 }
 
-// Params defines the parameters for creating a new Sources instance.
+// Params contains the parameters for creating a new source manager.
 type Params struct {
 	// Logger is the logger to use.
-	Logger types.Logger
+	Logger logger.Interface
 }
 
-// Metrics defines the metrics for the Sources module.
+// Metrics contains metrics about the source manager.
 type Metrics struct {
 	// SourceCount is the number of sources.
 	SourceCount int64
@@ -52,7 +52,7 @@ var (
 	ErrInvalidSource = errors.New("invalid source configuration")
 )
 
-// ValidateParams validates the parameters for creating a new Sources instance.
+// ValidateParams validates the parameters for creating a new source manager.
 func ValidateParams(p Params) error {
 	if p.Logger == nil {
 		return errors.New("logger is required")

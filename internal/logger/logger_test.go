@@ -189,6 +189,53 @@ func TestLoggerMethods(t *testing.T) {
 	log.Error("error message", "key", "value")
 }
 
+func TestLoggerEdgeCases(t *testing.T) {
+	// Create a test logger
+	config := zap.NewProductionConfig()
+	zapLogger, err := config.Build()
+	if err != nil {
+		t.Fatalf("Failed to create zap logger: %v", err)
+	}
+	defer zapLogger.Sync()
+
+	logConfig := &logger.Config{
+		Level:       logger.DebugLevel,
+		Development: true,
+	}
+	log := createLogger(zapLogger, logConfig)
+
+	t.Run("EmptyMessage", func(t *testing.T) {
+		log.Info("")
+	})
+
+	t.Run("EmptyFields", func(t *testing.T) {
+		log.Info("message")
+	})
+
+	t.Run("OddNumberOfFields", func(t *testing.T) {
+		log.Info("message", "key1", "value1", "key2")
+	})
+
+	t.Run("NilFields", func(t *testing.T) {
+		log.Info("message", nil, "value")
+	})
+
+	t.Run("WithEmptyFields", func(t *testing.T) {
+		child := log.With()
+		child.Info("message")
+	})
+
+	t.Run("WithNilFields", func(t *testing.T) {
+		child := log.With(nil)
+		child.Info("message")
+	})
+
+	t.Run("WithOddNumberOfFields", func(t *testing.T) {
+		child := log.With("key1", "value1", "key2")
+		child.Info("message")
+	})
+}
+
 // Helper function to convert logger.Level to zapcore.Level
 func levelToZap(level logger.Level) zapcore.Level {
 	switch level {

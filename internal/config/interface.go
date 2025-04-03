@@ -1,9 +1,7 @@
-// Package config provides configuration management for the GoCrawl application.
+// Package config provides configuration management for the application.
 package config
 
-// Interface defines the interface for configuration operations.
-// It provides access to application configuration settings and
-// supports different configuration sources.
+// Interface defines the interface for configuration management.
 type Interface interface {
 	// GetAppConfig returns the application configuration.
 	GetAppConfig() *AppConfig
@@ -13,9 +11,9 @@ type Interface interface {
 	GetElasticsearchConfig() *ElasticsearchConfig
 	// GetServerConfig returns the server configuration.
 	GetServerConfig() *ServerConfig
-	// GetSources returns the list of configured sources.
+	// GetSources returns the list of sources.
 	GetSources() []Source
-	// GetCommand returns the current command being executed.
+	// GetCommand returns the current command.
 	GetCommand() string
 	// GetCrawlerConfig returns the crawler configuration.
 	GetCrawlerConfig() *CrawlerConfig

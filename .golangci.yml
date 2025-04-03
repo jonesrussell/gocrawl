@@ -71,6 +71,15 @@ linters:
     - usetesting
     - wastedassign
     - whitespace
+    - gofmt
+    - goimports
+    - gosimple
+    - ineffassign
+    - misspell
+    - stylecheck
+    - typecheck
+    - varcheck
+    - whitespace
   settings:
     cyclop:
       max-complexity: 30
@@ -146,6 +155,18 @@ linters:
           paramsOnly: false
         underef:
           skipRecvDeref: false
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+        - experimental
+      disabled-checks:
+        - commentFormatting
+        - hugeParam
+        - ifElseChain
+        - octalLiteral
+        - singleCaseSwitch
+        - valSwap
     govet:
       disable:
         - fieldalignment
@@ -183,6 +204,10 @@ linters:
         - .*
     revive:
       rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+        - name: package-comments
         - name: use-any
           severity: warning
           disabled: false
@@ -240,6 +265,9 @@ linters:
         - XMPP
         - XSRF
         - XSS
+    gosec:
+      excludes:
+        - G404  # Insecure random number source (math/rand)
   exclusions:
     generated: lax
     presets:
