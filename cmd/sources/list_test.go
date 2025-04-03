@@ -49,9 +49,13 @@ func (m *mockLogger) Warn(msg string, args ...any) {
 // mockSourceManager implements sources.Interface for testing
 type mockSourceManager struct {
 	sources []sourceutils.SourceConfig
+	listErr error
 }
 
 func (m *mockSourceManager) ListSources(ctx context.Context) ([]*sourceutils.SourceConfig, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
 	result := make([]*sourceutils.SourceConfig, len(m.sources))
 	for i := range m.sources {
 		result[i] = &m.sources[i]
@@ -443,6 +447,7 @@ func Test_executeList_error(t *testing.T) {
 							MaxDepth:  2,
 						},
 					},
+					listErr: errors.New("test error"),
 				}
 
 				return cmdsrcs.Params{
