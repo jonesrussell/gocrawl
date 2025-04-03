@@ -15,6 +15,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -613,16 +614,45 @@ func TestCrawler_ProcessHTML(t *testing.T) {
 }
 
 func TestModuleProvides(t *testing.T) {
-	testLogger := &MockLogger{}
-
 	app := fxtest.New(t,
-		fx.Supply(testLogger),
+		fx.Supply(
+			&MockLogger{},
+		),
 		fx.Provide(
-			fx.Annotate(func() logger.Interface { return testLogger }, fx.As(new(logger.Interface))),
+			fx.Annotate(
+				func() logger.Interface { return &MockLogger{} },
+				fx.As(new(logger.Interface)),
+			),
+			func(log logger.Interface) debug.Debugger {
+				return &debug.LogDebugger{
+					Output: NewDebugLogger(log),
+				}
+			},
+			func() *sources.Sources { return &sources.Sources{} },
+			fx.Annotate(
+				func() chan *models.Article { return make(chan *models.Article, 100) },
+				fx.ResultTags(`name:"crawlerArticleChannel"`),
+			),
+			fx.Annotate(
+				func() string { return "test_index" },
+				fx.ResultTags(`name:"indexName"`),
+			),
+			fx.Annotate(
+				func() string { return "test_content_index" },
+				fx.ResultTags(`name:"contentIndex"`),
+			),
+			fx.Annotate(
+				func() common.Processor { return &MockProcessor{} },
+				fx.ResultTags(`name:"articleProcessor"`),
+			),
+			fx.Annotate(
+				func() common.Processor { return &MockProcessor{} },
+				fx.ResultTags(`name:"contentProcessor"`),
+			),
 		),
 		crawler.Module,
 	)
 
-	app.RequireStart()
-	app.RequireStop()
+	require.NoError(t, app.Start(t.Context()))
+	app.Stop(t.Context())
 }

@@ -9,7 +9,11 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -22,6 +26,109 @@ const (
 	// shutdownTimeout is the timeout for graceful shutdown
 	shutdownTimeout = 30 * time.Second
 )
+
+// Crawler implements the crawler command
+type Crawler struct {
+	config      config.Interface
+	logger      logger.Interface
+	storage     storagetypes.Interface
+	crawler     crawler.Interface
+	processors  []common.Processor
+	articleChan chan *models.Article
+	sourceName  string
+}
+
+// NewCrawler creates a new crawler instance
+func NewCrawler(
+	config config.Interface,
+	logger logger.Interface,
+	storage storagetypes.Interface,
+	crawler crawler.Interface,
+	processors []common.Processor,
+	articleChan chan *models.Article,
+	sourceName string,
+) *Crawler {
+	return &Crawler{
+		config:      config,
+		logger:      logger,
+		storage:     storage,
+		crawler:     crawler,
+		processors:  processors,
+		articleChan: articleChan,
+		sourceName:  sourceName,
+	}
+}
+
+// Start starts the crawler
+func (c *Crawler) Start(ctx context.Context) error {
+	// Test storage connection
+	if err := c.storage.TestConnection(ctx); err != nil {
+		return fmt.Errorf("failed to connect to storage: %w", err)
+	}
+
+	// Start crawler
+	c.logger.Info("Starting crawler...", "source", c.sourceName)
+	if err := c.crawler.Start(ctx, c.sourceName); err != nil {
+		return fmt.Errorf("failed to start crawler: %w", err)
+	}
+
+	// Process articles from the channel
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				c.logger.Info("Context cancelled, stopping article processing")
+				return
+			case article, ok := <-c.articleChan:
+				if !ok {
+					c.logger.Info("Article channel closed")
+					return
+				}
+
+				// Create a job for each article with timeout
+				job := &common.Job{
+					ID:        article.ID,
+					URL:       article.Source,
+					Status:    "pending",
+					CreatedAt: article.CreatedAt,
+					UpdatedAt: article.UpdatedAt,
+				}
+
+				// Process the article using each processor with timeout
+				for _, processor := range c.processors {
+					// Create a timeout context for each processor
+					processorCtx, processorCancel := context.WithTimeout(ctx, processorTimeout)
+					processor.ProcessJob(processorCtx, job)
+					processorCancel()
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
+// Stop gracefully stops the crawler
+func (c *Crawler) Stop(ctx context.Context) error {
+	// Create a timeout context for shutdown
+	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
+	defer shutdownCancel()
+
+	// Stop crawler
+	if err := c.crawler.Stop(shutdownCtx); err != nil {
+		if !strings.Contains(err.Error(), "Max depth limit reached") {
+			return fmt.Errorf("failed to stop crawler: %w", err)
+		}
+		c.logger.Info("Crawler stopped at max depth limit")
+	}
+
+	// Close storage connection
+	if err := c.storage.Close(); err != nil {
+		return fmt.Errorf("failed to close storage connection: %w", err)
+	}
+
+	return nil
+}
 
 // Cmd represents the crawl command
 var Cmd = &cobra.Command{
@@ -46,70 +153,19 @@ Specify the source name as an argument.`,
 		// Initialize the Fx application
 		fxApp := fx.New(
 			Module,
-			// storage.Module is already provided through app.Module
 			fx.Provide(
-				fx.Annotate(
-					func() context.Context { return ctx },
-					fx.ResultTags(`name:"crawlContext"`),
-				),
-				fx.Annotate(
-					func() string { return sourceName },
-					fx.ResultTags(`name:"sourceName"`),
-				),
+				func() context.Context { return ctx },
+				func() string { return sourceName },
 			),
-			fx.Invoke(func(lc fx.Lifecycle, p CommandDeps) {
+			fx.Invoke(func(lc fx.Lifecycle, crawler *Crawler) {
 				// Update the signal handler with the real logger
-				handler.SetLogger(p.Logger)
-
-				// Create a channel to signal when the crawler is done
-				crawlerDone := make(chan struct{})
+				handler.SetLogger(crawler.logger)
 
 				lc.Append(fx.Hook{
 					OnStart: func(ctx context.Context) error {
-						// Test storage connection
-						if testErr := p.Storage.TestConnection(p.Context); testErr != nil {
-							return fmt.Errorf("failed to connect to storage: %w", testErr)
+						if err := crawler.Start(ctx); err != nil {
+							return err
 						}
-
-						// Start crawler
-						p.Logger.Info("Starting crawler...", "source", p.SourceName)
-						if startErr := p.Crawler.Start(p.Context, p.SourceName); startErr != nil {
-							return fmt.Errorf("failed to start crawler: %w", startErr)
-						}
-
-						// Process articles from the channel
-						go func() {
-							defer close(crawlerDone)
-							for {
-								select {
-								case <-ctx.Done():
-									p.Logger.Info("Context cancelled, stopping article processing")
-									return
-								case article, ok := <-p.ArticleChan:
-									if !ok {
-										p.Logger.Info("Article channel closed")
-										return
-									}
-
-									// Create a job for each article with timeout
-									job := &common.Job{
-										ID:        article.ID,
-										URL:       article.Source,
-										Status:    "pending",
-										CreatedAt: article.CreatedAt,
-										UpdatedAt: article.UpdatedAt,
-									}
-
-									// Process the article using each processor with timeout
-									for _, processor := range p.Processors {
-										// Create a timeout context for each processor
-										processorCtx, processorCancel := context.WithTimeout(ctx, processorTimeout)
-										processor.ProcessJob(processorCtx, job)
-										processorCancel()
-									}
-								}
-							}
-						}()
 
 						// Wait for crawler to complete with timeout
 						go func() {
@@ -119,10 +175,10 @@ Specify the source name as an argument.`,
 
 							select {
 							case <-waitCtx.Done():
-								p.Logger.Info("Crawler reached timeout limit")
+								crawler.logger.Info("Crawler reached timeout limit")
 							default:
-								p.Crawler.Wait()
-								p.Logger.Info("Crawler finished processing")
+								crawler.crawler.Wait()
+								crawler.logger.Info("Crawler finished processing")
 							}
 							// Signal completion to the signal handler
 							handler.RequestShutdown()
@@ -131,32 +187,7 @@ Specify the source name as an argument.`,
 						return nil
 					},
 					OnStop: func(ctx context.Context) error {
-						// Create a timeout context for shutdown
-						shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
-						defer shutdownCancel()
-
-						// Stop crawler
-						if stopErr := p.Crawler.Stop(shutdownCtx); stopErr != nil {
-							if !strings.Contains(stopErr.Error(), "Max depth limit reached") {
-								return fmt.Errorf("failed to stop crawler: %w", stopErr)
-							}
-							p.Logger.Info("Crawler stopped at max depth limit")
-						}
-
-						// Wait for article processing to complete
-						select {
-						case <-crawlerDone:
-							p.Logger.Info("Article processing completed")
-						case <-shutdownCtx.Done():
-							p.Logger.Info("Shutdown timeout reached, stopping article processing")
-						}
-
-						// Close storage connection
-						if closeErr := p.Storage.Close(); closeErr != nil {
-							return fmt.Errorf("failed to close storage connection: %w", closeErr)
-						}
-
-						return nil
+						return crawler.Stop(ctx)
 					},
 				})
 			}),
@@ -166,8 +197,8 @@ Specify the source name as an argument.`,
 		handler.SetFXApp(fxApp)
 
 		// Start the application
-		if startErr := fxApp.Start(ctx); startErr != nil {
-			return fmt.Errorf("failed to start application: %w", startErr)
+		if err := fxApp.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start application: %w", err)
 		}
 
 		// Wait for completion signal

@@ -10,7 +10,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -91,8 +90,6 @@ var TestCrawlerModule = fx.Module("crawler",
 				Output: crawler.NewDebugLogger(log),
 			}
 		},
-		// Provide event bus
-		events.NewBus,
 		// Provide sources
 		func() *sources.Sources {
 			return &sources.Sources{}

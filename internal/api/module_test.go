@@ -71,10 +71,6 @@ var TestAPIModule = fx.Module("testAPI",
 		},
 		api.NewLifecycle,
 		api.NewServer,
-		// Provide a mock search manager for testing
-		func() api.SearchManager {
-			return apitestutils.NewMockSearchManager()
-		},
 	),
 )
 
