@@ -51,6 +51,8 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	require.NoError(t, err)
 
 	mockLogger := testutils.NewMockLogger()
+	mockLogger.On("Error", "Index not found", []any{"index", "non_existent_index"}).Return()
+
 	s := storage.NewStorage(mockClient, mockLogger, storage.Options{
 		IndexName: "test-index",
 	})
@@ -60,6 +62,9 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, storage.ErrIndexNotFound)
 	require.Contains(t, err.Error(), "non_existent_index")
+
+	// Verify that all expected logger calls were made
+	mockLogger.AssertExpectations(t)
 }
 
 func TestSearch_Success(t *testing.T) {
