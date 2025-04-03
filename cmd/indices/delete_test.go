@@ -227,8 +227,8 @@ func TestDeleteCommand(t *testing.T) {
 				}),
 			)
 
-			require.NoError(t, app.Start(context.Background()))
-			defer app.Stop(context.Background())
+			require.NoError(t, app.Start(t.Context()))
+			defer app.Stop(t.Context())
 		})
 	}
 }
