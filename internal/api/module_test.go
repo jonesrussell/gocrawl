@@ -130,7 +130,7 @@ func setupTestApp(t *testing.T) *testServer {
 		"size": 0,
 	}
 	t.Logf("Setting up mock expectations with query: %+v", expectedQuery)
-	mockSearch.On("Search", t.Context(), "", expectedQuery).Return([]any{
+	mockSearch.On("Search", mock.Anything, "", expectedQuery).Return([]any{
 		map[string]any{
 			"title": "Test Result",
 			"url":   "https://test.com",
@@ -138,7 +138,7 @@ func setupTestApp(t *testing.T) *testServer {
 	}, nil).Run(func(args mock.Arguments) {
 		t.Logf("Search called with args: %+v", args)
 	})
-	mockSearch.On("Count", t.Context(), "", expectedQuery).Return(int64(1), nil).Run(func(args mock.Arguments) {
+	mockSearch.On("Count", mock.Anything, "", expectedQuery).Return(int64(1), nil).Run(func(args mock.Arguments) {
 		t.Logf("Count called with args: %+v", args)
 	})
 

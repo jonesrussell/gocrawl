@@ -35,6 +35,31 @@ func New(log Logger) (Interface, error) {
 		viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	}
 
+	// Check for test environment
+	if os.Getenv("GOCRAWL_APP_ENVIRONMENT") == "test" {
+		// Set test-specific defaults
+		viper.SetDefault("app.environment", "test")
+		viper.SetDefault("app.name", "gocrawl-test")
+		viper.SetDefault("app.version", "0.0.1")
+		viper.SetDefault("app.debug", false)
+		viper.SetDefault("log.level", "debug")
+		viper.SetDefault("log.debug", true)
+		viper.SetDefault("elasticsearch.addresses", []string{"http://localhost:9200"})
+		viper.SetDefault("elasticsearch.index_name", "test-index")
+		viper.SetDefault("elasticsearch.api_key", "test_api_key")
+		viper.SetDefault("elasticsearch.retry.enabled", true)
+		viper.SetDefault("elasticsearch.retry.initial_wait", "1s")
+		viper.SetDefault("elasticsearch.retry.max_wait", "5s")
+		viper.SetDefault("elasticsearch.retry.max_retries", 3)
+		viper.SetDefault("server.address", ":8080")
+		viper.SetDefault("server.security.enabled", true)
+		viper.SetDefault("server.security.api_key", "test_api_key")
+		viper.SetDefault("crawler.base_url", "http://test.example.com")
+		viper.SetDefault("crawler.max_depth", 2)
+		viper.SetDefault("crawler.rate_limit", "2s")
+		viper.SetDefault("crawler.parallelism", 2)
+	}
+
 	cfg := &Config{
 		logger: log,
 	}

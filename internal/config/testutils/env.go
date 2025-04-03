@@ -61,9 +61,9 @@ func SetupTestEnv(t *testing.T) func() {
 
 	// Set required environment variables
 	t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
+	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
 
 	// Set default environment variables for testing
-	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
 	t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
 	t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
 	t.Setenv("GOCRAWL_APP_DEBUG", "false")
