@@ -66,6 +66,7 @@ const (
 	envDevelopment = "development"
 	envStaging     = "staging"
 	envProduction  = "production"
+	envTest        = "test"
 
 	// Default crawler settings
 	defaultMaxDepth    = 3

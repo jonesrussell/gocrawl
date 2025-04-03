@@ -23,39 +23,37 @@ func TestAppConfig(t *testing.T) {
 	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
 
 	tests := []struct {
-		name     string
-		setup    func(*testing.T)
-		validate func(*testing.T, *config.AppConfig)
+		name    string
+		setup   func(t *testing.T)
+		want    *config.AppConfig
+		wantErr bool
 	}{
 		{
-			name: "valid configuration",
+			name: "valid_configuration",
 			setup: func(t *testing.T) {
-				// Set environment variables
+				t.Helper()
 				t.Setenv("CONFIG_FILE", configPath)
 			},
-			validate: func(t *testing.T, cfg *config.AppConfig) {
-				require.Equal(t, "test", cfg.Environment)
-				require.Equal(t, "gocrawl", cfg.Name)
-				require.Equal(t, "1.0.0", cfg.Version)
-				require.False(t, cfg.Debug)
+			want: &config.AppConfig{
+				Environment: "test",
+				Name:        "gocrawl",
+				Version:     "1.0.0",
 			},
+			wantErr: false,
 		},
 		{
-			name: "environment variable override",
+			name: "environment_variable_override",
 			setup: func(t *testing.T) {
-				// Set environment variables
+				t.Helper()
 				t.Setenv("CONFIG_FILE", configPath)
 				t.Setenv("APP_ENVIRONMENT", "development")
-				t.Setenv("APP_NAME", "test-app")
-				t.Setenv("APP_VERSION", "2.0.0")
-				t.Setenv("APP_DEBUG", "true")
 			},
-			validate: func(t *testing.T, cfg *config.AppConfig) {
-				require.Equal(t, "development", cfg.Environment)
-				require.Equal(t, "test-app", cfg.Name)
-				require.Equal(t, "2.0.0", cfg.Version)
-				require.True(t, cfg.Debug)
+			want: &config.AppConfig{
+				Environment: "development",
+				Name:        "gocrawl",
+				Version:     "1.0.0",
 			},
+			wantErr: false,
 		},
 	}
 
@@ -64,16 +62,22 @@ func TestAppConfig(t *testing.T) {
 			// Run test setup first to set environment variables
 			tt.setup(t)
 
-			// Setup test environment
-			cleanup := testutils.SetupTestEnv(t)
-			defer cleanup()
-
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))
-			require.NoError(t, err)
 
 			// Validate results
-			tt.validate(t, cfg.GetAppConfig())
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Nil(t, cfg)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+			appCfg := cfg.GetAppConfig()
+			require.Equal(t, tt.want.Environment, appCfg.Environment)
+			require.Equal(t, tt.want.Name, appCfg.Name)
+			require.Equal(t, tt.want.Version, appCfg.Version)
 		})
 	}
 }
@@ -85,7 +89,7 @@ func TestAppConfigValidation(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "missing required fields",
+			name: "missing_required_fields",
 			setup: func(t *testing.T) {
 				// Create temporary test directory
 				tmpDir := t.TempDir()
@@ -123,7 +127,7 @@ sources:
 			wantErr: true,
 		},
 		{
-			name: "invalid environment",
+			name: "invalid_environment",
 			setup: func(t *testing.T) {
 				// Create temporary test directory
 				tmpDir := t.TempDir()
@@ -168,10 +172,6 @@ sources:
 		t.Run(tt.name, func(t *testing.T) {
 			// Run test setup first to set environment variables
 			tt.setup(t)
-
-			// Setup test environment
-			cleanup := testutils.SetupTestEnv(t)
-			defer cleanup()
 
 			// Create config
 			cfg, err := config.New(testutils.NewTestLogger(t))

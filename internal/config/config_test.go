@@ -46,6 +46,7 @@ elasticsearch:
   addresses:
     - https://localhost:9200
   api_key: test_api_key
+  index_name: test-index
   tls:
     enabled: true
     certificate: test-cert.pem
@@ -104,6 +105,7 @@ sources:
 				esCfg := cfg.GetElasticsearchConfig()
 				require.Equal(t, []string{"https://localhost:9200"}, esCfg.Addresses)
 				require.Equal(t, "test_api_key", esCfg.APIKey)
+				require.Equal(t, "test-index", esCfg.IndexName)
 				require.True(t, esCfg.TLS.Enabled)
 				require.Equal(t, "test-cert.pem", esCfg.TLS.CertFile)
 				require.Equal(t, "test-key.pem", esCfg.TLS.KeyFile)

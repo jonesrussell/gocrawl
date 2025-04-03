@@ -37,7 +37,7 @@ func validateAppConfig(cfg AppConfig) error {
 		}
 	}
 	// Validate environment value
-	validEnvs := []string{envDevelopment, envStaging, envProduction}
+	validEnvs := []string{envDevelopment, envStaging, envProduction, envTest}
 	isValidEnv := false
 	for _, env := range validEnvs {
 		if cfg.Environment == env {

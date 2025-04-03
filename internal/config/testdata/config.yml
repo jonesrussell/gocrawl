@@ -11,7 +11,7 @@ crawler:
   parallelism: 1
   source_file: testdata/sources.yml
 
-logging:
+log:
   level: debug
   debug: true
 

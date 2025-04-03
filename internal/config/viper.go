@@ -23,6 +23,11 @@ func setupViper(log Logger) error {
 	viper.SetEnvPrefix("")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
+	// Bind environment variables
+	if err := bindEnvs(defaultEnvBindings()); err != nil {
+		return fmt.Errorf("failed to bind environment variables: %w", err)
+	}
+
 	// Read config file if specified
 	if configFile := viper.GetString("config_file"); configFile != "" {
 		viper.SetConfigFile(configFile)
@@ -102,6 +107,10 @@ func bindEnvs(bindings map[string]string) error {
 // defaultEnvBindings returns a map of viper config keys to environment variable names
 func defaultEnvBindings() map[string]string {
 	return map[string]string{
+		"app.environment":               "APP_ENVIRONMENT",
+		"app.name":                      "APP_NAME",
+		"app.version":                   "APP_VERSION",
+		"app.debug":                     "APP_DEBUG",
 		"elasticsearch.username":        "ELASTIC_USERNAME",
 		"elasticsearch.password":        "ELASTIC_PASSWORD",
 		"elasticsearch.api_key":         "ELASTICSEARCH_API_KEY",
@@ -111,8 +120,6 @@ func defaultEnvBindings() map[string]string {
 		"elasticsearch.tls.ca":          "ELASTIC_CA_PATH",
 		"server.address":                "GOCRAWL_PORT",
 		"server.security.api_key":       "GOCRAWL_API_KEY",
-		"app.environment":               "APP_ENV",
-		"app.debug":                     "APP_DEBUG",
 		"log.level":                     "LOG_LEVEL",
 		"log.debug":                     "LOG_DEBUG",
 	}
