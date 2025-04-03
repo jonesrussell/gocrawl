@@ -85,13 +85,14 @@ func (l *Lister) renderIndicesTable(ctx context.Context, indices []string) error
 		healthStatus, healthErr := l.storage.GetIndexHealth(ctx, index)
 		if healthErr != nil {
 			l.logger.Error("Error getting health for index", "index", index, "error", healthErr)
-			continue
+			return fmt.Errorf("failed to get health for index %s: %w", index, healthErr)
 		}
 
 		// Get document count with fallback to 0 on error
 		docCount, docErr := l.storage.GetIndexDocCount(ctx, index)
 		if docErr != nil {
-			docCount = 0
+			l.logger.Error("Error getting document count for index", "index", index, "error", docErr)
+			return fmt.Errorf("failed to get document count for index %s: %w", index, docErr)
 		}
 
 		// Map health status to ingestion status

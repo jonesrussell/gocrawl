@@ -67,6 +67,23 @@ func NewCreator(
 func (c *Creator) Start(ctx context.Context) error {
 	c.logger.Info("Creating index", "index", c.index)
 
+	// Test storage connection
+	if err := c.storage.TestConnection(ctx); err != nil {
+		c.logger.Error("Failed to connect to storage", "error", err)
+		return fmt.Errorf("failed to connect to storage: %w", err)
+	}
+
+	// Check if index already exists
+	exists, err := c.storage.IndexExists(ctx, c.index)
+	if err != nil {
+		c.logger.Error("Failed to check if index exists", "index", c.index, "error", err)
+		return fmt.Errorf("failed to check if index exists: %w", err)
+	}
+
+	if exists {
+		return fmt.Errorf("index %s already exists", c.index)
+	}
+
 	if err := c.storage.CreateIndex(ctx, c.index, DefaultMapping); err != nil {
 		c.logger.Error("Failed to create index", "index", c.index, "error", err)
 		return fmt.Errorf("failed to create index %s: %w", c.index, err)
