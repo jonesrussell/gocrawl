@@ -22,17 +22,16 @@ var Module = fx.Options(
 
 	// Providers
 	fx.Provide(
-		// Provide logger config
-		fx.Annotate(
-			func() *logger.Config {
-				return &logger.Config{
+		// Provide logger params
+		func() logger.Params {
+			return logger.Params{
+				Config: &logger.Config{
 					Level:       logger.InfoLevel,
 					Development: false,
 					Encoding:    "json",
-				}
-			},
-			fx.ResultTags(`group:"loggerConfig"`),
-		),
+				},
+			}
+		},
 	),
 
 	// Invoke server startup

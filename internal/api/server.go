@@ -7,7 +7,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Server represents the API server.
@@ -15,7 +15,7 @@ type Server struct {
 	Context      context.Context
 	Config       config.Interface
 	Logger       logger.Interface
-	Storage      storage.Interface
+	Storage      types.Interface
 	IndexManager interfaces.IndexManager
 }
 

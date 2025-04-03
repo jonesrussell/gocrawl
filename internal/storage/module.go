@@ -13,6 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -115,20 +116,27 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 // Module provides the storage dependencies.
 var Module = fx.Module("storage",
 	fx.Provide(
+		// Provide http.RoundTripper
+		func() http.RoundTripper {
+			return http.DefaultTransport
+		},
 		NewOptionsFromConfig,
 		NewElasticsearchClient,
 		NewElasticsearchIndexManager,
-		NewStorage,
-		// Provide SearchManager implementation
-		func(storage Interface) interfaces.SearchManager {
+		// Provide types.Interface first
+		func(client *es.Client, logger logger.Interface, opts Options) types.Interface {
+			return NewStorage(client, logger, opts)
+		},
+		// Then provide SearchManager implementation
+		func(storage types.Interface) interfaces.SearchManager {
 			return &searchManagerWrapper{storage}
 		},
 	),
 )
 
-// searchManagerWrapper wraps storage.Interface to implement interfaces.SearchManager
+// searchManagerWrapper wraps types.Interface to implement interfaces.SearchManager
 type searchManagerWrapper struct {
-	Interface
+	types.Interface
 }
 
 func (w *searchManagerWrapper) Close() error {

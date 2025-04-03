@@ -13,7 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -30,7 +30,7 @@ type ProcessorParams struct {
 	fx.In
 
 	Logger      logger.Interface
-	Storage     storage.Interface
+	Storage     types.Interface
 	IndexName   string               `name:"indexName"`
 	ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
 	Service     Interface
@@ -53,9 +53,25 @@ type ServiceParams struct {
 	Logger    logger.Interface
 	Config    config.Interface
 	Sources   sources.Interface
-	Storage   storage.Interface
+	Storage   types.Interface
 	Source    string `name:"sourceName"`
 	IndexName string `name:"indexName"`
+}
+
+// Manager handles article management operations.
+type Manager struct {
+	logger  logger.Interface
+	storage types.Interface
+	config  config.Interface
+}
+
+// Params holds the dependencies required for the article manager.
+type Params struct {
+	fx.In
+	Context context.Context `name:"articleContext"`
+	Config  config.Interface
+	Logger  logger.Interface
+	Storage types.Interface
 }
 
 // Module provides the article module and its dependencies.
@@ -120,12 +136,19 @@ var Module = fx.Module("article",
 			},
 			fx.ResultTags(`name:"articleProcessor"`),
 		),
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			storage types.Interface,
+		) (*Manager, error) {
+			return NewArticleManager(log, storage, cfg)
+		},
 	),
 )
 
 // articleService provides article management functionality.
 type articleService struct {
-	storage   storage.Interface
+	storage   types.Interface
 	log       logger.Interface
 	selectors config.ArticleSelectors
 }
@@ -179,4 +202,13 @@ func isEmptySelectors(s config.ArticleSelectors) bool {
 		s.OGImage == "" &&
 		s.OgURL == "" &&
 		s.Canonical == ""
+}
+
+// NewArticleManager creates a new article manager.
+func NewArticleManager(log logger.Interface, storage types.Interface, cfg config.Interface) (*Manager, error) {
+	return &Manager{
+		logger:  log,
+		storage: storage,
+		config:  cfg,
+	}, nil
 }

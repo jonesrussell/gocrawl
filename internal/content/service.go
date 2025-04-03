@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Interface defines the interface for content operations
@@ -28,7 +28,7 @@ type Interface interface {
 // Service implements the Interface
 type Service struct {
 	Logger    logger.Interface
-	Storage   storage.Interface
+	Storage   types.Interface
 	IndexName string
 }
 
@@ -36,8 +36,8 @@ type Service struct {
 var _ Interface = (*Service)(nil)
 
 // NewService creates a new Service instance
-func NewService(logger logger.Interface) Interface {
-	return &Service{Logger: logger}
+func NewService(logger logger.Interface, storage types.Interface) Interface {
+	return &Service{Logger: logger, Storage: storage}
 }
 
 type JSONLDMetadata struct {
