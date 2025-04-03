@@ -225,30 +225,30 @@ func TestRateLimiting(t *testing.T) {
 func TestCORS(t *testing.T) {
 	tests := []struct {
 		name           string
-		origin         string
 		method         string
+		origin         string
 		allowedOrigins []string
 		expectedStatus int
 	}{
 		{
 			name:           "allowed origin",
-			origin:         "http://example.com",
 			method:         http.MethodPost,
-			allowedOrigins: []string{"http://example.com"},
+			origin:         "https://example.com",
+			allowedOrigins: []string{"https://example.com"},
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "disallowed origin",
-			origin:         "http://malicious.com",
 			method:         http.MethodPost,
-			allowedOrigins: []string{"http://example.com"},
+			origin:         "https://evil.com",
+			allowedOrigins: []string{"https://example.com"},
 			expectedStatus: http.StatusForbidden,
 		},
 		{
 			name:           "preflight request",
-			origin:         "http://example.com",
 			method:         http.MethodOptions,
-			allowedOrigins: []string{"http://example.com"},
+			origin:         "https://example.com",
+			allowedOrigins: []string{"https://example.com"},
 			expectedStatus: http.StatusNoContent,
 		},
 	}
@@ -270,6 +270,7 @@ func TestCORS(t *testing.T) {
 					TLS config.TLSConfig `yaml:"tls"`
 				}{
 					Enabled: true,
+					APIKey:  "test-key",
 					CORS: struct {
 						Enabled        bool     `yaml:"enabled"`
 						AllowedOrigins []string `yaml:"allowed_origins"`
@@ -296,6 +297,8 @@ func TestCORS(t *testing.T) {
 			}
 			if tt.method == http.MethodOptions {
 				req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+			} else {
+				req.Header.Set("X-Api-Key", "test-key")
 			}
 
 			router.ServeHTTP(w, req)
@@ -326,6 +329,7 @@ func TestSecurityHeaders(t *testing.T) {
 			TLS config.TLSConfig `yaml:"tls"`
 		}{
 			Enabled: true,
+			APIKey:  "test-key",
 		},
 	}
 	router, _ := setupTestRouter(t, cfg)
