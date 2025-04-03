@@ -39,7 +39,11 @@ func (m *MockLogger) Fatal(msg string, fields ...any) {
 // With implements logger.Interface
 func (m *MockLogger) With(fields ...any) logger.Interface {
 	args := m.Called(fields)
-	return args.Get(0).(logger.Interface)
+	if result, ok := args.Get(0).(logger.Interface); ok {
+		return result
+	}
+	// Return a default logger if type assertion fails
+	return NewMockLogger()
 }
 
 // Ensure MockLogger implements logger.Interface

@@ -127,7 +127,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 				func() context.Context { return ctx },
 				fx.ResultTags(`name:"crawlContext"`),
 			),
-			func() logger.Interface { return logger.NewNoOp() },
+			logger.NewNoOp,
 		),
 		fx.Invoke(func(lc fx.Lifecycle, p Dependencies) {
 			lc.Append(fx.Hook{

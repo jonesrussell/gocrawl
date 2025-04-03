@@ -284,6 +284,16 @@ func getArticleSelectorsFromSelector(s articleSelector) ArticleSelectors {
 	}
 }
 
+// articleSelectorProvider defines the interface for types that can provide article selectors
+type articleSelectorProvider interface {
+	GetArticleSelectors() ArticleSelectors
+}
+
+// getArticleSelectorsFromProvider extracts article selectors from any type that implements articleSelectorProvider
+func getArticleSelectorsFromProvider(p articleSelectorProvider) ArticleSelectors {
+	return p.GetArticleSelectors()
+}
+
 type loaderConfigWrapper struct {
 	loader.Config
 }

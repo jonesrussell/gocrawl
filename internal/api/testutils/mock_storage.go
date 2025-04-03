@@ -20,13 +20,19 @@ func NewMockStorage() *MockStorage {
 // Search implements storage.Interface.
 func (m *MockStorage) Search(ctx context.Context, query string, index string, size int) ([]any, error) {
 	args := m.Called(ctx, query, index, size)
-	return args.Get(0).([]any), args.Error(1)
+	if result, ok := args.Get(0).([]any); ok {
+		return result, args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 // Count implements storage.Interface.
 func (m *MockStorage) Count(ctx context.Context, query string, index string) (int64, error) {
 	args := m.Called(ctx, query, index)
-	return args.Get(0).(int64), args.Error(1)
+	if result, ok := args.Get(0).(int64); ok {
+		return result, args.Error(1)
+	}
+	return 0, args.Error(1)
 }
 
 // Close implements storage.Interface.
@@ -66,7 +72,10 @@ func (m *MockIndexManager) IndexExists(ctx context.Context, index string) (bool,
 // GetMapping implements interfaces.IndexManager.
 func (m *MockIndexManager) GetMapping(ctx context.Context, index string) (map[string]any, error) {
 	args := m.Called(ctx, index)
-	return args.Get(0).(map[string]any), args.Error(1)
+	if result, ok := args.Get(0).(map[string]any); ok {
+		return result, args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 // UpdateMapping implements interfaces.IndexManager.

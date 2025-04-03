@@ -161,7 +161,7 @@ func TestHTTPCommand(t *testing.T) {
 	)
 
 	app.RequireStart()
-	defer app.RequireStop()
+	app.RequireStop()
 }
 
 func TestHTTPCommandGracefulShutdown(t *testing.T) {
@@ -233,7 +233,7 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	)
 
 	app.RequireStart()
-	defer app.RequireStop()
+	app.RequireStop()
 }
 
 func TestCommand(t *testing.T) {
@@ -429,7 +429,7 @@ func TestServerHealthCheck(t *testing.T) {
 	// Start the app and verify it starts without errors
 	err := app.Start(t.Context())
 	require.NoError(t, err)
-	defer app.RequireStop()
+	app.RequireStop()
 
 	// Verify that the server was configured correctly
 	// Note: We don't need to verify the exact log message since we're testing server startup
@@ -522,7 +522,7 @@ func TestServerStorageConnection(t *testing.T) {
 	// Start the app and verify storage connection
 	err := app.Start(t.Context())
 	require.NoError(t, err)
-	defer app.RequireStop()
+	app.RequireStop()
 
 	// Verify that the storage connection was tested
 	mockStore.AssertCalled(t, "TestConnection", mock.Anything)

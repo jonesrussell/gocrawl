@@ -57,7 +57,7 @@ var testModule = func(t *testing.T) fx.Option {
 		fx.Provide(
 			func() context.Context { return t.Context() },
 			func() config.Interface { return configtestutils.NewMockConfig() },
-			func() logger.Interface { return logger.NewNoOp() },
+			logger.NewNoOp,
 		),
 	)
 }

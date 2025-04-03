@@ -169,13 +169,14 @@ func checkAndRunJobs(
 		return
 	}
 
-	for _, source := range sourcesList {
+	for i := range sourcesList {
+		source := &sourcesList[i]
 		for _, scheduledTime := range source.Time {
 			if currentTime == scheduledTime {
 				log.Info("Running scheduled crawl",
 					"source", source.Name,
 					"time", scheduledTime)
-				executeCrawl(ctx, log, c, source, processors, done, cfg, activeJobs, client)
+				executeCrawl(ctx, log, c, *source, processors, done, cfg, activeJobs, client)
 			}
 		}
 	}

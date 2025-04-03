@@ -116,7 +116,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		deleteModule,
 		fx.Provide(
 			func() context.Context { return ctx },
-			func() logger.Interface { return logger.NewNoOp() },
+			logger.NewNoOp,
 		),
 		fx.Invoke(func(lc fx.Lifecycle, p Params) {
 			// Update the signal handler with the real logger
@@ -161,7 +161,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 }
 
 // filterIndices filters out non-existent indices and returns lists of indices to delete and missing indices.
-func filterIndices(p *deleteParams, existingIndices []string) ([]string, []string) {
+func filterIndices(p *deleteParams, existingIndices []string) (indicesToDelete []string, missingIndices []string) {
 	// Create map of existing indices
 	existingMap := make(map[string]bool)
 	for _, idx := range existingIndices {
@@ -169,8 +169,6 @@ func filterIndices(p *deleteParams, existingIndices []string) ([]string, []strin
 	}
 
 	// Filter and report non-existent indices
-	var indicesToDelete []string
-	var missingIndices []string
 	for _, index := range p.indices {
 		if !existingMap[index] {
 			missingIndices = append(missingIndices, index)

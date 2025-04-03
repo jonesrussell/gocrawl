@@ -20,13 +20,19 @@ func NewMockSearchManager() *MockSearchManager {
 // Search implements api.SearchManager.
 func (m *MockSearchManager) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).([]any), args.Error(1)
+	if result, ok := args.Get(0).([]any); ok {
+		return result, args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 // Count implements api.SearchManager.
 func (m *MockSearchManager) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).(int64), args.Error(1)
+	if result, ok := args.Get(0).(int64); ok {
+		return result, args.Error(1)
+	}
+	return 0, args.Error(1)
 }
 
 // Aggregate implements api.SearchManager.
