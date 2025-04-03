@@ -10,8 +10,8 @@ import (
 
 // Module provides the HTTP server command dependencies
 var Module = fx.Module("httpd",
-	api.Module,
-	storage.Module,
 	config.TransportModule,
 	config.Module,
+	storage.Module,
+	api.Module,
 )

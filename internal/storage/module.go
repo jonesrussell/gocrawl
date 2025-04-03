@@ -113,30 +113,10 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 
 // Module provides the storage module for dependency injection
 var Module = fx.Module("storage",
-	config.TransportModule,
 	fx.Provide(
-		// Provide options from config
-		fx.Annotate(
-			NewOptionsFromConfig,
-			fx.ResultTags(`group:"storageOptions"`),
-		),
-
-		// Provide Elasticsearch client
-		fx.Annotate(
-			NewElasticsearchClient,
-			fx.ResultTags(`group:"storageClient"`),
-		),
-
-		// Provide index manager
-		fx.Annotate(
-			NewElasticsearchIndexManager,
-			fx.ResultTags(`group:"indexManager"`),
-		),
-
-		// Provide storage implementation
-		fx.Annotate(
-			NewStorage,
-			fx.ResultTags(`group:"storage"`),
-		),
+		NewOptionsFromConfig,
+		NewElasticsearchClient,
+		NewElasticsearchIndexManager,
+		NewStorage,
 	),
 )
