@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/common/types"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -28,9 +27,11 @@ var deleteSourceName string
 // Params holds the dependencies required for the delete operation.
 type Params struct {
 	fx.In
+	Context context.Context `name:"indicesContext"`
+	Config  config.Interface
 	Storage storagetypes.Interface
 	Sources sources.Interface
-	Logger  types.Logger
+	Logger  logger.Interface
 }
 
 // deleteParams holds the parameters required for deleting indices.
@@ -38,7 +39,7 @@ type deleteParams struct {
 	ctx     context.Context
 	storage storagetypes.Interface
 	sources sources.Interface
-	logger  types.Logger
+	logger  logger.Interface
 	indices []string
 	force   bool
 }
@@ -115,7 +116,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		deleteModule,
 		fx.Provide(
 			func() context.Context { return ctx },
-			func() types.Logger { return logger.NewNoOp() },
+			func() logger.Interface { return logger.NewNoOp() },
 		),
 		fx.Invoke(func(lc fx.Lifecycle, p Params) {
 			// Update the signal handler with the real logger
