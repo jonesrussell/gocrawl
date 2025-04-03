@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -78,8 +79,14 @@ sources:
 				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)
 
+				// Configure Viper
+				viper.SetConfigFile(configPath)
+				viper.SetConfigType("yaml")
+				err = viper.ReadInConfig()
+				require.NoError(t, err)
+
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", configPath)
+				t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.NoError(t, err)
@@ -123,7 +130,7 @@ sources:
 			tt.setup(t)
 
 			// Create config
-			cfg, err := config.New(testutils.NewTestLogger(t))
+			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
 
 			// Validate results
 			tt.validate(t, cfg, err)

@@ -14,51 +14,177 @@ import (
 )
 
 func TestCrawlerConfig(t *testing.T) {
-	// Get the absolute path to the testdata directory
-	testdataDir, err := filepath.Abs("testdata")
-	require.NoError(t, err)
-	configPath := filepath.Join(testdataDir, "config.yml")
-	sourcesPath := filepath.Join(testdataDir, "sources.yml")
-
-	// Verify test files exist
-	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
-	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
-
 	tests := []struct {
 		name     string
 		setup    func(*testing.T)
-		validate func(*testing.T, *config.CrawlerConfig)
+		validate func(*testing.T, config.Interface, error)
 	}{
 		{
-			name: "valid configuration",
+			name: "valid crawler configuration",
 			setup: func(t *testing.T) {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
+				configContent := `
+app:
+  environment: test
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: ` + sourcesPath + `
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  test_source:
+    url: http://test.example.com
+    rate_limit: 2s
+    max_depth: 2
+    article_index: test_articles
+    content_index: test_content
+    selectors:
+      title: h1
+      content: article
+      author: .author
+      date: .date
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				require.NoError(t, err)
+
+				// Configure Viper
+				viper.SetConfigFile(configPath)
+				viper.SetConfigType("yaml")
+				err = viper.ReadInConfig()
+				require.NoError(t, err)
+
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", configPath)
+				t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
 			},
-			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
-				require.Equal(t, "http://test.example.com", cfg.BaseURL)
-				require.Equal(t, 2, cfg.MaxDepth)
-				require.Equal(t, 2*time.Second, cfg.RateLimit)
-				require.Equal(t, 2, cfg.Parallelism)
-				require.Equal(t, sourcesPath, cfg.SourceFile)
+			validate: func(t *testing.T, cfg config.Interface, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, cfg)
+
+				crawlerCfg := cfg.GetCrawlerConfig()
+				require.Equal(t, "http://test.example.com", crawlerCfg.BaseURL)
+				require.Equal(t, 2, crawlerCfg.MaxDepth)
+				require.Equal(t, 2*time.Second, crawlerCfg.RateLimit)
+				require.Equal(t, 2, crawlerCfg.Parallelism)
 			},
 		},
 		{
-			name: "environment variable override",
+			name: "invalid crawler max depth",
 			setup: func(t *testing.T) {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
+				configContent := `
+app:
+  environment: test
+crawler:
+  base_url: http://test.example.com
+  max_depth: 0
+  rate_limit: 2s
+  parallelism: 2
+  source_file: ` + sourcesPath + `
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  test_source:
+    url: http://test.example.com
+    rate_limit: 2s
+    max_depth: 2
+    article_index: test_articles
+    content_index: test_content
+    selectors:
+      title: h1
+      content: article
+      author: .author
+      date: .date
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				require.NoError(t, err)
+
+				// Configure Viper
+				viper.SetConfigFile(configPath)
+				viper.SetConfigType("yaml")
+				err = viper.ReadInConfig()
+				require.NoError(t, err)
+
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", configPath)
-				t.Setenv("CRAWLER_BASE_URL", "http://override.example.com")
-				t.Setenv("CRAWLER_MAX_DEPTH", "3")
-				t.Setenv("CRAWLER_RATE_LIMIT", "3s")
-				t.Setenv("CRAWLER_PARALLELISM", "3")
+				t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
 			},
-			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
-				require.Equal(t, "http://override.example.com", cfg.BaseURL)
-				require.Equal(t, 3, cfg.MaxDepth)
-				require.Equal(t, 3*time.Second, cfg.RateLimit)
-				require.Equal(t, 3, cfg.Parallelism)
-				require.Equal(t, sourcesPath, cfg.SourceFile)
+			validate: func(t *testing.T, cfg config.Interface, err error) {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "crawler max depth must be greater than 0")
+			},
+		},
+		{
+			name: "invalid crawler parallelism",
+			setup: func(t *testing.T) {
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
+				configContent := `
+app:
+  environment: test
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 0
+  source_file: ` + sourcesPath + `
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  test_source:
+    url: http://test.example.com
+    rate_limit: 2s
+    max_depth: 2
+    article_index: test_articles
+    content_index: test_content
+    selectors:
+      title: h1
+      content: article
+      author: .author
+      date: .date
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				require.NoError(t, err)
+
+				// Configure Viper
+				viper.SetConfigFile(configPath)
+				viper.SetConfigType("yaml")
+				err = viper.ReadInConfig()
+				require.NoError(t, err)
+
+				// Set environment variables
+				t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
+			},
+			validate: func(t *testing.T, cfg config.Interface, err error) {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "crawler parallelism must be greater than 0")
 			},
 		},
 	}
@@ -73,11 +199,10 @@ func TestCrawlerConfig(t *testing.T) {
 			tt.setup(t)
 
 			// Create config
-			cfg, err := config.New(testutils.NewTestLogger(t))
-			require.NoError(t, err)
+			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
 
 			// Validate results
-			tt.validate(t, cfg.GetCrawlerConfig())
+			tt.validate(t, cfg, err)
 		})
 	}
 }

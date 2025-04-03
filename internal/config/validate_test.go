@@ -1,7 +1,6 @@
 package config_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,148 +11,118 @@ import (
 
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
-		name        string
-		setup       func(*testing.T)
-		wantErr     bool
-		errContains string
+		name          string
+		setup         func(*testing.T)
+		expectedError string
 	}{
 		{
-			name: "valid_config",
+			name: "valid configuration",
 			setup: func(t *testing.T) {
-				cleanup := testutils.SetupTestEnv(t)
-				defer cleanup()
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				// Set required environment variables
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
 				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
-			wantErr: false,
+			expectedError: "",
 		},
 		{
-			name: "invalid_app_environment",
+			name: "invalid environment",
 			setup: func(t *testing.T) {
-				cleanup := testutils.SetupTestEnv(t)
-				defer cleanup()
 				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "invalid")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
 				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
-			wantErr:     true,
-			errContains: "invalid environment",
+			expectedError: "invalid environment: invalid",
 		},
 		{
-			name: "invalid_log_level",
+			name: "invalid log level",
 			setup: func(t *testing.T) {
-				cleanup := testutils.SetupTestEnv(t)
-				defer cleanup()
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
 				t.Setenv("GOCRAWL_LOG_LEVEL", "invalid")
 				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
-			wantErr:     true,
-			errContains: "invalid log level",
+			expectedError: "invalid log level: invalid",
 		},
 		{
-			name: "invalid_crawler_max_depth",
+			name: "invalid crawler max depth",
 			setup: func(t *testing.T) {
-				cleanup := testutils.SetupTestEnv(t)
-				defer cleanup()
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "-1")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "0")
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
-			wantErr:     true,
-			errContains: "max depth must be greater than 0",
+			expectedError: "crawler max depth must be greater than 0",
 		},
 		{
-			name: "invalid_crawler_parallelism",
+			name: "invalid crawler parallelism",
 			setup: func(t *testing.T) {
-				cleanup := testutils.SetupTestEnv(t)
-				defer cleanup()
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
 				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "0")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
-			wantErr:     true,
-			errContains: "parallelism must be greater than 0",
+			expectedError: "crawler parallelism must be greater than 0",
 		},
 		{
-			name: "server_security_enabled_without_API_key",
+			name: "server security enabled without API key",
 			setup: func(t *testing.T) {
-				cleanup := testutils.SetupTestEnv(t)
-				defer cleanup()
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
 				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
-			wantErr:     true,
-			errContains: "API key is required when security is enabled",
+			expectedError: "server security is enabled but no API key is provided",
 		},
 		{
-			name: "server_security_enabled_with_invalid_API_key",
+			name: "server security enabled with invalid API key",
 			setup: func(t *testing.T) {
-				cleanup := testutils.SetupTestEnv(t)
-				defer cleanup()
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "development")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
 				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "invalid-key")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "invalid")
 			},
-			wantErr:     true,
-			errContains: "invalid API key format",
+			expectedError: "invalid API key format",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Setup test environment
+			cleanup := testutils.SetupTestEnv(t)
+			defer cleanup()
+
 			// Run test setup
 			tt.setup(t)
 
-			// Debug: Print environment variables
-			t.Logf("Environment variables after setup:")
-			for _, env := range os.Environ() {
-				t.Logf("  %s", env)
-			}
-
 			// Create config
 			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
-			if tt.wantErr {
+
+			// Validate results
+			if tt.expectedError != "" {
 				require.Error(t, err)
-				if tt.errContains != "" {
-					require.Contains(t, err.Error(), tt.errContains)
-				}
+				require.Equal(t, tt.expectedError, err.Error())
 				return
 			}
+
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
-
-			// Debug: Print config values
-			t.Logf("Config values:")
-			t.Logf("  App Environment: %s", cfg.GetAppConfig().Environment)
-			t.Logf("  Log Level: %s", cfg.GetLogConfig().Level)
-			t.Logf("  Crawler Max Depth: %d", cfg.GetCrawlerConfig().MaxDepth)
-			t.Logf("  Crawler Parallelism: %d", cfg.GetCrawlerConfig().Parallelism)
-			t.Logf("  Server Security Enabled: %v", cfg.GetServerConfig().Security.Enabled)
-			t.Logf("  Server Security API Key: %s", cfg.GetServerConfig().Security.APIKey)
 		})
 	}
 }

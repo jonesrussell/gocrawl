@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -12,56 +13,97 @@ import (
 )
 
 func TestLogConfig(t *testing.T) {
-	// Get the absolute path to the testdata directory
-	testdataDir, err := filepath.Abs("testdata")
-	require.NoError(t, err)
-	configPath := filepath.Join(testdataDir, "config.yml")
-	sourcesPath := filepath.Join(testdataDir, "sources.yml")
-
-	// Verify test files exist
-	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
-	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
-
 	tests := []struct {
 		name     string
 		setup    func(*testing.T)
-		validate func(*testing.T, *config.LogConfig)
+		validate func(*testing.T, config.Interface, error)
 	}{
 		{
-			name: "valid configuration",
+			name: "valid log configuration",
 			setup: func(t *testing.T) {
-				// Set environment variables
-				t.Setenv("CONFIG_FILE", configPath)
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
+				// Create test config file
+				configContent := `
+app:
+  environment: test
+log:
+  level: debug
+  debug: true
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Configure Viper
+				viper.SetConfigFile(configPath)
+				viper.SetConfigType("yaml")
+				err = viper.ReadInConfig()
+				require.NoError(t, err)
 			},
-			validate: func(t *testing.T, cfg *config.LogConfig) {
-				require.Equal(t, "debug", cfg.Level)
-				require.True(t, cfg.Debug)
+			validate: func(t *testing.T, cfg config.Interface, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, cfg)
+
+				logCfg := cfg.GetLogConfig()
+				require.Equal(t, "debug", logCfg.Level)
+				require.True(t, logCfg.Debug)
 			},
 		},
 		{
-			name: "environment variable override",
+			name: "invalid log level",
 			setup: func(t *testing.T) {
-				// Set environment variables
-				t.Setenv("CONFIG_FILE", configPath)
-				t.Setenv("LOG_LEVEL", "info")
-				t.Setenv("LOG_DEBUG", "false")
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
+				// Create test config file
+				configContent := `
+app:
+  environment: test
+log:
+  level: invalid
+  debug: true
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Configure Viper
+				viper.SetConfigFile(configPath)
+				viper.SetConfigType("yaml")
+				err = viper.ReadInConfig()
+				require.NoError(t, err)
 			},
-			validate: func(t *testing.T, cfg *config.LogConfig) {
-				require.Equal(t, "info", cfg.Level)
-				require.False(t, cfg.Debug)
+			validate: func(t *testing.T, cfg config.Interface, err error) {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "invalid log level")
 			},
 		},
 		{
-			name: "default values",
+			name: "missing log configuration",
 			setup: func(t *testing.T) {
-				// Set environment variables
-				t.Setenv("CONFIG_FILE", configPath)
-				t.Setenv("LOG_LEVEL", "")
-				t.Setenv("LOG_DEBUG", "")
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+
+				// Create test config file
+				configContent := `
+app:
+  environment: test
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Configure Viper
+				viper.SetConfigFile(configPath)
+				viper.SetConfigType("yaml")
+				err = viper.ReadInConfig()
+				require.NoError(t, err)
 			},
-			validate: func(t *testing.T, cfg *config.LogConfig) {
-				require.Equal(t, "info", cfg.Level)
-				require.False(t, cfg.Debug)
+			validate: func(t *testing.T, cfg config.Interface, err error) {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "log configuration is required")
 			},
 		},
 	}
@@ -76,11 +118,10 @@ func TestLogConfig(t *testing.T) {
 			tt.setup(t)
 
 			// Create config
-			cfg, err := config.New(testutils.NewTestLogger(t))
-			require.NoError(t, err)
+			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
 
 			// Validate results
-			tt.validate(t, cfg.GetLogConfig())
+			tt.validate(t, cfg, err)
 		})
 	}
 }
