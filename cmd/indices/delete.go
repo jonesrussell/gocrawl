@@ -214,7 +214,13 @@ You can specify one or more indices to delete, or use the --source flag to delet
 			if err := app.Start(cmd.Context()); err != nil {
 				return err
 			}
-			defer app.Stop(cmd.Context())
+
+			// Ensure app is stopped properly
+			defer func() {
+				if err := app.Stop(cmd.Context()); err != nil {
+					cmd.PrintErrf("Error stopping application: %v\n", err)
+				}
+			}()
 
 			return nil
 		},

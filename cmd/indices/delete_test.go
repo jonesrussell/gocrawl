@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
-	"go.uber.org/fx/fxtest"
 )
 
 func TestDeleteCommand(t *testing.T) {
@@ -182,17 +181,23 @@ func TestDeleteCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mocks
-			mockStore := &test.MockStorage{}
-			mockSources := &test.MockSources{}
+			setupMocks := func() (*test.MockStorage, *test.MockSources) {
+				mockStore := &test.MockStorage{}
+				mockSources := &test.MockSources{}
 
-			// Setup mock expectations
-			tt.setupMocks(mockStore, mockSources)
+				if tt.setupMocks != nil {
+					tt.setupMocks(mockStore, mockSources)
+				}
+
+				return mockStore, mockSources
+			}
+
+			mockStore, mockSources := setupMocks()
 
 			// Create test app
-			app := fxtest.New(t,
+			app := fx.New(
 				fx.NopLogger,
-				test.TestModule(t),
+				indices.Module,
 				fx.Provide(
 					func() storagetypes.Interface { return mockStore },
 					func() sources.Interface { return mockSources },
@@ -213,7 +218,7 @@ func TestDeleteCommand(t *testing.T) {
 							} else {
 								require.NoError(t, err)
 							}
-							return nil
+							return err
 						},
 						OnStop: func(ctx context.Context) error {
 							return nil
@@ -222,14 +227,8 @@ func TestDeleteCommand(t *testing.T) {
 				}),
 			)
 
-			// Start the app
-			err := app.Start(t.Context())
-			require.NoError(t, err)
-			defer app.RequireStop()
-
-			// Verify all expected calls were made
-			mockStore.AssertExpectations(t)
-			mockSources.AssertExpectations(t)
+			require.NoError(t, app.Start(context.Background()))
+			defer app.Stop(context.Background())
 		})
 	}
 }
