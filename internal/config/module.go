@@ -133,20 +133,20 @@ func loadEnvFile(log Logger, envFile string) error {
 }
 
 // SetupConfig initializes the configuration system with an optional environment file
-func SetupConfig(envFile string) error {
+func SetupConfig(log Logger, envFile string) error {
 	// Initialize Viper configuration
-	if err := setupViper(nil); err != nil {
+	if err := setupViper(log); err != nil {
 		return fmt.Errorf("failed to setup Viper: %w", err)
 	}
 
 	// Load environment file
 	if envFile != "" {
-		if err := loadEnvFile(nil, envFile); err != nil {
+		if err := loadEnvFile(log, envFile); err != nil {
 			return fmt.Errorf("failed to load environment file: %w", err)
 		}
 	} else {
 		// Load default .env file if it exists
-		if err := loadEnvFile(nil, ".env"); err != nil {
+		if err := loadEnvFile(log, ".env"); err != nil {
 			return fmt.Errorf("failed to load default .env file: %w", err)
 		}
 	}
@@ -168,7 +168,7 @@ func provideConfig(envFile string) func(setupConfig) (Interface, error) {
 			log = defaultLogger{}
 		}
 
-		if err := SetupConfig(envFile); err != nil {
+		if err := SetupConfig(log, envFile); err != nil {
 			return nil, err
 		}
 		return New(log)

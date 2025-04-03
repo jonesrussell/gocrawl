@@ -714,7 +714,11 @@ func TestModule(t *testing.T) {
 			Command:     "test",
 		}),
 		config.TestModule,
-		fx.Supply(newTestLogger(t)), // Provide test logger
+		fx.Provide(
+			func() config.Logger {
+				return newTestLogger(t)
+			},
+		),
 		fx.Invoke(func(c config.Interface) {
 			// Test that we can get a config instance
 			assert.NotNil(t, c)
