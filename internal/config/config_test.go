@@ -685,8 +685,8 @@ sources:
 // TestModule provides tests for the config module's dependency injection.
 func TestModule(t *testing.T) {
 	// Set the sources file path for testing
-	t.Setenv("CRAWLER_SOURCE_FILE", "testdata/sources.yml")
-	t.Setenv("CONFIG_FILE", "testdata/config.yaml")
+	t.Setenv("CRAWLER_SOURCE_FILE", "internal/config/testdata/sources.yml")
+	t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
 
 	// Create test app with config module
 	app := fxtest.New(t,
@@ -695,7 +695,7 @@ func TestModule(t *testing.T) {
 			Debug:       true,
 			Command:     "test",
 		}),
-		config.Module,
+		config.TestModule,
 		fx.Invoke(func(c config.Interface) {
 			// Test that we can get a config instance
 			assert.NotNil(t, c)
@@ -709,7 +709,7 @@ func TestModule(t *testing.T) {
 
 			// Test log config
 			logConfig := c.GetLogConfig()
-			assert.Equal(t, "info", logConfig.Level)
+			assert.Equal(t, "debug", logConfig.Level)
 		}),
 	)
 

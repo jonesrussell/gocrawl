@@ -1,0 +1,20 @@
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: internal/config/testdata/sources.yml
+log:
+  level: debug
+  debug: true
+elasticsearch:
+  addresses:
+    - https://localhost:9200
+  api_key: test_api_key
+  tls:
+    skip_verify: true 
