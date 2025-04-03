@@ -117,6 +117,14 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 // Module provides the storage module
 var Module = fx.Module("storage",
 	fx.Provide(
+		// Provide Elasticsearch client
+		NewElasticsearchClient,
+		// Provide storage options
+		func(cfg config.Interface) Options {
+			return Options{
+				IndexName: cfg.GetElasticsearchConfig().IndexName,
+			}
+		},
 		// Provide storage client
 		fx.Annotate(
 			NewStorage,
