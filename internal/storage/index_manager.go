@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 const (
@@ -18,11 +18,11 @@ const (
 // IndexManager implements the api.IndexManager interface
 type IndexManager struct {
 	client *elasticsearch.Client
-	logger common.Logger
+	logger logger.Interface
 }
 
 // NewIndexManager creates a new IndexManager instance
-func NewIndexManager(client *elasticsearch.Client, logger common.Logger) *IndexManager {
+func NewIndexManager(client *elasticsearch.Client, logger logger.Interface) *IndexManager {
 	return &IndexManager{
 		client: client,
 		logger: logger,

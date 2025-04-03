@@ -5,19 +5,19 @@ import (
 	"fmt"
 
 	es "github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // ElasticsearchStorage implements the storage interface using Elasticsearch
 type ElasticsearchStorage struct {
 	client *es.Client
 	config *config.Config
-	logger common.Logger
+	logger logger.Interface
 }
 
 // NewElasticsearchStorage creates a new Elasticsearch storage instance
-func NewElasticsearchStorage(client *es.Client, config *config.Config, logger common.Logger) *ElasticsearchStorage {
+func NewElasticsearchStorage(client *es.Client, config *config.Config, logger logger.Interface) *ElasticsearchStorage {
 	return &ElasticsearchStorage{
 		client: client,
 		config: config,
