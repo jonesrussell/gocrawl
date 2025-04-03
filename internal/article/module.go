@@ -4,8 +4,10 @@
 package article
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -27,7 +29,7 @@ import (
 type ProcessorParams struct {
 	fx.In
 
-	Logger      logger.Logger
+	Logger      logger.Interface
 	Storage     storage.Interface
 	IndexName   string               `name:"indexName"`
 	ArticleChan chan *models.Article `name:"crawlerArticleChannel"`
@@ -48,7 +50,7 @@ type ProcessorParams struct {
 type ServiceParams struct {
 	fx.In
 
-	Logger    logger.Logger
+	Logger    logger.Interface
 	Config    config.Interface
 	Sources   sources.Interface
 	Storage   storage.Interface
@@ -99,7 +101,10 @@ var Module = fx.Module("article",
 			}
 
 			// Create service with selectors
-			service := NewService(p.Logger, selectors, p.Storage, p.IndexName)
+			service := &articleService{
+				storage: p.Storage,
+				log:     p.Logger,
+			}
 			p.Logger.Debug("Created article service", "type", fmt.Sprintf("%T", service))
 			return service, nil
 		},
@@ -116,6 +121,41 @@ var Module = fx.Module("article",
 		),
 	),
 )
+
+// articleService provides article management functionality.
+type articleService struct {
+	storage storage.Interface
+	log     logger.Interface
+}
+
+// ExtractArticle extracts article data from an HTML element.
+func (s *articleService) ExtractArticle(e *colly.HTMLElement) *models.Article {
+	// TODO: Implement article extraction
+	return nil
+}
+
+// Process processes an article.
+func (s *articleService) Process(article *models.Article) error {
+	// TODO: Implement article processing
+	return nil
+}
+
+// ProcessJob processes a job and its items.
+func (s *articleService) ProcessJob(ctx context.Context, job *common.Job) {
+	// TODO: Implement job processing
+}
+
+// ProcessHTML processes HTML content from a source.
+func (s *articleService) ProcessHTML(e *colly.HTMLElement) error {
+	// TODO: Implement HTML processing
+	return nil
+}
+
+// GetMetrics returns the current processing metrics.
+func (s *articleService) GetMetrics() *common.Metrics {
+	// TODO: Implement metrics collection
+	return &common.Metrics{}
+}
 
 // isEmptySelectors checks if the article selectors are empty.
 // It returns true if all selector fields are empty strings.

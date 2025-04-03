@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
 // Interface defines the interface for content operations
@@ -27,7 +28,7 @@ type Interface interface {
 // Service implements the Interface
 type Service struct {
 	Logger    logger.Interface
-	Storage   Storage
+	Storage   storage.Interface
 	IndexName string
 }
 
