@@ -94,7 +94,11 @@ func (w *searchManagerWrapper) Count(ctx context.Context, index string, query ma
 	return w.Interface.Count(ctx, index, query)
 }
 
-func (w *searchManagerWrapper) Aggregate(ctx context.Context, index string, aggs map[string]any) (map[string]any, error) {
+func (w *searchManagerWrapper) Aggregate(
+	ctx context.Context,
+	index string,
+	aggs map[string]any,
+) (map[string]any, error) {
 	result, err := w.Interface.Aggregate(ctx, index, aggs)
 	if err != nil {
 		return nil, err

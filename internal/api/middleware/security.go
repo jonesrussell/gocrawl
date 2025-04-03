@@ -199,9 +199,10 @@ func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
 			m.logger.Info("Cleanup context cancelled, stopping cleanup routine")
 			return
 		case <-ticker.C:
+			expiryTime := m.timeProvider.Now().Add(-m.rateLimitWindow)
+
 			m.mu.Lock()
 			// Clean up old requests
-			expiryTime := m.timeProvider.Now().Add(-m.rateLimitWindow)
 			for ip, info := range m.rateLimiter {
 				if info.lastAccess.Before(expiryTime) {
 					delete(m.rateLimiter, ip)
@@ -210,25 +211,6 @@ func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
 			m.mu.Unlock()
 		}
 	}
-}
-
-func (m *SecurityMiddleware) isRequestAllowed(ip string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	now := m.timeProvider.Now()
-
-	// Check if rate limit is exceeded
-	if len(m.rateLimiter) >= m.config.Security.RateLimit {
-		return false
-	}
-
-	// Add current request
-	m.rateLimiter[ip] = rateLimitInfo{
-		count:      1,
-		lastAccess: now,
-	}
-	return true
 }
 
 // WaitCleanup waits for cleanup to complete

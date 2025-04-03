@@ -168,7 +168,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 	}
 }
 
-// StartHTTPServer starts the HTTP server for search requests
+// StartHTTPServer starts the HTTP server with the given configuration
 func StartHTTPServer(
 	log logger.Interface,
 	searchManager SearchManager,
@@ -179,10 +179,10 @@ func StartHTTPServer(
 	srv := &http.Server{
 		Addr:              cfg.GetServerConfig().Address,
 		Handler:           router,
-		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       cfg.GetServerConfig().ReadTimeout,
 		WriteTimeout:      cfg.GetServerConfig().WriteTimeout,
 		IdleTimeout:       cfg.GetServerConfig().IdleTimeout,
+		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
 	return srv, security, nil
