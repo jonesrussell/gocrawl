@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -15,6 +16,9 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
+
+// viperMutex protects concurrent access to Viper operations
+var viperMutex sync.Mutex
 
 const (
 	// defaultRetryMaxWait is the default maximum wait time between retries
@@ -186,6 +190,9 @@ var Module = fx.Module("config",
 
 // setupViper initializes Viper with default configuration
 func setupViper(log Logger) error {
+	viperMutex.Lock()
+	defer viperMutex.Unlock()
+
 	// Load config file from environment if specified
 	if cfgFile := os.Getenv("CONFIG_FILE"); cfgFile != "" {
 		log.Info("Using config file from environment",

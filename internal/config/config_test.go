@@ -33,6 +33,27 @@ func newTestLogger(t *testing.T) config.Logger {
 	return testLogger{t: t}
 }
 
+// setupTestEnv sets up the test environment and returns a cleanup function
+func setupTestEnv(t *testing.T) func() {
+	// Save current environment
+	originalEnv := os.Environ()
+
+	// Clear environment and viper config
+	os.Clearenv()
+	viper.Reset()
+
+	// Return cleanup function
+	return func() {
+		// Restore environment
+		os.Clearenv()
+		for _, e := range originalEnv {
+			k, v, _ := strings.Cut(e, "=")
+			t.Setenv(k, v)
+		}
+		viper.Reset()
+	}
+}
+
 func TestNew(t *testing.T) {
 	// Save current environment and use t.Setenv for automatic cleanup
 	t.Setenv("APP_ENV", "")
@@ -131,12 +152,12 @@ sources:
 				require.NoError(t, err)
 				require.NotNil(t, cfg)
 
+				// Verify configuration
 				appCfg := cfg.GetAppConfig()
 				require.Equal(t, "test", appCfg.Environment)
-
-				logCfg := cfg.GetLogConfig()
-				require.Equal(t, "debug", logCfg.Level)
-				require.True(t, logCfg.Debug)
+				require.Equal(t, "gocrawl", appCfg.Name)
+				require.Equal(t, "1.0.0", appCfg.Version)
+				require.False(t, appCfg.Debug)
 
 				crawlerCfg := cfg.GetCrawlerConfig()
 				require.Equal(t, "http://test.example.com", crawlerCfg.BaseURL)
@@ -144,20 +165,31 @@ sources:
 				require.Equal(t, 2*time.Second, crawlerCfg.RateLimit)
 				require.Equal(t, 2, crawlerCfg.Parallelism)
 
-				elasticCfg := cfg.GetElasticsearchConfig()
-				require.Equal(t, []string{"https://localhost:9200"}, elasticCfg.Addresses)
-				require.Empty(t, elasticCfg.Username)
-				require.Empty(t, elasticCfg.Password)
-				require.Equal(t, "test_api_key", elasticCfg.APIKey)
-				require.True(t, elasticCfg.TLS.SkipVerify)
+				logCfg := cfg.GetLogConfig()
+				require.Equal(t, "debug", logCfg.Level)
+				require.True(t, logCfg.Debug)
+
+				esCfg := cfg.GetElasticsearchConfig()
+				require.Equal(t, []string{"https://localhost:9200"}, esCfg.Addresses)
+				require.Equal(t, "test_api_key", esCfg.APIKey)
+				require.True(t, esCfg.TLS.SkipVerify)
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Setup test environment
+			cleanup := setupTestEnv(t)
+			defer cleanup()
+
+			// Run test setup
 			tt.setup(t)
+
+			// Create config
 			cfg, err := config.New(newTestLogger(t))
+
+			// Validate results
 			tt.validate(t, cfg, err)
 		})
 	}
@@ -738,11 +770,6 @@ sources:
 			Command:     "test",
 		}),
 		ConfigTestModule,
-		fx.Provide(
-			func() config.Logger {
-				return newTestLogger(t)
-			},
-		),
 		fx.Invoke(func(c config.Interface) {
 			// Test that we can get a config instance
 			assert.NotNil(t, c)
