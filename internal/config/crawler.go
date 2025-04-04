@@ -9,41 +9,32 @@ import (
 )
 
 // createCrawlerConfig creates the crawler configuration
-func createCrawlerConfig() (CrawlerConfig, error) {
-	fmt.Printf("DEBUG: Creating crawler config. Environment: %s\n", viper.GetString("app.environment"))
+func createCrawlerConfig(v *viper.Viper) (CrawlerConfig, error) {
+	fmt.Printf("DEBUG: Creating crawler config. Environment: %s\n", v.GetString("app.environment"))
 
-	rateLimit, err := parseRateLimit(viper.GetString("crawler.rate_limit"))
+	rateLimit, err := parseRateLimit(v.GetString("crawler.rate_limit"))
 	if err != nil {
 		fmt.Printf("DEBUG: Failed to parse rate limit: %v\n", err)
 		return CrawlerConfig{}, fmt.Errorf("error parsing rate limit: %w", err)
 	}
 	fmt.Printf("DEBUG: Rate limit parsed successfully: %v\n", rateLimit)
 
-	sourceFile := viper.GetString("crawler.source_file")
+	sourceFile := v.GetString("crawler.source_file")
 	if sourceFile == "" {
 		fmt.Printf("DEBUG: Source file is empty\n")
 		return CrawlerConfig{}, fmt.Errorf("source file is required")
 	}
 	fmt.Printf("DEBUG: Source file: %s\n", sourceFile)
 
-	var sources []Source
-	sources, err = loadSources(sourceFile)
-	if err != nil {
-		fmt.Printf("DEBUG: Failed to load sources: %v\n", err)
-		return CrawlerConfig{}, fmt.Errorf("failed to load sources: %w", err)
-	}
-	fmt.Printf("DEBUG: Sources loaded successfully: %d sources\n", len(sources))
-
 	return CrawlerConfig{
-		BaseURL:          viper.GetString("crawler.base_url"),
-		MaxDepth:         viper.GetInt("crawler.max_depth"),
+		BaseURL:          v.GetString("crawler.base_url"),
+		MaxDepth:         v.GetInt("crawler.max_depth"),
 		RateLimit:        rateLimit,
-		RandomDelay:      viper.GetDuration("crawler.random_delay"),
-		IndexName:        viper.GetString("crawler.index_name"),
-		ContentIndexName: viper.GetString("crawler.content_index_name"),
+		RandomDelay:      v.GetDuration("crawler.random_delay"),
+		IndexName:        v.GetString("crawler.index_name"),
+		ContentIndexName: v.GetString("crawler.content_index_name"),
 		SourceFile:       sourceFile,
-		Parallelism:      viper.GetInt("crawler.parallelism"),
-		Sources:          sources,
+		Parallelism:      v.GetInt("crawler.parallelism"),
 	}, nil
 }
 

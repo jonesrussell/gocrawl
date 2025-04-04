@@ -37,6 +37,13 @@
   - [x] Create priority_test.go for configuration priority tests
   - [x] Create testutils/logger_test.go for test utilities
   - [x] Move remaining test utilities to testutils package
+- [ ] Reduce Test Redundancy
+  - [ ] Consolidate configuration validation tests into validate_test.go
+  - [ ] Move Elasticsearch-specific validation tests to elasticsearch_test.go
+  - [ ] Create test utilities package for common test setup
+  - [ ] Refocus mock_config_test.go on mock implementation
+  - [ ] Merge or clarify responsibilities between config_test.go and validate_test.go
+  - [ ] Standardize table-driven tests across all test files
 - [ ] Enhance Testing
   - [ ] Add edge cases to TestParseRateLimit
   - [ ] Add configuration validation tests

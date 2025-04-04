@@ -2,87 +2,59 @@ package testutils
 
 import (
 	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
 
-// SetupTestEnv sets up the test environment and returns a cleanup function.
-// It saves the current environment, clears it, and returns a function that
-// restores the original environment when called.
+// SetupTestEnv sets up the test environment with common environment variables
 func SetupTestEnv(t *testing.T) func() {
-	// Save current environment
-	originalEnv := os.Environ()
-
-	// Clear environment and viper config
-	os.Clearenv()
-	viper.Reset()
-
-	// Get the absolute path to the testdata directory
-	_, filename, _, ok := runtime.Caller(0)
-	require.True(t, ok, "failed to get caller information")
-
-	// Walk up to find the config directory
-	dir := filepath.Dir(filename)
-	for filepath.Base(dir) != "config" && dir != "/" {
-		dir = filepath.Dir(dir)
+	// Store original environment variables
+	originalEnv := make(map[string]string)
+	for _, key := range os.Environ() {
+		originalEnv[key] = os.Getenv(key)
 	}
-	require.NotEqual(t, "/", dir, "failed to find config directory")
 
-	testdataDir := filepath.Join(dir, "testdata")
-	configPath := filepath.Join(testdataDir, "config.yml")
-	sourcesPath := filepath.Join(testdataDir, "sources.yml")
-
-	// Verify test files exist
-	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
-	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
-
-	// Set required environment variables first
-	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-	t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
-
-	// Set default environment variables for testing
-	t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
-	t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
-	t.Setenv("GOCRAWL_APP_DEBUG", "false")
-	t.Setenv("GOCRAWL_LOG_LEVEL", "info")
-	t.Setenv("GOCRAWL_LOG_DEBUG", "false")
-	t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-	t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-	t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "test_id:test_api_key")
-	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_ENABLED", "true")
-	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
-	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
-	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
-	t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
-	t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-	t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-	t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
-
-	// Configure Viper
-	viper.SetConfigFile(configPath)
-	viper.SetConfigType("yaml")
-	viper.SetEnvPrefix("GOCRAWL")
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// Read config file
-	err := viper.ReadInConfig()
-	require.NoError(t, err, "failed to read config file")
+	// Set common test environment variables
+	os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+	os.Setenv("GOCRAWL_LOG_LEVEL", "debug")
+	os.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+	os.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+	os.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
+	os.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "id:test_api_key")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+	os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
 
 	// Return cleanup function
 	return func() {
-		// Restore environment
-		os.Clearenv()
-		for _, e := range originalEnv {
-			k, v, _ := strings.Cut(e, "=")
-			os.Setenv(k, v)
+		// Restore original environment variables
+		for key := range originalEnv {
+			os.Setenv(key, originalEnv[key])
 		}
-		viper.Reset()
+	}
+}
+
+// SetupTestEnvWithValues sets up the test environment with custom values
+func SetupTestEnvWithValues(t *testing.T, values map[string]string) func() {
+	// Store original environment variables
+	originalEnv := make(map[string]string)
+	for _, key := range os.Environ() {
+		originalEnv[key] = os.Getenv(key)
+	}
+
+	// Set custom environment variables
+	for key, value := range values {
+		os.Setenv(key, value)
+	}
+
+	// Return cleanup function
+	return func() {
+		// Restore original environment variables
+		for key := range originalEnv {
+			os.Setenv(key, originalEnv[key])
+		}
 	}
 }
 

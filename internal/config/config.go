@@ -7,12 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
 // Constants for default configuration values
@@ -255,49 +253,53 @@ func (c *Config) load() error {
 			return fmt.Errorf("failed to read config: %w", err)
 		}
 		// Config file not found, use defaults
-		c.logger.Info("No config file found, using defaults")
+		if c.logger != nil {
+			c.logger.Info("No config file found, using defaults")
+		}
 	}
 
-	// Debug: Print Viper values
-	c.logger.Info("Loading config from Viper",
-		String("app.environment", v.GetString("app.environment")),
-		String("app.name", v.GetString("app.name")),
-		String("app.version", v.GetString("app.version")),
-		String("app.debug", fmt.Sprintf("%v", v.GetBool("app.debug"))),
-		String("log.level", v.GetString("log.level")),
-		String("log.debug", fmt.Sprintf("%v", v.GetBool("log.debug"))),
-		String("elasticsearch.addresses", fmt.Sprintf("%v", v.GetStringSlice("elasticsearch.addresses"))),
-		String("elasticsearch.username", v.GetString("elasticsearch.username")),
-		String("elasticsearch.password", v.GetString("elasticsearch.password")),
-		String("elasticsearch.api_key", v.GetString("elasticsearch.api_key")),
-		String("elasticsearch.index_name", v.GetString("elasticsearch.index_name")),
-		String("elasticsearch.cloud.id", v.GetString("elasticsearch.cloud.id")),
-		String("elasticsearch.cloud.api_key", v.GetString("elasticsearch.cloud.api_key")),
-		String("elasticsearch.tls.enabled", fmt.Sprintf("%v", v.GetBool("elasticsearch.tls.enabled"))),
-		String("elasticsearch.tls.certificate", v.GetString("elasticsearch.tls.certificate")),
-		String("elasticsearch.tls.key", v.GetString("elasticsearch.tls.key")),
-		String("elasticsearch.retry.enabled", fmt.Sprintf("%v", v.GetBool("elasticsearch.retry.enabled"))),
-		String("elasticsearch.retry.initial_wait", v.GetString("elasticsearch.retry.initial_wait")),
-		String("elasticsearch.retry.max_wait", v.GetString("elasticsearch.retry.max_wait")),
-		String("elasticsearch.retry.max_retries", fmt.Sprintf("%d", v.GetInt("elasticsearch.retry.max_retries"))),
-		String("crawler.source_file", v.GetString("crawler.source_file")),
-	)
+	// Debug: Print Viper values if logger is available
+	if c.logger != nil {
+		c.logger.Info("Loading config from Viper",
+			String("app.environment", v.GetString("app.environment")),
+			String("app.name", v.GetString("app.name")),
+			String("app.version", v.GetString("app.version")),
+			String("app.debug", fmt.Sprintf("%v", v.GetBool("app.debug"))),
+			String("log.level", v.GetString("log.level")),
+			String("log.debug", fmt.Sprintf("%v", v.GetBool("log.debug"))),
+			String("elasticsearch.addresses", fmt.Sprintf("%v", v.GetStringSlice("elasticsearch.addresses"))),
+			String("elasticsearch.username", v.GetString("elasticsearch.username")),
+			String("elasticsearch.password", v.GetString("elasticsearch.password")),
+			String("elasticsearch.api_key", v.GetString("elasticsearch.api_key")),
+			String("elasticsearch.index_name", v.GetString("elasticsearch.index_name")),
+			String("elasticsearch.cloud.id", v.GetString("elasticsearch.cloud.id")),
+			String("elasticsearch.cloud.api_key", v.GetString("elasticsearch.cloud.api_key")),
+			String("elasticsearch.tls.enabled", fmt.Sprintf("%v", v.GetBool("elasticsearch.tls.enabled"))),
+			String("elasticsearch.tls.certificate", v.GetString("elasticsearch.tls.certificate")),
+			String("elasticsearch.tls.key", v.GetString("elasticsearch.tls.key")),
+			String("elasticsearch.retry.enabled", fmt.Sprintf("%v", v.GetBool("elasticsearch.retry.enabled"))),
+			String("elasticsearch.retry.initial_wait", v.GetString("elasticsearch.retry.initial_wait")),
+			String("elasticsearch.retry.max_wait", v.GetString("elasticsearch.retry.max_wait")),
+			String("elasticsearch.retry.max_retries", fmt.Sprintf("%d", v.GetInt("elasticsearch.retry.max_retries"))),
+			String("crawler.source_file", v.GetString("crawler.source_file")),
+		)
+	}
 
 	// Load app config
-	c.App.Environment = viper.GetString("app.environment")
-	c.App.Name = viper.GetString("app.name")
-	c.App.Version = viper.GetString("app.version")
-	c.App.Debug = viper.GetBool("app.debug")
+	c.App.Environment = v.GetString("app.environment")
+	c.App.Name = v.GetString("app.name")
+	c.App.Version = v.GetString("app.version")
+	c.App.Debug = v.GetBool("app.debug")
 
 	// Load log config
-	c.Log.Level = viper.GetString("log.level")
-	c.Log.Debug = viper.GetBool("log.debug")
+	c.Log.Level = v.GetString("log.level")
+	c.Log.Debug = v.GetBool("log.debug")
 
 	// Load Elasticsearch config
-	c.Elasticsearch = *createElasticsearchConfig()
+	c.Elasticsearch = *createElasticsearchConfig(v)
 
 	// Load crawler config
-	crawlerConfig, err := createCrawlerConfig()
+	crawlerConfig, err := createCrawlerConfig(v)
 	if err != nil {
 		return fmt.Errorf("failed to create crawler config: %w", err)
 	}
@@ -305,7 +307,7 @@ func (c *Config) load() error {
 
 	// Load server config
 	c.Server = ServerConfig{
-		Address: viper.GetString("server.address"),
+		Address: v.GetString("server.address"),
 		Security: struct {
 			Enabled   bool   `yaml:"enabled"`
 			APIKey    string `yaml:"api_key"`
@@ -319,9 +321,9 @@ func (c *Config) load() error {
 			} `yaml:"cors"`
 			TLS TLSConfig `yaml:"tls"`
 		}{
-			Enabled:   viper.GetBool("server.security.enabled"),
-			APIKey:    viper.GetString("server.security.api_key"),
-			RateLimit: viper.GetInt("server.security.rate_limit"),
+			Enabled:   v.GetBool("server.security.enabled"),
+			APIKey:    v.GetString("server.security.api_key"),
+			RateLimit: v.GetInt("server.security.rate_limit"),
 			CORS: struct {
 				Enabled        bool     `yaml:"enabled"`
 				AllowedOrigins []string `yaml:"allowed_origins"`
@@ -329,16 +331,16 @@ func (c *Config) load() error {
 				AllowedHeaders []string `yaml:"allowed_headers"`
 				MaxAge         int      `yaml:"max_age"`
 			}{
-				Enabled:        viper.GetBool("server.security.cors.enabled"),
-				AllowedOrigins: viper.GetStringSlice("server.security.cors.allowed_origins"),
-				AllowedMethods: viper.GetStringSlice("server.security.cors.allowed_methods"),
-				AllowedHeaders: viper.GetStringSlice("server.security.cors.allowed_headers"),
-				MaxAge:         viper.GetInt("server.security.cors.max_age"),
+				Enabled:        v.GetBool("server.security.cors.enabled"),
+				AllowedOrigins: v.GetStringSlice("server.security.cors.allowed_origins"),
+				AllowedMethods: v.GetStringSlice("server.security.cors.allowed_methods"),
+				AllowedHeaders: v.GetStringSlice("server.security.cors.allowed_headers"),
+				MaxAge:         v.GetInt("server.security.cors.max_age"),
 			},
 			TLS: TLSConfig{
-				Enabled:  viper.GetBool("server.security.tls.enabled"),
-				CertFile: viper.GetString("server.security.tls.certificate"),
-				KeyFile:  viper.GetString("server.security.tls.key"),
+				Enabled:  v.GetBool("server.security.tls.enabled"),
+				CertFile: v.GetString("server.security.tls.certificate"),
+				KeyFile:  v.GetString("server.security.tls.key"),
 			},
 		},
 	}
@@ -450,14 +452,36 @@ func ParseRateLimit(rateLimit string) (time.Duration, error) {
 //   - *Config: The loaded configuration
 //   - error: Any error that occurred during loading
 func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
+	// Initialize Viper
+	v := viper.New()
+	v.SetConfigFile(path)
+	v.SetConfigType("yaml")
+	v.SetEnvPrefix("GOCRAWL")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Read config file
+	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
 
 	var config Config
-	if unmarshalErr := yaml.Unmarshal(data, &config); unmarshalErr != nil {
-		return nil, fmt.Errorf("error unmarshaling config: %w", unmarshalErr)
+	if err := v.Unmarshal(&config); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	// Load sources from file
+	if config.Crawler.SourceFile != "" {
+		sources, err := loadSources(config.Crawler.SourceFile)
+		if err != nil {
+			return nil, fmt.Errorf("error loading sources: %w", err)
+		}
+		config.Sources = sources
+	}
+
+	// Validate the loaded configuration
+	if err := ValidateConfig(&config); err != nil {
+		return nil, fmt.Errorf("error validating config: %w", err)
 	}
 
 	return &config, nil
@@ -636,10 +660,10 @@ func NewConfig(logger Logger) (Interface, error) {
 	}
 
 	// Ensure Elasticsearch config is properly loaded
-	cfg.Elasticsearch = *createElasticsearchConfig()
+	cfg.Elasticsearch = *createElasticsearchConfig(v)
 
 	// Ensure Crawler config is properly loaded
-	crawlerCfg, err := createCrawlerConfig()
+	crawlerCfg, err := createCrawlerConfig(v)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create crawler config: %w", err)
 	}

@@ -61,20 +61,14 @@ func ValidateConfig(cfg *Config) error {
 	}
 	fmt.Printf("DEBUG: Elasticsearch config validation passed\n")
 
-	// Skip remaining validations in test mode
-	if cfg.App.Environment == "test" {
-		fmt.Printf("DEBUG: Skipping remaining validations in test mode\n")
-		return nil
-	}
-
-	// Validate remaining app config
+	// Validate app config last
 	if err := validateAppConfig(&cfg.App); err != nil {
 		fmt.Printf("DEBUG: App config validation failed: %v\n", err)
 		return fmt.Errorf("app validation failed: %w", err)
 	}
 	fmt.Printf("DEBUG: App config validation passed\n")
 
-	// Validate sources
+	// Validate sources last
 	if err := validateSources(cfg.Sources); err != nil {
 		fmt.Printf("DEBUG: Sources validation failed: %v\n", err)
 		return err
@@ -251,14 +245,13 @@ func validateServerSecurity(security struct {
 
 // isValidAPIKey checks if the API key has a valid format
 func isValidAPIKey(key string) bool {
-	// API key must be at least 32 characters long and contain only alphanumeric characters
-	if len(key) < 32 {
+	// API key must be in the format "id:api_key"
+	parts := strings.Split(key, ":")
+	if len(parts) != 2 {
 		return false
 	}
-	for _, c := range key {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
-			return false
-		}
+	if parts[0] == "" || parts[1] == "" {
+		return false
 	}
 	return true
 }

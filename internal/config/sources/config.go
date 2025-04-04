@@ -44,8 +44,17 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate base URL format
-	if _, err := url.Parse(c.BaseURL); err != nil {
+	parsedURL, err := url.Parse(c.BaseURL)
+	if err != nil {
 		return fmt.Errorf("invalid base URL: %w", err)
+	}
+
+	// Additional validation for URL components
+	if parsedURL.Scheme == "" {
+		return errors.New("base URL must include a scheme (http:// or https://)")
+	}
+	if parsedURL.Host == "" {
+		return errors.New("base URL must include a host")
 	}
 
 	if c.MaxDepth < 0 {

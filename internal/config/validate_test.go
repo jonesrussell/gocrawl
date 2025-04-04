@@ -1,249 +1,236 @@
-package config_test
+package config
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/config/testutils"
+	"github.com/jonesrussell/gocrawl/testutils"
 )
 
 func TestValidateConfig(t *testing.T) {
+	t.Parallel()
+
+	// Create temporary test directory
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yml")
+
+	// Get the absolute path to the testdata directory
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(t, ok, "failed to get caller information")
+	dir := filepath.Dir(filename)
+	sourcesPath := filepath.Join(dir, "testdata", "sources.yml")
+	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
+
+	// Create test config file
+	configContent := fmt.Sprintf(`
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: %s
+log:
+  level: debug
+  debug: true
+elasticsearch:
+  addresses:
+    - https://localhost:9200
+  api_key: test_api_key
+  index_name: test-index
+  tls:
+    enabled: true
+    certificate: test-cert.pem
+    key: test-key.pem
+server:
+  security:
+    enabled: true
+    api_key: id:test_api_key
+`, sourcesPath)
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
+
 	tests := []struct {
-		name          string
-		setup         func(*testing.T)
-		expectedError string
+		name        string
+		envValues   map[string]string
+		expectedErr string
 	}{
 		{
-			name: "valid configuration",
-			setup: func(t *testing.T) {
-				// Set required environment variables
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-			},
-			expectedError: "",
+			name:        "valid configuration",
+			envValues:   map[string]string{},
+			expectedErr: "",
 		},
 		{
 			name: "invalid environment",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "invalid")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+			envValues: map[string]string{
+				"GOCRAWL_APP_ENVIRONMENT": "invalid",
 			},
-			expectedError: "invalid environment: invalid",
+			expectedErr: "invalid environment: invalid",
 		},
 		{
 			name: "invalid log level",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "invalid")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+			envValues: map[string]string{
+				"GOCRAWL_LOG_LEVEL": "invalid",
 			},
-			expectedError: "invalid log level: invalid",
+			expectedErr: "invalid log level: invalid",
 		},
 		{
 			name: "invalid crawler max depth",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "0")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+			envValues: map[string]string{
+				"GOCRAWL_CRAWLER_MAX_DEPTH": "0",
 			},
-			expectedError: "crawler max depth must be greater than 0",
+			expectedErr: "crawler max depth must be greater than 0",
 		},
 		{
 			name: "invalid crawler parallelism",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "0")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+			envValues: map[string]string{
+				"GOCRAWL_CRAWLER_PARALLELISM": "0",
 			},
-			expectedError: "crawler parallelism must be greater than 0",
+			expectedErr: "crawler parallelism must be greater than 0",
 		},
 		{
 			name: "server security enabled without API key",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+			envValues: map[string]string{
+				"GOCRAWL_SERVER_SECURITY_ENABLED": "true",
+				"GOCRAWL_SERVER_SECURITY_API_KEY": "",
 			},
-			expectedError: "server security is enabled but no API key is provided",
+			expectedErr: "server security is enabled but no API key is provided",
 		},
 		{
 			name: "server security enabled with invalid API key",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "invalid")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+			envValues: map[string]string{
+				"GOCRAWL_SERVER_SECURITY_ENABLED": "true",
+				"GOCRAWL_SERVER_SECURITY_API_KEY": "invalid",
 			},
-			expectedError: "server security is enabled but no API key is provided",
+			expectedErr: "server API key must be in the format 'id:api_key'",
 		},
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup test environment
-			cleanup := testutils.SetupTestEnv(t)
+			t.Parallel()
+
+			// Setup test environment with custom values
+			cleanup := testutils.SetupTestEnvWithValues(t, tt.envValues)
 			defer cleanup()
 
-			// Run test setup
-			tt.setup(t)
-
-			// Create config
-			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
-
-			// Validate results
-			if tt.expectedError != "" {
+			// Load and validate config
+			cfg, err := LoadConfig(configPath)
+			if tt.expectedErr == "" {
+				require.NoError(t, err)
+				require.NotNil(t, cfg)
+			} else {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.expectedError)
-				return
+				require.Contains(t, err.Error(), tt.expectedErr)
 			}
-
-			require.NoError(t, err)
-			require.NotNil(t, cfg)
 		})
 	}
 }
 
 func TestElasticsearchConfigBasicValidation(t *testing.T) {
-	// Set up test environment
-	cleanup := testutils.SetupTestEnv(t)
-	defer cleanup()
-
-	// Set base environment variables for all tests
-	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-	t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
-	t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
-	t.Setenv("GOCRAWL_LOG_LEVEL", "info")
-	t.Setenv("GOCRAWL_LOG_DEBUG", "false")
-	t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-	t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-	t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
-	t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
+	t.Parallel()
 
 	tests := []struct {
-		name       string
-		setup      func(t *testing.T)
-		wantErrMsg string
+		name        string
+		setupEnv    func()
+		expectedErr string
 	}{
 		{
 			name: "valid config",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+			setupEnv: func() {
+				os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
 			},
-			wantErrMsg: "",
+			expectedErr: "",
 		},
 		{
 			name: "missing addresses",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+			setupEnv: func() {
+				os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
 			},
-			wantErrMsg: "elasticsearch addresses cannot be empty",
+			expectedErr: "elasticsearch addresses cannot be empty",
 		},
 		{
 			name: "missing index name",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+			setupEnv: func() {
+				os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
 			},
-			wantErrMsg: "elasticsearch index name cannot be empty",
+			expectedErr: "elasticsearch index name cannot be empty",
 		},
 		{
 			name: "missing API key",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "")
+			setupEnv: func() {
+				os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
 			},
-			wantErrMsg: "elasticsearch API key cannot be empty",
+			expectedErr: "elasticsearch API key cannot be empty",
 		},
 		{
 			name: "invalid API key format",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "test_api_key")
+			setupEnv: func() {
+				os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "test_api_key")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
 			},
-			wantErrMsg: "elasticsearch API key must be in the format 'id:api_key'",
+			expectedErr: "elasticsearch API key must be in the format 'id:api_key'",
 		},
 		{
 			name: "missing TLS certificate",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "https://localhost:9200")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_TLS_ENABLED", "true")
-				t.Setenv("GOCRAWL_ELASTICSEARCH_TLS_CERTIFICATE", "")
+			setupEnv: func() {
+				os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "https://localhost:9200")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_TLS_ENABLED", "true")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
 			},
-			wantErrMsg: "TLS certificate file is required when TLS is enabled",
+			expectedErr: "TLS certificate file is required when TLS is enabled",
 		},
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			// Run test setup
-			tt.setup(t)
+			t.Parallel()
 
-			// Create config
-			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
+			// Setup test environment
+			tt.setupEnv()
 
-			// Validate results
-			if tt.wantErrMsg != "" {
+			// Load and validate config
+			cfg, err := LoadConfig("testdata/config.yml")
+			if tt.expectedErr == "" {
+				require.NoError(t, err)
+				require.NotNil(t, cfg)
+			} else {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.wantErrMsg)
-				return
+				require.Contains(t, err.Error(), tt.expectedErr)
 			}
-
-			require.NoError(t, err)
-			require.NotNil(t, cfg)
 		})
 	}
 }
