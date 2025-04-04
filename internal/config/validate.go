@@ -10,61 +10,82 @@ import (
 
 // ValidateConfig validates the configuration
 func ValidateConfig(cfg *Config) error {
-	// Validate app config first
-	if err := validateAppConfig(&cfg.App); err != nil {
-		return fmt.Errorf("app validation failed: %w", err)
+	fmt.Printf("DEBUG: Starting config validation. Environment: %s\n", cfg.App.Environment)
+
+	// Validate environment first
+	if cfg.App.Environment == "" {
+		fmt.Printf("DEBUG: Environment validation failed: environment cannot be empty\n")
+		return fmt.Errorf("app validation failed: environment cannot be empty")
 	}
+
+	// Validate environment value
+	validEnvs := []string{envDevelopment, envStaging, envProduction, envTest}
+	isValidEnv := false
+	for _, env := range validEnvs {
+		if cfg.App.Environment == env {
+			isValidEnv = true
+			break
+		}
+	}
+	if !isValidEnv {
+		fmt.Printf("DEBUG: Environment validation failed: invalid environment: %s\n", cfg.App.Environment)
+		return fmt.Errorf("invalid environment: %s", cfg.App.Environment)
+	}
+	fmt.Printf("DEBUG: Environment validation passed\n")
 
 	// Validate log config
 	if err := validateLogConfig(&cfg.Log); err != nil {
-		return fmt.Errorf("log validation failed: %w", err)
+		fmt.Printf("DEBUG: Log config validation failed: %v\n", err)
+		return err
 	}
-
-	// Validate Elasticsearch config
-	if err := validateElasticsearchConfig(&cfg.Elasticsearch); err != nil {
-		return fmt.Errorf("elasticsearch validation failed: %w", err)
-	}
-
-	// Skip remaining validations in test mode
-	if cfg.App.Environment == "test" {
-		return nil
-	}
+	fmt.Printf("DEBUG: Log config validation passed\n")
 
 	// Validate crawler config
 	if err := validateCrawlerConfig(&cfg.Crawler); err != nil {
-		return fmt.Errorf("crawler validation failed: %w", err)
+		fmt.Printf("DEBUG: Crawler config validation failed: %v\n", err)
+		return err
 	}
+	fmt.Printf("DEBUG: Crawler config validation passed\n")
 
 	// Validate server config
 	if err := validateServerConfig(&cfg.Server); err != nil {
-		return fmt.Errorf("server validation failed: %w", err)
+		fmt.Printf("DEBUG: Server config validation failed: %v\n", err)
+		return err
 	}
+	fmt.Printf("DEBUG: Server config validation passed\n")
+
+	// Validate Elasticsearch config
+	if err := validateElasticsearchConfig(&cfg.Elasticsearch); err != nil {
+		fmt.Printf("DEBUG: Elasticsearch config validation failed: %v\n", err)
+		return err
+	}
+	fmt.Printf("DEBUG: Elasticsearch config validation passed\n")
+
+	// Skip remaining validations in test mode
+	if cfg.App.Environment == "test" {
+		fmt.Printf("DEBUG: Skipping remaining validations in test mode\n")
+		return nil
+	}
+
+	// Validate remaining app config
+	if err := validateAppConfig(&cfg.App); err != nil {
+		fmt.Printf("DEBUG: App config validation failed: %v\n", err)
+		return fmt.Errorf("app validation failed: %w", err)
+	}
+	fmt.Printf("DEBUG: App config validation passed\n")
 
 	// Validate sources
 	if err := validateSources(cfg.Sources); err != nil {
-		return fmt.Errorf("sources validation failed: %w", err)
+		fmt.Printf("DEBUG: Sources validation failed: %v\n", err)
+		return err
 	}
+	fmt.Printf("DEBUG: Sources validation passed\n")
 
 	return nil
 }
 
 // validateAppConfig validates the application configuration
 func validateAppConfig(cfg *AppConfig) error {
-	if cfg.Environment == "" {
-		return errors.New("environment cannot be empty")
-	}
-	// Validate environment value
-	validEnvs := []string{envDevelopment, envStaging, envProduction, envTest}
-	isValidEnv := false
-	for _, env := range validEnvs {
-		if cfg.Environment == env {
-			isValidEnv = true
-			break
-		}
-	}
-	if !isValidEnv {
-		return fmt.Errorf("invalid environment: %s", cfg.Environment)
-	}
 	if cfg.Name == "" {
 		return errors.New("name cannot be empty")
 	}

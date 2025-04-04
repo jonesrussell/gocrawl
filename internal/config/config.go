@@ -284,34 +284,64 @@ func (c *Config) load() error {
 	)
 
 	// Load app config
-	c.App.Environment = v.GetString("app.environment")
-	c.App.Name = v.GetString("app.name")
-	c.App.Version = v.GetString("app.version")
-	c.App.Debug = v.GetBool("app.debug")
+	c.App.Environment = viper.GetString("app.environment")
+	c.App.Name = viper.GetString("app.name")
+	c.App.Version = viper.GetString("app.version")
+	c.App.Debug = viper.GetBool("app.debug")
 
 	// Load log config
-	c.Log.Level = v.GetString("log.level")
-	c.Log.Debug = v.GetBool("log.debug")
+	c.Log.Level = viper.GetString("log.level")
+	c.Log.Debug = viper.GetBool("log.debug")
 
 	// Load Elasticsearch config
 	c.Elasticsearch = *createElasticsearchConfig()
 
-	// Load server config
-	c.Server = createServerConfig()
-
 	// Load crawler config
-	var err error
-	c.Crawler, err = createCrawlerConfig()
+	crawlerConfig, err := createCrawlerConfig()
 	if err != nil {
 		return fmt.Errorf("failed to create crawler config: %w", err)
 	}
+	c.Crawler = crawlerConfig
 
-	// Load sources
-	sources, err := loadSources(c.Crawler.SourceFile)
-	if err != nil {
-		return fmt.Errorf("failed to load sources: %w", err)
+	// Load server config
+	c.Server = ServerConfig{
+		Address: viper.GetString("server.address"),
+		Security: struct {
+			Enabled   bool   `yaml:"enabled"`
+			APIKey    string `yaml:"api_key"`
+			RateLimit int    `yaml:"rate_limit"`
+			CORS      struct {
+				Enabled        bool     `yaml:"enabled"`
+				AllowedOrigins []string `yaml:"allowed_origins"`
+				AllowedMethods []string `yaml:"allowed_methods"`
+				AllowedHeaders []string `yaml:"allowed_headers"`
+				MaxAge         int      `yaml:"max_age"`
+			} `yaml:"cors"`
+			TLS TLSConfig `yaml:"tls"`
+		}{
+			Enabled:   viper.GetBool("server.security.enabled"),
+			APIKey:    viper.GetString("server.security.api_key"),
+			RateLimit: viper.GetInt("server.security.rate_limit"),
+			CORS: struct {
+				Enabled        bool     `yaml:"enabled"`
+				AllowedOrigins []string `yaml:"allowed_origins"`
+				AllowedMethods []string `yaml:"allowed_methods"`
+				AllowedHeaders []string `yaml:"allowed_headers"`
+				MaxAge         int      `yaml:"max_age"`
+			}{
+				Enabled:        viper.GetBool("server.security.cors.enabled"),
+				AllowedOrigins: viper.GetStringSlice("server.security.cors.allowed_origins"),
+				AllowedMethods: viper.GetStringSlice("server.security.cors.allowed_methods"),
+				AllowedHeaders: viper.GetStringSlice("server.security.cors.allowed_headers"),
+				MaxAge:         viper.GetInt("server.security.cors.max_age"),
+			},
+			TLS: TLSConfig{
+				Enabled:  viper.GetBool("server.security.tls.enabled"),
+				CertFile: viper.GetString("server.security.tls.certificate"),
+				KeyFile:  viper.GetString("server.security.tls.key"),
+			},
+		},
 	}
-	c.Sources = sources
 
 	return nil
 }

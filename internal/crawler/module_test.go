@@ -52,7 +52,6 @@ var TestCommonModule = fx.Module("testCommon",
 		return &fxevent.NopLogger
 	}),
 	// Core modules used by most commands, excluding logger and sources.
-	config.Module,
 	logger.Module,
 )
 

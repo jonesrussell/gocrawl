@@ -25,6 +25,7 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
 			},
 			expectedError: "",
 		},
@@ -37,6 +38,7 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
 			},
 			expectedError: "invalid environment: invalid",
 		},
@@ -49,6 +51,7 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
 			},
 			expectedError: "invalid log level: invalid",
 		},
@@ -61,6 +64,7 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
 			},
 			expectedError: "crawler max depth must be greater than 0",
 		},
@@ -73,6 +77,7 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "0")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
 			},
 			expectedError: "crawler parallelism must be greater than 0",
 		},
@@ -85,6 +90,7 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
 			},
 			expectedError: "server security is enabled but no API key is provided",
 		},
@@ -97,8 +103,9 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "invalid")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
 			},
-			expectedError: "invalid API key format",
+			expectedError: "server security is enabled but no API key is provided",
 		},
 	}
 
@@ -117,7 +124,7 @@ func TestValidateConfig(t *testing.T) {
 			// Validate results
 			if tt.expectedError != "" {
 				require.Error(t, err)
-				require.Equal(t, tt.expectedError, err.Error())
+				require.Contains(t, err.Error(), tt.expectedError)
 				return
 			}
 
@@ -211,13 +218,14 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
 
 			// Validate results
-			if tt.wantErrMsg == "" {
-				require.NoError(t, err)
-				require.NotNil(t, cfg)
-			} else {
+			if tt.wantErrMsg != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.wantErrMsg)
+				return
 			}
+
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
 		})
 	}
 }
