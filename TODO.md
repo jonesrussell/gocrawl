@@ -12,52 +12,31 @@
   - [ ] Add proper examples
 
 ### 2. Config Package Improvements
-- [ ] Split module.go into focused files
-  - [ ] Create viper.go for Viper setup
-  - [ ] Create server.go for server config
-  - [ ] Create elasticsearch.go for ES config
-  - [ ] Create crawler.go for crawler config
-  - [ ] Move constants to constants.go
+- [x] Split module.go into focused files
+  - [x] Create viper.go for Viper setup
+  - [x] Create server.go for server config
+  - [x] Create elasticsearch.go for ES config
+  - [x] Create crawler.go for crawler config
+  - [x] Create sources.go for sources config
+  - [x] Create logging.go for logging config
+  - [x] Move constants to constants.go
   - [ ] Add proper error types in errors.go
   - [ ] Add configuration versioning
   - [ ] Add schema validation
   - [ ] Add hot reload support
 - [x] Split config_test.go into focused test files
   - [x] Create app_test.go for app configuration tests
-    - [x] Move TestNew
-    - [x] Move TestConfigurationPriority
-    - [x] Move TestRequiredConfigurationValidation
   - [x] Create crawler_test.go for crawler configuration tests
-    - [x] Move TestSetMaxDepth
-    - [x] Move TestSetRateLimit
-    - [x] Move TestSetBaseURL
-    - [x] Move TestSetIndexName
-    - [x] Move TestCrawlerConfig_Setters
-    - [x] Move TestParseRateLimit
   - [x] Create elasticsearch_test.go for Elasticsearch configuration tests
-    - [x] Move Elasticsearch-related tests
-    - [x] Move TLS configuration tests
-    - [x] Add cloud configuration tests
-    - [x] Add retry configuration tests
-    - [x] Add basic auth configuration tests
-    - [x] Add validation tests for required fields
+  - [x] Create sources_test.go for sources configuration tests
+  - [x] Create logging_test.go for logging configuration tests
+  - [x] Create server_test.go for server configuration tests
   - [x] Create loader_test.go for configuration loading tests
-    - [x] Move TestLoadConfig
-    - [x] Move TestDefaultArticleSelectors
-    - [x] Fix linter errors by removing duplicate test declarations from config_test.go
   - [x] Create module_test.go for dependency injection tests
-    - [x] Move TestModule
-    - [x] Move TestNewNoOp
   - [x] Create transport_test.go for HTTP transport tests
-    - [x] Move TestNewHTTPTransport
   - [x] Create priority_test.go for configuration priority tests
-    - [x] Move TestConfigurationPriority
   - [x] Create testutils/logger_test.go for test utilities
-    - [x] Move testLogger and related utilities
   - [x] Move remaining test utilities to testutils package
-    - [x] Move setupTestEnv to testutils
-    - [x] Move testLogger to testutils
-    - [x] Move newTestLogger to testutils
 - [ ] Enhance Testing
   - [ ] Add edge cases to TestParseRateLimit
   - [ ] Add configuration validation tests
