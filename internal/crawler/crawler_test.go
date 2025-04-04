@@ -246,6 +246,7 @@ func TestCrawlerStartup(t *testing.T) {
 		Index:        "test_content",
 	}
 	mockSources.On("FindByName", "test_source").Return(testSource)
+	mockSources.On("GetSources").Return([]sourceutils.SourceConfig{*testSource}, nil)
 
 	app := fxtest.New(t,
 		fx.Provide(
@@ -282,6 +283,7 @@ func TestCrawlerShutdown(t *testing.T) {
 		Index:        "test_content",
 	}
 	mockSources.On("FindByName", "test_source").Return(testSource)
+	mockSources.On("GetSources").Return([]sourceutils.SourceConfig{*testSource}, nil)
 
 	app := fxtest.New(t,
 		fx.Provide(

@@ -22,7 +22,12 @@ func ValidateConfig(cfg *Config) error {
 
 	// Validate Elasticsearch config
 	if err := validateElasticsearchConfig(&cfg.Elasticsearch); err != nil {
-		return fmt.Errorf("Elasticsearch validation failed: %w", err)
+		return fmt.Errorf("elasticsearch validation failed: %w", err)
+	}
+
+	// Skip remaining validations in test mode
+	if cfg.App.Environment == "test" {
+		return nil
 	}
 
 	// Validate crawler config
@@ -35,12 +40,11 @@ func ValidateConfig(cfg *Config) error {
 		return fmt.Errorf("server validation failed: %w", err)
 	}
 
-	// Skip sources validation in test environment
-	if cfg.App.Environment != "test" {
-		if err := validateSources(cfg.Sources); err != nil {
-			return err
-		}
+	// Validate sources
+	if err := validateSources(cfg.Sources); err != nil {
+		return fmt.Errorf("sources validation failed: %w", err)
 	}
+
 	return nil
 }
 

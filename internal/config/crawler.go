@@ -20,7 +20,8 @@ func createCrawlerConfig() (CrawlerConfig, error) {
 		return CrawlerConfig{}, fmt.Errorf("source file is required")
 	}
 
-	sources, err := loadSources(sourceFile)
+	var sources []Source
+	sources, err = loadSources(sourceFile)
 	if err != nil {
 		return CrawlerConfig{}, fmt.Errorf("failed to load sources: %w", err)
 	}

@@ -69,7 +69,7 @@ func SetupTestEnv(t *testing.T) func() {
 	t.Setenv("GOCRAWL_LOG_DEBUG", "false")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-	t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "test_api_key")
+	t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_ENABLED", "true")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
@@ -89,15 +89,6 @@ func SetupTestEnv(t *testing.T) func() {
 		}
 		viper.Reset()
 	}
-}
-
-// Helper function to get current directory
-func getCurrentDir() string {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "error getting current directory"
-	}
-	return dir
 }
 
 // TestSetupTestEnv verifies the test environment setup and cleanup
