@@ -323,7 +323,6 @@ func TestSourceValidation(t *testing.T) {
 	}
 	mockSources.On("FindByName", "test_source").Return(testSource)
 	mockSources.On("GetSources").Return([]sourceutils.SourceConfig{*testSource}, nil)
-	mockSources.On("ValidateSource", testSource).Return(nil).Once()
 
 	app := fxtest.New(t,
 		fx.Provide(
