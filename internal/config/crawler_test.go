@@ -229,7 +229,7 @@ crawler:
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("GOCRAWL_CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: true,
 		},
@@ -249,7 +249,7 @@ crawler:
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("GOCRAWL_CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: true,
 		},
@@ -269,7 +269,7 @@ crawler:
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", "internal/config/testdata/config.yml")
+				t.Setenv("GOCRAWL_CONFIG_FILE", "internal/config/testdata/config.yml")
 			},
 			wantErr: true,
 		},

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -57,6 +58,8 @@ type CrawlerConfig struct {
 	SourceFile string `yaml:"source_file"`
 	// Parallelism defines how many concurrent crawlers to run
 	Parallelism int `yaml:"parallelism"`
+	// Sources is the list of configured sources
+	Sources []Source `yaml:"sources"`
 }
 
 // SetMaxDepth sets the MaxDepth in the CrawlerConfig and updates Viper.
@@ -555,8 +558,9 @@ func NewConfig(logger Logger) (Interface, error) {
 	v.AddConfigPath("$HOME/.gocrawl")
 	v.AddConfigPath("/etc/gocrawl")
 
-	// Set environment variable prefix
+	// Set environment variable prefix and key replacer
 	v.SetEnvPrefix("GOCRAWL")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
 	// Read config file
@@ -568,6 +572,31 @@ func NewConfig(logger Logger) (Interface, error) {
 		logger.Info("No config file found, using defaults")
 	}
 
+	// Log loaded configuration
+	logger.Info("Loading config from Viper", []Field{
+		{Key: "app.environment", Value: v.GetString("app.environment")},
+		{Key: "app.name", Value: v.GetString("app.name")},
+		{Key: "app.version", Value: v.GetString("app.version")},
+		{Key: "app.debug", Value: v.GetBool("app.debug")},
+		{Key: "log.level", Value: v.GetString("log.level")},
+		{Key: "log.debug", Value: v.GetBool("log.debug")},
+		{Key: "elasticsearch.addresses", Value: v.GetStringSlice("elasticsearch.addresses")},
+		{Key: "elasticsearch.username", Value: v.GetString("elasticsearch.username")},
+		{Key: "elasticsearch.password", Value: v.GetString("elasticsearch.password")},
+		{Key: "elasticsearch.api_key", Value: v.GetString("elasticsearch.api_key")},
+		{Key: "elasticsearch.index_name", Value: v.GetString("elasticsearch.index_name")},
+		{Key: "elasticsearch.cloud.id", Value: v.GetString("elasticsearch.cloud.id")},
+		{Key: "elasticsearch.cloud.api_key", Value: v.GetString("elasticsearch.cloud.api_key")},
+		{Key: "elasticsearch.tls.enabled", Value: v.GetBool("elasticsearch.tls.enabled")},
+		{Key: "elasticsearch.tls.certificate", Value: v.GetString("elasticsearch.tls.certificate")},
+		{Key: "elasticsearch.tls.key", Value: v.GetString("elasticsearch.tls.key")},
+		{Key: "elasticsearch.retry.enabled", Value: v.GetBool("elasticsearch.retry.enabled")},
+		{Key: "elasticsearch.retry.initial_wait", Value: v.GetString("elasticsearch.retry.initial_wait")},
+		{Key: "elasticsearch.retry.max_wait", Value: v.GetString("elasticsearch.retry.max_wait")},
+		{Key: "elasticsearch.retry.max_retries", Value: v.GetInt("elasticsearch.retry.max_retries")},
+		{Key: "crawler.source_file", Value: v.GetString("crawler.source_file")},
+	}...)
+
 	// Create config instance
 	cfg := DefaultConfig()
 
@@ -576,9 +605,19 @@ func NewConfig(logger Logger) (Interface, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Ensure Elasticsearch config is properly loaded
+	cfg.Elasticsearch = *createElasticsearchConfig()
+
+	// Ensure Crawler config is properly loaded
+	crawlerCfg, err := createCrawlerConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create crawler config: %w", err)
+	}
+	cfg.Crawler = crawlerCfg
+
 	// Validate config
 	if err := ValidateConfig(cfg); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+		return nil, err // Return validation error directly without wrapping
 	}
 
 	return cfg, nil

@@ -206,9 +206,9 @@ func Test_runList(t *testing.T) {
 	require.NoError(t, writeErr)
 
 	// Set environment variables for testing
-	t.Setenv("SOURCES_FILE", filepath.Join(tmpDir, "sources.yml"))
-	t.Setenv("APP_ENV", "test")
-	t.Setenv("LOG_LEVEL", "info")
+	t.Setenv("GOCRAWL_SOURCES_FILE", filepath.Join(tmpDir, "sources.yml"))
+	t.Setenv("GOCRAWL_APP_ENV", "test")
+	t.Setenv("GOCRAWL_LOG_LEVEL", "info")
 
 	tests := []struct {
 		name    string

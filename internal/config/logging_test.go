@@ -167,7 +167,7 @@ crawler:
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", configPath)
+				t.Setenv("GOCRAWL_CONFIG_FILE", configPath)
 				return tmpDir
 			},
 			wantErr: true,

@@ -1,0 +1,755 @@
+=== RUN   TestElasticsearchConfigValidation
+    elasticsearch_test.go:147: Starting TestElasticsearchConfigValidation
+    elasticsearch_test.go:148: Initial environment variables:
+    elasticsearch_test.go:150:   USER=fsd42
+    elasticsearch_test.go:150:   SHLVL=1
+    elasticsearch_test.go:150:   HOME=/home/fsd42
+    elasticsearch_test.go:150:   OLDPWD=/home/fsd42/Development/gocrawl
+    elasticsearch_test.go:150:   CAROOT=/mnt/c/Users/jones/AppData/Local/mkcert
+    elasticsearch_test.go:150:   DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+    elasticsearch_test.go:150:   WSL_DISTRO_NAME=Ubuntu
+    elasticsearch_test.go:150:   WAYLAND_DISPLAY=wayland-0
+    elasticsearch_test.go:150:   LOGNAME=fsd42
+    elasticsearch_test.go:150:   PULSE_SERVER=unix:/mnt/wslg/PulseServer
+    elasticsearch_test.go:150:   WSL_INTEROP=/run/WSL/35697_interop
+    elasticsearch_test.go:150:   NAME=DESKTOP-V3430N0
+    elasticsearch_test.go:150:   _=/home/linuxbrew/.linuxbrew/bin/go
+    elasticsearch_test.go:150:   TERM=xterm-256color
+    elasticsearch_test.go:150:   XDG_RUNTIME_DIR=/run/user/1000/
+    elasticsearch_test.go:150:   DISPLAY=:0
+    elasticsearch_test.go:150:   LANG=C.UTF-8
+    elasticsearch_test.go:150:   SHELL=/usr/bin/zsh
+    elasticsearch_test.go:150:   HOSTTYPE=x86_64
+    elasticsearch_test.go:150:   WSL2_GUI_APPS_ENABLED=1
+    elasticsearch_test.go:150:   WSLENV=VSCODE_WSL_EXT_LOCATION/up:VSCODE_SERVER_TAR/up:CAROOT/up:
+    elasticsearch_test.go:150:   ZSH=/home/fsd42/.oh-my-zsh
+    elasticsearch_test.go:150:   PAGER=less
+    elasticsearch_test.go:150:   LESS=-R
+    elasticsearch_test.go:150:   LSCOLORS=Gxfxcxdxbxegedabagacad
+    elasticsearch_test.go:150:   LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:
+    elasticsearch_test.go:150:   HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew
+    elasticsearch_test.go:150:   HOMEBREW_CELLAR=/home/linuxbrew/.linuxbrew/Cellar
+    elasticsearch_test.go:150:   HOMEBREW_REPOSITORY=/home/linuxbrew/.linuxbrew/Homebrew
+    elasticsearch_test.go:150:   INFOPATH=/home/linuxbrew/.linuxbrew/share/info:/home/linuxbrew/.linuxbrew/share/info:
+    elasticsearch_test.go:150:   TERM_PROGRAM=vscode
+    elasticsearch_test.go:150:   TERM_PROGRAM_VERSION=0.48.7
+    elasticsearch_test.go:150:   COLORTERM=truecolor
+    elasticsearch_test.go:150:   GIT_ASKPASS=/home/fsd42/.cursor-server/bin/1d623c4cc1d3bb6e0fe4f1d5434b47b958b05870/extensions/git/dist/askpass.sh
+    elasticsearch_test.go:150:   VSCODE_GIT_ASKPASS_NODE=/home/fsd42/.cursor-server/bin/1d623c4cc1d3bb6e0fe4f1d5434b47b958b05870/node
+    elasticsearch_test.go:150:   VSCODE_GIT_ASKPASS_EXTRA_ARGS=
+    elasticsearch_test.go:150:   VSCODE_GIT_ASKPASS_MAIN=/home/fsd42/.cursor-server/bin/1d623c4cc1d3bb6e0fe4f1d5434b47b958b05870/extensions/git/dist/askpass-main.js
+    elasticsearch_test.go:150:   VSCODE_GIT_IPC_HANDLE=/run/user/1000/vscode-git-3206f2fffc.sock
+    elasticsearch_test.go:150:   VSCODE_IPC_HOOK_CLI=/run/user/1000/vscode-ipc-3119ac80-2dbb-48b0-af17-eec9d6c7924e.sock
+    elasticsearch_test.go:150:   PATH=/home/linuxbrew/.linuxbrew/Cellar/go/1.24.1/libexec/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/fsd42/.local/bin:/home/fsd42/.cursor-server/bin/1d623c4cc1d3bb6e0fe4f1d5434b47b958b05870/bin/remote-cli:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/fsd42/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/lib/wsl/lib:/mnt/c/Users/jones/AppData/Local/Programs/cursor/resources/app/bin:/mnt/c/Users/jones/AppData/Local/Programs/cursor/resources/app/bin:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA NvDLISR:/mnt/c/WINDOWS/system32:/mnt/c/WINDOWS:/mnt/c/WINDOWS/System32/Wbem:/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/:/mnt/c/WINDOWS/System32/OpenSSH/:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/tools/gsudo/Current:/mnt/c/Users/jones/AppData/Local/Microsoft/WindowsApps:/mnt/c/Users/jones/AppData/Roaming/Cursor/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin:/mnt/c/Users/jones/AppData/Local/Programs/cursor/resources/app/bi:/mnt/c/Program Files/Git/cmd:/mnt/c/WINDOWS/system32:/mnt/c/WINDOWS:/mnt/c/WINDOWS/System32/Wbem:/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/:/mnt/c/WINDOWS/System32/OpenSSH/:/mnt/c/Users/jones/AppData/Local/Microsoft/WindowsA:/Docker/host/bin:/mnt/c/Users/jones/AppData/Local/Microsoft/WindowsApps:/mnt/c/Users/jones/AppData/Roaming/Cursor/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin:/mnt/c/Users/jones/AppData/Local/Programs/Microsoft VS Code/bin:/mnt/c/Users/jones/AppData/Local/Microsoft/WindowsApps:/mnt/c/Users/jones/AppData/Local/Programs/cursor/resources/app/bin:/mnt/c/Users/jones/AppData/Local/JetBrains/Toolbox/scripts:/home/fsd42/go/bin:/home/fsd42/go/bin
+    elasticsearch_test.go:150:   PWD=/home/fsd42/Development/gocrawl/internal/config
+    env.go:19: Starting SetupTestEnv
+    env.go:20: Current working directory: /home/fsd42/Development/gocrawl/internal/config
+    env.go:21: Initial environment variables:
+    env.go:23:   USER=fsd42
+    env.go:23:   SHLVL=1
+    env.go:23:   HOME=/home/fsd42
+    env.go:23:   OLDPWD=/home/fsd42/Development/gocrawl
+    env.go:23:   CAROOT=/mnt/c/Users/jones/AppData/Local/mkcert
+    env.go:23:   DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+    env.go:23:   WSL_DISTRO_NAME=Ubuntu
+    env.go:23:   WAYLAND_DISPLAY=wayland-0
+    env.go:23:   LOGNAME=fsd42
+    env.go:23:   PULSE_SERVER=unix:/mnt/wslg/PulseServer
+    env.go:23:   WSL_INTEROP=/run/WSL/35697_interop
+    env.go:23:   NAME=DESKTOP-V3430N0
+    env.go:23:   _=/home/linuxbrew/.linuxbrew/bin/go
+    env.go:23:   TERM=xterm-256color
+    env.go:23:   XDG_RUNTIME_DIR=/run/user/1000/
+    env.go:23:   DISPLAY=:0
+    env.go:23:   LANG=C.UTF-8
+    env.go:23:   SHELL=/usr/bin/zsh
+    env.go:23:   HOSTTYPE=x86_64
+    env.go:23:   WSL2_GUI_APPS_ENABLED=1
+    env.go:23:   WSLENV=VSCODE_WSL_EXT_LOCATION/up:VSCODE_SERVER_TAR/up:CAROOT/up:
+    env.go:23:   ZSH=/home/fsd42/.oh-my-zsh
+    env.go:23:   PAGER=less
+    env.go:23:   LESS=-R
+    env.go:23:   LSCOLORS=Gxfxcxdxbxegedabagacad
+    env.go:23:   LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:
+    env.go:23:   HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew
+    env.go:23:   HOMEBREW_CELLAR=/home/linuxbrew/.linuxbrew/Cellar
+    env.go:23:   HOMEBREW_REPOSITORY=/home/linuxbrew/.linuxbrew/Homebrew
+    env.go:23:   INFOPATH=/home/linuxbrew/.linuxbrew/share/info:/home/linuxbrew/.linuxbrew/share/info:
+    env.go:23:   TERM_PROGRAM=vscode
+    env.go:23:   TERM_PROGRAM_VERSION=0.48.7
+    env.go:23:   COLORTERM=truecolor
+    env.go:23:   GIT_ASKPASS=/home/fsd42/.cursor-server/bin/1d623c4cc1d3bb6e0fe4f1d5434b47b958b05870/extensions/git/dist/askpass.sh
+    env.go:23:   VSCODE_GIT_ASKPASS_NODE=/home/fsd42/.cursor-server/bin/1d623c4cc1d3bb6e0fe4f1d5434b47b958b05870/node
+    env.go:23:   VSCODE_GIT_ASKPASS_EXTRA_ARGS=
+    env.go:23:   VSCODE_GIT_ASKPASS_MAIN=/home/fsd42/.cursor-server/bin/1d623c4cc1d3bb6e0fe4f1d5434b47b958b05870/extensions/git/dist/askpass-main.js
+    env.go:23:   VSCODE_GIT_IPC_HANDLE=/run/user/1000/vscode-git-3206f2fffc.sock
+    env.go:23:   VSCODE_IPC_HOOK_CLI=/run/user/1000/vscode-ipc-3119ac80-2dbb-48b0-af17-eec9d6c7924e.sock
+    env.go:23:   PATH=/home/linuxbrew/.linuxbrew/Cellar/go/1.24.1/libexec/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/fsd42/.local/bin:/home/fsd42/.cursor-server/bin/1d623c4cc1d3bb6e0fe4f1d5434b47b958b05870/bin/remote-cli:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/fsd42/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/lib/wsl/lib:/mnt/c/Users/jones/AppData/Local/Programs/cursor/resources/app/bin:/mnt/c/Users/jones/AppData/Local/Programs/cursor/resources/app/bin:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA NvDLISR:/mnt/c/WINDOWS/system32:/mnt/c/WINDOWS:/mnt/c/WINDOWS/System32/Wbem:/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/:/mnt/c/WINDOWS/System32/OpenSSH/:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/tools/gsudo/Current:/mnt/c/Users/jones/AppData/Local/Microsoft/WindowsApps:/mnt/c/Users/jones/AppData/Roaming/Cursor/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin:/mnt/c/Users/jones/AppData/Local/Programs/cursor/resources/app/bi:/mnt/c/Program Files/Git/cmd:/mnt/c/WINDOWS/system32:/mnt/c/WINDOWS:/mnt/c/WINDOWS/System32/Wbem:/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/:/mnt/c/WINDOWS/System32/OpenSSH/:/mnt/c/Users/jones/AppData/Local/Microsoft/WindowsA:/Docker/host/bin:/mnt/c/Users/jones/AppData/Local/Microsoft/WindowsApps:/mnt/c/Users/jones/AppData/Roaming/Cursor/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin:/mnt/c/Users/jones/AppData/Local/Programs/Microsoft VS Code/bin:/mnt/c/Users/jones/AppData/Local/Microsoft/WindowsApps:/mnt/c/Users/jones/AppData/Local/Programs/cursor/resources/app/bin:/mnt/c/Users/jones/AppData/Local/JetBrains/Toolbox/scripts:/home/fsd42/go/bin:/home/fsd42/go/bin
+    env.go:23:   PWD=/home/fsd42/Development/gocrawl/internal/config
+    env.go:34: Environment after clearing:
+    env.go:42: Caller filename: /home/fsd42/Development/gocrawl/internal/config/testutils/env.go
+    env.go:50: Found config directory: /home/fsd42/Development/gocrawl/internal/config
+    env.go:57: Config directory: /home/fsd42/Development/gocrawl/internal/config
+    env.go:58: Testdata directory: /home/fsd42/Development/gocrawl/internal/config/testdata
+    env.go:59: Config file path: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    env.go:60: Sources file path: /home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    env.go:74: Viper configuration:
+    env.go:75:   Config file: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    env.go:76:   Env prefix: GOCRAWL
+    env.go:77:   Automatic env: false
+    env.go:82: Successfully read config file
+    env.go:104: Final environment variables:
+    env.go:106:   GOCRAWL_APP_ENVIRONMENT=test
+    env.go:106:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    env.go:106:   GOCRAWL_APP_NAME=gocrawl-test
+    env.go:106:   GOCRAWL_APP_VERSION=0.0.1
+    env.go:106:   GOCRAWL_APP_DEBUG=false
+    env.go:106:   GOCRAWL_LOG_LEVEL=info
+    env.go:106:   GOCRAWL_LOG_DEBUG=false
+    env.go:106:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    env.go:106:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    env.go:106:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    env.go:106:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    env.go:106:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    env.go:106:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    env.go:106:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    env.go:106:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:159: Environment after SetupTestEnv:
+    elasticsearch_test.go:161:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:161:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:161:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:161:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:161:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:161:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:161:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:161:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:161:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:161:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:161:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:161:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:161:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:161:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:161:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+=== RUN   TestElasticsearchConfigValidation/missing_addresses
+    elasticsearch_test.go:339: Running test case: missing addresses
+    elasticsearch_test.go:342: Environment before test setup:
+    elasticsearch_test.go:344:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:344:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:344:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:344:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:344:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:173: Setting up environment variables for missing addresses test
+    elasticsearch_test.go:174: GOCRAWL_ELASTICSEARCH_ADDRESSES: http://localhost:9200
+    elasticsearch_test.go:175: GOCRAWL_ELASTICSEARCH_CLOUD_ID: 
+    elasticsearch_test.go:184: Environment after setting variables:
+    elasticsearch_test.go:186:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:186:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:186:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:186:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:186:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:186:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:186:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:186:   GOCRAWL_ELASTICSEARCH_ADDRESSES=
+    elasticsearch_test.go:186:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:186:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:186:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:186:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:186:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:186:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:186:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:186:   GOCRAWL_ELASTICSEARCH_CLOUD_ID=
+    elasticsearch_test.go:350: Environment after test setup:
+    elasticsearch_test.go:352:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:352:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:352:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:352:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:352:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_ADDRESSES=
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_CLOUD_ID=
+    elasticsearch_test.go:356: Viper configuration:
+    elasticsearch_test.go:357:   Config file: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    elasticsearch_test.go:358:   Elasticsearch addresses: [http://localhost:9200]
+    elasticsearch_test.go:359:   Elasticsearch index name: test-index
+    elasticsearch_test.go:360:   Elasticsearch API key: test_api_key
+=== NAME  TestElasticsearchConfigValidation
+    logger.go:15: INFO: No config file found, using defaults []
+    logger.go:15: INFO: Loading config from Viper [{app.environment } {app.name } {app.version } {app.debug false} {log.level } {log.debug false} {elasticsearch.addresses []} {elasticsearch.username } {elasticsearch.password } {elasticsearch.api_key } {elasticsearch.index_name } {elasticsearch.cloud.id } {elasticsearch.cloud.api_key } {elasticsearch.tls.enabled false} {elasticsearch.tls.certificate } {elasticsearch.tls.key } {elasticsearch.retry.enabled false} {elasticsearch.retry.initial_wait } {elasticsearch.retry.max_wait } {elasticsearch.retry.max_retries 0} {crawler.source_file }]
+
+Creating Elasticsearch config:
+Addresses: [http://localhost:9200]
+Username: 
+Password: 
+API Key: test_api_key
+Index Name: test-index
+Cloud ID: 
+Cloud API Key: 
+TLS Enabled: false
+TLS Certificate: test-cert.pem
+TLS Key: test-key.pem
+Retry Enabled: true
+Retry Initial Wait: 1s
+Retry Max Wait: 5s
+Retry Max Retries: 3
+
+Final Elasticsearch config:
+&{Addresses:[http://localhost:9200] Username: Password: APIKey:test_api_key IndexName:test-index Cloud:{ID: APIKey:} TLS:{Enabled:false CertFile:test-cert.pem KeyFile:test-key.pem} Retry:{Enabled:true InitialWait:1s MaxWait:5s MaxRetries:3}}
+Loaded sources config: [{Name:test_source URL:http://test.example.com RateLimit:2s MaxDepth:2 Time:[] ArticleIndex:test_articles Index: Selectors:{Article:{Container: Title:h1 Body:article Intro: Byline: PublishedTime: TimeAgo: JSONLD: Section: Keywords: Description: OGTitle: OGDescription: OGImage: OgURL: Canonical: WordCount: PublishDate: Category: Tags: Author:.author BylineName:}}}]
+=== NAME  TestElasticsearchConfigValidation/missing_addresses
+    elasticsearch_test.go:364: 
+        	Error Trace:	/home/fsd42/Development/gocrawl/internal/config/elasticsearch_test.go:364
+        	Error:      	"invalid config: invalid config: field \"log.level\" with value : invalid log level" does not contain "at least one Elasticsearch address must be provided"
+        	Test:       	TestElasticsearchConfigValidation/missing_addresses
+=== RUN   TestElasticsearchConfigValidation/invalid_address
+    elasticsearch_test.go:339: Running test case: invalid address
+    elasticsearch_test.go:342: Environment before test setup:
+    elasticsearch_test.go:344:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:344:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:344:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:344:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:344:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:195: Setting up environment variables for invalid address test
+    elasticsearch_test.go:196: GOCRAWL_ELASTICSEARCH_ADDRESSES: http://localhost:9200
+    elasticsearch_test.go:350: Environment after test setup:
+    elasticsearch_test.go:352:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:352:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:352:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:352:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:352:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_ADDRESSES=not-a-url
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:356: Viper configuration:
+    elasticsearch_test.go:357:   Config file: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    elasticsearch_test.go:358:   Elasticsearch addresses: [not-a-url]
+    elasticsearch_test.go:359:   Elasticsearch index name: test-index
+    elasticsearch_test.go:360:   Elasticsearch API key: test_api_key
+=== NAME  TestElasticsearchConfigValidation
+    logger.go:15: INFO: No config file found, using defaults []
+    logger.go:15: INFO: Loading config from Viper [{app.environment } {app.name } {app.version } {app.debug false} {log.level } {log.debug false} {elasticsearch.addresses []} {elasticsearch.username } {elasticsearch.password } {elasticsearch.api_key } {elasticsearch.index_name } {elasticsearch.cloud.id } {elasticsearch.cloud.api_key } {elasticsearch.tls.enabled false} {elasticsearch.tls.certificate } {elasticsearch.tls.key } {elasticsearch.retry.enabled false} {elasticsearch.retry.initial_wait } {elasticsearch.retry.max_wait } {elasticsearch.retry.max_retries 0} {crawler.source_file }]
+
+Creating Elasticsearch config:
+Addresses: [not-a-url]
+Username: 
+Password: 
+API Key: test_api_key
+Index Name: test-index
+Cloud ID: 
+Cloud API Key: 
+TLS Enabled: false
+TLS Certificate: test-cert.pem
+TLS Key: test-key.pem
+Retry Enabled: true
+Retry Initial Wait: 1s
+Retry Max Wait: 5s
+Retry Max Retries: 3
+
+Final Elasticsearch config:
+&{Addresses:[not-a-url] Username: Password: APIKey:test_api_key IndexName:test-index Cloud:{ID: APIKey:} TLS:{Enabled:false CertFile:test-cert.pem KeyFile:test-key.pem} Retry:{Enabled:true InitialWait:1s MaxWait:5s MaxRetries:3}}
+Loaded sources config: [{Name:test_source URL:http://test.example.com RateLimit:2s MaxDepth:2 Time:[] ArticleIndex:test_articles Index: Selectors:{Article:{Container: Title:h1 Body:article Intro: Byline: PublishedTime: TimeAgo: JSONLD: Section: Keywords: Description: OGTitle: OGDescription: OGImage: OgURL: Canonical: WordCount: PublishDate: Category: Tags: Author:.author BylineName:}}}]
+=== NAME  TestElasticsearchConfigValidation/invalid_address
+    elasticsearch_test.go:364: 
+        	Error Trace:	/home/fsd42/Development/gocrawl/internal/config/elasticsearch_test.go:364
+        	Error:      	"invalid config: invalid config: field \"log.level\" with value : invalid log level" does not contain "invalid Elasticsearch address"
+        	Test:       	TestElasticsearchConfigValidation/invalid_address
+=== RUN   TestElasticsearchConfigValidation/missing_credentials
+    elasticsearch_test.go:339: Running test case: missing credentials
+    elasticsearch_test.go:342: Environment before test setup:
+    elasticsearch_test.go:344:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:344:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:344:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:344:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:344:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:209: Setting up environment variables for missing credentials test
+    elasticsearch_test.go:210: GOCRAWL_ELASTICSEARCH_ADDRESSES: http://localhost:9200
+    elasticsearch_test.go:211: GOCRAWL_ELASTICSEARCH_USERNAME: 
+    elasticsearch_test.go:212: GOCRAWL_ELASTICSEARCH_PASSWORD: 
+    elasticsearch_test.go:213: GOCRAWL_ELASTICSEARCH_API_KEY: test_api_key
+    elasticsearch_test.go:350: Environment after test setup:
+    elasticsearch_test.go:352:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:352:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:352:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:352:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:352:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_API_KEY=
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_USERNAME=
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_PASSWORD=
+    elasticsearch_test.go:356: Viper configuration:
+    elasticsearch_test.go:357:   Config file: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    elasticsearch_test.go:358:   Elasticsearch addresses: [http://localhost:9200]
+    elasticsearch_test.go:359:   Elasticsearch index name: test-index
+    elasticsearch_test.go:360:   Elasticsearch API key: test_api_key
+=== NAME  TestElasticsearchConfigValidation
+    logger.go:15: INFO: No config file found, using defaults []
+    logger.go:15: INFO: Loading config from Viper [{app.environment } {app.name } {app.version } {app.debug false} {log.level } {log.debug false} {elasticsearch.addresses []} {elasticsearch.username } {elasticsearch.password } {elasticsearch.api_key } {elasticsearch.index_name } {elasticsearch.cloud.id } {elasticsearch.cloud.api_key } {elasticsearch.tls.enabled false} {elasticsearch.tls.certificate } {elasticsearch.tls.key } {elasticsearch.retry.enabled false} {elasticsearch.retry.initial_wait } {elasticsearch.retry.max_wait } {elasticsearch.retry.max_retries 0} {crawler.source_file }]
+
+Creating Elasticsearch config:
+Addresses: [http://localhost:9200]
+Username: 
+Password: 
+API Key: test_api_key
+Index Name: test-index
+Cloud ID: 
+Cloud API Key: 
+TLS Enabled: false
+TLS Certificate: test-cert.pem
+TLS Key: test-key.pem
+Retry Enabled: true
+Retry Initial Wait: 1s
+Retry Max Wait: 5s
+Retry Max Retries: 3
+
+Final Elasticsearch config:
+&{Addresses:[http://localhost:9200] Username: Password: APIKey:test_api_key IndexName:test-index Cloud:{ID: APIKey:} TLS:{Enabled:false CertFile:test-cert.pem KeyFile:test-key.pem} Retry:{Enabled:true InitialWait:1s MaxWait:5s MaxRetries:3}}
+Loaded sources config: [{Name:test_source URL:http://test.example.com RateLimit:2s MaxDepth:2 Time:[] ArticleIndex:test_articles Index: Selectors:{Article:{Container: Title:h1 Body:article Intro: Byline: PublishedTime: TimeAgo: JSONLD: Section: Keywords: Description: OGTitle: OGDescription: OGImage: OgURL: Canonical: WordCount: PublishDate: Category: Tags: Author:.author BylineName:}}}]
+=== NAME  TestElasticsearchConfigValidation/missing_credentials
+    elasticsearch_test.go:364: 
+        	Error Trace:	/home/fsd42/Development/gocrawl/internal/config/elasticsearch_test.go:364
+        	Error:      	"invalid config: invalid config: field \"log.level\" with value : invalid log level" does not contain "either username/password or api_key must be provided"
+        	Test:       	TestElasticsearchConfigValidation/missing_credentials
+=== RUN   TestElasticsearchConfigValidation/invalid_retry_values
+    elasticsearch_test.go:339: Running test case: invalid retry values
+    elasticsearch_test.go:342: Environment before test setup:
+    elasticsearch_test.go:344:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:344:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:344:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:344:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:344:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:229: Setting up environment variables for invalid retry values test
+    elasticsearch_test.go:230: GOCRAWL_ELASTICSEARCH_ADDRESSES: http://localhost:9200
+    elasticsearch_test.go:231: GOCRAWL_ELASTICSEARCH_USERNAME: 
+    elasticsearch_test.go:232: GOCRAWL_ELASTICSEARCH_PASSWORD: 
+    elasticsearch_test.go:233: GOCRAWL_ELASTICSEARCH_RETRY_ENABLED: true
+    elasticsearch_test.go:234: GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES: 3
+    elasticsearch_test.go:350: Environment after test setup:
+    elasticsearch_test.go:352:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:352:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:352:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:352:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:352:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=-1
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_USERNAME=user
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_PASSWORD=pass
+    elasticsearch_test.go:356: Viper configuration:
+    elasticsearch_test.go:357:   Config file: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    elasticsearch_test.go:358:   Elasticsearch addresses: [http://localhost:9200]
+    elasticsearch_test.go:359:   Elasticsearch index name: test-index
+    elasticsearch_test.go:360:   Elasticsearch API key: test_api_key
+=== NAME  TestElasticsearchConfigValidation
+    logger.go:15: INFO: No config file found, using defaults []
+    logger.go:15: INFO: Loading config from Viper [{app.environment } {app.name } {app.version } {app.debug false} {log.level } {log.debug false} {elasticsearch.addresses []} {elasticsearch.username } {elasticsearch.password } {elasticsearch.api_key } {elasticsearch.index_name } {elasticsearch.cloud.id } {elasticsearch.cloud.api_key } {elasticsearch.tls.enabled false} {elasticsearch.tls.certificate } {elasticsearch.tls.key } {elasticsearch.retry.enabled false} {elasticsearch.retry.initial_wait } {elasticsearch.retry.max_wait } {elasticsearch.retry.max_retries 0} {crawler.source_file }]
+
+Creating Elasticsearch config:
+Addresses: [http://localhost:9200]
+Username: user
+Password: pass
+API Key: test_api_key
+Index Name: test-index
+Cloud ID: 
+Cloud API Key: 
+TLS Enabled: false
+TLS Certificate: test-cert.pem
+TLS Key: test-key.pem
+Retry Enabled: true
+Retry Initial Wait: 1s
+Retry Max Wait: 5s
+Retry Max Retries: -1
+
+Final Elasticsearch config:
+&{Addresses:[http://localhost:9200] Username:user Password:pass APIKey:test_api_key IndexName:test-index Cloud:{ID: APIKey:} TLS:{Enabled:false CertFile:test-cert.pem KeyFile:test-key.pem} Retry:{Enabled:true InitialWait:1s MaxWait:5s MaxRetries:-1}}
+Loaded sources config: [{Name:test_source URL:http://test.example.com RateLimit:2s MaxDepth:2 Time:[] ArticleIndex:test_articles Index: Selectors:{Article:{Container: Title:h1 Body:article Intro: Byline: PublishedTime: TimeAgo: JSONLD: Section: Keywords: Description: OGTitle: OGDescription: OGImage: OgURL: Canonical: WordCount: PublishDate: Category: Tags: Author:.author BylineName:}}}]
+=== NAME  TestElasticsearchConfigValidation/invalid_retry_values
+    elasticsearch_test.go:364: 
+        	Error Trace:	/home/fsd42/Development/gocrawl/internal/config/elasticsearch_test.go:364
+        	Error:      	"invalid config: invalid config: field \"log.level\" with value : invalid log level" does not contain "max retries must be greater than or equal to 0"
+        	Test:       	TestElasticsearchConfigValidation/invalid_retry_values
+=== RUN   TestElasticsearchConfigValidation/invalid_retry_initial_wait
+    elasticsearch_test.go:339: Running test case: invalid retry initial wait
+    elasticsearch_test.go:342: Environment before test setup:
+    elasticsearch_test.go:344:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:344:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:344:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:344:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:344:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:251: Setting up environment variables for invalid retry initial wait test
+    elasticsearch_test.go:252: GOCRAWL_ELASTICSEARCH_ADDRESSES: http://localhost:9200
+    elasticsearch_test.go:253: GOCRAWL_ELASTICSEARCH_USERNAME: 
+    elasticsearch_test.go:254: GOCRAWL_ELASTICSEARCH_PASSWORD: 
+    elasticsearch_test.go:255: GOCRAWL_ELASTICSEARCH_RETRY_ENABLED: true
+    elasticsearch_test.go:256: GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT: 1s
+    elasticsearch_test.go:350: Environment after test setup:
+    elasticsearch_test.go:352:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:352:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:352:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:352:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:352:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=500ms
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_USERNAME=user
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_PASSWORD=pass
+    elasticsearch_test.go:356: Viper configuration:
+    elasticsearch_test.go:357:   Config file: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    elasticsearch_test.go:358:   Elasticsearch addresses: [http://localhost:9200]
+    elasticsearch_test.go:359:   Elasticsearch index name: test-index
+    elasticsearch_test.go:360:   Elasticsearch API key: test_api_key
+=== NAME  TestElasticsearchConfigValidation
+    logger.go:15: INFO: No config file found, using defaults []
+    logger.go:15: INFO: Loading config from Viper [{app.environment } {app.name } {app.version } {app.debug false} {log.level } {log.debug false} {elasticsearch.addresses []} {elasticsearch.username } {elasticsearch.password } {elasticsearch.api_key } {elasticsearch.index_name } {elasticsearch.cloud.id } {elasticsearch.cloud.api_key } {elasticsearch.tls.enabled false} {elasticsearch.tls.certificate } {elasticsearch.tls.key } {elasticsearch.retry.enabled false} {elasticsearch.retry.initial_wait } {elasticsearch.retry.max_wait } {elasticsearch.retry.max_retries 0} {crawler.source_file }]
+
+Creating Elasticsearch config:
+Addresses: [http://localhost:9200]
+Username: user
+Password: pass
+API Key: test_api_key
+Index Name: test-index
+Cloud ID: 
+Cloud API Key: 
+TLS Enabled: false
+TLS Certificate: test-cert.pem
+TLS Key: test-key.pem
+Retry Enabled: true
+Retry Initial Wait: 500ms
+Retry Max Wait: 5s
+Retry Max Retries: 3
+
+Final Elasticsearch config:
+&{Addresses:[http://localhost:9200] Username:user Password:pass APIKey:test_api_key IndexName:test-index Cloud:{ID: APIKey:} TLS:{Enabled:false CertFile:test-cert.pem KeyFile:test-key.pem} Retry:{Enabled:true InitialWait:500ms MaxWait:5s MaxRetries:3}}
+Loaded sources config: [{Name:test_source URL:http://test.example.com RateLimit:2s MaxDepth:2 Time:[] ArticleIndex:test_articles Index: Selectors:{Article:{Container: Title:h1 Body:article Intro: Byline: PublishedTime: TimeAgo: JSONLD: Section: Keywords: Description: OGTitle: OGDescription: OGImage: OgURL: Canonical: WordCount: PublishDate: Category: Tags: Author:.author BylineName:}}}]
+=== NAME  TestElasticsearchConfigValidation/invalid_retry_initial_wait
+    elasticsearch_test.go:364: 
+        	Error Trace:	/home/fsd42/Development/gocrawl/internal/config/elasticsearch_test.go:364
+        	Error:      	"invalid config: invalid config: field \"log.level\" with value : invalid log level" does not contain "initial wait must be at least 1 second"
+        	Test:       	TestElasticsearchConfigValidation/invalid_retry_initial_wait
+=== RUN   TestElasticsearchConfigValidation/invalid_retry_max_wait
+    elasticsearch_test.go:339: Running test case: invalid retry max wait
+    elasticsearch_test.go:342: Environment before test setup:
+    elasticsearch_test.go:344:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:344:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:344:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:344:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:344:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:273: Setting up environment variables for invalid retry max wait test
+    elasticsearch_test.go:274: GOCRAWL_ELASTICSEARCH_ADDRESSES: http://localhost:9200
+    elasticsearch_test.go:275: GOCRAWL_ELASTICSEARCH_USERNAME: 
+    elasticsearch_test.go:276: GOCRAWL_ELASTICSEARCH_PASSWORD: 
+    elasticsearch_test.go:277: GOCRAWL_ELASTICSEARCH_RETRY_ENABLED: true
+    elasticsearch_test.go:278: GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT: 1s
+    elasticsearch_test.go:279: GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT: 5s
+    elasticsearch_test.go:350: Environment after test setup:
+    elasticsearch_test.go:352:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:352:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:352:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:352:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:352:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=2s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=1s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_USERNAME=user
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_PASSWORD=pass
+    elasticsearch_test.go:356: Viper configuration:
+    elasticsearch_test.go:357:   Config file: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    elasticsearch_test.go:358:   Elasticsearch addresses: [http://localhost:9200]
+    elasticsearch_test.go:359:   Elasticsearch index name: test-index
+    elasticsearch_test.go:360:   Elasticsearch API key: test_api_key
+=== NAME  TestElasticsearchConfigValidation
+    logger.go:15: INFO: No config file found, using defaults []
+    logger.go:15: INFO: Loading config from Viper [{app.environment } {app.name } {app.version } {app.debug false} {log.level } {log.debug false} {elasticsearch.addresses []} {elasticsearch.username } {elasticsearch.password } {elasticsearch.api_key } {elasticsearch.index_name } {elasticsearch.cloud.id } {elasticsearch.cloud.api_key } {elasticsearch.tls.enabled false} {elasticsearch.tls.certificate } {elasticsearch.tls.key } {elasticsearch.retry.enabled false} {elasticsearch.retry.initial_wait } {elasticsearch.retry.max_wait } {elasticsearch.retry.max_retries 0} {crawler.source_file }]
+
+Creating Elasticsearch config:
+Addresses: [http://localhost:9200]
+Username: user
+Password: pass
+API Key: test_api_key
+Index Name: test-index
+Cloud ID: 
+Cloud API Key: 
+TLS Enabled: false
+TLS Certificate: test-cert.pem
+TLS Key: test-key.pem
+Retry Enabled: true
+Retry Initial Wait: 2s
+Retry Max Wait: 1s
+Retry Max Retries: 3
+
+Final Elasticsearch config:
+&{Addresses:[http://localhost:9200] Username:user Password:pass APIKey:test_api_key IndexName:test-index Cloud:{ID: APIKey:} TLS:{Enabled:false CertFile:test-cert.pem KeyFile:test-key.pem} Retry:{Enabled:true InitialWait:2s MaxWait:1s MaxRetries:3}}
+Loaded sources config: [{Name:test_source URL:http://test.example.com RateLimit:2s MaxDepth:2 Time:[] ArticleIndex:test_articles Index: Selectors:{Article:{Container: Title:h1 Body:article Intro: Byline: PublishedTime: TimeAgo: JSONLD: Section: Keywords: Description: OGTitle: OGDescription: OGImage: OgURL: Canonical: WordCount: PublishDate: Category: Tags: Author:.author BylineName:}}}]
+=== NAME  TestElasticsearchConfigValidation/invalid_retry_max_wait
+    elasticsearch_test.go:364: 
+        	Error Trace:	/home/fsd42/Development/gocrawl/internal/config/elasticsearch_test.go:364
+        	Error:      	"invalid config: invalid config: field \"log.level\" with value : invalid log level" does not contain "max wait must be greater than initial wait"
+        	Test:       	TestElasticsearchConfigValidation/invalid_retry_max_wait
+=== RUN   TestElasticsearchConfigValidation/missing_index_name
+    elasticsearch_test.go:339: Running test case: missing index name
+    elasticsearch_test.go:342: Environment before test setup:
+    elasticsearch_test.go:344:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:344:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:344:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:344:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:344:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:297: Setting up environment variables for missing index name test
+    elasticsearch_test.go:298: GOCRAWL_ELASTICSEARCH_ADDRESSES: http://localhost:9200
+    elasticsearch_test.go:299: GOCRAWL_ELASTICSEARCH_USERNAME: 
+    elasticsearch_test.go:300: GOCRAWL_ELASTICSEARCH_PASSWORD: 
+    elasticsearch_test.go:301: GOCRAWL_ELASTICSEARCH_INDEX_NAME: test-index
+    elasticsearch_test.go:350: Environment after test setup:
+    elasticsearch_test.go:352:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:352:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:352:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:352:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:352:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_USERNAME=user
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_PASSWORD=pass
+    elasticsearch_test.go:356: Viper configuration:
+    elasticsearch_test.go:357:   Config file: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    elasticsearch_test.go:358:   Elasticsearch addresses: [http://localhost:9200]
+    elasticsearch_test.go:359:   Elasticsearch index name: test-index
+    elasticsearch_test.go:360:   Elasticsearch API key: test_api_key
+=== NAME  TestElasticsearchConfigValidation
+    logger.go:15: INFO: No config file found, using defaults []
+    logger.go:15: INFO: Loading config from Viper [{app.environment } {app.name } {app.version } {app.debug false} {log.level } {log.debug false} {elasticsearch.addresses []} {elasticsearch.username } {elasticsearch.password } {elasticsearch.api_key } {elasticsearch.index_name } {elasticsearch.cloud.id } {elasticsearch.cloud.api_key } {elasticsearch.tls.enabled false} {elasticsearch.tls.certificate } {elasticsearch.tls.key } {elasticsearch.retry.enabled false} {elasticsearch.retry.initial_wait } {elasticsearch.retry.max_wait } {elasticsearch.retry.max_retries 0} {crawler.source_file }]
+
+Creating Elasticsearch config:
+Addresses: [http://localhost:9200]
+Username: user
+Password: pass
+API Key: test_api_key
+Index Name: test-index
+Cloud ID: 
+Cloud API Key: 
+TLS Enabled: false
+TLS Certificate: test-cert.pem
+TLS Key: test-key.pem
+Retry Enabled: true
+Retry Initial Wait: 1s
+Retry Max Wait: 5s
+Retry Max Retries: 3
+
+Final Elasticsearch config:
+&{Addresses:[http://localhost:9200] Username:user Password:pass APIKey:test_api_key IndexName:test-index Cloud:{ID: APIKey:} TLS:{Enabled:false CertFile:test-cert.pem KeyFile:test-key.pem} Retry:{Enabled:true InitialWait:1s MaxWait:5s MaxRetries:3}}
+Loaded sources config: [{Name:test_source URL:http://test.example.com RateLimit:2s MaxDepth:2 Time:[] ArticleIndex:test_articles Index: Selectors:{Article:{Container: Title:h1 Body:article Intro: Byline: PublishedTime: TimeAgo: JSONLD: Section: Keywords: Description: OGTitle: OGDescription: OGImage: OgURL: Canonical: WordCount: PublishDate: Category: Tags: Author:.author BylineName:}}}]
+=== NAME  TestElasticsearchConfigValidation/missing_index_name
+    elasticsearch_test.go:364: 
+        	Error Trace:	/home/fsd42/Development/gocrawl/internal/config/elasticsearch_test.go:364
+        	Error:      	"invalid config: invalid config: field \"log.level\" with value : invalid log level" does not contain "index name cannot be empty"
+        	Test:       	TestElasticsearchConfigValidation/missing_index_name
+=== RUN   TestElasticsearchConfigValidation/missing_TLS_certificate
+    elasticsearch_test.go:339: Running test case: missing TLS certificate
+    elasticsearch_test.go:342: Environment before test setup:
+    elasticsearch_test.go:344:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:344:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:344:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:344:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:344:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:344:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:344:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:317: Setting up environment variables for missing TLS certificate test
+    elasticsearch_test.go:318: GOCRAWL_ELASTICSEARCH_ADDRESSES: http://localhost:9200
+    elasticsearch_test.go:319: GOCRAWL_ELASTICSEARCH_USERNAME: 
+    elasticsearch_test.go:320: GOCRAWL_ELASTICSEARCH_PASSWORD: 
+    elasticsearch_test.go:321: GOCRAWL_ELASTICSEARCH_TLS_ENABLED: 
+    elasticsearch_test.go:322: GOCRAWL_ELASTICSEARCH_TLS_CERTIFICATE: 
+    elasticsearch_test.go:350: Environment after test setup:
+    elasticsearch_test.go:352:   GOCRAWL_APP_ENVIRONMENT=test
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_SOURCE_FILE=/home/fsd42/Development/gocrawl/internal/config/testdata/sources.yml
+    elasticsearch_test.go:352:   GOCRAWL_APP_NAME=gocrawl-test
+    elasticsearch_test.go:352:   GOCRAWL_APP_VERSION=0.0.1
+    elasticsearch_test.go:352:   GOCRAWL_APP_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_LOG_LEVEL=info
+    elasticsearch_test.go:352:   GOCRAWL_LOG_DEBUG=false
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_ADDRESSES=http://localhost:9200
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_INDEX_NAME=test-index
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_API_KEY=test_api_key
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_ENABLED=true
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT=1s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT=5s
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES=3
+    elasticsearch_test.go:352:   GOCRAWL_CRAWLER_BASE_URL=http://test.example.com
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_USERNAME=user
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_PASSWORD=pass
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_TLS_ENABLED=true
+    elasticsearch_test.go:352:   GOCRAWL_ELASTICSEARCH_TLS_CERTIFICATE=
+    elasticsearch_test.go:356: Viper configuration:
+    elasticsearch_test.go:357:   Config file: /home/fsd42/Development/gocrawl/internal/config/testdata/config.yml
+    elasticsearch_test.go:358:   Elasticsearch addresses: [http://localhost:9200]
+    elasticsearch_test.go:359:   Elasticsearch index name: test-index
+    elasticsearch_test.go:360:   Elasticsearch API key: test_api_key
+=== NAME  TestElasticsearchConfigValidation
+    logger.go:15: INFO: No config file found, using defaults []
+    logger.go:15: INFO: Loading config from Viper [{app.environment } {app.name } {app.version } {app.debug false} {log.level } {log.debug false} {elasticsearch.addresses []} {elasticsearch.username } {elasticsearch.password } {elasticsearch.api_key } {elasticsearch.index_name } {elasticsearch.cloud.id } {elasticsearch.cloud.api_key } {elasticsearch.tls.enabled false} {elasticsearch.tls.certificate } {elasticsearch.tls.key } {elasticsearch.retry.enabled false} {elasticsearch.retry.initial_wait } {elasticsearch.retry.max_wait } {elasticsearch.retry.max_retries 0} {crawler.source_file }]
+
+Creating Elasticsearch config:
+Addresses: [http://localhost:9200]
+Username: user
+Password: pass
+API Key: test_api_key
+Index Name: test-index
+Cloud ID: 
+Cloud API Key: 
+TLS Enabled: true
+TLS Certificate: test-cert.pem
+TLS Key: test-key.pem
+Retry Enabled: true
+Retry Initial Wait: 1s
+Retry Max Wait: 5s
+Retry Max Retries: 3
+
+Final Elasticsearch config:
+&{Addresses:[http://localhost:9200] Username:user Password:pass APIKey:test_api_key IndexName:test-index Cloud:{ID: APIKey:} TLS:{Enabled:true CertFile:test-cert.pem KeyFile:test-key.pem} Retry:{Enabled:true InitialWait:1s MaxWait:5s MaxRetries:3}}
+Loaded sources config: [{Name:test_source URL:http://test.example.com RateLimit:2s MaxDepth:2 Time:[] ArticleIndex:test_articles Index: Selectors:{Article:{Container: Title:h1 Body:article Intro: Byline: PublishedTime: TimeAgo: JSONLD: Section: Keywords: Description: OGTitle: OGDescription: OGImage: OgURL: Canonical: WordCount: PublishDate: Category: Tags: Author:.author BylineName:}}}]
+=== NAME  TestElasticsearchConfigValidation/missing_TLS_certificate
+    elasticsearch_test.go:364: 
+        	Error Trace:	/home/fsd42/Development/gocrawl/internal/config/elasticsearch_test.go:364
+        	Error:      	"invalid config: invalid config: field \"log.level\" with value : invalid log level" does not contain "certificate path cannot be empty when TLS is enabled"
+        	Test:       	TestElasticsearchConfigValidation/missing_TLS_certificate
+=== NAME  TestElasticsearchConfigValidation
+    env.go:111: Running cleanup function
+    env.go:119: Cleanup completed
+--- FAIL: TestElasticsearchConfigValidation (0.01s)
+    --- FAIL: TestElasticsearchConfigValidation/missing_addresses (0.00s)
+    --- FAIL: TestElasticsearchConfigValidation/invalid_address (0.00s)
+    --- FAIL: TestElasticsearchConfigValidation/missing_credentials (0.00s)
+    --- FAIL: TestElasticsearchConfigValidation/invalid_retry_values (0.00s)
+    --- FAIL: TestElasticsearchConfigValidation/invalid_retry_initial_wait (0.00s)
+    --- FAIL: TestElasticsearchConfigValidation/invalid_retry_max_wait (0.00s)
+    --- FAIL: TestElasticsearchConfigValidation/missing_index_name (0.00s)
+    --- FAIL: TestElasticsearchConfigValidation/missing_TLS_certificate (0.00s)
+FAIL
+FAIL	github.com/jonesrussell/gocrawl/internal/config	0.011s
+FAIL

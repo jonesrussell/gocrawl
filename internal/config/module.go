@@ -31,19 +31,32 @@ func New(log Logger) (Interface, error) {
 	// Initialize Viper if no config file is set
 	if viper.GetViper().ConfigFileUsed() == "" {
 		viper.AutomaticEnv()
-		viper.SetEnvPrefix("")
+		viper.SetEnvPrefix("GOCRAWL")
 		viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	}
 
-	// Check for test environment
-	if os.Getenv("GOCRAWL_APP_ENVIRONMENT") == "test" {
-		// Set test-specific defaults
-		viper.SetDefault("app.environment", "test")
+	// Set environment from env var or default to development
+	env := viper.GetString("app.environment")
+	if env == "" {
+		env = os.Getenv("GOCRAWL_APP_ENVIRONMENT")
+		if env == "" {
+			env = "development"
+		}
+		viper.Set("app.environment", env)
+	}
+
+	// Set test-specific defaults if in test environment
+	if env == "test" {
+		// Application settings
 		viper.SetDefault("app.name", "gocrawl-test")
 		viper.SetDefault("app.version", "0.0.1")
 		viper.SetDefault("app.debug", false)
+
+		// Logging settings
 		viper.SetDefault("log.level", "debug")
 		viper.SetDefault("log.debug", true)
+
+		// Elasticsearch settings
 		viper.SetDefault("elasticsearch.addresses", []string{"http://localhost:9200"})
 		viper.SetDefault("elasticsearch.index_name", "test-index")
 		viper.SetDefault("elasticsearch.api_key", "test_api_key")
@@ -51,9 +64,13 @@ func New(log Logger) (Interface, error) {
 		viper.SetDefault("elasticsearch.retry.initial_wait", "1s")
 		viper.SetDefault("elasticsearch.retry.max_wait", "5s")
 		viper.SetDefault("elasticsearch.retry.max_retries", 3)
+
+		// Server settings
 		viper.SetDefault("server.address", ":8080")
 		viper.SetDefault("server.security.enabled", true)
 		viper.SetDefault("server.security.api_key", "test_api_key")
+
+		// Crawler settings
 		viper.SetDefault("crawler.base_url", "http://test.example.com")
 		viper.SetDefault("crawler.max_depth", 2)
 		viper.SetDefault("crawler.rate_limit", "2s")
@@ -67,7 +84,7 @@ func New(log Logger) (Interface, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 	if err := ValidateConfig(cfg); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+		return nil, err // Return validation error directly without wrapping
 	}
 	return cfg, nil
 }

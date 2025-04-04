@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,22 +10,38 @@ import (
 
 // ValidateConfig validates the configuration
 func ValidateConfig(cfg *Config) error {
+	// Debug: Print configuration being validated
+	fmt.Printf("Validating configuration:\n")
+	fmt.Printf("  App: %+v\n", cfg.App)
+	fmt.Printf("  Log: %+v\n", cfg.Log)
+	fmt.Printf("  Elasticsearch: %+v\n", cfg.Elasticsearch)
+	fmt.Printf("  Crawler: %+v\n", cfg.Crawler)
+	fmt.Printf("  Server: %+v\n", cfg.Server)
+	fmt.Printf("  Sources: %+v\n", cfg.Sources)
+
+	// Validate specific configurations first
 	if err := validateAppConfig(cfg.App); err != nil {
+		fmt.Printf("App validation failed: %v\n", err)
 		return err
 	}
 	if err := validateLogConfig(cfg.Log); err != nil {
-		return err
-	}
-	if err := validateCrawlerConfig(cfg.Crawler); err != nil {
+		fmt.Printf("Log validation failed: %v\n", err)
 		return err
 	}
 	if err := validateElasticsearchConfig(cfg.Elasticsearch); err != nil {
+		fmt.Printf("Elasticsearch validation failed: %v\n", err)
+		return err
+	}
+	if err := validateCrawlerConfig(cfg.Crawler); err != nil {
+		fmt.Printf("Crawler validation failed: %v\n", err)
 		return err
 	}
 	if err := validateServerConfig(cfg.Server); err != nil {
+		fmt.Printf("Server validation failed: %v\n", err)
 		return err
 	}
 	if err := validateSources(cfg.Sources); err != nil {
+		fmt.Printf("Sources validation failed: %v\n", err)
 		return err
 	}
 	return nil
@@ -33,11 +50,7 @@ func ValidateConfig(cfg *Config) error {
 // validateAppConfig validates the application configuration
 func validateAppConfig(cfg AppConfig) error {
 	if cfg.Environment == "" {
-		return &ConfigValidationError{
-			Field:  "app.environment",
-			Value:  cfg.Environment,
-			Reason: "environment cannot be empty",
-		}
+		return errors.New("environment cannot be empty")
 	}
 	// Validate environment value
 	validEnvs := []string{envDevelopment, envStaging, envProduction, envTest}
@@ -49,31 +62,23 @@ func validateAppConfig(cfg AppConfig) error {
 		}
 	}
 	if !isValidEnv {
-		return &ConfigValidationError{
-			Field:  "app.environment",
-			Value:  cfg.Environment,
-			Reason: "invalid environment",
-		}
+		return fmt.Errorf("invalid environment: %s", cfg.Environment)
 	}
 	if cfg.Name == "" {
-		return &ConfigValidationError{
-			Field:  "app.name",
-			Value:  cfg.Name,
-			Reason: "name cannot be empty",
-		}
+		return errors.New("name cannot be empty")
 	}
 	if cfg.Version == "" {
-		return &ConfigValidationError{
-			Field:  "app.version",
-			Value:  cfg.Version,
-			Reason: "version cannot be empty",
-		}
+		return errors.New("version cannot be empty")
 	}
 	return nil
 }
 
 // validateLogConfig validates the log configuration
 func validateLogConfig(cfg LogConfig) error {
+	fmt.Printf("Validating log config: %+v\n", cfg)
+	if cfg.Level == "" {
+		cfg.Level = "info" // Default to info if not set
+	}
 	validLevels := []string{"debug", "info", "warn", "error"}
 	isValidLevel := false
 	for _, level := range validLevels {
@@ -83,58 +88,52 @@ func validateLogConfig(cfg LogConfig) error {
 		}
 	}
 	if !isValidLevel {
-		return &ConfigValidationError{
-			Field:  "log.level",
-			Value:  cfg.Level,
-			Reason: "invalid log level",
-		}
+		fmt.Printf("Invalid log level: %s\n", cfg.Level)
+		return fmt.Errorf("invalid log level: %s", cfg.Level)
 	}
 	return nil
 }
 
 // validateCrawlerConfig validates the crawler configuration
 func validateCrawlerConfig(cfg CrawlerConfig) error {
+	fmt.Printf("DEBUG: Validating crawler config: %+v\n", cfg)
+
 	if cfg.BaseURL == "" {
-		return &ConfigValidationError{
-			Field:  "crawler.base_url",
-			Value:  cfg.BaseURL,
-			Reason: "base URL cannot be empty",
-		}
+		fmt.Printf("DEBUG: BaseURL validation failed - empty\n")
+		return errors.New("crawler base URL cannot be empty")
 	}
+
 	if cfg.MaxDepth < 1 {
-		return &ConfigValidationError{
-			Field:  "crawler.max_depth",
-			Value:  cfg.MaxDepth,
-			Reason: "max depth must be greater than 0",
-		}
+		fmt.Printf("DEBUG: MaxDepth validation failed - value: %d\n", cfg.MaxDepth)
+		return errors.New("crawler max depth must be greater than 0")
 	}
+
 	if cfg.RateLimit < time.Second {
-		return &ConfigValidationError{
-			Field:  "crawler.rate_limit",
-			Value:  cfg.RateLimit,
-			Reason: "rate limit must be at least 1 second",
-		}
+		fmt.Printf("DEBUG: RateLimit validation failed - value: %v\n", cfg.RateLimit)
+		return errors.New("crawler rate limit must be at least 1 second")
 	}
+
 	if cfg.Parallelism < 1 {
-		return &ConfigValidationError{
-			Field:  "crawler.parallelism",
-			Value:  cfg.Parallelism,
-			Reason: "parallelism must be greater than 0",
-		}
+		fmt.Printf("DEBUG: Parallelism validation failed - value: %d\n", cfg.Parallelism)
+		return errors.New("crawler parallelism must be greater than 0")
 	}
+
 	if cfg.SourceFile == "" {
-		return &ConfigValidationError{
-			Field:  "crawler.source_file",
-			Value:  cfg.SourceFile,
-			Reason: "source file cannot be empty",
-		}
+		fmt.Printf("DEBUG: SourceFile validation failed - empty\n")
+		return errors.New("crawler source file cannot be empty")
 	}
+
+	fmt.Printf("DEBUG: Crawler config validation passed\n")
 	return nil
 }
 
 // validateElasticsearchConfig validates the Elasticsearch configuration
 func validateElasticsearchConfig(cfg ElasticsearchConfig) error {
+	fmt.Printf("Validating Elasticsearch config: %+v\n", cfg)
+
+	// Validate addresses first
 	if len(cfg.Addresses) == 0 {
+		fmt.Printf("No Elasticsearch addresses provided\n")
 		return &ConfigValidationError{
 			Field:  "elasticsearch.addresses",
 			Value:  cfg.Addresses,
@@ -145,6 +144,7 @@ func validateElasticsearchConfig(cfg ElasticsearchConfig) error {
 	// Validate each address
 	for _, addr := range cfg.Addresses {
 		if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
+			fmt.Printf("Invalid Elasticsearch address: %s\n", addr)
 			return &ConfigValidationError{
 				Field:  "elasticsearch.addresses",
 				Value:  addr,
@@ -153,23 +153,7 @@ func validateElasticsearchConfig(cfg ElasticsearchConfig) error {
 		}
 	}
 
-	// Validate credentials
-	if cfg.APIKey == "" && (cfg.Username == "" || cfg.Password == "") {
-		return &ConfigValidationError{
-			Field:  "elasticsearch.credentials",
-			Value:  "missing",
-			Reason: "either username/password or api_key must be provided",
-		}
-	}
-
-	if cfg.IndexName == "" {
-		return &ConfigValidationError{
-			Field:  "elasticsearch.index_name",
-			Value:  cfg.IndexName,
-			Reason: "index name cannot be empty",
-		}
-	}
-
+	// Validate TLS configuration if enabled
 	if cfg.TLS.Enabled {
 		if cfg.TLS.CertFile == "" {
 			return &ConfigValidationError{
@@ -187,13 +171,32 @@ func validateElasticsearchConfig(cfg ElasticsearchConfig) error {
 		}
 	}
 
+	// Validate credentials
+	if cfg.APIKey == "" && (cfg.Username == "" || cfg.Password == "") {
+		fmt.Printf("Missing Elasticsearch credentials\n")
+		return &ConfigValidationError{
+			Field:  "elasticsearch.credentials",
+			Value:  "missing",
+			Reason: "either username/password or api_key must be provided",
+		}
+	}
+
+	// Validate index name
+	if cfg.IndexName == "" {
+		return &ConfigValidationError{
+			Field:  "elasticsearch.index_name",
+			Value:  cfg.IndexName,
+			Reason: "index name cannot be empty",
+		}
+	}
+
 	// Validate retry configuration if enabled
 	if cfg.Retry.Enabled {
 		if cfg.Retry.MaxRetries < 0 {
 			return &ConfigValidationError{
 				Field:  "elasticsearch.retry.max_retries",
 				Value:  cfg.Retry.MaxRetries,
-				Reason: "retry values must be non-negative",
+				Reason: "max retries must be greater than or equal to 0",
 			}
 		}
 		if cfg.Retry.InitialWait < time.Second {
@@ -207,7 +210,7 @@ func validateElasticsearchConfig(cfg ElasticsearchConfig) error {
 			return &ConfigValidationError{
 				Field:  "elasticsearch.retry.max_wait",
 				Value:  cfg.Retry.MaxWait,
-				Reason: "max wait must be greater than or equal to initial wait",
+				Reason: "max wait must be greater than initial wait",
 			}
 		}
 	}
@@ -248,18 +251,10 @@ func validateServerSecurity(security struct {
 }) error {
 	if security.Enabled {
 		if security.APIKey == "" {
-			return &ConfigValidationError{
-				Field:  "server.security.api_key",
-				Value:  security.APIKey,
-				Reason: "API key is required when security is enabled",
-			}
+			return errors.New("server security is enabled but no API key is provided")
 		}
 		if !isValidAPIKey(security.APIKey) {
-			return &ConfigValidationError{
-				Field:  "server.security.api_key",
-				Value:  security.APIKey,
-				Reason: "invalid API key format",
-			}
+			return errors.New("invalid API key format")
 		}
 	}
 
@@ -340,41 +335,21 @@ func validateServerTLS(tls TLSConfig) error {
 // validateSources validates the source configurations
 func validateSources(sources []Source) error {
 	if len(sources) == 0 {
-		return &ConfigValidationError{
-			Field:  "sources",
-			Value:  sources,
-			Reason: "at least one source must be configured",
-		}
+		return errors.New("at least one source must be configured")
 	}
 	for i := range sources {
 		source := &sources[i]
 		if source.Name == "" {
-			return &ConfigValidationError{
-				Field:  fmt.Sprintf("sources[%d].name", i),
-				Value:  source.Name,
-				Reason: "source name cannot be empty",
-			}
+			return fmt.Errorf("source[%d] name cannot be empty", i)
 		}
 		if source.URL == "" {
-			return &ConfigValidationError{
-				Field:  fmt.Sprintf("sources[%d].url", i),
-				Value:  source.URL,
-				Reason: "source URL cannot be empty",
-			}
+			return fmt.Errorf("source[%d] URL cannot be empty", i)
 		}
 		if source.MaxDepth < 1 {
-			return &ConfigValidationError{
-				Field:  fmt.Sprintf("sources[%d].max_depth", i),
-				Value:  source.MaxDepth,
-				Reason: "source max depth must be greater than 0",
-			}
+			return fmt.Errorf("source[%d] max depth must be greater than 0", i)
 		}
 		if source.RateLimit < time.Second {
-			return &ConfigValidationError{
-				Field:  fmt.Sprintf("sources[%d].rate_limit", i),
-				Value:  source.RateLimit,
-				Reason: "source rate limit must be at least 1 second",
-			}
+			return fmt.Errorf("source[%d] rate limit must be at least 1 second", i)
 		}
 	}
 	return nil

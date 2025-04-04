@@ -64,17 +64,19 @@ sources:
 				// Create test sources file
 				sourcesContent := `
 sources:
-  test_source:
+  - name: test_source
     url: http://test.example.com
     rate_limit: 2s
     max_depth: 2
     article_index: test_articles
-    content_index: test_content
+    index: test_content
     selectors:
-      title: h1
-      content: article
-      author: .author
-      date: .date
+      article:
+        container: article
+        title: h1
+        body: article
+        author: .author
+        publish_date: .date
 `
 				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
 				require.NoError(t, err)

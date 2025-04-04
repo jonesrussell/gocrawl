@@ -32,6 +32,11 @@ app:
   name: gocrawl
   version: 1.0.0
   debug: false
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: test_api_key
+  index_name: test-index
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
@@ -67,6 +72,11 @@ app:
   name: gocrawl
   version: 1.0.0
   debug: false
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: test_api_key
+  index_name: test-index
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
@@ -90,7 +100,13 @@ app:
 				configPath := filepath.Join(tmpDir, "config.yml")
 
 				// Create test config file
-				configContent := ``
+				configContent := `
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: test_api_key
+  index_name: test-index
+`
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
@@ -165,7 +181,7 @@ sources:
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", configPath)
+				t.Setenv("GOCRAWL_CONFIG_FILE", configPath)
 			},
 			wantErr: true,
 		},
@@ -205,7 +221,7 @@ sources:
 				require.NoError(t, err)
 
 				// Set environment variables
-				t.Setenv("CONFIG_FILE", configPath)
+				t.Setenv("GOCRAWL_CONFIG_FILE", configPath)
 			},
 			wantErr: true,
 		},

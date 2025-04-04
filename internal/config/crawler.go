@@ -15,6 +15,16 @@ func createCrawlerConfig() (CrawlerConfig, error) {
 		return CrawlerConfig{}, fmt.Errorf("error parsing rate limit: %w", err)
 	}
 
+	sourceFile := viper.GetString("crawler.source_file")
+	if sourceFile == "" {
+		return CrawlerConfig{}, fmt.Errorf("source file is required")
+	}
+
+	sources, err := loadSources(sourceFile)
+	if err != nil {
+		return CrawlerConfig{}, fmt.Errorf("failed to load sources: %w", err)
+	}
+
 	return CrawlerConfig{
 		BaseURL:          viper.GetString("crawler.base_url"),
 		MaxDepth:         viper.GetInt("crawler.max_depth"),
@@ -22,8 +32,9 @@ func createCrawlerConfig() (CrawlerConfig, error) {
 		RandomDelay:      viper.GetDuration("crawler.random_delay"),
 		IndexName:        viper.GetString("crawler.index_name"),
 		ContentIndexName: viper.GetString("crawler.content_index_name"),
-		SourceFile:       viper.GetString("crawler.source_file"),
+		SourceFile:       sourceFile,
 		Parallelism:      viper.GetInt("crawler.parallelism"),
+		Sources:          sources,
 	}, nil
 }
 

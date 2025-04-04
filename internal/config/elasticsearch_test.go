@@ -143,160 +143,185 @@ elasticsearch:
 }
 
 func TestElasticsearchConfigValidation(t *testing.T) {
+	// Set up test environment
 	cleanup := testutils.SetupTestEnv(t)
 	defer cleanup()
 
-	logger := testutils.NewTestLogger(t)
+	// Print initial environment state
+	t.Log("Starting TestElasticsearchConfigValidation")
+	t.Log("Initial environment variables:")
+	for _, env := range os.Environ() {
+		t.Logf("  %s", env)
+	}
+
+	// Set log level first to ensure it's preserved
+	t.Setenv("GOCRAWL_LOG_LEVEL", "info")
+	t.Setenv("GOCRAWL_LOG_DEBUG", "false")
+
+	// Print environment after SetupTestEnv
+	t.Log("Environment after SetupTestEnv:")
+	for _, env := range os.Environ() {
+		t.Logf("  %s", env)
+	}
+
+	// Debug: Print Viper configuration
+	t.Log("Viper configuration:")
+	t.Logf("  Config file: %s", viper.GetViper().ConfigFileUsed())
+	t.Logf("  Env prefix: %s", viper.GetViper().GetEnvPrefix())
+	t.Logf("  Automatic env: %v", viper.GetViper().IsSet("automatic_env"))
+	t.Logf("  All settings:")
+	for _, key := range viper.AllKeys() {
+		t.Logf("    %s: %v", key, viper.Get(key))
+	}
 
 	tests := []struct {
-		name        string
-		setup       func(*testing.T)
-		expectedErr string
+		name       string
+		setup      func(t *testing.T)
+		wantErrMsg string
 	}{
 		{
 			name: "missing addresses",
 			setup: func(t *testing.T) {
-				// Debug: Print environment variables
-				t.Logf("Setting up environment variables for missing addresses test")
-				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
-				t.Logf("ELASTICSEARCH_CLOUD_ID: %s", os.Getenv("ELASTICSEARCH_CLOUD_ID"))
-
-				t.Setenv("ELASTICSEARCH_ADDRESSES", "")
-				t.Setenv("ELASTICSEARCH_CLOUD_ID", "")
+				t.Log("Setting up environment variables for missing addresses test")
+				t.Logf("GOCRAWL_ELASTICSEARCH_ADDRESSES: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_ADDRESSES"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_CLOUD_ID: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_CLOUD_ID"))
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_CLOUD_ID", "")
+				t.Log("Environment after setting up missing addresses test:")
+				for _, env := range os.Environ() {
+					t.Logf("  %s", env)
+				}
 			},
-			expectedErr: "at least one Elasticsearch address must be provided",
+			wantErrMsg: "at least one Elasticsearch address must be provided",
 		},
 		{
 			name: "invalid address",
 			setup: func(t *testing.T) {
-				// Debug: Print environment variables
-				t.Logf("Setting up environment variables for invalid address test")
-				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
-
-				t.Setenv("ELASTICSEARCH_ADDRESSES", "not-a-url")
+				t.Log("Setting up environment variables for invalid address test")
+				t.Logf("GOCRAWL_ELASTICSEARCH_ADDRESSES: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_ADDRESSES"))
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "not-a-url")
+				t.Log("Environment after setting up invalid address test:")
+				for _, env := range os.Environ() {
+					t.Logf("  %s", env)
+				}
 			},
-			expectedErr: "invalid Elasticsearch address",
+			wantErrMsg: "invalid Elasticsearch address",
 		},
 		{
 			name: "missing credentials",
 			setup: func(t *testing.T) {
-				// Debug: Print environment variables
-				t.Logf("Setting up environment variables for missing credentials test")
-				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
-				t.Logf("ELASTICSEARCH_USERNAME: %s", os.Getenv("ELASTICSEARCH_USERNAME"))
-				t.Logf("ELASTICSEARCH_PASSWORD: %s", os.Getenv("ELASTICSEARCH_PASSWORD"))
-				t.Logf("ELASTICSEARCH_API_KEY: %s", os.Getenv("ELASTICSEARCH_API_KEY"))
-
-				t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("ELASTICSEARCH_USERNAME", "")
-				t.Setenv("ELASTICSEARCH_PASSWORD", "")
-				t.Setenv("ELASTICSEARCH_API_KEY", "")
+				t.Log("Setting up environment variables for missing credentials test")
+				t.Logf("GOCRAWL_ELASTICSEARCH_ADDRESSES: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_ADDRESSES"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_USERNAME: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_USERNAME"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_PASSWORD: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_PASSWORD"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_API_KEY: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_API_KEY"))
+				t.Setenv("GOCRAWL_ELASTICSEARCH_USERNAME", "")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_PASSWORD", "")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "")
+				t.Log("Environment after setting up missing credentials test:")
+				for _, env := range os.Environ() {
+					t.Logf("  %s", env)
+				}
 			},
-			expectedErr: "either username/password or api_key must be provided",
+			wantErrMsg: "either username/password or api_key must be provided",
 		},
 		{
 			name: "invalid retry values",
 			setup: func(t *testing.T) {
-				// Debug: Print environment variables
-				t.Logf("Setting up environment variables for invalid retry values test")
-				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
-				t.Logf("ELASTICSEARCH_USERNAME: %s", os.Getenv("ELASTICSEARCH_USERNAME"))
-				t.Logf("ELASTICSEARCH_PASSWORD: %s", os.Getenv("ELASTICSEARCH_PASSWORD"))
-				t.Logf("ELASTICSEARCH_RETRY_ENABLED: %s", os.Getenv("ELASTICSEARCH_RETRY_ENABLED"))
-				t.Logf("ELASTICSEARCH_RETRY_MAX_RETRIES: %s", os.Getenv("ELASTICSEARCH_RETRY_MAX_RETRIES"))
-
-				t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("ELASTICSEARCH_USERNAME", "user")
-				t.Setenv("ELASTICSEARCH_PASSWORD", "pass")
-				t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
-				t.Setenv("ELASTICSEARCH_RETRY_MAX_RETRIES", "-1")
+				t.Log("Setting up environment variables for invalid retry values test")
+				t.Logf("GOCRAWL_ELASTICSEARCH_ADDRESSES: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_ADDRESSES"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_USERNAME: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_USERNAME"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_PASSWORD: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_PASSWORD"))
+				t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_ENABLED", "true")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES", "-1")
 			},
-			expectedErr: "retry values must be non-negative",
+			wantErrMsg: "max retries must be greater than or equal to 0",
 		},
 		{
 			name: "invalid retry initial wait",
 			setup: func(t *testing.T) {
-				// Debug: Print environment variables
-				t.Logf("Setting up environment variables for invalid retry initial wait test")
-				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
-				t.Logf("ELASTICSEARCH_USERNAME: %s", os.Getenv("ELASTICSEARCH_USERNAME"))
-				t.Logf("ELASTICSEARCH_PASSWORD: %s", os.Getenv("ELASTICSEARCH_PASSWORD"))
-				t.Logf("ELASTICSEARCH_RETRY_ENABLED: %s", os.Getenv("ELASTICSEARCH_RETRY_ENABLED"))
-				t.Logf("ELASTICSEARCH_RETRY_INITIAL_WAIT: %s", os.Getenv("ELASTICSEARCH_RETRY_INITIAL_WAIT"))
-
-				t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("ELASTICSEARCH_USERNAME", "user")
-				t.Setenv("ELASTICSEARCH_PASSWORD", "pass")
-				t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
-				t.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "500ms")
+				t.Log("Setting up environment variables for invalid retry initial wait test")
+				t.Logf("GOCRAWL_ELASTICSEARCH_ADDRESSES: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_ADDRESSES"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_USERNAME: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_USERNAME"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_PASSWORD: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_PASSWORD"))
+				t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_ENABLED", "true")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT", "500ms")
 			},
-			expectedErr: "initial wait must be at least 1 second",
+			wantErrMsg: "initial wait must be at least 1 second",
 		},
 		{
 			name: "invalid retry max wait",
 			setup: func(t *testing.T) {
-				// Debug: Print environment variables
-				t.Logf("Setting up environment variables for invalid retry max wait test")
-				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
-				t.Logf("ELASTICSEARCH_USERNAME: %s", os.Getenv("ELASTICSEARCH_USERNAME"))
-				t.Logf("ELASTICSEARCH_PASSWORD: %s", os.Getenv("ELASTICSEARCH_PASSWORD"))
-				t.Logf("ELASTICSEARCH_RETRY_ENABLED: %s", os.Getenv("ELASTICSEARCH_RETRY_ENABLED"))
-				t.Logf("ELASTICSEARCH_RETRY_INITIAL_WAIT: %s", os.Getenv("ELASTICSEARCH_RETRY_INITIAL_WAIT"))
-				t.Logf("ELASTICSEARCH_RETRY_MAX_WAIT: %s", os.Getenv("ELASTICSEARCH_RETRY_MAX_WAIT"))
-
-				t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("ELASTICSEARCH_USERNAME", "user")
-				t.Setenv("ELASTICSEARCH_PASSWORD", "pass")
-				t.Setenv("ELASTICSEARCH_RETRY_ENABLED", "true")
-				t.Setenv("ELASTICSEARCH_RETRY_INITIAL_WAIT", "2s")
-				t.Setenv("ELASTICSEARCH_RETRY_MAX_WAIT", "1s")
+				t.Log("Setting up environment variables for invalid retry max wait test")
+				t.Logf("GOCRAWL_ELASTICSEARCH_ADDRESSES: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_ADDRESSES"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_USERNAME: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_USERNAME"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_PASSWORD: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_PASSWORD"))
+				t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_ENABLED", "true")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT", "2s")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT", "1s")
 			},
-			expectedErr: "max wait must be greater than or equal to initial wait",
+			wantErrMsg: "max wait must be greater than initial wait",
 		},
 		{
 			name: "missing index name",
 			setup: func(t *testing.T) {
-				// Debug: Print environment variables
-				t.Logf("Setting up environment variables for missing index name test")
-				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
-				t.Logf("ELASTICSEARCH_USERNAME: %s", os.Getenv("ELASTICSEARCH_USERNAME"))
-				t.Logf("ELASTICSEARCH_PASSWORD: %s", os.Getenv("ELASTICSEARCH_PASSWORD"))
-				t.Logf("ELASTICSEARCH_INDEX_NAME: %s", os.Getenv("ELASTICSEARCH_INDEX_NAME"))
-
-				t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("ELASTICSEARCH_USERNAME", "user")
-				t.Setenv("ELASTICSEARCH_PASSWORD", "pass")
-				t.Setenv("ELASTICSEARCH_INDEX_NAME", "")
+				t.Log("Setting up environment variables for missing index name test")
+				t.Logf("GOCRAWL_ELASTICSEARCH_ADDRESSES: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_ADDRESSES"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_USERNAME: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_USERNAME"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_PASSWORD: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_PASSWORD"))
+				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "")
 			},
-			expectedErr: "index name cannot be empty",
+			wantErrMsg: "index name cannot be empty",
 		},
 		{
 			name: "missing TLS certificate",
 			setup: func(t *testing.T) {
-				// Debug: Print environment variables
-				t.Logf("Setting up environment variables for missing TLS certificate test")
-				t.Logf("ELASTICSEARCH_ADDRESSES: %s", os.Getenv("ELASTICSEARCH_ADDRESSES"))
-				t.Logf("ELASTICSEARCH_USERNAME: %s", os.Getenv("ELASTICSEARCH_USERNAME"))
-				t.Logf("ELASTICSEARCH_PASSWORD: %s", os.Getenv("ELASTICSEARCH_PASSWORD"))
-				t.Logf("ELASTICSEARCH_TLS_ENABLED: %s", os.Getenv("ELASTICSEARCH_TLS_ENABLED"))
-				t.Logf("ELASTICSEARCH_TLS_CERTIFICATE: %s", os.Getenv("ELASTICSEARCH_TLS_CERTIFICATE"))
-
-				t.Setenv("ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-				t.Setenv("ELASTICSEARCH_USERNAME", "user")
-				t.Setenv("ELASTICSEARCH_PASSWORD", "pass")
-				t.Setenv("ELASTICSEARCH_TLS_ENABLED", "true")
-				t.Setenv("ELASTICSEARCH_TLS_CERTIFICATE", "")
+				t.Log("Setting up environment variables for missing TLS certificate test")
+				t.Logf("GOCRAWL_ELASTICSEARCH_ADDRESSES: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_ADDRESSES"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_USERNAME: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_USERNAME"))
+				t.Logf("GOCRAWL_ELASTICSEARCH_PASSWORD: %s", os.Getenv("GOCRAWL_ELASTICSEARCH_PASSWORD"))
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "https://localhost:9200")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "test_api_key")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_TLS_ENABLED", "true")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_TLS_CERTIFICATE", "")
 			},
-			expectedErr: "certificate path cannot be empty when TLS is enabled",
+			wantErrMsg: "certificate path cannot be empty when TLS is enabled",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Logf("Running test case: %s", tt.name)
+
+			// Debug: Print environment before test setup
+			t.Logf("Environment before test setup:")
+			for _, env := range os.Environ() {
+				t.Logf("  %s", env)
+			}
+
 			tt.setup(t)
-			_, err := config.New(logger)
+
+			// Debug: Print environment after test setup
+			t.Logf("Environment after test setup:")
+			for _, env := range os.Environ() {
+				t.Logf("  %s", env)
+			}
+
+			// Debug: Print viper configuration
+			t.Logf("Viper configuration:")
+			t.Logf("  Config file: %s", viper.GetViper().ConfigFileUsed())
+			t.Logf("  Elasticsearch addresses: %v", viper.GetStringSlice("elasticsearch.addresses"))
+			t.Logf("  Elasticsearch index name: %s", viper.GetString("elasticsearch.index_name"))
+			t.Logf("  Elasticsearch API key: %s", viper.GetString("elasticsearch.api_key"))
+
+			_, err := config.New(testutils.NewTestLogger(t))
 			require.Error(t, err)
-			require.Contains(t, err.Error(), tt.expectedErr)
+			require.Contains(t, err.Error(), tt.wantErrMsg)
+
+			// Debug: Print test result
+			t.Logf("Test case %s completed successfully", tt.name)
 		})
 	}
 }

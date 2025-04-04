@@ -138,7 +138,16 @@ func setupTestApp(t *testing.T) *testServer {
 	}, nil).Run(func(args mock.Arguments) {
 		t.Logf("Search called with args: %+v", args)
 	})
-	mockSearch.On("Count", mock.Anything, "", expectedQuery).Return(int64(1), nil).Run(func(args mock.Arguments) {
+
+	countQuery := map[string]any{
+		"query": map[string]any{
+			"match": map[string]any{
+				"content": "test",
+			},
+		},
+		"size": 10,
+	}
+	mockSearch.On("Count", mock.Anything, "", countQuery).Return(int64(1), nil).Run(func(args mock.Arguments) {
 		t.Logf("Count called with args: %+v", args)
 	})
 

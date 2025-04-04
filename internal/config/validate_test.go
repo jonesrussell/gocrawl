@@ -126,3 +126,109 @@ func TestValidateConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestElasticsearchConfigBasicValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      config.ElasticsearchConfig
+		env         map[string]string
+		expectedErr string
+	}{
+		{
+			name: "valid config",
+			config: config.ElasticsearchConfig{
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test-index",
+				APIKey:    "test_api_key",
+			},
+			env: map[string]string{
+				"GOCRAWL_APP_ENVIRONMENT": "test",
+			},
+			expectedErr: "",
+		},
+		{
+			name: "missing addresses",
+			config: config.ElasticsearchConfig{
+				IndexName: "test-index",
+				APIKey:    "test_api_key",
+			},
+			env: map[string]string{
+				"GOCRAWL_APP_ENVIRONMENT": "test",
+			},
+			expectedErr: "elasticsearch addresses cannot be empty",
+		},
+		{
+			name: "missing index name",
+			config: config.ElasticsearchConfig{
+				Addresses: []string{"http://localhost:9200"},
+				APIKey:    "test_api_key",
+			},
+			env: map[string]string{
+				"GOCRAWL_APP_ENVIRONMENT": "test",
+			},
+			expectedErr: "elasticsearch index name cannot be empty",
+		},
+		{
+			name: "missing API key",
+			config: config.ElasticsearchConfig{
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test-index",
+			},
+			env: map[string]string{
+				"GOCRAWL_APP_ENVIRONMENT": "test",
+			},
+			expectedErr: "elasticsearch API key cannot be empty",
+		},
+		{
+			name: "invalid API key format",
+			config: config.ElasticsearchConfig{
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test-index",
+				APIKey:    "invalid-key",
+			},
+			env: map[string]string{
+				"GOCRAWL_APP_ENVIRONMENT": "test",
+			},
+			expectedErr: "elasticsearch API key must be in the format 'id:api_key'",
+		},
+		{
+			name: "missing TLS certificate",
+			config: config.ElasticsearchConfig{
+				Addresses: []string{"https://localhost:9200"},
+				IndexName: "test-index",
+				APIKey:    "test_api_key",
+				TLS: config.TLSConfig{
+					Enabled: true,
+				},
+			},
+			env: map[string]string{
+				"GOCRAWL_APP_ENVIRONMENT": "test",
+			},
+			expectedErr: "TLS certificate file is required when TLS is enabled",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup test environment
+			cleanup := testutils.SetupTestEnv(t)
+			defer cleanup()
+
+			// Set environment variables
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			err := config.ValidateConfig(&config.Config{
+				Elasticsearch: tt.config,
+			})
+
+			if tt.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedErr)
+			}
+		})
+	}
+}

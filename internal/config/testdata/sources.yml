@@ -4,7 +4,7 @@ sources:
     rate_limit: 2s
     max_depth: 2
     article_index: test_articles
-    index: test_content
+    content_index: test_content
     selectors:
       article:
         title: h1
