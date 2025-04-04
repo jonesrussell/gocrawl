@@ -53,7 +53,7 @@ func SetupTestEnv(t *testing.T) func() {
 	t.Setenv("GOCRAWL_LOG_DEBUG", "false")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-	t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "test_api_key")
+	t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "test_id:test_api_key")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_ENABLED", "true")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT", "5s")

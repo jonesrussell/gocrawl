@@ -26,6 +26,8 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 			},
 			expectedError: "",
 		},
@@ -39,6 +41,8 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 			},
 			expectedError: "invalid environment: invalid",
 		},
@@ -52,6 +56,8 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 			},
 			expectedError: "invalid log level: invalid",
 		},
@@ -65,6 +71,8 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 			},
 			expectedError: "crawler max depth must be greater than 0",
 		},
@@ -78,6 +86,8 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 			},
 			expectedError: "crawler parallelism must be greater than 0",
 		},
@@ -91,6 +101,8 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 			},
 			expectedError: "server security is enabled but no API key is provided",
 		},
@@ -104,6 +116,8 @@ func TestValidateConfig(t *testing.T) {
 				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
 				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "invalid")
 				t.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
+				t.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 			},
 			expectedError: "server security is enabled but no API key is provided",
 		},
@@ -145,6 +159,10 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 	t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
 	t.Setenv("GOCRAWL_LOG_LEVEL", "info")
 	t.Setenv("GOCRAWL_LOG_DEBUG", "false")
+	t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+	t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+	t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
+	t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 
 	tests := []struct {
 		name       string
