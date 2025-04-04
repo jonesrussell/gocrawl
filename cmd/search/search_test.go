@@ -176,6 +176,10 @@ func TestCommandExecution(t *testing.T) {
 	// Set up test dependencies
 	deps := setupTestDeps(t)
 
+	// Set up logger expectations
+	deps.Logger.(*testutils.MockLogger).On("Info", "Starting search...", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+	deps.Logger.(*testutils.MockLogger).On("Info", "Search completed", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+
 	// Set up search manager expectations
 	expectedQuery := map[string]any{
 		"query": map[string]any{
@@ -194,6 +198,7 @@ func TestCommandExecution(t *testing.T) {
 
 	// Verify mock expectations
 	deps.SearchManager.(*mockSearchManager).AssertExpectations(t)
+	deps.Logger.(*testutils.MockLogger).AssertExpectations(t)
 }
 
 func TestSearchCommand(t *testing.T) {

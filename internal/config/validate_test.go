@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -139,10 +140,16 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 			config: config.ElasticsearchConfig{
 				Addresses: []string{"http://localhost:9200"},
 				IndexName: "test-index",
-				APIKey:    "test_api_key",
+				APIKey:    "id:api_key",
 			},
 			env: map[string]string{
-				"GOCRAWL_APP_ENVIRONMENT": "test",
+				"GOCRAWL_APP_ENVIRONMENT":     "test",
+				"GOCRAWL_APP_NAME":            "gocrawl-test",
+				"GOCRAWL_APP_VERSION":         "0.0.1",
+				"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+				"GOCRAWL_CRAWLER_MAX_DEPTH":   "2",
+				"GOCRAWL_CRAWLER_RATE_LIMIT":  "2s",
+				"GOCRAWL_CRAWLER_PARALLELISM": "2",
 			},
 			expectedErr: "",
 		},
@@ -150,10 +157,16 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 			name: "missing addresses",
 			config: config.ElasticsearchConfig{
 				IndexName: "test-index",
-				APIKey:    "test_api_key",
+				APIKey:    "id:api_key",
 			},
 			env: map[string]string{
-				"GOCRAWL_APP_ENVIRONMENT": "test",
+				"GOCRAWL_APP_ENVIRONMENT":     "test",
+				"GOCRAWL_APP_NAME":            "gocrawl-test",
+				"GOCRAWL_APP_VERSION":         "0.0.1",
+				"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+				"GOCRAWL_CRAWLER_MAX_DEPTH":   "2",
+				"GOCRAWL_CRAWLER_RATE_LIMIT":  "2s",
+				"GOCRAWL_CRAWLER_PARALLELISM": "2",
 			},
 			expectedErr: "elasticsearch addresses cannot be empty",
 		},
@@ -161,10 +174,16 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 			name: "missing index name",
 			config: config.ElasticsearchConfig{
 				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "test_api_key",
+				APIKey:    "id:api_key",
 			},
 			env: map[string]string{
-				"GOCRAWL_APP_ENVIRONMENT": "test",
+				"GOCRAWL_APP_ENVIRONMENT":     "test",
+				"GOCRAWL_APP_NAME":            "gocrawl-test",
+				"GOCRAWL_APP_VERSION":         "0.0.1",
+				"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+				"GOCRAWL_CRAWLER_MAX_DEPTH":   "2",
+				"GOCRAWL_CRAWLER_RATE_LIMIT":  "2s",
+				"GOCRAWL_CRAWLER_PARALLELISM": "2",
 			},
 			expectedErr: "elasticsearch index name cannot be empty",
 		},
@@ -175,7 +194,13 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 				IndexName: "test-index",
 			},
 			env: map[string]string{
-				"GOCRAWL_APP_ENVIRONMENT": "test",
+				"GOCRAWL_APP_ENVIRONMENT":     "test",
+				"GOCRAWL_APP_NAME":            "gocrawl-test",
+				"GOCRAWL_APP_VERSION":         "0.0.1",
+				"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+				"GOCRAWL_CRAWLER_MAX_DEPTH":   "2",
+				"GOCRAWL_CRAWLER_RATE_LIMIT":  "2s",
+				"GOCRAWL_CRAWLER_PARALLELISM": "2",
 			},
 			expectedErr: "elasticsearch API key cannot be empty",
 		},
@@ -187,7 +212,13 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 				APIKey:    "invalid-key",
 			},
 			env: map[string]string{
-				"GOCRAWL_APP_ENVIRONMENT": "test",
+				"GOCRAWL_APP_ENVIRONMENT":     "test",
+				"GOCRAWL_APP_NAME":            "gocrawl-test",
+				"GOCRAWL_APP_VERSION":         "0.0.1",
+				"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+				"GOCRAWL_CRAWLER_MAX_DEPTH":   "2",
+				"GOCRAWL_CRAWLER_RATE_LIMIT":  "2s",
+				"GOCRAWL_CRAWLER_PARALLELISM": "2",
 			},
 			expectedErr: "elasticsearch API key must be in the format 'id:api_key'",
 		},
@@ -196,13 +227,19 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 			config: config.ElasticsearchConfig{
 				Addresses: []string{"https://localhost:9200"},
 				IndexName: "test-index",
-				APIKey:    "test_api_key",
+				APIKey:    "id:api_key",
 				TLS: config.TLSConfig{
 					Enabled: true,
 				},
 			},
 			env: map[string]string{
-				"GOCRAWL_APP_ENVIRONMENT": "test",
+				"GOCRAWL_APP_ENVIRONMENT":     "test",
+				"GOCRAWL_APP_NAME":            "gocrawl-test",
+				"GOCRAWL_APP_VERSION":         "0.0.1",
+				"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+				"GOCRAWL_CRAWLER_MAX_DEPTH":   "2",
+				"GOCRAWL_CRAWLER_RATE_LIMIT":  "2s",
+				"GOCRAWL_CRAWLER_PARALLELISM": "2",
 			},
 			expectedErr: "TLS certificate file is required when TLS is enabled",
 		},
@@ -219,9 +256,28 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			err := config.ValidateConfig(&config.Config{
+			// Parse rate limit duration
+			rateLimit, err := time.ParseDuration(tt.env["GOCRAWL_CRAWLER_RATE_LIMIT"])
+			require.NoError(t, err)
+
+			// Create test config
+			cfg := &config.Config{
+				App: config.AppConfig{
+					Environment: tt.env["GOCRAWL_APP_ENVIRONMENT"],
+					Name:        tt.env["GOCRAWL_APP_NAME"],
+					Version:     tt.env["GOCRAWL_APP_VERSION"],
+				},
+				Crawler: config.CrawlerConfig{
+					BaseURL:     tt.env["GOCRAWL_CRAWLER_BASE_URL"],
+					MaxDepth:    2,
+					RateLimit:   rateLimit,
+					Parallelism: 2,
+				},
 				Elasticsearch: tt.config,
-			})
+			}
+
+			// Validate config
+			err = config.ValidateConfig(cfg)
 
 			if tt.expectedErr == "" {
 				require.NoError(t, err)

@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -14,112 +13,58 @@ import (
 
 func TestAppConfig(t *testing.T) {
 	tests := []struct {
-		name     string
-		setup    func(*testing.T)
-		validate func(*testing.T, config.Interface, error)
+		name          string
+		setup         func(*testing.T)
+		expectedError string
 	}{
 		{
 			name: "valid app configuration",
 			setup: func(t *testing.T) {
-				// Create temporary test directory
-				tmpDir := t.TempDir()
-				configPath := filepath.Join(tmpDir, "config.yml")
-
-				// Create test config file
-				configContent := `
-app:
-  environment: test
-  name: gocrawl
-  version: 1.0.0
-  debug: false
-elasticsearch:
-  addresses:
-    - http://localhost:9200
-  api_key: test_api_key
-  index_name: test-index
-`
-				err := os.WriteFile(configPath, []byte(configContent), 0644)
-				require.NoError(t, err)
-
-				// Configure Viper
-				viper.SetConfigFile(configPath)
-				viper.SetConfigType("yaml")
-				err = viper.ReadInConfig()
-				require.NoError(t, err)
+				// Set required environment variables
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
+				t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
+				t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
-			validate: func(t *testing.T, cfg config.Interface, err error) {
-				require.NoError(t, err)
-				require.NotNil(t, cfg)
-
-				appCfg := cfg.GetAppConfig()
-				require.Equal(t, "test", appCfg.Environment)
-				require.Equal(t, "gocrawl", appCfg.Name)
-				require.Equal(t, "1.0.0", appCfg.Version)
-				require.False(t, appCfg.Debug)
-			},
+			expectedError: "",
 		},
 		{
 			name: "invalid environment",
 			setup: func(t *testing.T) {
-				// Create temporary test directory
-				tmpDir := t.TempDir()
-				configPath := filepath.Join(tmpDir, "config.yml")
-
-				// Create test config file
-				configContent := `
-app:
-  environment: invalid
-  name: gocrawl
-  version: 1.0.0
-  debug: false
-elasticsearch:
-  addresses:
-    - http://localhost:9200
-  api_key: test_api_key
-  index_name: test-index
-`
-				err := os.WriteFile(configPath, []byte(configContent), 0644)
-				require.NoError(t, err)
-
-				// Configure Viper
-				viper.SetConfigFile(configPath)
-				viper.SetConfigType("yaml")
-				err = viper.ReadInConfig()
-				require.NoError(t, err)
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "invalid")
+				t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
+				t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
+				t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
-			validate: func(t *testing.T, cfg config.Interface, err error) {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "invalid environment")
-			},
+			expectedError: "invalid environment: invalid",
 		},
 		{
 			name: "missing app configuration",
 			setup: func(t *testing.T) {
-				// Create temporary test directory
-				tmpDir := t.TempDir()
-				configPath := filepath.Join(tmpDir, "config.yml")
-
-				// Create test config file
-				configContent := `
-elasticsearch:
-  addresses:
-    - http://localhost:9200
-  api_key: test_api_key
-  index_name: test-index
-`
-				err := os.WriteFile(configPath, []byte(configContent), 0644)
-				require.NoError(t, err)
-
-				// Configure Viper
-				viper.SetConfigFile(configPath)
-				viper.SetConfigType("yaml")
-				err = viper.ReadInConfig()
-				require.NoError(t, err)
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "")
+				t.Setenv("GOCRAWL_APP_NAME", "")
+				t.Setenv("GOCRAWL_APP_VERSION", "")
+				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
+				t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
+				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
 			},
-			validate: func(t *testing.T, cfg config.Interface, err error) {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "app configuration is required")
-			},
+			expectedError: "environment cannot be empty",
 		},
 	}
 
@@ -136,7 +81,20 @@ elasticsearch:
 			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
 
 			// Validate results
-			tt.validate(t, cfg, err)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+
+			// Verify app config values
+			appCfg := cfg.GetAppConfig()
+			require.Equal(t, "test", appCfg.Environment)
+			require.Equal(t, "gocrawl-test", appCfg.Name)
+			require.Equal(t, "0.0.1", appCfg.Version)
 		})
 	}
 }

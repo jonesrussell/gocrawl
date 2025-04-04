@@ -15,10 +15,6 @@ import (
 // It saves the current environment, clears it, and returns a function that
 // restores the original environment when called.
 func SetupTestEnv(t *testing.T) func() {
-	// Debug: Print initial state
-	t.Logf("Starting SetupTestEnv")
-	t.Logf("Current working directory: %s", getCurrentDir())
-
 	// Save current environment
 	originalEnv := os.Environ()
 
@@ -26,16 +22,9 @@ func SetupTestEnv(t *testing.T) func() {
 	os.Clearenv()
 	viper.Reset()
 
-	// Debug: Print after clearing environment
-	t.Logf("Environment after clearing:")
-	for _, env := range os.Environ() {
-		t.Logf("  %s", env)
-	}
-
 	// Get the absolute path to the testdata directory
 	_, filename, _, ok := runtime.Caller(0)
 	require.True(t, ok, "failed to get caller information")
-	t.Logf("Caller filename: %s", filename)
 
 	// Walk up to find the config directory
 	dir := filepath.Dir(filename)
@@ -43,17 +32,10 @@ func SetupTestEnv(t *testing.T) func() {
 		dir = filepath.Dir(dir)
 	}
 	require.NotEqual(t, "/", dir, "failed to find config directory")
-	t.Logf("Found config directory: %s", dir)
 
 	testdataDir := filepath.Join(dir, "testdata")
 	configPath := filepath.Join(testdataDir, "config.yml")
 	sourcesPath := filepath.Join(testdataDir, "sources.yml")
-
-	// Debug: Print paths
-	t.Logf("Config directory: %s", dir)
-	t.Logf("Testdata directory: %s", testdataDir)
-	t.Logf("Config file path: %s", configPath)
-	t.Logf("Sources file path: %s", sourcesPath)
 
 	// Verify test files exist
 	require.FileExists(t, configPath, "config.yml should exist in testdata directory")
@@ -66,25 +48,9 @@ func SetupTestEnv(t *testing.T) func() {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Debug: Print Viper configuration
-	t.Logf("Viper configuration:")
-	t.Logf("  Config file: %s", viper.GetViper().ConfigFileUsed())
-	t.Logf("  Env prefix: %s", viper.GetViper().GetEnvPrefix())
-	t.Logf("  Automatic env: %v", viper.GetViper().IsSet("automatic_env"))
-	t.Logf("  All settings:")
-	for _, key := range viper.AllKeys() {
-		t.Logf("    %s: %v", key, viper.Get(key))
-	}
-
 	// Read config file
 	err := viper.ReadInConfig()
 	require.NoError(t, err, "failed to read config file")
-	t.Logf("Successfully read config file")
-
-	// Debug: Print config file contents
-	configBytes, err := os.ReadFile(configPath)
-	require.NoError(t, err, "failed to read config file for debugging")
-	t.Logf("Config file contents:\n%s", string(configBytes))
 
 	// Set required environment variables
 	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
@@ -97,10 +63,8 @@ func SetupTestEnv(t *testing.T) func() {
 	// Preserve log level from config file
 	if logLevel := viper.GetString("log.level"); logLevel != "" {
 		t.Setenv("GOCRAWL_LOG_LEVEL", logLevel)
-		t.Logf("Preserved log level from config file: %s", logLevel)
 	} else {
 		t.Setenv("GOCRAWL_LOG_LEVEL", "info")
-		t.Logf("Using default log level: info")
 	}
 	t.Setenv("GOCRAWL_LOG_DEBUG", "false")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
@@ -111,22 +75,12 @@ func SetupTestEnv(t *testing.T) func() {
 	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
 	t.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
 	t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
-
-	// Debug: Print final environment state
-	t.Logf("Final environment variables:")
-	for _, env := range os.Environ() {
-		t.Logf("  %s", env)
-	}
-
-	// Debug: Print final Viper state
-	t.Logf("Final Viper state:")
-	for _, key := range viper.AllKeys() {
-		t.Logf("  %s: %v", key, viper.Get(key))
-	}
+	t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+	t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+	t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
 
 	// Return cleanup function
 	return func() {
-		t.Logf("Running cleanup function")
 		// Restore environment
 		os.Clearenv()
 		for _, e := range originalEnv {
@@ -134,7 +88,6 @@ func SetupTestEnv(t *testing.T) func() {
 			os.Setenv(k, v)
 		}
 		viper.Reset()
-		t.Logf("Cleanup completed")
 	}
 }
 

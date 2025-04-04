@@ -69,7 +69,21 @@ type Result struct {
 var Cmd = &cobra.Command{
 	Use:   "search",
 	Short: "Search content in Elasticsearch",
-	RunE:  runSearch,
+	Long: `Search command allows you to search through crawled content in Elasticsearch.
+
+Examples:
+  # Search for content containing "golang"
+  gocrawl search -q "golang"
+
+  # Search in a specific index with custom result size
+  gocrawl search -i "articles" -q "golang" -s 20
+
+Flags:
+  -i, --index string   Index to search (default "articles")
+  -q, --query string   Query string to search for (required)
+  -s, --size int      Number of results to return (default 10)
+`,
+	RunE: runSearch,
 }
 
 // searchModule provides the search command dependencies
