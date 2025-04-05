@@ -1,7 +1,6 @@
 package config_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,110 +14,73 @@ import (
 func TestValidateConfig(t *testing.T) {
 	t.Parallel()
 
-	// Create temporary test directory
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yml")
-	sourcesPath := filepath.Join(tmpDir, "sources.yml")
-
-	// Create test sources file
-	sourcesContent := `
-sources:
-  - name: test
-    url: http://test.example.com
-    selectors:
-      article: article
-      title: h1
-      content: .content
-`
-	err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
-	require.NoError(t, err)
-
-	// Create test config file
-	configContent := fmt.Sprintf(`
-app:
-  environment: test
-  name: gocrawl
-  version: 1.0.0
-  debug: false
-crawler:
-  base_url: http://test.example.com
-  max_depth: 2
-  rate_limit: 2s
-  parallelism: 2
-  source_file: %s
-log:
-  level: debug
-  debug: true
-elasticsearch:
-  addresses:
-    - https://localhost:9200
-  api_key: id:test_api_key
-  index_name: test-index
-  tls:
-    enabled: true
-    certificate: test-cert.pem
-    key: test-key.pem
-server:
-  security:
-    enabled: true
-    api_key: id:test_api_key
-`, sourcesPath)
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
-	require.NoError(t, err)
-
 	tests := []struct {
-		name        string
-		envValues   map[string]string
-		expectedErr string
+		name       string
+		setup      func(t *testing.T) *testutils.TestSetup
+		wantErrMsg string
 	}{
 		{
-			name:        "valid configuration",
-			envValues:   map[string]string{},
-			expectedErr: "",
+			name: "valid configuration",
+			setup: func(t *testing.T) *testutils.TestSetup {
+				return testutils.SetupTestEnvironment(t, map[string]interface{}{}, "")
+			},
+			wantErrMsg: "",
 		},
 		{
 			name: "invalid environment",
-			envValues: map[string]string{
-				"GOCRAWL_APP_ENVIRONMENT": "invalid",
+			setup: func(t *testing.T) *testutils.TestSetup {
+				return testutils.SetupTestEnvironment(t, map[string]interface{}{
+					"app.environment": "invalid",
+				}, "")
 			},
-			expectedErr: "invalid config: field \"app.environment\" with value invalid: invalid environment",
+			wantErrMsg: "invalid config: field \"app.environment\" with value invalid: invalid environment",
 		},
 		{
 			name: "invalid log level",
-			envValues: map[string]string{
-				"GOCRAWL_LOG_LEVEL": "invalid",
+			setup: func(t *testing.T) *testutils.TestSetup {
+				return testutils.SetupTestEnvironment(t, map[string]interface{}{
+					"log.level": "invalid",
+				}, "")
 			},
-			expectedErr: "invalid config: field \"log.level\" with value invalid: invalid log level",
+			wantErrMsg: "invalid config: field \"log.level\" with value invalid: invalid log level",
 		},
 		{
 			name: "invalid crawler max depth",
-			envValues: map[string]string{
-				"GOCRAWL_CRAWLER_MAX_DEPTH": "0",
+			setup: func(t *testing.T) *testutils.TestSetup {
+				return testutils.SetupTestEnvironment(t, map[string]interface{}{
+					"crawler.max_depth": 0,
+				}, "")
 			},
-			expectedErr: "invalid config: field \"crawler.max_depth\" with value 0: crawler max depth must be greater than 0",
+			wantErrMsg: "invalid config: field \"crawler.max_depth\" with value 0: crawler max depth must be greater than 0",
 		},
 		{
 			name: "invalid crawler parallelism",
-			envValues: map[string]string{
-				"GOCRAWL_CRAWLER_PARALLELISM": "0",
+			setup: func(t *testing.T) *testutils.TestSetup {
+				return testutils.SetupTestEnvironment(t, map[string]interface{}{
+					"crawler.parallelism": 0,
+				}, "")
 			},
-			expectedErr: "invalid config: field \"crawler.parallelism\" with value 0: crawler parallelism must be greater than 0",
+			wantErrMsg: "invalid config: field \"crawler.parallelism\" with value 0: crawler parallelism must be greater than 0",
 		},
 		{
 			name: "server security enabled without API key",
-			envValues: map[string]string{
-				"GOCRAWL_SERVER_SECURITY_ENABLED": "true",
-				"GOCRAWL_SERVER_SECURITY_API_KEY": "",
+			setup: func(t *testing.T) *testutils.TestSetup {
+				return testutils.SetupTestEnvironment(t, map[string]interface{}{
+					"server.security.enabled": true,
+					"server.security.api_key": "",
+				}, "")
 			},
-			expectedErr: "invalid config: field \"server.security.api_key\" with value : server security is enabled but no API key is provided",
+			wantErrMsg: "invalid config: field \"server.security.api_key\" with value : server security is enabled but no API key is provided",
 		},
 		{
 			name: "server security enabled with invalid API key",
-			envValues: map[string]string{
-				"GOCRAWL_SERVER_SECURITY_ENABLED": "true",
-				"GOCRAWL_SERVER_SECURITY_API_KEY": "invalid",
+			setup: func(t *testing.T) *testutils.TestSetup {
+				return testutils.SetupTestEnvironment(t, map[string]interface{}{
+					"server.security.enabled": true,
+					"server.security.api_key": "invalid",
+				}, "")
 			},
-			expectedErr: "invalid config: field \"server.security.api_key\" with value invalid: invalid API key format",
+			wantErrMsg: "invalid config: field \"server.security.api_key\" with value invalid: invalid API key format",
 		},
 	}
 
@@ -126,20 +88,17 @@ server:
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			setup := tt.setup(t)
+			defer setup.Cleanup()
 
-			// Setup test environment with custom values
-			cleanup := testutils.SetupTestEnvWithValues(t, tt.envValues)
-			defer cleanup()
-
-			// Load and validate config
-			cfg, err := config.LoadConfig(configPath)
-			if tt.expectedErr == "" {
-				require.NoError(t, err)
-				require.NotNil(t, cfg)
-			} else {
+			cfg, err := config.New(testutils.NewTestLogger(t))
+			if tt.wantErrMsg != "" {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.expectedErr)
+				require.Contains(t, err.Error(), tt.wantErrMsg)
+				return
 			}
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
 		})
 	}
 }
