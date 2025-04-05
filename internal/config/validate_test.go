@@ -22,7 +22,42 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "valid config",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, "", "")
+				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+  debug: false
+log:
+  level: debug
+  debug: false
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: testdata/sources.yml
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
+  tls:
+    enabled: false
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 5s
+    max_retries: 3
+  bulk:
+    size: 1000
+    flush_interval: 30s
+server:
+  address: :8080
+  security:
+    enabled: true
+    api_key: id:test_api_key
+`, "")
 			},
 			wantErrMsg: "",
 		},
@@ -32,6 +67,14 @@ func TestValidateConfig(t *testing.T) {
 				return testutils.SetupTestEnvironment(t, `
 app:
   environment: invalid
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "invalid environment",
@@ -40,8 +83,18 @@ app:
 			name: "invalid log level",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
 log:
   level: invalid
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "invalid log level",
@@ -50,8 +103,18 @@ log:
 			name: "invalid server port",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
 server:
-  port: 0
+  address: :invalid
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "server port must be between 1 and 65535",
@@ -60,8 +123,18 @@ server:
 			name: "invalid server timeout",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
 server:
-  timeout: invalid
+  read_timeout: invalid
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "invalid server timeout",
@@ -70,10 +143,20 @@ server:
 			name: "invalid security config",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
 server:
   security:
     enabled: true
     api_key: ""
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "API key is required when security is enabled",
@@ -82,8 +165,16 @@ server:
 			name: "invalid rate limit",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
 crawler:
+  base_url: http://test.example.com
+  max_depth: 2
   rate_limit: invalid
+  parallelism: 2
+  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "invalid rate limit",

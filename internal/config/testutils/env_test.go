@@ -1,42 +1,50 @@
-package testutils_test
+package testutils
 
 import (
 	"os"
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/internal/config/testutils"
+	"github.com/stretchr/testify/require"
 )
 
-// TestSetupTestEnv verifies the test environment setup and cleanup
-func TestSetupTestEnv(t *testing.T) {
-	// Set a test environment variable
-	os.Setenv("TEST_VAR", "test_value")
+func TestSetupTestEnvironment(t *testing.T) {
+	t.Run("basic_environment_setup_and_cleanup", func(t *testing.T) {
+		// Store original environment
+		origEnv := make(map[string]string)
+		for _, env := range os.Environ() {
+			origEnv[env] = os.Getenv(env)
+		}
 
-	// Setup test environment
-	cleanup := testutils.SetupTestEnv(t)
-	defer cleanup()
+		// Set initial environment
+		t.Setenv("TEST_VAR", "test_value")
 
-	// Verify environment is cleared
-	val, exists := os.LookupEnv("TEST_VAR")
-	if exists {
-		t.Errorf("environment should be cleared, but TEST_VAR exists with value: %s", val)
-	}
+		// Setup test environment
+		cleanup := SetupTestEnv(t)
+		defer cleanup()
 
-	// Set a new test variable
-	os.Setenv("NEW_TEST_VAR", "new_value")
+		// Verify environment is cleared
+		for k := range origEnv {
+			_, exists := os.LookupEnv(k)
+			require.False(t, exists, "environment should be cleared, but %s exists", k)
+		}
 
-	// Run cleanup
-	cleanup()
+		// Verify test environment is set correctly
+		for k, v := range map[string]string{
+			"GOCRAWL_APP_ENVIRONMENT": "test",
+			"GOCRAWL_APP_NAME":        "gocrawl-test",
+			"GOCRAWL_APP_VERSION":     "0.0.1",
+		} {
+			actual := os.Getenv(k)
+			require.Equal(t, v, actual, "environment variable %s should be set correctly", k)
+		}
 
-	// Verify original environment is restored
-	val, exists = os.LookupEnv("TEST_VAR")
-	if !exists || val != "test_value" {
-		t.Error("original environment was not restored correctly")
-	}
+		// Run cleanup
+		cleanup()
 
-	// Verify new test variable is cleared
-	_, exists = os.LookupEnv("NEW_TEST_VAR")
-	if exists {
-		t.Error("cleanup should have cleared new environment variables")
-	}
+		// Verify cleanup restored original environment
+		for k, v := range origEnv {
+			actual := os.Getenv(k)
+			require.Equal(t, v, actual, "cleanup should have restored original environment variable %s", k)
+		}
+	})
 }

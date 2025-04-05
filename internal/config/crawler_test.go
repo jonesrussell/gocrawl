@@ -1,10 +1,12 @@
 package config_test
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -24,19 +26,42 @@ func TestCrawlerConfig(t *testing.T) {
 			configContent: `
 app:
   environment: test
+  name: gocrawl-test
+  version: 0.0.1
+  debug: false
+log:
+  level: info
+  debug: false
 crawler:
   base_url: http://test.example.com
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: sources.yml
+  source_file: %s
+  random_delay: 1s
+  index_name: gocrawl
+  content_index_name: gocrawl-content
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  index_name: gocrawl
+  api_key: id:key
+server:
+  address: :8080
+  read_timeout: 5s
+  write_timeout: 10s
+  idle_timeout: 15s
 `,
 			sourcesContent: `sources:
   - name: test
     url: http://test.example.com
+    rate_limit: 2s
+    max_depth: 2
     selectors:
-      - name: title
-        path: h1`,
+      article:
+        container: article
+        title: h1
+        body: .content`,
 			wantErr: false,
 		},
 		{
@@ -44,34 +69,69 @@ crawler:
 			configContent: `
 app:
   environment: test
+  name: gocrawl-test
+  version: 0.0.1
+  debug: false
+log:
+  level: info
+  debug: false
 crawler:
-  base_url: http://test.example.com
+  base_url: ""
   max_depth: 0
   rate_limit: invalid
   parallelism: 0
-  source_file: sources.yml
+  source_file: %s
+  random_delay: 1s
+  index_name: gocrawl
+  content_index_name: gocrawl-content
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  index_name: gocrawl
+  api_key: id:key
+server:
+  address: :8080
+  read_timeout: 5s
+  write_timeout: 10s
+  idle_timeout: 15s
 `,
 			sourcesContent: `sources:
   - name: test
     url: http://test.example.com
+    rate_limit: 2s
+    max_depth: 2
     selectors:
-      - name: title
-        path: h1`,
+      article:
+        container: article
+        title: h1
+        body: .content`,
 			wantErr: true,
-			errMsg:  "max depth must be greater than 0",
+			errMsg:  "crawler base URL cannot be empty",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setup := testutils.SetupTestEnvironment(t, tt.configContent, tt.sourcesContent)
+			// Create temporary directory for test files
+			tmpDir, err := os.MkdirTemp("", "gocrawl-test-*")
+			require.NoError(t, err)
+			defer os.RemoveAll(tmpDir)
+
+			// Create sources file path
+			sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+			// Create test setup
+			setup := testutils.SetupTestEnvironment(t,
+				fmt.Sprintf(tt.configContent, sourcesPath),
+				tt.sourcesContent)
 			defer setup.Cleanup()
 
-			viper.Reset()
-			viper.Set("crawler.source_file", setup.SourcesPath)
-			viper.Set("app.environment", "test")
+			t.Logf("Config file path: %s", setup.ConfigPath)
+			t.Logf("Sources file path: %s", setup.SourcesPath)
+			t.Logf("Config content: %s", tt.configContent)
 
-			cfg, err := config.New(testutils.NewTestLogger(t))
+			// Load and validate config
+			cfg, err := config.LoadConfig(setup.ConfigPath)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errMsg)
@@ -80,12 +140,19 @@ crawler:
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
 
+			t.Logf("Loaded config: %+v", cfg)
+			t.Logf("Crawler config: %+v", cfg.GetCrawlerConfig())
+
+			// Verify crawler config
 			crawlerCfg := cfg.GetCrawlerConfig()
 			require.Equal(t, "http://test.example.com", crawlerCfg.BaseURL)
 			require.Equal(t, 2, crawlerCfg.MaxDepth)
 			require.Equal(t, 2*time.Second, crawlerCfg.RateLimit)
 			require.Equal(t, 2, crawlerCfg.Parallelism)
 			require.Equal(t, setup.SourcesPath, crawlerCfg.SourceFile)
+			require.Equal(t, time.Second, crawlerCfg.RandomDelay)
+			require.Equal(t, "gocrawl", crawlerCfg.IndexName)
+			require.Equal(t, "gocrawl-content", crawlerCfg.ContentIndexName)
 		})
 	}
 }
@@ -98,6 +165,7 @@ func TestParseRateLimit(t *testing.T) {
 		input   string
 		want    time.Duration
 		wantErr bool
+		errMsg  string
 	}{
 		{
 			name:    "valid duration",
@@ -108,14 +176,16 @@ func TestParseRateLimit(t *testing.T) {
 		{
 			name:    "empty string",
 			input:   "",
-			want:    config.DefaultRateLimit,
-			wantErr: false,
+			want:    0,
+			wantErr: true,
+			errMsg:  "rate limit cannot be empty",
 		},
 		{
 			name:    "invalid duration",
 			input:   "invalid",
 			want:    0,
 			wantErr: true,
+			errMsg:  "error parsing duration",
 		},
 	}
 
@@ -126,6 +196,7 @@ func TestParseRateLimit(t *testing.T) {
 			got, err := config.ParseRateLimit(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.errMsg)
 				return
 			}
 			require.NoError(t, err)
@@ -147,7 +218,6 @@ func TestCrawlerConfig_Setters(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
 				require.Equal(t, 5, cfg.MaxDepth)
-				require.Equal(t, 5, viper.GetInt("crawler.max_depth"))
 			},
 		},
 		{
@@ -157,7 +227,6 @@ func TestCrawlerConfig_Setters(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
 				require.Equal(t, 2*time.Second, cfg.RateLimit)
-				require.Equal(t, "2s", viper.GetString("crawler.rate_limit"))
 			},
 		},
 		{
@@ -167,7 +236,6 @@ func TestCrawlerConfig_Setters(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
 				require.Equal(t, "http://example.com", cfg.BaseURL)
-				require.Equal(t, "http://example.com", viper.GetString("crawler.base_url"))
 			},
 		},
 		{
@@ -177,24 +245,22 @@ func TestCrawlerConfig_Setters(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
 				require.Equal(t, "test_index", cfg.IndexName)
-				require.Equal(t, "test_index", viper.GetString("elasticsearch.index_name"))
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setup := testutils.SetupTestEnvironment(t, `
+			setup := testutils.SetupTestEnvironment(t, fmt.Sprintf(`
 app:
   environment: test
+  name: gocrawl-test
+  version: 0.0.1
+  debug: false
 crawler:
-  source_file: sources.yml
-`, "")
+  source_file: %s
+`, "sources.yml"), "")
 			defer setup.Cleanup()
-
-			viper.Reset()
-			viper.Set("crawler.source_file", setup.SourcesPath)
-			viper.Set("app.environment", "test")
 
 			cfg := &config.CrawlerConfig{}
 			tt.setup(cfg)

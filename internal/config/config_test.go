@@ -89,6 +89,11 @@ sources:
 
 				// Set environment variables
 				t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+				t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
+				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
+				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+				t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.NoError(t, err)

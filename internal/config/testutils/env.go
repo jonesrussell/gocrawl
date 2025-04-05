@@ -2,6 +2,8 @@ package testutils
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -24,7 +26,27 @@ func SetupTestEnv(t *testing.T) func() {
 		os.Unsetenv(key)
 	}
 
+	// Get the absolute path to the testdata directory
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(t, ok, "failed to get caller information")
+
+	// Walk up to find the config directory
+	dir := filepath.Dir(filename)
+	for filepath.Base(dir) != "gocrawl" && dir != "/" {
+		dir = filepath.Dir(dir)
+	}
+	require.NotEqual(t, "/", dir, "failed to find gocrawl directory")
+
+	// Set paths to config files
+	configPath := filepath.Join(dir, "internal", "config", "testdata", "configs", "base.yml")
+	sourcesPath := filepath.Join(dir, "internal", "config", "testdata", "configs", "sources.yml")
+
+	require.FileExists(t, configPath, "base.yml should exist in testdata directory")
+	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
+
 	// Set common test environment variables
+	os.Setenv("GOCRAWL_CONFIG_FILE", configPath)
+	os.Setenv("GOCRAWL_SOURCES_FILE", sourcesPath)
 	os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
 	os.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
 	os.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
@@ -32,12 +54,20 @@ func SetupTestEnv(t *testing.T) func() {
 	os.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
 	os.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
 	os.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
+	os.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
+	os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
 	os.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
 	os.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "id:test_api_key")
 	os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
 	os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 	os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-	os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "../testdata/sources.yml")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_TLS_ENABLED", "false")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_ENABLED", "true")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_INITIAL_WAIT", "1s")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_WAIT", "5s")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_RETRY_MAX_RETRIES", "3")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_BULK_SIZE", "1000")
+	os.Setenv("GOCRAWL_ELASTICSEARCH_FLUSH_INTERVAL", "30s")
 
 	// Return cleanup function
 	return func() {
@@ -67,6 +97,11 @@ func SetupTestEnvWithValues(t *testing.T, values map[string]string) func() {
 		}
 	}
 
+	// Clear all environment variables
+	for key := range originalEnv {
+		os.Unsetenv(key)
+	}
+
 	// Set custom environment variables
 	for key, value := range values {
 		os.Setenv(key, value)
@@ -74,6 +109,14 @@ func SetupTestEnvWithValues(t *testing.T, values map[string]string) func() {
 
 	// Return cleanup function
 	return func() {
+		// Clear all current environment variables
+		for _, env := range os.Environ() {
+			pair := strings.SplitN(env, "=", 2)
+			if len(pair) == 2 {
+				os.Unsetenv(pair[0])
+			}
+		}
+
 		// Restore original environment variables
 		for key, value := range originalEnv {
 			os.Setenv(key, value)

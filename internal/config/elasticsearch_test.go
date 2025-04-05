@@ -19,7 +19,33 @@ func TestElasticsearchConfigValidation(t *testing.T) {
 		{
 			name: "valid config",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, "", "")
+				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  parallelism: 2
+  rate_limit: 2s
+  source_file: ../testdata/sources.yml
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
+  tls:
+    enabled: false
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 5s
+    max_retries: 3
+  bulk:
+    size: 1000
+    flush_interval: 30s
+`, "")
 			},
 			wantErrMsg: "",
 		},
@@ -27,8 +53,20 @@ func TestElasticsearchConfigValidation(t *testing.T) {
 			name: "missing addresses",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  parallelism: 2
+  rate_limit: 2s
+  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses: []
+  api_key: id:test_api_key
+  index_name: test-index
 `, "")
 			},
 			wantErrMsg: "elasticsearch addresses cannot be empty",
@@ -37,7 +75,20 @@ elasticsearch:
 			name: "missing index name",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  parallelism: 2
+  rate_limit: 2s
+  source_file: ../testdata/sources.yml
 elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
   index_name: ""
 `, "")
 			},
@@ -47,8 +98,21 @@ elasticsearch:
 			name: "missing API key",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  parallelism: 2
+  rate_limit: 2s
+  source_file: ../testdata/sources.yml
 elasticsearch:
+  addresses:
+    - http://localhost:9200
   api_key: ""
+  index_name: test-index
 `, "")
 			},
 			wantErrMsg: "elasticsearch API key cannot be empty",
@@ -57,8 +121,21 @@ elasticsearch:
 			name: "invalid API key format",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  parallelism: 2
+  rate_limit: 2s
+  source_file: ../testdata/sources.yml
 elasticsearch:
+  addresses:
+    - http://localhost:9200
   api_key: "invalid"
+  index_name: test-index
 `, "")
 			},
 			wantErrMsg: "elasticsearch API key must be in the format 'id:api_key'",
@@ -67,7 +144,21 @@ elasticsearch:
 			name: "missing TLS certificate",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  parallelism: 2
+  rate_limit: 2s
+  source_file: ../testdata/sources.yml
 elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
   tls:
     enabled: true
 `, "")
@@ -78,7 +169,21 @@ elasticsearch:
 			name: "invalid retry configuration",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  parallelism: 2
+  rate_limit: 2s
+  source_file: ../testdata/sources.yml
 elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
   retry:
     enabled: true
     initial_wait: invalid
@@ -90,7 +195,21 @@ elasticsearch:
 			name: "invalid bulk size",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  parallelism: 2
+  rate_limit: 2s
+  source_file: ../testdata/sources.yml
 elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
   bulk:
     size: 0
 `, "")
@@ -101,7 +220,21 @@ elasticsearch:
 			name: "invalid flush interval",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  parallelism: 2
+  rate_limit: 2s
+  source_file: ../testdata/sources.yml
 elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
   bulk:
     flush_interval: invalid
 `, "")
@@ -125,7 +258,7 @@ elasticsearch:
 			}
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
-			require.NotNil(t, cfg.Elasticsearch)
+			require.NotNil(t, cfg.GetElasticsearchConfig())
 		})
 	}
 }
