@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/testutils"
@@ -9,132 +10,115 @@ import (
 )
 
 func TestPriorityConfig(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
-		name        string
-		config      map[string]interface{}
-		sources     string
-		wantErr     bool
-		errContains string
+		name           string
+		configContent  string
+		sourcesContent string
+		wantErr        bool
+		errMsg         string
 	}{
 		{
-			name: "valid priority configuration",
-			config: map[string]interface{}{
-				"app.environment":          "test",
-				"app.name":                 "gocrawl-test",
-				"app.version":              "0.0.1",
-				"log.level":                "debug",
-				"elasticsearch.addresses":  []string{"http://localhost:9200"},
-				"elasticsearch.api_key":    "id:test_api_key",
-				"elasticsearch.index_name": "test-index",
-				"crawler.base_url":         "http://test.example.com",
-				"crawler.max_depth":        2,
-				"crawler.rate_limit":       "2s",
-				"crawler.parallelism":      2,
-			},
-			sources: `
-sources:
-  - name: test_source
-    url: http://test.example.com
-    rate_limit: 2s
-    max_depth: 2
-    article_index: test_articles
-    index: test_content
-    priority: 1
-    selectors:
-      article:
-        title: h1
-        body: article
-        author: .author
-        published_time: .date
+			name: "valid configuration",
+			configContent: `
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 2
+  source_file: sources.yml
 `,
+			sourcesContent: `sources:
+  - name: test
+    url: http://test.example.com
+    selectors:
+      - name: title
+        path: h1`,
 			wantErr: false,
 		},
 		{
-			name: "invalid priority pattern",
-			config: map[string]interface{}{
-				"app.environment":          "test",
-				"app.name":                 "gocrawl-test",
-				"app.version":              "0.0.1",
-				"log.level":                "debug",
-				"elasticsearch.addresses":  []string{"http://localhost:9200"},
-				"elasticsearch.api_key":    "id:test_api_key",
-				"elasticsearch.index_name": "test-index",
-				"crawler.base_url":         "http://test.example.com",
-				"crawler.max_depth":        2,
-				"crawler.rate_limit":       "2s",
-				"crawler.parallelism":      2,
-			},
-			sources: `
-sources:
-  - name: test_source
-    url: http://test.example.com
-    rate_limit: 2s
-    max_depth: 2
-    article_index: test_articles
-    index: test_content
-    priority: invalid
-    selectors:
-      article:
-        title: h1
-        body: article
-        author: .author
-        published_time: .date
+			name: "invalid max depth",
+			configContent: `
+crawler:
+  base_url: http://test.example.com
+  max_depth: 0
+  rate_limit: 2s
+  parallelism: 2
+  source_file: sources.yml
 `,
-			wantErr:     true,
-			errContains: "invalid priority pattern",
+			sourcesContent: `sources:
+  - name: test
+    url: http://test.example.com
+    selectors:
+      - name: title
+        path: h1`,
+			wantErr: true,
+			errMsg:  "max depth must be greater than 0",
 		},
 		{
-			name: "invalid priority value",
-			config: map[string]interface{}{
-				"app.environment":          "test",
-				"app.name":                 "gocrawl-test",
-				"app.version":              "0.0.1",
-				"log.level":                "debug",
-				"elasticsearch.addresses":  []string{"http://localhost:9200"},
-				"elasticsearch.api_key":    "id:test_api_key",
-				"elasticsearch.index_name": "test-index",
-				"crawler.base_url":         "http://test.example.com",
-				"crawler.max_depth":        2,
-				"crawler.rate_limit":       "2s",
-				"crawler.parallelism":      2,
-			},
-			sources: `
-sources:
-  - name: test_source
-    url: http://test.example.com
-    rate_limit: 2s
-    max_depth: 2
-    article_index: test_articles
-    index: test_content
-    priority: -1
-    selectors:
-      article:
-        title: h1
-        body: article
-        author: .author
-        published_time: .date
+			name: "invalid parallelism",
+			configContent: `
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  parallelism: 0
+  source_file: sources.yml
 `,
-			wantErr:     true,
-			errContains: "priority must be greater than or equal to 0",
+			sourcesContent: `sources:
+  - name: test
+    url: http://test.example.com
+    selectors:
+      - name: title
+        path: h1`,
+			wantErr: true,
+			errMsg:  "parallelism must be greater than 0",
+		},
+		{
+			name: "invalid rate limit",
+			configContent: `
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: invalid
+  parallelism: 2
+  source_file: sources.yml
+`,
+			sourcesContent: `sources:
+  - name: test
+    url: http://test.example.com
+    selectors:
+      - name: title
+        path: h1`,
+			wantErr: true,
+			errMsg:  "invalid rate limit duration",
 		},
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			setup := testutils.SetupTestEnvironment(t, tt.config, tt.sources)
+			t.Parallel()
+			setup := testutils.SetupTestEnvironment(t, tt.configContent, tt.sourcesContent)
 			defer setup.Cleanup()
 
 			cfg, err := config.New(testutils.NewTestLogger(t))
 			if tt.wantErr {
 				require.Error(t, err)
-				if tt.errContains != "" {
-					require.Contains(t, err.Error(), tt.errContains)
-				}
+				require.Contains(t, err.Error(), tt.errMsg)
 				return
 			}
-
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
+
+			// Validate specific fields
+			crawlerCfg := cfg.GetCrawlerConfig()
+			require.Equal(t, "http://test.example.com", crawlerCfg.BaseURL)
+			require.Equal(t, 2, crawlerCfg.MaxDepth)
+			require.Equal(t, 2*time.Second, crawlerCfg.RateLimit)
+			require.Equal(t, 2, crawlerCfg.Parallelism)
+			require.Equal(t, setup.SourcesPath, crawlerCfg.SourceFile)
 		})
 	}
 }

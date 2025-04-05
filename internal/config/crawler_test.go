@@ -1,8 +1,7 @@
 package config_test
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,73 +11,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 )
-
-// createTestConfig creates a test configuration file with the given values
-func createTestConfig(t *testing.T, values map[string]interface{}) string {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yml")
-	sourcesPath := filepath.Join(tmpDir, "sources.yml")
-
-	// Create test config file
-	configContent := `
-app:
-  environment: test
-  name: gocrawl
-  version: 1.0.0
-  debug: false
-crawler:
-  base_url: http://test.example.com
-  max_depth: 2
-  rate_limit: 2s
-  parallelism: 2
-  source_file: ` + sourcesPath + `
-log:
-  level: debug
-  debug: true
-elasticsearch:
-  addresses:
-    - https://localhost:9200
-  api_key: test_api_key
-  index_name: test-index
-  tls:
-    enabled: true
-    certificate: test-cert.pem
-    key: test-key.pem
-server:
-  security:
-    enabled: true
-    api_key: id:test_api_key
-`
-
-	// Override values from the map
-	for key, value := range values {
-		viper.Set(key, value)
-	}
-
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
-	require.NoError(t, err)
-
-	// Create test sources file
-	sourcesContent := `
-sources:
-  - name: test_source
-    url: http://test.example.com
-    rate_limit: 2s
-    max_depth: 2
-    article_index: test_articles
-    index: test_content
-    selectors:
-      article:
-        title: h1
-        body: article
-        author: .author
-        published_time: .date
-`
-	err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
-	require.NoError(t, err)
-
-	return configPath
-}
 
 func TestCrawlerConfig(t *testing.T) {
 	tests := []struct {
@@ -170,7 +102,7 @@ crawler:
 			setup := testutils.SetupTestEnvironment(t, tt.configContent, tt.sourcesContent)
 			defer setup.Cleanup()
 
-			cfg, err := config.New(t)
+			cfg, err := config.New(testutils.NewTestLogger(t))
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errMsg)
@@ -180,11 +112,12 @@ crawler:
 			require.NotNil(t, cfg)
 
 			// Validate specific fields
-			require.Equal(t, "http://test.example.com", cfg.Crawler.BaseURL)
-			require.Equal(t, 2, cfg.Crawler.MaxDepth)
-			require.Equal(t, 2*time.Second, cfg.Crawler.RateLimit)
-			require.Equal(t, 2, cfg.Crawler.Parallelism)
-			require.Equal(t, setup.SourcesPath, cfg.Crawler.SourceFile)
+			crawlerCfg := cfg.GetCrawlerConfig()
+			require.Equal(t, "http://test.example.com", crawlerCfg.BaseURL)
+			require.Equal(t, 2, crawlerCfg.MaxDepth)
+			require.Equal(t, 2*time.Second, crawlerCfg.RateLimit)
+			require.Equal(t, 2, crawlerCfg.Parallelism)
+			require.Equal(t, setup.SourcesPath, crawlerCfg.SourceFile)
 		})
 	}
 }
@@ -198,27 +131,30 @@ func TestCrawlerConfigValidation(t *testing.T) {
 		{
 			name: "invalid max depth",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{
-					"crawler.max_depth": 0,
-				}, "")
+				return testutils.SetupTestEnvironment(t, `
+crawler:
+  max_depth: 0
+`, "")
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid parallelism",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{
-					"crawler.parallelism": 0,
-				}, "")
+				return testutils.SetupTestEnvironment(t, `
+crawler:
+  parallelism: 0
+`, "")
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid rate limit",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{
-					"crawler.rate_limit": "0s",
-				}, "")
+				return testutils.SetupTestEnvironment(t, `
+crawler:
+  rate_limit: 0s
+`, "")
 			},
 			wantErr: true,
 		},
@@ -229,7 +165,7 @@ func TestCrawlerConfigValidation(t *testing.T) {
 			setup := tt.setup(t)
 			defer setup.Cleanup()
 
-			cfg, err := config.New(testutils.NewTestLogger(t))
+			cfg, err := config.LoadConfig(setup.ConfigPath)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Nil(t, cfg)
@@ -315,10 +251,11 @@ func TestSetMaxDepth(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			setup := testutils.SetupTestEnvironment(t, map[string]interface{}{
-				"crawler.max_depth": tt.depth,
-				"crawler.base_url":  "http://test.example.com",
-			}, "")
+			setup := testutils.SetupTestEnvironment(t, `
+crawler:
+  max_depth: `+fmt.Sprint(tt.depth)+`
+  base_url: http://test.example.com
+`, "")
 			defer setup.Cleanup()
 
 			cfg, err := config.LoadConfig(setup.ConfigPath)
@@ -333,7 +270,7 @@ func TestSetMaxDepth(t *testing.T) {
 }
 
 func TestSetRateLimit(t *testing.T) {
-	setup := testutils.SetupTestEnvironment(t, map[string]interface{}{}, "")
+	setup := testutils.SetupTestEnvironment(t, "", "")
 	defer setup.Cleanup()
 
 	cfg := &config.CrawlerConfig{}
@@ -344,7 +281,7 @@ func TestSetRateLimit(t *testing.T) {
 }
 
 func TestSetBaseURL(t *testing.T) {
-	setup := testutils.SetupTestEnvironment(t, map[string]interface{}{}, "")
+	setup := testutils.SetupTestEnvironment(t, "", "")
 	defer setup.Cleanup()
 
 	cfg := &config.CrawlerConfig{}
@@ -355,7 +292,7 @@ func TestSetBaseURL(t *testing.T) {
 }
 
 func TestSetIndexName(t *testing.T) {
-	setup := testutils.SetupTestEnvironment(t, map[string]interface{}{}, "")
+	setup := testutils.SetupTestEnvironment(t, "", "")
 	defer setup.Cleanup()
 
 	cfg := &config.CrawlerConfig{}
@@ -415,7 +352,7 @@ func TestCrawlerConfig_Setters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setup := testutils.SetupTestEnvironment(t, map[string]interface{}{}, "")
+			setup := testutils.SetupTestEnvironment(t, "", "")
 			defer setup.Cleanup()
 
 			viper.Reset()

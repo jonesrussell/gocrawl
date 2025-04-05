@@ -20,67 +20,73 @@ func TestValidateConfig(t *testing.T) {
 		wantErrMsg string
 	}{
 		{
-			name: "valid configuration",
+			name: "valid config",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{}, "")
+				return testutils.SetupTestEnvironment(t, "", "")
 			},
 			wantErrMsg: "",
 		},
 		{
 			name: "invalid environment",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{
-					"app.environment": "invalid",
-				}, "")
+				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: invalid
+`, "")
 			},
-			wantErrMsg: "invalid config: field \"app.environment\" with value invalid: invalid environment",
+			wantErrMsg: "invalid environment",
 		},
 		{
 			name: "invalid log level",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{
-					"log.level": "invalid",
-				}, "")
+				return testutils.SetupTestEnvironment(t, `
+log:
+  level: invalid
+`, "")
 			},
-			wantErrMsg: "invalid config: field \"log.level\" with value invalid: invalid log level",
+			wantErrMsg: "invalid log level",
 		},
 		{
-			name: "invalid crawler max depth",
+			name: "invalid server port",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{
-					"crawler.max_depth": 0,
-				}, "")
+				return testutils.SetupTestEnvironment(t, `
+server:
+  port: 0
+`, "")
 			},
-			wantErrMsg: "invalid config: field \"crawler.max_depth\" with value 0: crawler max depth must be greater than 0",
+			wantErrMsg: "server port must be between 1 and 65535",
 		},
 		{
-			name: "invalid crawler parallelism",
+			name: "invalid server timeout",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{
-					"crawler.parallelism": 0,
-				}, "")
+				return testutils.SetupTestEnvironment(t, `
+server:
+  timeout: invalid
+`, "")
 			},
-			wantErrMsg: "invalid config: field \"crawler.parallelism\" with value 0: crawler parallelism must be greater than 0",
+			wantErrMsg: "invalid server timeout",
 		},
 		{
-			name: "server security enabled without API key",
+			name: "invalid security config",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{
-					"server.security.enabled": true,
-					"server.security.api_key": "",
-				}, "")
+				return testutils.SetupTestEnvironment(t, `
+server:
+  security:
+    enabled: true
+    api_key: ""
+`, "")
 			},
-			wantErrMsg: "invalid config: field \"server.security.api_key\" with value : server security is enabled but no API key is provided",
+			wantErrMsg: "API key is required when security is enabled",
 		},
 		{
-			name: "server security enabled with invalid API key",
+			name: "invalid rate limit",
 			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, map[string]interface{}{
-					"server.security.enabled": true,
-					"server.security.api_key": "invalid",
-				}, "")
+				return testutils.SetupTestEnvironment(t, `
+crawler:
+  rate_limit: invalid
+`, "")
 			},
-			wantErrMsg: "invalid config: field \"server.security.api_key\" with value invalid: invalid API key format",
+			wantErrMsg: "invalid rate limit",
 		},
 	}
 
@@ -91,7 +97,7 @@ func TestValidateConfig(t *testing.T) {
 			setup := tt.setup(t)
 			defer setup.Cleanup()
 
-			cfg, err := config.New(testutils.NewTestLogger(t))
+			cfg, err := config.LoadConfig(setup.ConfigPath)
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.wantErrMsg)
