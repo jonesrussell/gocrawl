@@ -93,6 +93,20 @@ func TestCrawlerConfig(t *testing.T) {
 				// Create temporary config file
 				configPath := filepath.Join(t.TempDir(), "config.yml")
 				require.NoError(t, os.WriteFile(configPath, []byte(`
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+log:
+  level: info
+  debug: false
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  index_name: gocrawl
+server:
+  address: :8080
 crawler:
   base_url: http://test.example.com
   max_depth: 2
@@ -117,14 +131,19 @@ sources:
 				testutils.SetupTestEnvWithValues(t, map[string]string{
 					"GOCRAWL_APP_ENVIRONMENT":     "test",
 					"GOCRAWL_CRAWLER_SOURCE_FILE": sourcesPath,
+					"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+					"GOCRAWL_CRAWLER_MAX_DEPTH":   "2",
+					"GOCRAWL_CRAWLER_RATE_LIMIT":  "2s",
+					"GOCRAWL_CRAWLER_PARALLELISM": "2",
 				})
 
 				return configPath, sourcesPath
 			},
 			validate: func(t *testing.T, cfg *config.CrawlerConfig) {
+				require.NotNil(t, cfg)
 				require.Equal(t, "http://test.example.com", cfg.BaseURL)
 				require.Equal(t, 2, cfg.MaxDepth)
-				require.Equal(t, "2s", cfg.RateLimit)
+				require.Equal(t, "2s", cfg.RateLimit.String())
 				require.Equal(t, 2, cfg.Parallelism)
 			},
 			expectError: false,
@@ -135,6 +154,20 @@ sources:
 				// Create temporary config file
 				configPath := filepath.Join(t.TempDir(), "config.yml")
 				require.NoError(t, os.WriteFile(configPath, []byte(`
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+log:
+  level: info
+  debug: false
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  index_name: gocrawl
+server:
+  address: :8080
 crawler:
   base_url: http://test.example.com
   max_depth: 0
@@ -159,6 +192,10 @@ sources:
 				testutils.SetupTestEnvWithValues(t, map[string]string{
 					"GOCRAWL_APP_ENVIRONMENT":     "test",
 					"GOCRAWL_CRAWLER_SOURCE_FILE": sourcesPath,
+					"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+					"GOCRAWL_CRAWLER_MAX_DEPTH":   "0",
+					"GOCRAWL_CRAWLER_RATE_LIMIT":  "2s",
+					"GOCRAWL_CRAWLER_PARALLELISM": "2",
 				})
 
 				return configPath, sourcesPath
@@ -174,6 +211,20 @@ sources:
 				// Create temporary config file
 				configPath := filepath.Join(t.TempDir(), "config.yml")
 				require.NoError(t, os.WriteFile(configPath, []byte(`
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+log:
+  level: info
+  debug: false
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  index_name: gocrawl
+server:
+  address: :8080
 crawler:
   base_url: http://test.example.com
   max_depth: 2
@@ -198,6 +249,10 @@ sources:
 				testutils.SetupTestEnvWithValues(t, map[string]string{
 					"GOCRAWL_APP_ENVIRONMENT":     "test",
 					"GOCRAWL_CRAWLER_SOURCE_FILE": sourcesPath,
+					"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+					"GOCRAWL_CRAWLER_MAX_DEPTH":   "2",
+					"GOCRAWL_CRAWLER_RATE_LIMIT":  "2s",
+					"GOCRAWL_CRAWLER_PARALLELISM": "0",
 				})
 
 				return configPath, sourcesPath
@@ -213,6 +268,20 @@ sources:
 				// Create temporary config file
 				configPath := filepath.Join(t.TempDir(), "config.yml")
 				require.NoError(t, os.WriteFile(configPath, []byte(`
+app:
+  environment: test
+  name: gocrawl
+  version: 1.0.0
+  debug: false
+log:
+  level: info
+  debug: false
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  index_name: gocrawl
+server:
+  address: :8080
 crawler:
   base_url: http://test.example.com
   max_depth: 2
@@ -237,6 +306,10 @@ sources:
 				testutils.SetupTestEnvWithValues(t, map[string]string{
 					"GOCRAWL_APP_ENVIRONMENT":     "test",
 					"GOCRAWL_CRAWLER_SOURCE_FILE": sourcesPath,
+					"GOCRAWL_CRAWLER_BASE_URL":    "http://test.example.com",
+					"GOCRAWL_CRAWLER_MAX_DEPTH":   "2",
+					"GOCRAWL_CRAWLER_RATE_LIMIT":  "invalid",
+					"GOCRAWL_CRAWLER_PARALLELISM": "2",
 				})
 
 				return configPath, sourcesPath
@@ -249,20 +322,28 @@ sources:
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			configPath, sourcesPath := tt.setup(t)
 			defer os.Remove(configPath)
 			defer os.Remove(sourcesPath)
 
+			// Set config file path in environment
+			os.Setenv("GOCRAWL_CONFIG", configPath)
+			defer os.Unsetenv("GOCRAWL_CONFIG")
+
 			cfg, err := config.New(testutils.NewTestLogger(t))
 			if tt.expectError {
 				require.Error(t, err)
+				if tt.validate != nil {
+					tt.validate(t, nil)
+				}
 			} else {
 				require.NoError(t, err)
-			}
-
-			if tt.validate != nil {
-				tt.validate(t, cfg.GetCrawlerConfig())
+				require.NotNil(t, cfg)
+				if tt.validate != nil {
+					tt.validate(t, cfg.GetCrawlerConfig())
+				}
 			}
 		})
 	}
