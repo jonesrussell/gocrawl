@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/spf13/viper"
@@ -41,6 +42,11 @@ func createCrawlerConfig(v *viper.Viper) (CrawlerConfig, error) {
 // loadSources loads sources from a file
 func loadSources(path string) ([]Source, error) {
 	fmt.Printf("DEBUG: Loading sources from file: %s\n", path)
+
+	// Check if file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, fmt.Errorf("source file does not exist: %s", path)
+	}
 
 	sourcesConfig, err := loader.LoadFromFile(path)
 	if err != nil {

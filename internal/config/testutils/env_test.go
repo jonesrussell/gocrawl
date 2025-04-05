@@ -10,7 +10,7 @@ import (
 // TestSetupTestEnv verifies the test environment setup and cleanup
 func TestSetupTestEnv(t *testing.T) {
 	// Set a test environment variable
-	t.Setenv("TEST_VAR", "test_value")
+	os.Setenv("TEST_VAR", "test_value")
 
 	// Setup test environment
 	cleanup := testutils.SetupTestEnv(t)
@@ -23,7 +23,7 @@ func TestSetupTestEnv(t *testing.T) {
 	}
 
 	// Set a new test variable
-	t.Setenv("NEW_TEST_VAR", "new_value")
+	os.Setenv("NEW_TEST_VAR", "new_value")
 
 	// Run cleanup
 	cleanup()

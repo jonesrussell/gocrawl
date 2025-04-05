@@ -15,7 +15,11 @@ func ValidateConfig(cfg *Config) error {
 	// Validate environment first
 	if cfg.App.Environment == "" {
 		fmt.Printf("DEBUG: Environment validation failed: environment cannot be empty\n")
-		return fmt.Errorf("app validation failed: environment cannot be empty")
+		return &ConfigValidationError{
+			Field:  "app.environment",
+			Value:  cfg.App.Environment,
+			Reason: "environment cannot be empty",
+		}
 	}
 
 	// Validate environment value
@@ -29,7 +33,11 @@ func ValidateConfig(cfg *Config) error {
 	}
 	if !isValidEnv {
 		fmt.Printf("DEBUG: Environment validation failed: invalid environment: %s\n", cfg.App.Environment)
-		return fmt.Errorf("invalid environment: %s", cfg.App.Environment)
+		return &ConfigValidationError{
+			Field:  "app.environment",
+			Value:  cfg.App.Environment,
+			Reason: "invalid environment",
+		}
 	}
 	fmt.Printf("DEBUG: Environment validation passed\n")
 
@@ -64,7 +72,11 @@ func ValidateConfig(cfg *Config) error {
 	// Validate app config last
 	if err := validateAppConfig(&cfg.App); err != nil {
 		fmt.Printf("DEBUG: App config validation failed: %v\n", err)
-		return fmt.Errorf("app validation failed: %w", err)
+		return &ConfigValidationError{
+			Field:  "app",
+			Value:  cfg.App,
+			Reason: err.Error(),
+		}
 	}
 	fmt.Printf("DEBUG: App config validation passed\n")
 
@@ -81,10 +93,18 @@ func ValidateConfig(cfg *Config) error {
 // validateAppConfig validates the application configuration
 func validateAppConfig(cfg *AppConfig) error {
 	if cfg.Name == "" {
-		return errors.New("name cannot be empty")
+		return &ConfigValidationError{
+			Field:  "app.name",
+			Value:  cfg.Name,
+			Reason: "name cannot be empty",
+		}
 	}
 	if cfg.Version == "" {
-		return errors.New("version cannot be empty")
+		return &ConfigValidationError{
+			Field:  "app.version",
+			Value:  cfg.Version,
+			Reason: "version cannot be empty",
+		}
 	}
 	return nil
 }
@@ -103,7 +123,11 @@ func validateLogConfig(cfg *LogConfig) error {
 		}
 	}
 	if !isValidLevel {
-		return fmt.Errorf("invalid log level: %s", cfg.Level)
+		return &ConfigValidationError{
+			Field:  "log.level",
+			Value:  cfg.Level,
+			Reason: "invalid log level",
+		}
 	}
 	return nil
 }
@@ -111,23 +135,43 @@ func validateLogConfig(cfg *LogConfig) error {
 // validateCrawlerConfig validates the crawler configuration
 func validateCrawlerConfig(cfg *CrawlerConfig) error {
 	if cfg.BaseURL == "" {
-		return errors.New("crawler base URL cannot be empty")
+		return &ConfigValidationError{
+			Field:  "crawler.base_url",
+			Value:  cfg.BaseURL,
+			Reason: "crawler base URL cannot be empty",
+		}
 	}
 
 	if cfg.MaxDepth < 1 {
-		return errors.New("crawler max depth must be greater than 0")
+		return &ConfigValidationError{
+			Field:  "crawler.max_depth",
+			Value:  cfg.MaxDepth,
+			Reason: "crawler max depth must be greater than 0",
+		}
 	}
 
 	if cfg.RateLimit < time.Second {
-		return errors.New("crawler rate limit must be at least 1 second")
+		return &ConfigValidationError{
+			Field:  "crawler.rate_limit",
+			Value:  cfg.RateLimit,
+			Reason: "crawler rate limit must be at least 1 second",
+		}
 	}
 
 	if cfg.Parallelism < 1 {
-		return errors.New("crawler parallelism must be greater than 0")
+		return &ConfigValidationError{
+			Field:  "crawler.parallelism",
+			Value:  cfg.Parallelism,
+			Reason: "crawler parallelism must be greater than 0",
+		}
 	}
 
 	if cfg.SourceFile == "" {
-		return errors.New("crawler source file cannot be empty")
+		return &ConfigValidationError{
+			Field:  "crawler.source_file",
+			Value:  cfg.SourceFile,
+			Reason: "crawler source file cannot be empty",
+		}
 	}
 
 	return nil
@@ -136,26 +180,46 @@ func validateCrawlerConfig(cfg *CrawlerConfig) error {
 // validateElasticsearchConfig validates the Elasticsearch configuration
 func validateElasticsearchConfig(cfg *ElasticsearchConfig) error {
 	if len(cfg.Addresses) == 0 {
-		return errors.New("elasticsearch addresses cannot be empty")
+		return &ConfigValidationError{
+			Field:  "elasticsearch.addresses",
+			Value:  cfg.Addresses,
+			Reason: "elasticsearch addresses cannot be empty",
+		}
 	}
 
 	if cfg.IndexName == "" {
-		return errors.New("elasticsearch index name cannot be empty")
+		return &ConfigValidationError{
+			Field:  "elasticsearch.index_name",
+			Value:  cfg.IndexName,
+			Reason: "elasticsearch index name cannot be empty",
+		}
 	}
 
 	if cfg.APIKey == "" && (cfg.Username == "" || cfg.Password == "") {
-		return errors.New("elasticsearch API key cannot be empty")
+		return &ConfigValidationError{
+			Field:  "elasticsearch.api_key",
+			Value:  cfg.APIKey,
+			Reason: "elasticsearch API key cannot be empty",
+		}
 	}
 
 	// Validate API key format if provided
 	if cfg.APIKey != "" && !strings.Contains(cfg.APIKey, ":") {
-		return errors.New("elasticsearch API key must be in the format 'id:api_key'")
+		return &ConfigValidationError{
+			Field:  "elasticsearch.api_key",
+			Value:  cfg.APIKey,
+			Reason: "elasticsearch API key must be in the format 'id:api_key'",
+		}
 	}
 
 	// Validate TLS configuration
 	if cfg.TLS.Enabled {
 		if cfg.TLS.CertFile == "" {
-			return errors.New("TLS certificate file is required when TLS is enabled")
+			return &ConfigValidationError{
+				Field:  "elasticsearch.tls.cert_file",
+				Value:  cfg.TLS.CertFile,
+				Reason: "TLS certificate file is required when TLS is enabled",
+			}
 		}
 	}
 
@@ -195,10 +259,18 @@ func validateServerSecurity(security struct {
 }) error {
 	if security.Enabled {
 		if security.APIKey == "" {
-			return errors.New("server security is enabled but no API key is provided")
+			return &ConfigValidationError{
+				Field:  "server.security.api_key",
+				Value:  security.APIKey,
+				Reason: "server security is enabled but no API key is provided",
+			}
 		}
 		if !isValidAPIKey(security.APIKey) {
-			return errors.New("invalid API key format")
+			return &ConfigValidationError{
+				Field:  "server.security.api_key",
+				Value:  security.APIKey,
+				Reason: "invalid API key format",
+			}
 		}
 	}
 
@@ -283,16 +355,32 @@ func validateSources(sources []Source) error {
 	for i := range sources {
 		source := &sources[i]
 		if source.Name == "" {
-			return fmt.Errorf("source[%d] name cannot be empty", i)
+			return &ConfigValidationError{
+				Field:  "source.name",
+				Value:  source.Name,
+				Reason: "source name cannot be empty",
+			}
 		}
 		if source.URL == "" {
-			return fmt.Errorf("source[%d] URL cannot be empty", i)
+			return &ConfigValidationError{
+				Field:  "source.url",
+				Value:  source.URL,
+				Reason: "source URL cannot be empty",
+			}
 		}
 		if source.MaxDepth < 1 {
-			return fmt.Errorf("source[%d] max depth must be greater than 0", i)
+			return &ConfigValidationError{
+				Field:  "source.max_depth",
+				Value:  source.MaxDepth,
+				Reason: "source max depth must be greater than 0",
+			}
 		}
 		if source.RateLimit < time.Second {
-			return fmt.Errorf("source[%d] rate limit must be at least 1 second", i)
+			return &ConfigValidationError{
+				Field:  "source.rate_limit",
+				Value:  source.RateLimit,
+				Reason: "source rate limit must be at least 1 second",
+			}
 		}
 	}
 	return nil

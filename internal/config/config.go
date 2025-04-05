@@ -669,6 +669,15 @@ func NewConfig(logger Logger) (Interface, error) {
 	}
 	cfg.Crawler = crawlerCfg
 
+	// Load sources from file
+	if cfg.Crawler.SourceFile != "" {
+		sources, err := loadSources(cfg.Crawler.SourceFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load sources: %w", err)
+		}
+		cfg.Sources = sources
+	}
+
 	// Validate config
 	if err := ValidateConfig(cfg); err != nil {
 		return nil, err // Return validation error directly without wrapping

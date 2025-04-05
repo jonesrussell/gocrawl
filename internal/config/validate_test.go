@@ -74,28 +74,28 @@ server:
 			envValues: map[string]string{
 				"GOCRAWL_APP_ENVIRONMENT": "invalid",
 			},
-			expectedErr: "invalid environment: invalid",
+			expectedErr: "invalid config: field \"app.environment\" with value invalid: invalid environment",
 		},
 		{
 			name: "invalid log level",
 			envValues: map[string]string{
 				"GOCRAWL_LOG_LEVEL": "invalid",
 			},
-			expectedErr: "invalid log level: invalid",
+			expectedErr: "invalid config: field \"log.level\" with value invalid: invalid log level",
 		},
 		{
 			name: "invalid crawler max depth",
 			envValues: map[string]string{
 				"GOCRAWL_CRAWLER_MAX_DEPTH": "0",
 			},
-			expectedErr: "crawler max depth must be greater than 0",
+			expectedErr: "invalid config: field \"crawler.max_depth\" with value 0: crawler max depth must be greater than 0",
 		},
 		{
 			name: "invalid crawler parallelism",
 			envValues: map[string]string{
 				"GOCRAWL_CRAWLER_PARALLELISM": "0",
 			},
-			expectedErr: "crawler parallelism must be greater than 0",
+			expectedErr: "invalid config: field \"crawler.parallelism\" with value 0: crawler parallelism must be greater than 0",
 		},
 		{
 			name: "server security enabled without API key",
@@ -103,7 +103,7 @@ server:
 				"GOCRAWL_SERVER_SECURITY_ENABLED": "true",
 				"GOCRAWL_SERVER_SECURITY_API_KEY": "",
 			},
-			expectedErr: "server security is enabled but no API key is provided",
+			expectedErr: "invalid config: field \"server.security.api_key\" with value : server security is enabled but no API key is provided",
 		},
 		{
 			name: "server security enabled with invalid API key",
@@ -111,7 +111,7 @@ server:
 				"GOCRAWL_SERVER_SECURITY_ENABLED": "true",
 				"GOCRAWL_SERVER_SECURITY_API_KEY": "invalid",
 			},
-			expectedErr: "server API key must be in the format 'id:api_key'",
+			expectedErr: "invalid config: field \"server.security.api_key\" with value invalid: invalid API key format",
 		},
 	}
 

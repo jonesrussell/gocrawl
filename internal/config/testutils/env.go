@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,13 +12,24 @@ import (
 func SetupTestEnv(t *testing.T) func() {
 	// Store original environment variables
 	originalEnv := make(map[string]string)
-	for _, key := range os.Environ() {
-		originalEnv[key] = os.Getenv(key)
+	for _, env := range os.Environ() {
+		pair := strings.SplitN(env, "=", 2)
+		if len(pair) == 2 {
+			originalEnv[pair[0]] = pair[1]
+		}
+	}
+
+	// Clear all environment variables
+	for key := range originalEnv {
+		os.Unsetenv(key)
 	}
 
 	// Set common test environment variables
 	os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+	os.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
+	os.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
 	os.Setenv("GOCRAWL_LOG_LEVEL", "debug")
+	os.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
 	os.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
 	os.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
 	os.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
@@ -25,13 +37,21 @@ func SetupTestEnv(t *testing.T) func() {
 	os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
 	os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 	os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-	os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+	os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "../testdata/sources.yml")
 
 	// Return cleanup function
 	return func() {
+		// Clear all current environment variables
+		for _, env := range os.Environ() {
+			pair := strings.SplitN(env, "=", 2)
+			if len(pair) == 2 {
+				os.Unsetenv(pair[0])
+			}
+		}
+
 		// Restore original environment variables
-		for key := range originalEnv {
-			os.Setenv(key, originalEnv[key])
+		for key, value := range originalEnv {
+			os.Setenv(key, value)
 		}
 	}
 }
@@ -40,8 +60,11 @@ func SetupTestEnv(t *testing.T) func() {
 func SetupTestEnvWithValues(t *testing.T, values map[string]string) func() {
 	// Store original environment variables
 	originalEnv := make(map[string]string)
-	for _, key := range os.Environ() {
-		originalEnv[key] = os.Getenv(key)
+	for _, env := range os.Environ() {
+		pair := strings.SplitN(env, "=", 2)
+		if len(pair) == 2 {
+			originalEnv[pair[0]] = pair[1]
+		}
 	}
 
 	// Set custom environment variables
@@ -52,8 +75,8 @@ func SetupTestEnvWithValues(t *testing.T, values map[string]string) func() {
 	// Return cleanup function
 	return func() {
 		// Restore original environment variables
-		for key := range originalEnv {
-			os.Setenv(key, originalEnv[key])
+		for key, value := range originalEnv {
+			os.Setenv(key, value)
 		}
 	}
 }

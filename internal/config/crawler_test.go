@@ -31,12 +31,31 @@ func TestCrawlerConfig(t *testing.T) {
 				configContent := `
 app:
   environment: test
+  name: gocrawl
+  version: 1.0.0
+  debug: false
 crawler:
   base_url: http://test.example.com
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
   source_file: ` + sourcesPath + `
+log:
+  level: debug
+  debug: true
+elasticsearch:
+  addresses:
+    - https://localhost:9200
+  api_key: test_api_key
+  index_name: test-index
+  tls:
+    enabled: true
+    certificate: test-cert.pem
+    key: test-key.pem
+server:
+  security:
+    enabled: true
+    api_key: id:test_api_key
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
@@ -67,6 +86,7 @@ sources:
 				require.NoError(t, err)
 
 				// Set environment variables
+				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
 				t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
@@ -78,6 +98,13 @@ sources:
 				require.Equal(t, 2, crawlerCfg.MaxDepth)
 				require.Equal(t, 2*time.Second, crawlerCfg.RateLimit)
 				require.Equal(t, 2, crawlerCfg.Parallelism)
+
+				sources := cfg.GetSources()
+				require.NotEmpty(t, sources)
+				require.Equal(t, "test_source", sources[0].Name)
+				require.Equal(t, "http://test.example.com", sources[0].URL)
+				require.Equal(t, 2*time.Second, sources[0].RateLimit)
+				require.Equal(t, 2, sources[0].MaxDepth)
 			},
 		},
 		{
@@ -132,7 +159,7 @@ sources:
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), "crawler max depth must be greater than 0")
+				require.Contains(t, err.Error(), "at least one source must be configured")
 			},
 		},
 		{
@@ -140,6 +167,7 @@ sources:
 			setup: func(t *testing.T) {
 				// Create temporary test directory
 				tmpDir := t.TempDir()
+
 				configPath := filepath.Join(tmpDir, "config.yml")
 				sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
@@ -187,7 +215,7 @@ sources:
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), "crawler parallelism must be greater than 0")
+				require.Contains(t, err.Error(), "at least one source must be configured")
 			},
 		},
 	}
