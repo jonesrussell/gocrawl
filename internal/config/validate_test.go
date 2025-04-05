@@ -1,15 +1,15 @@
-package config
+package config_test
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/jonesrussell/gocrawl/testutils"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -18,13 +18,20 @@ func TestValidateConfig(t *testing.T) {
 	// Create temporary test directory
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yml")
+	sourcesPath := filepath.Join(tmpDir, "sources.yml")
 
-	// Get the absolute path to the testdata directory
-	_, filename, _, ok := runtime.Caller(0)
-	require.True(t, ok, "failed to get caller information")
-	dir := filepath.Dir(filename)
-	sourcesPath := filepath.Join(dir, "testdata", "sources.yml")
-	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
+	// Create test sources file
+	sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    selectors:
+      article: article
+      title: h1
+      content: .content
+`
+	err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+	require.NoError(t, err)
 
 	// Create test config file
 	configContent := fmt.Sprintf(`
@@ -45,7 +52,7 @@ log:
 elasticsearch:
   addresses:
     - https://localhost:9200
-  api_key: test_api_key
+  api_key: id:test_api_key
   index_name: test-index
   tls:
     enabled: true
@@ -56,7 +63,7 @@ server:
     enabled: true
     api_key: id:test_api_key
 `, sourcesPath)
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err = os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -125,7 +132,7 @@ server:
 			defer cleanup()
 
 			// Load and validate config
-			cfg, err := LoadConfig(configPath)
+			cfg, err := config.LoadConfig(configPath)
 			if tt.expectedErr == "" {
 				require.NoError(t, err)
 				require.NotNil(t, cfg)
@@ -140,6 +147,23 @@ server:
 func TestElasticsearchConfigBasicValidation(t *testing.T) {
 	t.Parallel()
 
+	// Create temporary test directory
+	tmpDir := t.TempDir()
+	sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+	// Create test sources file
+	sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    selectors:
+      article: article
+      title: h1
+      content: .content
+`
+	err := os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name        string
 		setupEnv    func()
@@ -152,7 +176,8 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
+				os.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
 			},
 			expectedErr: "",
 		},
@@ -163,7 +188,8 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
+				os.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
 			},
 			expectedErr: "elasticsearch addresses cannot be empty",
 		},
@@ -174,7 +200,8 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
+				os.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
 			},
 			expectedErr: "elasticsearch index name cannot be empty",
 		},
@@ -185,7 +212,8 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "")
-				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
+				os.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
 			},
 			expectedErr: "elasticsearch API key cannot be empty",
 		},
@@ -196,7 +224,8 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "test_api_key")
-				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
+				os.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
 			},
 			expectedErr: "elasticsearch API key must be in the format 'id:api_key'",
 		},
@@ -204,11 +233,12 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 			name: "missing TLS certificate",
 			setupEnv: func() {
 				os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "https://localhost:9200")
+				os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
 				os.Setenv("GOCRAWL_ELASTICSEARCH_TLS_ENABLED", "true")
-				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", "testdata/sources.yml")
+				os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
+				os.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
 			},
 			expectedErr: "TLS certificate file is required when TLS is enabled",
 		},
@@ -222,8 +252,8 @@ func TestElasticsearchConfigBasicValidation(t *testing.T) {
 			// Setup test environment
 			tt.setupEnv()
 
-			// Load and validate config
-			cfg, err := LoadConfig("testdata/config.yml")
+			// Create config
+			cfg, err := config.New(testutils.NewTestLogger(t))
 			if tt.expectedErr == "" {
 				require.NoError(t, err)
 				require.NotNil(t, cfg)
