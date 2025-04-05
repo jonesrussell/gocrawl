@@ -23,6 +23,8 @@ func TestCrawlerConfig(t *testing.T) {
 		{
 			name: "valid_configuration",
 			configContent: `
+app:
+  environment: test
 crawler:
   base_url: http://test.example.com
   max_depth: 2
@@ -41,6 +43,8 @@ crawler:
 		{
 			name: "invalid_max_depth",
 			configContent: `
+app:
+  environment: test
 crawler:
   base_url: http://test.example.com
   max_depth: 0
@@ -60,6 +64,8 @@ crawler:
 		{
 			name: "invalid_parallelism",
 			configContent: `
+app:
+  environment: test
 crawler:
   base_url: http://test.example.com
   max_depth: 2
@@ -79,6 +85,8 @@ crawler:
 		{
 			name: "invalid_rate_limit",
 			configContent: `
+app:
+  environment: test
 crawler:
   base_url: http://test.example.com
   max_depth: 2
@@ -101,6 +109,11 @@ crawler:
 		t.Run(tt.name, func(t *testing.T) {
 			setup := testutils.SetupTestEnvironment(t, tt.configContent, tt.sourcesContent)
 			defer setup.Cleanup()
+
+			// Reset Viper and set the source file path
+			viper.Reset()
+			viper.Set("crawler.source_file", setup.SourcesPath)
+			viper.Set("app.environment", "test")
 
 			cfg, err := config.New(testutils.NewTestLogger(t))
 			if tt.wantErr {
@@ -132,8 +145,11 @@ func TestCrawlerConfigValidation(t *testing.T) {
 			name: "invalid max depth",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
 crawler:
   max_depth: 0
+  source_file: sources.yml
 `, "")
 			},
 			wantErr: true,
@@ -142,8 +158,11 @@ crawler:
 			name: "invalid parallelism",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
 crawler:
   parallelism: 0
+  source_file: sources.yml
 `, "")
 			},
 			wantErr: true,
@@ -152,8 +171,11 @@ crawler:
 			name: "invalid rate limit",
 			setup: func(t *testing.T) *testutils.TestSetup {
 				return testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
 crawler:
   rate_limit: 0s
+  source_file: sources.yml
 `, "")
 			},
 			wantErr: true,
@@ -164,6 +186,11 @@ crawler:
 		t.Run(tt.name, func(t *testing.T) {
 			setup := tt.setup(t)
 			defer setup.Cleanup()
+
+			// Reset Viper and set the source file path
+			viper.Reset()
+			viper.Set("crawler.source_file", setup.SourcesPath)
+			viper.Set("app.environment", "test")
 
 			cfg, err := config.LoadConfig(setup.ConfigPath)
 			if tt.wantErr {
@@ -252,11 +279,20 @@ func TestSetMaxDepth(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			setup := testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
 crawler:
   max_depth: `+fmt.Sprint(tt.depth)+`
   base_url: http://test.example.com
+  rate_limit: 2s
+  source_file: sources.yml
 `, "")
 			defer setup.Cleanup()
+
+			// Reset Viper and set the source file path
+			viper.Reset()
+			viper.Set("crawler.source_file", setup.SourcesPath)
+			viper.Set("app.environment", "test")
 
 			cfg, err := config.LoadConfig(setup.ConfigPath)
 			if tt.wantErr {
@@ -270,8 +306,18 @@ crawler:
 }
 
 func TestSetRateLimit(t *testing.T) {
-	setup := testutils.SetupTestEnvironment(t, "", "")
+	setup := testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+crawler:
+  source_file: sources.yml
+`, "")
 	defer setup.Cleanup()
+
+	// Reset Viper and set the source file path
+	viper.Reset()
+	viper.Set("crawler.source_file", setup.SourcesPath)
+	viper.Set("app.environment", "test")
 
 	cfg := &config.CrawlerConfig{}
 	rateLimit := 2 * time.Second
@@ -281,8 +327,18 @@ func TestSetRateLimit(t *testing.T) {
 }
 
 func TestSetBaseURL(t *testing.T) {
-	setup := testutils.SetupTestEnvironment(t, "", "")
+	setup := testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+crawler:
+  source_file: sources.yml
+`, "")
 	defer setup.Cleanup()
+
+	// Reset Viper and set the source file path
+	viper.Reset()
+	viper.Set("crawler.source_file", setup.SourcesPath)
+	viper.Set("app.environment", "test")
 
 	cfg := &config.CrawlerConfig{}
 	url := "http://example.com"
@@ -292,8 +348,18 @@ func TestSetBaseURL(t *testing.T) {
 }
 
 func TestSetIndexName(t *testing.T) {
-	setup := testutils.SetupTestEnvironment(t, "", "")
+	setup := testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+crawler:
+  source_file: sources.yml
+`, "")
 	defer setup.Cleanup()
+
+	// Reset Viper and set the source file path
+	viper.Reset()
+	viper.Set("crawler.source_file", setup.SourcesPath)
+	viper.Set("app.environment", "test")
 
 	cfg := &config.CrawlerConfig{}
 	index := "test_index"
@@ -352,8 +418,18 @@ func TestCrawlerConfig_Setters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setup := testutils.SetupTestEnvironment(t, "", "")
+			setup := testutils.SetupTestEnvironment(t, `
+app:
+  environment: test
+crawler:
+  source_file: sources.yml
+`, "")
 			defer setup.Cleanup()
+
+			// Reset Viper and set the source file path
+			viper.Reset()
+			viper.Set("crawler.source_file", setup.SourcesPath)
+			viper.Set("app.environment", "test")
 
 			viper.Reset()
 			cfg := &config.CrawlerConfig{}
