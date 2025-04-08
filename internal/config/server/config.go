@@ -4,12 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Default configuration values
 const (
 	DefaultSecurityEnabled = false
 	DefaultAPIKey          = ""
+	DefaultAddress         = ":8080"
+	DefaultReadTimeout     = 15 * time.Second
+	DefaultWriteTimeout    = 15 * time.Second
+	DefaultIdleTimeout     = 60 * time.Second
 )
 
 // Config holds server-specific configuration settings.
@@ -18,6 +23,14 @@ type Config struct {
 	SecurityEnabled bool `yaml:"security_enabled"`
 	// APIKey is the API key used for authentication
 	APIKey string `yaml:"api_key"`
+	// Address is the address to listen on (e.g., ":8080")
+	Address string `yaml:"address"`
+	// ReadTimeout is the maximum duration for reading the entire request
+	ReadTimeout time.Duration `yaml:"read_timeout"`
+	// WriteTimeout is the maximum duration before timing out writes of the response
+	WriteTimeout time.Duration `yaml:"write_timeout"`
+	// IdleTimeout is the maximum amount of time to wait for the next request
+	IdleTimeout time.Duration `yaml:"idle_timeout"`
 }
 
 // Validate checks if the configuration is valid.
@@ -42,6 +55,10 @@ func New(opts ...Option) *Config {
 	cfg := &Config{
 		SecurityEnabled: DefaultSecurityEnabled,
 		APIKey:          DefaultAPIKey,
+		Address:         DefaultAddress,
+		ReadTimeout:     DefaultReadTimeout,
+		WriteTimeout:    DefaultWriteTimeout,
+		IdleTimeout:     DefaultIdleTimeout,
 	}
 
 	for _, opt := range opts {

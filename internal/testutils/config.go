@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -21,10 +23,10 @@ type MockConfig struct {
 	mock.Mock
 }
 
-func (m *MockConfig) GetAppConfig() *config.AppConfig {
+func (m *MockConfig) GetAppConfig() *app.Config {
 	args := m.Called()
 	if cfg := args.Get(0); cfg != nil {
-		if appCfg, ok := cfg.(*config.AppConfig); ok {
+		if appCfg, ok := cfg.(*app.Config); ok {
 			return appCfg
 		}
 	}
@@ -92,110 +94,54 @@ func (m *MockConfig) GetCommand() string {
 }
 
 // NewTestServerConfig creates a new ServerConfig for testing
-func NewTestServerConfig() *config.ServerConfig {
-	return &config.ServerConfig{
-		Security: struct {
-			Enabled   bool   `yaml:"enabled"`
-			APIKey    string `yaml:"api_key"`
-			RateLimit int    `yaml:"rate_limit"`
-			CORS      struct {
-				Enabled        bool     `yaml:"enabled"`
-				AllowedOrigins []string `yaml:"allowed_origins"`
-				AllowedMethods []string `yaml:"allowed_methods"`
-				AllowedHeaders []string `yaml:"allowed_headers"`
-				MaxAge         int      `yaml:"max_age"`
-			} `yaml:"cors"`
-			TLS config.TLSConfig `yaml:"tls"`
-		}{
-			Enabled:   true,
-			APIKey:    "test-key",
-			RateLimit: defaultRateLimit,
-			CORS: struct {
-				Enabled        bool     `yaml:"enabled"`
-				AllowedOrigins []string `yaml:"allowed_origins"`
-				AllowedMethods []string `yaml:"allowed_methods"`
-				AllowedHeaders []string `yaml:"allowed_headers"`
-				MaxAge         int      `yaml:"max_age"`
-			}{
-				Enabled:        true,
-				AllowedOrigins: []string{"*"},
-				AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-				AllowedHeaders: []string{"Content-Type", "Authorization", "X-API-Key"},
-				MaxAge:         defaultMaxAge,
-			},
-			TLS: config.TLSConfig{
-				Enabled:  true,
-				CertFile: "test-cert.pem",
-				KeyFile:  "test-key.pem",
-			},
-		},
+func NewTestServerConfig() *server.Config {
+	return &server.Config{
+		SecurityEnabled: true,
+		APIKey:          "test:test-key",
+		Address:         ":8080",
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
 	}
 }
 
 // NewMockConfig creates a new mock configuration for testing.
 func NewMockConfig() *config.Config {
-	cfg := &config.Config{
-		App: config.AppConfig{
-			Environment: "test",
-			Name:        "gocrawl",
-			Version:     "1.0.0",
-			Debug:       true,
-		},
-		Log: config.LogConfig{
-			Level: "debug",
-			Debug: true,
-		},
-		Elasticsearch: config.ElasticsearchConfig{
-			Addresses: []string{"http://localhost:9200"},
-			IndexName: "test-index",
-		},
-		Server: config.ServerConfig{
-			Address: ":8080",
-			Security: struct {
-				Enabled   bool   `yaml:"enabled"`
-				APIKey    string `yaml:"api_key"`
-				RateLimit int    `yaml:"rate_limit"`
-				CORS      struct {
-					Enabled        bool     `yaml:"enabled"`
-					AllowedOrigins []string `yaml:"allowed_origins"`
-					AllowedMethods []string `yaml:"allowed_methods"`
-					AllowedHeaders []string `yaml:"allowed_headers"`
-					MaxAge         int      `yaml:"max_age"`
-				} `yaml:"cors"`
-				TLS config.TLSConfig `yaml:"tls"`
-			}{
-				Enabled:   true,
-				APIKey:    "test-key",
-				RateLimit: defaultRateLimit,
-				CORS: struct {
-					Enabled        bool     `yaml:"enabled"`
-					AllowedOrigins []string `yaml:"allowed_origins"`
-					AllowedMethods []string `yaml:"allowed_methods"`
-					AllowedHeaders []string `yaml:"allowed_headers"`
-					MaxAge         int      `yaml:"max_age"`
-				}{
-					Enabled:        true,
-					AllowedOrigins: []string{"*"},
-					AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-					AllowedHeaders: []string{"*"},
-					MaxAge:         defaultMaxAge,
-				},
-				TLS: config.TLSConfig{
-					Enabled:  true,
-					CertFile: "test-cert.pem",
-					KeyFile:  "test-key.pem",
-				},
-			},
-		},
-		Crawler: config.CrawlerConfig{
-			MaxDepth:         defaultMaxDepth,
-			RateLimit:        defaultRateLimit * time.Second,
-			RandomDelay:      defaultRandomDelay,
-			Parallelism:      defaultParallelism,
-			IndexName:        "test-index",
-			ContentIndexName: "test-content-index",
-			SourceFile:       "internal/api/testdata/sources.yml",
-		},
+	appCfg := app.New(
+		app.WithEnvironment("test"),
+		app.WithName("gocrawl"),
+		app.WithVersion("1.0.0"),
+		app.WithDebug(true),
+	)
+
+	logCfg := &config.LogConfig{
+		Level: "debug",
 	}
-	return cfg
+
+	elasticCfg := &config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+	}
+
+	serverCfg := &server.Config{
+		SecurityEnabled: false,
+		APIKey:          "",
+		Address:         ":8080",
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
+	}
+
+	crawlerCfg := &config.CrawlerConfig{
+		MaxDepth:    2,
+		RateLimit:   time.Second * 5,
+		Parallelism: 4,
+	}
+
+	return &config.Config{
+		App:           appCfg,
+		Log:           logCfg,
+		Elasticsearch: elasticCfg,
+		Server:        serverCfg,
+		Crawler:       crawlerCfg,
+	}
 }
