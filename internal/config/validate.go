@@ -7,32 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"go.uber.org/zap"
 )
-
-// Config holds the complete application configuration.
-type Config struct {
-	// App holds application-level configuration
-	App *AppConfig `yaml:"app"`
-	// Log holds logging-related configuration
-	Log *LogConfig `yaml:"log"`
-	// Crawler holds crawler-specific configuration
-	Crawler *CrawlerConfig `yaml:"crawler"`
-	// Elasticsearch holds Elasticsearch connection configuration
-	Elasticsearch *ElasticsearchConfig `yaml:"elasticsearch"`
-}
-
-// ConfigValidationError represents a configuration validation error.
-type ConfigValidationError struct {
-	Field  string
-	Value  interface{}
-	Reason string
-}
-
-// Error returns a string representation of the validation error.
-func (e *ConfigValidationError) Error() string {
-	return fmt.Sprintf("invalid configuration: %s=%v (%s)", e.Field, e.Value, e.Reason)
-}
 
 const (
 	envDevelopment = "development"
@@ -53,7 +30,7 @@ func ValidateConfig(cfg *Config) error {
 	// Validate environment first
 	if cfg.App.Environment == "" {
 		logger.Error("Environment validation failed: environment cannot be empty")
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "app.environment",
 			Value:  cfg.App.Environment,
 			Reason: "environment cannot be empty",
@@ -72,7 +49,7 @@ func ValidateConfig(cfg *Config) error {
 	if !isValidEnv {
 		logger.Error("Environment validation failed",
 			zap.String("environment", cfg.App.Environment))
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "app.environment",
 			Value:  cfg.App.Environment,
 			Reason: "invalid environment",
@@ -104,7 +81,7 @@ func ValidateConfig(cfg *Config) error {
 	// Validate app config last
 	if err := validateAppConfig(cfg.App); err != nil {
 		logger.Error("App config validation failed", zap.Error(err))
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "app",
 			Value:  cfg.App,
 			Reason: err.Error(),
@@ -123,16 +100,16 @@ func ValidateConfig(cfg *Config) error {
 }
 
 // validateAppConfig validates the application configuration
-func validateAppConfig(cfg *AppConfig) error {
+func validateAppConfig(cfg *app.Config) error {
 	if cfg.Name == "" {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "app.name",
 			Value:  cfg.Name,
 			Reason: "name cannot be empty",
 		}
 	}
 	if cfg.Version == "" {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "app.version",
 			Value:  cfg.Version,
 			Reason: "version cannot be empty",
@@ -144,7 +121,7 @@ func validateAppConfig(cfg *AppConfig) error {
 // validateLogConfig validates the log configuration
 func validateLogConfig(cfg *LogConfig) error {
 	if cfg == nil {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "log",
 			Value:  nil,
 			Reason: "log configuration is required",
@@ -156,7 +133,7 @@ func validateLogConfig(cfg *LogConfig) error {
 	}
 
 	if !ValidLogLevels[strings.ToLower(cfg.Level)] {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "log.level",
 			Value:  cfg.Level,
 			Reason: "invalid log level",
@@ -168,7 +145,7 @@ func validateLogConfig(cfg *LogConfig) error {
 // validateCrawlerConfig validates the crawler configuration
 func validateCrawlerConfig(cfg *CrawlerConfig) error {
 	if cfg == nil {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "crawler",
 			Value:  nil,
 			Reason: "crawler configuration is required",
@@ -176,7 +153,7 @@ func validateCrawlerConfig(cfg *CrawlerConfig) error {
 	}
 
 	if cfg.BaseURL == "" {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "crawler.base_url",
 			Value:  cfg.BaseURL,
 			Reason: "crawler base URL cannot be empty",
@@ -184,7 +161,7 @@ func validateCrawlerConfig(cfg *CrawlerConfig) error {
 	}
 
 	if cfg.MaxDepth < 1 {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "crawler.max_depth",
 			Value:  cfg.MaxDepth,
 			Reason: "crawler max depth must be greater than 0",
@@ -192,15 +169,23 @@ func validateCrawlerConfig(cfg *CrawlerConfig) error {
 	}
 
 	if cfg.RateLimit < time.Second {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "crawler.rate_limit",
 			Value:  cfg.RateLimit,
 			Reason: "crawler rate limit must be at least 1 second",
 		}
 	}
 
+	if cfg.RandomDelay < 0 {
+		return &ValidationError{
+			Field:  "crawler.random_delay",
+			Value:  cfg.RandomDelay,
+			Reason: "crawler random delay must be non-negative",
+		}
+	}
+
 	if cfg.Parallelism < 1 {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "crawler.parallelism",
 			Value:  cfg.Parallelism,
 			Reason: "crawler parallelism must be greater than 0",
@@ -208,10 +193,10 @@ func validateCrawlerConfig(cfg *CrawlerConfig) error {
 	}
 
 	if cfg.SourceFile == "" {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "crawler.source_file",
 			Value:  cfg.SourceFile,
-			Reason: "crawler source file cannot be empty",
+			Reason: "crawler source file is required",
 		}
 	}
 
@@ -221,7 +206,7 @@ func validateCrawlerConfig(cfg *CrawlerConfig) error {
 // validateElasticsearchConfig validates the Elasticsearch configuration
 func validateElasticsearchConfig(cfg *ElasticsearchConfig) error {
 	if cfg == nil {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "elasticsearch",
 			Value:  nil,
 			Reason: "elasticsearch configuration is required",
@@ -229,45 +214,45 @@ func validateElasticsearchConfig(cfg *ElasticsearchConfig) error {
 	}
 
 	if len(cfg.Addresses) == 0 {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "elasticsearch.addresses",
 			Value:  cfg.Addresses,
-			Reason: "elasticsearch addresses cannot be empty",
+			Reason: "at least one Elasticsearch address is required",
 		}
 	}
 
 	if cfg.IndexName == "" {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "elasticsearch.index_name",
 			Value:  cfg.IndexName,
-			Reason: "elasticsearch index name cannot be empty",
+			Reason: "elasticsearch index name is required",
 		}
 	}
 
 	if cfg.APIKey == "" && (cfg.Username == "" || cfg.Password == "") {
-		return &ConfigValidationError{
-			Field:  "elasticsearch.api_key",
-			Value:  cfg.APIKey,
-			Reason: "either API key or username/password must be provided",
+		return &ValidationError{
+			Field:  "elasticsearch.auth",
+			Value:  nil,
+			Reason: "either API key or username/password is required",
 		}
 	}
 
 	return nil
 }
 
-// validateSources validates the source configurations
+// validateSources validates the source configuration
 func validateSources(sources []Source) error {
 	if len(sources) == 0 {
-		return &ConfigValidationError{
+		return &ValidationError{
 			Field:  "sources",
 			Value:  sources,
-			Reason: "at least one source must be configured",
+			Reason: "at least one source is required",
 		}
 	}
 
 	for i, source := range sources {
 		if source.Name == "" {
-			return &ConfigValidationError{
+			return &ValidationError{
 				Field:  fmt.Sprintf("sources[%d].name", i),
 				Value:  source.Name,
 				Reason: "source name cannot be empty",
@@ -275,42 +260,50 @@ func validateSources(sources []Source) error {
 		}
 
 		if source.URL == "" {
-			return &ConfigValidationError{
+			return &ValidationError{
 				Field:  fmt.Sprintf("sources[%d].url", i),
 				Value:  source.URL,
 				Reason: "source URL cannot be empty",
 			}
 		}
 
-		if source.RateLimit < time.Second {
-			return &ConfigValidationError{
-				Field:  fmt.Sprintf("sources[%d].rate_limit", i),
-				Value:  source.RateLimit,
-				Reason: "source rate limit must be at least 1 second",
-			}
-		}
-
-		if source.MaxDepth < 1 {
-			return &ConfigValidationError{
-				Field:  fmt.Sprintf("sources[%d].max_depth", i),
-				Value:  source.MaxDepth,
-				Reason: "source max depth must be greater than 0",
-			}
-		}
-
 		if len(source.AllowedDomains) == 0 {
-			return &ConfigValidationError{
+			return &ValidationError{
 				Field:  fmt.Sprintf("sources[%d].allowed_domains", i),
 				Value:  source.AllowedDomains,
-				Reason: "at least one allowed domain must be configured",
+				Reason: "at least one allowed domain is required",
 			}
 		}
 
 		if len(source.StartURLs) == 0 {
-			return &ConfigValidationError{
+			return &ValidationError{
 				Field:  fmt.Sprintf("sources[%d].start_urls", i),
 				Value:  source.StartURLs,
-				Reason: "at least one start URL must be configured",
+				Reason: "at least one start URL is required",
+			}
+		}
+
+		if source.RateLimit < time.Second {
+			return &ValidationError{
+				Field:  fmt.Sprintf("sources[%d].rate_limit", i),
+				Value:  source.RateLimit,
+				Reason: "rate limit must be at least 1 second",
+			}
+		}
+
+		if source.MaxDepth < 1 {
+			return &ValidationError{
+				Field:  fmt.Sprintf("sources[%d].max_depth", i),
+				Value:  source.MaxDepth,
+				Reason: "max depth must be greater than 0",
+			}
+		}
+
+		if len(source.Selectors) == 0 {
+			return &ValidationError{
+				Field:  fmt.Sprintf("sources[%d].selectors", i),
+				Value:  source.Selectors,
+				Reason: "at least one selector is required",
 			}
 		}
 	}

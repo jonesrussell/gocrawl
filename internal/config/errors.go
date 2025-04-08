@@ -39,70 +39,70 @@ var (
 	ErrConfigFileInvalid = errors.New("invalid configuration file content")
 )
 
-// ConfigValidationError represents an error in configuration validation
-type ConfigValidationError struct {
+// ValidationError represents an error in configuration validation
+type ValidationError struct {
 	Field  string
 	Value  any
 	Reason string
 }
 
-func (e *ConfigValidationError) Error() string {
+func (e *ValidationError) Error() string {
 	return fmt.Sprintf("invalid config: field %q with value %v: %s", e.Field, e.Value, e.Reason)
 }
 
-// ConfigLoadError represents an error loading configuration
-type ConfigLoadError struct {
+// LoadError represents an error loading configuration
+type LoadError struct {
 	File string
 	Err  error
 }
 
-func (e *ConfigLoadError) Error() string {
+func (e *LoadError) Error() string {
 	return fmt.Sprintf("failed to load config from %s: %v", e.File, e.Err)
 }
 
-func (e *ConfigLoadError) Unwrap() error {
+func (e *LoadError) Unwrap() error {
 	return e.Err
 }
 
-// ConfigParseError represents an error parsing configuration
-type ConfigParseError struct {
+// ParseError represents an error parsing configuration
+type ParseError struct {
 	Field string
 	Value string
 	Err   error
 }
 
-func (e *ConfigParseError) Error() string {
+func (e *ParseError) Error() string {
 	return fmt.Sprintf("failed to parse config field %q with value %q: %v", e.Field, e.Value, e.Err)
 }
 
-func (e *ConfigParseError) Unwrap() error {
+func (e *ParseError) Unwrap() error {
 	return e.Err
 }
 
-// ConfigSourceError represents an error loading source configuration
-type ConfigSourceError struct {
+// SourceError represents an error loading source configuration
+type SourceError struct {
 	Source string
 	Err    error
 }
 
-func (e *ConfigSourceError) Error() string {
+func (e *SourceError) Error() string {
 	return fmt.Sprintf("failed to load source %s: %v", e.Source, e.Err)
 }
 
-func (e *ConfigSourceError) Unwrap() error {
+func (e *SourceError) Unwrap() error {
 	return e.Err
 }
 
-// ConfigViperError represents an error from Viper configuration
-type ConfigViperError struct {
+// ViperError represents an error from Viper configuration
+type ViperError struct {
 	Operation string
 	Err       error
 }
 
-func (e *ConfigViperError) Error() string {
+func (e *ViperError) Error() string {
 	return fmt.Sprintf("viper error during %s: %v", e.Operation, e.Err)
 }
 
-func (e *ConfigViperError) Unwrap() error {
+func (e *ViperError) Unwrap() error {
 	return e.Err
 }
