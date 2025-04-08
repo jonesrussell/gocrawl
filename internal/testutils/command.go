@@ -10,6 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -71,7 +72,7 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 
 	// Set up mock config
 	mockConfig := &configtestutils.MockConfig{}
-	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+	mockConfig.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",

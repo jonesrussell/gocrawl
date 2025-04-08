@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/types"
 )
@@ -33,7 +33,7 @@ const (
 
 // SecurityMiddleware implements security measures for the API
 type SecurityMiddleware struct {
-	config          *config.ServerConfig
+	config          *server.Config
 	logger          logger.Interface
 	rateLimiter     map[string]rateLimitInfo
 	mu              sync.RWMutex
@@ -54,7 +54,7 @@ var _ SecurityMiddlewareInterface = (*SecurityMiddleware)(nil)
 // No constants needed
 
 // NewSecurityMiddleware creates a new security middleware instance
-func NewSecurityMiddleware(cfg *config.ServerConfig, log logger.Interface) *SecurityMiddleware {
+func NewSecurityMiddleware(cfg *server.Config, log logger.Interface) *SecurityMiddleware {
 	return &SecurityMiddleware{
 		config:          cfg,
 		logger:          log,
@@ -150,16 +150,19 @@ func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
 
 // isAllowedOrigin checks if the given origin is allowed
 func (m *SecurityMiddleware) isAllowedOrigin(origin string) bool {
-	for _, allowed := range m.config.Security.CORS.AllowedOrigins {
-		if allowed == origin {
-			return true
-		}
+	// Since server.Config has a simpler structure, we need to handle CORS differently
+	if !m.config.SecurityEnabled {
+		return true // If security is disabled, allow all origins
 	}
-	return false
+	return false // If security is enabled but no CORS config, deny all
 }
 
 // rateLimit applies rate limiting to the request
 func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
+	if !m.config.SecurityEnabled {
+		return nil // Skip rate limiting if security is disabled
+	}
+
 	ip := c.ClientIP()
 	now := m.timeProvider.Now()
 
@@ -179,7 +182,7 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 	if now.Sub(info.lastAccess) > m.rateLimitWindow {
 		info.count = 1
 		info.lastAccess = now
-	} else if info.count >= m.config.Security.RateLimit {
+	} else if info.count >= 100 { // Use a default rate limit since server.Config doesn't have RateLimit
 		return errors.New("rate limit exceeded")
 	} else {
 		info.count++
@@ -191,12 +194,16 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 
 // authenticate authenticates the request using API key
 func (m *SecurityMiddleware) authenticate(c *gin.Context) error {
+	if !m.config.SecurityEnabled {
+		return nil // Skip authentication if security is disabled
+	}
+
 	apiKey := c.GetHeader("X-Api-Key")
 	if apiKey == "" {
 		return ErrMissingAPIKey
 	}
 
-	if apiKey != m.config.Security.APIKey {
+	if apiKey != m.config.APIKey {
 		return ErrInvalidAPIKey
 	}
 

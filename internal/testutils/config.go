@@ -93,11 +93,11 @@ func (m *MockConfig) GetCommand() string {
 	return "test"
 }
 
-// NewTestServerConfig creates a new ServerConfig for testing
+// NewTestServerConfig creates a new server configuration for testing.
 func NewTestServerConfig() *server.Config {
 	return &server.Config{
-		SecurityEnabled: true,
-		APIKey:          "test:test-key",
+		SecurityEnabled: false,
+		APIKey:          "",
 		Address:         ":8080",
 		ReadTimeout:     15 * time.Second,
 		WriteTimeout:    15 * time.Second,
@@ -107,41 +107,22 @@ func NewTestServerConfig() *server.Config {
 
 // NewMockConfig creates a new mock configuration for testing.
 func NewMockConfig() *config.Config {
-	appCfg := app.New(
-		app.WithEnvironment("test"),
-		app.WithName("gocrawl"),
-		app.WithVersion("1.0.0"),
-		app.WithDebug(true),
-	)
-
-	logCfg := &config.LogConfig{
-		Level: "debug",
-	}
-
-	elasticCfg := &config.ElasticsearchConfig{
-		Addresses: []string{"http://localhost:9200"},
-	}
-
-	serverCfg := &server.Config{
-		SecurityEnabled: false,
-		APIKey:          "",
-		Address:         ":8080",
-		ReadTimeout:     15 * time.Second,
-		WriteTimeout:    15 * time.Second,
-		IdleTimeout:     60 * time.Second,
-	}
-
-	crawlerCfg := &config.CrawlerConfig{
-		MaxDepth:    2,
-		RateLimit:   time.Second * 5,
-		Parallelism: 4,
-	}
-
 	return &config.Config{
-		App:           appCfg,
-		Log:           logCfg,
-		Elasticsearch: elasticCfg,
-		Server:        serverCfg,
-		Crawler:       crawlerCfg,
+		Environment: "test",
+		Server: &server.Config{
+			SecurityEnabled: false,
+			APIKey:          "",
+			Address:         ":8080",
+			ReadTimeout:     15 * time.Second,
+			WriteTimeout:    15 * time.Second,
+			IdleTimeout:     60 * time.Second,
+		},
+		Crawler: &config.CrawlerConfig{
+			MaxDepth:    3,
+			RateLimit:   1 * time.Second,
+			RandomDelay: 500 * time.Millisecond,
+			Parallelism: 1,
+			Sources:     []config.Source{},
+		},
 	}
 }

@@ -117,8 +117,14 @@ type Source struct {
 	RateLimit time.Duration `yaml:"rate_limit"`
 	// MaxDepth defines how many levels deep to crawl for this source
 	MaxDepth int `yaml:"max_depth"`
+	// Time holds time-related configuration
+	Time []string `yaml:"time"`
+	// ArticleIndex is the name of the index for articles
+	ArticleIndex string `yaml:"article_index"`
+	// Index is the name of the index for general content
+	Index string `yaml:"index"`
 	// Selectors define CSS selectors for extracting content
-	Selectors map[string]string `yaml:"selectors"`
+	Selectors SourceSelectors `yaml:"selectors"`
 }
 
 // NewConfig creates a new configuration with default values.
@@ -348,8 +354,6 @@ func (c *LogConfig) Validate() error {
 type SourceSelectors struct {
 	// Article contains selectors for article-specific content
 	Article ArticleSelectors `yaml:"article"`
-	// Content contains selectors for general content
-	Content ContentSelectors `yaml:"content"`
 }
 
 // ArticleSelectors defines the selectors for article content.
@@ -358,8 +362,6 @@ type ArticleSelectors struct {
 	Container string `yaml:"container"`
 	// Title is the selector for the article title
 	Title string `yaml:"title"`
-	// Author is the selector for the article author
-	Author string `yaml:"author"`
 	// Body is the selector for the article body
 	Body string `yaml:"body"`
 	// Intro is the selector for the article introduction
@@ -378,16 +380,28 @@ type ArticleSelectors struct {
 	Section string `yaml:"section"`
 	// Keywords is the selector for article keywords
 	Keywords string `yaml:"keywords"`
-}
-
-// ContentSelectors defines the selectors for general content.
-type ContentSelectors struct {
-	// Title is the selector for the content title
-	Title string `yaml:"title"`
-	// Description is the selector for the content description
-	Description string `yaml:"description"`
-	// URL is the selector for the content URL
-	URL string `yaml:"url"`
+	// OGTitle is the selector for the Open Graph title
+	OGTitle string `yaml:"og_title"`
+	// OGDescription is the selector for the Open Graph description
+	OGDescription string `yaml:"og_description"`
+	// OGImage is the selector for the Open Graph image
+	OGImage string `yaml:"og_image"`
+	// OgURL is the selector for the Open Graph URL
+	OgURL string `yaml:"og_url"`
+	// Canonical is the selector for the canonical URL
+	Canonical string `yaml:"canonical"`
+	// WordCount is the selector for the word count
+	WordCount string `yaml:"word_count"`
+	// PublishDate is the selector for the publish date
+	PublishDate string `yaml:"publish_date"`
+	// Category is the selector for the article category
+	Category string `yaml:"category"`
+	// Tags is the selector for article tags
+	Tags string `yaml:"tags"`
+	// Author is the selector for the article author
+	Author string `yaml:"author"`
+	// BylineName is the selector for the byline name
+	BylineName string `yaml:"byline_name"`
 }
 
 // Rule defines a crawling rule for a source.

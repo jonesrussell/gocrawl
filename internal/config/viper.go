@@ -9,6 +9,13 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Default configuration values for local use only
+const (
+	defaultAppEnv     = "development"
+	defaultAppName    = "gocrawl"
+	defaultAppVersion = "1.0.0"
+)
+
 // viperMutex protects concurrent access to Viper operations
 var viperMutex sync.Mutex
 
@@ -39,12 +46,11 @@ func setupViper(log Logger) error {
 
 	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.Warn("Error reading config file", Error(err))
-			return fmt.Errorf("failed to read config: %w", err)
-		}
-		// Config file not found, use defaults
-		log.Info("No config file found, using defaults")
+		logger.Error("failed to read config file",
+			"error", err.Error(),
+			"file", viper.ConfigFileUsed(),
+		)
+		return fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	// Set default values only if not already set
@@ -67,34 +73,52 @@ func setupViper(log Logger) error {
 		viper.SetDefault("log.debug", false)
 	}
 	if !viper.IsSet("crawler.max_depth") {
-		viper.SetDefault("crawler.max_depth", defaultMaxDepth)
+		viper.SetDefault("crawler.max_depth", DefaultMaxDepth)
 	}
 	if !viper.IsSet("crawler.parallelism") {
-		viper.SetDefault("crawler.parallelism", defaultParallelism)
+		viper.SetDefault("crawler.parallelism", DefaultParallelism)
 	}
 	if !viper.IsSet("crawler.rate_limit") {
-		viper.SetDefault("crawler.rate_limit", defaultCrawlerRateLimit)
+		viper.SetDefault("crawler.rate_limit", DefaultRateLimit)
 	}
 	if !viper.IsSet("crawler.random_delay") {
-		viper.SetDefault("crawler.random_delay", defaultRandomDelay)
+		viper.SetDefault("crawler.random_delay", DefaultRandomDelay)
 	}
-	if !viper.IsSet("elasticsearch.addresses") {
-		viper.SetDefault("elasticsearch.addresses", []string{defaultESAddress})
+	if !viper.IsSet("server.host") {
+		viper.SetDefault("server.host", DefaultHTTPHost)
 	}
-	if !viper.IsSet("elasticsearch.index_name") {
-		viper.SetDefault("elasticsearch.index_name", defaultESIndex)
-	}
-	if !viper.IsSet("server.address") {
-		viper.SetDefault("server.address", ":"+DefaultServerPort)
+	if !viper.IsSet("server.port") {
+		viper.SetDefault("server.port", DefaultServerPort)
 	}
 	if !viper.IsSet("server.read_timeout") {
-		viper.SetDefault("server.read_timeout", DefaultReadTimeout)
+		viper.SetDefault("server.read_timeout", DefaultHTTPReadTimeout)
 	}
 	if !viper.IsSet("server.write_timeout") {
-		viper.SetDefault("server.write_timeout", DefaultWriteTimeout)
+		viper.SetDefault("server.write_timeout", DefaultHTTPWriteTimeout)
 	}
 	if !viper.IsSet("server.idle_timeout") {
-		viper.SetDefault("server.idle_timeout", DefaultIdleTimeout)
+		viper.SetDefault("server.idle_timeout", DefaultHTTPIdleTimeout)
+	}
+	if !viper.IsSet("storage.type") {
+		viper.SetDefault("storage.type", DefaultStorageType)
+	}
+	if !viper.IsSet("storage.elasticsearch.host") {
+		viper.SetDefault("storage.elasticsearch.host", DefaultElasticsearchHost)
+	}
+	if !viper.IsSet("storage.elasticsearch.index") {
+		viper.SetDefault("storage.elasticsearch.index", DefaultElasticsearchIndex)
+	}
+	if !viper.IsSet("storage.elasticsearch.username") {
+		viper.SetDefault("storage.elasticsearch.username", DefaultElasticsearchUsername)
+	}
+	if !viper.IsSet("storage.elasticsearch.password") {
+		viper.SetDefault("storage.elasticsearch.password", DefaultElasticsearchPassword)
+	}
+	if !viper.IsSet("log.format") {
+		viper.SetDefault("log.format", DefaultLogFormat)
+	}
+	if !viper.IsSet("log.output") {
+		viper.SetDefault("log.output", DefaultLogOutput)
 	}
 
 	return nil

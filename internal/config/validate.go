@@ -299,11 +299,12 @@ func validateSources(sources []Source) error {
 			}
 		}
 
-		if len(source.Selectors) == 0 {
+		// Check if article selectors are empty
+		if source.Selectors.Article.Title == "" && source.Selectors.Article.Body == "" {
 			return &ValidationError{
 				Field:  fmt.Sprintf("sources[%d].selectors", i),
 				Value:  source.Selectors,
-				Reason: "at least one selector is required",
+				Reason: "at least title or body selector is required",
 			}
 		}
 	}
