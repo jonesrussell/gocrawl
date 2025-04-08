@@ -6,15 +6,53 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
+)
+
+// Config holds the complete application configuration.
+type Config struct {
+	// App holds application-level configuration
+	App *AppConfig `yaml:"app"`
+	// Log holds logging-related configuration
+	Log *LogConfig `yaml:"log"`
+	// Crawler holds crawler-specific configuration
+	Crawler *CrawlerConfig `yaml:"crawler"`
+	// Elasticsearch holds Elasticsearch connection configuration
+	Elasticsearch *ElasticsearchConfig `yaml:"elasticsearch"`
+}
+
+// ConfigValidationError represents a configuration validation error.
+type ConfigValidationError struct {
+	Field  string
+	Value  interface{}
+	Reason string
+}
+
+// Error returns a string representation of the validation error.
+func (e *ConfigValidationError) Error() string {
+	return fmt.Sprintf("invalid configuration: %s=%v (%s)", e.Field, e.Value, e.Reason)
+}
+
+const (
+	envDevelopment = "development"
+	envStaging     = "staging"
+	envProduction  = "production"
+	envTest        = "test"
 )
 
 // ValidateConfig validates the configuration
 func ValidateConfig(cfg *Config) error {
-	fmt.Printf("DEBUG: Starting config validation. Environment: %s\n", cfg.App.Environment)
+	if cfg == nil {
+		return errors.New("configuration is required")
+	}
+
+	logger.Debug("Starting config validation",
+		zap.String("environment", cfg.App.Environment))
 
 	// Validate environment first
 	if cfg.App.Environment == "" {
-		fmt.Printf("DEBUG: Environment validation failed: environment cannot be empty\n")
+		logger.Error("Environment validation failed: environment cannot be empty")
 		return &ConfigValidationError{
 			Field:  "app.environment",
 			Value:  cfg.App.Environment,
@@ -32,60 +70,54 @@ func ValidateConfig(cfg *Config) error {
 		}
 	}
 	if !isValidEnv {
-		fmt.Printf("DEBUG: Environment validation failed: invalid environment: %s\n", cfg.App.Environment)
+		logger.Error("Environment validation failed",
+			zap.String("environment", cfg.App.Environment))
 		return &ConfigValidationError{
 			Field:  "app.environment",
 			Value:  cfg.App.Environment,
 			Reason: "invalid environment",
 		}
 	}
-	fmt.Printf("DEBUG: Environment validation passed\n")
+	logger.Debug("Environment validation passed")
 
 	// Validate log config
-	if err := validateLogConfig(&cfg.Log); err != nil {
-		fmt.Printf("DEBUG: Log config validation failed: %v\n", err)
+	if err := validateLogConfig(cfg.Log); err != nil {
+		logger.Error("Log config validation failed", zap.Error(err))
 		return err
 	}
-	fmt.Printf("DEBUG: Log config validation passed\n")
+	logger.Debug("Log config validation passed")
 
 	// Validate crawler config
-	if err := validateCrawlerConfig(&cfg.Crawler); err != nil {
-		fmt.Printf("DEBUG: Crawler config validation failed: %v\n", err)
+	if err := validateCrawlerConfig(cfg.Crawler); err != nil {
+		logger.Error("Crawler config validation failed", zap.Error(err))
 		return err
 	}
-	fmt.Printf("DEBUG: Crawler config validation passed\n")
-
-	// Validate server config
-	if err := validateServerConfig(&cfg.Server); err != nil {
-		fmt.Printf("DEBUG: Server config validation failed: %v\n", err)
-		return err
-	}
-	fmt.Printf("DEBUG: Server config validation passed\n")
+	logger.Debug("Crawler config validation passed")
 
 	// Validate Elasticsearch config
-	if err := validateElasticsearchConfig(&cfg.Elasticsearch); err != nil {
-		fmt.Printf("DEBUG: Elasticsearch config validation failed: %v\n", err)
+	if err := validateElasticsearchConfig(cfg.Elasticsearch); err != nil {
+		logger.Error("Elasticsearch config validation failed", zap.Error(err))
 		return err
 	}
-	fmt.Printf("DEBUG: Elasticsearch config validation passed\n")
+	logger.Debug("Elasticsearch config validation passed")
 
 	// Validate app config last
-	if err := validateAppConfig(&cfg.App); err != nil {
-		fmt.Printf("DEBUG: App config validation failed: %v\n", err)
+	if err := validateAppConfig(cfg.App); err != nil {
+		logger.Error("App config validation failed", zap.Error(err))
 		return &ConfigValidationError{
 			Field:  "app",
 			Value:  cfg.App,
 			Reason: err.Error(),
 		}
 	}
-	fmt.Printf("DEBUG: App config validation passed\n")
+	logger.Debug("App config validation passed")
 
 	// Validate sources last
-	if err := validateSources(cfg.Sources); err != nil {
-		fmt.Printf("DEBUG: Sources validation failed: %v\n", err)
+	if err := validateSources(cfg.Crawler.Sources); err != nil {
+		logger.Error("Sources validation failed", zap.Error(err))
 		return err
 	}
-	fmt.Printf("DEBUG: Sources validation passed\n")
+	logger.Debug("Sources validation passed")
 
 	return nil
 }
@@ -111,18 +143,19 @@ func validateAppConfig(cfg *AppConfig) error {
 
 // validateLogConfig validates the log configuration
 func validateLogConfig(cfg *LogConfig) error {
+	if cfg == nil {
+		return &ConfigValidationError{
+			Field:  "log",
+			Value:  nil,
+			Reason: "log configuration is required",
+		}
+	}
+
 	if cfg.Level == "" {
 		cfg.Level = "info" // Default to info if not set
 	}
-	validLevels := []string{"debug", "info", "warn", "error"}
-	isValidLevel := false
-	for _, level := range validLevels {
-		if strings.ToLower(cfg.Level) == level {
-			isValidLevel = true
-			break
-		}
-	}
-	if !isValidLevel {
+
+	if !ValidLogLevels[strings.ToLower(cfg.Level)] {
 		return &ConfigValidationError{
 			Field:  "log.level",
 			Value:  cfg.Level,
@@ -134,6 +167,14 @@ func validateLogConfig(cfg *LogConfig) error {
 
 // validateCrawlerConfig validates the crawler configuration
 func validateCrawlerConfig(cfg *CrawlerConfig) error {
+	if cfg == nil {
+		return &ConfigValidationError{
+			Field:  "crawler",
+			Value:  nil,
+			Reason: "crawler configuration is required",
+		}
+	}
+
 	if cfg.BaseURL == "" {
 		return &ConfigValidationError{
 			Field:  "crawler.base_url",
@@ -179,6 +220,14 @@ func validateCrawlerConfig(cfg *CrawlerConfig) error {
 
 // validateElasticsearchConfig validates the Elasticsearch configuration
 func validateElasticsearchConfig(cfg *ElasticsearchConfig) error {
+	if cfg == nil {
+		return &ConfigValidationError{
+			Field:  "elasticsearch",
+			Value:  nil,
+			Reason: "elasticsearch configuration is required",
+		}
+	}
+
 	if len(cfg.Addresses) == 0 {
 		return &ConfigValidationError{
 			Field:  "elasticsearch.addresses",
@@ -199,189 +248,72 @@ func validateElasticsearchConfig(cfg *ElasticsearchConfig) error {
 		return &ConfigValidationError{
 			Field:  "elasticsearch.api_key",
 			Value:  cfg.APIKey,
-			Reason: "elasticsearch API key cannot be empty",
+			Reason: "either API key or username/password must be provided",
 		}
 	}
 
-	// Validate API key format if provided
-	if cfg.APIKey != "" && !strings.Contains(cfg.APIKey, ":") {
-		return &ConfigValidationError{
-			Field:  "elasticsearch.api_key",
-			Value:  cfg.APIKey,
-			Reason: "elasticsearch API key must be in the format 'id:api_key'",
-		}
-	}
-
-	// Validate TLS configuration
-	if cfg.TLS.Enabled {
-		if cfg.TLS.CertFile == "" {
-			return &ConfigValidationError{
-				Field:  "elasticsearch.tls.cert_file",
-				Value:  cfg.TLS.CertFile,
-				Reason: "TLS certificate file is required when TLS is enabled",
-			}
-		}
-	}
-
-	return nil
-}
-
-// validateServerConfig validates the server configuration
-func validateServerConfig(cfg *ServerConfig) error {
-	if cfg.Address == "" {
-		return &ConfigValidationError{
-			Field:  "server.address",
-			Value:  cfg.Address,
-			Reason: "address cannot be empty",
-		}
-	}
-
-	if err := validateServerSecurity(cfg.Security); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// validateServerSecurity validates the server security configuration
-func validateServerSecurity(security struct {
-	Enabled   bool   `yaml:"enabled"`
-	APIKey    string `yaml:"api_key"`
-	RateLimit int    `yaml:"rate_limit"`
-	CORS      struct {
-		Enabled        bool     `yaml:"enabled"`
-		AllowedOrigins []string `yaml:"allowed_origins"`
-		AllowedMethods []string `yaml:"allowed_methods"`
-		AllowedHeaders []string `yaml:"allowed_headers"`
-		MaxAge         int      `yaml:"max_age"`
-	} `yaml:"cors"`
-	TLS TLSConfig `yaml:"tls"`
-}) error {
-	if security.Enabled {
-		if security.APIKey == "" {
-			return &ConfigValidationError{
-				Field:  "server.security.api_key",
-				Value:  security.APIKey,
-				Reason: "server security is enabled but no API key is provided",
-			}
-		}
-		if !isValidAPIKey(security.APIKey) {
-			return &ConfigValidationError{
-				Field:  "server.security.api_key",
-				Value:  security.APIKey,
-				Reason: "invalid API key format",
-			}
-		}
-	}
-
-	if security.RateLimit < 0 {
-		return &ConfigValidationError{
-			Field:  "server.security.rate_limit",
-			Value:  security.RateLimit,
-			Reason: "rate limit must be non-negative",
-		}
-	}
-
-	if security.CORS.Enabled {
-		if len(security.CORS.AllowedOrigins) == 0 {
-			return &ConfigValidationError{
-				Field:  "server.security.cors.allowed_origins",
-				Value:  security.CORS.AllowedOrigins,
-				Reason: "at least one allowed origin must be specified when CORS is enabled",
-			}
-		}
-		if len(security.CORS.AllowedMethods) == 0 {
-			return &ConfigValidationError{
-				Field:  "server.security.cors.allowed_methods",
-				Value:  security.CORS.AllowedMethods,
-				Reason: "at least one allowed method must be specified when CORS is enabled",
-			}
-		}
-		if security.CORS.MaxAge < 0 {
-			return &ConfigValidationError{
-				Field:  "server.security.cors.max_age",
-				Value:  security.CORS.MaxAge,
-				Reason: "max age must be non-negative",
-			}
-		}
-	}
-
-	if security.TLS.Enabled {
-		if err := validateServerTLS(security.TLS); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// isValidAPIKey checks if the API key has a valid format
-func isValidAPIKey(key string) bool {
-	// API key must be in the format "id:api_key"
-	parts := strings.Split(key, ":")
-	if len(parts) != 2 {
-		return false
-	}
-	if parts[0] == "" || parts[1] == "" {
-		return false
-	}
-	return true
-}
-
-// validateServerTLS validates the server TLS configuration
-func validateServerTLS(tls TLSConfig) error {
-	if tls.CertFile == "" {
-		return &ConfigValidationError{
-			Field:  "server.security.tls.certificate",
-			Value:  tls.CertFile,
-			Reason: "certificate path cannot be empty when TLS is enabled",
-		}
-	}
-	if tls.KeyFile == "" {
-		return &ConfigValidationError{
-			Field:  "server.security.tls.key",
-			Value:  tls.KeyFile,
-			Reason: "key path cannot be empty when TLS is enabled",
-		}
-	}
 	return nil
 }
 
 // validateSources validates the source configurations
 func validateSources(sources []Source) error {
 	if len(sources) == 0 {
-		return errors.New("at least one source must be configured")
+		return &ConfigValidationError{
+			Field:  "sources",
+			Value:  sources,
+			Reason: "at least one source must be configured",
+		}
 	}
-	for i := range sources {
-		source := &sources[i]
+
+	for i, source := range sources {
 		if source.Name == "" {
 			return &ConfigValidationError{
-				Field:  "source.name",
+				Field:  fmt.Sprintf("sources[%d].name", i),
 				Value:  source.Name,
 				Reason: "source name cannot be empty",
 			}
 		}
+
 		if source.URL == "" {
 			return &ConfigValidationError{
-				Field:  "source.url",
+				Field:  fmt.Sprintf("sources[%d].url", i),
 				Value:  source.URL,
 				Reason: "source URL cannot be empty",
 			}
 		}
-		if source.MaxDepth < 1 {
-			return &ConfigValidationError{
-				Field:  "source.max_depth",
-				Value:  source.MaxDepth,
-				Reason: "source max depth must be greater than 0",
-			}
-		}
+
 		if source.RateLimit < time.Second {
 			return &ConfigValidationError{
-				Field:  "source.rate_limit",
+				Field:  fmt.Sprintf("sources[%d].rate_limit", i),
 				Value:  source.RateLimit,
 				Reason: "source rate limit must be at least 1 second",
 			}
 		}
+
+		if source.MaxDepth < 1 {
+			return &ConfigValidationError{
+				Field:  fmt.Sprintf("sources[%d].max_depth", i),
+				Value:  source.MaxDepth,
+				Reason: "source max depth must be greater than 0",
+			}
+		}
+
+		if len(source.AllowedDomains) == 0 {
+			return &ConfigValidationError{
+				Field:  fmt.Sprintf("sources[%d].allowed_domains", i),
+				Value:  source.AllowedDomains,
+				Reason: "at least one allowed domain must be configured",
+			}
+		}
+
+		if len(source.StartURLs) == 0 {
+			return &ConfigValidationError{
+				Field:  fmt.Sprintf("sources[%d].start_urls", i),
+				Value:  source.StartURLs,
+				Reason: "at least one start URL must be configured",
+			}
+		}
 	}
+
 	return nil
 }

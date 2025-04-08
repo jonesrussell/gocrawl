@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 var setupMutex sync.Mutex
@@ -31,12 +33,7 @@ func SetupTestEnvironment(t *testing.T, configContent string, sourcesContent str
 	tmpDir, err := os.MkdirTemp("", "gocrawl-test-*")
 	require.NoError(err)
 
-	// Create config file
-	configPath := filepath.Join(tmpDir, "config.yml")
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
-	require.NoError(err)
-
-	// Create sources file
+	// Create sources file first
 	sourcesPath := filepath.Join(tmpDir, "sources.yml")
 	if sourcesContent != "" {
 		err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
@@ -47,6 +44,90 @@ func SetupTestEnvironment(t *testing.T, configContent string, sourcesContent str
 		sourcesContent, err := os.ReadFile(defaultSourcesPath)
 		require.NoError(err)
 		err = os.WriteFile(sourcesPath, sourcesContent, 0644)
+		require.NoError(err)
+	}
+
+	// Create config file
+	configPath := filepath.Join(tmpDir, "config.yml")
+	if configContent != "" {
+		// Update the source_file path in the config content
+		if !strings.Contains(configContent, "source_file:") {
+			// Parse the existing YAML to check for crawler section
+			var config map[string]interface{}
+			err = yaml.Unmarshal([]byte(configContent), &config)
+			require.NoError(err)
+
+			if _, hasCrawler := config["crawler"]; !hasCrawler {
+				configContent = strings.TrimSpace(configContent) + fmt.Sprintf("\ncrawler:\n  source_file: %s\n  base_url: http://test.example.com\n", sourcesPath)
+			} else {
+				// Unmarshal the crawler section
+				var crawlerConfig map[string]interface{}
+				if crawlerSection, ok := config["crawler"].(map[string]interface{}); ok {
+					crawlerConfig = crawlerSection
+				} else {
+					crawlerConfig = make(map[string]interface{})
+				}
+				// Update source_file and base_url
+				crawlerConfig["source_file"] = sourcesPath
+				if _, hasBaseURL := crawlerConfig["base_url"]; !hasBaseURL {
+					crawlerConfig["base_url"] = "http://test.example.com"
+				}
+				config["crawler"] = crawlerConfig
+
+				// Marshal back to YAML
+				configBytes, err := yaml.Marshal(config)
+				require.NoError(err)
+				configContent = string(configBytes)
+			}
+		} else {
+			// Use yaml parsing to update the source_file path
+			var config map[string]interface{}
+			err = yaml.Unmarshal([]byte(configContent), &config)
+			require.NoError(err)
+
+			if crawlerSection, ok := config["crawler"].(map[string]interface{}); ok {
+				crawlerSection["source_file"] = sourcesPath
+				if _, hasBaseURL := crawlerSection["base_url"]; !hasBaseURL {
+					crawlerSection["base_url"] = "http://test.example.com"
+				}
+				config["crawler"] = crawlerSection
+			}
+
+			// Marshal back to YAML
+			configBytes, err := yaml.Marshal(config)
+			require.NoError(err)
+			configContent = string(configBytes)
+		}
+		err = os.WriteFile(configPath, []byte(configContent), 0644)
+		require.NoError(err)
+	} else {
+		// Copy the default config file
+		defaultConfigPath := filepath.Join("testdata", "configs", "base.yml")
+		configContent, err := os.ReadFile(defaultConfigPath)
+		require.NoError(err)
+
+		// Update the source_file path using YAML parsing
+		var config map[string]interface{}
+		err = yaml.Unmarshal(configContent, &config)
+		require.NoError(err)
+
+		if crawlerSection, ok := config["crawler"].(map[string]interface{}); ok {
+			crawlerSection["source_file"] = sourcesPath
+			if _, hasBaseURL := crawlerSection["base_url"]; !hasBaseURL {
+				crawlerSection["base_url"] = "http://test.example.com"
+			}
+			config["crawler"] = crawlerSection
+		} else {
+			config["crawler"] = map[string]interface{}{
+				"source_file": sourcesPath,
+				"base_url":    "http://test.example.com",
+			}
+		}
+
+		// Marshal back to YAML
+		configBytes, err := yaml.Marshal(config)
+		require.NoError(err)
+		err = os.WriteFile(configPath, configBytes, 0644)
 		require.NoError(err)
 	}
 

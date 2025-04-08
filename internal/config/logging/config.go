@@ -8,7 +8,7 @@ import (
 
 // Default configuration values
 const (
-	DefaultLevel      = "info"
+	DefaultLevel      = "debug"
 	DefaultEncoding   = "json"
 	DefaultOutput     = "stdout"
 	DefaultDebug      = false
@@ -44,6 +44,10 @@ type Config struct {
 
 // Validate checks if the configuration is valid.
 func (c *Config) Validate() error {
+	if c == nil {
+		return errors.New("log configuration is required")
+	}
+
 	if c.Level == "" {
 		return errors.New("log level cannot be empty")
 	}

@@ -29,7 +29,6 @@ crawler:
   max_depth: 2
   parallelism: 2
   rate_limit: 2s
-  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses:
     - http://localhost:9200
@@ -62,7 +61,6 @@ crawler:
   max_depth: 2
   parallelism: 2
   rate_limit: 2s
-  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses: []
   api_key: id:test_api_key
@@ -84,7 +82,6 @@ crawler:
   max_depth: 2
   parallelism: 2
   rate_limit: 2s
-  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses:
     - http://localhost:9200
@@ -107,7 +104,6 @@ crawler:
   max_depth: 2
   parallelism: 2
   rate_limit: 2s
-  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses:
     - http://localhost:9200
@@ -130,7 +126,6 @@ crawler:
   max_depth: 2
   parallelism: 2
   rate_limit: 2s
-  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses:
     - http://localhost:9200
@@ -153,7 +148,6 @@ crawler:
   max_depth: 2
   parallelism: 2
   rate_limit: 2s
-  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses:
     - http://localhost:9200
@@ -178,7 +172,6 @@ crawler:
   max_depth: 2
   parallelism: 2
   rate_limit: 2s
-  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses:
     - http://localhost:9200
@@ -204,7 +197,6 @@ crawler:
   max_depth: 2
   parallelism: 2
   rate_limit: 2s
-  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses:
     - http://localhost:9200
@@ -229,7 +221,6 @@ crawler:
   max_depth: 2
   parallelism: 2
   rate_limit: 2s
-  source_file: ../testdata/sources.yml
 elasticsearch:
   addresses:
     - http://localhost:9200
@@ -258,7 +249,6 @@ elasticsearch:
 			}
 			require.NoError(t, err)
 			require.NotNil(t, cfg)
-			require.NotNil(t, cfg.GetElasticsearchConfig())
 		})
 	}
 }

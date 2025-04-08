@@ -87,19 +87,39 @@ log:
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, "config.yml")
 
-				// Create test config file
+				// Create test config file with no log section
 				configContent := `
 app:
-  environment: test
+  environment: custom
+  name: test-app
+  version: 1.0.0
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
 				require.NoError(t, err)
 
 				// Configure Viper
+				viper.Reset()
 				viper.SetConfigFile(configPath)
 				viper.SetConfigType("yaml")
 				err = viper.ReadInConfig()
 				require.NoError(t, err)
+
+				// Clear all environment variables that might set defaults
+				envVars := []string{
+					"GOCRAWL_CONFIG_FILE",
+					"GOCRAWL_SOURCES_FILE",
+					"GOCRAWL_APP_ENVIRONMENT",
+					"GOCRAWL_APP_NAME",
+					"GOCRAWL_APP_VERSION",
+					"GOCRAWL_LOG_LEVEL",
+					"GOCRAWL_LOG_DEBUG",
+				}
+				for _, env := range envVars {
+					os.Unsetenv(env)
+				}
+
+				// Ensure we're not in test environment
+				viper.Set("app.environment", "custom")
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.Error(t, err)

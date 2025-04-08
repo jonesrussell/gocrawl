@@ -1,11 +1,10 @@
 package config_test
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/alecthomas/assert/v2"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
@@ -16,19 +15,13 @@ import (
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name     string
-		setup    func(*testing.T)
+		setup    func(*testing.T) *testutils.TestSetup
 		validate func(*testing.T, config.Interface, error)
 	}{
 		{
 			name: "valid configuration",
-			setup: func(t *testing.T) {
-				// Create temporary test directory
-				tmpDir := t.TempDir()
-				configPath := filepath.Join(tmpDir, "config.yml")
-				sourcesPath := filepath.Join(tmpDir, "sources.yml")
-
-				// Create test config file
-				configContent := `
+			setup: func(t *testing.T) *testutils.TestSetup {
+				return testutils.SetupTestEnvironment(t, `
 app:
   environment: test
   name: gocrawl
@@ -39,61 +32,19 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: ` + sourcesPath + `
 log:
   level: debug
   debug: true
 elasticsearch:
   addresses:
     - https://localhost:9200
-  api_key: test_api_key
+  api_key: id:test_api_key
   index_name: test-index
   tls:
     enabled: true
     certificate: test-cert.pem
     key: test-key.pem
-sources:
-  - name: test
-    url: http://test.example.com
-    rate_limit: 100ms
-    max_depth: 1
-`
-				err := os.WriteFile(configPath, []byte(configContent), 0644)
-				require.NoError(t, err)
-
-				// Create test sources file
-				sourcesContent := `
-sources:
-  - name: test_source
-    url: http://test.example.com
-    rate_limit: 2s
-    max_depth: 2
-    article_index: test_articles
-    index: test_content
-    selectors:
-      article:
-        container: article
-        title: h1
-        body: article
-        author: .author
-        publish_date: .date
-`
-				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
-				require.NoError(t, err)
-
-				// Configure Viper
-				viper.SetConfigFile(configPath)
-				viper.SetConfigType("yaml")
-				err = viper.ReadInConfig()
-				require.NoError(t, err)
-
-				// Set environment variables
-				t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-				t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
+`, "")
 			},
 			validate: func(t *testing.T, cfg config.Interface, err error) {
 				require.NoError(t, err)
@@ -118,7 +69,7 @@ sources:
 
 				esCfg := cfg.GetElasticsearchConfig()
 				require.Equal(t, []string{"https://localhost:9200"}, esCfg.Addresses)
-				require.Equal(t, "test_api_key", esCfg.APIKey)
+				require.Equal(t, "id:test_api_key", esCfg.APIKey)
 				require.Equal(t, "test-index", esCfg.IndexName)
 				require.True(t, esCfg.TLS.Enabled)
 				require.Equal(t, "test-cert.pem", esCfg.TLS.CertFile)
@@ -130,17 +81,478 @@ sources:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup test environment
-			cleanup := testutils.SetupTestEnv(t)
-			defer cleanup()
+			setup := tt.setup(t)
+			defer setup.Cleanup()
 
-			// Run test setup
-			tt.setup(t)
+			// Configure Viper
+			viper.SetConfigFile(setup.ConfigPath)
+			viper.SetConfigType("yaml")
+			err := viper.ReadInConfig()
+			require.NoError(t, err)
 
 			// Create config
 			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
 
 			// Validate results
 			tt.validate(t, cfg, err)
+		})
+	}
+}
+
+func TestConfig_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		cfg     *config.Config
+		wantErr bool
+	}{
+		{
+			name: "valid config",
+			cfg: &config.Config{
+				App: &config.AppConfig{
+					Environment: "development",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+				},
+				Sources: []config.Source{
+					{
+						AllowedDomains: []string{"example.com"},
+						StartURLs:      []string{"https://example.com"},
+						Rules: config.Rules{
+							{
+								Pattern:  "/blog/*",
+								Action:   config.ActionAllow,
+								Priority: 1,
+							},
+							{
+								Pattern:  "/admin/*",
+								Action:   config.ActionDisallow,
+								Priority: 2,
+							},
+						},
+						Selectors: config.SourceSelectors{
+							Article: config.ArticleSelectors{
+								Title:   "h1",
+								Body:    "article",
+								TimeAgo: "time",
+								Author:  ".author",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing allowed domains",
+			cfg: &config.Config{
+				App: &config.AppConfig{
+					Environment: "development",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+				},
+				Sources: []config.Source{
+					{
+						StartURLs: []string{"https://example.com"},
+						Rules: config.Rules{
+							{
+								Pattern:  "/blog/*",
+								Action:   config.ActionAllow,
+								Priority: 1,
+							},
+						},
+						Selectors: config.SourceSelectors{
+							Article: config.ArticleSelectors{
+								Title: "h1",
+								Body:  "article",
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing start URLs",
+			cfg: &config.Config{
+				App: &config.AppConfig{
+					Environment: "development",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+				},
+				Sources: []config.Source{
+					{
+						AllowedDomains: []string{"example.com"},
+						Rules: config.Rules{
+							{
+								Pattern:  "/blog/*",
+								Action:   config.ActionAllow,
+								Priority: 1,
+							},
+						},
+						Selectors: config.SourceSelectors{
+							Article: config.ArticleSelectors{
+								Title: "h1",
+								Body:  "article",
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing required selectors",
+			cfg: &config.Config{
+				App: &config.AppConfig{
+					Environment: "development",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+				},
+				Sources: []config.Source{
+					{
+						AllowedDomains: []string{"example.com"},
+						StartURLs:      []string{"https://example.com"},
+						Rules: config.Rules{
+							{
+								Pattern:  "/blog/*",
+								Action:   config.ActionAllow,
+								Priority: 1,
+							},
+						},
+						Selectors: config.SourceSelectors{
+							Article: config.ArticleSelectors{
+								Title: "h1",
+								// Missing body selector
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid URL in start URLs",
+			cfg: &config.Config{
+				App: &config.AppConfig{
+					Environment: "development",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+				},
+				Sources: []config.Source{
+					{
+						AllowedDomains: []string{"example.com"},
+						StartURLs:      []string{"not-a-url"},
+						Rules: config.Rules{
+							{
+								Pattern:  "/blog/*",
+								Action:   config.ActionAllow,
+								Priority: 1,
+							},
+						},
+						Selectors: config.SourceSelectors{
+							Article: config.ArticleSelectors{
+								Title: "h1",
+								Body:  "article",
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty sources",
+			cfg: &config.Config{
+				App: &config.AppConfig{
+					Environment: "development",
+					Name:        "gocrawl",
+					Version:     "1.0.0",
+				},
+				Sources: []config.Source{},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.cfg.Validate()
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSource_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		source  config.Source
+		wantErr bool
+	}{
+		{
+			name: "valid source",
+			source: config.Source{
+				AllowedDomains: []string{"example.com"},
+				StartURLs:      []string{"https://example.com"},
+				Rules: config.Rules{
+					{
+						Pattern:  "/blog/*",
+						Action:   config.ActionAllow,
+						Priority: 1,
+					},
+					{
+						Pattern:  "/admin/*",
+						Action:   config.ActionDisallow,
+						Priority: 2,
+					},
+				},
+				Selectors: config.SourceSelectors{
+					Article: config.ArticleSelectors{
+						Title:   "h1",
+						Body:    "article",
+						TimeAgo: "time",
+						Author:  ".author",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing allowed domains",
+			source: config.Source{
+				StartURLs: []string{"https://example.com"},
+				Rules: config.Rules{
+					{
+						Pattern:  "/blog/*",
+						Action:   config.ActionAllow,
+						Priority: 1,
+					},
+				},
+				Selectors: config.SourceSelectors{
+					Article: config.ArticleSelectors{
+						Title: "h1",
+						Body:  "article",
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing start URLs",
+			source: config.Source{
+				AllowedDomains: []string{"example.com"},
+				Rules: config.Rules{
+					{
+						Pattern:  "/blog/*",
+						Action:   config.ActionAllow,
+						Priority: 1,
+					},
+				},
+				Selectors: config.SourceSelectors{
+					Article: config.ArticleSelectors{
+						Title: "h1",
+						Body:  "article",
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid URL in start URLs",
+			source: config.Source{
+				AllowedDomains: []string{"example.com"},
+				StartURLs:      []string{"not-a-url"},
+				Rules: config.Rules{
+					{
+						Pattern:  "/blog/*",
+						Action:   config.ActionAllow,
+						Priority: 1,
+					},
+				},
+				Selectors: config.SourceSelectors{
+					Article: config.ArticleSelectors{
+						Title: "h1",
+						Body:  "article",
+					},
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.source.Validate()
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestConfig_ValidateSelectors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		selectors config.ArticleSelectors
+		wantErr   bool
+	}{
+		{
+			name: "valid selectors",
+			selectors: config.ArticleSelectors{
+				Title:   "h1",
+				Body:    "article",
+				TimeAgo: "time",
+				Author:  ".author",
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing title",
+			selectors: config.ArticleSelectors{
+				Body:    "article",
+				TimeAgo: "time",
+				Author:  ".author",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing body",
+			selectors: config.ArticleSelectors{
+				Title:   "h1",
+				TimeAgo: "time",
+				Author:  ".author",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty title",
+			selectors: config.ArticleSelectors{
+				Title:   "",
+				Body:    "article",
+				TimeAgo: "time",
+				Author:  ".author",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty body",
+			selectors: config.ArticleSelectors{
+				Title:   "h1",
+				Body:    "",
+				TimeAgo: "time",
+				Author:  ".author",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.selectors.Validate()
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRules_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		rules   config.Rules
+		wantErr bool
+	}{
+		{
+			name: "valid rules",
+			rules: config.Rules{
+				{
+					Pattern:  "/blog/*",
+					Action:   config.ActionAllow,
+					Priority: 1,
+				},
+				{
+					Pattern:  "/admin/*",
+					Action:   config.ActionDisallow,
+					Priority: 2,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "empty rules",
+			rules:   config.Rules{},
+			wantErr: false,
+		},
+		{
+			name: "invalid pattern",
+			rules: config.Rules{
+				{
+					Pattern:  "",
+					Action:   config.ActionAllow,
+					Priority: 1,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid action",
+			rules: config.Rules{
+				{
+					Pattern:  "/blog/*",
+					Action:   "invalid",
+					Priority: 1,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative priority",
+			rules: config.Rules{
+				{
+					Pattern:  "/blog/*",
+					Action:   config.ActionAllow,
+					Priority: -1,
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.rules.Validate()
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }

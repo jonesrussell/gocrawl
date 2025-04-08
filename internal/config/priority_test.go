@@ -22,12 +22,44 @@ func TestPriorityConfig(t *testing.T) {
 		{
 			name: "valid configuration",
 			configContent: `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+  debug: false
+
+log:
+  level: debug
+  debug: false
+
 crawler:
   base_url: http://test.example.com
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
   source_file: sources.yml
+
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
+  tls:
+    enabled: false
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 5s
+    max_retries: 3
+  bulk:
+    size: 1000
+    flush_interval: 30s
+
+server:
+  address: :8080
+  security:
+    enabled: true
+    api_key: id:test_api_key
 `,
 			sourcesContent: `sources:
   - name: test
@@ -40,12 +72,44 @@ crawler:
 		{
 			name: "invalid max depth",
 			configContent: `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+  debug: false
+
+log:
+  level: debug
+  debug: false
+
 crawler:
   base_url: http://test.example.com
   max_depth: 0
   rate_limit: 2s
   parallelism: 2
   source_file: sources.yml
+
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
+  tls:
+    enabled: false
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 5s
+    max_retries: 3
+  bulk:
+    size: 1000
+    flush_interval: 30s
+
+server:
+  address: :8080
+  security:
+    enabled: true
+    api_key: id:test_api_key
 `,
 			sourcesContent: `sources:
   - name: test
@@ -59,12 +123,44 @@ crawler:
 		{
 			name: "invalid parallelism",
 			configContent: `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+  debug: false
+
+log:
+  level: debug
+  debug: false
+
 crawler:
   base_url: http://test.example.com
   max_depth: 2
   rate_limit: 2s
   parallelism: 0
   source_file: sources.yml
+
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
+  tls:
+    enabled: false
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 5s
+    max_retries: 3
+  bulk:
+    size: 1000
+    flush_interval: 30s
+
+server:
+  address: :8080
+  security:
+    enabled: true
+    api_key: id:test_api_key
 `,
 			sourcesContent: `sources:
   - name: test
@@ -78,12 +174,44 @@ crawler:
 		{
 			name: "invalid rate limit",
 			configContent: `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+  debug: false
+
+log:
+  level: debug
+  debug: false
+
 crawler:
   base_url: http://test.example.com
   max_depth: 2
   rate_limit: invalid
   parallelism: 2
   source_file: sources.yml
+
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
+  tls:
+    enabled: false
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 5s
+    max_retries: 3
+  bulk:
+    size: 1000
+    flush_interval: 30s
+
+server:
+  address: :8080
+  security:
+    enabled: true
+    api_key: id:test_api_key
 `,
 			sourcesContent: `sources:
   - name: test

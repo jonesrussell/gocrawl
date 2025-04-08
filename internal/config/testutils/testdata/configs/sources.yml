@@ -1,0 +1,22 @@
+sources:
+  - name: test_source
+    url: http://test.example.com
+    selectors:
+      title: h1
+      content: .content
+      date: .date
+      author: .author
+    allowed_domains:
+      - test.example.com
+    start_urls:
+      - http://test.example.com/page1
+      - http://test.example.com/page2
+    rules:
+      - pattern: /blog/.*
+        allow: true
+      - pattern: /admin/.*
+        allow: false
+    headers:
+      User-Agent: GoCrawl Test Bot
+    rate_limit: 1s
+    max_depth: 2 

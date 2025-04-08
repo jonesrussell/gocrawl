@@ -36,7 +36,6 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: testdata/sources.yml
 elasticsearch:
   addresses:
     - http://localhost:9200
@@ -74,7 +73,6 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "invalid environment",
@@ -94,7 +92,6 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "invalid log level",
@@ -114,7 +111,6 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "server port must be between 1 and 65535",
@@ -134,7 +130,6 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "invalid server timeout",
@@ -156,7 +151,6 @@ crawler:
   max_depth: 2
   rate_limit: 2s
   parallelism: 2
-  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "API key is required when security is enabled",
@@ -174,7 +168,6 @@ crawler:
   max_depth: 2
   rate_limit: invalid
   parallelism: 2
-  source_file: testdata/sources.yml
 `, "")
 			},
 			wantErrMsg: "invalid rate limit",
