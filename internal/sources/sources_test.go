@@ -50,7 +50,7 @@ sources:
 
 	// Create test config
 	cfg := &config.Config{
-		Crawler: config.CrawlerConfig{
+		Crawler: &config.CrawlerConfig{
 			SourceFile: sourcesFile,
 		},
 	}

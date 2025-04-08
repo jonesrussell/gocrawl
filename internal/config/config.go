@@ -232,8 +232,8 @@ func (c *Config) GetAppConfig() *app.Config {
 }
 
 // GetLogConfig returns the logging configuration.
-func (c *Config) GetLogConfig() *LogConfig {
-	return c.Log
+func (c *Config) GetLogConfig() *log.Config {
+	return c.Logger
 }
 
 // GetServerConfig returns the server configuration.
@@ -298,6 +298,8 @@ type LogConfig struct {
 	MaxAge int `yaml:"max_age"`
 	// Compress determines if the rotated log files should be compressed
 	Compress bool `yaml:"compress"`
+	// Debug enables debug mode for additional logging
+	Debug bool `yaml:"debug"`
 }
 
 // Validate checks if the log configuration is valid.

@@ -9,6 +9,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -60,7 +61,7 @@ var TestConfigModule = fx.Module("testConfig",
 	fx.Provide(
 		func() config.Interface {
 			mockCfg := &configtestutils.MockConfig{}
-			mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+			mockCfg.On("GetAppConfig").Return(&app.Config{
 				Environment: "test",
 				Name:        "gocrawl",
 				Version:     "1.0.0",

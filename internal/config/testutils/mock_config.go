@@ -4,6 +4,10 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -34,39 +38,46 @@ func (m *MockConfig) GetCrawlerConfig() *config.CrawlerConfig {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return &config.CrawlerConfig{
-			BaseURL:          "http://test.com",
-			MaxDepth:         defaultMaxDepth,
-			RateLimit:        time.Second,
-			RandomDelay:      time.Second,
-			IndexName:        "test_index",
-			ContentIndexName: "test_content",
-			SourceFile:       "", // Empty to prevent loading from file
+			BaseURL:     "http://test.com",
+			MaxDepth:    defaultMaxDepth,
+			RateLimit:   time.Second,
+			RandomDelay: time.Second,
+			IndexName:   "test_index",
+			SourceFile:  "", // Empty to prevent loading from file
 		}
 	}
 	return args.Get(0).(*config.CrawlerConfig)
 }
 
 // GetLogConfig implements config.Interface.
-func (m *MockConfig) GetLogConfig() *config.LogConfig {
+func (m *MockConfig) GetLogConfig() *log.Config {
 	args := m.Called()
 	if args.Get(0) == nil {
-		return &config.LogConfig{
-			Level: "info",
-			Debug: false,
+		return &log.Config{
+			Level:      "info",
+			Format:     "json",
+			Output:     "stdout",
+			MaxSize:    100,
+			MaxBackups: 3,
+			MaxAge:     28,
+			Compress:   true,
 		}
 	}
-	return args.Get(0).(*config.LogConfig)
+	return args.Get(0).(*log.Config)
 }
 
 // GetAppConfig implements config.Interface.
-func (m *MockConfig) GetAppConfig() *config.AppConfig {
+func (m *MockConfig) GetAppConfig() *app.Config {
 	args := m.Called()
 	if args.Get(0) == nil {
-		return &config.AppConfig{
+		return &app.Config{
 			Environment: "test",
+			Name:        "gocrawl",
+			Version:     "1.0.0",
+			Debug:       false,
 		}
 	}
-	return args.Get(0).(*config.AppConfig)
+	return args.Get(0).(*app.Config)
 }
 
 // GetElasticsearchConfig implements config.Interface.
@@ -82,17 +93,15 @@ func (m *MockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 }
 
 // GetServerConfig implements config.Interface.
-func (m *MockConfig) GetServerConfig() *config.ServerConfig {
+func (m *MockConfig) GetServerConfig() *server.Config {
 	args := m.Called()
 	if args.Get(0) == nil {
-		return &config.ServerConfig{
-			Address:      ":8080",
-			ReadTimeout:  defaultReadTimeout,
-			WriteTimeout: defaultWriteTimeout,
-			IdleTimeout:  defaultIdleTimeout,
+		return &server.Config{
+			SecurityEnabled: false,
+			APIKey:          "",
 		}
 	}
-	return args.Get(0).(*config.ServerConfig)
+	return args.Get(0).(*server.Config)
 }
 
 // GetCommand implements config.Interface.
@@ -105,15 +114,15 @@ func (m *MockConfig) GetCommand() string {
 }
 
 // GetPriorityConfig implements config.Interface.
-func (m *MockConfig) GetPriorityConfig() *config.PriorityConfig {
+func (m *MockConfig) GetPriorityConfig() *priority.Config {
 	args := m.Called()
 	if args.Get(0) == nil {
-		return &config.PriorityConfig{
+		return &priority.Config{
 			Default: 1,
-			Rules:   []config.PriorityRule{},
+			Rules:   []priority.Rule{},
 		}
 	}
-	return args.Get(0).(*config.PriorityConfig)
+	return args.Get(0).(*priority.Config)
 }
 
 // Ensure MockConfig implements config.Interface
