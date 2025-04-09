@@ -207,7 +207,9 @@ func TestConfig_Validate(t *testing.T) {
 				},
 				BulkSize:      1000,
 				FlushInterval: 30 * time.Second,
-				TLSEnabled:    true,
+				TLS: &TLSConfig{
+					Enabled: true,
+				},
 			},
 			wantErr: true,
 		},
@@ -240,7 +242,7 @@ func TestNew(t *testing.T) {
 			name: "default configuration",
 			opts: nil,
 			expected: &Config{
-				Addresses: DefaultAddresses,
+				Addresses: []string{DefaultAddresses},
 				IndexName: DefaultIndexName,
 				Retry: struct {
 					Enabled     bool          `yaml:"enabled"`
@@ -260,7 +262,7 @@ func TestNew(t *testing.T) {
 		{
 			name: "custom configuration",
 			opts: []Option{
-				WithAddresses("http://custom:9200"),
+				WithAddresses([]string{"http://custom:9200"}),
 				WithIndexName("custom"),
 				WithAPIKey("custom_id:custom_key"),
 				WithRetryEnabled(false),
@@ -269,14 +271,9 @@ func TestNew(t *testing.T) {
 				WithMaxRetries(5),
 				WithBulkSize(2000),
 				WithFlushInterval(60 * time.Second),
-				WithTLSEnabled(true),
-				WithTLSCertFile("cert.pem"),
-				WithTLSKeyFile("key.pem"),
-				WithTLSCAFile("ca.pem"),
-				WithTLSInsecureSkipVerify(true),
 			},
 			expected: &Config{
-				Addresses: "http://custom:9200",
+				Addresses: []string{"http://custom:9200"},
 				IndexName: "custom",
 				APIKey:    "custom_id:custom_key",
 				Retry: struct {
@@ -290,13 +287,8 @@ func TestNew(t *testing.T) {
 					MaxWait:     10 * time.Second,
 					MaxRetries:  5,
 				},
-				BulkSize:              2000,
-				FlushInterval:         60 * time.Second,
-				TLSEnabled:            true,
-				TLSCertFile:           "cert.pem",
-				TLSKeyFile:            "key.pem",
-				TLSCAFile:             "ca.pem",
-				TLSInsecureSkipVerify: true,
+				BulkSize:      2000,
+				FlushInterval: 60 * time.Second,
 			},
 		},
 	}
@@ -306,7 +298,10 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := New(tt.opts...)
+			cfg := NewConfig()
+			for _, opt := range tt.opts {
+				opt(cfg)
+			}
 			require.Equal(t, tt.expected, cfg)
 		})
 	}

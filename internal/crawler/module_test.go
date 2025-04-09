@@ -10,6 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -69,13 +70,12 @@ var TestConfigModule = fx.Module("testConfig",
 			})
 			mockCfg.On("GetLogConfig").Return(&config.LogConfig{
 				Level: "debug",
-				Debug: true,
 			})
 			mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 				Addresses: []string{"http://localhost:9200"},
 				IndexName: "test-index",
 			})
-			mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+			mockCfg.On("GetServerConfig").Return(&server.Config{
 				Address:      ":8080",
 				ReadTimeout:  defaultReadTimeout,
 				WriteTimeout: defaultWriteTimeout,

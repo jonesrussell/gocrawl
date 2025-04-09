@@ -81,7 +81,6 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 	})
 	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
 		Level: "debug",
-		Debug: true,
 	})
 	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},

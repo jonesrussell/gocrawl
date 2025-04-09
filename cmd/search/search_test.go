@@ -12,6 +12,10 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -216,28 +220,27 @@ func TestSearchCommand(t *testing.T) {
 	mockStorageMock.On("TestConnection", mock.Anything).Return(nil)
 
 	mockConfig := &configtestutils.MockConfig{}
-	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+	mockConfig.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+	mockConfig.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
-	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+	mockConfig.On("GetElasticsearchConfig").Return(&elasticsearch.Config{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+	mockConfig.On("GetServerConfig").Return(&server.Config{
 		Address: ":8080",
 	})
 	mockConfig.On("GetSources").Return([]config.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
-	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
-		Default: 1,
-		Rules:   []config.PriorityRule{},
+	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 
 	cmd := search.Command()

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/assert/v2"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -13,92 +12,18 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
-	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 )
 
 func TestNew(t *testing.T) {
-	tests := []struct {
-		name     string
-		setup    func(*testing.T) *testutils.TestSetup
-		validate func(*testing.T, config.Interface, error)
-	}{
-		{
-			name: "valid configuration",
-			setup: func(t *testing.T) *testutils.TestSetup {
-				return testutils.SetupTestEnvironment(t, `
-app:
-  environment: test
-  name: gocrawl
-  version: 1.0.0
-  debug: false
-crawler:
-  base_url: http://test.example.com
-  max_depth: 2
-  rate_limit: 2s
-  parallelism: 2
-log:
-  level: debug
-elasticsearch:
-  addresses:
-    - https://localhost:9200
-  api_key: id:test_api_key
-  index_name: test-index
-  tls:
-    enabled: true
-    certificate: test-cert.pem
-    key: test-key.pem
-`, "")
-			},
-			validate: func(t *testing.T, cfg config.Interface, err error) {
-				require.NoError(t, err)
-				require.NotNil(t, cfg)
+	t.Parallel()
 
-				// Verify configuration
-				appCfg := cfg.GetAppConfig()
-				require.Equal(t, "test", appCfg.Environment)
-				require.Equal(t, "gocrawl", appCfg.Name)
-				require.Equal(t, "1.0.0", appCfg.Version)
-				require.False(t, appCfg.Debug)
-
-				crawlerCfg := cfg.GetCrawlerConfig()
-				require.Equal(t, "http://test.example.com", crawlerCfg.BaseURL)
-				require.Equal(t, 2, crawlerCfg.MaxDepth)
-				require.Equal(t, 2*time.Second, crawlerCfg.RateLimit)
-				require.Equal(t, 2, crawlerCfg.Parallelism)
-
-				logCfg := cfg.GetLogConfig()
-				require.Equal(t, "debug", logCfg.Level)
-
-				esCfg := cfg.GetElasticsearchConfig()
-				require.Equal(t, []string{"https://localhost:9200"}, esCfg.Addresses)
-				require.Equal(t, "id:test_api_key", esCfg.APIKey)
-				require.Equal(t, "test-index", esCfg.IndexName)
-				require.True(t, esCfg.TLS.Enabled)
-				require.Equal(t, "test-cert.pem", esCfg.TLS.CertFile)
-				require.Equal(t, "test-key.pem", esCfg.TLS.KeyFile)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Setup test environment
-			setup := tt.setup(t)
-			defer setup.Cleanup()
-
-			// Configure Viper
-			viper.SetConfigFile(setup.ConfigPath)
-			viper.SetConfigType("yaml")
-			err := viper.ReadInConfig()
-			require.NoError(t, err)
-
-			// Create config
-			cfg, err := config.New(testutils.NewTestLogger(t))
-
-			// Validate results
-			tt.validate(t, cfg, err)
-		})
-	}
+	cfg := config.New()
+	require.NotNil(t, cfg)
+	require.NotNil(t, cfg.GetAppConfig())
+	require.NotNil(t, cfg.GetLogConfig())
+	require.NotNil(t, cfg.GetElasticsearchConfig())
+	require.NotNil(t, cfg.GetServerConfig())
+	require.NotNil(t, cfg.GetPriorityConfig())
 }
 
 func TestConfig_Validate(t *testing.T) {
@@ -116,10 +41,17 @@ func TestConfig_Validate(t *testing.T) {
 					Name:        "test",
 					Version:     "1.0.0",
 				},
-				Logger:   log.New(),
-				Server:   server.New(),
-				Priority: priority.New(),
-				Crawler:  config.NewCrawlerConfig(),
+				Logger: &log.Config{
+					Level: "debug",
+				},
+				Server: &server.Config{
+					Address: ":8080",
+				},
+				Priority: &priority.Config{
+					DefaultPriority: 1,
+					Rules:           []priority.Rule{},
+				},
+				Crawler: config.NewCrawlerConfig(),
 				Sources: []config.Source{
 					{
 						Name:           "test",

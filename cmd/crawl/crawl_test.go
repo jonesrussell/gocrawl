@@ -69,8 +69,8 @@ func setupTestDeps(t *testing.T) *testDeps {
 	mockConfig.On("GetSources").Return([]config.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
 	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 	mockSourceManager := testutils.NewMockSourceManager()
 
@@ -201,8 +201,8 @@ func TestCommandExecution(t *testing.T) {
 	mockConfig.On("GetSources").Return([]config.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
 	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 	mockSourceManager := testutils.NewMockSourceManager()
 
@@ -606,8 +606,8 @@ func TestCrawlCommand(t *testing.T) {
 	mockConfig.On("GetSources").Return([]config.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
 	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 
 	cmd := crawl.Command()
@@ -615,4 +615,34 @@ func TestCrawlCommand(t *testing.T) {
 	require.Equal(t, "crawl [source]", cmd.Use)
 	require.NotEmpty(t, cmd.Short)
 	require.NotEmpty(t, cmd.Long)
+}
+
+func TestNew(t *testing.T) {
+	t.Parallel()
+
+	mockConfig := &configtestutils.MockConfig{}
+	mockConfig.On("GetAppConfig").Return(&app.Config{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
+	mockConfig.On("GetLogConfig").Return(&log.Config{
+		Level: "debug",
+	})
+	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	})
+	mockConfig.On("GetServerConfig").Return(&server.Config{
+		Address: ":8080",
+	})
+	mockConfig.On("GetSources").Return([]config.Source{}, nil)
+	mockConfig.On("GetCommand").Return("test")
+	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
+	})
+
+	// ... existing code ...
 }

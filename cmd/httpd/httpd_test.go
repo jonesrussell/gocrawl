@@ -152,8 +152,8 @@ var TestConfigModule = fx.Module("testConfig",
 				mockCfg.On("GetSources").Return([]config.Source{}, nil)
 				mockCfg.On("GetCommand").Return("test")
 				mockCfg.On("GetPriorityConfig").Return(&priority.Config{
-					Default: 1,
-					Rules:   []priority.Rule{},
+					DefaultPriority: 1,
+					Rules:           []priority.Rule{},
 				})
 				return mockCfg
 			},
@@ -192,8 +192,8 @@ func TestHTTPCommand(t *testing.T) {
 	mockCfg.On("GetSources").Return([]config.Source{})
 	mockCfg.On("GetCommand").Return("test")
 	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -272,8 +272,8 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
 	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -349,7 +349,7 @@ func TestServerStartStop(t *testing.T) {
 		}
 	})
 
-	serverConfig := &config.ServerConfig{
+	serverConfig := &server.Config{
 		Address: fmt.Sprintf(":%d", port),
 	}
 
@@ -449,8 +449,8 @@ func TestServerHealthCheck(t *testing.T) {
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
 	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -557,8 +557,8 @@ func TestServerStorageConnection(t *testing.T) {
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
 	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -658,8 +658,8 @@ func TestServerErrorHandling(t *testing.T) {
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
 	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -756,8 +756,8 @@ func TestServerTimeoutHandling(t *testing.T) {
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
 	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}

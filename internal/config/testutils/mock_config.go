@@ -5,6 +5,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
@@ -81,15 +82,15 @@ func (m *MockConfig) GetAppConfig() *app.Config {
 }
 
 // GetElasticsearchConfig implements config.Interface.
-func (m *MockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
+func (m *MockConfig) GetElasticsearchConfig() *elasticsearch.Config {
 	args := m.Called()
 	if args.Get(0) == nil {
-		return &config.ElasticsearchConfig{
+		return &elasticsearch.Config{
 			Addresses: []string{"http://localhost:9200"},
 			IndexName: "test_index",
 		}
 	}
-	return args.Get(0).(*config.ElasticsearchConfig)
+	return args.Get(0).(*elasticsearch.Config)
 }
 
 // GetServerConfig implements config.Interface.

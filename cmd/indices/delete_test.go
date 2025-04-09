@@ -7,18 +7,62 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/indices"
-	"github.com/jonesrussell/gocrawl/cmd/indices/test"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 )
+
+// MockSources implements sources.Interface for testing
+type MockSources struct {
+	mock.Mock
+}
+
+func (m *MockSources) FindByName(name string) *sourceutils.SourceConfig {
+	args := m.Called(name)
+	if source, ok := args.Get(0).(*sourceutils.SourceConfig); ok {
+		return source
+	}
+	return nil
+}
+
+func (m *MockSources) AddSource(ctx context.Context, source *sourceutils.SourceConfig) error {
+	args := m.Called(ctx, source)
+	return args.Error(0)
+}
+
+func (m *MockSources) DeleteSource(ctx context.Context, name string) error {
+	args := m.Called(ctx, name)
+	return args.Error(0)
+}
+
+func (m *MockSources) GetMetrics() sources.Metrics {
+	args := m.Called()
+	if metrics, ok := args.Get(0).(sources.Metrics); ok {
+		return metrics
+	}
+	return sources.Metrics{}
+}
+
+func (m *MockSources) GetSources() []sources.Source {
+	args := m.Called()
+	if sources, ok := args.Get(0).([]sources.Source); ok {
+		return sources
+	}
+	return nil
+}
 
 func TestDeleteCommand(t *testing.T) {
 	// Set up test environment
@@ -31,7 +75,7 @@ func TestDeleteCommand(t *testing.T) {
 		indices     []string
 		force       bool
 		sourceName  string
-		setupMocks  func(*test.MockStorage, *test.MockSources)
+		setupMocks  func(*testutils.MockStorage, *MockSources)
 		wantErr     bool
 		errContains string
 	}{
@@ -44,7 +88,7 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{"test-index"},
 			force:      true,
 			sourceName: "",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+			setupMocks: func(ms *testutils.MockStorage, msrc *MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{"test-index"}, nil)
 				ms.On("DeleteIndex", mock.Anything, "test-index").Return(nil)
@@ -61,7 +105,7 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{},
 			force:      true,
 			sourceName: "test-source",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+			setupMocks: func(ms *testutils.MockStorage, msrc *MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{"test-index", "test-articles"}, nil)
 				ms.On("DeleteIndex", mock.Anything, "test-index").Return(nil)
@@ -84,7 +128,7 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{},
 			force:      true,
 			sourceName: "test source",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+			setupMocks: func(ms *testutils.MockStorage, msrc *MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{"test-index", "test-articles"}, nil)
 				ms.On("DeleteIndex", mock.Anything, "test-index").Return(nil)
@@ -105,7 +149,7 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{},
 			force:      true,
 			sourceName: "nonexistent",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+			setupMocks: func(ms *testutils.MockStorage, msrc *MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				msrc.On("FindByName", "nonexistent").Return(nil).Once()
 			},
@@ -121,7 +165,7 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{"test-index"},
 			force:      true,
 			sourceName: "",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+			setupMocks: func(ms *testutils.MockStorage, msrc *MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(assert.AnError)
 			},
 			wantErr:     true,
@@ -136,7 +180,7 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{"test-index"},
 			force:      true,
 			sourceName: "",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+			setupMocks: func(ms *testutils.MockStorage, msrc *MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return(nil, assert.AnError)
 			},
@@ -152,7 +196,7 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{"test-index"},
 			force:      true,
 			sourceName: "",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+			setupMocks: func(ms *testutils.MockStorage, msrc *MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{"test-index"}, nil)
 				ms.On("DeleteIndex", mock.Anything, "test-index").Return(assert.AnError)
@@ -164,7 +208,7 @@ func TestDeleteCommand(t *testing.T) {
 			source:  nil,
 			indices: []string{},
 			force:   false,
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+			setupMocks: func(ms *testutils.MockStorage, msrc *MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				ms.On("ListIndices", mock.Anything).Return([]string{}, nil)
 			},
@@ -177,7 +221,7 @@ func TestDeleteCommand(t *testing.T) {
 			indices:    []string{"test-index"},
 			force:      false,
 			sourceName: "test-source",
-			setupMocks: func(ms *test.MockStorage, msrc *test.MockSources) {
+			setupMocks: func(ms *testutils.MockStorage, msrc *MockSources) {
 				ms.On("TestConnection", mock.Anything).Return(nil)
 				msrc.On("FindByName", "test-source").Return(nil).Once()
 			},
@@ -188,9 +232,9 @@ func TestDeleteCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setupMocks := func() (*test.MockStorage, *test.MockSources) {
-				mockStore := &test.MockStorage{}
-				mockSources := &test.MockSources{}
+			setupMocks := func() (*testutils.MockStorage, *MockSources) {
+				mockStore := &testutils.MockStorage{}
+				mockSources := &MockSources{}
 
 				if tt.setupMocks != nil {
 					tt.setupMocks(mockStore, mockSources)
@@ -231,42 +275,40 @@ func TestDeleteCommand(t *testing.T) {
 						}
 					},
 					func() config.Interface {
-						mockCfg := &configtestutils.MockConfig{}
-						mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+						mockConfig := &configtestutils.MockConfig{}
+						mockConfig.On("GetAppConfig").Return(&app.Config{
 							Environment: "test",
 							Name:        "gocrawl",
 							Version:     "1.0.0",
 							Debug:       true,
 						})
-						mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+						mockConfig.On("GetLogConfig").Return(&log.Config{
 							Level: "debug",
-							Debug: true,
 						})
-						mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+						mockConfig.On("GetElasticsearchConfig").Return(&elasticsearch.Config{
 							Addresses: []string{"http://localhost:9200"},
 							IndexName: "test-index",
 						})
-						mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+						mockConfig.On("GetServerConfig").Return(&server.Config{
 							Address: ":8080",
 						})
-						mockCfg.On("GetSources").Return([]config.Source{}, nil)
-						mockCfg.On("GetCommand").Return("test")
-						mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
-							Default: 1,
-							Rules:   []config.PriorityRule{},
+						mockConfig.On("GetSources").Return([]config.Source{}, nil)
+						mockConfig.On("GetCommand").Return("test")
+						mockConfig.On("GetPriorityConfig").Return(&priority.Config{
+							DefaultPriority: 1,
+							Rules:           []priority.Rule{},
 						})
-						mockCfg.On("GetCrawlerConfig").Return(&config.CrawlerConfig{
-							BaseURL:          "http://localhost",
-							MaxDepth:         2,
-							RateLimit:        time.Second * 2,
-							RandomDelay:      time.Second,
-							IndexName:        "test-index",
-							ContentIndexName: "test-content",
-							SourceFile:       "testdata/sources.yml",
-							Parallelism:      2,
+						mockConfig.On("GetCrawlerConfig").Return(&config.CrawlerConfig{
+							BaseURL:     "http://localhost",
+							MaxDepth:    2,
+							RateLimit:   time.Second * 2,
+							RandomDelay: time.Second,
+							IndexName:   "test-index",
+							SourceFile:  "testdata/sources.yml",
+							Parallelism: 2,
 						})
-						mockCfg.On("Validate").Return(nil)
-						return mockCfg
+						mockConfig.On("Validate").Return(nil)
+						return mockConfig
 					},
 					func() storagetypes.Interface { return mockStore },
 					func() sources.Interface { return mockSources },
@@ -362,5 +404,34 @@ func TestDeleteCommandArgs(t *testing.T) {
 				require.NoError(t, err)
 			}
 		})
+	}
+}
+
+func setupTestDeps() *Dependencies {
+	return &Dependencies{
+		Config: &mockConfig{
+			app: &config.App{
+				Elasticsearch: &elasticsearch.Config{
+					URL: "http://localhost:9200",
+				},
+				Log: &log.Config{
+					Level: "debug",
+				},
+				Priority: &priority.Config{
+					Enabled: true,
+				},
+				Server: &server.Config{
+					Port: 8080,
+				},
+			},
+		},
+		Sources: []*sourceutils.SourceConfig{
+			{
+				Name:         "test-source",
+				URL:          "https://example.com",
+				ArticleIndex: "test-articles",
+				Index:        "test-content",
+			},
+		},
 	}
 }

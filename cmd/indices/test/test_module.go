@@ -41,8 +41,8 @@ func TestModule(t *testing.T) fx.Option {
 				mockCfg.On("GetSources").Return([]config.Source{}, nil)
 				mockCfg.On("GetCommand").Return("test")
 				mockCfg.On("GetPriorityConfig").Return(&priority.Config{
-					Default: 1,
-					Rules:   []priority.Rule{},
+					DefaultPriority: 1,
+					Rules:           []priority.Rule{},
 				})
 				return mockCfg
 			},

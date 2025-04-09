@@ -12,6 +12,7 @@ import (
 	cmdsrcs "github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -143,8 +144,8 @@ func (m *mockConfig) GetBool(_ string) bool                   { return false }
 func (m *mockConfig) GetDuration(_ string) time.Duration      { return 0 }
 func (m *mockConfig) UnmarshalKey(_ string, _ any) error      { return nil }
 func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig { return &config.CrawlerConfig{} }
-func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
-	return &config.ElasticsearchConfig{}
+func (m *mockConfig) GetElasticsearchConfig() *elasticsearch.Config {
+	return &elasticsearch.Config{}
 }
 func (m *mockConfig) GetLogConfig() *log.Config {
 	return &log.Config{

@@ -3,6 +3,7 @@ package config_test
 import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
@@ -15,7 +16,7 @@ type MockConfig struct {
 	// LogConfig is the logging configuration
 	LogConfig *log.Config
 	// ElasticsearchConfig is the Elasticsearch configuration
-	ElasticsearchConfig *config.ElasticsearchConfig
+	ElasticsearchConfig *elasticsearch.Config
 	// ServerConfig is the server configuration
 	ServerConfig *server.Config
 	// Sources is the list of sources
@@ -53,7 +54,7 @@ func (m *MockConfig) WithAppConfig(cfg *app.Config) *MockConfig {
 }
 
 // WithElasticsearchConfig sets the elasticsearch config for the mock config.
-func (m *MockConfig) WithElasticsearchConfig(cfg *config.ElasticsearchConfig) *MockConfig {
+func (m *MockConfig) WithElasticsearchConfig(cfg *elasticsearch.Config) *MockConfig {
 	m.ElasticsearchConfig = cfg
 	return m
 }
@@ -85,7 +86,7 @@ func (m *MockConfig) GetAppConfig() *app.Config {
 }
 
 // GetElasticsearchConfig returns the Elasticsearch configuration.
-func (m *MockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
+func (m *MockConfig) GetElasticsearchConfig() *elasticsearch.Config {
 	return m.ElasticsearchConfig
 }
 
@@ -102,8 +103,8 @@ func (m *MockConfig) GetCommand() string {
 // GetPriorityConfig returns the priority configuration
 func (m *MockConfig) GetPriorityConfig() *priority.Config {
 	return &priority.Config{
-		Default: 1,
-		Rules:   []priority.Rule{},
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	}
 }
 

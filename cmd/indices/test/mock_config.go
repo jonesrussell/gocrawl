@@ -3,6 +3,7 @@ package test
 import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
@@ -27,9 +28,9 @@ func (m *MockConfig) GetLogConfig() *log.Config {
 }
 
 // GetElasticsearchConfig returns the Elasticsearch configuration.
-func (m *MockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
+func (m *MockConfig) GetElasticsearchConfig() *elasticsearch.Config {
 	args := m.Called()
-	return args.Get(0).(*config.ElasticsearchConfig)
+	return args.Get(0).(*elasticsearch.Config)
 }
 
 // GetServerConfig returns the server configuration.
