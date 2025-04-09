@@ -284,6 +284,26 @@ type ElasticsearchConfig struct {
 	Username string `yaml:"username"`
 	// Password is the password for basic authentication
 	Password string `yaml:"password"`
+	// Cloud contains cloud-specific configuration
+	Cloud struct {
+		// ID is the cloud deployment ID
+		ID string `yaml:"id"`
+		// APIKey is the cloud API key
+		APIKey string `yaml:"api_key"`
+	} `yaml:"cloud"`
+	// TLS contains TLS configuration
+	TLS TLSConfig `yaml:"tls"`
+	// Retry contains retry configuration
+	Retry struct {
+		// Enabled indicates whether retries are enabled
+		Enabled bool `yaml:"enabled"`
+		// InitialWait is the initial wait time between retries
+		InitialWait time.Duration `yaml:"initial_wait"`
+		// MaxWait is the maximum wait time between retries
+		MaxWait time.Duration `yaml:"max_wait"`
+		// MaxRetries is the maximum number of retries
+		MaxRetries int `yaml:"max_retries"`
+	} `yaml:"retry"`
 }
 
 // LogConfig holds logging-specific configuration settings.

@@ -9,6 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 )
 
@@ -100,68 +104,69 @@ elasticsearch:
 }
 
 func TestConfig_Validate(t *testing.T) {
-	t.Parallel()
+	logger := testutils.NewTestLogger(t)
 
 	tests := []struct {
-		name    string
-		cfg     *config.Config
-		wantErr bool
+		name          string
+		config        *config.Config
+		expectedError string
 	}{
 		{
-			name: "valid config",
-			cfg: &config.Config{
-				App: &config.AppConfig{
+			name: "valid configuration",
+			config: &config.Config{
+				Environment: "development",
+				App: &app.Config{
 					Environment: "development",
-					Name:        "gocrawl",
+					Name:        "test",
 					Version:     "1.0.0",
 				},
+				Logger:   log.New(),
+				Server:   server.New(),
+				Priority: priority.New(),
+				Crawler:  config.NewCrawlerConfig(),
 				Sources: []config.Source{
 					{
-						AllowedDomains: []string{"example.com"},
-						StartURLs:      []string{"https://example.com"},
-						Rules: config.Rules{
-							{
-								Pattern:  "/blog/*",
-								Action:   config.ActionAllow,
-								Priority: 1,
-							},
-							{
-								Pattern:  "/admin/*",
-								Action:   config.ActionDisallow,
-								Priority: 2,
-							},
-						},
+						Name:           "test",
+						URL:            "http://test.example.com",
+						AllowedDomains: []string{"test.example.com"},
+						StartURLs:      []string{"http://test.example.com"},
+						RateLimit:      time.Second,
+						MaxDepth:       1,
+						ArticleIndex:   "articles",
+						Index:          "test",
 						Selectors: config.SourceSelectors{
 							Article: config.ArticleSelectors{
-								Title:   "h1",
-								Body:    "article",
-								TimeAgo: "time",
-								Author:  ".author",
+								Title: "h1",
+								Body:  "article",
 							},
 						},
 					},
 				},
 			},
-			wantErr: false,
+			expectedError: "",
 		},
 		{
 			name: "missing allowed domains",
-			cfg: &config.Config{
-				App: &config.AppConfig{
+			config: &config.Config{
+				Environment: "development",
+				App: &app.Config{
 					Environment: "development",
-					Name:        "gocrawl",
+					Name:        "test",
 					Version:     "1.0.0",
 				},
+				Logger:   log.New(),
+				Server:   server.New(),
+				Priority: priority.New(),
+				Crawler:  config.NewCrawlerConfig(),
 				Sources: []config.Source{
 					{
-						StartURLs: []string{"https://example.com"},
-						Rules: config.Rules{
-							{
-								Pattern:  "/blog/*",
-								Action:   config.ActionAllow,
-								Priority: 1,
-							},
-						},
+						Name:         "test",
+						URL:          "http://test.example.com",
+						StartURLs:    []string{"http://test.example.com"},
+						RateLimit:    time.Second,
+						MaxDepth:     1,
+						ArticleIndex: "articles",
+						Index:        "test",
 						Selectors: config.SourceSelectors{
 							Article: config.ArticleSelectors{
 								Title: "h1",
@@ -171,26 +176,30 @@ func TestConfig_Validate(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
+			expectedError: "missing allowed domains",
 		},
 		{
 			name: "missing start URLs",
-			cfg: &config.Config{
-				App: &config.AppConfig{
+			config: &config.Config{
+				Environment: "development",
+				App: &app.Config{
 					Environment: "development",
-					Name:        "gocrawl",
+					Name:        "test",
 					Version:     "1.0.0",
 				},
+				Logger:   log.New(),
+				Server:   server.New(),
+				Priority: priority.New(),
+				Crawler:  config.NewCrawlerConfig(),
 				Sources: []config.Source{
 					{
-						AllowedDomains: []string{"example.com"},
-						Rules: config.Rules{
-							{
-								Pattern:  "/blog/*",
-								Action:   config.ActionAllow,
-								Priority: 1,
-							},
-						},
+						Name:           "test",
+						URL:            "http://test.example.com",
+						AllowedDomains: []string{"test.example.com"},
+						RateLimit:      time.Second,
+						MaxDepth:       1,
+						ArticleIndex:   "articles",
+						Index:          "test",
 						Selectors: config.SourceSelectors{
 							Article: config.ArticleSelectors{
 								Title: "h1",
@@ -200,57 +209,59 @@ func TestConfig_Validate(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
+			expectedError: "missing start URLs",
 		},
 		{
 			name: "missing required selectors",
-			cfg: &config.Config{
-				App: &config.AppConfig{
+			config: &config.Config{
+				Environment: "development",
+				App: &app.Config{
 					Environment: "development",
-					Name:        "gocrawl",
+					Name:        "test",
 					Version:     "1.0.0",
 				},
+				Logger:   log.New(),
+				Server:   server.New(),
+				Priority: priority.New(),
+				Crawler:  config.NewCrawlerConfig(),
 				Sources: []config.Source{
 					{
-						AllowedDomains: []string{"example.com"},
-						StartURLs:      []string{"https://example.com"},
-						Rules: config.Rules{
-							{
-								Pattern:  "/blog/*",
-								Action:   config.ActionAllow,
-								Priority: 1,
-							},
-						},
-						Selectors: config.SourceSelectors{
-							Article: config.ArticleSelectors{
-								Title: "h1",
-								// Missing body selector
-							},
-						},
+						Name:           "test",
+						URL:            "http://test.example.com",
+						AllowedDomains: []string{"test.example.com"},
+						StartURLs:      []string{"http://test.example.com"},
+						RateLimit:      time.Second,
+						MaxDepth:       1,
+						ArticleIndex:   "articles",
+						Index:          "test",
 					},
 				},
 			},
-			wantErr: true,
+			expectedError: "missing required selectors",
 		},
 		{
 			name: "invalid URL in start URLs",
-			cfg: &config.Config{
-				App: &config.AppConfig{
+			config: &config.Config{
+				Environment: "development",
+				App: &app.Config{
 					Environment: "development",
-					Name:        "gocrawl",
+					Name:        "test",
 					Version:     "1.0.0",
 				},
+				Logger:   log.New(),
+				Server:   server.New(),
+				Priority: priority.New(),
+				Crawler:  config.NewCrawlerConfig(),
 				Sources: []config.Source{
 					{
-						AllowedDomains: []string{"example.com"},
+						Name:           "test",
+						URL:            "http://test.example.com",
+						AllowedDomains: []string{"test.example.com"},
 						StartURLs:      []string{"not-a-url"},
-						Rules: config.Rules{
-							{
-								Pattern:  "/blog/*",
-								Action:   config.ActionAllow,
-								Priority: 1,
-							},
-						},
+						RateLimit:      time.Second,
+						MaxDepth:       1,
+						ArticleIndex:   "articles",
+						Index:          "test",
 						Selectors: config.SourceSelectors{
 							Article: config.ArticleSelectors{
 								Title: "h1",
@@ -260,19 +271,24 @@ func TestConfig_Validate(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
+			expectedError: "invalid URL in start URLs",
 		},
 		{
 			name: "empty sources",
-			cfg: &config.Config{
-				App: &config.AppConfig{
+			config: &config.Config{
+				Environment: "development",
+				App: &app.Config{
 					Environment: "development",
-					Name:        "gocrawl",
+					Name:        "test",
 					Version:     "1.0.0",
 				},
-				Sources: []config.Source{},
+				Logger:   log.New(),
+				Server:   server.New(),
+				Priority: priority.New(),
+				Crawler:  config.NewCrawlerConfig(),
+				Sources:  []config.Source{},
 			},
-			wantErr: true,
+			expectedError: "empty sources",
 		},
 	}
 
@@ -281,11 +297,12 @@ func TestConfig_Validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := tt.cfg.Validate()
-			if tt.wantErr {
-				assert.Error(t, err)
+			err := tt.config.Validate()
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

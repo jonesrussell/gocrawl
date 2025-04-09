@@ -2,18 +2,22 @@ package config_test
 
 import (
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 )
 
 // MockConfig is a mock implementation of config.Interface for testing.
 type MockConfig struct {
 	// AppConfig is the application configuration
-	AppConfig *config.AppConfig
+	AppConfig *app.Config
 	// LogConfig is the logging configuration
-	LogConfig *config.LogConfig
+	LogConfig *log.Config
 	// ElasticsearchConfig is the Elasticsearch configuration
 	ElasticsearchConfig *config.ElasticsearchConfig
 	// ServerConfig is the server configuration
-	ServerConfig *config.ServerConfig
+	ServerConfig *server.Config
 	// Sources is the list of sources
 	Sources []config.Source
 	// Command is the current command
@@ -21,7 +25,7 @@ type MockConfig struct {
 	// CrawlerConfig is the crawler configuration
 	CrawlerConfig *config.CrawlerConfig
 	// PriorityConfig is the priority configuration
-	PriorityConfig *config.PriorityConfig
+	PriorityConfig *priority.Config
 }
 
 // WithSources sets the sources for the mock config.
@@ -37,13 +41,13 @@ func (m *MockConfig) WithCrawlerConfig(cfg *config.CrawlerConfig) *MockConfig {
 }
 
 // WithLogConfig sets the log config for the mock config.
-func (m *MockConfig) WithLogConfig(cfg *config.LogConfig) *MockConfig {
+func (m *MockConfig) WithLogConfig(cfg *log.Config) *MockConfig {
 	m.LogConfig = cfg
 	return m
 }
 
 // WithAppConfig sets the app config for the mock config.
-func (m *MockConfig) WithAppConfig(cfg *config.AppConfig) *MockConfig {
+func (m *MockConfig) WithAppConfig(cfg *app.Config) *MockConfig {
 	m.AppConfig = cfg
 	return m
 }
@@ -55,7 +59,7 @@ func (m *MockConfig) WithElasticsearchConfig(cfg *config.ElasticsearchConfig) *M
 }
 
 // WithServerConfig sets the server config for the mock config.
-func (m *MockConfig) WithServerConfig(cfg *config.ServerConfig) *MockConfig {
+func (m *MockConfig) WithServerConfig(cfg *server.Config) *MockConfig {
 	m.ServerConfig = cfg
 	return m
 }
@@ -71,12 +75,12 @@ func (m *MockConfig) GetCrawlerConfig() *config.CrawlerConfig {
 }
 
 // GetLogConfig returns the logging configuration.
-func (m *MockConfig) GetLogConfig() *config.LogConfig {
+func (m *MockConfig) GetLogConfig() *log.Config {
 	return m.LogConfig
 }
 
 // GetAppConfig returns the application configuration.
-func (m *MockConfig) GetAppConfig() *config.AppConfig {
+func (m *MockConfig) GetAppConfig() *app.Config {
 	return m.AppConfig
 }
 
@@ -86,7 +90,7 @@ func (m *MockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 }
 
 // GetServerConfig returns the server configuration.
-func (m *MockConfig) GetServerConfig() *config.ServerConfig {
+func (m *MockConfig) GetServerConfig() *server.Config {
 	return m.ServerConfig
 }
 
@@ -96,10 +100,10 @@ func (m *MockConfig) GetCommand() string {
 }
 
 // GetPriorityConfig returns the priority configuration
-func (m *MockConfig) GetPriorityConfig() *config.PriorityConfig {
-	return &config.PriorityConfig{
+func (m *MockConfig) GetPriorityConfig() *priority.Config {
+	return &priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	}
 }
 

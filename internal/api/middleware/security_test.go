@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/mock"
 )
@@ -51,7 +51,7 @@ func (m *mockTimeProvider) Advance(d time.Duration) {
 	m.currentTime = m.currentTime.Add(d)
 }
 
-func setupTestRouter(t *testing.T, securityConfig *config.ServerConfig) (*gin.Engine, *middleware.SecurityMiddleware) {
+func setupTestRouter(t *testing.T, securityConfig *server.Config) (*gin.Engine, *middleware.SecurityMiddleware) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
@@ -103,23 +103,13 @@ func TestAPIKeyAuthentication(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.ServerConfig{
-				Security: struct {
-					Enabled   bool   `yaml:"enabled"`
-					APIKey    string `yaml:"api_key"`
-					RateLimit int    `yaml:"rate_limit"`
-					CORS      struct {
-						Enabled        bool     `yaml:"enabled"`
-						AllowedOrigins []string `yaml:"allowed_origins"`
-						AllowedMethods []string `yaml:"allowed_methods"`
-						AllowedHeaders []string `yaml:"allowed_headers"`
-						MaxAge         int      `yaml:"max_age"`
-					} `yaml:"cors"`
-					TLS config.TLSConfig `yaml:"tls"`
-				}{
-					Enabled: true,
-					APIKey:  tt.apiKey,
-				},
+			cfg := &server.Config{
+				SecurityEnabled: true,
+				APIKey:          tt.apiKey,
+				Address:         ":8080",
+				ReadTimeout:     15 * time.Second,
+				WriteTimeout:    15 * time.Second,
+				IdleTimeout:     60 * time.Second,
 			}
 			router, _ := setupTestRouter(t, cfg)
 
@@ -138,24 +128,13 @@ func TestAPIKeyAuthentication(t *testing.T) {
 }
 
 func TestRateLimiting(t *testing.T) {
-	cfg := &config.ServerConfig{
-		Security: struct {
-			Enabled   bool   `yaml:"enabled"`
-			APIKey    string `yaml:"api_key"`
-			RateLimit int    `yaml:"rate_limit"`
-			CORS      struct {
-				Enabled        bool     `yaml:"enabled"`
-				AllowedOrigins []string `yaml:"allowed_origins"`
-				AllowedMethods []string `yaml:"allowed_methods"`
-				AllowedHeaders []string `yaml:"allowed_headers"`
-				MaxAge         int      `yaml:"max_age"`
-			} `yaml:"cors"`
-			TLS config.TLSConfig `yaml:"tls"`
-		}{
-			Enabled:   true,
-			APIKey:    "test-key",
-			RateLimit: 2, // 2 requests per 5 seconds
-		},
+	cfg := &server.Config{
+		SecurityEnabled: true,
+		APIKey:          "test-key",
+		Address:         ":8080",
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
 	}
 	router, securityMiddleware := setupTestRouter(t, cfg)
 
@@ -255,36 +234,13 @@ func TestCORS(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.ServerConfig{
-				Security: struct {
-					Enabled   bool   `yaml:"enabled"`
-					APIKey    string `yaml:"api_key"`
-					RateLimit int    `yaml:"rate_limit"`
-					CORS      struct {
-						Enabled        bool     `yaml:"enabled"`
-						AllowedOrigins []string `yaml:"allowed_origins"`
-						AllowedMethods []string `yaml:"allowed_methods"`
-						AllowedHeaders []string `yaml:"allowed_headers"`
-						MaxAge         int      `yaml:"max_age"`
-					} `yaml:"cors"`
-					TLS config.TLSConfig `yaml:"tls"`
-				}{
-					Enabled: true,
-					APIKey:  "test-key",
-					CORS: struct {
-						Enabled        bool     `yaml:"enabled"`
-						AllowedOrigins []string `yaml:"allowed_origins"`
-						AllowedMethods []string `yaml:"allowed_methods"`
-						AllowedHeaders []string `yaml:"allowed_headers"`
-						MaxAge         int      `yaml:"max_age"`
-					}{
-						Enabled:        true,
-						AllowedOrigins: tt.allowedOrigins,
-						AllowedMethods: []string{http.MethodPost},
-						AllowedHeaders: []string{"Content-Type", "X-Api-Key"},
-						MaxAge:         86400,
-					},
-				},
+			cfg := &server.Config{
+				SecurityEnabled: true,
+				APIKey:          "test-key",
+				Address:         ":8080",
+				ReadTimeout:     15 * time.Second,
+				WriteTimeout:    15 * time.Second,
+				IdleTimeout:     60 * time.Second,
 			}
 			router, _ := setupTestRouter(t, cfg)
 
@@ -314,23 +270,13 @@ func TestCORS(t *testing.T) {
 }
 
 func TestSecurityHeaders(t *testing.T) {
-	cfg := &config.ServerConfig{
-		Security: struct {
-			Enabled   bool   `yaml:"enabled"`
-			APIKey    string `yaml:"api_key"`
-			RateLimit int    `yaml:"rate_limit"`
-			CORS      struct {
-				Enabled        bool     `yaml:"enabled"`
-				AllowedOrigins []string `yaml:"allowed_origins"`
-				AllowedMethods []string `yaml:"allowed_methods"`
-				AllowedHeaders []string `yaml:"allowed_headers"`
-				MaxAge         int      `yaml:"max_age"`
-			} `yaml:"cors"`
-			TLS config.TLSConfig `yaml:"tls"`
-		}{
-			Enabled: true,
-			APIKey:  "test-key",
-		},
+	cfg := &server.Config{
+		SecurityEnabled: true,
+		APIKey:          "test-key",
+		Address:         ":8080",
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
 	}
 	router, _ := setupTestRouter(t, cfg)
 

@@ -7,12 +7,16 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	apitestutils "github.com/jonesrussell/gocrawl/internal/api/testutils"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -75,39 +79,32 @@ func setupTestApp(t *testing.T) *testServer {
 
 	// Create mock dependencies
 	mockConfig := &configtestutils.MockConfig{}
-	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+	mockConfig.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
-		Level: "debug",
-		Debug: true,
+	mockConfig.On("GetLogConfig").Return(&log.Config{
+		Level:      "debug",
+		Format:     "json",
+		Output:     "stdout",
+		MaxSize:    100,
+		MaxBackups: 3,
+		MaxAge:     28,
+		Compress:   true,
 	})
 	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
-		Address: ":8080",
-		Security: struct {
-			Enabled   bool   `yaml:"enabled"`
-			APIKey    string `yaml:"api_key"`
-			RateLimit int    `yaml:"rate_limit"`
-			CORS      struct {
-				Enabled        bool     `yaml:"enabled"`
-				AllowedOrigins []string `yaml:"allowed_origins"`
-				AllowedMethods []string `yaml:"allowed_methods"`
-				AllowedHeaders []string `yaml:"allowed_headers"`
-				MaxAge         int      `yaml:"max_age"`
-			} `yaml:"cors"`
-			TLS config.TLSConfig `yaml:"tls"`
-		}{
-			Enabled:   true,
-			APIKey:    testAPIKey,
-			RateLimit: 100,
-		},
+	mockConfig.On("GetServerConfig").Return(&server.Config{
+		SecurityEnabled: true,
+		APIKey:          testAPIKey,
+		Address:         ":8080",
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
 	})
 	mockConfig.On("GetSources").Return([]config.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
@@ -384,9 +381,9 @@ func TestModule(t *testing.T) {
 
 func TestSecurityMiddleware(t *testing.T) {
 	// Create test dependencies
-	serverConfig := &config.ServerConfig{}
-	serverConfig.Security.Enabled = true
-	serverConfig.Security.APIKey = testAPIKey
+	serverConfig := &server.Config{}
+	serverConfig.SecurityEnabled = true
+	serverConfig.APIKey = testAPIKey
 	mockLogger := setupMockLogger()
 
 	// Create security middleware

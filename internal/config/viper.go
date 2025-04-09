@@ -7,13 +7,7 @@ import (
 	"sync"
 
 	"github.com/spf13/viper"
-)
-
-// Default configuration values for local use only
-const (
-	defaultAppEnv     = "development"
-	defaultAppName    = "gocrawl"
-	defaultAppVersion = "1.0.0"
+	"go.uber.org/zap"
 )
 
 // viperMutex protects concurrent access to Viper operations
@@ -47,8 +41,8 @@ func setupViper(log Logger) error {
 	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
 		logger.Error("failed to read config file",
-			"error", err.Error(),
-			"file", viper.ConfigFileUsed(),
+			zap.Error(err),
+			zap.String("file", viper.ConfigFileUsed()),
 		)
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -82,7 +76,7 @@ func setupViper(log Logger) error {
 		viper.SetDefault("crawler.rate_limit", DefaultRateLimit)
 	}
 	if !viper.IsSet("crawler.random_delay") {
-		viper.SetDefault("crawler.random_delay", DefaultRandomDelay)
+		viper.SetDefault("crawler.random_delay", defaultRandomDelay)
 	}
 	if !viper.IsSet("server.host") {
 		viper.SetDefault("server.host", DefaultHTTPHost)
