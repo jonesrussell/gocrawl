@@ -10,6 +10,9 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/job"
@@ -22,24 +25,24 @@ import (
 
 // mockConfig implements config.Interface for testing
 type mockConfig struct {
-	appConfig           *config.AppConfig
+	appConfig           *app.Config
 	crawlerConfig       *config.CrawlerConfig
 	elasticsearchConfig *config.ElasticsearchConfig
-	logConfig           *config.LogConfig
+	logConfig           *log.Config
 	sources             []config.Source
-	serverConfig        *config.ServerConfig
+	serverConfig        *server.Config
 	command             string
 }
 
-func (m *mockConfig) GetAppConfig() *config.AppConfig         { return m.appConfig }
+func (m *mockConfig) GetAppConfig() *app.Config               { return m.appConfig }
 func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig { return m.crawlerConfig }
 func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 	return m.elasticsearchConfig
 }
-func (m *mockConfig) GetLogConfig() *config.LogConfig       { return m.logConfig }
-func (m *mockConfig) GetSources() []config.Source           { return m.sources }
-func (m *mockConfig) GetServerConfig() *config.ServerConfig { return m.serverConfig }
-func (m *mockConfig) GetCommand() string                    { return m.command }
+func (m *mockConfig) GetLogConfig() *log.Config       { return m.logConfig }
+func (m *mockConfig) GetSources() []config.Source     { return m.sources }
+func (m *mockConfig) GetServerConfig() *server.Config { return m.serverConfig }
+func (m *mockConfig) GetCommand() string              { return m.command }
 
 // mockCrawler implements crawler.Interface for testing
 type mockCrawler struct{}
@@ -128,7 +131,7 @@ func TestModuleProvides(t *testing.T) {
 	mockLogger.On("Sync").Return(nil)
 
 	mockCfg := &mockConfig{
-		appConfig: &config.AppConfig{
+		appConfig: &app.Config{
 			Environment: "test",
 			Name:        "gocrawl",
 			Version:     "1.0.0",
@@ -144,12 +147,11 @@ func TestModuleProvides(t *testing.T) {
 			Addresses: []string{"http://localhost:9200"},
 			IndexName: "test-index",
 		},
-		logConfig: &config.LogConfig{
+		logConfig: &log.Config{
 			Level: "debug",
-			Debug: true,
 		},
 		sources:      []config.Source{},
-		serverConfig: &config.ServerConfig{Address: ":8080"},
+		serverConfig: &server.Config{Address: ":8080"},
 		command:      "job",
 	}
 
@@ -178,7 +180,7 @@ func TestModuleLifecycle(t *testing.T) {
 	mockLogger.On("Sync").Return(nil)
 
 	mockCfg := &mockConfig{
-		appConfig: &config.AppConfig{
+		appConfig: &app.Config{
 			Environment: "test",
 			Name:        "gocrawl",
 			Version:     "1.0.0",
@@ -194,12 +196,11 @@ func TestModuleLifecycle(t *testing.T) {
 			Addresses: []string{"http://localhost:9200"},
 			IndexName: "test-index",
 		},
-		logConfig: &config.LogConfig{
+		logConfig: &log.Config{
 			Level: "debug",
-			Debug: true,
 		},
 		sources:      []config.Source{},
-		serverConfig: &config.ServerConfig{Address: ":8080"},
+		serverConfig: &server.Config{Address: ":8080"},
 		command:      "job",
 	}
 
@@ -228,7 +229,7 @@ func TestJobScheduling(t *testing.T) {
 	mockLogger.On("Sync").Return(nil)
 
 	mockCfg := &mockConfig{
-		appConfig: &config.AppConfig{
+		appConfig: &app.Config{
 			Environment: "test",
 			Name:        "gocrawl",
 			Version:     "1.0.0",
@@ -244,14 +245,13 @@ func TestJobScheduling(t *testing.T) {
 			Addresses: []string{"http://localhost:9200"},
 			IndexName: "test-index",
 		},
-		logConfig: &config.LogConfig{
+		logConfig: &log.Config{
 			Level: "debug",
-			Debug: true,
 		},
 		sources: []config.Source{
 			{Name: "Test Source", URL: "https://test.com", RateLimit: time.Second, MaxDepth: 1},
 		},
-		serverConfig: &config.ServerConfig{Address: ":8080"},
+		serverConfig: &server.Config{Address: ":8080"},
 		command:      "job",
 	}
 

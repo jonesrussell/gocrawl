@@ -13,6 +13,10 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -129,28 +133,27 @@ var TestConfigModule = fx.Module("testConfig",
 		fx.Annotate(
 			func() config.Interface {
 				mockCfg := &configtestutils.MockConfig{}
-				mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+				mockCfg.On("GetAppConfig").Return(&app.Config{
 					Environment: "test",
 					Name:        "gocrawl",
 					Version:     "1.0.0",
 					Debug:       true,
 				})
-				mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+				mockCfg.On("GetLogConfig").Return(&log.Config{
 					Level: "debug",
-					Debug: true,
 				})
 				mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 					Addresses: []string{"http://localhost:9200"},
 					IndexName: "test-index",
 				})
-				mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+				mockCfg.On("GetServerConfig").Return(&server.Config{
 					Address: ":invalid_port",
 				})
 				mockCfg.On("GetSources").Return([]config.Source{}, nil)
 				mockCfg.On("GetCommand").Return("test")
-				mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+				mockCfg.On("GetPriorityConfig").Return(&priority.Config{
 					Default: 1,
-					Rules:   []config.PriorityRule{},
+					Rules:   []priority.Rule{},
 				})
 				return mockCfg
 			},
@@ -167,21 +170,20 @@ func TestHTTPCommand(t *testing.T) {
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := &configtestutils.MockConfig{}
-	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+	mockCfg.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+	mockCfg.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
 	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+	mockCfg.On("GetServerConfig").Return(&server.Config{
 		Address:      ":8080",
 		ReadTimeout:  defaultReadTimeout,
 		WriteTimeout: defaultWriteTimeout,
@@ -189,9 +191,9 @@ func TestHTTPCommand(t *testing.T) {
 	})
 	mockCfg.On("GetSources").Return([]config.Source{})
 	mockCfg.On("GetCommand").Return("test")
-	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -248,21 +250,20 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := &configtestutils.MockConfig{}
-	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+	mockCfg.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+	mockCfg.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
 	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+	mockCfg.On("GetServerConfig").Return(&server.Config{
 		Address:      ":8080",
 		ReadTimeout:  defaultReadTimeout,
 		WriteTimeout: defaultWriteTimeout,
@@ -270,9 +271,9 @@ func TestHTTPCommandGracefulShutdown(t *testing.T) {
 	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
-	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -429,28 +430,27 @@ func TestServerHealthCheck(t *testing.T) {
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := &configtestutils.MockConfig{}
-	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+	mockCfg.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+	mockCfg.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
 	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+	mockCfg.On("GetServerConfig").Return(&server.Config{
 		Address: ":8080",
 	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
-	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -535,21 +535,20 @@ func TestServerStorageConnection(t *testing.T) {
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := &configtestutils.MockConfig{}
-	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+	mockCfg.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+	mockCfg.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
 	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+	mockCfg.On("GetServerConfig").Return(&server.Config{
 		Address:      ":8080",
 		ReadTimeout:  defaultReadTimeout,
 		WriteTimeout: defaultWriteTimeout,
@@ -557,9 +556,9 @@ func TestServerStorageConnection(t *testing.T) {
 	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
-	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -637,21 +636,20 @@ func TestServerErrorHandling(t *testing.T) {
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := &configtestutils.MockConfig{}
-	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+	mockCfg.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+	mockCfg.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
 	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+	mockCfg.On("GetServerConfig").Return(&server.Config{
 		Address:      ":8080",
 		ReadTimeout:  defaultReadTimeout,
 		WriteTimeout: defaultWriteTimeout,
@@ -659,9 +657,9 @@ func TestServerErrorHandling(t *testing.T) {
 	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
-	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}
@@ -736,21 +734,20 @@ func TestServerTimeoutHandling(t *testing.T) {
 	mockLogger.On("Error", mock.Anything, mock.Anything, mock.Anything).Return()
 
 	mockCfg := &configtestutils.MockConfig{}
-	mockCfg.On("GetAppConfig").Return(&config.AppConfig{
+	mockCfg.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockCfg.On("GetLogConfig").Return(&config.LogConfig{
+	mockCfg.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
 	mockCfg.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockCfg.On("GetServerConfig").Return(&config.ServerConfig{
+	mockCfg.On("GetServerConfig").Return(&server.Config{
 		Address:      ":8080",
 		ReadTimeout:  defaultReadTimeout,
 		WriteTimeout: defaultWriteTimeout,
@@ -758,9 +755,9 @@ func TestServerTimeoutHandling(t *testing.T) {
 	})
 	mockCfg.On("GetSources").Return([]config.Source{}, nil)
 	mockCfg.On("GetCommand").Return("test")
-	mockCfg.On("GetPriorityConfig").Return(&config.PriorityConfig{
+	mockCfg.On("GetPriorityConfig").Return(&priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	})
 
 	mockStore := &mockStorage{}

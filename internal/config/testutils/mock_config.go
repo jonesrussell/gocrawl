@@ -118,8 +118,8 @@ func (m *MockConfig) GetPriorityConfig() *priority.Config {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return &priority.Config{
-			Default: 1,
-			Rules:   []priority.Rule{},
+			DefaultPriority: 1,
+			Rules:           []priority.Rule{},
 		}
 	}
 	return args.Get(0).(*priority.Config)

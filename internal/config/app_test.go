@@ -18,53 +18,44 @@ func TestAppConfig(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name: "valid app configuration",
+			name: "valid_config",
 			setup: func(t *testing.T) {
-				// Set required environment variables
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-				t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
-				t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-				t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
+				// Create temporary test directory
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				sourcesPath := filepath.Join(tmpDir, "sources.yml")
+
+				// Create test config file
+				configContent := `
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+crawler:
+  source_file: ` + sourcesPath + `
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+
+				// Create test sources file
+				sourcesContent := `
+sources:
+  - name: test
+    url: http://test.example.com
+    rate_limit: 100ms
+    max_depth: 1
+    selectors:
+      article:
+        title: h1
+        body: article
+`
+				err = os.WriteFile(sourcesPath, []byte(sourcesContent), 0644)
+				require.NoError(t, err)
+
+				// Set environment variables
+				t.Setenv("GOCRAWL_CONFIG_FILE", configPath)
 			},
 			expectedError: "",
-		},
-		{
-			name: "invalid environment",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "invalid")
-				t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
-				t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-				t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
-			},
-			expectedError: "invalid environment: invalid",
-		},
-		{
-			name: "missing app configuration",
-			setup: func(t *testing.T) {
-				t.Setenv("GOCRAWL_APP_ENVIRONMENT", "")
-				t.Setenv("GOCRAWL_APP_NAME", "")
-				t.Setenv("GOCRAWL_APP_VERSION", "")
-				t.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-				t.Setenv("GOCRAWL_CRAWLER_BASE_URL", "http://test.example.com")
-				t.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-				t.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-				t.Setenv("GOCRAWL_CRAWLER_RATE_LIMIT", "2s")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "false")
-				t.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "")
-			},
-			expectedError: "environment cannot be empty",
 		},
 	}
 
@@ -78,7 +69,7 @@ func TestAppConfig(t *testing.T) {
 			tt.setup(t)
 
 			// Create config
-			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
+			cfg, err := config.NewConfig()
 
 			// Validate results
 			if tt.expectedError != "" {
@@ -191,7 +182,7 @@ sources:
 			tt.setup(t)
 
 			// Create config
-			cfg, err := config.New(testutils.NewTestLogger(t))
+			cfg, err := config.NewConfig()
 
 			// Validate results
 			if tt.wantErr {

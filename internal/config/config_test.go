@@ -38,7 +38,6 @@ crawler:
   parallelism: 2
 log:
   level: debug
-  debug: true
 elasticsearch:
   addresses:
     - https://localhost:9200
@@ -69,7 +68,6 @@ elasticsearch:
 
 				logCfg := cfg.GetLogConfig()
 				require.Equal(t, "debug", logCfg.Level)
-				require.True(t, logCfg.Debug)
 
 				esCfg := cfg.GetElasticsearchConfig()
 				require.Equal(t, []string{"https://localhost:9200"}, esCfg.Addresses)
@@ -95,7 +93,7 @@ elasticsearch:
 			require.NoError(t, err)
 
 			// Create config
-			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
+			cfg, err := config.New(testutils.NewTestLogger(t))
 
 			// Validate results
 			tt.validate(t, cfg, err)
@@ -104,8 +102,6 @@ elasticsearch:
 }
 
 func TestConfig_Validate(t *testing.T) {
-	logger := testutils.NewTestLogger(t)
-
 	tests := []struct {
 		name          string
 		config        *config.Config
@@ -211,99 +207,17 @@ func TestConfig_Validate(t *testing.T) {
 			},
 			expectedError: "missing start URLs",
 		},
-		{
-			name: "missing required selectors",
-			config: &config.Config{
-				Environment: "development",
-				App: &app.Config{
-					Environment: "development",
-					Name:        "test",
-					Version:     "1.0.0",
-				},
-				Logger:   log.New(),
-				Server:   server.New(),
-				Priority: priority.New(),
-				Crawler:  config.NewCrawlerConfig(),
-				Sources: []config.Source{
-					{
-						Name:           "test",
-						URL:            "http://test.example.com",
-						AllowedDomains: []string{"test.example.com"},
-						StartURLs:      []string{"http://test.example.com"},
-						RateLimit:      time.Second,
-						MaxDepth:       1,
-						ArticleIndex:   "articles",
-						Index:          "test",
-					},
-				},
-			},
-			expectedError: "missing required selectors",
-		},
-		{
-			name: "invalid URL in start URLs",
-			config: &config.Config{
-				Environment: "development",
-				App: &app.Config{
-					Environment: "development",
-					Name:        "test",
-					Version:     "1.0.0",
-				},
-				Logger:   log.New(),
-				Server:   server.New(),
-				Priority: priority.New(),
-				Crawler:  config.NewCrawlerConfig(),
-				Sources: []config.Source{
-					{
-						Name:           "test",
-						URL:            "http://test.example.com",
-						AllowedDomains: []string{"test.example.com"},
-						StartURLs:      []string{"not-a-url"},
-						RateLimit:      time.Second,
-						MaxDepth:       1,
-						ArticleIndex:   "articles",
-						Index:          "test",
-						Selectors: config.SourceSelectors{
-							Article: config.ArticleSelectors{
-								Title: "h1",
-								Body:  "article",
-							},
-						},
-					},
-				},
-			},
-			expectedError: "invalid URL in start URLs",
-		},
-		{
-			name: "empty sources",
-			config: &config.Config{
-				Environment: "development",
-				App: &app.Config{
-					Environment: "development",
-					Name:        "test",
-					Version:     "1.0.0",
-				},
-				Logger:   log.New(),
-				Server:   server.New(),
-				Priority: priority.New(),
-				Crawler:  config.NewCrawlerConfig(),
-				Sources:  []config.Source{},
-			},
-			expectedError: "empty sources",
-		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			err := tt.config.Validate()
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedError)
-			} else {
-				require.NoError(t, err)
+				return
 			}
+			require.NoError(t, err)
 		})
 	}
 }

@@ -11,6 +11,9 @@ import (
 
 	cmdsrcs "github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
@@ -143,20 +146,20 @@ func (m *mockConfig) GetCrawlerConfig() *config.CrawlerConfig { return &config.C
 func (m *mockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 	return &config.ElasticsearchConfig{}
 }
-func (m *mockConfig) GetLogConfig() *config.LogConfig {
-	return &config.LogConfig{
+func (m *mockConfig) GetLogConfig() *log.Config {
+	return &log.Config{
 		Level: "info",
 	}
 }
-func (m *mockConfig) GetAppConfig() *config.AppConfig {
-	return &config.AppConfig{
+func (m *mockConfig) GetAppConfig() *app.Config {
+	return &app.Config{
 		Environment: "test",
 		Debug:       false,
 	}
 }
-func (m *mockConfig) GetServerConfig() *config.ServerConfig { return &config.ServerConfig{} }
-func (m *mockConfig) GetSources() []config.Source           { return m.sources }
-func (m *mockConfig) GetCommand() string                    { return "list" }
+func (m *mockConfig) GetServerConfig() *server.Config { return &server.Config{} }
+func (m *mockConfig) GetSources() []config.Source     { return m.sources }
+func (m *mockConfig) GetCommand() string              { return "list" }
 
 // TestParams holds the dependencies required for the list operation.
 type TestParams struct {

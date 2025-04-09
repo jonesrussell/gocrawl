@@ -16,10 +16,18 @@ const (
 	DefaultSSL      = false
 )
 
-// Config holds storage-specific configuration settings.
+// Config represents storage-specific configuration settings.
 type Config struct {
-	// Type is the storage type (elasticsearch, postgres, etc.)
+	// Type is the storage type (memory, file, elasticsearch)
 	Type string `yaml:"type"`
+	// Path is the path to the storage directory (for file storage)
+	Path string `yaml:"path"`
+	// MaxSize is the maximum size of the storage in bytes
+	MaxSize int64 `yaml:"max_size"`
+	// MaxItems is the maximum number of items to store
+	MaxItems int `yaml:"max_items"`
+	// Compression is whether to compress stored data
+	Compression bool `yaml:"compression"`
 	// Host is the storage host
 	Host string `yaml:"host"`
 	// Port is the storage port
@@ -32,15 +40,19 @@ type Config struct {
 	SSL bool `yaml:"ssl"`
 }
 
-// New creates a new storage configuration with default values.
-func New() *Config {
+// NewConfig creates a new Config instance with default values.
+func NewConfig() *Config {
 	return &Config{
-		Type:     DefaultType,
-		Host:     DefaultHost,
-		Port:     DefaultPort,
-		Username: DefaultUsername,
-		Password: DefaultPassword,
-		SSL:      DefaultSSL,
+		Type:        "memory",
+		Path:        "./data",
+		MaxSize:     1024 * 1024 * 1024, // 1 GB
+		MaxItems:    10000,
+		Compression: true,
+		Host:        DefaultHost,
+		Port:        DefaultPort,
+		Username:    DefaultUsername,
+		Password:    DefaultPassword,
+		SSL:         DefaultSSL,
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -86,7 +87,7 @@ func NewCommandTestModule(t *testing.T) *CommandTestModule {
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+	mockConfig.On("GetServerConfig").Return(&server.Config{
 		Address: ":8080",
 	})
 	mockConfig.On("GetSources").Return([]config.Source{})

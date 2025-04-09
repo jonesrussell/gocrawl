@@ -18,13 +18,20 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "valid configuration",
 			config: &Config{
-				Addresses:     "http://localhost:9200",
-				IndexName:     "test",
-				APIKey:        "test_id:test_key",
-				RetryEnabled:  true,
-				InitialWait:   1 * time.Second,
-				MaxWait:       5 * time.Second,
-				MaxRetries:    3,
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test",
+				APIKey:    "test_id:test_key",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     true,
+					InitialWait: 1 * time.Second,
+					MaxWait:     5 * time.Second,
+					MaxRetries:  3,
+				},
 				BulkSize:      1000,
 				FlushInterval: 30 * time.Second,
 			},
@@ -33,12 +40,19 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "missing addresses",
 			config: &Config{
-				IndexName:     "test",
-				APIKey:        "test_id:test_key",
-				RetryEnabled:  true,
-				InitialWait:   1 * time.Second,
-				MaxWait:       5 * time.Second,
-				MaxRetries:    3,
+				IndexName: "test",
+				APIKey:    "test_id:test_key",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     true,
+					InitialWait: 1 * time.Second,
+					MaxWait:     5 * time.Second,
+					MaxRetries:  3,
+				},
 				BulkSize:      1000,
 				FlushInterval: 30 * time.Second,
 			},
@@ -47,12 +61,19 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "missing index name",
 			config: &Config{
-				Addresses:     "http://localhost:9200",
-				APIKey:        "test_id:test_key",
-				RetryEnabled:  true,
-				InitialWait:   1 * time.Second,
-				MaxWait:       5 * time.Second,
-				MaxRetries:    3,
+				Addresses: []string{"http://localhost:9200"},
+				APIKey:    "test_id:test_key",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     true,
+					InitialWait: 1 * time.Second,
+					MaxWait:     5 * time.Second,
+					MaxRetries:  3,
+				},
 				BulkSize:      1000,
 				FlushInterval: 30 * time.Second,
 			},
@@ -61,12 +82,19 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "missing API key",
 			config: &Config{
-				Addresses:     "http://localhost:9200",
-				IndexName:     "test",
-				RetryEnabled:  true,
-				InitialWait:   1 * time.Second,
-				MaxWait:       5 * time.Second,
-				MaxRetries:    3,
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     true,
+					InitialWait: 1 * time.Second,
+					MaxWait:     5 * time.Second,
+					MaxRetries:  3,
+				},
 				BulkSize:      1000,
 				FlushInterval: 30 * time.Second,
 			},
@@ -75,13 +103,20 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "invalid API key format",
 			config: &Config{
-				Addresses:     "http://localhost:9200",
-				IndexName:     "test",
-				APIKey:        "invalid",
-				RetryEnabled:  true,
-				InitialWait:   1 * time.Second,
-				MaxWait:       5 * time.Second,
-				MaxRetries:    3,
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test",
+				APIKey:    "invalid",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     true,
+					InitialWait: 1 * time.Second,
+					MaxWait:     5 * time.Second,
+					MaxRetries:  3,
+				},
 				BulkSize:      1000,
 				FlushInterval: 30 * time.Second,
 			},
@@ -90,13 +125,20 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "invalid retry configuration",
 			config: &Config{
-				Addresses:     "http://localhost:9200",
-				IndexName:     "test",
-				APIKey:        "test_id:test_key",
-				RetryEnabled:  true,
-				InitialWait:   0,
-				MaxWait:       5 * time.Second,
-				MaxRetries:    3,
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test",
+				APIKey:    "test_id:test_key",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     true,
+					InitialWait: 0,
+					MaxWait:     5 * time.Second,
+					MaxRetries:  3,
+				},
 				BulkSize:      1000,
 				FlushInterval: 30 * time.Second,
 			},
@@ -105,13 +147,20 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "invalid bulk size",
 			config: &Config{
-				Addresses:     "http://localhost:9200",
-				IndexName:     "test",
-				APIKey:        "test_id:test_key",
-				RetryEnabled:  true,
-				InitialWait:   1 * time.Second,
-				MaxWait:       5 * time.Second,
-				MaxRetries:    3,
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test",
+				APIKey:    "test_id:test_key",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     true,
+					InitialWait: 1 * time.Second,
+					MaxWait:     5 * time.Second,
+					MaxRetries:  3,
+				},
 				BulkSize:      0,
 				FlushInterval: 30 * time.Second,
 			},
@@ -120,13 +169,20 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "invalid flush interval",
 			config: &Config{
-				Addresses:     "http://localhost:9200",
-				IndexName:     "test",
-				APIKey:        "test_id:test_key",
-				RetryEnabled:  true,
-				InitialWait:   1 * time.Second,
-				MaxWait:       5 * time.Second,
-				MaxRetries:    3,
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test",
+				APIKey:    "test_id:test_key",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     true,
+					InitialWait: 1 * time.Second,
+					MaxWait:     5 * time.Second,
+					MaxRetries:  3,
+				},
 				BulkSize:      1000,
 				FlushInterval: 0,
 			},
@@ -135,13 +191,20 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "TLS enabled without certificate",
 			config: &Config{
-				Addresses:     "http://localhost:9200",
-				IndexName:     "test",
-				APIKey:        "test_id:test_key",
-				RetryEnabled:  true,
-				InitialWait:   1 * time.Second,
-				MaxWait:       5 * time.Second,
-				MaxRetries:    3,
+				Addresses: []string{"http://localhost:9200"},
+				IndexName: "test",
+				APIKey:    "test_id:test_key",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     true,
+					InitialWait: 1 * time.Second,
+					MaxWait:     5 * time.Second,
+					MaxRetries:  3,
+				},
 				BulkSize:      1000,
 				FlushInterval: 30 * time.Second,
 				TLSEnabled:    true,
@@ -177,12 +240,19 @@ func TestNew(t *testing.T) {
 			name: "default configuration",
 			opts: nil,
 			expected: &Config{
-				Addresses:     DefaultAddresses,
-				IndexName:     DefaultIndexName,
-				RetryEnabled:  DefaultRetryEnabled,
-				InitialWait:   DefaultInitialWait,
-				MaxWait:       DefaultMaxWait,
-				MaxRetries:    DefaultMaxRetries,
+				Addresses: DefaultAddresses,
+				IndexName: DefaultIndexName,
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     DefaultRetryEnabled,
+					InitialWait: DefaultInitialWait,
+					MaxWait:     DefaultMaxWait,
+					MaxRetries:  DefaultMaxRetries,
+				},
 				BulkSize:      DefaultBulkSize,
 				FlushInterval: DefaultFlushInterval,
 			},
@@ -206,13 +276,20 @@ func TestNew(t *testing.T) {
 				WithTLSInsecureSkipVerify(true),
 			},
 			expected: &Config{
-				Addresses:             "http://custom:9200",
-				IndexName:             "custom",
-				APIKey:                "custom_id:custom_key",
-				RetryEnabled:          false,
-				InitialWait:           2 * time.Second,
-				MaxWait:               10 * time.Second,
-				MaxRetries:            5,
+				Addresses: "http://custom:9200",
+				IndexName: "custom",
+				APIKey:    "custom_id:custom_key",
+				Retry: struct {
+					Enabled     bool          `yaml:"enabled"`
+					InitialWait time.Duration `yaml:"initial_wait"`
+					MaxWait     time.Duration `yaml:"max_wait"`
+					MaxRetries  int           `yaml:"max_retries"`
+				}{
+					Enabled:     false,
+					InitialWait: 2 * time.Second,
+					MaxWait:     10 * time.Second,
+					MaxRetries:  5,
+				},
 				BulkSize:              2000,
 				FlushInterval:         60 * time.Second,
 				TLSEnabled:            true,
@@ -233,4 +310,27 @@ func TestNew(t *testing.T) {
 			require.Equal(t, tt.expected, cfg)
 		})
 	}
+}
+
+func TestNewConfig(t *testing.T) {
+	expectedAddresses := []string{"http://localhost:9200"}
+	cfg := NewConfig()
+
+	require.NotNil(t, cfg)
+	require.Equal(t, expectedAddresses, cfg.Addresses)
+	require.Empty(t, cfg.APIKey)
+	require.Empty(t, cfg.Username)
+	require.Empty(t, cfg.Password)
+	require.Empty(t, cfg.IndexName)
+	require.Empty(t, cfg.Cloud.ID)
+	require.Empty(t, cfg.Cloud.APIKey)
+	require.NotNil(t, cfg.TLS)
+	require.False(t, cfg.TLS.Enabled)
+	require.NotNil(t, cfg.Retry)
+	require.True(t, cfg.Retry.Enabled)
+	require.Equal(t, time.Second, cfg.Retry.InitialWait)
+	require.Equal(t, time.Minute, cfg.Retry.MaxWait)
+	require.Equal(t, 3, cfg.Retry.MaxRetries)
+	require.Equal(t, 1000, cfg.BulkSize)
+	require.Equal(t, 30*time.Second, cfg.FlushInterval)
 }

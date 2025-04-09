@@ -6,11 +6,10 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
@@ -48,7 +47,7 @@ type Config struct {
 	// Log holds logging configuration
 	Log *LogConfig `yaml:"log"`
 	// Elasticsearch holds Elasticsearch configuration
-	Elasticsearch *ElasticsearchConfig `yaml:"elasticsearch"`
+	Elasticsearch *elasticsearch.Config `yaml:"elasticsearch"`
 	// Sources holds the list of sources to crawl
 	Sources []Source `yaml:"sources"`
 }
@@ -125,18 +124,174 @@ type Source struct {
 	Index string `yaml:"index"`
 	// Selectors define CSS selectors for extracting content
 	Selectors SourceSelectors `yaml:"selectors"`
+	// Rules define crawling rules for this source
+	Rules Rules `yaml:"rules"`
 }
 
-// NewConfig creates a new configuration with default values.
-func NewConfig() *Config {
-	return &Config{
+// Rule defines a crawling rule for a source.
+type Rule struct {
+	// Pattern is the URL pattern to match
+	Pattern string `yaml:"pattern"`
+	// Action is the action to take when the pattern matches
+	Action string `yaml:"action"`
+	// Priority is the priority of the rule
+	Priority int `yaml:"priority"`
+}
+
+// Rules is a slice of Rule
+type Rules []Rule
+
+// Validate checks if the rules are valid.
+func (r Rules) Validate() error {
+	if len(r) == 0 {
+		return nil
+	}
+
+	for _, rule := range r {
+		if rule.Pattern == "" {
+			return errors.New("rule pattern is required")
+		}
+		if rule.Action == "" {
+			return errors.New("rule action is required")
+		}
+		if rule.Priority < 0 {
+			return errors.New("rule priority must be non-negative")
+		}
+	}
+
+	return nil
+}
+
+// TLSConfig holds TLS configuration settings.
+type TLSConfig struct {
+	// Enabled indicates whether TLS is enabled
+	Enabled bool `yaml:"enabled"`
+	// CertFile is the path to the certificate file
+	CertFile string `yaml:"cert_file"`
+	// KeyFile is the path to the key file
+	KeyFile string `yaml:"key_file"`
+	// CAFile is the path to the CA certificate file
+	CAFile string `yaml:"ca_file"`
+	// InsecureSkipVerify indicates whether to skip certificate verification
+	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
+}
+
+// SourceSelectors defines the selectors for a source.
+// It contains the rules for extracting content from web pages.
+type SourceSelectors struct {
+	// Article contains selectors for article-specific content
+	Article ArticleSelectors `yaml:"article"`
+}
+
+// ArticleSelectors defines the selectors for article content.
+type ArticleSelectors struct {
+	// Container is the selector for the article container
+	Container string `yaml:"container"`
+	// Title is the selector for the article title
+	Title string `yaml:"title"`
+	// Body is the selector for the article body
+	Body string `yaml:"body"`
+	// Intro is the selector for the article introduction
+	Intro string `yaml:"intro"`
+	// Byline is the selector for the article byline
+	Byline string `yaml:"byline"`
+	// PublishedTime is the selector for the article published time
+	PublishedTime string `yaml:"published_time"`
+	// TimeAgo is the selector for the relative time
+	TimeAgo string `yaml:"time_ago"`
+	// JSONLD is the selector for JSON-LD metadata
+	JSONLD string `yaml:"json_ld"`
+	// Description is the selector for the article description
+	Description string `yaml:"description"`
+	// Section is the selector for the article section
+	Section string `yaml:"section"`
+	// Keywords is the selector for article keywords
+	Keywords string `yaml:"keywords"`
+	// OGTitle is the selector for the Open Graph title
+	OGTitle string `yaml:"og_title"`
+	// OGDescription is the selector for the Open Graph description
+	OGDescription string `yaml:"og_description"`
+	// OGImage is the selector for the Open Graph image
+	OGImage string `yaml:"og_image"`
+	// OgURL is the selector for the Open Graph URL
+	OgURL string `yaml:"og_url"`
+	// Canonical is the selector for the canonical URL
+	Canonical string `yaml:"canonical"`
+	// WordCount is the selector for the word count
+	WordCount string `yaml:"word_count"`
+	// PublishDate is the selector for the publish date
+	PublishDate string `yaml:"publish_date"`
+	// Category is the selector for the article category
+	Category string `yaml:"category"`
+	// Tags is the selector for article tags
+	Tags string `yaml:"tags"`
+	// Author is the selector for the article author
+	Author string `yaml:"author"`
+	// BylineName is the selector for the byline name
+	BylineName string `yaml:"byline_name"`
+}
+
+// Validate checks if the article selectors are valid.
+func (s *ArticleSelectors) Validate() error {
+	if s == nil {
+		return errors.New("article selectors are required")
+	}
+
+	if s.Title == "" {
+		return errors.New("title selector is required")
+	}
+
+	if s.Body == "" {
+		return errors.New("body selector is required")
+	}
+
+	return nil
+}
+
+// DefaultArticleSelectors returns a default set of article selectors.
+func DefaultArticleSelectors() ArticleSelectors {
+	return ArticleSelectors{
+		Container:     "article, .article, [itemtype*='Article']",
+		Title:         "h1",
+		Body:          "article, [role='main'], .content, .article-content",
+		Intro:         ".article-intro, .post-intro, .entry-summary",
+		Byline:        ".article-byline, .post-meta, .entry-meta",
+		PublishedTime: "meta[property='article:published_time']",
+		TimeAgo:       "time",
+		JSONLD:        "script[type='application/ld+json']",
+		Section:       "meta[property='article:section']",
+		Keywords:      "meta[name='keywords']",
+		Description:   "meta[name='description']",
+		OGTitle:       "meta[property='og:title']",
+		OGDescription: "meta[property='og:description']",
+		OGImage:       "meta[property='og:image']",
+		OgURL:         "meta[property='og:url']",
+		Canonical:     "link[rel='canonical']",
+		WordCount:     "meta[property='article:word_count']",
+		PublishDate:   "meta[property='article:published_time']",
+		Category:      "meta[property='article:section']",
+		Tags:          "meta[property='article:tag']",
+		Author:        "meta[name='author']",
+		BylineName:    ".author-name, .byline-name",
+	}
+}
+
+// NewConfig creates a new configuration with default values and validates it.
+func NewConfig() (*Config, error) {
+	cfg := &Config{
 		Environment: "development",
-		Logger:      log.New(),
-		Server:      server.New(),
-		Priority:    priority.New(),
-		Storage:     storage.New(),
+		Logger:      log.NewConfig(),
+		Server:      server.NewConfig(),
+		Priority:    priority.NewConfig(),
+		Storage:     storage.NewConfig(),
 		Crawler:     NewCrawlerConfig(),
 	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	return cfg, nil
 }
 
 // Validate checks if the configuration is valid.
@@ -187,8 +342,10 @@ func NewCrawlerConfig() *CrawlerConfig {
 	return &CrawlerConfig{
 		MaxDepth:    3,
 		RateLimit:   time.Second,
-		RandomDelay: time.Millisecond * 500,
-		Parallelism: 1,
+		RandomDelay: time.Second / 2,
+		Parallelism: 2,
+		SourceFile:  "config/sources.yml",
+		IndexName:   "crawl_content",
 	}
 }
 
@@ -268,64 +425,14 @@ func (c *Config) GetCommand() string {
 }
 
 // GetElasticsearchConfig returns the Elasticsearch configuration.
-func (c *Config) GetElasticsearchConfig() *ElasticsearchConfig {
+func (c *Config) GetElasticsearchConfig() *elasticsearch.Config {
 	return c.Elasticsearch
 }
 
-// ElasticsearchConfig holds Elasticsearch-specific configuration settings.
-type ElasticsearchConfig struct {
-	// Addresses are the Elasticsearch server addresses
-	Addresses []string `yaml:"addresses"`
-	// IndexName is the name of the Elasticsearch index
-	IndexName string `yaml:"index_name"`
-	// APIKey is the API key for authentication
-	APIKey string `yaml:"api_key"`
-	// Username is the username for basic authentication
-	Username string `yaml:"username"`
-	// Password is the password for basic authentication
-	Password string `yaml:"password"`
-	// Cloud contains cloud-specific configuration
-	Cloud struct {
-		// ID is the cloud deployment ID
-		ID string `yaml:"id"`
-		// APIKey is the cloud API key
-		APIKey string `yaml:"api_key"`
-	} `yaml:"cloud"`
-	// TLS contains TLS configuration
-	TLS TLSConfig `yaml:"tls"`
-	// Retry contains retry configuration
-	Retry struct {
-		// Enabled indicates whether retries are enabled
-		Enabled bool `yaml:"enabled"`
-		// InitialWait is the initial wait time between retries
-		InitialWait time.Duration `yaml:"initial_wait"`
-		// MaxWait is the maximum wait time between retries
-		MaxWait time.Duration `yaml:"max_wait"`
-		// MaxRetries is the maximum number of retries
-		MaxRetries int `yaml:"max_retries"`
-	} `yaml:"retry"`
-}
-
-// LogConfig holds logging-specific configuration settings.
+// LogConfig represents logging configuration settings.
 type LogConfig struct {
 	// Level is the logging level (debug, info, warn, error)
 	Level string `yaml:"level"`
-	// Format is the log format (json, text)
-	Format string `yaml:"format"`
-	// Output is the log output destination (stdout, stderr, file)
-	Output string `yaml:"output"`
-	// File is the log file path (only used when output is file)
-	File string `yaml:"file"`
-	// MaxSize is the maximum size of the log file in megabytes
-	MaxSize int `yaml:"max_size"`
-	// MaxBackups is the maximum number of old log files to retain
-	MaxBackups int `yaml:"max_backups"`
-	// MaxAge is the maximum number of days to retain old log files
-	MaxAge int `yaml:"max_age"`
-	// Compress determines if the rotated log files should be compressed
-	Compress bool `yaml:"compress"`
-	// Debug enables debug mode for additional logging
-	Debug bool `yaml:"debug"`
 }
 
 // Validate checks if the log configuration is valid.
@@ -342,463 +449,41 @@ func (c *LogConfig) Validate() error {
 		return fmt.Errorf("invalid log level: %s", c.Level)
 	}
 
-	if c.Format == "" {
-		return errors.New("log format is required")
-	}
-
-	if c.Output == "" {
-		return errors.New("log output is required")
-	}
-
-	if c.Output == "file" && c.File == "" {
-		return errors.New("log file is required when output is file")
-	}
-
-	if c.MaxSize < 0 {
-		return fmt.Errorf("max size must be non-negative, got %d", c.MaxSize)
-	}
-
-	if c.MaxBackups < 0 {
-		return fmt.Errorf("max backups must be non-negative, got %d", c.MaxBackups)
-	}
-
-	if c.MaxAge < 0 {
-		return fmt.Errorf("max age must be non-negative, got %d", c.MaxAge)
-	}
-
 	return nil
 }
 
-// SourceSelectors defines the selectors for a source.
-// It contains the rules for extracting content from web pages.
-type SourceSelectors struct {
-	// Article contains selectors for article-specific content
-	Article ArticleSelectors `yaml:"article"`
-}
+// LoadConfig loads the configuration from the specified file path.
+func LoadConfig(path string) (*Config, error) {
+	v := viper.New()
+	v.SetConfigFile(path)
 
-// ArticleSelectors defines the selectors for article content.
-type ArticleSelectors struct {
-	// Container is the selector for the article container
-	Container string `yaml:"container"`
-	// Title is the selector for the article title
-	Title string `yaml:"title"`
-	// Body is the selector for the article body
-	Body string `yaml:"body"`
-	// Intro is the selector for the article introduction
-	Intro string `yaml:"intro"`
-	// Byline is the selector for the article byline
-	Byline string `yaml:"byline"`
-	// PublishedTime is the selector for the article published time
-	PublishedTime string `yaml:"published_time"`
-	// TimeAgo is the selector for the relative time
-	TimeAgo string `yaml:"time_ago"`
-	// JSONLD is the selector for JSON-LD metadata
-	JSONLD string `yaml:"json_ld"`
-	// Description is the selector for the article description
-	Description string `yaml:"description"`
-	// Section is the selector for the article section
-	Section string `yaml:"section"`
-	// Keywords is the selector for article keywords
-	Keywords string `yaml:"keywords"`
-	// OGTitle is the selector for the Open Graph title
-	OGTitle string `yaml:"og_title"`
-	// OGDescription is the selector for the Open Graph description
-	OGDescription string `yaml:"og_description"`
-	// OGImage is the selector for the Open Graph image
-	OGImage string `yaml:"og_image"`
-	// OgURL is the selector for the Open Graph URL
-	OgURL string `yaml:"og_url"`
-	// Canonical is the selector for the canonical URL
-	Canonical string `yaml:"canonical"`
-	// WordCount is the selector for the word count
-	WordCount string `yaml:"word_count"`
-	// PublishDate is the selector for the publish date
-	PublishDate string `yaml:"publish_date"`
-	// Category is the selector for the article category
-	Category string `yaml:"category"`
-	// Tags is the selector for article tags
-	Tags string `yaml:"tags"`
-	// Author is the selector for the article author
-	Author string `yaml:"author"`
-	// BylineName is the selector for the byline name
-	BylineName string `yaml:"byline_name"`
-}
-
-// Rule defines a crawling rule for a source.
-type Rule struct {
-	// Pattern is the URL pattern to match
-	Pattern string `yaml:"pattern"`
-	// Action is the action to take when the pattern matches
-	Action string `yaml:"action"`
-	// Priority is the priority of the rule
-	Priority int `yaml:"priority"`
-}
-
-// Rules is a slice of Rule
-type Rules []Rule
-
-// Validate checks if the rules are valid.
-func (r Rules) Validate() error {
-	if len(r) == 0 {
-		return nil
+	if err := v.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	for _, rule := range r {
-		if rule.Pattern == "" {
-			return errors.New("rule pattern is required")
-		}
-		if rule.Action == "" {
-			return errors.New("rule action is required")
-		}
-		if rule.Priority < 0 {
-			return errors.New("rule priority must be non-negative")
-		}
+	config := &Config{}
+	if err := v.Unmarshal(config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	return nil
-}
-
-// TLSConfig holds TLS configuration settings.
-type TLSConfig struct {
-	// Enabled indicates whether TLS is enabled
-	Enabled bool `yaml:"enabled"`
-	// CertFile is the path to the certificate file
-	CertFile string `yaml:"cert_file"`
-	// KeyFile is the path to the key file
-	KeyFile string `yaml:"key_file"`
-	// CAFile is the path to the CA certificate file
-	CAFile string `yaml:"ca_file"`
-	// InsecureSkipVerify indicates whether to skip certificate verification
-	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
-}
-
-// ServerConfig holds server-specific configuration settings.
-type ServerConfig struct {
-	// Address is the address to listen on (e.g., ":8080")
-	Address string `yaml:"address"`
-	// ReadTimeout is the maximum duration for reading the entire request
-	ReadTimeout time.Duration `yaml:"read_timeout"`
-	// WriteTimeout is the maximum duration before timing out writes of the response
-	WriteTimeout time.Duration `yaml:"write_timeout"`
-	// IdleTimeout is the maximum amount of time to wait for the next request
-	IdleTimeout time.Duration `yaml:"idle_timeout"`
-	// Security contains security-related settings
-	Security struct {
-		// Enabled indicates whether security features are enabled
-		Enabled bool `yaml:"enabled"`
-		// APIKey is the API key for authentication
-		APIKey string `yaml:"api_key"`
-		// RateLimit is the maximum number of requests per minute
-		RateLimit int `yaml:"rate_limit"`
-		// CORS contains CORS configuration
-		CORS struct {
-			// Enabled indicates whether CORS is enabled
-			Enabled bool `yaml:"enabled"`
-			// AllowedOrigins is a list of allowed origins
-			AllowedOrigins []string `yaml:"allowed_origins"`
-			// AllowedMethods is a list of allowed HTTP methods
-			AllowedMethods []string `yaml:"allowed_methods"`
-			// AllowedHeaders is a list of allowed headers
-			AllowedHeaders []string `yaml:"allowed_headers"`
-			// MaxAge is the maximum age of preflight requests
-			MaxAge int `yaml:"max_age"`
-		} `yaml:"cors"`
-		// TLS contains TLS configuration
-		TLS TLSConfig `yaml:"tls"`
-	} `yaml:"security"`
-}
-
-// Command represents a command for the application.
-type Command struct {
-	// Name is the command name
-	Name string `yaml:"name"`
-	// Description is the command description
-	Description string `yaml:"description"`
-	// Run is the function to run the command
-	Run func() error
-}
-
-// Logger defines the interface for logging operations.
-type Logger interface {
-	// Debug logs a message at debug level
-	Debug(msg string, fields ...Field)
-	// Info logs a message at info level
-	Info(msg string, fields ...Field)
-	// Warn logs a message at warn level
-	Warn(msg string, fields ...Field)
-	// Error logs a message at error level
-	Error(msg string, fields ...Field)
-	// With returns a new logger with the given fields
-	With(fields ...Field) Logger
-}
-
-// Field represents a single logging field.
-type Field struct {
-	// Key is the field name
-	Key string
-	// Value is the field value
-	Value interface{}
-}
-
-// New creates a new Config instance with the provided logger.
-func New(logger Logger) (*Config, error) {
-	if logger == nil {
-		logger = &defaultLogger{}
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
-	cfg := &Config{
-		Logger:   log.New(),
-		Server:   server.New(),
-		Priority: priority.New(),
-		Storage:  storage.New(),
-		Crawler:  NewCrawlerConfig(),
-	}
-
-	if err := cfg.load(); err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	if err := cfg.validate(); err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
+	return config, nil
 }
 
-// load loads the configuration from Viper.
-func (c *Config) load() error {
-	// Initialize Viper if no config file is set
-	if viper.GetViper().ConfigFileUsed() == "" {
-		viper.AutomaticEnv()
-		viper.SetEnvPrefix("GOCRAWL")
-		viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+// New creates a new Config instance with default values.
+func New() *Config {
+	return &Config{
+		Environment:   "development",
+		Logger:        log.NewConfig(),
+		Server:        server.NewConfig(),
+		Priority:      priority.NewConfig(),
+		Storage:       storage.NewConfig(),
+		Crawler:       NewCrawlerConfig(),
+		App:           app.NewConfig(),
+		Log:           &LogConfig{Level: "info"},
+		Elasticsearch: elasticsearch.NewConfig(),
 	}
-
-	// Set environment from env var or default to development
-	env := viper.GetString("app.environment")
-	if env == "" {
-		env = os.Getenv("GOCRAWL_APP_ENVIRONMENT")
-		if env == "" {
-			env = "development"
-		}
-		viper.Set("app.environment", env)
-	}
-
-	// Load app config
-	appCfg, err := loadAppConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load app config: %w", err)
-	}
-	c.App = appCfg
-
-	// Load log config
-	logCfg, err := loadLogConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load log config: %w", err)
-	}
-	c.Log = logCfg
-
-	// Load elasticsearch config
-	esCfg, err := loadElasticsearchConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load elasticsearch config: %w", err)
-	}
-	c.Elasticsearch = esCfg
-
-	// Load crawler config
-	crawlerCfg, err := loadCrawlerConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load crawler config: %w", err)
-	}
-	c.Crawler = crawlerCfg
-
-	// Load sources
-	sources, err := loadSources()
-	if err != nil {
-		return fmt.Errorf("failed to load sources: %w", err)
-	}
-	c.Sources = sources
-
-	// Load priority config
-	priorityCfg, err := loadPriorityConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load priority config: %w", err)
-	}
-	c.Priority = priorityCfg
-
-	return nil
-}
-
-// validate validates the configuration.
-func (c *Config) validate() error {
-	if c == nil {
-		return errors.New("config is required")
-	}
-
-	if c.Log == nil {
-		return errors.New("log configuration is required")
-	}
-
-	if err := c.Log.Validate(); err != nil {
-		return fmt.Errorf("invalid log configuration: %w", err)
-	}
-
-	return nil
-}
-
-// SetElasticsearchIndex sets the Elasticsearch index name.
-func (c *Config) SetElasticsearchIndex(index string) {
-	c.Elasticsearch.IndexName = index
-	viper.Set("elasticsearch.index_name", index)
-}
-
-// GetElasticsearchIndex returns the Elasticsearch index name.
-func (c *Config) GetElasticsearchIndex() string {
-	return c.Elasticsearch.IndexName
-}
-
-// NoOpConfig is a no-op implementation of the Config interface.
-type NoOpConfig struct{}
-
-// GetAppConfig returns a default app configuration.
-func (c *NoOpConfig) GetAppConfig() *app.Config {
-	return &app.Config{
-		Environment: "test",
-		Name:        "test",
-		Version:     "test",
-		Debug:       false,
-	}
-}
-
-// GetLogConfig returns a default log configuration.
-func (c *NoOpConfig) GetLogConfig() *LogConfig {
-	return &LogConfig{
-		Level:      "info",
-		Format:     "text",
-		Output:     "stdout",
-		File:       "",
-		MaxSize:    10,
-		MaxBackups: 3,
-		MaxAge:     7,
-		Compress:   false,
-	}
-}
-
-// GetCrawlerConfig returns a default crawler configuration.
-func (c *NoOpConfig) GetCrawlerConfig() *CrawlerConfig {
-	return &CrawlerConfig{
-		MaxDepth:    DefaultMaxDepth,
-		RateLimit:   DefaultRateLimit,
-		RandomDelay: time.Second,
-		Parallelism: DefaultParallelism,
-	}
-}
-
-// GetElasticsearchConfig returns a default Elasticsearch configuration.
-func (c *NoOpConfig) GetElasticsearchConfig() *ElasticsearchConfig {
-	return &ElasticsearchConfig{
-		Addresses: []string{"http://localhost:9200"},
-		IndexName: "gocrawl",
-	}
-}
-
-// GetServerConfig returns a default server configuration.
-func (c *NoOpConfig) GetServerConfig() *server.Config {
-	return &server.Config{
-		SecurityEnabled: false,
-		APIKey:          "",
-	}
-}
-
-// GetSources returns an empty list of sources.
-func (c *NoOpConfig) GetSources() []Source {
-	return []Source{}
-}
-
-// GetPriorityConfig returns a default priority configuration.
-func (c *NoOpConfig) GetPriorityConfig() *priority.Config {
-	return priority.New()
-}
-
-// GetEnvironment returns the test environment.
-func (c *NoOpConfig) GetEnvironment() string {
-	return "test"
-}
-
-// Validate checks if the article selectors are valid.
-func (s *ArticleSelectors) Validate() error {
-	if s == nil {
-		return errors.New("article selectors are required")
-	}
-
-	if s.Title == "" {
-		return errors.New("title selector is required")
-	}
-
-	if s.Body == "" {
-		return errors.New("body selector is required")
-	}
-
-	return nil
-}
-
-// defaultLogger is a no-op implementation of the Logger interface.
-type defaultLogger struct{}
-
-func (l *defaultLogger) Debug(msg string, fields ...Field) {}
-func (l *defaultLogger) Info(msg string, fields ...Field)  {}
-func (l *defaultLogger) Warn(msg string, fields ...Field)  {}
-func (l *defaultLogger) Error(msg string, fields ...Field) {}
-func (l *defaultLogger) With(fields ...Field) Logger       { return l }
-
-// loadAppConfig loads the application configuration.
-func loadAppConfig() (*app.Config, error) {
-	return &app.Config{
-		Environment: "development",
-		Name:        "gocrawl",
-		Version:     "1.0.0",
-		Debug:       false,
-	}, nil
-}
-
-// loadLogConfig loads the logging configuration.
-func loadLogConfig() (*LogConfig, error) {
-	return &LogConfig{
-		Level:      "info",
-		Format:     "text",
-		Output:     "stdout",
-		File:       "",
-		MaxSize:    10,
-		MaxBackups: 3,
-		MaxAge:     7,
-		Compress:   false,
-	}, nil
-}
-
-// loadElasticsearchConfig loads the Elasticsearch configuration.
-func loadElasticsearchConfig() (*ElasticsearchConfig, error) {
-	return &ElasticsearchConfig{
-		Addresses: []string{"http://localhost:9200"},
-		IndexName: "gocrawl",
-	}, nil
-}
-
-// loadCrawlerConfig loads the crawler configuration.
-func loadCrawlerConfig() (*CrawlerConfig, error) {
-	return &CrawlerConfig{
-		MaxDepth:    3,
-		RateLimit:   time.Second,
-		RandomDelay: time.Millisecond * 500,
-		Parallelism: 1,
-	}, nil
-}
-
-// loadSources loads the sources configuration.
-func loadSources() ([]Source, error) {
-	return []Source{}, nil
-}
-
-// loadPriorityConfig loads the priority configuration.
-func loadPriorityConfig() (*priority.Config, error) {
-	return priority.New(), nil
 }

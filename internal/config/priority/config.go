@@ -3,12 +3,31 @@ package priority
 
 import "fmt"
 
-// Config holds priority-related configuration settings.
+// Config represents priority-specific configuration settings.
 type Config struct {
-	// Default is the default priority for sources
-	Default int `yaml:"default"`
+	// DefaultPriority is the default priority for new items
+	DefaultPriority int `yaml:"default_priority"`
+	// MaxPriority is the maximum allowed priority
+	MaxPriority int `yaml:"max_priority"`
+	// MinPriority is the minimum allowed priority
+	MinPriority int `yaml:"min_priority"`
+	// PriorityIncrement is the amount to increment priority by
+	PriorityIncrement int `yaml:"priority_increment"`
+	// PriorityDecrement is the amount to decrement priority by
+	PriorityDecrement int `yaml:"priority_decrement"`
 	// Rules define priority rules for specific sources
 	Rules []Rule `yaml:"rules"`
+}
+
+// NewConfig creates a new Config instance with default values.
+func NewConfig() *Config {
+	return &Config{
+		DefaultPriority:   5,
+		MaxPriority:       10,
+		MinPriority:       1,
+		PriorityIncrement: 1,
+		PriorityDecrement: 1,
+	}
 }
 
 // Rule defines a rule for setting source priority.
@@ -19,21 +38,13 @@ type Rule struct {
 	Priority int `yaml:"priority"`
 }
 
-// New creates a new priority configuration with default values.
-func New() *Config {
-	return &Config{
-		Default: 0,
-		Rules:   []Rule{},
-	}
-}
-
 // Option is a function that configures a priority configuration.
 type Option func(*Config)
 
 // WithDefault sets the default priority.
 func WithDefault(priority int) Option {
 	return func(c *Config) {
-		c.Default = priority
+		c.DefaultPriority = priority
 	}
 }
 

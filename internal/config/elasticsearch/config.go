@@ -19,41 +19,55 @@ const (
 	DefaultFlushInterval = 30 * time.Second
 )
 
-// Config holds Elasticsearch-specific configuration settings.
+// Config represents Elasticsearch configuration settings.
 type Config struct {
-	// Addresses is a comma-separated list of Elasticsearch nodes
-	Addresses string `yaml:"addresses"`
-	// IndexName is the name of the Elasticsearch index
-	IndexName string `yaml:"index_name"`
-	// APIKey is the API key for authentication (format: id:api_key)
+	// Addresses is a list of Elasticsearch node addresses
+	Addresses []string `yaml:"addresses"`
+	// APIKey is the API key for authentication
 	APIKey string `yaml:"api_key"`
-	// RetryEnabled enables retry logic for failed requests
-	RetryEnabled bool `yaml:"retry_enabled"`
-	// InitialWait is the initial wait time between retries
-	InitialWait time.Duration `yaml:"initial_wait"`
-	// MaxWait is the maximum wait time between retries
-	MaxWait time.Duration `yaml:"max_wait"`
-	// MaxRetries is the maximum number of retries
-	MaxRetries int `yaml:"max_retries"`
+	// Username is the username for authentication
+	Username string `yaml:"username"`
+	// Password is the password for authentication
+	Password string `yaml:"password"`
+	// IndexName is the name of the index
+	IndexName string `yaml:"index_name"`
+	// Cloud contains cloud-specific configuration
+	Cloud struct {
+		ID     string `yaml:"id"`
+		APIKey string `yaml:"api_key"`
+	} `yaml:"cloud"`
+	// TLS contains TLS configuration
+	TLS *TLSConfig `yaml:"tls"`
+	// Retry contains retry configuration
+	Retry struct {
+		Enabled     bool          `yaml:"enabled"`
+		InitialWait time.Duration `yaml:"initial_wait"`
+		MaxWait     time.Duration `yaml:"max_wait"`
+		MaxRetries  int           `yaml:"max_retries"`
+	} `yaml:"retry"`
 	// BulkSize is the number of documents to bulk index
 	BulkSize int `yaml:"bulk_size"`
 	// FlushInterval is the interval at which to flush the bulk indexer
 	FlushInterval time.Duration `yaml:"flush_interval"`
-	// TLSEnabled enables TLS for the connection
-	TLSEnabled bool `yaml:"tls_enabled"`
-	// TLSCertFile is the path to the TLS certificate file
-	TLSCertFile string `yaml:"tls_cert_file"`
-	// TLSKeyFile is the path to the TLS key file
-	TLSKeyFile string `yaml:"tls_key_file"`
-	// TLSCAFile is the path to the TLS CA file
-	TLSCAFile string `yaml:"tls_ca_file"`
-	// TLSInsecureSkipVerify skips TLS certificate verification
-	TLSInsecureSkipVerify bool `yaml:"tls_insecure_skip_verify"`
+}
+
+// TLSConfig represents TLS configuration settings.
+type TLSConfig struct {
+	// Enabled indicates whether TLS is enabled
+	Enabled bool `yaml:"enabled"`
+	// CertFile is the path to the certificate file
+	CertFile string `yaml:"cert_file"`
+	// KeyFile is the path to the key file
+	KeyFile string `yaml:"key_file"`
+	// CAFile is the path to the CA certificate file
+	CAFile string `yaml:"ca_file"`
+	// InsecureSkipVerify indicates whether to skip certificate verification
+	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
 }
 
 // Validate checks if the configuration is valid.
 func (c *Config) Validate() error {
-	if c.Addresses == "" {
+	if len(c.Addresses) == 0 {
 		return errors.New("elasticsearch addresses cannot be empty")
 	}
 
@@ -69,17 +83,17 @@ func (c *Config) Validate() error {
 		return errors.New("elasticsearch API key must be in the format 'id:api_key'")
 	}
 
-	if c.RetryEnabled {
-		if c.InitialWait <= 0 {
-			return fmt.Errorf("initial wait must be greater than 0, got %v", c.InitialWait)
+	if c.Retry.Enabled {
+		if c.Retry.InitialWait <= 0 {
+			return fmt.Errorf("initial wait must be greater than 0, got %v", c.Retry.InitialWait)
 		}
 
-		if c.MaxWait <= 0 {
-			return fmt.Errorf("max wait must be greater than 0, got %v", c.MaxWait)
+		if c.Retry.MaxWait <= 0 {
+			return fmt.Errorf("max wait must be greater than 0, got %v", c.Retry.MaxWait)
 		}
 
-		if c.MaxRetries <= 0 {
-			return fmt.Errorf("max retries must be greater than 0, got %d", c.MaxRetries)
+		if c.Retry.MaxRetries <= 0 {
+			return fmt.Errorf("max retries must be greater than 0, got %d", c.Retry.MaxRetries)
 		}
 	}
 
@@ -91,12 +105,12 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("flush interval must be greater than 0, got %v", c.FlushInterval)
 	}
 
-	if c.TLSEnabled {
-		if c.TLSCertFile == "" {
+	if c.TLS.Enabled {
+		if c.TLS.CertFile == "" {
 			return errors.New("TLS certificate file is required when TLS is enabled")
 		}
 
-		if c.TLSKeyFile == "" {
+		if c.TLS.KeyFile == "" {
 			return errors.New("TLS key file is required when TLS is enabled")
 		}
 	}
@@ -104,40 +118,43 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// New creates a new Elasticsearch configuration with the given options.
-func New(opts ...Option) *Config {
-	cfg := &Config{
-		Addresses:     DefaultAddresses,
-		IndexName:     DefaultIndexName,
-		RetryEnabled:  DefaultRetryEnabled,
-		InitialWait:   DefaultInitialWait,
-		MaxWait:       DefaultMaxWait,
-		MaxRetries:    DefaultMaxRetries,
-		BulkSize:      DefaultBulkSize,
-		FlushInterval: DefaultFlushInterval,
+// NewConfig creates a new Config instance with default values.
+func NewConfig() *Config {
+	defaultAddresses := []string{"http://localhost:9200"}
+	tls := &TLSConfig{
+		Enabled: false,
 	}
 
-	for _, opt := range opts {
-		opt(cfg)
+	return &Config{
+		Addresses: defaultAddresses,
+		Cloud: struct {
+			ID     string `yaml:"id"`
+			APIKey string `yaml:"api_key"`
+		}{},
+		TLS: tls,
+		Retry: struct {
+			Enabled     bool          `yaml:"enabled"`
+			InitialWait time.Duration `yaml:"initial_wait"`
+			MaxWait     time.Duration `yaml:"max_wait"`
+			MaxRetries  int           `yaml:"max_retries"`
+		}{
+			Enabled:     true,
+			InitialWait: time.Second,
+			MaxWait:     time.Minute,
+			MaxRetries:  3,
+		},
+		BulkSize:      1000,
+		FlushInterval: 30 * time.Second,
 	}
-
-	return cfg
 }
 
 // Option is a function that configures an Elasticsearch configuration.
 type Option func(*Config)
 
 // WithAddresses sets the Elasticsearch addresses.
-func WithAddresses(addresses string) Option {
+func WithAddresses(addresses []string) Option {
 	return func(c *Config) {
 		c.Addresses = addresses
-	}
-}
-
-// WithIndexName sets the Elasticsearch index name.
-func WithIndexName(name string) Option {
-	return func(c *Config) {
-		c.IndexName = name
 	}
 }
 
@@ -148,31 +165,66 @@ func WithAPIKey(key string) Option {
 	}
 }
 
+// WithUsername sets the Elasticsearch username.
+func WithUsername(username string) Option {
+	return func(c *Config) {
+		c.Username = username
+	}
+}
+
+// WithPassword sets the Elasticsearch password.
+func WithPassword(password string) Option {
+	return func(c *Config) {
+		c.Password = password
+	}
+}
+
+// WithIndexName sets the Elasticsearch index name.
+func WithIndexName(name string) Option {
+	return func(c *Config) {
+		c.IndexName = name
+	}
+}
+
+// WithCloudID sets the Elasticsearch cloud ID.
+func WithCloudID(id string) Option {
+	return func(c *Config) {
+		c.Cloud.ID = id
+	}
+}
+
+// WithCloudAPIKey sets the Elasticsearch cloud API key.
+func WithCloudAPIKey(apiKey string) Option {
+	return func(c *Config) {
+		c.Cloud.APIKey = apiKey
+	}
+}
+
 // WithRetryEnabled sets whether retry is enabled.
 func WithRetryEnabled(enabled bool) Option {
 	return func(c *Config) {
-		c.RetryEnabled = enabled
+		c.Retry.Enabled = enabled
 	}
 }
 
 // WithInitialWait sets the initial wait time.
 func WithInitialWait(wait time.Duration) Option {
 	return func(c *Config) {
-		c.InitialWait = wait
+		c.Retry.InitialWait = wait
 	}
 }
 
 // WithMaxWait sets the maximum wait time.
 func WithMaxWait(wait time.Duration) Option {
 	return func(c *Config) {
-		c.MaxWait = wait
+		c.Retry.MaxWait = wait
 	}
 }
 
 // WithMaxRetries sets the maximum number of retries.
 func WithMaxRetries(retries int) Option {
 	return func(c *Config) {
-		c.MaxRetries = retries
+		c.Retry.MaxRetries = retries
 	}
 }
 
@@ -193,34 +245,34 @@ func WithFlushInterval(interval time.Duration) Option {
 // WithTLSEnabled sets whether TLS is enabled.
 func WithTLSEnabled(enabled bool) Option {
 	return func(c *Config) {
-		c.TLSEnabled = enabled
+		c.TLS.Enabled = enabled
 	}
 }
 
 // WithTLSCertFile sets the TLS certificate file.
 func WithTLSCertFile(file string) Option {
 	return func(c *Config) {
-		c.TLSCertFile = file
+		c.TLS.CertFile = file
 	}
 }
 
 // WithTLSKeyFile sets the TLS key file.
 func WithTLSKeyFile(file string) Option {
 	return func(c *Config) {
-		c.TLSKeyFile = file
+		c.TLS.KeyFile = file
 	}
 }
 
 // WithTLSCAFile sets the TLS CA file.
 func WithTLSCAFile(file string) Option {
 	return func(c *Config) {
-		c.TLSCAFile = file
+		c.TLS.CAFile = file
 	}
 }
 
 // WithTLSInsecureSkipVerify sets whether to skip TLS certificate verification.
 func WithTLSInsecureSkipVerify(skip bool) Option {
 	return func(c *Config) {
-		c.TLSInsecureSkipVerify = skip
+		c.TLS.InsecureSkipVerify = skip
 	}
 }

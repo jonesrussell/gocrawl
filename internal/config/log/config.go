@@ -17,7 +17,7 @@ const (
 	DefaultCompress   = true
 )
 
-// Config holds logging-specific configuration settings.
+// Config represents logging-specific configuration settings.
 type Config struct {
 	// Level is the logging level (debug, info, warn, error)
 	Level string `yaml:"level"`
@@ -37,16 +37,16 @@ type Config struct {
 	Compress bool `yaml:"compress"`
 }
 
-// New creates a new logging configuration with default values.
-func New() *Config {
+// NewConfig creates a new Config instance with default values.
+func NewConfig() *Config {
 	return &Config{
-		Level:      DefaultLevel,
-		Format:     DefaultFormat,
-		Output:     DefaultOutput,
-		MaxSize:    DefaultMaxSize,
-		MaxBackups: DefaultMaxBackups,
-		MaxAge:     DefaultMaxAge,
-		Compress:   DefaultCompress,
+		Level:      "info",
+		Format:     "json",
+		Output:     "stdout",
+		MaxSize:    100,
+		MaxBackups: 3,
+		MaxAge:     30,
+		Compress:   true,
 	}
 }
 

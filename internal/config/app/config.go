@@ -5,15 +5,15 @@ import (
 	"fmt"
 )
 
-// Config holds application-level configuration settings.
+// Config represents application-specific configuration settings.
 type Config struct {
-	// Environment specifies the runtime environment (development, staging, production)
-	Environment string `yaml:"environment"`
-	// Name is the application name
+	// Name is the name of the application
 	Name string `yaml:"name"`
-	// Version is the application version
+	// Version is the version of the application
 	Version string `yaml:"version"`
-	// Debug enables debug mode for additional logging
+	// Environment is the application environment (development, staging, production)
+	Environment string `yaml:"environment"`
+	// Debug indicates whether debug mode is enabled
 	Debug bool `yaml:"debug"`
 }
 
@@ -85,5 +85,15 @@ func WithVersion(version string) Option {
 func WithDebug(debug bool) Option {
 	return func(c *Config) {
 		c.Debug = debug
+	}
+}
+
+// NewConfig creates a new Config instance with default values.
+func NewConfig() *Config {
+	return &Config{
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Environment: "development",
+		Debug:       false,
 	}
 }

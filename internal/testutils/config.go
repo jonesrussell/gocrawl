@@ -63,10 +63,10 @@ func (m *MockConfig) GetElasticsearchConfig() *config.ElasticsearchConfig {
 	return nil
 }
 
-func (m *MockConfig) GetServerConfig() *config.ServerConfig {
+func (m *MockConfig) GetServerConfig() *server.Config {
 	args := m.Called()
 	if cfg := args.Get(0); cfg != nil {
-		if serverCfg, ok := cfg.(*config.ServerConfig); ok {
+		if serverCfg, ok := cfg.(*server.Config); ok {
 			return serverCfg
 		}
 	}

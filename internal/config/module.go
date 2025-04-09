@@ -6,6 +6,6 @@ import "go.uber.org/fx"
 // Module provides the configuration package's dependencies.
 var Module = fx.Module("config",
 	fx.Provide(
-		New,
+		NewConfig,
 	),
 )

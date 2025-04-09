@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/search"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -85,6 +86,12 @@ func setupTestDeps(t *testing.T) *testDeps {
 	mockStorage := testutils.NewMockStorage(mockLogger)
 	mockHandler := signal.NewSignalHandler(mockLogger)
 	mockConfig := configtestutils.MockConfig{}
+	mockConfig.On("GetAppConfig").Return(&app.Config{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	})
 	mockSearchManager := &mockSearchManager{}
 
 	return &testDeps{

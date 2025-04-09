@@ -9,6 +9,10 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -46,28 +50,27 @@ func setupTestDeps(t *testing.T) *testDeps {
 	mockLogger := logger.NewNoOp()
 	mockHandler := signal.NewSignalHandler(mockLogger)
 	mockConfig := &configtestutils.MockConfig{}
-	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+	mockConfig.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+	mockConfig.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
 	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+	mockConfig.On("GetServerConfig").Return(&server.Config{
 		Address: ":8080",
 	})
 	mockConfig.On("GetSources").Return([]config.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
-	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
+	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	})
 	mockSourceManager := testutils.NewMockSourceManager()
 
@@ -179,28 +182,27 @@ func TestCommandExecution(t *testing.T) {
 	mockStorageMock := mockStorage.(*testutils.MockStorage)
 	mockHandler := signal.NewSignalHandler(mockLogger)
 	mockConfig := &configtestutils.MockConfig{}
-	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+	mockConfig.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+	mockConfig.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
 	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+	mockConfig.On("GetServerConfig").Return(&server.Config{
 		Address: ":8080",
 	})
 	mockConfig.On("GetSources").Return([]config.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
-	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
+	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	})
 	mockSourceManager := testutils.NewMockSourceManager()
 
@@ -585,28 +587,27 @@ func TestCrawlCommand(t *testing.T) {
 	mockStorageMock.On("TestConnection", mock.Anything).Return(nil)
 
 	mockConfig := &configtestutils.MockConfig{}
-	mockConfig.On("GetAppConfig").Return(&config.AppConfig{
+	mockConfig.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
 	})
-	mockConfig.On("GetLogConfig").Return(&config.LogConfig{
+	mockConfig.On("GetLogConfig").Return(&log.Config{
 		Level: "debug",
-		Debug: true,
 	})
 	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
-	mockConfig.On("GetServerConfig").Return(&config.ServerConfig{
+	mockConfig.On("GetServerConfig").Return(&server.Config{
 		Address: ":8080",
 	})
 	mockConfig.On("GetSources").Return([]config.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
-	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
+	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
 		Default: 1,
-		Rules:   []config.PriorityRule{},
+		Rules:   []priority.Rule{},
 	})
 
 	cmd := crawl.Command()

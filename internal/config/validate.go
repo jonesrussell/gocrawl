@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"go.uber.org/zap"
 )
 
@@ -203,37 +204,41 @@ func validateCrawlerConfig(cfg *CrawlerConfig) error {
 	return nil
 }
 
-// validateElasticsearchConfig validates the Elasticsearch configuration
-func validateElasticsearchConfig(cfg *ElasticsearchConfig) error {
+// validateElasticsearchConfig validates the Elasticsearch configuration.
+func validateElasticsearchConfig(cfg *elasticsearch.Config) error {
 	if cfg == nil {
-		return &ValidationError{
-			Field:  "elasticsearch",
-			Value:  nil,
-			Reason: "elasticsearch configuration is required",
-		}
+		return errors.New("elasticsearch configuration is required")
 	}
 
 	if len(cfg.Addresses) == 0 {
-		return &ValidationError{
-			Field:  "elasticsearch.addresses",
-			Value:  cfg.Addresses,
-			Reason: "at least one Elasticsearch address is required",
-		}
+		return errors.New("elasticsearch addresses cannot be empty")
 	}
 
 	if cfg.IndexName == "" {
-		return &ValidationError{
-			Field:  "elasticsearch.index_name",
-			Value:  cfg.IndexName,
-			Reason: "elasticsearch index name is required",
+		return errors.New("elasticsearch index name cannot be empty")
+	}
+
+	if cfg.Retry.Enabled {
+		if cfg.Retry.InitialWait <= 0 {
+			return fmt.Errorf("initial wait must be greater than 0, got %v", cfg.Retry.InitialWait)
+		}
+
+		if cfg.Retry.MaxWait <= 0 {
+			return fmt.Errorf("max wait must be greater than 0, got %v", cfg.Retry.MaxWait)
+		}
+
+		if cfg.Retry.MaxRetries <= 0 {
+			return fmt.Errorf("max retries must be greater than 0, got %d", cfg.Retry.MaxRetries)
 		}
 	}
 
-	if cfg.APIKey == "" && (cfg.Username == "" || cfg.Password == "") {
-		return &ValidationError{
-			Field:  "elasticsearch.auth",
-			Value:  nil,
-			Reason: "either API key or username/password is required",
+	if cfg.TLS.Enabled {
+		if cfg.TLS.CertFile == "" {
+			return errors.New("TLS certificate file is required when TLS is enabled")
+		}
+
+		if cfg.TLS.KeyFile == "" {
+			return errors.New("TLS key file is required when TLS is enabled")
 		}
 	}
 
