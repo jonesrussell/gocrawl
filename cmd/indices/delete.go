@@ -204,21 +204,29 @@ You can specify one or more indices to delete, or use the --source flag to delet
 				return err
 			}
 
+			// Create a context
+			ctx := cmd.Context()
+
+			// Get config path from flag or use default
+			configPath, _ := cmd.Flags().GetString("config")
+
 			app := fx.New(
 				fx.NopLogger,
 				Module,
 				fx.Provide(
+					func() context.Context { return ctx },
+					func() string { return configPath }, // config path
 					func() []string { return args },
 					func() bool { return force },
 					func() string { return sourceName },
 					NewDeleter,
 				),
 				fx.Invoke(func(deleter *Deleter) error {
-					return deleter.Start(cmd.Context())
+					return deleter.Start(ctx)
 				}),
 			)
 
-			return app.Start(cmd.Context())
+			return app.Start(ctx)
 		},
 	}
 

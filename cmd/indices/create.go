@@ -104,9 +104,11 @@ This command creates a new index in the Elasticsearch cluster with the specified
 The index will be created with default settings unless overridden by configuration.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Create a cancellable context
-			ctx, cancel := context.WithCancel(cmd.Context())
-			defer cancel()
+			// Create a context
+			ctx := cmd.Context()
+
+			// Get config path from flag or use default
+			configPath, _ := cmd.Flags().GetString("config")
 
 			// Initialize the Fx application
 			fxApp := fx.New(
@@ -114,7 +116,8 @@ The index will be created with default settings unless overridden by configurati
 				Module,
 				fx.Provide(
 					func() context.Context { return ctx },
-					func() string { return args[0] },
+					func() string { return args[0] },    // index name
+					func() string { return configPath }, // config path
 				),
 				fx.Invoke(func(lc fx.Lifecycle, creator *Creator) {
 					lc.Append(fx.Hook{

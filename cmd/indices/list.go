@@ -37,21 +37,90 @@ func NewLister(
 	}
 }
 
+// handleIndexError handles common error cases for index operations
+func (l *Lister) handleIndexError(operation string, index string, err error, action string, details string) error {
+	l.logger.Error(fmt.Sprintf("Failed to %s for index", operation),
+		"index", index,
+		"error", err,
+		"action", action,
+		"details", details,
+	)
+	return fmt.Errorf("failed to %s for index %s: %w. %s", operation, index, err, action)
+}
+
+// renderIndicesTable formats and displays the indices in a table format.
+func (l *Lister) renderIndicesTable(ctx context.Context, indices []string) error {
+	// Initialize table writer with stdout as output
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Index Name", "Health", "Docs Count", "Status"})
+
+	// Process each index and gather its metadata
+	for _, index := range indices {
+		// Get health status with error handling
+		healthStatus, healthErr := l.storage.GetIndexHealth(ctx, index)
+		if healthErr != nil {
+			return l.handleIndexError(
+				"get health status",
+				index,
+				healthErr,
+				"Check if the index exists and Elasticsearch is running",
+				"This could be due to network issues, index not existing, or Elasticsearch being down",
+			)
+		}
+
+		// Get document count with fallback to 0 on error
+		docCount, docErr := l.storage.GetIndexDocCount(ctx, index)
+		if docErr != nil {
+			return l.handleIndexError(
+				"get document count",
+				index,
+				docErr,
+				"Check if the index exists and has documents",
+				"This could be due to index corruption, permission issues, or Elasticsearch being in a degraded state",
+			)
+		}
+
+		// Map health status to ingestion status
+		ingestionStatus := getIngestionStatus(healthStatus)
+
+		// Add row to table
+		t.AppendRow([]any{
+			index,
+			healthStatus,
+			docCount,
+			ingestionStatus,
+		})
+	}
+
+	// Render the final table
+	t.Render()
+	return nil
+}
+
 // Start executes the list operation
 func (l *Lister) Start(ctx context.Context) error {
 	l.logger.Info("Listing indices")
 
 	// Test storage connection
 	if err := l.storage.TestConnection(ctx); err != nil {
-		l.logger.Error("Failed to connect to storage", "error", err)
-		return fmt.Errorf("failed to connect to storage: %w", err)
+		l.logger.Error("Failed to connect to storage",
+			"error", err,
+			"action", "Check Elasticsearch connection settings and ensure the service is running",
+			"details", "This could be due to incorrect host/port, network issues, or Elasticsearch being down",
+		)
+		return fmt.Errorf("failed to connect to storage: %w. Check Elasticsearch connection settings and ensure the service is running", err)
 	}
 
 	// List indices
 	indices, err := l.storage.ListIndices(ctx)
 	if err != nil {
-		l.logger.Error("Failed to list indices", "error", err)
-		return fmt.Errorf("failed to list indices: %w", err)
+		l.logger.Error("Failed to list indices",
+			"error", err,
+			"action", "Check Elasticsearch permissions and cluster health",
+			"details", "This could be due to permission issues, cluster being in a degraded state, or network problems",
+		)
+		return fmt.Errorf("failed to list indices: %w. Check Elasticsearch permissions and cluster health", err)
 	}
 
 	// Filter out internal indices (those starting with '.')
@@ -64,53 +133,15 @@ func (l *Lister) Start(ctx context.Context) error {
 
 	// Handle the case where no indices are found
 	if len(filteredIndices) == 0 {
-		l.logger.Info("No indices found")
+		l.logger.Info("No indices found",
+			"action", "Create an index using 'gocrawl indices create <index-name>'",
+			"details", "No user-created indices were found in the Elasticsearch cluster",
+		)
 		return nil
 	}
 
 	// Render the indices table
 	return l.renderIndicesTable(ctx, filteredIndices)
-}
-
-// renderIndicesTable formats and displays the indices in a table format.
-func (l *Lister) renderIndicesTable(ctx context.Context, indices []string) error {
-	// Initialize table writer with stdout as output
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Index Name", "Health", "Docs Count", "Ingestion Name", "Ingestion Status"})
-
-	// Process each index and gather its metadata
-	for _, index := range indices {
-		// Get health status with error handling
-		healthStatus, healthErr := l.storage.GetIndexHealth(ctx, index)
-		if healthErr != nil {
-			l.logger.Error("Error getting health for index", "index", index, "error", healthErr)
-			return fmt.Errorf("failed to get health for index %s: %w", index, healthErr)
-		}
-
-		// Get document count with fallback to 0 on error
-		docCount, docErr := l.storage.GetIndexDocCount(ctx, index)
-		if docErr != nil {
-			l.logger.Error("Error getting document count for index", "index", index, "error", docErr)
-			return fmt.Errorf("failed to get document count for index %s: %w", index, docErr)
-		}
-
-		// Map health status to ingestion status
-		ingestionStatus := getIngestionStatus(healthStatus)
-
-		// Add row to table
-		t.AppendRow([]any{
-			index,
-			healthStatus,
-			docCount,
-			"", // Placeholder for future ingestion name feature
-			ingestionStatus,
-		})
-	}
-
-	// Render the final table
-	t.Render()
-	return nil
 }
 
 // listCommand creates and returns the list command that displays all indices.
