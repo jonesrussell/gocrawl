@@ -53,15 +53,15 @@ type Config struct {
 	Command string `yaml:"command"`
 }
 
-// New returns a new configuration with default values.
-func New() *Config {
+// newConfig returns a new configuration with default values.
+func newConfig() *Config {
 	return &Config{
 		Environment:   "development",
 		Logger:        log.NewConfig(),
 		Server:        server.NewConfig(),
 		Priority:      priority.NewConfig(),
 		Storage:       storage.NewConfig(),
-		Crawler:       crawler.New(),
+		Crawler:       crawler.New(crawler.WithBaseURL("https://example.com")),
 		App:           app.New(),
 		Elasticsearch: elasticsearch.NewConfig(),
 	}
@@ -112,7 +112,7 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	cfg := New()
+	cfg := newConfig()
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}

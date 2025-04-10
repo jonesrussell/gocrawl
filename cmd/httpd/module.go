@@ -32,6 +32,10 @@ var Module = fx.Options(
 				},
 			}
 		},
+		// Provide config path
+		func() string {
+			return "config.yaml"
+		},
 	),
 
 	// Invoke server startup

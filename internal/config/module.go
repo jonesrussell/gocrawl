@@ -7,6 +7,14 @@ import (
 
 // Module provides the configuration module.
 var Module = fx.Options(
-	fx.Provide(New),
-	fx.Provide(LoadConfig),
+	fx.Provide(
+		func(cfg *Config) Interface {
+			return cfg
+		},
+	),
+	fx.Provide(
+		func(path string) (*Config, error) {
+			return LoadConfig(path)
+		},
+	),
 )
