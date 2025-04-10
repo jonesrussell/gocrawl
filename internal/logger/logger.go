@@ -16,6 +16,7 @@ func DefaultConfig() *Config {
 		Encoding:         "console",
 		OutputPaths:      []string{"stdout"},
 		ErrorOutputPaths: []string{"stderr"},
+		EnableColor:      true,
 	}
 }
 
@@ -36,10 +37,33 @@ func New(cfg *Config) (Interface, error) {
 		MessageKey:     "msg",
 		StacktraceKey:  "stacktrace",
 		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.LowercaseLevelEncoder,
 		EncodeTime:     zapcore.ISO8601TimeEncoder,
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
+	}
+
+	// Configure level encoder based on development mode and color settings
+	if cfg.Development && cfg.EnableColor {
+		encoderConfig.EncodeLevel = func(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+			var color string
+			switch l {
+			case zapcore.DebugLevel:
+				color = ColorDebug
+			case zapcore.InfoLevel:
+				color = ColorInfo
+			case zapcore.WarnLevel:
+				color = ColorWarn
+			case zapcore.ErrorLevel:
+				color = ColorError
+			case zapcore.FatalLevel:
+				color = ColorFatal
+			default:
+				color = ColorReset
+			}
+			enc.AppendString(color + l.CapitalString() + ColorReset)
+		}
+	} else {
+		encoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
 	}
 
 	// Create core

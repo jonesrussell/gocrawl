@@ -146,6 +146,7 @@ func LoadConfig(path string) (*Config, error) {
 	v.BindEnv("elasticsearch.retry.max_retries", "ELASTICSEARCH_MAX_RETRIES")
 	v.BindEnv("elasticsearch.bulk_size", "ELASTICSEARCH_BULK_SIZE")
 	v.BindEnv("elasticsearch.flush_interval", "ELASTICSEARCH_FLUSH_INTERVAL")
+	v.BindEnv("elasticsearch.discover_nodes", "ELASTICSEARCH_DISCOVER_NODES")
 
 	// Read config file (if it exists)
 	if err := v.ReadInConfig(); err != nil {

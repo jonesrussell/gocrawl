@@ -17,6 +17,16 @@ const (
 	FatalLevel Level = "fatal"
 )
 
+// ANSI color codes for log levels
+const (
+	ColorDebug = "\033[36m" // Cyan
+	ColorInfo  = "\033[32m" // Green
+	ColorWarn  = "\033[33m" // Yellow
+	ColorError = "\033[31m" // Red
+	ColorFatal = "\033[35m" // Magenta
+	ColorReset = "\033[0m"  // Reset
+)
+
 // Config represents the logger configuration.
 type Config struct {
 	// Level is the minimum logging level.
@@ -29,4 +39,6 @@ type Config struct {
 	OutputPaths []string `yaml:"outputPaths" json:"outputPaths"`
 	// ErrorOutputPaths is a list of URLs to write internal logger errors to.
 	ErrorOutputPaths []string `yaml:"errorOutputPaths" json:"errorOutputPaths"`
+	// EnableColor enables colored output in development mode.
+	EnableColor bool `yaml:"enableColor" json:"enableColor"`
 }

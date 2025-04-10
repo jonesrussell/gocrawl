@@ -86,7 +86,7 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 		MaxRetries:              DefaultMaxRetries,
 		RetryBackoff:            retryBackoff,
 		// Connection pool configuration
-		DiscoverNodesOnStart:  true,
+		DiscoverNodesOnStart:  esConfig.DiscoverNodes,
 		DiscoverNodesInterval: 30 * time.Second,
 	}
 

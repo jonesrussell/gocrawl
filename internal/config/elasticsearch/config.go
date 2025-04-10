@@ -74,6 +74,8 @@ type Config struct {
 	BulkSize int `yaml:"bulk_size"`
 	// FlushInterval is the interval at which to flush the bulk indexer
 	FlushInterval time.Duration `yaml:"flush_interval"`
+	// DiscoverNodes enables/disables node discovery
+	DiscoverNodes bool `yaml:"discover_nodes"`
 }
 
 // TLSConfig represents TLS configuration settings.
