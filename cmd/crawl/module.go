@@ -6,11 +6,13 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -86,6 +88,39 @@ var Module = fx.Module("crawl",
 			},
 			fx.ParamTags(`name:"sourceName"`),
 			fx.ResultTags(`name:"contentIndex"`),
+		),
+	),
+
+	// Provide crawler instance
+	fx.Provide(
+		fx.Annotate(
+			func(
+				logger logger.Interface,
+				indexManager api.IndexManager,
+				sources sources.Interface,
+				processors []common.Processor,
+				bus *events.Bus,
+			) crawler.Interface {
+				// Find article and content processors
+				var articleProcessor, contentProcessor common.Processor
+				for _, p := range processors {
+					if p.ContentType() == common.ContentTypeArticle {
+						articleProcessor = p
+					} else if p.ContentType() == common.ContentTypePage {
+						contentProcessor = p
+					}
+				}
+
+				return crawler.NewCrawler(
+					logger,
+					indexManager,
+					sources,
+					articleProcessor,
+					contentProcessor,
+					bus,
+				)
+			},
+			fx.ResultTags(`name:"crawler"`),
 		),
 	),
 )
