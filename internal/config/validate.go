@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"go.uber.org/zap"
 )
 
@@ -59,7 +62,7 @@ func ValidateConfig(cfg *Config) error {
 	logger.Debug("Environment validation passed")
 
 	// Validate log config
-	if err := validateLogConfig(cfg.Log); err != nil {
+	if err := validateLogConfig(cfg.Logger); err != nil {
 		logger.Error("Log config validation failed", zap.Error(err))
 		return err
 	}
@@ -91,12 +94,77 @@ func ValidateConfig(cfg *Config) error {
 	logger.Debug("App config validation passed")
 
 	// Validate sources last
-	if err := validateSources(cfg.Crawler.Sources); err != nil {
+	if err := validateSources(cfg.Sources); err != nil {
 		logger.Error("Sources validation failed", zap.Error(err))
 		return err
 	}
 	logger.Debug("Sources validation passed")
 
+	return nil
+}
+
+// ValidateEnvironment validates the environment setting.
+func ValidateEnvironment(env string) error {
+	switch env {
+	case "development", "staging", "production":
+		return nil
+	default:
+		return fmt.Errorf("invalid environment: %s", env)
+	}
+}
+
+// ValidateLogLevel validates the log level setting.
+func ValidateLogLevel(level string) error {
+	switch level {
+	case "debug", "info", "warn", "error":
+		return nil
+	default:
+		return fmt.Errorf("invalid log level: %s", level)
+	}
+}
+
+// ValidateRateLimit validates the rate limit setting.
+func ValidateRateLimit(limit time.Duration) error {
+	if limit < 0 {
+		return errors.New("rate limit must be non-negative")
+	}
+	return nil
+}
+
+// ValidateMaxDepth validates the maximum depth setting.
+func ValidateMaxDepth(depth int) error {
+	if depth < 0 {
+		return errors.New("max depth must be non-negative")
+	}
+	return nil
+}
+
+// ValidateParallelism validates the parallelism setting.
+func ValidateParallelism(parallelism int) error {
+	if parallelism < 1 {
+		return errors.New("parallelism must be positive")
+	}
+	return nil
+}
+
+// ValidateSource validates a source configuration.
+func ValidateSource(source *types.Source) error {
+	if source == nil {
+		return errors.New("source is required")
+	}
+	return source.Validate()
+}
+
+// ValidateSources validates a list of source configurations.
+func ValidateSources(sources []types.Source) error {
+	if len(sources) == 0 {
+		return errors.New("at least one source is required")
+	}
+	for i, source := range sources {
+		if err := source.Validate(); err != nil {
+			return fmt.Errorf("source[%d]: %w", i, err)
+		}
+	}
 	return nil
 }
 
@@ -120,7 +188,7 @@ func validateAppConfig(cfg *app.Config) error {
 }
 
 // validateLogConfig validates the log configuration
-func validateLogConfig(cfg *LogConfig) error {
+func validateLogConfig(cfg *log.Config) error {
 	if cfg == nil {
 		return &ValidationError{
 			Field:  "log",
@@ -133,7 +201,14 @@ func validateLogConfig(cfg *LogConfig) error {
 		cfg.Level = "info" // Default to info if not set
 	}
 
-	if !ValidLogLevels[strings.ToLower(cfg.Level)] {
+	validLevels := map[string]bool{
+		"debug": true,
+		"info":  true,
+		"warn":  true,
+		"error": true,
+	}
+
+	if !validLevels[strings.ToLower(cfg.Level)] {
 		return &ValidationError{
 			Field:  "log.level",
 			Value:  cfg.Level,
@@ -144,7 +219,7 @@ func validateLogConfig(cfg *LogConfig) error {
 }
 
 // validateCrawlerConfig validates the crawler configuration
-func validateCrawlerConfig(cfg *CrawlerConfig) error {
+func validateCrawlerConfig(cfg *crawler.Config) error {
 	if cfg == nil {
 		return &ValidationError{
 			Field:  "crawler",
@@ -152,167 +227,39 @@ func validateCrawlerConfig(cfg *CrawlerConfig) error {
 			Reason: "crawler configuration is required",
 		}
 	}
-
-	if cfg.BaseURL == "" {
-		return &ValidationError{
-			Field:  "crawler.base_url",
-			Value:  cfg.BaseURL,
-			Reason: "crawler base URL cannot be empty",
-		}
-	}
-
-	if cfg.MaxDepth < 1 {
-		return &ValidationError{
-			Field:  "crawler.max_depth",
-			Value:  cfg.MaxDepth,
-			Reason: "crawler max depth must be greater than 0",
-		}
-	}
-
-	if cfg.RateLimit < time.Second {
-		return &ValidationError{
-			Field:  "crawler.rate_limit",
-			Value:  cfg.RateLimit,
-			Reason: "crawler rate limit must be at least 1 second",
-		}
-	}
-
-	if cfg.RandomDelay < 0 {
-		return &ValidationError{
-			Field:  "crawler.random_delay",
-			Value:  cfg.RandomDelay,
-			Reason: "crawler random delay must be non-negative",
-		}
-	}
-
-	if cfg.Parallelism < 1 {
-		return &ValidationError{
-			Field:  "crawler.parallelism",
-			Value:  cfg.Parallelism,
-			Reason: "crawler parallelism must be greater than 0",
-		}
-	}
-
-	if cfg.SourceFile == "" {
-		return &ValidationError{
-			Field:  "crawler.source_file",
-			Value:  cfg.SourceFile,
-			Reason: "crawler source file is required",
-		}
-	}
-
-	return nil
+	return cfg.Validate()
 }
 
-// validateElasticsearchConfig validates the Elasticsearch configuration.
+// validateElasticsearchConfig validates the Elasticsearch configuration
 func validateElasticsearchConfig(cfg *elasticsearch.Config) error {
 	if cfg == nil {
-		return errors.New("elasticsearch configuration is required")
-	}
-
-	if len(cfg.Addresses) == 0 {
-		return errors.New("elasticsearch addresses cannot be empty")
-	}
-
-	if cfg.IndexName == "" {
-		return errors.New("elasticsearch index name cannot be empty")
-	}
-
-	if cfg.Retry.Enabled {
-		if cfg.Retry.InitialWait <= 0 {
-			return fmt.Errorf("initial wait must be greater than 0, got %v", cfg.Retry.InitialWait)
-		}
-
-		if cfg.Retry.MaxWait <= 0 {
-			return fmt.Errorf("max wait must be greater than 0, got %v", cfg.Retry.MaxWait)
-		}
-
-		if cfg.Retry.MaxRetries <= 0 {
-			return fmt.Errorf("max retries must be greater than 0, got %d", cfg.Retry.MaxRetries)
+		return &ValidationError{
+			Field:  "elasticsearch",
+			Value:  nil,
+			Reason: "elasticsearch configuration is required",
 		}
 	}
-
-	if cfg.TLS.Enabled {
-		if cfg.TLS.CertFile == "" {
-			return errors.New("TLS certificate file is required when TLS is enabled")
-		}
-
-		if cfg.TLS.KeyFile == "" {
-			return errors.New("TLS key file is required when TLS is enabled")
-		}
-	}
-
-	return nil
+	return cfg.Validate()
 }
 
-// validateSources validates the source configuration
-func validateSources(sources []Source) error {
+// validateSources validates a list of source configurations
+func validateSources(sources []types.Source) error {
 	if len(sources) == 0 {
 		return &ValidationError{
 			Field:  "sources",
-			Value:  sources,
+			Value:  nil,
 			Reason: "at least one source is required",
 		}
 	}
 
 	for i, source := range sources {
-		if source.Name == "" {
+		if err := source.Validate(); err != nil {
 			return &ValidationError{
-				Field:  fmt.Sprintf("sources[%d].name", i),
-				Value:  source.Name,
-				Reason: "source name cannot be empty",
-			}
-		}
-
-		if source.URL == "" {
-			return &ValidationError{
-				Field:  fmt.Sprintf("sources[%d].url", i),
-				Value:  source.URL,
-				Reason: "source URL cannot be empty",
-			}
-		}
-
-		if len(source.AllowedDomains) == 0 {
-			return &ValidationError{
-				Field:  fmt.Sprintf("sources[%d].allowed_domains", i),
-				Value:  source.AllowedDomains,
-				Reason: "at least one allowed domain is required",
-			}
-		}
-
-		if len(source.StartURLs) == 0 {
-			return &ValidationError{
-				Field:  fmt.Sprintf("sources[%d].start_urls", i),
-				Value:  source.StartURLs,
-				Reason: "at least one start URL is required",
-			}
-		}
-
-		if source.RateLimit < time.Second {
-			return &ValidationError{
-				Field:  fmt.Sprintf("sources[%d].rate_limit", i),
-				Value:  source.RateLimit,
-				Reason: "rate limit must be at least 1 second",
-			}
-		}
-
-		if source.MaxDepth < 1 {
-			return &ValidationError{
-				Field:  fmt.Sprintf("sources[%d].max_depth", i),
-				Value:  source.MaxDepth,
-				Reason: "max depth must be greater than 0",
-			}
-		}
-
-		// Check if article selectors are empty
-		if source.Selectors.Article.Title == "" && source.Selectors.Article.Body == "" {
-			return &ValidationError{
-				Field:  fmt.Sprintf("sources[%d].selectors", i),
-				Value:  source.Selectors,
-				Reason: "at least title or body selector is required",
+				Field:  fmt.Sprintf("sources[%d]", i),
+				Value:  source,
+				Reason: err.Error(),
 			}
 		}
 	}
-
 	return nil
 }

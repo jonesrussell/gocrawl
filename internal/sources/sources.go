@@ -4,10 +4,10 @@ package sources
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
@@ -32,9 +32,9 @@ type Sources struct {
 // Ensure Sources implements Interface
 var _ Interface = (*Sources)(nil)
 
-// ConvertSourceConfig converts a sources.Config to a config.Source.
+// ConvertSourceConfig converts a sources.Config to a types.Source.
 // It handles the conversion of fields between the two types.
-func ConvertSourceConfig(source *Config) *config.Source {
+func ConvertSourceConfig(source *Config) *types.Source {
 	if source == nil {
 		return nil
 	}
@@ -42,15 +42,17 @@ func ConvertSourceConfig(source *Config) *config.Source {
 	return sourceutils.ConvertToConfigSource(source)
 }
 
-// convertSourceConfig converts a config.Source to a sourceutils.SourceConfig
-func convertSourceConfig(src config.Source) sourceutils.SourceConfig {
+// convertSourceConfig converts a types.Source to a sourceutils.SourceConfig
+func convertSourceConfig(src types.Source) sourceutils.SourceConfig {
 	return sourceutils.SourceConfig{
-		Name:         src.Name,
-		URL:          src.URL,
-		RateLimit:    src.RateLimit,
-		MaxDepth:     src.MaxDepth,
-		ArticleIndex: src.ArticleIndex,
-		Index:        src.Index,
+		Name:           src.Name,
+		URL:            src.URL,
+		AllowedDomains: src.AllowedDomains,
+		StartURLs:      src.StartURLs,
+		RateLimit:      src.RateLimit,
+		MaxDepth:       src.MaxDepth,
+		Time:           src.Time,
+		Index:          src.Index,
 		Selectors: sourceutils.SelectorConfig{
 			Article: sourceutils.ArticleSelectors{
 				Container:     src.Selectors.Article.Container,
@@ -77,6 +79,7 @@ func convertSourceConfig(src config.Source) sourceutils.SourceConfig {
 				BylineName:    src.Selectors.Article.BylineName,
 			},
 		},
+		Rules: src.Rules,
 	}
 }
 
@@ -145,10 +148,7 @@ func (s *Sources) AddSource(ctx context.Context, source *sourceutils.SourceConfi
 		}
 	}
 
-	// Set default index names if not provided
-	if source.ArticleIndex == "" {
-		source.ArticleIndex = "articles"
-	}
+	// Set default index name if not provided
 	if source.Index == "" {
 		source.Index = "content"
 	}
@@ -206,21 +206,9 @@ func (s *Sources) ValidateSource(source *sourceutils.SourceConfig) error {
 		return ErrInvalidSource
 	}
 
-	// Validate required fields
-	if source.Name == "" {
-		return fmt.Errorf("%w: name is required", ErrInvalidSource)
-	}
-	if source.URL == "" {
-		return fmt.Errorf("%w: URL is required", ErrInvalidSource)
-	}
-	if source.RateLimit <= 0 {
-		return fmt.Errorf("%w: rate limit must be positive", ErrInvalidSource)
-	}
-	if source.MaxDepth <= 0 {
-		return fmt.Errorf("%w: max depth must be positive", ErrInvalidSource)
-	}
-
-	return nil
+	// Convert to types.Source and validate
+	typesSource := ConvertSourceConfig(source)
+	return typesSource.Validate()
 }
 
 // GetMetrics returns the current metrics.
@@ -228,12 +216,12 @@ func (s *Sources) GetMetrics() Metrics {
 	return s.metrics
 }
 
-// GetSources retrieves all source configurations.
+// GetSources returns all sources.
 func (s *Sources) GetSources() ([]sourceutils.SourceConfig, error) {
 	return s.sources, nil
 }
 
-// FindByName finds a source by name. Returns nil if not found.
+// FindByName finds a source by name.
 func (s *Sources) FindByName(name string) *sourceutils.SourceConfig {
 	for i := range s.sources {
 		if s.sources[i].Name == name {
@@ -243,7 +231,7 @@ func (s *Sources) FindByName(name string) *sourceutils.SourceConfig {
 	return nil
 }
 
-// articleSelector represents the common structure of article selectors
+// articleSelector represents the selectors used for article content extraction.
 type articleSelector struct {
 	Container     string `yaml:"container"`
 	Title         string `yaml:"title"`
@@ -269,7 +257,7 @@ type articleSelector struct {
 	BylineName    string `yaml:"byline_name"`
 }
 
-// getArticleSelectorsFromSelector creates ArticleSelectors from an articleSelector
+// getArticleSelectorsFromSelector converts an articleSelector to ArticleSelectors.
 func getArticleSelectorsFromSelector(s articleSelector) ArticleSelectors {
 	return ArticleSelectors{
 		Container:     s.Container,
@@ -297,7 +285,7 @@ func getArticleSelectorsFromSelector(s articleSelector) ArticleSelectors {
 	}
 }
 
-// extractArticleSelectorsFromLoader creates an articleSelector from loader.ArticleSelectors
+// extractArticleSelectorsFromLoader converts loader.ArticleSelectors to articleSelector.
 func extractArticleSelectorsFromLoader(selectors loader.ArticleSelectors) articleSelector {
 	return articleSelector{
 		Container:     selectors.Container,
@@ -325,8 +313,8 @@ func extractArticleSelectorsFromLoader(selectors loader.ArticleSelectors) articl
 	}
 }
 
-// extractArticleSelectorsFromConfig creates an articleSelector from config.ArticleSelectors
-func extractArticleSelectorsFromConfig(selectors config.ArticleSelectors) articleSelector {
+// extractArticleSelectorsFromConfig converts types.ArticleSelectors to articleSelector.
+func extractArticleSelectorsFromConfig(selectors types.ArticleSelectors) articleSelector {
 	return articleSelector{
 		Container:     selectors.Container,
 		Title:         selectors.Title,
@@ -353,34 +341,36 @@ func extractArticleSelectorsFromConfig(selectors config.ArticleSelectors) articl
 	}
 }
 
+// loaderConfigWrapper wraps a loader.Config to provide article selector conversion.
 type loaderConfigWrapper struct {
 	loader.Config
 }
 
+// GetArticleSelectors returns the article selectors from the loader config.
 func (w loaderConfigWrapper) GetArticleSelectors() ArticleSelectors {
-	return getArticleSelectorsFromSelector(extractArticleSelectorsFromLoader(w.Selectors.Article))
+	return getArticleSelectorsFromSelector(extractArticleSelectorsFromLoader(w.Config.Selectors.Article))
 }
 
+// sourceWrapper wraps a types.Source to provide article selector conversion.
 type sourceWrapper struct {
-	config.Source
+	types.Source
 }
 
+// GetArticleSelectors returns the article selectors from the source.
 func (w sourceWrapper) GetArticleSelectors() ArticleSelectors {
-	return getArticleSelectorsFromSelector(extractArticleSelectorsFromConfig(w.Selectors.Article))
+	return getArticleSelectorsFromSelector(extractArticleSelectorsFromConfig(w.Source.Selectors.Article))
 }
 
 // NewSelectorConfigFromLoader creates a new SelectorConfig from a loader.Config.
 func NewSelectorConfigFromLoader(src loader.Config) SelectorConfig {
-	wrapper := loaderConfigWrapper{src}
 	return SelectorConfig{
-		Article: wrapper.GetArticleSelectors(),
+		Article: getArticleSelectorsFromSelector(extractArticleSelectorsFromLoader(src.Selectors.Article)),
 	}
 }
 
-// NewSelectorConfigFromSource creates a new SelectorConfig from a config.Source.
-func NewSelectorConfigFromSource(src config.Source) SelectorConfig {
-	wrapper := sourceWrapper{src}
+// NewSelectorConfigFromSource creates a new SelectorConfig from a types.Source.
+func NewSelectorConfigFromSource(src types.Source) SelectorConfig {
 	return SelectorConfig{
-		Article: wrapper.GetArticleSelectors(),
+		Article: getArticleSelectorsFromSelector(extractArticleSelectorsFromConfig(src.Selectors.Article)),
 	}
 }

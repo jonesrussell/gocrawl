@@ -9,7 +9,12 @@ import (
 	"go.uber.org/fx/fxtest"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/testutils"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 // TestModule provides tests for the config module's dependency injection.
@@ -59,7 +64,25 @@ func TestNewNoOp(t *testing.T) {
 	t.Parallel()
 
 	// Create a no-op config
-	c := config.NewNoOp()
+	c := &testutils.MockConfig{}
+	c.On("GetAppConfig").Return(&app.Config{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       false,
+	})
+	c.On("GetLogConfig").Return(&log.Config{
+		Level: "info",
+	})
+	c.On("GetElasticsearchConfig").Return(&elasticsearch.Config{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "gocrawl",
+	})
+	c.On("GetServerConfig").Return(&server.Config{
+		Address: ":8080",
+	})
+	c.On("GetSources").Return([]types.Source{}, nil)
+	c.On("GetCommand").Return("test")
 
 	// Test app config
 	appConfig := c.GetAppConfig()

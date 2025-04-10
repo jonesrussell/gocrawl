@@ -71,7 +71,7 @@ var Module = fx.Module("crawl",
 				if source == nil {
 					panic(fmt.Sprintf("failed to get source %s: source not found", sourceName))
 				}
-				return source.ArticleIndex
+				return source.Index
 			},
 			fx.ParamTags(`name:"sourceName"`),
 			fx.ResultTags(`name:"indexName"`),

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
@@ -50,12 +51,14 @@ func ProvideSources(params ModuleParams) Result {
 // NewConfig creates a new source configuration.
 func NewConfig() *Config {
 	return &Config{
-		Name:         "default",
-		URL:          "http://localhost",
-		MaxDepth:     DefaultMaxDepth,
-		RateLimit:    DefaultRateLimit,
-		ArticleIndex: "articles",
-		Index:        "content",
+		Name:           "default",
+		URL:            "http://localhost",
+		AllowedDomains: []string{"localhost"},
+		StartURLs:      []string{"http://localhost"},
+		MaxDepth:       DefaultMaxDepth,
+		RateLimit:      DefaultRateLimit,
+		Index:          "content",
+		Rules:          types.Rules{},
 	}
 }
 
@@ -73,9 +76,9 @@ func NewSources(cfg *Config, logger logger.Interface) *Sources {
 // DefaultConfig returns the default source configuration.
 func DefaultConfig() *Config {
 	defaultConfig := &Config{
-		RateLimit:    DefaultRateLimit,
-		ArticleIndex: "articles",
-		Index:        "content",
+		RateLimit: DefaultRateLimit,
+		Index:     "content",
+		Rules:     types.Rules{},
 	}
 	return defaultConfig
 }

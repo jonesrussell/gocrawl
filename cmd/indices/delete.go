@@ -65,7 +65,7 @@ func (d *Deleter) Start(ctx context.Context) error {
 		if source == nil {
 			return fmt.Errorf("source not found: %s", d.sourceName)
 		}
-		d.indices = []string{source.Index, source.ArticleIndex}
+		d.indices = []string{source.Index}
 		d.logger.Info("Resolved source indices", "indices", d.indices)
 	}
 
@@ -199,46 +199,28 @@ You can specify one or more indices to delete, or use the --source flag to delet
 					func() string { return sourceName },
 					NewDeleter,
 				),
-				fx.Invoke(func(lc fx.Lifecycle, deleter *Deleter, ctx context.Context) {
-					lc.Append(fx.Hook{
-						OnStart: func(ctx context.Context) error {
-							return deleter.Start(ctx)
-						},
-						OnStop: func(ctx context.Context) error {
-							return nil
-						},
-					})
+				fx.Invoke(func(deleter *Deleter) error {
+					return deleter.Start(cmd.Context())
 				}),
 			)
 
-			if err := app.Start(cmd.Context()); err != nil {
-				return err
-			}
-
-			// Ensure app is stopped properly
-			defer func() {
-				if err := app.Stop(cmd.Context()); err != nil {
-					cmd.PrintErrf("Error stopping application: %v\n", err)
-				}
-			}()
-
-			return nil
+			return app.Start(cmd.Context())
 		},
 	}
 
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion without confirmation")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Skip confirmation prompt")
 	cmd.Flags().StringVarP(&sourceName, "source", "s", "", "Delete indices for a specific source")
 
 	return cmd
 }
 
-// ValidateDeleteArgs validates the command arguments to ensure they are valid.
+// ValidateDeleteArgs validates the arguments for the delete command.
 func ValidateDeleteArgs(sourceName string, args []string) error {
 	if sourceName == "" && len(args) == 0 {
-		return errors.New("either specify indices or use --source flag")
+		return errors.New("either indices or a source name must be specified")
 	}
 	if sourceName != "" && len(args) > 0 {
-		return errors.New("cannot specify both indices and --source flag")
+		return errors.New("cannot specify both indices and a source name")
 	}
 	return nil
 }

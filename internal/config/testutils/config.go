@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 const (
@@ -56,13 +57,13 @@ func LoadTestConfig(t *testing.T, filename string) *config.Config {
 }
 
 // LoadTestSources loads test source configurations from the specified filename
-func LoadTestSources(t *testing.T, filename string) []config.Source {
+func LoadTestSources(t *testing.T, filename string) []types.Source {
 	t.Helper()
 	v := viper.New()
 	v.SetConfigFile(GetTestConfigPath(t, filename))
 	require.NoError(t, v.ReadInConfig(), "failed to read config file")
 
-	var sources []config.Source
+	var sources []types.Source
 	require.NoError(t, v.UnmarshalKey("sources", &sources), "failed to unmarshal sources")
 	return sources
 }

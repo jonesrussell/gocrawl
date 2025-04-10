@@ -5,10 +5,12 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -26,19 +28,19 @@ type MockConfig struct {
 }
 
 // GetSources implements config.Interface.
-func (m *MockConfig) GetSources() []config.Source {
+func (m *MockConfig) GetSources() []types.Source {
 	args := m.Called()
 	if args.Get(0) == nil {
-		return []config.Source{}
+		return []types.Source{}
 	}
-	return args.Get(0).([]config.Source)
+	return args.Get(0).([]types.Source)
 }
 
 // GetCrawlerConfig implements config.Interface.
-func (m *MockConfig) GetCrawlerConfig() *config.CrawlerConfig {
+func (m *MockConfig) GetCrawlerConfig() *crawler.Config {
 	args := m.Called()
 	if args.Get(0) == nil {
-		return &config.CrawlerConfig{
+		return &crawler.Config{
 			BaseURL:     "http://test.com",
 			MaxDepth:    defaultMaxDepth,
 			RateLimit:   time.Second,
@@ -47,7 +49,7 @@ func (m *MockConfig) GetCrawlerConfig() *config.CrawlerConfig {
 			SourceFile:  "", // Empty to prevent loading from file
 		}
 	}
-	return args.Get(0).(*config.CrawlerConfig)
+	return args.Get(0).(*crawler.Config)
 }
 
 // GetLogConfig implements config.Interface.

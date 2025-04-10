@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 // Default configuration values
@@ -16,7 +18,7 @@ const (
 	DefaultMaxBodySize = 10 * 1024 * 1024 // 10MB
 )
 
-// Config holds crawler-specific configuration settings.
+// Config represents the crawler configuration.
 type Config struct {
 	// BaseURL is the starting point for the crawler
 	BaseURL string `yaml:"base_url"`
@@ -24,7 +26,9 @@ type Config struct {
 	MaxDepth int `yaml:"max_depth"`
 	// RateLimit defines the delay between requests
 	RateLimit time.Duration `yaml:"rate_limit"`
-	// Parallelism defines the number of concurrent requests
+	// RandomDelay adds randomization to the delay between requests
+	RandomDelay time.Duration `yaml:"random_delay"`
+	// Parallelism defines the number of concurrent crawlers
 	Parallelism int `yaml:"parallelism"`
 	// UserAgent defines the user agent string to use
 	UserAgent string `yaml:"user_agent"`
@@ -36,63 +40,62 @@ type Config struct {
 	AllowedDomains []string `yaml:"allowed_domains"`
 	// DisallowedDomains defines the domains that cannot be crawled
 	DisallowedDomains []string `yaml:"disallowed_domains"`
-	// SourceFile defines the path to the sources configuration file
+	// SourceFile is the path to the sources configuration file
 	SourceFile string `yaml:"source_file"`
-	// ContentIndexName defines the name of the index for content
-	ContentIndexName string `yaml:"content_index_name"`
+	// Sources contains the list of sources to crawl
+	Sources []types.Source `yaml:"sources"`
+	// IndexName is the name of the Elasticsearch index
+	IndexName string `yaml:"index_name"`
 }
 
-// Validate checks if the configuration is valid.
+// Validate validates the crawler configuration.
 func (c *Config) Validate() error {
 	if c.BaseURL == "" {
-		return errors.New("base URL must be specified")
+		return errors.New("base_url is required")
 	}
-
-	if c.MaxDepth <= 0 {
-		return fmt.Errorf("max depth must be greater than 0, got %d", c.MaxDepth)
+	if c.MaxDepth < 0 {
+		return errors.New("max_depth must be non-negative")
 	}
-
-	if c.RateLimit <= 0 {
-		return fmt.Errorf("rate limit must be greater than 0, got %v", c.RateLimit)
+	if c.RateLimit < 0 {
+		return errors.New("rate_limit must be non-negative")
 	}
-
-	if c.Parallelism <= 0 {
-		return fmt.Errorf("parallelism must be greater than 0, got %d", c.Parallelism)
+	if c.RandomDelay < 0 {
+		return errors.New("random_delay must be non-negative")
 	}
-
-	if c.Timeout <= 0 {
-		return fmt.Errorf("timeout must be greater than 0, got %v", c.Timeout)
+	if c.Parallelism < 1 {
+		return errors.New("parallelism must be positive")
 	}
-
-	if c.MaxBodySize <= 0 {
-		return fmt.Errorf("max body size must be greater than 0, got %d", c.MaxBodySize)
-	}
-
-	if c.SourceFile == "" {
-		return errors.New("source file must be specified")
-	}
-
 	return nil
 }
 
-// New creates a new crawler configuration with the given options.
-func New(opts ...Option) *Config {
-	cfg := &Config{
-		MaxDepth:          DefaultMaxDepth,
-		RateLimit:         DefaultRateLimit,
-		Parallelism:       DefaultParallelism,
-		UserAgent:         DefaultUserAgent,
-		Timeout:           DefaultTimeout,
-		MaxBodySize:       DefaultMaxBodySize,
-		AllowedDomains:    []string{},
-		DisallowedDomains: []string{},
+// New returns a new crawler configuration with default values.
+func New() *Config {
+	return &Config{
+		MaxDepth:    3,
+		RateLimit:   time.Second,
+		RandomDelay: time.Millisecond * 500,
+		Parallelism: 1,
 	}
+}
 
-	for _, opt := range opts {
-		opt(cfg)
-	}
+// SetMaxDepth sets the maximum depth for the crawler.
+func (c *Config) SetMaxDepth(depth int) {
+	c.MaxDepth = depth
+}
 
-	return cfg
+// SetRateLimit sets the rate limit for the crawler.
+func (c *Config) SetRateLimit(rate time.Duration) {
+	c.RateLimit = rate
+}
+
+// SetBaseURL sets the base URL for the crawler.
+func (c *Config) SetBaseURL(url string) {
+	c.BaseURL = url
+}
+
+// SetIndexName sets the index name for the crawler.
+func (c *Config) SetIndexName(index string) {
+	c.IndexName = index
 }
 
 // Option is a function that configures a crawler configuration.

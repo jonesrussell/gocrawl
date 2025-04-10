@@ -15,11 +15,14 @@ import (
 	apitestutils "github.com/jonesrussell/gocrawl/internal/api/testutils"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -94,7 +97,7 @@ func setupTestApp(t *testing.T) *testServer {
 		MaxAge:     28,
 		Compress:   true,
 	})
-	mockConfig.On("GetElasticsearchConfig").Return(&config.ElasticsearchConfig{
+	mockConfig.On("GetElasticsearchConfig").Return(&elasticsearch.Config{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
 	})
@@ -106,11 +109,11 @@ func setupTestApp(t *testing.T) *testServer {
 		WriteTimeout:    15 * time.Second,
 		IdleTimeout:     60 * time.Second,
 	})
-	mockConfig.On("GetSources").Return([]config.Source{}, nil)
+	mockConfig.On("GetSources").Return([]types.Source{}, nil)
 	mockConfig.On("GetCommand").Return("test")
-	mockConfig.On("GetPriorityConfig").Return(&config.PriorityConfig{
-		Default: 1,
-		Rules:   []config.PriorityRule{},
+	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
 	})
 	mockLogger := apitestutils.NewMockLogger()
 	mockSearch := apitestutils.NewMockSearchManager()
@@ -170,7 +173,7 @@ func setupTestApp(t *testing.T) *testServer {
 			),
 			fx.Annotate(
 				mockStorage,
-				fx.As(new(types.Interface)),
+				fx.As(new(storagetypes.Interface)),
 			),
 			fx.Annotate(
 				mockIndexManager,
@@ -366,7 +369,7 @@ func TestModule(t *testing.T) {
 			func() context.Context { return t.Context() },
 			func() config.Interface { return mockConfig },
 			func() logger.Interface { return mockLogger },
-			func() types.Interface { return mockStorage },
+			func() storagetypes.Interface { return mockStorage },
 			func() api.IndexManager { return mockIndexManager },
 		),
 		api.Module,

@@ -10,10 +10,10 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
@@ -25,9 +25,9 @@ type Service struct {
 	// Logger for article operations
 	Logger logger.Interface
 	// Selectors for article extraction
-	Selectors config.ArticleSelectors
+	Selectors types.ArticleSelectors
 	// Storage for article persistence
-	Storage types.Interface
+	Storage storagetypes.Interface
 	// IndexName is the name of the article index
 	IndexName string
 	// metrics holds processing metrics
@@ -37,8 +37,8 @@ type Service struct {
 // NewService creates a new article service.
 func NewService(
 	logger logger.Interface,
-	selectors config.ArticleSelectors,
-	storage types.Interface,
+	selectors types.ArticleSelectors,
+	storage storagetypes.Interface,
 	indexName string,
 ) Interface {
 	return &Service{

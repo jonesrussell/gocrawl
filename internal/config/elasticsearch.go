@@ -2,7 +2,11 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 // ElasticsearchConfig represents Elasticsearch configuration settings.
@@ -23,7 +27,7 @@ type ElasticsearchConfig struct {
 		APIKey string `yaml:"api_key"`
 	} `yaml:"cloud"`
 	// TLS contains TLS configuration
-	TLS *TLSConfig `yaml:"tls"`
+	TLS *types.TLSConfig `yaml:"tls"`
 	// Retry contains retry configuration
 	Retry struct {
 		Enabled     bool          `yaml:"enabled"`
@@ -41,7 +45,7 @@ func NewElasticsearchConfig() *ElasticsearchConfig {
 			ID     string `yaml:"id"`
 			APIKey string `yaml:"api_key"`
 		}{},
-		TLS: &TLSConfig{
+		TLS: &types.TLSConfig{
 			Enabled: false,
 		},
 		Retry: struct {
@@ -56,4 +60,17 @@ func NewElasticsearchConfig() *ElasticsearchConfig {
 			MaxRetries:  3,
 		},
 	}
+}
+
+// Validate validates the Elasticsearch configuration.
+func (c *ElasticsearchConfig) Validate() error {
+	if len(c.Addresses) == 0 {
+		return errors.New("at least one address is required")
+	}
+	if c.TLS != nil {
+		if err := c.TLS.Validate(); err != nil {
+			return fmt.Errorf("tls: %w", err)
+		}
+	}
+	return nil
 }

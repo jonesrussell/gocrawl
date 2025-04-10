@@ -7,19 +7,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 // SourceConfig represents a source configuration.
 type SourceConfig struct {
-	Name         string
-	URL          string
-	RateLimit    time.Duration
-	MaxDepth     int
-	Time         []string
-	ArticleIndex string
-	Index        string
-	Selectors    SelectorConfig
+	Name           string
+	URL            string
+	AllowedDomains []string
+	StartURLs      []string
+	RateLimit      time.Duration
+	MaxDepth       int
+	Time           []string
+	Index          string
+	Selectors      SelectorConfig
+	Rules          types.Rules
 }
 
 // SelectorConfig defines the CSS selectors used for content extraction.
@@ -53,22 +55,23 @@ type ArticleSelectors struct {
 	BylineName    string
 }
 
-// ConvertToConfigSource converts a SourceConfig to a config.Source.
-func ConvertToConfigSource(source *SourceConfig) *config.Source {
+// ConvertToConfigSource converts a SourceConfig to a types.Source.
+func ConvertToConfigSource(source *SourceConfig) *types.Source {
 	if source == nil {
 		return nil
 	}
 
-	return &config.Source{
-		Name:         source.Name,
-		URL:          source.URL,
-		RateLimit:    source.RateLimit,
-		MaxDepth:     source.MaxDepth,
-		Time:         source.Time,
-		ArticleIndex: source.ArticleIndex,
-		Index:        source.Index,
-		Selectors: config.SourceSelectors{
-			Article: config.ArticleSelectors{
+	return &types.Source{
+		Name:           source.Name,
+		URL:            source.URL,
+		AllowedDomains: source.AllowedDomains,
+		StartURLs:      source.StartURLs,
+		RateLimit:      source.RateLimit,
+		MaxDepth:       source.MaxDepth,
+		Time:           source.Time,
+		Index:          source.Index,
+		Selectors: types.SourceSelectors{
+			Article: types.ArticleSelectors{
 				Container:     source.Selectors.Article.Container,
 				Title:         source.Selectors.Article.Title,
 				Body:          source.Selectors.Article.Body,
@@ -93,6 +96,7 @@ func ConvertToConfigSource(source *SourceConfig) *config.Source {
 				BylineName:    source.Selectors.Article.BylineName,
 			},
 		},
+		Rules: source.Rules,
 	}
 }
 
