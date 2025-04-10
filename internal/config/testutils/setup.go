@@ -17,7 +17,7 @@ type TestSetup struct {
 }
 
 // SetupTestEnvironment creates a test environment with config and sources files
-func SetupTestEnvironment(t *testing.T, configContent string, sourcesContent string) *TestSetup {
+func SetupTestEnvironment(t *testing.T, configContent, sourcesContent string) *TestSetup {
 	tmpDir := t.TempDir()
 	sourcesPath := filepath.Join(tmpDir, "sources.yml")
 	configPath := filepath.Join(tmpDir, "config.yml")

@@ -93,8 +93,8 @@ func (c *Config) Validate() error {
 	if err := c.Elasticsearch.Validate(); err != nil {
 		return fmt.Errorf("elasticsearch: %w", err)
 	}
-	for i, source := range c.Sources {
-		if err := source.Validate(); err != nil {
+	for i := range c.Sources {
+		if err := c.Sources[i].Validate(); err != nil {
 			return fmt.Errorf("source[%d]: %w", i, err)
 		}
 	}

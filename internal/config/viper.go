@@ -22,3 +22,8 @@ type Field struct {
 	// Value is the field value
 	Value interface{}
 }
+
+type ConfigValue struct {
+	Key   string
+	Value any
+}

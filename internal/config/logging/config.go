@@ -81,7 +81,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid log output: %s", c.Output)
 	}
 
-	if strings.ToLower(c.Output) == "file" && c.File == "" {
+	if strings.EqualFold(c.Output, "file") && c.File == "" {
 		return errors.New("log file path is required when output is file")
 	}
 

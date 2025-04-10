@@ -120,7 +120,7 @@ func (c *Config) Validate() error {
 
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
-	defaultAddresses := []string{"http://localhost:9200"}
+	defaultAddresses := []string{DefaultAddresses}
 	tls := &TLSConfig{
 		Enabled: false,
 	}
@@ -138,13 +138,13 @@ func NewConfig() *Config {
 			MaxWait     time.Duration `yaml:"max_wait"`
 			MaxRetries  int           `yaml:"max_retries"`
 		}{
-			Enabled:     true,
-			InitialWait: time.Second,
-			MaxWait:     time.Minute,
-			MaxRetries:  3,
+			Enabled:     DefaultRetryEnabled,
+			InitialWait: DefaultInitialWait,
+			MaxWait:     DefaultMaxWait,
+			MaxRetries:  DefaultMaxRetries,
 		},
-		BulkSize:      1000,
-		FlushInterval: 30 * time.Second,
+		BulkSize:      DefaultBulkSize,
+		FlushInterval: DefaultFlushInterval,
 	}
 }
 

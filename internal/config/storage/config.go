@@ -14,6 +14,8 @@ const (
 	DefaultUsername = ""
 	DefaultPassword = ""
 	DefaultSSL      = false
+	DefaultMaxSize  = 1024 * 1024 * 1024 // 1 GB
+	DefaultMaxItems = 10000
 )
 
 // Config represents storage-specific configuration settings.
@@ -43,10 +45,10 @@ type Config struct {
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
 	return &Config{
-		Type:        "memory",
+		Type:        DefaultType,
 		Path:        "./data",
-		MaxSize:     1024 * 1024 * 1024, // 1 GB
-		MaxItems:    10000,
+		MaxSize:     DefaultMaxSize,
+		MaxItems:    DefaultMaxItems,
 		Compression: true,
 		Host:        DefaultHost,
 		Port:        DefaultPort,

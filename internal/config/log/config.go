@@ -13,7 +13,7 @@ const (
 	DefaultOutput     = "stdout"
 	DefaultMaxSize    = 100
 	DefaultMaxBackups = 3
-	DefaultMaxAge     = 28
+	DefaultMaxAge     = 30
 	DefaultCompress   = true
 )
 
@@ -40,13 +40,13 @@ type Config struct {
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
 	return &Config{
-		Level:      "info",
-		Format:     "json",
-		Output:     "stdout",
-		MaxSize:    100,
-		MaxBackups: 3,
-		MaxAge:     30,
-		Compress:   true,
+		Level:      DefaultLevel,
+		Format:     DefaultFormat,
+		Output:     DefaultOutput,
+		MaxSize:    DefaultMaxSize,
+		MaxBackups: DefaultMaxBackups,
+		MaxAge:     DefaultMaxAge,
+		Compress:   DefaultCompress,
 	}
 }
 

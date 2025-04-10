@@ -1,8 +1,9 @@
-package server
+package server_test
 
 import (
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/stretchr/testify/require"
 )
 
@@ -11,12 +12,12 @@ func TestConfig_Validate(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		config  *Config
+		config  *server.Config
 		wantErr bool
 	}{
 		{
 			name: "valid configuration with security disabled",
-			config: &Config{
+			config: &server.Config{
 				SecurityEnabled: false,
 				APIKey:          "",
 			},
@@ -24,7 +25,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "valid configuration with security enabled",
-			config: &Config{
+			config: &server.Config{
 				SecurityEnabled: true,
 				APIKey:          "test_id:test_api_key",
 			},
@@ -32,7 +33,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "security enabled without API key",
-			config: &Config{
+			config: &server.Config{
 				SecurityEnabled: true,
 				APIKey:          "",
 			},
@@ -40,7 +41,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "security enabled with invalid API key format",
-			config: &Config{
+			config: &server.Config{
 				SecurityEnabled: true,
 				APIKey:          "invalid_format",
 			},
@@ -48,7 +49,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "security enabled with empty API key parts",
-			config: &Config{
+			config: &server.Config{
 				SecurityEnabled: true,
 				APIKey:          ":",
 			},
@@ -56,7 +57,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "security enabled with empty API key id",
-			config: &Config{
+			config: &server.Config{
 				SecurityEnabled: true,
 				APIKey:          ":test_api_key",
 			},
@@ -64,7 +65,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "security enabled with empty API key value",
-			config: &Config{
+			config: &server.Config{
 				SecurityEnabled: true,
 				APIKey:          "test_id:",
 			},
@@ -91,24 +92,24 @@ func TestNew(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		opts     []Option
-		expected *Config
+		opts     []server.Option
+		expected *server.Config
 	}{
 		{
 			name: "default configuration",
 			opts: nil,
-			expected: &Config{
-				SecurityEnabled: DefaultSecurityEnabled,
-				APIKey:          DefaultAPIKey,
+			expected: &server.Config{
+				SecurityEnabled: server.DefaultSecurityEnabled,
+				APIKey:          server.DefaultAPIKey,
 			},
 		},
 		{
 			name: "custom configuration",
-			opts: []Option{
-				WithSecurityEnabled(true),
-				WithAPIKey("test_id:test_api_key"),
+			opts: []server.Option{
+				server.WithSecurityEnabled(true),
+				server.WithAPIKey("test_id:test_api_key"),
 			},
-			expected: &Config{
+			expected: &server.Config{
 				SecurityEnabled: true,
 				APIKey:          "test_id:test_api_key",
 			},
@@ -119,7 +120,7 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := New(tt.opts...)
+			cfg := server.New(tt.opts...)
 			require.Equal(t, tt.expected, cfg)
 		})
 	}

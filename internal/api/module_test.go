@@ -5,7 +5,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -316,7 +315,7 @@ func TestSearchEndpoint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create request
-			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			req.Header.Set("Content-Type", "application/json")
 			if tt.apiKey != "" {
 				req.Header.Set("X-Api-Key", tt.apiKey)

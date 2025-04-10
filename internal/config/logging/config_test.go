@@ -1,8 +1,9 @@
-package logging
+package logging_test
 
 import (
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/internal/config/logging"
 	"github.com/stretchr/testify/require"
 )
 
@@ -11,12 +12,12 @@ func TestConfig_Validate(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		config  *Config
+		config  *logging.Config
 		wantErr bool
 	}{
 		{
 			name: "valid configuration",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Encoding:   "json",
 				Output:     "stdout",
@@ -28,7 +29,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "valid file configuration",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Encoding:   "json",
 				Output:     "file",
@@ -41,7 +42,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "missing level",
-			config: &Config{
+			config: &logging.Config{
 				Encoding:   "json",
 				Output:     "stdout",
 				MaxSize:    100,
@@ -52,7 +53,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid level",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "invalid",
 				Encoding:   "json",
 				Output:     "stdout",
@@ -64,7 +65,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "missing encoding",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Output:     "stdout",
 				MaxSize:    100,
@@ -75,7 +76,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid encoding",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Encoding:   "invalid",
 				Output:     "stdout",
@@ -87,7 +88,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "missing output",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Encoding:   "json",
 				MaxSize:    100,
@@ -98,7 +99,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid output",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Encoding:   "json",
 				Output:     "invalid",
@@ -110,7 +111,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "file output without file path",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Encoding:   "json",
 				Output:     "file",
@@ -122,7 +123,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid max size",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Encoding:   "json",
 				Output:     "stdout",
@@ -134,7 +135,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid max backups",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Encoding:   "json",
 				Output:     "stdout",
@@ -146,7 +147,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid max age",
-			config: &Config{
+			config: &logging.Config{
 				Level:      "info",
 				Encoding:   "json",
 				Output:     "stdout",
@@ -177,19 +178,19 @@ func TestNew(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		opts     []Option
-		expected *Config
+		opts     []logging.Option
+		expected *logging.Config
 	}{
 		{
 			name: "default configuration",
 			opts: nil,
-			expected: &Config{
-				Level:      DefaultLevel,
-				Encoding:   DefaultEncoding,
-				Output:     DefaultOutput,
-				Debug:      DefaultDebug,
-				Caller:     DefaultCaller,
-				Stacktrace: DefaultStacktrace,
+			expected: &logging.Config{
+				Level:      logging.DefaultLevel,
+				Encoding:   logging.DefaultEncoding,
+				Output:     logging.DefaultOutput,
+				Debug:      logging.DefaultDebug,
+				Caller:     logging.DefaultCaller,
+				Stacktrace: logging.DefaultStacktrace,
 				MaxSize:    100,
 				MaxBackups: 3,
 				MaxAge:     30,
@@ -198,20 +199,20 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name: "custom configuration",
-			opts: []Option{
-				WithLevel("debug"),
-				WithEncoding("console"),
-				WithOutput("file"),
-				WithFile("custom.log"),
-				WithDebug(true),
-				WithCaller(true),
-				WithStacktrace(true),
-				WithMaxSize(200),
-				WithMaxBackups(5),
-				WithMaxAge(60),
-				WithCompress(false),
+			opts: []logging.Option{
+				logging.WithLevel("debug"),
+				logging.WithEncoding("console"),
+				logging.WithOutput("file"),
+				logging.WithFile("custom.log"),
+				logging.WithDebug(true),
+				logging.WithCaller(true),
+				logging.WithStacktrace(true),
+				logging.WithMaxSize(200),
+				logging.WithMaxBackups(5),
+				logging.WithMaxAge(60),
+				logging.WithCompress(false),
 			},
-			expected: &Config{
+			expected: &logging.Config{
 				Level:      "debug",
 				Encoding:   "console",
 				Output:     "file",
@@ -231,7 +232,7 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := New(tt.opts...)
+			cfg := logging.New(tt.opts...)
 			require.Equal(t, tt.expected, cfg)
 		})
 	}

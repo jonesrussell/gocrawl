@@ -11,10 +11,8 @@ import (
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -126,12 +124,8 @@ var Module = fx.Module("storage",
 			}
 		},
 		// Provide storage client
-		func(client *es.Client, logger logger.Interface, opts Options) types.Interface {
-			return NewStorage(client, logger, opts)
-		},
+		NewStorage,
 		// Provide search manager
-		func(storage types.Interface, logger logger.Interface) api.SearchManager {
-			return NewSearchManager(storage, logger)
-		},
+		NewSearchManager,
 	),
 )

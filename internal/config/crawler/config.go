@@ -10,12 +10,13 @@ import (
 
 // Default configuration values
 const (
-	DefaultMaxDepth    = 2
+	DefaultMaxDepth    = 3
 	DefaultRateLimit   = 2 * time.Second
 	DefaultParallelism = 2
 	DefaultUserAgent   = "gocrawl/1.0"
 	DefaultTimeout     = 30 * time.Second
 	DefaultMaxBodySize = 10 * 1024 * 1024 // 10MB
+	DefaultRandomDelay = 500 * time.Millisecond
 )
 
 // Config represents the crawler configuration.
@@ -50,52 +51,59 @@ type Config struct {
 
 // Validate validates the crawler configuration.
 func (c *Config) Validate() error {
+	if c == nil {
+		return errors.New("crawler configuration is required")
+	}
+
 	if c.BaseURL == "" {
-		return errors.New("base_url is required")
+		return errors.New("base URL is required")
 	}
+
 	if c.MaxDepth < 0 {
-		return errors.New("max_depth must be non-negative")
+		return errors.New("max depth must be non-negative")
 	}
+
 	if c.RateLimit < 0 {
-		return errors.New("rate_limit must be non-negative")
+		return errors.New("rate limit must be non-negative")
 	}
+
 	if c.RandomDelay < 0 {
-		return errors.New("random_delay must be non-negative")
+		return errors.New("random delay must be non-negative")
 	}
+
 	if c.Parallelism < 1 {
 		return errors.New("parallelism must be positive")
 	}
+
+	if c.Timeout < 0 {
+		return errors.New("timeout must be non-negative")
+	}
+
+	if c.MaxBodySize < 0 {
+		return errors.New("max body size must be non-negative")
+	}
+
 	return nil
 }
 
-// New returns a new crawler configuration with default values.
-func New() *Config {
-	return &Config{
-		MaxDepth:    3,
-		RateLimit:   time.Second,
-		RandomDelay: time.Millisecond * 500,
-		Parallelism: 1,
+// New creates a new crawler configuration with the given options.
+func New(opts ...Option) *Config {
+	cfg := &Config{
+		MaxDepth:    DefaultMaxDepth,
+		RateLimit:   DefaultRateLimit,
+		RandomDelay: DefaultRandomDelay,
+		Parallelism: DefaultParallelism,
+		UserAgent:   DefaultUserAgent,
+		Timeout:     DefaultTimeout,
+		MaxBodySize: DefaultMaxBodySize,
+		IndexName:   "gocrawl",
 	}
-}
 
-// SetMaxDepth sets the maximum depth for the crawler.
-func (c *Config) SetMaxDepth(depth int) {
-	c.MaxDepth = depth
-}
+	for _, opt := range opts {
+		opt(cfg)
+	}
 
-// SetRateLimit sets the rate limit for the crawler.
-func (c *Config) SetRateLimit(rate time.Duration) {
-	c.RateLimit = rate
-}
-
-// SetBaseURL sets the base URL for the crawler.
-func (c *Config) SetBaseURL(url string) {
-	c.BaseURL = url
-}
-
-// SetIndexName sets the index name for the crawler.
-func (c *Config) SetIndexName(index string) {
-	c.IndexName = index
+	return cfg
 }
 
 // Option is a function that configures a crawler configuration.
@@ -119,6 +127,13 @@ func WithMaxDepth(depth int) Option {
 func WithRateLimit(limit time.Duration) Option {
 	return func(c *Config) {
 		c.RateLimit = limit
+	}
+}
+
+// WithRandomDelay sets the random delay.
+func WithRandomDelay(delay time.Duration) Option {
+	return func(c *Config) {
+		c.RandomDelay = delay
 	}
 }
 

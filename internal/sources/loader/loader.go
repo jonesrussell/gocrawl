@@ -67,14 +67,14 @@ func LoadFromFile(path string) ([]Config, error) {
 	}
 
 	var fileConfig FileConfig
-	if err := yaml.Unmarshal(data, &fileConfig); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	if unmarshalErr := yaml.Unmarshal(data, &fileConfig); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w", unmarshalErr)
 	}
 
 	// Validate each config
 	for i := range fileConfig.Sources {
-		if err := ValidateConfig(&fileConfig.Sources[i]); err != nil {
-			return nil, fmt.Errorf("invalid config at index %d: %w", i, err)
+		if validateErr := ValidateConfig(&fileConfig.Sources[i]); validateErr != nil {
+			return nil, fmt.Errorf("invalid config at index %d: %w", i, validateErr)
 		}
 	}
 
@@ -112,8 +112,8 @@ func ValidateConfig(cfg *Config) error {
 	// Validate time format if provided
 	if len(cfg.Time) > 0 {
 		for _, t := range cfg.Time {
-			if _, err := time.Parse("15:04", t); err != nil {
-				return fmt.Errorf("invalid time format: %w", err)
+			if _, parseErr := time.Parse("15:04", t); parseErr != nil {
+				return fmt.Errorf("invalid time format: %w", parseErr)
 			}
 		}
 	}

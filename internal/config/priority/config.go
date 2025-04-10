@@ -1,7 +1,18 @@
 // Package priority provides priority-related configuration types and functions.
 package priority
 
-import "fmt"
+import (
+	"errors"
+)
+
+// Default configuration values
+const (
+	DefaultPriority          = 5
+	DefaultMaxPriority       = 10
+	DefaultMinPriority       = 1
+	DefaultPriorityIncrement = 1
+	DefaultPriorityDecrement = 1
+)
 
 // Config represents priority-specific configuration settings.
 type Config struct {
@@ -22,11 +33,11 @@ type Config struct {
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
 	return &Config{
-		DefaultPriority:   5,
-		MaxPriority:       10,
-		MinPriority:       1,
-		PriorityIncrement: 1,
-		PriorityDecrement: 1,
+		DefaultPriority:   DefaultPriority,
+		MaxPriority:       DefaultMaxPriority,
+		MinPriority:       DefaultMinPriority,
+		PriorityIncrement: DefaultPriorityIncrement,
+		PriorityDecrement: DefaultPriorityDecrement,
 	}
 }
 
@@ -66,7 +77,7 @@ func (c *Config) Validate() error {
 
 	for _, rule := range c.Rules {
 		if rule.Pattern == "" {
-			return fmt.Errorf("rule pattern cannot be empty")
+			return errors.New("rule pattern cannot be empty")
 		}
 	}
 

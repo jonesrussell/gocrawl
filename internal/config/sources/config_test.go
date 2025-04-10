@@ -1,9 +1,10 @@
-package sources
+package sources_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/config/sources"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,12 +13,12 @@ func TestConfig_Validate(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		config  *Config
+		config  *sources.Config
 		wantErr bool
 	}{
 		{
 			name: "valid configuration",
-			config: &Config{
+			config: &sources.Config{
 				BaseURL:      "http://example.com",
 				MaxDepth:     2,
 				Parallelism:  2,
@@ -30,7 +31,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "empty base URL",
-			config: &Config{
+			config: &sources.Config{
 				BaseURL:      "",
 				MaxDepth:     2,
 				Parallelism:  2,
@@ -43,7 +44,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid base URL",
-			config: &Config{
+			config: &sources.Config{
 				BaseURL:      "invalid-url",
 				MaxDepth:     2,
 				Parallelism:  2,
@@ -56,7 +57,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "negative max depth",
-			config: &Config{
+			config: &sources.Config{
 				BaseURL:      "http://example.com",
 				MaxDepth:     -1,
 				Parallelism:  2,
@@ -69,7 +70,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "zero parallelism",
-			config: &Config{
+			config: &sources.Config{
 				BaseURL:      "http://example.com",
 				MaxDepth:     2,
 				Parallelism:  0,
@@ -82,7 +83,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "negative rate limit",
-			config: &Config{
+			config: &sources.Config{
 				BaseURL:      "http://example.com",
 				MaxDepth:     2,
 				Parallelism:  2,
@@ -95,7 +96,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "zero timeout",
-			config: &Config{
+			config: &sources.Config{
 				BaseURL:      "http://example.com",
 				MaxDepth:     2,
 				Parallelism:  2,
@@ -108,7 +109,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "empty user agent",
-			config: &Config{
+			config: &sources.Config{
 				BaseURL:      "http://example.com",
 				MaxDepth:     2,
 				Parallelism:  2,
@@ -121,7 +122,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "empty allow domains",
-			config: &Config{
+			config: &sources.Config{
 				BaseURL:      "http://example.com",
 				MaxDepth:     2,
 				Parallelism:  2,
@@ -153,34 +154,34 @@ func TestNew(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		opts     []Option
-		expected *Config
+		opts     []sources.Option
+		expected *sources.Config
 	}{
 		{
 			name: "default configuration",
 			opts: nil,
-			expected: &Config{
-				MaxDepth:     DefaultMaxDepth,
-				Parallelism:  DefaultParallelism,
-				RateLimit:    DefaultRateLimit,
-				Timeout:      DefaultTimeout,
-				UserAgent:    DefaultUserAgent,
-				AllowDomains: DefaultAllowDomains,
+			expected: &sources.Config{
+				MaxDepth:     sources.DefaultMaxDepth,
+				Parallelism:  sources.DefaultParallelism,
+				RateLimit:    sources.DefaultRateLimit,
+				Timeout:      sources.DefaultTimeout,
+				UserAgent:    sources.DefaultUserAgent,
+				AllowDomains: sources.DefaultAllowDomains,
 			},
 		},
 		{
 			name: "custom configuration",
-			opts: []Option{
-				WithBaseURL("http://example.com"),
-				WithMaxDepth(3),
-				WithParallelism(4),
-				WithRateLimit(5 * time.Second),
-				WithTimeout(60 * time.Second),
-				WithUserAgent("custom-agent"),
-				WithAllowDomains("example.com,test.com"),
-				WithDisallowedURLFilters([]string{"*.pdf", "*.jpg"}),
+			opts: []sources.Option{
+				sources.WithBaseURL("http://example.com"),
+				sources.WithMaxDepth(3),
+				sources.WithParallelism(4),
+				sources.WithRateLimit(5 * time.Second),
+				sources.WithTimeout(60 * time.Second),
+				sources.WithUserAgent("custom-agent"),
+				sources.WithAllowDomains("example.com,test.com"),
+				sources.WithDisallowedURLFilters([]string{"*.pdf", "*.jpg"}),
 			},
-			expected: &Config{
+			expected: &sources.Config{
 				BaseURL:              "http://example.com",
 				MaxDepth:             3,
 				Parallelism:          4,
@@ -197,7 +198,7 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := New(tt.opts...)
+			cfg := sources.New(tt.opts...)
 			require.Equal(t, tt.expected, cfg)
 		})
 	}

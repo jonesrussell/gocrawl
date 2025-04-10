@@ -87,48 +87,86 @@ const (
 	// DefaultHTTPIdleTimeout is the default idle timeout for HTTP connections
 	DefaultHTTPIdleTimeout = 90 * time.Second
 
-	// defaultRetryMaxWait is the default maximum wait time between retries
-	defaultRetryMaxWait = 30 * time.Second
+	// DefaultRetryMaxWait is the default maximum wait time between retries
+	DefaultRetryMaxWait = 30 * time.Second
 
-	// defaultRetryInitialWait is the default initial wait time between retries
-	defaultRetryInitialWait = 1 * time.Second
+	// DefaultRetryInitialWait is the default initial wait time between retries
+	DefaultRetryInitialWait = 1 * time.Second
 
-	// defaultMaxRetries is the default number of retries for failed requests
-	defaultMaxRetries = 3
+	// DefaultMaxRetries is the default number of retries for failed requests
+	DefaultMaxRetries = 3
 
 	// DefaultServerPort is the default server port
 	DefaultServerPort = 8080
 
-	// Constants for default configuration values
-	defaultMaxAge             = 86400 // 24 hours in seconds
-	defaultRateLimitPerMinute = 60
+	// DefaultMaxAge is the default maximum age in seconds (24 hours)
+	DefaultMaxAge = 86400
 
-	// Default rate limits
-	defaultCrawlerRateLimit = "1s"
-	defaultRandomDelay      = 500 * time.Millisecond
+	// DefaultRateLimitPerMinute is the default rate limit per minute
+	DefaultRateLimitPerMinute = 60
 
-	// Default Elasticsearch settings
-	defaultESAddress = "http://localhost:9200"
-	defaultESIndex   = "gocrawl"
+	// DefaultCrawlerRateLimit is the default crawler rate limit
+	DefaultCrawlerRateLimit = "1s"
 
-	// Default app settings
-	defaultAppName    = "gocrawl"
-	defaultAppVersion = "1.0.0"
-	defaultAppEnv     = "development"
+	// DefaultRandomDelay is the default random delay between requests
+	DefaultRandomDelay = 500 * time.Millisecond
 
-	// Default values for various configurations
-	DefaultMaxRetries          = 3
-	DefaultBulkSize            = 1000
-	DefaultFlushInterval       = 30 * time.Second
-	DefaultPriority            = 5
-	DefaultMaxPriority         = 10
-	DefaultTimeout             = 10 * time.Second
-	DefaultMaxHeaderBytes      = 1 << 20            // 1 MB
-	DefaultStorageMaxSize      = 1024 * 1024 * 1024 // 1 GB
-	DefaultStorageMaxItems     = 10000
-	DefaultMaxIdleConns        = 100
-	DefaultIdleConnTimeout     = 90 * time.Second
+	// DefaultESAddress is the default Elasticsearch address
+	DefaultESAddress = "http://localhost:9200"
+
+	// DefaultESIndex is the default Elasticsearch index name
+	DefaultESIndex = "gocrawl"
+
+	// DefaultAppName is the default application name
+	DefaultAppName = "gocrawl"
+
+	// DefaultAppVersion is the default application version
+	DefaultAppVersion = "1.0.0"
+
+	// DefaultAppEnv is the default application environment
+	DefaultAppEnv = "development"
+
+	// DefaultBulkSize is the default bulk size for Elasticsearch operations
+	DefaultBulkSize = 1000
+
+	// DefaultFlushInterval is the default flush interval for Elasticsearch operations
+	DefaultFlushInterval = 30 * time.Second
+
+	// DefaultPriority is the default priority for items
+	DefaultPriority = 5
+
+	// DefaultMaxPriority is the default maximum priority
+	DefaultMaxPriority = 10
+
+	// DefaultTimeout is the default timeout for operations
+	DefaultTimeout = 10 * time.Second
+
+	// DefaultMaxHeaderBytes is the default maximum header bytes (1 MB)
+	DefaultMaxHeaderBytes = 1 << 20
+
+	// DefaultStorageMaxSize is the default maximum storage size (1 GB)
+	DefaultStorageMaxSize = 1024 * 1024 * 1024
+
+	// DefaultStorageMaxItems is the default maximum number of items to store
+	DefaultStorageMaxItems = 10000
+
+	// DefaultMaxIdleConns is the default maximum number of idle (keep-alive) connections
+	DefaultMaxIdleConns = 100
+
+	// DefaultMaxIdleConnsPerHost is the default maximum number of idle (keep-alive) connections per host
+	DefaultMaxIdleConnsPerHost = 100
+
+	// DefaultIdleConnTimeout is the default maximum amount of time an idle (keep-alive) connection will remain idle before closing itself
+	DefaultIdleConnTimeout = 90 * time.Second
+
+	// DefaultTLSHandshakeTimeout is the default maximum amount of time waiting to wait for a TLS handshake
 	DefaultTLSHandshakeTimeout = 10 * time.Second
+
+	// DefaultMaxBodySize is the default maximum body size (10MB)
+	DefaultMaxBodySize = 10 * 1024 * 1024
+
+	// DefaultMaxRateLimitCount is the default maximum rate limit count
+	DefaultMaxRateLimitCount = 100
 )
 
 // ValidHTTPMethods defines the valid HTTP methods

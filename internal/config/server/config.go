@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 )
@@ -15,6 +14,9 @@ const (
 	DefaultReadTimeout     = 15 * time.Second
 	DefaultWriteTimeout    = 15 * time.Second
 	DefaultIdleTimeout     = 60 * time.Second
+	DefaultHost            = "localhost"
+	DefaultPort            = 8080
+	DefaultMaxHeaderBytes  = 1 << 20 // 1 MB
 )
 
 // Config represents server-specific configuration settings.
@@ -58,7 +60,7 @@ func (c *Config) Validate() error {
 		// API key should be in the format "id:api_key"
 		parts := strings.Split(c.APIKey, ":")
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			return fmt.Errorf("server API key must be in the format 'id:api_key'")
+			return errors.New("server API key must be in the format 'id:api_key'")
 		}
 	}
 
@@ -103,12 +105,12 @@ func WithAPIKey(key string) Option {
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
 	return &Config{
-		Host:           "localhost",
-		Port:           8080,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		IdleTimeout:    120 * time.Second,
-		MaxHeaderBytes: 1 << 20, // 1 MB
+		Host:           DefaultHost,
+		Port:           DefaultPort,
+		ReadTimeout:    DefaultReadTimeout,
+		WriteTimeout:   DefaultWriteTimeout,
+		IdleTimeout:    DefaultIdleTimeout,
+		MaxHeaderBytes: DefaultMaxHeaderBytes,
 		TLS: struct {
 			Enabled  bool   `yaml:"enabled"`
 			CertFile string `yaml:"cert_file"`

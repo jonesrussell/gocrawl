@@ -9,8 +9,8 @@ import (
 
 // MockProcessor implements common.Processor for testing
 type MockProcessor struct {
-	ProcessFunc     func(ctx context.Context, data interface{}) error
-	CanProcessFunc  func(data interface{}) bool
+	ProcessFunc     func(ctx context.Context, data any) error
+	CanProcessFunc  func(data any) bool
 	ContentTypeFunc func() common.ContentType
 	GetMetricsFunc  func() *common.Metrics
 	ProcessHTMLFunc func(ctx context.Context, html *colly.HTMLElement) error
@@ -19,14 +19,14 @@ type MockProcessor struct {
 	StopFunc        func(ctx context.Context) error
 }
 
-func (p *MockProcessor) Process(ctx context.Context, data interface{}) error {
+func (p *MockProcessor) Process(ctx context.Context, data any) error {
 	if p.ProcessFunc != nil {
 		return p.ProcessFunc(ctx, data)
 	}
 	return nil
 }
 
-func (p *MockProcessor) CanProcess(data interface{}) bool {
+func (p *MockProcessor) CanProcess(data any) bool {
 	if p.CanProcessFunc != nil {
 		return p.CanProcessFunc(data)
 	}
@@ -80,6 +80,6 @@ func NewMockProcessor() *MockProcessor {
 }
 
 // ProvideMockProcessors provides mock processors for testing
-func ProvideMockProcessors() (common.Processor, common.Processor) {
+func ProvideMockProcessors() (contentProcessor, articleProcessor common.Processor) {
 	return NewMockProcessor(), NewMockProcessor()
 }

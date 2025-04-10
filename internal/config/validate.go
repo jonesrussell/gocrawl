@@ -160,8 +160,8 @@ func ValidateSources(sources []types.Source) error {
 	if len(sources) == 0 {
 		return errors.New("at least one source is required")
 	}
-	for i, source := range sources {
-		if err := source.Validate(); err != nil {
+	for i := range sources {
+		if err := sources[i].Validate(); err != nil {
 			return fmt.Errorf("source[%d]: %w", i, err)
 		}
 	}
@@ -252,13 +252,9 @@ func validateSources(sources []types.Source) error {
 		}
 	}
 
-	for i, source := range sources {
-		if err := source.Validate(); err != nil {
-			return &ValidationError{
-				Field:  fmt.Sprintf("sources[%d]", i),
-				Value:  source,
-				Reason: err.Error(),
-			}
+	for i := range sources {
+		if err := sources[i].Validate(); err != nil {
+			return fmt.Errorf("source[%d]: %w", i, err)
 		}
 	}
 	return nil
