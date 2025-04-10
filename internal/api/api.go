@@ -119,33 +119,29 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 					"content": req.Query,
 				},
 			},
-			"size": defaultSearchSize,
 		}
 
-		// Use the search manager to perform the search
-		results, err := searchManager.Search(c.Request.Context(), req.Index, query)
+		// Get the total count first
+		total, err := searchManager.Count(c.Request.Context(), req.Index, query)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, types.APIError{
 				Code:    http.StatusInternalServerError,
-				Message: "Failed to perform search",
+				Message: "Failed to get total count",
 				Err:     err,
 			})
 			return
 		}
 
-		// Get the total count using a wrapped query
-		total, err := searchManager.Count(c.Request.Context(), req.Index, map[string]any{
-			"query": map[string]any{
-				"match": map[string]any{
-					"content": req.Query,
-				},
-			},
-			"size": defaultSearchSize,
-		})
+		// Add size to query for search
+		searchQuery := query
+		searchQuery["size"] = defaultSearchSize
+
+		// Use the search manager to perform the search
+		results, err := searchManager.Search(c.Request.Context(), req.Index, searchQuery)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, types.APIError{
 				Code:    http.StatusInternalServerError,
-				Message: "Failed to get total count",
+				Message: "Failed to perform search",
 				Err:     err,
 			})
 			return
@@ -156,7 +152,6 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 			Results: results,
 			Total:   int(total),
 		}
-
 		c.JSON(http.StatusOK, response)
 	}
 }

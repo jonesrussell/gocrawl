@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:{{$dotenv GOCRAWL_PORT}}
 @contentType = application/json
-@apiKey = {{$dotenv GOCRAWL_API_KEY}}
+@apiKey = {{$dotenv ELASTICSEARCH_API_KEY}}
 
 ### Health Check
 GET {{baseUrl}}/health
@@ -13,8 +13,7 @@ X-API-Key: {{apiKey}}
 
 {
     "query": "test",
-    "index": "articles",
-    "size": 10
+    "index": "articles"
 }
 
 ### Search with empty query

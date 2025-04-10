@@ -830,18 +830,22 @@ func (s *Storage) Count(ctx context.Context, index string, query any) (int64, er
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
 	defer cancel()
 
-	body, marshalErr := marshalJSON(query)
-	if marshalErr != nil {
-		return 0, fmt.Errorf("error marshaling count query: %w", marshalErr)
+	// Create the count request
+	var body bytes.Buffer
+	if query != nil {
+		if err := json.NewEncoder(&body).Encode(query); err != nil {
+			return 0, fmt.Errorf("error encoding count query: %w", err)
+		}
 	}
 
-	res, countErr := s.client.Count(
+	res, err := s.client.Count(
 		s.client.Count.WithContext(ctx),
 		s.client.Count.WithIndex(index),
-		s.client.Count.WithBody(bytes.NewReader(body)),
+		s.client.Count.WithBody(&body),
 	)
-	if countErr != nil {
-		return 0, fmt.Errorf("failed to execute count: %w", countErr)
+	if err != nil {
+		s.logger.Error("Failed to execute count", "error", err)
+		return 0, fmt.Errorf("failed to execute count: %w", err)
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
@@ -854,20 +858,16 @@ func (s *Storage) Count(ctx context.Context, index string, query any) (int64, er
 		return 0, fmt.Errorf("error executing count: %s", res.String())
 	}
 
-	var result map[string]any
-	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		s.logger.Error("Failed to decode count result", "error", decodeErr)
-		return 0, fmt.Errorf("error decoding count result: %w", decodeErr)
+	var result struct {
+		Count int64 `json:"count"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		s.logger.Error("Failed to decode count result", "error", err)
+		return 0, fmt.Errorf("error decoding count result: %w", err)
 	}
 
-	count, ok := result["count"].(float64)
-	if !ok {
-		s.logger.Error("Failed to decode count result", "error", "invalid count result format")
-		return 0, errors.New("invalid count result format")
-	}
-
-	s.logger.Info("Executed count successfully", "index", index)
-	return int64(count), nil
+	s.logger.Info("Executed count successfully", "index", index, "count", result.Count)
+	return result.Count, nil
 }
 
 // TestConnection tests the connection to the storage backend
