@@ -186,8 +186,8 @@ func (d *Deleter) confirmDeletion(indicesToDelete []string) error {
 	return nil
 }
 
-// deleteCommand creates and returns the command for deleting Elasticsearch indices.
-func deleteCommand() *cobra.Command {
+// NewDeleteCommand creates a new delete command
+func NewDeleteCommand() *cobra.Command {
 	var (
 		force      bool
 		sourceName string

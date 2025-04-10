@@ -46,9 +46,9 @@ func NewIndices(p struct {
 		Long:  `Manage Elasticsearch indices for the crawler.`,
 	}
 
-	cmd.AddCommand(listCommand())
-	cmd.AddCommand(deleteCommand())
-	cmd.AddCommand(CreateCommand())
+	cmd.AddCommand(NewListCommand())
+	cmd.AddCommand(NewDeleteCommand())
+	cmd.AddCommand(NewCreateCommand())
 
 	return cmd
 }

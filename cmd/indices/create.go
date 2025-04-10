@@ -94,8 +94,8 @@ func (c *Creator) Start(ctx context.Context) error {
 	return nil
 }
 
-// CreateCommand creates and returns the command for creating an Elasticsearch index.
-func CreateCommand() *cobra.Command {
+// NewCreateCommand creates a new create command
+func NewCreateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [index-name]",
 		Short: "Create a new Elasticsearch index",

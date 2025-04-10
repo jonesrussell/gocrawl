@@ -12,34 +12,27 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
-// Lister implements the indices list command
-type Lister struct {
-	config  config.Interface
-	logger  logger.Interface
-	storage types.Interface
+// TableRenderer handles the display of index data in a table format
+type TableRenderer struct {
+	logger logger.Interface
 }
 
-// NewLister creates a new lister instance
-func NewLister(
-	config config.Interface,
-	logger logger.Interface,
-	storage types.Interface,
-) *Lister {
-	return &Lister{
-		config:  config,
-		logger:  logger,
-		storage: storage,
+// NewTableRenderer creates a new TableRenderer instance
+func NewTableRenderer(logger logger.Interface) *TableRenderer {
+	return &TableRenderer{
+		logger: logger,
 	}
 }
 
 // handleIndexError handles common error cases for index operations
-func (l *Lister) handleIndexError(operation string, index string, err error, action string, details string) error {
-	l.logger.Error(fmt.Sprintf("Failed to %s for index", operation),
+func (r *TableRenderer) handleIndexError(operation string, index string, err error, action string, details string) error {
+	r.logger.Error(fmt.Sprintf("Failed to %s for index", operation),
 		"index", index,
 		"error", err,
 		"action", action,
@@ -48,8 +41,8 @@ func (l *Lister) handleIndexError(operation string, index string, err error, act
 	return fmt.Errorf("failed to %s for index %s: %w. %s", operation, index, err, action)
 }
 
-// renderIndicesTable formats and displays the indices in a table format.
-func (l *Lister) renderIndicesTable(ctx context.Context, indices []string) error {
+// RenderTable formats and displays the indices in a table format
+func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface, indices []string) error {
 	// Initialize table writer with stdout as output
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -58,9 +51,9 @@ func (l *Lister) renderIndicesTable(ctx context.Context, indices []string) error
 	// Process each index and gather its metadata
 	for _, index := range indices {
 		// Get health status with error handling
-		healthStatus, healthErr := l.storage.GetIndexHealth(ctx, index)
+		healthStatus, healthErr := storage.GetIndexHealth(ctx, index)
 		if healthErr != nil {
-			return l.handleIndexError(
+			return r.handleIndexError(
 				"get health status",
 				index,
 				healthErr,
@@ -70,9 +63,9 @@ func (l *Lister) renderIndicesTable(ctx context.Context, indices []string) error
 		}
 
 		// Get document count with fallback to 0 on error
-		docCount, docErr := l.storage.GetIndexDocCount(ctx, index)
+		docCount, docErr := storage.GetIndexDocCount(ctx, index)
 		if docErr != nil {
-			return l.handleIndexError(
+			return r.handleIndexError(
 				"get document count",
 				index,
 				docErr,
@@ -96,6 +89,29 @@ func (l *Lister) renderIndicesTable(ctx context.Context, indices []string) error
 	// Render the final table
 	t.Render()
 	return nil
+}
+
+// Lister implements the indices list command
+type Lister struct {
+	config   config.Interface
+	logger   logger.Interface
+	storage  types.Interface
+	renderer *TableRenderer
+}
+
+// NewLister creates a new lister instance
+func NewLister(
+	config config.Interface,
+	logger logger.Interface,
+	storage types.Interface,
+	renderer *TableRenderer,
+) *Lister {
+	return &Lister{
+		config:   config,
+		logger:   logger,
+		storage:  storage,
+		renderer: renderer,
+	}
 }
 
 // Start executes the list operation
@@ -140,59 +156,57 @@ func (l *Lister) Start(ctx context.Context) error {
 		return nil
 	}
 
-	// Render the indices table
-	return l.renderIndicesTable(ctx, filteredIndices)
+	// Render the indices table using the renderer
+	return l.renderer.RenderTable(ctx, l.storage, filteredIndices)
 }
 
-// listCommand creates and returns the list command that displays all indices.
-func listCommand() *cobra.Command {
-	return &cobra.Command{
+// NewListCommand creates a new list command
+func NewListCommand() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all Elasticsearch indices",
-		Long: `Display a list of all indices in the Elasticsearch cluster.
-
-Example:
-  gocrawl indices list`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Create a context
-			ctx := cmd.Context()
-
-			// Get config path from flag or use default
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get config path from flags
 			configPath, _ := cmd.Flags().GetString("config")
 
-			// Initialize the Fx application
-			fxApp := fx.New(
-				fx.NopLogger,
-				Module,
-				fx.Provide(
-					func() context.Context { return ctx },
-					func() string { return configPath }, // Provide config path
-				),
-				fx.Invoke(func(lc fx.Lifecycle, lister *Lister) {
-					lc.Append(fx.Hook{
-						OnStart: func(ctx context.Context) error {
-							return lister.Start(ctx)
-						},
-						OnStop: func(context.Context) error {
-							return nil
-						},
-					})
+			// Create Fx application
+			app := fx.New(
+				// Provide config path string
+				fx.Provide(func() string { return configPath }),
+				// Provide config module
+				config.Module,
+				// Provide storage module
+				storage.Module,
+				// Provide logger module
+				logger.Module,
+				// Provide Lister
+				fx.Provide(NewLister),
+				// Provide TableRenderer
+				fx.Provide(NewTableRenderer),
+				// Invoke list command
+				fx.Invoke(func(l *Lister, r *TableRenderer) error {
+					return l.Start(cmd.Context())
 				}),
 			)
 
-			// Start the application
-			if err := fxApp.Start(ctx); err != nil {
-				return fmt.Errorf("error starting application: %w", err)
+			// Start application
+			if err := app.Start(context.Background()); err != nil {
+				return fmt.Errorf("failed to start application: %w", err)
 			}
 
-			// Stop the application
-			if err := fxApp.Stop(ctx); err != nil {
-				return fmt.Errorf("error stopping application: %w", err)
+			// Stop application
+			if err := app.Stop(context.Background()); err != nil {
+				return fmt.Errorf("failed to stop application: %w", err)
 			}
 
 			return nil
 		},
 	}
+
+	// Add flags
+	cmd.Flags().StringP("config", "c", "config.yaml", "Path to config file")
+
+	return cmd
 }
 
 // getIngestionStatus maps Elasticsearch health status to human-readable ingestion status.
