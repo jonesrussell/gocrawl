@@ -4,45 +4,35 @@ package config
 import (
 	"net/http"
 	"time"
-
-	"go.uber.org/fx"
 )
 
-// TransportConfig represents the HTTP transport configuration.
+// TransportConfig holds the configuration for HTTP transport.
 type TransportConfig struct {
-	MaxIdleConns        int           `yaml:"max_idle_conns"`
-	MaxIdleConnsPerHost int           `yaml:"max_idle_conns_per_host"`
-	IdleConnTimeout     time.Duration `yaml:"idle_conn_timeout"`
-	TLSHandshakeTimeout time.Duration `yaml:"tls_handshake_timeout"`
+	MaxIdleConns        int
+	MaxIdleConnsPerHost int
+	IdleConnTimeout     int
+	TLSHandshakeTimeout int
 }
 
-// NewTransportConfig creates a new transport configuration with default values.
+// NewTransportConfig initializes a TransportConfig with default values.
 func NewTransportConfig() *TransportConfig {
 	return &TransportConfig{
 		MaxIdleConns:        DefaultMaxIdleConns,
 		MaxIdleConnsPerHost: DefaultMaxIdleConnsPerHost,
-		IdleConnTimeout:     DefaultIdleConnTimeout,
-		TLSHandshakeTimeout: DefaultTLSHandshakeTimeout,
+		IdleConnTimeout:     int(DefaultIdleConnTimeout.Seconds()),
+		TLSHandshakeTimeout: int(DefaultTLSHandshakeTimeout.Seconds()),
 	}
 }
 
-// TransportModule provides the HTTP transport configuration
-var TransportModule = fx.Module("transport",
-	fx.Provide(
-		fx.Annotate(
-			NewHTTPTransport,
-			fx.As(new(http.RoundTripper)),
-		),
-	),
-)
+// TransportModule provides the HTTP transport configuration.
+var TransportModule = NewTransportConfig()
 
-// NewHTTPTransport creates a new HTTP transport with default settings.
-func NewHTTPTransport() *http.Transport {
+// NewHTTPTransport creates a new HTTP transport using the provided configuration.
+func NewHTTPTransport(config *TransportConfig) *http.Transport {
 	return &http.Transport{
-		MaxIdleConns:          DefaultMaxIdleConns,
-		MaxIdleConnsPerHost:   DefaultMaxIdleConnsPerHost,
-		IdleConnTimeout:       DefaultIdleConnTimeout,
-		TLSHandshakeTimeout:   DefaultTLSHandshakeTimeout,
-		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConns:        config.MaxIdleConns,
+		MaxIdleConnsPerHost: config.MaxIdleConnsPerHost,
+		IdleConnTimeout:     time.Duration(config.IdleConnTimeout) * time.Second,
+		TLSHandshakeTimeout: time.Duration(config.TLSHandshakeTimeout) * time.Second,
 	}
 }
