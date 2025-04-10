@@ -5,15 +5,18 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
+	"os"
 	"time"
+
+	"crypto/x509"
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
+	"golang.org/x/net/http2"
 )
 
 // Constants for timeouts and retries
@@ -23,57 +26,99 @@ const (
 )
 
 // createTLSConfig creates a TLS configuration with appropriate security settings
-func createTLSConfig(esConfig *elasticsearch.Config, logger logger.Interface) *tls.Config {
-	if esConfig.TLS == nil || !esConfig.TLS.Enabled {
-		return nil
+func createTLSConfig(esConfig *elasticsearch.Config) (*tls.Config, error) {
+	// Create basic TLS config with minimum version 1.2
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
 	}
 
-	// InsecureSkipVerify is only used in development environments
-	// and should be disabled in production. This is a security risk
-	// and should only be used for testing or development purposes.
-	// See https://pkg.go.dev/crypto/tls#Config for more information.
-	// SECURITY WARNING: Setting InsecureSkipVerify to true means that
-	// the client will accept any certificate presented by the server,
-	// making the connection vulnerable to man-in-the-middle attacks.
-	// This should never be used in production environments.
-	if esConfig.TLS.InsecureSkipVerify {
-		logger.Warn(
-			"TLS certificate verification is disabled - " +
-				"this is a security risk and should never be used in production",
-		)
+	// Handle CA certificates if provided
+	if esConfig.TLS != nil && esConfig.TLS.CAFile != "" {
+		caCert, err := os.ReadFile(esConfig.TLS.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, errors.New("failed to append CA certificate")
+		}
+
+		tlsConfig.RootCAs = caCertPool
 	}
 
-	// #nosec G402 - InsecureSkipVerify is configurable and documented
-	return &tls.Config{
-		InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify,
+	// Handle client certificates if provided
+	if esConfig.TLS != nil && esConfig.TLS.CertFile != "" && esConfig.TLS.KeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(esConfig.TLS.CertFile, esConfig.TLS.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
+
+	// Handle insecure skip verify if configured
+	if esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify {
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	return tlsConfig, nil
 }
 
 // createTransport creates a configured HTTP transport for Elasticsearch
 func createTransport(esConfig *elasticsearch.Config, logger logger.Interface) (*http.Transport, error) {
+	logger.Debug("Creating HTTP transport")
+
 	transport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		return nil, errors.New("failed to get default transport")
 	}
 
 	clonedTransport := transport.Clone()
-	clonedTransport.TLSClientConfig = createTLSConfig(esConfig, logger)
+
+	// Create and set TLS config
+	tlsConfig, err := createTLSConfig(esConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create TLS configuration: %w", err)
+	}
+	clonedTransport.TLSClientConfig = tlsConfig
+
+	// Set timeouts
+	clonedTransport.ResponseHeaderTimeout = 10 * time.Second
+	clonedTransport.ExpectContinueTimeout = 1 * time.Second
+	clonedTransport.TLSHandshakeTimeout = 10 * time.Second
+	clonedTransport.IdleConnTimeout = 90 * time.Second
+
+	// Enable HTTP/2 support
+	if err := http2.ConfigureTransport(clonedTransport); err != nil {
+		logger.Warn("Failed to enable HTTP/2 support", "error", err)
+	}
+
+	logger.Debug("Created HTTP transport with TLS configuration",
+		"responseHeaderTimeout", clonedTransport.ResponseHeaderTimeout,
+		"expectContinueTimeout", clonedTransport.ExpectContinueTimeout,
+		"tlsHandshakeTimeout", clonedTransport.TLSHandshakeTimeout,
+		"idleConnTimeout", clonedTransport.IdleConnTimeout,
+		"tlsInsecureSkipVerify", tlsConfig.InsecureSkipVerify)
 
 	return clonedTransport, nil
 }
 
 // createClientConfig creates an Elasticsearch client configuration
 func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transport, logger logger.Interface) es.Config {
-	// Log detailed configuration information
+	// Log configuration details
 	logger.Debug("Creating Elasticsearch client configuration",
 		"addresses", esConfig.Addresses,
 		"hasAPIKey", esConfig.APIKey != "",
 		"hasUsername", esConfig.Username != "",
 		"hasPassword", esConfig.Password != "",
-		"tlsEnabled", esConfig.TLS != nil && esConfig.TLS.Enabled,
-		"tlsInsecureSkipVerify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify)
+		"tlsInsecureSkipVerify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify,
+		"tlsHasCAFile", esConfig.TLS != nil && esConfig.TLS.CAFile != "",
+		"tlsHasCertFile", esConfig.TLS != nil && esConfig.TLS.CertFile != "",
+		"tlsHasKeyFile", esConfig.TLS != nil && esConfig.TLS.KeyFile != "",
+		"retryEnabled", esConfig.Retry.Enabled,
+		"maxRetries", esConfig.Retry.MaxRetries)
 
-	// Create the client configuration
+	// Create client configuration
 	cfg := es.Config{
 		Addresses: esConfig.Addresses,
 		Username:  esConfig.Username,
@@ -89,10 +134,11 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 		},
 		MaxRetries:            esConfig.Retry.MaxRetries,
 		DiscoverNodesOnStart:  esConfig.DiscoverNodes,
-		DiscoverNodesInterval: 0, // Set to 0 to disable periodic node discovery
+		DiscoverNodesInterval: 0, // Disable periodic node discovery
+		CompressRequestBody:   true,
 	}
 
-	// Log the final configuration (excluding sensitive fields)
+	// Log final configuration (excluding sensitive fields)
 	logger.Debug("Final Elasticsearch client configuration",
 		"addresses", cfg.Addresses,
 		"hasAPIKey", cfg.APIKey != "",
@@ -104,7 +150,18 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 		"retryOnStatus", cfg.RetryOnStatus,
 		"maxRetries", cfg.MaxRetries,
 		"discoverNodesOnStart", cfg.DiscoverNodesOnStart,
-		"discoverNodesInterval", cfg.DiscoverNodesInterval)
+		"discoverNodesInterval", cfg.DiscoverNodesInterval,
+		"transport", map[string]interface{}{
+			"tlsInsecureSkipVerify": transport.TLSClientConfig != nil && transport.TLSClientConfig.InsecureSkipVerify,
+			"hasRootCAs":            transport.TLSClientConfig != nil && transport.TLSClientConfig.RootCAs != nil,
+			"hasCertificates":       transport.TLSClientConfig != nil && len(transport.TLSClientConfig.Certificates) > 0,
+			"minVersion": func() uint16 {
+				if transport.TLSClientConfig != nil {
+					return transport.TLSClientConfig.MinVersion
+				}
+				return 0
+			}(),
+		})
 
 	return cfg
 }
@@ -116,17 +173,15 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 		return nil, errors.New("elasticsearch addresses are required")
 	}
 
-	if esConfig.APIKey == "" {
-		return nil, errors.New("API key is required")
-	}
-
 	// Log detailed configuration information
 	logger.Debug("Elasticsearch configuration",
 		"addresses", esConfig.Addresses,
 		"hasAPIKey", esConfig.APIKey != "",
 		"hasBasicAuth", esConfig.Username != "" && esConfig.Password != "",
-		"tls.enabled", esConfig.TLS != nil && esConfig.TLS.Enabled,
-		"tls.insecure_skip_verify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify)
+		"tls.insecure_skip_verify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify,
+		"tls.has_ca_file", esConfig.TLS != nil && esConfig.TLS.CAFile != "",
+		"tls.has_cert_file", esConfig.TLS != nil && esConfig.TLS.CertFile != "",
+		"tls.has_key_file", esConfig.TLS != nil && esConfig.TLS.KeyFile != "")
 
 	// Create transport
 	transport, err := createTransport(esConfig, logger)
@@ -148,22 +203,12 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 	if err != nil {
 		return nil, fmt.Errorf("failed to ping Elasticsearch: %w", err)
 	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
+	defer res.Body.Close()
 
 	if res.IsError() {
-		// Log the full error response
-		body, _ := io.ReadAll(res.Body)
-		logger.Error("Elasticsearch ping error",
-			"status", res.StatusCode,
-			"error", string(body))
-		return nil, fmt.Errorf("failed to connect to Elasticsearch: %s", res.String())
+		return nil, fmt.Errorf("error pinging Elasticsearch: %s", res.String())
 	}
 
-	logger.Info("Successfully connected to Elasticsearch", "addresses", esConfig.Addresses)
 	return client, nil
 }
 

@@ -33,6 +33,9 @@ var Module = fx.Module("indices",
 		NewLister,
 		NewTableRenderer,
 		NewDeleter,
+		func(cfg *config.Config) config.Interface {
+			return cfg
+		},
 	),
 )
 

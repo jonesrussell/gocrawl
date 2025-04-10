@@ -47,11 +47,11 @@ A simple web crawler built in Go that fetches and processes web pages, storing r
    LOG_LEVEL: debug
    APP_DEBUG: true
 
-   ELASTIC_URL: https://localhost:9200
-   ELASTIC_USERNAME: elastic
-   ELASTIC_PASSWORD: your_password
+   ELASTICSEARCH_URL: https://localhost:9200
+   ELASTICSEARCH_USERNAME: elastic
+   ELASTICSEARCH_PASSWORD: your_password
    ELASTICSEARCH_API_KEY: your_api_key
-   ELASTIC_INDEX_NAME: articles
+   ELASTICSEARCH_INDEX_NAME: articles
    ELASTICSEARCH_SKIP_TLS: true
 
    CRAWLER_BASE_URL: https://www.elliotlaketoday.com/opp-beat

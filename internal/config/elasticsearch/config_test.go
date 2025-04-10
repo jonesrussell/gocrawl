@@ -144,7 +144,6 @@ func TestConfig_Validate(t *testing.T) {
 				APIKey:    validAPIKey,
 				IndexName: "test",
 				TLS: &elasticsearch.TLSConfig{
-					Enabled:  true,
 					CertFile: "",
 					KeyFile:  "key.pem",
 				},

@@ -44,17 +44,17 @@ jobs:
       TEST_MOCK_ENABLED: true
       
       # Elasticsearch Security (using test values)
-      ELASTIC_USERNAME: test_user
-      ELASTIC_PASSWORD: test_password
+      ELASTICSEARCH_USERNAME: test_user
+      ELASTICSEARCH_PASSWORD: test_password
       
       # Server Security (using test values)
       GOCRAWL_API_KEY: test_api_key
       
       # TLS Configuration (disabled for tests)
       ELASTICSEARCH_SKIP_TLS: true
-      ELASTIC_CERT_PATH: ""
-      ELASTIC_KEY_PATH: ""
-      ELASTIC_CA_PATH: ""
+      ELASTICSEARCH_CERT_PATH: ""
+      ELASTICSEARCH_KEY_PATH: ""
+      ELASTICSEARCH_CA_PATH: ""
 
     steps:
     - name: Checkout Code

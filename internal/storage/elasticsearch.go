@@ -26,9 +26,19 @@ func NewElasticsearchStorage(client *es.Client, config *config.Config, logger lo
 }
 
 // TestConnection tests the connection to Elasticsearch.
-func (s *ElasticsearchStorage) TestConnection(_ context.Context) error {
+func (s *ElasticsearchStorage) TestConnection(ctx context.Context) error {
+	s.logger.Debug("Testing Elasticsearch connection",
+		"addresses", s.config.Elasticsearch.Addresses,
+		"username", s.config.Elasticsearch.Username,
+		"api_key", s.config.Elasticsearch.APIKey != "",
+		"tls_insecure_skip_verify", s.config.Elasticsearch.TLS != nil && s.config.Elasticsearch.TLS.InsecureSkipVerify,
+		"tls_has_ca_file", s.config.Elasticsearch.TLS != nil && s.config.Elasticsearch.TLS.CAFile != "",
+		"tls_has_cert_file", s.config.Elasticsearch.TLS != nil && s.config.Elasticsearch.TLS.CertFile != "",
+		"tls_has_key_file", s.config.Elasticsearch.TLS != nil && s.config.Elasticsearch.TLS.KeyFile != "")
+
 	res, err := s.client.Info()
 	if err != nil {
+		s.logger.Error("Failed to connect to Elasticsearch", "error", err)
 		return fmt.Errorf("failed to connect to Elasticsearch: %w", err)
 	}
 	defer func() {
@@ -38,9 +48,11 @@ func (s *ElasticsearchStorage) TestConnection(_ context.Context) error {
 	}()
 
 	if res.IsError() {
+		s.logger.Error("Error response from Elasticsearch", "response", res.String())
 		return fmt.Errorf("error response from Elasticsearch: %s", res.String())
 	}
 
+	s.logger.Info("Successfully connected to Elasticsearch")
 	return nil
 }
 
@@ -52,11 +64,15 @@ type Client struct {
 
 // NewClient creates a new Elasticsearch client
 func NewClient(opts Options) (*Client, error) {
-	client, err := es.NewClient(es.Config{
+	cfg := es.Config{
 		Addresses: opts.Addresses,
 		Username:  opts.Username,
 		Password:  opts.Password,
-	})
+		APIKey:    opts.APIKey,
+		Transport: opts.Transport,
+	}
+
+	client, err := es.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error creating elasticsearch client: %w", err)
 	}

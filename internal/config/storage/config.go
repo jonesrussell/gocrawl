@@ -4,6 +4,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"os"
 )
 
 // Default configuration values
@@ -74,6 +75,19 @@ func (c *Config) Validate() error {
 
 	if c.Port <= 0 {
 		return fmt.Errorf("storage port must be positive, got %d", c.Port)
+	}
+
+	// Validate TLS configuration if SSL is enabled
+	if c.SSL {
+		// For development environments, allow insecure connections
+		if os.Getenv("APP_ENV") == "development" {
+			return nil
+		}
+
+		// For production, require proper certificate configuration
+		if c.Username == "" || c.Password == "" {
+			return errors.New("username and password are required for SSL connections in production")
+		}
 	}
 
 	return nil

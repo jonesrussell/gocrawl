@@ -129,10 +129,10 @@ Essential environment variables:
 - `CRAWLER_BASE_URL`: Starting URL
 - `CRAWLER_MAX_DEPTH`: Maximum crawl depth
 - `CRAWLER_RATE_LIMIT`: Request rate limit
-- `ELASTIC_URL`: Elasticsearch URL
-- `ELASTIC_USERNAME`: Elasticsearch username
-- `ELASTIC_PASSWORD`: Elasticsearch password
-- `ELASTIC_INDEX_NAME`: Default index name
+- `ELASTICSEARCH_URL`: Elasticsearch URL
+- `ELASTICSEARCH_USERNAME`: Elasticsearch username
+- `ELASTICSEARCH_PASSWORD`: Elasticsearch password
+- `ELASTICSEARCH_INDEX_NAME`: Default index name
 
 ## Testing
 

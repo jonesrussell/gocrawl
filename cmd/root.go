@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,50 +40,33 @@ It provides a flexible and extensible framework for building custom crawlers.`,
 
 // setupConfig handles configuration file setup for all commands.
 // It ensures the config file path is absolute and configures Viper.
-func setupConfig(_ *cobra.Command, _ []string) error {
-	// Initialize Viper
-	v := viper.New()
-	v.SetConfigName("config")
-	v.SetConfigType("yaml")
-
-	// Add standard config paths
-	v.AddConfigPath(".")
-	v.AddConfigPath("./config")
-	v.AddConfigPath("$HOME/.gocrawl")
-	v.AddConfigPath("/etc/gocrawl")
-
-	// If config file is provided via flag, use it
+func setupConfig(cmd *cobra.Command, args []string) error {
+	// Get the absolute path to the config file
 	if cfgFile != "" {
-		if !os.IsPathSeparator(cfgFile[0]) {
-			// Convert relative path to absolute
-			wd, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get working directory: %w", err)
-			}
-			cfgFile = filepath.Join(wd, cfgFile)
+		absPath, err := filepath.Abs(cfgFile)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for config file: %w", err)
 		}
-		v.SetConfigFile(cfgFile)
+		cfgFile = absPath
 	}
 
-	// Set environment variable prefix
-	v.SetEnvPrefix("GOCRAWL")
-	v.AutomaticEnv()
+	// Initialize Viper
+	viper.SetConfigFile(cfgFile)
+	viper.AutomaticEnv()
 
-	// Read config file
-	if err := v.ReadInConfig(); err != nil {
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFoundError) {
-			return fmt.Errorf("failed to read config: %w", err)
+	// Read the config file
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return fmt.Errorf("failed to read config file: %w", err)
 		}
-		// Config file not found, use defaults
-		fmt.Println("No config file found, using defaults")
 	}
 
-	// Set debug mode if enabled
-	if debug {
-		v.Set("app.debug", true)
-		v.Set("log.debug", true)
+	// Set the command name in the configuration
+	commandName := cmd.Name()
+	if cmd.Parent() != nil {
+		commandName = fmt.Sprintf("%s %s", cmd.Parent().Name(), cmd.Name())
 	}
+	viper.Set("command", commandName)
 
 	return nil
 }

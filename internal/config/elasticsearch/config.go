@@ -1,9 +1,20 @@
+// Package elasticsearch provides Elasticsearch configuration management.
 package elasticsearch
 
 import (
-	"encoding/base64"
+	"errors"
 	"fmt"
 	"time"
+)
+
+// ValidationLevel represents the level of configuration validation required
+type ValidationLevel int
+
+const (
+	// BasicValidation only validates essential connection settings
+	BasicValidation ValidationLevel = iota
+	// FullValidation performs complete configuration validation
+	FullValidation
 )
 
 // Default configuration values
@@ -50,9 +61,7 @@ func (e *ConfigError) Error() string {
 
 // Config represents Elasticsearch configuration settings.
 type Config struct {
-	// Addresses is a list of Elasticsearch node addresses.
-	// Multiple addresses can be provided for high availability.
-	// Example: ["http://node1:9200", "http://node2:9200"]
+	// Addresses is a list of Elasticsearch node addresses
 	Addresses []string `yaml:"addresses"`
 	// APIKey is the base64 encoded API key for authentication
 	APIKey string `yaml:"api_key"`
@@ -86,93 +95,54 @@ type Config struct {
 
 // TLSConfig represents TLS configuration settings.
 type TLSConfig struct {
-	// Enabled indicates whether TLS is enabled
-	Enabled bool `yaml:"enabled"`
-	// CertFile is the path to the certificate file
-	CertFile string `yaml:"cert_file"`
-	// KeyFile is the path to the key file
-	KeyFile string `yaml:"key_file"`
-	// CAFile is the path to the CA certificate file
-	CAFile string `yaml:"ca_file"`
-	// InsecureSkipVerify indicates whether to skip certificate verification
-	// WARNING: Setting this to true in production is not recommended
-	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
+	CertFile           string `yaml:"cert_file" env:"ELASTICSEARCH_TLS_CERT_FILE"`
+	KeyFile            string `yaml:"key_file" env:"ELASTICSEARCH_TLS_KEY_FILE"`
+	CAFile             string `yaml:"ca_file" env:"ELASTICSEARCH_TLS_CA_FILE"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify" env:"ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY"`
 }
 
-// Validate checks if the configuration is valid.
+// Validate performs complete configuration validation
 func (c *Config) Validate() error {
-	if len(c.Addresses) == 0 {
-		return &ConfigError{Code: ErrCodeEmptyAddresses, Message: "at least one address is required"}
+	if err := c.ValidateConnection(); err != nil {
+		return err
 	}
 
 	if c.IndexName == "" {
-		return &ConfigError{Code: ErrCodeEmptyIndexName, Message: "index name is required"}
+		return errors.New("index name is required")
 	}
 
-	if c.APIKey == "" {
-		return &ConfigError{Code: ErrCodeMissingAPIKey, Message: "API key is required"}
-	}
+	return nil
+}
 
-	if _, err := base64.StdEncoding.DecodeString(c.APIKey); err != nil {
-		return &ConfigError{Code: ErrCodeInvalidFormat, Message: "API key must be base64 encoded"}
+// ValidateConnection validates only the connection settings
+func (c *Config) ValidateConnection() error {
+	if len(c.Addresses) == 0 {
+		return errors.New("at least one Elasticsearch address is required")
 	}
-
-	if c.Password != "" && len(c.Password) < 8 {
-		return &ConfigError{Code: ErrCodeWeakPassword, Message: "password must be at least 8 characters"}
-	}
-
-	if c.Retry.Enabled {
-		if c.Retry.InitialWait <= 0 {
-			return &ConfigError{Code: ErrCodeInvalidRetry, Message: "initial wait must be positive"}
-		}
-		if c.Retry.MaxWait <= 0 {
-			return &ConfigError{Code: ErrCodeInvalidRetry, Message: "max wait must be positive"}
-		}
-		if c.Retry.MaxRetries <= 0 {
-			return &ConfigError{Code: ErrCodeInvalidRetry, Message: "max retries must be positive"}
-		}
-	}
-
-	if c.BulkSize <= 0 {
-		return &ConfigError{Code: ErrCodeInvalidBulkSize, Message: "bulk size must be positive"}
-	}
-
-	if c.FlushInterval <= 0 {
-		return &ConfigError{Code: ErrCodeInvalidFlush, Message: "flush interval must be positive"}
-	}
-
-	if c.TLS != nil && c.TLS.Enabled {
-		if c.TLS.CertFile == "" || c.TLS.KeyFile == "" {
-			return &ConfigError{Code: ErrCodeInvalidTLS, Message: "cert and key files are required for TLS"}
-		}
-	}
-
 	return nil
 }
 
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
 	return &Config{
-		Addresses: []string{"http://localhost:9200"},
-		IndexName: "gocrawl",
-		TLS: &TLSConfig{
-			Enabled:            false, // TLS disabled by default
-			InsecureSkipVerify: false, // Secure by default
-		},
+		Addresses: []string{DefaultAddresses},
+		IndexName: DefaultIndexName,
 		Retry: struct {
 			Enabled     bool          `yaml:"enabled"`
 			InitialWait time.Duration `yaml:"initial_wait"`
 			MaxWait     time.Duration `yaml:"max_wait"`
 			MaxRetries  int           `yaml:"max_retries"`
 		}{
-			Enabled:     true,
-			InitialWait: time.Second,
-			MaxWait:     time.Minute,
+			Enabled:     DefaultRetryEnabled,
+			InitialWait: DefaultInitialWait,
+			MaxWait:     DefaultMaxWait,
 			MaxRetries:  DefaultMaxRetries,
 		},
-		BulkSize:      DefaultBulkSize,      // Set default bulk size
-		FlushInterval: DefaultFlushInterval, // Set default flush interval
-		DiscoverNodes: false,                // Default to false to prevent node discovery
+		BulkSize:      DefaultBulkSize,
+		FlushInterval: DefaultFlushInterval,
+		TLS: &TLSConfig{
+			InsecureSkipVerify: true, // Default to true for development
+		},
 	}
 }
 
@@ -191,7 +161,6 @@ func ExampleConfig() {
 
 	// TLS configuration
 	tlsCfg := NewConfig()
-	WithTLSEnabled(true)(tlsCfg)
 	WithTLSCertFile("cert.pem")(tlsCfg)
 	WithTLSKeyFile("key.pem")(tlsCfg)
 	WithTLSCAFile("ca.pem")(tlsCfg)
@@ -311,16 +280,12 @@ func WithFlushInterval(interval time.Duration) Option {
 	}
 }
 
-// WithTLSEnabled sets whether TLS is enabled.
-func WithTLSEnabled(enabled bool) Option {
-	return func(c *Config) {
-		c.TLS.Enabled = enabled
-	}
-}
-
 // WithTLSCertFile sets the TLS certificate file.
 func WithTLSCertFile(file string) Option {
 	return func(c *Config) {
+		if c.TLS == nil {
+			c.TLS = &TLSConfig{}
+		}
 		c.TLS.CertFile = file
 	}
 }
@@ -328,6 +293,9 @@ func WithTLSCertFile(file string) Option {
 // WithTLSKeyFile sets the TLS key file.
 func WithTLSKeyFile(file string) Option {
 	return func(c *Config) {
+		if c.TLS == nil {
+			c.TLS = &TLSConfig{}
+		}
 		c.TLS.KeyFile = file
 	}
 }
@@ -335,6 +303,9 @@ func WithTLSKeyFile(file string) Option {
 // WithTLSCAFile sets the TLS CA file.
 func WithTLSCAFile(file string) Option {
 	return func(c *Config) {
+		if c.TLS == nil {
+			c.TLS = &TLSConfig{}
+		}
 		c.TLS.CAFile = file
 	}
 }
@@ -342,6 +313,9 @@ func WithTLSCAFile(file string) Option {
 // WithTLSInsecureSkipVerify sets whether to skip TLS certificate verification.
 func WithTLSInsecureSkipVerify(skip bool) Option {
 	return func(c *Config) {
+		if c.TLS == nil {
+			c.TLS = &TLSConfig{}
+		}
 		c.TLS.InsecureSkipVerify = skip
 	}
 }
