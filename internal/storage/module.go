@@ -40,12 +40,8 @@ func createTransport(esConfig *elasticsearch.Config, logger logger.Interface) (*
 			logger.Warn("TLS certificate verification is disabled")
 		}
 	} else {
-		// Even if TLS is not explicitly enabled, we should still configure it
-		// since we're using HTTPS
-		clonedTransport.TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: true, // Skip verification for development
-		}
-		logger.Warn("TLS certificate verification is disabled for development")
+		// Use default TLS configuration which performs certificate verification
+		clonedTransport.TLSClientConfig = &tls.Config{}
 	}
 
 	return clonedTransport, nil
@@ -87,7 +83,7 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 		RetryBackoff:            retryBackoff,
 		// Connection pool configuration
 		DiscoverNodesOnStart:  esConfig.DiscoverNodes,
-		DiscoverNodesInterval: 30 * time.Second,
+		DiscoverNodesInterval: 0, // Set to 0 to disable periodic node discovery
 	}
 
 	// Log the final configuration (excluding sensitive fields)
