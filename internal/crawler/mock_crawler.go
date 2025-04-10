@@ -50,10 +50,16 @@ func (m *MockCrawler) SetCollector(collector *colly.Collector) {
 	m.Called(collector)
 }
 
-// GetIndexManager mocks the GetIndexManager method
+// GetIndexManager returns the index manager.
 func (m *MockCrawler) GetIndexManager() storagetypes.IndexManager {
 	args := m.Called()
-	return args.Get(0).(storagetypes.IndexManager)
+	if args.Get(0) == nil {
+		return nil
+	}
+	if im, ok := args.Get(0).(storagetypes.IndexManager); ok {
+		return im
+	}
+	return nil
 }
 
 // Wait mocks the Wait method
@@ -61,10 +67,16 @@ func (m *MockCrawler) Wait() {
 	m.Called()
 }
 
-// GetMetrics mocks the GetMetrics method
+// GetMetrics returns the crawler metrics.
 func (m *MockCrawler) GetMetrics() *common.Metrics {
 	args := m.Called()
-	return args.Get(0).(*common.Metrics)
+	if args.Get(0) == nil {
+		return nil
+	}
+	if metrics, ok := args.Get(0).(*common.Metrics); ok {
+		return metrics
+	}
+	return nil
 }
 
 // SetTestServerURL mocks the SetTestServerURL method
