@@ -29,6 +29,7 @@ func (r *realTimeProvider) Now() time.Time {
 const (
 	// DefaultRateLimitWindow is the default window for rate limiting
 	DefaultRateLimitWindow = 5 * time.Second
+	defaultRateLimit       = 100
 )
 
 // SecurityMiddleware implements security measures for the API
@@ -182,7 +183,7 @@ func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
 	if now.Sub(info.lastAccess) > m.rateLimitWindow {
 		info.count = 1
 		info.lastAccess = now
-	} else if info.count >= 100 { // Use a default rate limit since server.Config doesn't have RateLimit
+	} else if info.count >= defaultRateLimit { // Use a default rate limit since server.Config doesn't have RateLimit
 		return errors.New("rate limit exceeded")
 	} else {
 		info.count++

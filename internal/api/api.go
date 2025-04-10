@@ -36,6 +36,7 @@ const (
 	DefaultMaxResults = 10
 	DefaultTimeout    = 30 * time.Second
 	DefaultRetries    = 3
+	defaultSearchSize = 10
 )
 
 // SetupRouter creates and configures the Gin router with all routes
@@ -118,7 +119,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 					"content": req.Query,
 				},
 			},
-			"size": req.Size,
+			"size": defaultSearchSize,
 		}
 
 		// Use the search manager to perform the search

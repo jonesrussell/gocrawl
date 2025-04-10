@@ -14,6 +14,9 @@ const (
 	DefaultDebug      = false
 	DefaultCaller     = false
 	DefaultStacktrace = false
+	defaultMaxSize    = 100 // 100MB
+	defaultMaxBackups = 3   // Keep 3 backups
+	defaultMaxAge     = 30  // Keep for 30 days
 )
 
 // Config holds logging-specific configuration settings.
@@ -109,9 +112,9 @@ func New(opts ...Option) *Config {
 		Debug:      DefaultDebug,
 		Caller:     DefaultCaller,
 		Stacktrace: DefaultStacktrace,
-		MaxSize:    100,  // 100MB
-		MaxBackups: 3,    // Keep 3 backups
-		MaxAge:     30,   // Keep for 30 days
+		MaxSize:    defaultMaxSize,
+		MaxBackups: defaultMaxBackups,
+		MaxAge:     defaultMaxAge,
 		Compress:   true, // Compress rotated files
 	}
 

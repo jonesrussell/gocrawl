@@ -156,7 +156,8 @@ const (
 	// DefaultMaxIdleConnsPerHost is the default maximum number of idle (keep-alive) connections per host
 	DefaultMaxIdleConnsPerHost = 100
 
-	// DefaultIdleConnTimeout is the default maximum amount of time an idle (keep-alive) connection will remain idle before closing itself
+	// DefaultIdleConnTimeout is the default maximum amount of time an idle
+	// (keep-alive) connection will remain idle before closing itself
 	DefaultIdleConnTimeout = 90 * time.Second
 
 	// DefaultTLSHandshakeTimeout is the default maximum amount of time waiting to wait for a TLS handshake

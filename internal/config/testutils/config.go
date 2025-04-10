@@ -47,9 +47,9 @@ func LoadTestConfig(t *testing.T, filename string) *config.Config {
 	v.SetDefault("log.level", "debug")
 	v.SetDefault("log.debug", true)
 	v.SetDefault("crawler.base_url", "http://test.example.com")
-	v.SetDefault("crawler.max_depth", 2)
+	v.SetDefault("crawler.max_depth", config.DefaultMaxDepth)
 	v.SetDefault("crawler.rate_limit", "2s")
-	v.SetDefault("crawler.parallelism", 2)
+	v.SetDefault("crawler.parallelism", config.DefaultParallelism)
 
 	cfg := &config.Config{}
 	require.NoError(t, v.Unmarshal(cfg), "failed to unmarshal config")

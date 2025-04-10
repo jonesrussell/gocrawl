@@ -9,6 +9,10 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
+const (
+	defaultMaxRetries = 3
+)
+
 // ElasticsearchConfig represents Elasticsearch configuration settings.
 type ElasticsearchConfig struct {
 	// Addresses is a list of Elasticsearch node addresses
@@ -57,7 +61,7 @@ func NewElasticsearchConfig() *ElasticsearchConfig {
 			Enabled:     true,
 			InitialWait: time.Second,
 			MaxWait:     time.Minute,
-			MaxRetries:  3,
+			MaxRetries:  defaultMaxRetries,
 		},
 	}
 }
