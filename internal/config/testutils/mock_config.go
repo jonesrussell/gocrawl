@@ -8,6 +8,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
+	"github.com/jonesrussell/gocrawl/internal/config/storage"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/stretchr/testify/mock"
 )
@@ -15,6 +16,16 @@ import (
 // MockConfig is a mock implementation of the Config interface
 type MockConfig struct {
 	mock.Mock
+	AppConfig           *app.Config
+	LogConfig           *log.Config
+	ServerConfig        *server.Config
+	Sources             []types.Source
+	CrawlerConfig       *crawler.Config
+	PriorityConfig      *priority.Config
+	ElasticsearchConfig *elasticsearch.Config
+	StorageConfig       *storage.Config
+	Command             string
+	ValidateError       error
 }
 
 // GetSources implements config.Interface.
@@ -73,6 +84,18 @@ func (m *MockConfig) GetPriorityConfig() *priority.Config {
 	args := m.Called()
 	cfg, _ := args.Get(0).(*priority.Config)
 	return cfg
+}
+
+// GetStorageConfig implements config.Interface.
+func (m *MockConfig) GetStorageConfig() *storage.Config {
+	args := m.Called()
+	cfg, _ := args.Get(0).(*storage.Config)
+	return cfg
+}
+
+// Validate implements config.Interface.
+func (m *MockConfig) Validate() error {
+	return m.ValidateError
 }
 
 // Ensure MockConfig implements config.Interface

@@ -6,6 +6,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
@@ -44,8 +45,8 @@ type Config struct {
 	Command string `yaml:"command"`
 }
 
-// Validate validates the configuration based on the current command.
-func (c *Config) Validate() error {
+// validateBasicConfig validates the basic configuration that's common to all commands
+func (c *Config) validateBasicConfig() error {
 	if c.Environment == "" {
 		return errors.New("environment is required")
 	}
@@ -55,60 +56,86 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("logger: %w", err)
 	}
 
-	// Validate command-specific components
+	return nil
+}
+
+// validateCrawlConfig validates the configuration for the crawl command
+func (c *Config) validateCrawlConfig() error {
+	if err := c.Elasticsearch.Validate(); err != nil {
+		return fmt.Errorf("elasticsearch: %w", err)
+	}
+	if c.Crawler == nil {
+		return errors.New("crawler configuration is required")
+	}
+	if err := c.Crawler.Validate(); err != nil {
+		return fmt.Errorf("crawler: %w", err)
+	}
+	if len(c.Sources) == 0 {
+		return errors.New("at least one source is required")
+	}
+	for i := range c.Sources {
+		if err := c.Sources[i].Validate(); err != nil {
+			return fmt.Errorf("source[%d]: %w", i, err)
+		}
+	}
+	return nil
+}
+
+// validateHTTPDConfig validates the configuration for the httpd command
+func (c *Config) validateHTTPDConfig() error {
+	if err := c.Server.Validate(); err != nil {
+		return fmt.Errorf("server: %w", err)
+	}
+	if err := c.Storage.Validate(); err != nil {
+		return fmt.Errorf("storage: %w", err)
+	}
+	return nil
+}
+
+// validateSearchConfig validates the configuration for the search command
+func (c *Config) validateSearchConfig() error {
+	if err := c.Elasticsearch.Validate(); err != nil {
+		return fmt.Errorf("elasticsearch: %w", err)
+	}
+	if err := c.Storage.Validate(); err != nil {
+		return fmt.Errorf("storage: %w", err)
+	}
+	return nil
+}
+
+// Validate validates the configuration based on the current command.
+func (c *Config) Validate() error {
+	if err := c.validateBasicConfig(); err != nil {
+		return err
+	}
+
 	switch c.Command {
 	case commands.IndicesList, commands.IndicesDelete:
-		// Only need basic Elasticsearch connection
 		if err := c.Elasticsearch.ValidateConnection(); err != nil {
 			return fmt.Errorf("elasticsearch: %w", err)
 		}
 
 	case commands.IndicesCreate:
-		// Need Elasticsearch with index name
 		if err := c.Elasticsearch.Validate(); err != nil {
 			return fmt.Errorf("elasticsearch: %w", err)
 		}
 
 	case commands.Crawl:
-		// Need full Elasticsearch, crawler, and sources
-		if err := c.Elasticsearch.Validate(); err != nil {
-			return fmt.Errorf("elasticsearch: %w", err)
-		}
-		if c.Crawler == nil {
-			return errors.New("crawler configuration is required")
-		}
-		if err := c.Crawler.Validate(); err != nil {
-			return fmt.Errorf("crawler: %w", err)
-		}
-		if len(c.Sources) == 0 {
-			return errors.New("at least one source is required")
-		}
-		for i := range c.Sources {
-			if err := c.Sources[i].Validate(); err != nil {
-				return fmt.Errorf("source[%d]: %w", i, err)
-			}
+		if err := c.validateCrawlConfig(); err != nil {
+			return err
 		}
 
 	case commands.HTTPD:
-		// Need server and storage config
-		if err := c.Server.Validate(); err != nil {
-			return fmt.Errorf("server: %w", err)
-		}
-		if err := c.Storage.Validate(); err != nil {
-			return fmt.Errorf("storage: %w", err)
+		if err := c.validateHTTPDConfig(); err != nil {
+			return err
 		}
 
 	case commands.Search:
-		// Need Elasticsearch and storage
-		if err := c.Elasticsearch.Validate(); err != nil {
-			return fmt.Errorf("elasticsearch: %w", err)
-		}
-		if err := c.Storage.Validate(); err != nil {
-			return fmt.Errorf("storage: %w", err)
+		if err := c.validateSearchConfig(); err != nil {
+			return err
 		}
 
 	case commands.Sources:
-		// Need storage for source management
 		if err := c.Storage.Validate(); err != nil {
 			return fmt.Errorf("storage: %w", err)
 		}
@@ -127,9 +154,7 @@ func LoadConfig() (*Config, error) {
 	setDefaults(v)
 
 	// Load environment
-	if err := loadEnvironment(); err != nil {
-		return nil, err
-	}
+	loadEnvironment()
 
 	// Bind environment variables
 	if err := bindEnvVars(v); err != nil {
@@ -138,8 +163,9 @@ func LoadConfig() (*Config, error) {
 
 	// Read config file if exists
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, err
+		var configFileNotFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFound) {
+			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
 	}
 
@@ -163,11 +189,10 @@ func setDefaults(v *viper.Viper) {
 }
 
 // loadEnvironment loads environment variables from .env file
-func loadEnvironment() error {
+func loadEnvironment() {
 	if err := godotenv.Load(); err != nil {
-		fmt.Printf("Warning: Failed to load .env file: %v\n", err)
+		log.Printf("Warning: Failed to load .env file: %v", err)
 	}
-	return nil
 }
 
 // bindEnvVars binds environment variables to configuration keys
@@ -244,4 +269,9 @@ func (c *Config) GetElasticsearchConfig() *elasticsearch.Config {
 // GetCommand returns the current command.
 func (c *Config) GetCommand() string {
 	return c.Command
+}
+
+// GetStorageConfig returns the storage configuration.
+func (c *Config) GetStorageConfig() *storage.Config {
+	return c.Storage
 }

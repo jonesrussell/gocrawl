@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 // Default configuration values
@@ -21,82 +19,58 @@ const (
 
 // Config represents the crawler configuration.
 type Config struct {
-	// BaseURL is the starting point for the crawler
-	BaseURL string `yaml:"base_url"`
-	// MaxDepth defines how many levels deep the crawler should traverse
+	// MaxDepth is the maximum depth to crawl
 	MaxDepth int `yaml:"max_depth"`
-	// RateLimit defines the delay between requests
-	RateLimit time.Duration `yaml:"rate_limit"`
-	// RandomDelay adds randomization to the delay between requests
-	RandomDelay time.Duration `yaml:"random_delay"`
-	// Parallelism defines the number of concurrent crawlers
-	Parallelism int `yaml:"parallelism"`
-	// UserAgent defines the user agent string to use
+	// MaxConcurrency is the maximum number of concurrent requests
+	MaxConcurrency int `yaml:"max_concurrency"`
+	// RequestTimeout is the timeout for each request
+	RequestTimeout time.Duration `yaml:"request_timeout"`
+	// UserAgent is the user agent to use for requests
 	UserAgent string `yaml:"user_agent"`
-	// Timeout defines the request timeout
-	Timeout time.Duration `yaml:"timeout"`
-	// MaxBodySize defines the maximum response body size
-	MaxBodySize int64 `yaml:"max_body_size"`
-	// AllowedDomains defines the domains that can be crawled
+	// RespectRobotsTxt indicates whether to respect robots.txt
+	RespectRobotsTxt bool `yaml:"respect_robots_txt"`
+	// AllowedDomains is the list of domains to crawl
 	AllowedDomains []string `yaml:"allowed_domains"`
-	// DisallowedDomains defines the domains that cannot be crawled
+	// DisallowedDomains is the list of domains to exclude
 	DisallowedDomains []string `yaml:"disallowed_domains"`
-	// SourceFile is the path to the sources configuration file
-	SourceFile string `yaml:"source_file"`
-	// Sources contains the list of sources to crawl
-	Sources []types.Source `yaml:"sources"`
-	// IndexName is the name of the Elasticsearch index
-	IndexName string `yaml:"index_name"`
+	// Delay is the delay between requests
+	Delay time.Duration `yaml:"delay"`
+	// RandomDelay is the random delay to add to the base delay
+	RandomDelay time.Duration `yaml:"random_delay"`
 }
 
 // Validate validates the crawler configuration.
 func (c *Config) Validate() error {
-	if c == nil {
-		return errors.New("crawler configuration is required")
-	}
-
-	if c.BaseURL == "" {
-		return errors.New("base URL is required")
-	}
-
 	if c.MaxDepth < 0 {
-		return errors.New("max depth must be non-negative")
+		return errors.New("max_depth must be non-negative")
 	}
-
-	if c.RateLimit < 0 {
-		return errors.New("rate limit must be non-negative")
+	if c.MaxConcurrency < 1 {
+		return errors.New("max_concurrency must be positive")
 	}
-
+	if c.RequestTimeout < 0 {
+		return errors.New("request_timeout must be non-negative")
+	}
+	if c.Delay < 0 {
+		return errors.New("delay must be non-negative")
+	}
 	if c.RandomDelay < 0 {
-		return errors.New("random delay must be non-negative")
+		return errors.New("random_delay must be non-negative")
 	}
-
-	if c.Parallelism < 1 {
-		return errors.New("parallelism must be positive")
-	}
-
-	if c.Timeout < 0 {
-		return errors.New("timeout must be non-negative")
-	}
-
-	if c.MaxBodySize < 0 {
-		return errors.New("max body size must be non-negative")
-	}
-
 	return nil
 }
 
 // New creates a new crawler configuration with the given options.
 func New(opts ...Option) *Config {
 	cfg := &Config{
-		MaxDepth:    DefaultMaxDepth,
-		RateLimit:   DefaultRateLimit,
-		RandomDelay: DefaultRandomDelay,
-		Parallelism: DefaultParallelism,
-		UserAgent:   DefaultUserAgent,
-		Timeout:     DefaultTimeout,
-		MaxBodySize: DefaultMaxBodySize,
-		IndexName:   "gocrawl",
+		MaxDepth:          DefaultMaxDepth,
+		MaxConcurrency:    DefaultParallelism,
+		RequestTimeout:    DefaultTimeout,
+		Delay:             DefaultRateLimit,
+		RandomDelay:       DefaultRandomDelay,
+		UserAgent:         DefaultUserAgent,
+		RespectRobotsTxt:  true,
+		AllowedDomains:    []string{"*"},
+		DisallowedDomains: []string{},
 	}
 
 	for _, opt := range opts {
@@ -109,13 +83,6 @@ func New(opts ...Option) *Config {
 // Option is a function that configures a crawler configuration.
 type Option func(*Config)
 
-// WithBaseURL sets the base URL.
-func WithBaseURL(url string) Option {
-	return func(c *Config) {
-		c.BaseURL = url
-	}
-}
-
 // WithMaxDepth sets the maximum depth.
 func WithMaxDepth(depth int) Option {
 	return func(c *Config) {
@@ -123,24 +90,17 @@ func WithMaxDepth(depth int) Option {
 	}
 }
 
-// WithRateLimit sets the rate limit.
-func WithRateLimit(limit time.Duration) Option {
+// WithMaxConcurrency sets the maximum concurrency.
+func WithMaxConcurrency(concurrency int) Option {
 	return func(c *Config) {
-		c.RateLimit = limit
+		c.MaxConcurrency = concurrency
 	}
 }
 
-// WithRandomDelay sets the random delay.
-func WithRandomDelay(delay time.Duration) Option {
+// WithRequestTimeout sets the request timeout.
+func WithRequestTimeout(timeout time.Duration) Option {
 	return func(c *Config) {
-		c.RandomDelay = delay
-	}
-}
-
-// WithParallelism sets the parallelism.
-func WithParallelism(parallelism int) Option {
-	return func(c *Config) {
-		c.Parallelism = parallelism
+		c.RequestTimeout = timeout
 	}
 }
 
@@ -151,17 +111,10 @@ func WithUserAgent(agent string) Option {
 	}
 }
 
-// WithTimeout sets the timeout.
-func WithTimeout(timeout time.Duration) Option {
+// WithRespectRobotsTxt sets whether to respect robots.txt.
+func WithRespectRobotsTxt(respect bool) Option {
 	return func(c *Config) {
-		c.Timeout = timeout
-	}
-}
-
-// WithMaxBodySize sets the maximum body size.
-func WithMaxBodySize(size int64) Option {
-	return func(c *Config) {
-		c.MaxBodySize = size
+		c.RespectRobotsTxt = respect
 	}
 }
 
@@ -179,10 +132,17 @@ func WithDisallowedDomains(domains []string) Option {
 	}
 }
 
-// WithSourceFile sets the source file.
-func WithSourceFile(file string) Option {
+// WithDelay sets the delay between requests.
+func WithDelay(delay time.Duration) Option {
 	return func(c *Config) {
-		c.SourceFile = file
+		c.Delay = delay
+	}
+}
+
+// WithRandomDelay sets the random delay.
+func WithRandomDelay(delay time.Duration) Option {
+	return func(c *Config) {
+		c.RandomDelay = delay
 	}
 }
 

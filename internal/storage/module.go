@@ -23,6 +23,12 @@ import (
 const (
 	DefaultMaxRetries     = 3
 	DefaultScrollDuration = 5 * time.Minute
+	// DefaultResponseHeaderTimeout is the default timeout for response headers
+	DefaultResponseHeaderTimeout = 10 * time.Second
+	// DefaultTLSHandshakeTimeout is the default timeout for TLS handshake
+	DefaultTLSHandshakeTimeout = 10 * time.Second
+	// DefaultIdleConnTimeout is the default timeout for idle connections
+	DefaultIdleConnTimeout = 90 * time.Second
 )
 
 // createTLSConfig creates a TLS configuration with appropriate security settings
@@ -83,14 +89,14 @@ func createTransport(esConfig *elasticsearch.Config, logger logger.Interface) (*
 	clonedTransport.TLSClientConfig = tlsConfig
 
 	// Set timeouts
-	clonedTransport.ResponseHeaderTimeout = 10 * time.Second
+	clonedTransport.ResponseHeaderTimeout = DefaultResponseHeaderTimeout
 	clonedTransport.ExpectContinueTimeout = 1 * time.Second
-	clonedTransport.TLSHandshakeTimeout = 10 * time.Second
-	clonedTransport.IdleConnTimeout = 90 * time.Second
+	clonedTransport.TLSHandshakeTimeout = DefaultTLSHandshakeTimeout
+	clonedTransport.IdleConnTimeout = DefaultIdleConnTimeout
 
 	// Enable HTTP/2 support
-	if err := http2.ConfigureTransport(clonedTransport); err != nil {
-		logger.Warn("Failed to enable HTTP/2 support", "error", err)
+	if configErr := configureTransport(clonedTransport); configErr != nil {
+		logger.Warn("Failed to enable HTTP/2 support", "error", configErr)
 	}
 
 	logger.Debug("Created HTTP transport with TLS configuration",
@@ -101,6 +107,20 @@ func createTransport(esConfig *elasticsearch.Config, logger logger.Interface) (*
 		"tlsInsecureSkipVerify", tlsConfig.InsecureSkipVerify)
 
 	return clonedTransport, nil
+}
+
+// configureTransport configures the HTTP transport with appropriate timeouts and settings
+func configureTransport(transport *http.Transport) error {
+	transport.ResponseHeaderTimeout = DefaultResponseHeaderTimeout
+	transport.TLSHandshakeTimeout = DefaultTLSHandshakeTimeout
+	transport.IdleConnTimeout = DefaultIdleConnTimeout
+
+	// Configure HTTP/2
+	if configErr := http2.ConfigureTransport(transport); configErr != nil {
+		return fmt.Errorf("failed to configure HTTP/2 transport: %w", configErr)
+	}
+
+	return nil
 }
 
 // createClientConfig creates an Elasticsearch client configuration
@@ -151,7 +171,7 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 		"maxRetries", cfg.MaxRetries,
 		"discoverNodesOnStart", cfg.DiscoverNodesOnStart,
 		"discoverNodesInterval", cfg.DiscoverNodesInterval,
-		"transport", map[string]interface{}{
+		"transport", map[string]any{
 			"tlsInsecureSkipVerify": transport.TLSClientConfig != nil && transport.TLSClientConfig.InsecureSkipVerify,
 			"hasRootCAs":            transport.TLSClientConfig != nil && transport.TLSClientConfig.RootCAs != nil,
 			"hasCertificates":       transport.TLSClientConfig != nil && len(transport.TLSClientConfig.Certificates) > 0,
