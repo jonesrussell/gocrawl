@@ -302,7 +302,7 @@ sources:
 			tt.setupEnv()
 
 			// Create config
-			cfg, err := config.New(testutils.NewTestLogger(t))
+			cfg, err := config.NewConfig()
 			if tt.expectedErr == "" {
 				require.NoError(t, err)
 				require.NotNil(t, cfg)

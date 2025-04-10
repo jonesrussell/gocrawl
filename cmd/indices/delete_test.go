@@ -56,12 +56,30 @@ func (m *MockSources) GetMetrics() sources.Metrics {
 	return sources.Metrics{}
 }
 
-func (m *MockSources) GetSources() []sources.Source {
+func (m *MockSources) GetSources() ([]sourceutils.SourceConfig, error) {
 	args := m.Called()
-	if sources, ok := args.Get(0).([]sources.Source); ok {
-		return sources
+	if sources, ok := args.Get(0).([]sourceutils.SourceConfig); ok {
+		return sources, args.Error(1)
 	}
-	return nil
+	return nil, args.Error(1)
+}
+
+func (m *MockSources) ListSources(ctx context.Context) ([]*sourceutils.SourceConfig, error) {
+	args := m.Called(ctx)
+	if sources, ok := args.Get(0).([]*sourceutils.SourceConfig); ok {
+		return sources, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockSources) UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error {
+	args := m.Called(ctx, source)
+	return args.Error(0)
+}
+
+func (m *MockSources) ValidateSource(source *sourceutils.SourceConfig) error {
+	args := m.Called(source)
+	return args.Error(0)
 }
 
 func TestDeleteCommand(t *testing.T) {
@@ -404,34 +422,5 @@ func TestDeleteCommandArgs(t *testing.T) {
 				require.NoError(t, err)
 			}
 		})
-	}
-}
-
-func setupTestDeps() *Dependencies {
-	return &Dependencies{
-		Config: &mockConfig{
-			app: &config.App{
-				Elasticsearch: &elasticsearch.Config{
-					URL: "http://localhost:9200",
-				},
-				Log: &log.Config{
-					Level: "debug",
-				},
-				Priority: &priority.Config{
-					Enabled: true,
-				},
-				Server: &server.Config{
-					Port: 8080,
-				},
-			},
-		},
-		Sources: []*sourceutils.SourceConfig{
-			{
-				Name:         "test-source",
-				URL:          "https://example.com",
-				ArticleIndex: "test-articles",
-				Index:        "test-content",
-			},
-		},
 	}
 }

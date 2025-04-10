@@ -82,9 +82,9 @@ func TestConfig_Validate(t *testing.T) {
 					Name:        "test",
 					Version:     "1.0.0",
 				},
-				Logger:   log.New(),
+				Logger:   log.NewConfig(),
 				Server:   server.New(),
-				Priority: priority.New(),
+				Priority: priority.NewConfig(),
 				Crawler:  config.NewCrawlerConfig(),
 				Sources: []config.Source{
 					{
@@ -115,9 +115,9 @@ func TestConfig_Validate(t *testing.T) {
 					Name:        "test",
 					Version:     "1.0.0",
 				},
-				Logger:   log.New(),
+				Logger:   log.NewConfig(),
 				Server:   server.New(),
-				Priority: priority.New(),
+				Priority: priority.NewConfig(),
 				Crawler:  config.NewCrawlerConfig(),
 				Sources: []config.Source{
 					{

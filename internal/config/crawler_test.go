@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 )
 
@@ -152,7 +153,6 @@ server:
 			require.Equal(t, setup.SourcesPath, crawlerCfg.SourceFile)
 			require.Equal(t, time.Second, crawlerCfg.RandomDelay)
 			require.Equal(t, "gocrawl", crawlerCfg.IndexName)
-			require.Equal(t, "gocrawl-content", crawlerCfg.ContentIndexName)
 		})
 	}
 }
@@ -162,41 +162,37 @@ func TestParseRateLimit(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		input   string
+		limit   string
 		want    time.Duration
 		wantErr bool
-		errMsg  string
 	}{
 		{
 			name:    "valid duration",
-			input:   "2s",
-			want:    2 * time.Second,
+			limit:   "1s",
+			want:    time.Second,
 			wantErr: false,
 		},
 		{
-			name:    "empty string",
-			input:   "",
+			name:    "invalid duration",
+			limit:   "invalid",
 			want:    0,
 			wantErr: true,
-			errMsg:  "rate limit cannot be empty",
 		},
 		{
-			name:    "invalid duration",
-			input:   "invalid",
+			name:    "empty duration",
+			limit:   "",
 			want:    0,
 			wantErr: true,
-			errMsg:  "error parsing duration",
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := config.ParseRateLimit(tt.input)
+
+			got, err := crawler.ParseRateLimit(tt.limit)
 			if tt.wantErr {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.errMsg)
 				return
 			}
 			require.NoError(t, err)

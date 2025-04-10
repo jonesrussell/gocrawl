@@ -487,3 +487,96 @@ func New() *Config {
 		Elasticsearch: elasticsearch.NewConfig(),
 	}
 }
+
+// Validate checks if the source configuration is valid.
+func (s *Source) Validate() error {
+	if s.Name == "" {
+		return errors.New("source name is required")
+	}
+	if s.URL == "" {
+		return errors.New("source URL is required")
+	}
+	if len(s.AllowedDomains) == 0 {
+		return errors.New("at least one allowed domain is required")
+	}
+	if len(s.StartURLs) == 0 {
+		return errors.New("at least one start URL is required")
+	}
+	if s.RateLimit <= 0 {
+		return errors.New("rate limit must be positive")
+	}
+	if s.MaxDepth < 0 {
+		return errors.New("max depth cannot be negative")
+	}
+	if s.ArticleIndex == "" {
+		return errors.New("article index is required")
+	}
+	if s.Index == "" {
+		return errors.New("index is required")
+	}
+	if err := s.Selectors.Article.Validate(); err != nil {
+		return fmt.Errorf("invalid article selectors: %w", err)
+	}
+	if err := s.Rules.Validate(); err != nil {
+		return fmt.Errorf("invalid rules: %w", err)
+	}
+	return nil
+}
+
+// NewNoOp creates a new no-op implementation of the config interface.
+func NewNoOp() Interface {
+	return &noOpConfig{}
+}
+
+// noOpConfig is a no-op implementation of the config interface.
+type noOpConfig struct{}
+
+// GetAppConfig returns a no-op app config.
+func (c *noOpConfig) GetAppConfig() *app.Config {
+	return app.NewConfig()
+}
+
+// GetLogConfig returns a no-op log config.
+func (c *noOpConfig) GetLogConfig() *log.Config {
+	return log.NewConfig()
+}
+
+// GetServerConfig returns a no-op server config.
+func (c *noOpConfig) GetServerConfig() *server.Config {
+	return server.NewConfig()
+}
+
+// GetPriorityConfig returns a no-op priority config.
+func (c *noOpConfig) GetPriorityConfig() *priority.Config {
+	return priority.NewConfig()
+}
+
+// GetStorageConfig returns a no-op storage config.
+func (c *noOpConfig) GetStorageConfig() *storage.Config {
+	return storage.NewConfig()
+}
+
+// GetCrawlerConfig returns a no-op crawler config.
+func (c *noOpConfig) GetCrawlerConfig() *CrawlerConfig {
+	return NewCrawlerConfig()
+}
+
+// GetElasticsearchConfig returns a no-op Elasticsearch config.
+func (c *noOpConfig) GetElasticsearchConfig() *elasticsearch.Config {
+	return elasticsearch.NewConfig()
+}
+
+// GetSources returns an empty slice of sources.
+func (c *noOpConfig) GetSources() []Source {
+	return nil
+}
+
+// GetCommand returns an empty string for the command.
+func (c *noOpConfig) GetCommand() string {
+	return ""
+}
+
+// Validate performs no validation.
+func (c *noOpConfig) Validate() error {
+	return nil
+}

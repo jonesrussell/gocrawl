@@ -231,7 +231,7 @@ server:
 			setup := testutils.SetupTestEnvironment(t, tt.configContent, tt.sourcesContent)
 			defer setup.Cleanup()
 
-			cfg, err := config.New(testutils.NewTestLogger(t))
+			cfg, err := config.NewConfig()
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errMsg)

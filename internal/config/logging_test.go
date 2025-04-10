@@ -48,7 +48,6 @@ log:
 
 				logCfg := cfg.GetLogConfig()
 				require.Equal(t, "debug", logCfg.Level)
-				require.True(t, logCfg.Debug)
 			},
 		},
 		{
@@ -138,7 +137,7 @@ app:
 			tt.setup(t)
 
 			// Create config
-			cfg, err := config.NewConfig(testutils.NewTestLogger(t))
+			cfg, err := config.NewConfig()
 
 			// Validate results
 			tt.validate(t, cfg, err)
@@ -204,7 +203,7 @@ crawler:
 			_ = tt.setup(t)
 
 			// Create config
-			cfg, err := config.New(testutils.NewTestLogger(t))
+			cfg, err := config.NewConfig()
 
 			// Validate results
 			if tt.wantErr {

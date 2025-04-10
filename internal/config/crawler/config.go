@@ -38,6 +38,8 @@ type Config struct {
 	DisallowedDomains []string `yaml:"disallowed_domains"`
 	// SourceFile defines the path to the sources configuration file
 	SourceFile string `yaml:"source_file"`
+	// ContentIndexName defines the name of the index for content
+	ContentIndexName string `yaml:"content_index_name"`
 }
 
 // Validate checks if the configuration is valid.
@@ -164,4 +166,22 @@ func WithSourceFile(file string) Option {
 	return func(c *Config) {
 		c.SourceFile = file
 	}
+}
+
+// ParseRateLimit parses a rate limit string into a time.Duration.
+func ParseRateLimit(limit string) (time.Duration, error) {
+	if limit == "" {
+		return 0, errors.New("rate limit cannot be empty")
+	}
+
+	duration, err := time.ParseDuration(limit)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing duration: %w", err)
+	}
+
+	if duration <= 0 {
+		return 0, errors.New("rate limit must be positive")
+	}
+
+	return duration, nil
 }

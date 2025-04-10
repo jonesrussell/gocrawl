@@ -71,7 +71,6 @@ func TestNewNoOp(t *testing.T) {
 	// Test log config
 	logConfig := c.GetLogConfig()
 	require.Equal(t, "info", logConfig.Level)
-	require.False(t, logConfig.Debug)
 
 	// Test elasticsearch config
 	esConfig := c.GetElasticsearchConfig()
