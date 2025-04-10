@@ -61,20 +61,20 @@ type FileConfig struct {
 
 // LoadFromFile loads source configurations from a YAML file.
 func LoadFromFile(path string) ([]Config, error) {
-	data, readErr := os.ReadFile(path)
-	if readErr != nil {
-		return nil, fmt.Errorf("failed to open file: %w", readErr)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 
 	var fileConfig FileConfig
-	if unmarshalErr := yaml.Unmarshal(data, &fileConfig); unmarshalErr != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", unmarshalErr)
+	if err := yaml.Unmarshal(data, &fileConfig); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
 	// Validate each config
 	for i := range fileConfig.Sources {
-		if validateErr := ValidateConfig(&fileConfig.Sources[i]); validateErr != nil {
-			return nil, fmt.Errorf("invalid config at index %d: %w", i, validateErr)
+		if err := ValidateConfig(&fileConfig.Sources[i]); err != nil {
+			return nil, fmt.Errorf("invalid config at index %d: %w", i, err)
 		}
 	}
 
@@ -96,8 +96,8 @@ func ValidateConfig(cfg *Config) error {
 	}
 
 	// Parse URL and validate scheme
-	u, parseErr := url.Parse(cfg.URL)
-	if parseErr != nil || u.Scheme == "" || (u.Scheme != "http" && u.Scheme != "https") {
+	u, err := url.Parse(cfg.URL)
+	if err != nil || u.Scheme == "" || (u.Scheme != "http" && u.Scheme != "https") {
 		return errors.New("invalid URL: must be a valid HTTP(S) URL")
 	}
 
@@ -112,8 +112,8 @@ func ValidateConfig(cfg *Config) error {
 	// Validate time format if provided
 	if len(cfg.Time) > 0 {
 		for _, t := range cfg.Time {
-			if _, timeErr := time.Parse("15:04", t); timeErr != nil {
-				return fmt.Errorf("invalid time format: %w", timeErr)
+			if _, err := time.Parse("15:04", t); err != nil {
+				return fmt.Errorf("invalid time format: %w", err)
 			}
 		}
 	}

@@ -58,13 +58,10 @@ func TestConfig_Validate(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			err := tt.config.Validate()
-			if tt.wantErr {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.config.Validate()
+			if test.wantErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)

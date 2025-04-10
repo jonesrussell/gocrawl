@@ -3,10 +3,12 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,6 +38,8 @@ var (
 It provides a flexible and extensible framework for building custom crawlers.`,
 		PersistentPreRunE: setupConfig,
 	}
+
+	cfg config.Interface
 )
 
 // setupConfig handles configuration file setup for all commands.
@@ -71,7 +75,8 @@ func setupConfig(_ *cobra.Command, _ []string) error {
 
 	// Read config file
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFoundError) {
 			return fmt.Errorf("failed to read config: %w", err)
 		}
 		// Config file not found, use defaults

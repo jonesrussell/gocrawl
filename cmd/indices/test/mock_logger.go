@@ -5,41 +5,38 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockLogger implements logger.Interface for testing
+// MockLogger is a mock implementation of logger.Interface
 type MockLogger struct {
 	mock.Mock
 }
 
-// Debug logs a debug message
-func (m *MockLogger) Debug(msg string, fields ...interface{}) {
-	m.Called(msg, fields)
+// Debug implements logger.Interface
+func (m *MockLogger) Debug(msg string, fields ...any) {
+	m.Called(fields)
 }
 
-// Info logs an info message
-func (m *MockLogger) Info(msg string, fields ...interface{}) {
-	m.Called(msg, fields)
+// Info implements logger.Interface
+func (m *MockLogger) Info(msg string, fields ...any) {
+	m.Called(fields)
 }
 
-// Warn logs a warning message
-func (m *MockLogger) Warn(msg string, fields ...interface{}) {
-	m.Called(msg, fields)
+// Warn implements logger.Interface
+func (m *MockLogger) Warn(msg string, fields ...any) {
+	m.Called(fields)
 }
 
-// Error logs an error message
-func (m *MockLogger) Error(msg string, fields ...interface{}) {
-	m.Called(msg, fields)
+// Error implements logger.Interface
+func (m *MockLogger) Error(msg string, fields ...any) {
+	m.Called(fields)
 }
 
-// Fatal logs a fatal message
-func (m *MockLogger) Fatal(msg string, fields ...interface{}) {
-	m.Called(msg, fields)
+// Fatal implements logger.Interface
+func (m *MockLogger) Fatal(msg string, fields ...any) {
+	m.Called(fields)
 }
 
-// With returns a new logger with the given fields
-func (m *MockLogger) With(fields ...interface{}) logger.Interface {
+// With implements logger.Interface
+func (m *MockLogger) With(fields ...any) logger.Interface {
 	args := m.Called(fields)
-	if args.Get(0) == nil {
-		return m
-	}
 	return args.Get(0).(logger.Interface)
 }

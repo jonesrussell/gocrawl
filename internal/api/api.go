@@ -33,6 +33,9 @@ type SearchManager interface {
 const (
 	readHeaderTimeout = 10 * time.Second // Timeout for reading headers
 	shutdownTimeout   = 5 * time.Second  // Timeout for graceful shutdown
+	DefaultMaxResults = 10
+	DefaultTimeout    = 30 * time.Second
+	DefaultRetries    = 3
 )
 
 // SetupRouter creates and configures the Gin router with all routes
