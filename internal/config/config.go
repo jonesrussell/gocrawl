@@ -6,7 +6,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	stdlog "log"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -18,6 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/storage"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/viper"
 )
 
@@ -99,9 +99,19 @@ func (c *Config) Validate() error {
 
 // LoadConfig loads the configuration from the given path.
 func LoadConfig(path string) (*Config, error) {
+	// Create a logger for configuration
+	log, err := logger.New(&logger.Config{
+		Level:       logger.InfoLevel,
+		Development: true,
+		Encoding:    "console",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
 	// Load .env files
 	if err := godotenv.Load(".env", ".env.development"); err != nil {
-		stdlog.Printf("Warning: Error loading .env files: %v", err)
+		log.Warn("Error loading .env files", "error", err)
 	}
 
 	v := viper.New()
@@ -144,45 +154,57 @@ func LoadConfig(path string) (*Config, error) {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 		// Config file not found, using defaults and environment variables
-		stdlog.Println("No config file found, using defaults and environment variables")
+		log.Info("No config file found, using defaults and environment variables")
 	}
 
-	// Log environment variables that are set
-	configKeys := []string{
-		"app.name",
-		"app.env",
-		"app.debug",
-		"server.port",
-		"server.read_timeout",
-		"server.write_timeout",
-		"server.idle_timeout",
-		"elasticsearch.addresses",
-		"elasticsearch.api_key",
-		"elasticsearch.index_name",
-		"elasticsearch.max_retries",
-		"elasticsearch.retry_initial_wait",
-		"elasticsearch.retry_max_wait",
-		"crawler.max_depth",
-		"crawler.parallelism",
-		"crawler.max_age",
-		"crawler.rate_limit",
-		"log.level",
-		"log.format",
-		"elastic.username",
-		"elastic.password",
-		"elastic.skip_tls",
-		"elastic.ca_fingerprint",
-		"gocrawl.port",
-		"gocrawl.api_key",
+	// Get environment to determine logging level
+	env := v.GetString("app.environment")
+	if env == "" {
+		env = "development"
 	}
 
-	for _, key := range configKeys {
-		if v.IsSet(key) {
-			// Mask sensitive values in the log message
-			if strings.Contains(key, "api_key") || strings.Contains(key, "password") {
-				stdlog.Printf("Using environment variable %s for %s (value masked)", strings.ReplaceAll(key, ".", "_"), key)
-			} else {
-				stdlog.Printf("Using environment variable %s for %s", strings.ReplaceAll(key, ".", "_"), key)
+	// Only log configuration in development mode
+	if env == "development" {
+		log.Info("Loading configuration", "environment", env)
+
+		// Log environment variables that are set
+		configKeys := []string{
+			"app.name",
+			"app.env",
+			"app.debug",
+			"server.port",
+			"server.read_timeout",
+			"server.write_timeout",
+			"server.idle_timeout",
+			"elasticsearch.addresses",
+			"elasticsearch.api_key",
+			"elasticsearch.index_name",
+			"elasticsearch.max_retries",
+			"elasticsearch.retry_initial_wait",
+			"elasticsearch.retry_max_wait",
+			"crawler.max_depth",
+			"crawler.parallelism",
+			"crawler.max_age",
+			"crawler.rate_limit",
+			"log.level",
+			"log.format",
+			"elastic.username",
+			"elastic.password",
+			"elastic.skip_tls",
+			"elastic.ca_fingerprint",
+			"gocrawl.port",
+			"gocrawl.api_key",
+		}
+
+		log.Info("Environment Variables:")
+		for _, key := range configKeys {
+			if v.IsSet(key) {
+				// Mask sensitive values in the log message
+				if strings.Contains(key, "api_key") || strings.Contains(key, "password") {
+					log.Info("  "+strings.ReplaceAll(key, ".", "_"), "value", "[MASKED]")
+				} else {
+					log.Info("  "+strings.ReplaceAll(key, ".", "_"), "value", v.Get(key))
+				}
 			}
 		}
 	}

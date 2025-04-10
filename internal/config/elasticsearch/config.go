@@ -3,7 +3,6 @@ package elasticsearch
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
 	"time"
 )
 
@@ -115,12 +114,8 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Log the API key for debugging
-	log.Printf("Validating API key: %s", c.APIKey)
-
 	// Check if API key is valid base64
 	if _, err := base64.StdEncoding.DecodeString(c.APIKey); err != nil {
-		log.Printf("Base64 decode error: %v", err)
 		return &ConfigError{
 			Code:    ErrCodeInvalidAPIKey,
 			Message: "API key must be base64 encoded",
