@@ -81,5 +81,17 @@ func NewMockProcessor() *MockProcessor {
 
 // ProvideMockProcessors provides mock processors for testing
 func ProvideMockProcessors() (contentProcessor, articleProcessor common.Processor) {
-	return NewMockProcessor(), NewMockProcessor()
+	contentProcessor = &MockProcessor{
+		ProcessFunc: func(ctx context.Context, data any) error {
+			return nil
+		},
+	}
+
+	articleProcessor = &MockProcessor{
+		ProcessFunc: func(ctx context.Context, data any) error {
+			return nil
+		},
+	}
+
+	return contentProcessor, articleProcessor
 }

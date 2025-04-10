@@ -2,65 +2,74 @@ package testutils
 
 import (
 	"os"
-	"path/filepath"
-	"runtime"
+	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
-// SetupTestEnv sets up the test environment with common environment variables
+const (
+	// MaxEnvParts is the maximum number of parts in an environment variable
+	MaxEnvParts = 2
+)
+
+// SetupTestEnv sets up the test environment with default values
 func SetupTestEnv(t *testing.T) func() {
-	// Store original environment variables
+	t.Helper()
+
+	// Store original environment
 	originalEnv := make(map[string]string)
-	for _, key := range os.Environ() {
-		originalEnv[key] = os.Getenv(key)
+	for _, env := range os.Environ() {
+		pair := strings.SplitN(env, "=", MaxEnvParts)
+		if len(pair) == MaxEnvParts {
+			originalEnv[pair[0]] = pair[1]
+		}
 	}
 
-	// Get the absolute path to the testdata directory
-	_, filename, _, ok := runtime.Caller(0)
-	require.True(t, ok, "failed to get caller information")
-
-	// Walk up to find the config directory
-	dir := filepath.Dir(filename)
-	for filepath.Base(dir) != "gocrawl" && dir != "/" {
-		dir = filepath.Dir(dir)
+	// Set test environment variables
+	for key, value := range map[string]string{
+		"GOCRAWL_APP_ENVIRONMENT":          "test",
+		"GOCRAWL_LOG_LEVEL":                "debug",
+		"GOCRAWL_CRAWLER_MAX_DEPTH":        "2",
+		"GOCRAWL_CRAWLER_PARALLELISM":      "2",
+		"GOCRAWL_SERVER_SECURITY_ENABLED":  "true",
+		"GOCRAWL_SERVER_SECURITY_API_KEY":  "id:test_api_key",
+		"GOCRAWL_ELASTICSEARCH_ADDRESSES":  "http://localhost:9200",
+		"GOCRAWL_ELASTICSEARCH_INDEX_NAME": "test-index",
+		"GOCRAWL_ELASTICSEARCH_API_KEY":    "id:test_api_key",
+		"GOCRAWL_CRAWLER_SOURCE_FILE":      "testdata/sources.yml",
+	} {
+		t.Setenv(key, value)
 	}
-	require.NotEqual(t, "/", dir, "failed to find gocrawl directory")
-
-	sourcesPath := filepath.Join(dir, "internal", "config", "testdata", "sources.yml")
-	require.FileExists(t, sourcesPath, "sources.yml should exist in testdata directory")
-
-	// Set common test environment variables
-	os.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
-	os.Setenv("GOCRAWL_LOG_LEVEL", "debug")
-	os.Setenv("GOCRAWL_CRAWLER_MAX_DEPTH", "2")
-	os.Setenv("GOCRAWL_CRAWLER_PARALLELISM", "2")
-	os.Setenv("GOCRAWL_SERVER_SECURITY_ENABLED", "true")
-	os.Setenv("GOCRAWL_SERVER_SECURITY_API_KEY", "id:test_api_key")
-	os.Setenv("GOCRAWL_ELASTICSEARCH_ADDRESSES", "http://localhost:9200")
-	os.Setenv("GOCRAWL_ELASTICSEARCH_INDEX_NAME", "test-index")
-	os.Setenv("GOCRAWL_ELASTICSEARCH_API_KEY", "id:test_api_key")
-	os.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", sourcesPath)
 
 	// Return cleanup function
 	return func() {
-		// Restore original environment variables
-		for key := range originalEnv {
-			os.Setenv(key, originalEnv[key])
+		for key, value := range originalEnv {
+			t.Setenv(key, value)
 		}
 	}
 }
 
 // SetupTestEnvWithValues sets up the test environment with custom values
 func SetupTestEnvWithValues(t *testing.T, values map[string]string) func() {
-	// First set up the common environment
-	cleanup := SetupTestEnv(t)
+	t.Helper()
 
-	// Then override with custom values
-	for key, value := range values {
-		os.Setenv(key, value)
+	// Store original environment
+	originalEnv := make(map[string]string)
+	for _, env := range os.Environ() {
+		pair := strings.SplitN(env, "=", MaxEnvParts)
+		if len(pair) == MaxEnvParts {
+			originalEnv[pair[0]] = pair[1]
+		}
 	}
 
-	return cleanup
+	// Set test environment variables
+	for key, value := range values {
+		t.Setenv(key, value)
+	}
+
+	// Return cleanup function
+	return func() {
+		for key, value := range originalEnv {
+			t.Setenv(key, value)
+		}
+	}
 }

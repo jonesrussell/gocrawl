@@ -6,6 +6,11 @@ import (
 	"testing"
 )
 
+const (
+	// MaxEnvParts is the maximum number of parts in an environment variable
+	MaxEnvParts = 2
+)
+
 // SetupTestEnv sets up the test environment with default values
 func SetupTestEnv(t *testing.T) func() {
 	t.Helper()
@@ -13,8 +18,8 @@ func SetupTestEnv(t *testing.T) func() {
 	// Store original environment
 	originalEnv := make(map[string]string)
 	for _, env := range os.Environ() {
-		pair := strings.SplitN(env, "=", 2)
-		if len(pair) == 2 {
+		pair := strings.SplitN(env, "=", MaxEnvParts)
+		if len(pair) == MaxEnvParts {
 			originalEnv[pair[0]] = pair[1]
 		}
 	}
@@ -46,8 +51,8 @@ func SetupTestEnvWithValues(t *testing.T, values map[string]string) func() {
 	// Store original environment
 	originalEnv := make(map[string]string)
 	for _, env := range os.Environ() {
-		pair := strings.SplitN(env, "=", 2)
-		if len(pair) == 2 {
+		pair := strings.SplitN(env, "=", MaxEnvParts)
+		if len(pair) == MaxEnvParts {
 			originalEnv[pair[0]] = pair[1]
 		}
 	}
