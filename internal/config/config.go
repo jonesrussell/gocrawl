@@ -182,14 +182,10 @@ func LoadConfig(path string) (*Config, error) {
 			if strings.Contains(key, "api_key") || strings.Contains(key, "password") {
 				stdlog.Printf("Using environment variable %s for %s (value masked)", strings.ReplaceAll(key, ".", "_"), key)
 			} else {
-				stdlog.Printf("Using environment variable %s for %s: %v", strings.ReplaceAll(key, ".", "_"), key, v.Get(key))
+				stdlog.Printf("Using environment variable %s for %s", strings.ReplaceAll(key, ".", "_"), key)
 			}
 		}
 	}
-
-	// Debug log Elasticsearch configuration
-	stdlog.Printf("Debug: Elasticsearch API Key from Viper: %v", v.Get("elasticsearch.api_key"))
-	stdlog.Printf("Debug: ELASTICSEARCH_API_KEY env var: %v", v.Get("ELASTICSEARCH_API_KEY"))
 
 	cfg := newConfig()
 	if err := v.Unmarshal(cfg); err != nil {
@@ -199,13 +195,11 @@ func LoadConfig(path string) (*Config, error) {
 	// Explicitly set API key from environment variable
 	if apiKey := v.GetString("ELASTICSEARCH_API_KEY"); apiKey != "" {
 		cfg.Elasticsearch.APIKey = apiKey
-		stdlog.Printf("Debug: Set Elasticsearch API key from environment variable")
 	}
 
 	// Explicitly set TLS skip verify from environment variable
 	if skipTLS := v.GetBool("ELASTICSEARCH_SKIP_TLS"); skipTLS {
 		cfg.Elasticsearch.TLS.InsecureSkipVerify = true
-		stdlog.Printf("Debug: Set Elasticsearch TLS skip verify to true")
 	}
 
 	// Validate the configuration
