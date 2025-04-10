@@ -55,6 +55,11 @@ type Config struct {
 
 // newConfig returns a new configuration with default values.
 func newConfig() *Config {
+	esConfig := elasticsearch.NewConfig()
+	esConfig.IndexName = "gocrawl"
+	esConfig.APIKey = "test:test" // Default API key for development
+	esConfig.TLS.Enabled = false  // Disable TLS by default for development
+
 	return &Config{
 		Environment:   "development",
 		Logger:        log.NewConfig(),
@@ -63,7 +68,7 @@ func newConfig() *Config {
 		Storage:       storage.NewConfig(),
 		Crawler:       crawler.New(crawler.WithBaseURL("https://example.com")),
 		App:           app.New(),
-		Elasticsearch: elasticsearch.NewConfig(),
+		Elasticsearch: esConfig,
 	}
 }
 

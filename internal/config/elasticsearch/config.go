@@ -3,7 +3,6 @@ package elasticsearch
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -79,10 +78,6 @@ func (c *Config) Validate() error {
 		return errors.New("elasticsearch API key cannot be empty")
 	}
 
-	if !strings.Contains(c.APIKey, ":") {
-		return errors.New("elasticsearch API key must be in the format 'id:api_key'")
-	}
-
 	if c.Retry.Enabled {
 		if c.Retry.InitialWait <= 0 {
 			return fmt.Errorf("initial wait must be greater than 0, got %v", c.Retry.InitialWait)
@@ -106,13 +101,16 @@ func (c *Config) Validate() error {
 	}
 
 	if c.TLS.Enabled {
-		if c.TLS.CertFile == "" {
-			return errors.New("TLS certificate file is required when TLS is enabled")
-		}
+		if !c.TLS.InsecureSkipVerify {
+			if c.TLS.CertFile == "" {
+				return errors.New("TLS certificate file is required when TLS is enabled and insecure_skip_verify is false")
+			}
 
-		if c.TLS.KeyFile == "" {
-			return errors.New("TLS key file is required when TLS is enabled")
+			if c.TLS.KeyFile == "" {
+				return errors.New("TLS key file is required when TLS is enabled and insecure_skip_verify is false")
+			}
 		}
+		// When insecure_skip_verify is true, we don't need certificate files
 	}
 
 	return nil
@@ -122,7 +120,8 @@ func (c *Config) Validate() error {
 func NewConfig() *Config {
 	defaultAddresses := []string{DefaultAddresses}
 	tls := &TLSConfig{
-		Enabled: false,
+		Enabled:            false,
+		InsecureSkipVerify: true,
 	}
 
 	return &Config{

@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"strings"
 	"time"
 )
 
@@ -55,12 +54,6 @@ func (c *Config) Validate() error {
 	if c.SecurityEnabled {
 		if c.APIKey == "" {
 			return errors.New("server security is enabled but no API key is provided")
-		}
-
-		// API key should be in the format "id:api_key"
-		parts := strings.Split(c.APIKey, ":")
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			return errors.New("server API key must be in the format 'id:api_key'")
 		}
 	}
 

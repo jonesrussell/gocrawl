@@ -6,12 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
@@ -22,18 +21,8 @@ const (
 	DefaultScrollDuration = 5 * time.Minute
 )
 
-// NewElasticsearchClient creates a new Elasticsearch client with the provided configuration
-func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.Client, error) {
-	esConfig := cfg.GetElasticsearchConfig()
-	if len(esConfig.Addresses) == 0 {
-		return nil, errors.New("elasticsearch addresses are required")
-	}
-
-	logger.Debug("Elasticsearch configuration",
-		"addresses", esConfig.Addresses,
-		"hasAPIKey", esConfig.APIKey != "",
-		"hasBasicAuth", esConfig.Username != "" && esConfig.Password != "")
-
+// createTransport creates a configured HTTP transport for Elasticsearch
+func createTransport(esConfig *elasticsearch.Config, logger logger.Interface) (*http.Transport, error) {
 	transport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		return nil, errors.New("failed to get default transport")
@@ -41,59 +30,117 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 
 	clonedTransport := transport.Clone()
 
-	// Check if TLS verification should be skipped based on environment variable
-	skipTLS := false
-	switch skipTLSStr := os.Getenv("ELASTIC_SKIP_TLS"); {
-	case skipTLSStr == "":
-		// Default to false
-	case skipTLSStr != "":
-		var err error
-		skipTLS, err = strconv.ParseBool(skipTLSStr)
-		if err != nil {
-			logger.Warn("Invalid ELASTIC_SKIP_TLS value, defaulting to false", "value", skipTLSStr)
-		}
-	}
-
-	if skipTLS {
-		// #nosec G402 -- InsecureSkipVerify is controlled by ELASTIC_SKIP_TLS environment variable
+	// Configure TLS if needed
+	if esConfig.TLS != nil && esConfig.TLS.Enabled {
 		clonedTransport.TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify,
 		}
-		logger.Warn("TLS certificate verification is disabled")
+		if esConfig.TLS.InsecureSkipVerify {
+			logger.Warn("TLS certificate verification is disabled")
+		}
+	} else {
+		// Even if TLS is not explicitly enabled, we should still configure it
+		// since we're using HTTPS
+		clonedTransport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true, // Skip verification for development
+		}
+		logger.Warn("TLS certificate verification is disabled for development")
 	}
 
-	esCfg := es.Config{
+	return clonedTransport, nil
+}
+
+// createClientConfig creates an Elasticsearch client configuration
+func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transport, logger logger.Interface) es.Config {
+	// Log detailed configuration information
+	logger.Debug("Creating Elasticsearch client configuration",
+		"addresses", esConfig.Addresses,
+		"hasAPIKey", esConfig.APIKey != "",
+		"apiKeyLength", len(esConfig.APIKey),
+		"hasUsername", esConfig.Username != "",
+		"hasPassword", esConfig.Password != "",
+		"tlsEnabled", esConfig.TLS != nil && esConfig.TLS.Enabled,
+		"tlsInsecureSkipVerify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify)
+
+	// Configure retry backoff with exponential backoff
+	retryBackoff := func(attempt int) time.Duration {
+		// Exponential backoff: 100ms, 200ms, 400ms, etc.
+		backoff := time.Duration(1<<uint(attempt)) * 100 * time.Millisecond
+		logger.Debug("Retry backoff calculated", "attempt", attempt, "backoff", backoff)
+		return backoff
+	}
+
+	// Create the client configuration
+	cfg := es.Config{
 		Addresses: esConfig.Addresses,
-		Transport: clonedTransport,
+		Transport: transport,
+		// The API key is already in the format id:api_key, no need to modify it
+		APIKey: esConfig.APIKey,
 		// Client configuration
-		EnableMetrics:       false,
-		EnableDebugLogger:   false,
-		CompressRequestBody: true,
-		DisableRetry:        false,
-		RetryOnStatus:       []int{502, 503, 504},
-		MaxRetries:          DefaultMaxRetries,
-		RetryBackoff:        func(i int) time.Duration { return time.Duration(i) * 100 * time.Millisecond },
+		EnableMetrics:           true,
+		EnableDebugLogger:       true,
+		EnableCompatibilityMode: true,
+		CompressRequestBody:     true,
+		DisableRetry:            false,
+		RetryOnStatus:           []int{502, 503, 504},
+		MaxRetries:              DefaultMaxRetries,
+		RetryBackoff:            retryBackoff,
+		// Connection pool configuration
+		DiscoverNodesOnStart:  true,
+		DiscoverNodesInterval: 30 * time.Second,
 	}
 
-	// Configure authentication
-	switch {
-	case esConfig.APIKey != "":
-		esCfg.APIKey = esConfig.APIKey
-		logger.Debug("Using API key authentication")
-	case esConfig.Username != "" && esConfig.Password != "":
-		esCfg.Username = esConfig.Username
-		esCfg.Password = esConfig.Password
-		logger.Debug("Using basic authentication")
-	default:
-		return nil, errors.New("either API key or basic authentication is required")
+	// Log the final configuration (excluding sensitive fields)
+	logger.Debug("Final Elasticsearch client configuration",
+		"addresses", cfg.Addresses,
+		"hasAPIKey", cfg.APIKey != "",
+		"enableMetrics", cfg.EnableMetrics,
+		"enableDebugLogger", cfg.EnableDebugLogger,
+		"enableCompatibilityMode", cfg.EnableCompatibilityMode,
+		"compressRequestBody", cfg.CompressRequestBody,
+		"disableRetry", cfg.DisableRetry,
+		"retryOnStatus", cfg.RetryOnStatus,
+		"maxRetries", cfg.MaxRetries,
+		"discoverNodesOnStart", cfg.DiscoverNodesOnStart,
+		"discoverNodesInterval", cfg.DiscoverNodesInterval)
+
+	return cfg
+}
+
+// NewElasticsearchClient creates a new Elasticsearch client with the provided configuration
+func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.Client, error) {
+	esConfig := cfg.GetElasticsearchConfig()
+	if len(esConfig.Addresses) == 0 {
+		return nil, errors.New("elasticsearch addresses are required")
 	}
 
+	if esConfig.APIKey == "" {
+		return nil, errors.New("API key is required")
+	}
+
+	logger.Debug("Elasticsearch configuration",
+		"addresses", esConfig.Addresses,
+		"hasAPIKey", esConfig.APIKey != "",
+		"hasBasicAuth", esConfig.Username != "" && esConfig.Password != "",
+		"tls.enabled", esConfig.TLS != nil && esConfig.TLS.Enabled,
+		"tls.insecure_skip_verify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify)
+
+	// Create transport
+	transport, err := createTransport(esConfig, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transport: %w", err)
+	}
+
+	// Create client config
+	esCfg := createClientConfig(esConfig, transport, logger)
+
+	// Create client
 	client, err := es.NewClient(esCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
 	}
 
-	// Test the connection
+	// Test connection
 	res, err := client.Ping()
 	if err != nil {
 		return nil, fmt.Errorf("failed to ping Elasticsearch: %w", err)

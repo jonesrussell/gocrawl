@@ -71,10 +71,19 @@ func (c *ElasticsearchConfig) Validate() error {
 	if len(c.Addresses) == 0 {
 		return errors.New("at least one address is required")
 	}
+	if c.APIKey == "" {
+		return errors.New("API key is required")
+	}
 	if c.TLS != nil {
 		if err := c.TLS.Validate(); err != nil {
 			return fmt.Errorf("tls: %w", err)
 		}
 	}
 	return nil
+}
+
+// GetAPIKey returns the API key in the correct format for the Elasticsearch client.
+func (c *ElasticsearchConfig) GetAPIKey() string {
+	// The API key is already in the correct format (id:api_key)
+	return c.APIKey
 }

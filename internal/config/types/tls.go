@@ -21,11 +21,13 @@ func (c *TLSConfig) Validate() error {
 	if !c.Enabled {
 		return nil
 	}
-	if c.CertFile == "" {
-		return errors.New("cert_file is required when TLS is enabled")
-	}
-	if c.KeyFile == "" {
-		return errors.New("key_file is required when TLS is enabled")
+	if !c.InsecureSkipVerify {
+		if c.CertFile == "" {
+			return errors.New("cert_file is required when TLS is enabled and insecure_skip_verify is false")
+		}
+		if c.KeyFile == "" {
+			return errors.New("key_file is required when TLS is enabled and insecure_skip_verify is false")
+		}
 	}
 	return nil
 }
