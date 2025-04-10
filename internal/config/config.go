@@ -6,7 +6,7 @@ package config
 import (
 	"errors"
 	"fmt"
-	"strings"
+	"os"
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
@@ -17,7 +17,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/storage"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/viper"
 )
 
@@ -43,24 +42,6 @@ type Config struct {
 	Sources []types.Source `yaml:"sources"`
 	// Command is the current command being executed
 	Command string `yaml:"command"`
-}
-
-// newConfig returns a new configuration with default values.
-func newConfig() *Config {
-	esConfig := elasticsearch.NewConfig()
-	esConfig.IndexName = "gocrawl"
-	esConfig.TLS.Enabled = false // Disable TLS by default for development
-
-	return &Config{
-		Environment:   "development",
-		Logger:        logconfig.NewConfig(),
-		Server:        server.NewConfig(),
-		Priority:      priority.NewConfig(),
-		Storage:       storage.NewConfig(),
-		Crawler:       crawler.New(crawler.WithBaseURL("https://example.com")),
-		App:           app.New(),
-		Elasticsearch: esConfig,
-	}
 }
 
 // Validate validates the configuration.
@@ -97,140 +78,94 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+func setDefaults(v *viper.Viper) {
+	// Elasticsearch defaults
+	v.SetDefault("elasticsearch.bulk_size", DefaultBulkSize)
+	v.SetDefault("elasticsearch.flush_interval", DefaultFlushInterval)
+	v.SetDefault("elasticsearch.discover_nodes", true)
+	v.SetDefault("elasticsearch.retry.enabled", true)
+	v.SetDefault("elasticsearch.retry.initial_wait", DefaultRetryInitialWait)
+	v.SetDefault("elasticsearch.retry.max_wait", DefaultRetryMaxWait)
+	v.SetDefault("elasticsearch.retry.max_retries", DefaultMaxRetries)
+	v.SetDefault("elasticsearch.tls.enabled", false)
+	v.SetDefault("elasticsearch.tls.insecure_skip_verify", false)
+}
+
+func bindEnvVars(v *viper.Viper) error {
+	envVars := map[string]string{
+		"elasticsearch.api_key":                  "ELASTICSEARCH_API_KEY",
+		"elasticsearch.addresses":                "ELASTICSEARCH_HOSTS",
+		"elasticsearch.index_name":               "ELASTICSEARCH_INDEX_PREFIX",
+		"elasticsearch.username":                 "ELASTIC_USERNAME",
+		"elasticsearch.password":                 "ELASTIC_PASSWORD",
+		"elasticsearch.cloud.id":                 "ELASTICSEARCH_CLOUD_ID",
+		"elasticsearch.cloud.api_key":            "ELASTICSEARCH_CLOUD_API_KEY",
+		"elasticsearch.tls.enabled":              "ELASTIC_TLS_ENABLED",
+		"elasticsearch.tls.cert_file":            "ELASTIC_TLS_CERT_FILE",
+		"elasticsearch.tls.key_file":             "ELASTIC_TLS_KEY_FILE",
+		"elasticsearch.tls.ca_file":              "ELASTIC_TLS_CA_FILE",
+		"elasticsearch.tls.insecure_skip_verify": "ELASTICSEARCH_SKIP_TLS",
+		"elasticsearch.retry.enabled":            "ELASTICSEARCH_RETRY_ENABLED",
+		"elasticsearch.retry.initial_wait":       "ELASTICSEARCH_RETRY_INITIAL_WAIT",
+		"elasticsearch.retry.max_wait":           "ELASTICSEARCH_RETRY_MAX_WAIT",
+		"elasticsearch.retry.max_retries":        "ELASTICSEARCH_MAX_RETRIES",
+		"elasticsearch.bulk_size":                "ELASTICSEARCH_BULK_SIZE",
+		"elasticsearch.flush_interval":           "ELASTICSEARCH_FLUSH_INTERVAL",
+		"elasticsearch.discover_nodes":           "ELASTICSEARCH_DISCOVER_NODES",
+	}
+
+	for configKey, envVar := range envVars {
+		if err := v.BindEnv(configKey, envVar); err != nil {
+			return fmt.Errorf("failed to bind environment variable %s: %w", envVar, err)
+		}
+	}
+
+	return nil
+}
+
 // LoadConfig loads the configuration from the given path.
 func LoadConfig(path string) (*Config, error) {
-	// Create a logger for configuration
-	log, err := logger.New(&logger.Config{
-		Level:       logger.InfoLevel,
-		Development: true,
-		Encoding:    "console",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
+	var cfg Config
+	var loadErr error
+
+	v := viper.New()
+	v.SetConfigType("yaml")
+	v.SetConfigName("config")
+	v.AddConfigPath(path)
+	v.AddConfigPath(".")
+
+	// Set default values
+	setDefaults(v)
+
+	// Load environment variables
+	if loadErr = bindEnvVars(v); loadErr != nil {
+		return nil, fmt.Errorf("failed to bind environment variables: %w", loadErr)
 	}
 
 	// Load .env files
-	if err := godotenv.Load(".env", ".env.development"); err != nil {
-		log.Warn("Error loading .env files", "error", err)
+	if loadErr = godotenv.Load(".env", ".env.development"); loadErr != nil && !os.IsNotExist(loadErr) {
+		return nil, fmt.Errorf("failed to load .env files: %w", loadErr)
 	}
-
-	v := viper.New()
-	v.SetConfigFile(path)
-	v.SetConfigType("yaml")
-
-	// Replace dots with underscores in env variables
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// Enable reading env variables
-	v.AutomaticEnv()
-
-	// Allow empty environment variables for optional fields
-	v.AllowEmptyEnv(true)
-
-	// Bind environment variables to configuration fields
-	v.BindEnv("elasticsearch.api_key", "ELASTICSEARCH_API_KEY")
-	v.BindEnv("elasticsearch.addresses", "ELASTICSEARCH_HOSTS")
-	v.BindEnv("elasticsearch.index_name", "ELASTICSEARCH_INDEX_PREFIX")
-	v.BindEnv("elasticsearch.username", "ELASTIC_USERNAME")
-	v.BindEnv("elasticsearch.password", "ELASTIC_PASSWORD")
-	v.BindEnv("elasticsearch.cloud.id", "ELASTICSEARCH_CLOUD_ID")
-	v.BindEnv("elasticsearch.cloud.api_key", "ELASTICSEARCH_CLOUD_API_KEY")
-	v.BindEnv("elasticsearch.tls.enabled", "ELASTIC_TLS_ENABLED")
-	v.BindEnv("elasticsearch.tls.cert_file", "ELASTIC_TLS_CERT_FILE")
-	v.BindEnv("elasticsearch.tls.key_file", "ELASTIC_TLS_KEY_FILE")
-	v.BindEnv("elasticsearch.tls.ca_file", "ELASTIC_TLS_CA_FILE")
-	v.BindEnv("elasticsearch.tls.insecure_skip_verify", "ELASTICSEARCH_SKIP_TLS")
-	v.BindEnv("elasticsearch.retry.enabled", "ELASTICSEARCH_RETRY_ENABLED")
-	v.BindEnv("elasticsearch.retry.initial_wait", "ELASTICSEARCH_RETRY_INITIAL_WAIT")
-	v.BindEnv("elasticsearch.retry.max_wait", "ELASTICSEARCH_RETRY_MAX_WAIT")
-	v.BindEnv("elasticsearch.retry.max_retries", "ELASTICSEARCH_MAX_RETRIES")
-	v.BindEnv("elasticsearch.bulk_size", "ELASTICSEARCH_BULK_SIZE")
-	v.BindEnv("elasticsearch.flush_interval", "ELASTICSEARCH_FLUSH_INTERVAL")
-	v.BindEnv("elasticsearch.discover_nodes", "ELASTICSEARCH_DISCOVER_NODES")
 
 	// Read config file (if it exists)
-	if err := v.ReadInConfig(); err != nil {
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFoundError) {
-			return nil, fmt.Errorf("failed to read config: %w", err)
-		}
-		// Config file not found, using defaults and environment variables
-		log.Info("No config file found, using defaults and environment variables")
-	}
-
-	// Get environment to determine logging level
-	env := v.GetString("app.environment")
-	if env == "" {
-		env = "development"
-	}
-
-	// Only log configuration in development mode
-	if env == "development" {
-		log.Info("Loading configuration", "environment", env)
-
-		// Log environment variables that are set
-		configKeys := []string{
-			"app.name",
-			"app.env",
-			"app.debug",
-			"server.port",
-			"server.read_timeout",
-			"server.write_timeout",
-			"server.idle_timeout",
-			"elasticsearch.addresses",
-			"elasticsearch.api_key",
-			"elasticsearch.index_name",
-			"elasticsearch.max_retries",
-			"elasticsearch.retry_initial_wait",
-			"elasticsearch.retry_max_wait",
-			"crawler.max_depth",
-			"crawler.parallelism",
-			"crawler.max_age",
-			"crawler.rate_limit",
-			"log.level",
-			"log.format",
-			"elastic.username",
-			"elastic.password",
-			"elastic.skip_tls",
-			"elastic.ca_fingerprint",
-			"gocrawl.port",
-			"gocrawl.api_key",
-		}
-
-		log.Info("Environment Variables:")
-		for _, key := range configKeys {
-			if v.IsSet(key) {
-				// Mask sensitive values in the log message
-				if strings.Contains(key, "api_key") || strings.Contains(key, "password") {
-					log.Info("  "+strings.ReplaceAll(key, ".", "_"), "value", "[MASKED]")
-				} else {
-					log.Info("  "+strings.ReplaceAll(key, ".", "_"), "value", v.Get(key))
-				}
-			}
+	if loadErr = v.ReadInConfig(); loadErr != nil {
+		var configFileNotFound viper.ConfigFileNotFoundError
+		if !errors.As(loadErr, &configFileNotFound) {
+			return nil, fmt.Errorf("failed to read config file: %w", loadErr)
 		}
 	}
 
-	cfg := newConfig()
-	if err := v.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	// Unmarshal config
+	if loadErr = v.Unmarshal(&cfg); loadErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", loadErr)
 	}
 
-	// Explicitly set API key from environment variable
-	if apiKey := v.GetString("ELASTICSEARCH_API_KEY"); apiKey != "" {
-		cfg.Elasticsearch.APIKey = apiKey
+	// Validate config
+	if loadErr = cfg.Validate(); loadErr != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", loadErr)
 	}
 
-	// Explicitly set TLS skip verify from environment variable
-	if skipTLS := v.GetBool("ELASTICSEARCH_SKIP_TLS"); skipTLS {
-		cfg.Elasticsearch.TLS.InsecureSkipVerify = true
-	}
-
-	// Validate the configuration
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
-	}
-
-	return cfg, nil
+	return &cfg, nil
 }
 
 // GetAppConfig returns the application configuration.

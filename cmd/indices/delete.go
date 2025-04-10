@@ -18,6 +18,11 @@ import (
 	"go.uber.org/fx"
 )
 
+var (
+	// ErrDeletionCancelled is returned when the user cancels the deletion
+	ErrDeletionCancelled = errors.New("deletion cancelled by user")
+)
+
 // Deleter implements the indices delete command
 type Deleter struct {
 	config     config.Interface
@@ -174,12 +179,12 @@ func (d *Deleter) confirmDeletion(indicesToDelete []string) error {
 
 	// If no input or newline, treat as 'N'
 	if n == 0 || response[0] == '\n' {
-		return fmt.Errorf("deletion cancelled by user")
+		return ErrDeletionCancelled
 	}
 
 	// Only proceed if input is 'y' or 'Y'
 	if response[0] != 'y' && response[0] != 'Y' {
-		return fmt.Errorf("deletion cancelled by user")
+		return ErrDeletionCancelled
 	}
 
 	return nil
