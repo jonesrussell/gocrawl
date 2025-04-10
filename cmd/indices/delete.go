@@ -103,7 +103,6 @@ func (d *Deleter) Start(ctx context.Context) error {
 	if !d.force {
 		if err := d.confirmDeletion(filtered.toDelete); err != nil {
 			d.logger.Info("Deletion cancelled by user")
-			fmt.Fprintf(os.Stdout, "Deletion cancelled\n")
 			return err
 		}
 	}
@@ -247,7 +246,15 @@ You can specify indices by name or by source name.`,
 				Module,
 				// Invoke delete command
 				fx.Invoke(func(d *Deleter) error {
-					return d.Start(cmd.Context())
+					if err := d.Start(cmd.Context()); err != nil {
+						if errors.Is(err, ErrDeletionCancelled) {
+							cmd.Println("Deletion cancelled")
+							return nil
+						}
+						return err
+					}
+					cmd.Println("Successfully deleted indices")
+					return nil
 				}),
 			)
 

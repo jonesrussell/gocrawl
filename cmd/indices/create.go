@@ -127,18 +127,22 @@ The index will be created with default settings unless overridden by configurati
 				Module,
 				// Invoke create command
 				fx.Invoke(func(c *Creator) error {
-					return c.Start(cmd.Context())
+					if err := c.Start(cmd.Context()); err != nil {
+						return err
+					}
+					cmd.Printf("Successfully created index: %s\n", args[0])
+					return nil
 				}),
 			)
 
 			// Start application
 			if err := app.Start(context.Background()); err != nil {
-				return fmt.Errorf("failed to start application: %w", err)
+				return err
 			}
 
 			// Stop application
 			if err := app.Stop(context.Background()); err != nil {
-				return fmt.Errorf("failed to stop application: %w", err)
+				return err
 			}
 
 			return nil
