@@ -6,85 +6,70 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockCrawler is a mock implementation of crawler.Interface
+// MockCrawler is a mock implementation of the crawler interface
 type MockCrawler struct {
 	mock.Mock
 }
 
-// Start implements crawler.Interface
+// Start mocks the Start method
 func (m *MockCrawler) Start(ctx context.Context, sourceName string) error {
 	args := m.Called(ctx, sourceName)
 	return args.Error(0)
 }
 
-// Stop implements crawler.Interface
+// Stop mocks the Stop method
 func (m *MockCrawler) Stop(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-// Subscribe implements crawler.Interface
+// Subscribe mocks the Subscribe method
 func (m *MockCrawler) Subscribe(handler events.Handler) {
 	m.Called(handler)
 }
 
-// SetRateLimit implements crawler.Interface
+// SetRateLimit mocks the SetRateLimit method
 func (m *MockCrawler) SetRateLimit(duration time.Duration) error {
 	args := m.Called(duration)
 	return args.Error(0)
 }
 
-// SetMaxDepth implements crawler.Interface
+// SetMaxDepth mocks the SetMaxDepth method
 func (m *MockCrawler) SetMaxDepth(depth int) {
 	m.Called(depth)
 }
 
-// SetCollector implements crawler.Interface
+// SetCollector mocks the SetCollector method
 func (m *MockCrawler) SetCollector(collector *colly.Collector) {
 	m.Called(collector)
 }
 
-// GetIndexManager returns the index manager interface.
-func (m *MockCrawler) GetIndexManager() api.IndexManager {
+// GetIndexManager mocks the GetIndexManager method
+func (m *MockCrawler) GetIndexManager() storagetypes.IndexManager {
 	args := m.Called()
-	if args.Get(0) == nil {
-		return nil
-	}
-	indexManager, ok := args.Get(0).(api.IndexManager)
-	if !ok {
-		return nil
-	}
-	return indexManager
+	return args.Get(0).(storagetypes.IndexManager)
 }
 
-// Wait implements crawler.Interface
+// Wait mocks the Wait method
 func (m *MockCrawler) Wait() {
 	m.Called()
 }
 
-// GetMetrics returns the current crawler metrics.
+// GetMetrics mocks the GetMetrics method
 func (m *MockCrawler) GetMetrics() *common.Metrics {
 	args := m.Called()
-	if args.Get(0) == nil {
-		return nil
-	}
-	metrics, ok := args.Get(0).(*common.Metrics)
-	if !ok {
-		return nil
-	}
-	return metrics
+	return args.Get(0).(*common.Metrics)
 }
 
-// SetTestServerURL implements crawler.Interface
+// SetTestServerURL mocks the SetTestServerURL method
 func (m *MockCrawler) SetTestServerURL(url string) {
 	m.Called(url)
 }
 
-// Ensure MockCrawler implements crawler.Interface
 var _ Interface = (*MockCrawler)(nil)

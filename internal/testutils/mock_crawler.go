@@ -5,21 +5,43 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockCrawler implements crawler.Interface for testing
+// MockCrawler is a mock implementation of the crawler.Interface for testing.
 type MockCrawler struct {
 	mock.Mock
+	Logger           logger.Interface
+	indexManager     storagetypes.IndexManager
+	sources          sources.Interface
+	articleProcessor common.Processor
+	contentProcessor common.Processor
+	bus              *events.Bus
 }
 
-// NewMockCrawler creates a new mock crawler instance
-func NewMockCrawler() *MockCrawler {
-	return &MockCrawler{}
+// NewMockCrawler creates a new mock crawler instance.
+func NewMockCrawler(
+	logger logger.Interface,
+	indexManager storagetypes.IndexManager,
+	sources sources.Interface,
+	articleProcessor common.Processor,
+	contentProcessor common.Processor,
+	bus *events.Bus,
+) crawler.Interface {
+	return &MockCrawler{
+		Logger:           logger,
+		indexManager:     indexManager,
+		sources:          sources,
+		articleProcessor: articleProcessor,
+		contentProcessor: contentProcessor,
+		bus:              bus,
+	}
 }
 
 func (m *MockCrawler) Start(ctx context.Context, source string) error {
@@ -49,14 +71,8 @@ func (m *MockCrawler) SetCollector(collector *colly.Collector) {
 	m.Called(collector)
 }
 
-func (m *MockCrawler) GetIndexManager() api.IndexManager {
-	args := m.Called()
-	if result := args.Get(0); result != nil {
-		if im, ok := result.(api.IndexManager); ok {
-			return im
-		}
-	}
-	return nil
+func (m *MockCrawler) GetIndexManager() storagetypes.IndexManager {
+	return m.indexManager
 }
 
 func (m *MockCrawler) Wait() {

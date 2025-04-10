@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
@@ -43,7 +43,7 @@ type Crawler struct {
 	collector        *colly.Collector
 	Logger           logger.Interface
 	bus              *events.Bus
-	indexManager     api.IndexManager
+	indexManager     storagetypes.IndexManager
 	sources          sources.Interface
 	articleProcessor common.Processor
 	contentProcessor common.Processor
@@ -345,8 +345,8 @@ func (c *Crawler) SetCollector(collector *colly.Collector) {
 	c.collector = collector
 }
 
-// GetIndexManager returns the index manager interface.
-func (c *Crawler) GetIndexManager() api.IndexManager {
+// GetIndexManager returns the index manager
+func (c *Crawler) GetIndexManager() storagetypes.IndexManager {
 	return c.indexManager
 }
 

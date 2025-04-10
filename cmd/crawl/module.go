@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -96,7 +95,7 @@ var Module = fx.Module("crawl",
 		fx.Annotate(
 			func(
 				logger logger.Interface,
-				indexManager api.IndexManager,
+				indexManager storagetypes.IndexManager,
 				sources sources.Interface,
 				processors []common.Processor,
 				bus *events.Bus,

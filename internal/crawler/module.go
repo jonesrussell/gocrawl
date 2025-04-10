@@ -6,11 +6,11 @@ package crawler
 import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
-	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -30,7 +30,7 @@ type Result struct {
 // ProvideCrawler creates a new crawler instance with the given dependencies.
 func ProvideCrawler(
 	logger logger.Interface,
-	indexManager api.IndexManager,
+	indexManager storagetypes.IndexManager,
 	sources sources.Interface,
 	processors []common.Processor,
 	bus *events.Bus,
@@ -80,7 +80,7 @@ var Module = fx.Module("crawler",
 // NewCrawler creates a new crawler instance.
 func NewCrawler(
 	logger logger.Interface,
-	indexManager api.IndexManager,
+	indexManager storagetypes.IndexManager,
 	sources sources.Interface,
 	articleProcessor common.Processor,
 	contentProcessor common.Processor,
