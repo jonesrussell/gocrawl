@@ -97,8 +97,8 @@ func (d *Deleter) Start(ctx context.Context) error {
 	// Confirm deletion if needed
 	if !d.force {
 		if err := d.confirmDeletion(filtered.toDelete); err != nil {
-			d.logger.Info("Deletion cancelled", "error", err)
-			// Return nil for user cancellation to avoid showing usage
+			d.logger.Info("Deletion cancelled by user")
+			fmt.Fprintf(os.Stdout, "Deletion cancelled\n")
 			return nil
 		}
 	}
@@ -110,6 +110,7 @@ func (d *Deleter) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to delete index %s: %w", index, err)
 		}
 		d.logger.Info("Successfully deleted index", "index", index)
+		fmt.Fprintf(os.Stdout, "Successfully deleted index: %s\n", index)
 	}
 
 	return nil
