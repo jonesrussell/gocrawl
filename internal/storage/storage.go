@@ -608,7 +608,6 @@ func (s *Storage) GetIndexHealth(ctx context.Context, index string) (string, err
 		s.client.Cluster.Health.WithIndex(index),
 	)
 	if err != nil {
-		s.logger.Error("Failed to get index health", "error", err)
 		return "", fmt.Errorf("failed to get index health: %w", err)
 	}
 	defer func() {
@@ -618,23 +617,19 @@ func (s *Storage) GetIndexHealth(ctx context.Context, index string) (string, err
 	}()
 
 	if res.IsError() {
-		s.logger.Error("Failed to get index health", "error", res.String())
 		return "", fmt.Errorf("error getting index health: %s", res.String())
 	}
 
 	var health map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&health); decodeErr != nil {
-		s.logger.Error("Failed to get index health", "error", decodeErr)
 		return "", fmt.Errorf("error decoding index health: %w", decodeErr)
 	}
 
 	status, ok := health["status"].(string)
 	if !ok {
-		s.logger.Error("Failed to get index health", "error", "invalid index health format")
 		return "", ErrInvalidIndexHealth
 	}
 
-	s.logger.Info("Retrieved index health", "index", index, "health", status)
 	return status, nil
 }
 
@@ -645,8 +640,7 @@ func (s *Storage) GetIndexDocCount(ctx context.Context, index string) (int64, er
 		s.client.Count.WithIndex(index),
 	)
 	if err != nil {
-		s.logger.Error("Failed to get index document count", "error", err)
-		return 0, fmt.Errorf("failed to get index document count: %w", err)
+		return 0, fmt.Errorf("failed to get document count: %w", err)
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
@@ -655,23 +649,19 @@ func (s *Storage) GetIndexDocCount(ctx context.Context, index string) (int64, er
 	}()
 
 	if res.IsError() {
-		s.logger.Error("Failed to get index document count", "error", res.String())
-		return 0, fmt.Errorf("error getting index document count: %s", res.String())
+		return 0, fmt.Errorf("error getting document count: %s", res.String())
 	}
 
 	var count map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&count); decodeErr != nil {
-		s.logger.Error("Failed to get index document count", "error", decodeErr)
-		return 0, fmt.Errorf("error decoding index document count: %w", decodeErr)
+		return 0, fmt.Errorf("error decoding document count: %w", decodeErr)
 	}
 
 	countValue, ok := count["count"].(float64)
 	if !ok {
-		s.logger.Error("Failed to get index document count", "error", "invalid index document count format")
 		return 0, ErrInvalidDocCount
 	}
 
-	s.logger.Info("Retrieved index document count", "index", index, "count", int64(countValue))
 	return int64(countValue), nil
 }
 
@@ -833,8 +823,8 @@ func (s *Storage) Count(ctx context.Context, index string, query any) (int64, er
 	// Create the count request
 	var body bytes.Buffer
 	if query != nil {
-		if err := json.NewEncoder(&body).Encode(query); err != nil {
-			return 0, fmt.Errorf("error encoding count query: %w", err)
+		if encodeErr := json.NewEncoder(&body).Encode(query); encodeErr != nil {
+			return 0, fmt.Errorf("error encoding count query: %w", encodeErr)
 		}
 	}
 
@@ -861,9 +851,9 @@ func (s *Storage) Count(ctx context.Context, index string, query any) (int64, er
 	var result struct {
 		Count int64 `json:"count"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		s.logger.Error("Failed to decode count result", "error", err)
-		return 0, fmt.Errorf("error decoding count result: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		s.logger.Error("Failed to decode count result", "error", decodeErr)
+		return 0, fmt.Errorf("error decoding count result: %w", decodeErr)
 	}
 
 	s.logger.Info("Executed count successfully", "index", index, "count", result.Count)

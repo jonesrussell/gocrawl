@@ -55,8 +55,14 @@ func New(cfg *Config) (Interface, error) {
 				color = ColorWarn
 			case zapcore.ErrorLevel:
 				color = ColorError
+			case zapcore.DPanicLevel:
+				color = ColorError
+			case zapcore.PanicLevel:
+				color = ColorError
 			case zapcore.FatalLevel:
 				color = ColorFatal
+			case zapcore.InvalidLevel:
+				color = ColorReset
 			default:
 				color = ColorReset
 			}

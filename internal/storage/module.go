@@ -22,6 +22,33 @@ const (
 	DefaultScrollDuration = 5 * time.Minute
 )
 
+// createTLSConfig creates a TLS configuration with appropriate security settings
+func createTLSConfig(esConfig *elasticsearch.Config, logger logger.Interface) *tls.Config {
+	if esConfig.TLS == nil || !esConfig.TLS.Enabled {
+		return nil
+	}
+
+	// InsecureSkipVerify is only used in development environments
+	// and should be disabled in production. This is a security risk
+	// and should only be used for testing or development purposes.
+	// See https://pkg.go.dev/crypto/tls#Config for more information.
+	// SECURITY WARNING: Setting InsecureSkipVerify to true means that
+	// the client will accept any certificate presented by the server,
+	// making the connection vulnerable to man-in-the-middle attacks.
+	// This should never be used in production environments.
+	if esConfig.TLS.InsecureSkipVerify {
+		logger.Warn(
+			"TLS certificate verification is disabled - " +
+				"this is a security risk and should never be used in production",
+		)
+	}
+
+	// #nosec G402 - InsecureSkipVerify is configurable and documented
+	return &tls.Config{
+		InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify,
+	}
+}
+
 // createTransport creates a configured HTTP transport for Elasticsearch
 func createTransport(esConfig *elasticsearch.Config, logger logger.Interface) (*http.Transport, error) {
 	transport, ok := http.DefaultTransport.(*http.Transport)
@@ -30,15 +57,7 @@ func createTransport(esConfig *elasticsearch.Config, logger logger.Interface) (*
 	}
 
 	clonedTransport := transport.Clone()
-
-	// Configure TLS
-	clonedTransport.TLSClientConfig = &tls.Config{
-		InsecureSkipVerify: esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify,
-	}
-
-	if esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify {
-		logger.Warn("TLS certificate verification is disabled")
-	}
+	clonedTransport.TLSClientConfig = createTLSConfig(esConfig, logger)
 
 	return clonedTransport, nil
 }
@@ -54,30 +73,21 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 		"tlsEnabled", esConfig.TLS != nil && esConfig.TLS.Enabled,
 		"tlsInsecureSkipVerify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify)
 
-	// Configure retry backoff with exponential backoff
-	retryBackoff := func(attempt int) time.Duration {
-		// Exponential backoff: 100ms, 200ms, 400ms, etc.
-		backoff := time.Duration(1<<uint(attempt)) * 100 * time.Millisecond
-		logger.Debug("Retry backoff calculated", "attempt", attempt, "backoff", backoff)
-		return backoff
-	}
-
 	// Create the client configuration
 	cfg := es.Config{
 		Addresses: esConfig.Addresses,
+		Username:  esConfig.Username,
+		Password:  esConfig.Password,
+		APIKey:    esConfig.APIKey,
 		Transport: transport,
-		// The API key is already in the correct format (base64 encoded id:api_key)
-		APIKey: esConfig.APIKey,
-		// Client configuration
-		EnableMetrics:           true,
-		EnableDebugLogger:       true,
-		EnableCompatibilityMode: true,
-		CompressRequestBody:     true,
-		DisableRetry:            false,
-		RetryOnStatus:           []int{502, 503, 504},
-		MaxRetries:              DefaultMaxRetries,
-		RetryBackoff:            retryBackoff,
-		// Connection pool configuration
+		RetryOnStatus: []int{
+			http.StatusTooManyRequests,
+			http.StatusInternalServerError,
+			http.StatusBadGateway,
+			http.StatusServiceUnavailable,
+			http.StatusGatewayTimeout,
+		},
+		MaxRetries:            esConfig.Retry.MaxRetries,
 		DiscoverNodesOnStart:  esConfig.DiscoverNodes,
 		DiscoverNodesInterval: 0, // Set to 0 to disable periodic node discovery
 	}

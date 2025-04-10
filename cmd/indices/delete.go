@@ -104,18 +104,31 @@ func (d *Deleter) Start(ctx context.Context) error {
 		if err := d.confirmDeletion(filtered.toDelete); err != nil {
 			d.logger.Info("Deletion cancelled by user")
 			fmt.Fprintf(os.Stdout, "Deletion cancelled\n")
-			return nil
+			return err
 		}
 	}
 
 	// Delete indices
+	var deleteErr error
 	for _, index := range filtered.toDelete {
 		if err := d.storage.DeleteIndex(ctx, index); err != nil {
-			d.logger.Error("Failed to delete index", "index", index, "error", err)
-			return fmt.Errorf("failed to delete index %s: %w", index, err)
+			d.logger.Error("Failed to delete index",
+				"index", index,
+				"error", err,
+			)
+			deleteErr = fmt.Errorf("failed to delete index %s: %w", index, err)
+			continue
 		}
+
 		d.logger.Info("Successfully deleted index", "index", index)
-		fmt.Fprintf(os.Stdout, "Successfully deleted index: %s\n", index)
+	}
+
+	if deleteErr != nil {
+		return deleteErr
+	}
+
+	if len(filtered.toDelete) == 0 {
+		d.logger.Info("No indices to delete")
 	}
 
 	return nil

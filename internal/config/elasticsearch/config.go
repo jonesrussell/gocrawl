@@ -18,19 +18,24 @@ const (
 	DefaultFlushInterval = 30 * time.Second
 	MinPasswordLength    = 8
 	DefaultDiscoverNodes = false // Default to false to prevent node discovery
+
+	// Retry configuration constants
+	HAInitialWait = 2 * time.Second
+	HAMaxWait     = 10 * time.Second
+	HAMaxRetries  = 5
 )
 
 // Error codes for configuration validation
 const (
 	ErrCodeEmptyAddresses  = "EMPTY_ADDRESSES"
 	ErrCodeEmptyIndexName  = "EMPTY_INDEX_NAME"
-	ErrCodeEmptyAPIKey     = "EMPTY_API_KEY"
-	ErrCodeInvalidAPIKey   = "INVALID_API_KEY"
+	ErrCodeMissingAPIKey   = "MISSING_API_KEY"
+	ErrCodeInvalidFormat   = "INVALID_FORMAT"
+	ErrCodeWeakPassword    = "WEAK_PASSWORD"
 	ErrCodeInvalidRetry    = "INVALID_RETRY"
 	ErrCodeInvalidBulkSize = "INVALID_BULK_SIZE"
-	ErrCodeInvalidFlush    = "INVALID_FLUSH_INTERVAL"
+	ErrCodeInvalidFlush    = "INVALID_FLUSH"
 	ErrCodeInvalidTLS      = "INVALID_TLS"
-	ErrCodeWeakPassword    = "WEAK_PASSWORD"
 )
 
 // ConfigError represents a configuration validation error
@@ -97,93 +102,48 @@ type TLSConfig struct {
 // Validate checks if the configuration is valid.
 func (c *Config) Validate() error {
 	if len(c.Addresses) == 0 {
-		return &ConfigError{
-			Code:    ErrCodeEmptyAddresses,
-			Message: "elasticsearch addresses cannot be empty",
-		}
+		return &ConfigError{Code: ErrCodeEmptyAddresses, Message: "at least one address is required"}
 	}
 
 	if c.IndexName == "" {
-		return &ConfigError{
-			Code:    ErrCodeEmptyIndexName,
-			Message: "elasticsearch index name cannot be empty",
-		}
+		return &ConfigError{Code: ErrCodeEmptyIndexName, Message: "index name is required"}
 	}
 
 	if c.APIKey == "" {
-		return &ConfigError{
-			Code:    ErrCodeEmptyAPIKey,
-			Message: "elasticsearch API key cannot be empty",
-		}
+		return &ConfigError{Code: ErrCodeMissingAPIKey, Message: "API key is required"}
 	}
 
-	// Check if API key is valid base64
 	if _, err := base64.StdEncoding.DecodeString(c.APIKey); err != nil {
-		return &ConfigError{
-			Code:    ErrCodeInvalidAPIKey,
-			Message: "API key must be base64 encoded",
-		}
+		return &ConfigError{Code: ErrCodeInvalidFormat, Message: "API key must be base64 encoded"}
 	}
 
-	if c.Password != "" && len(c.Password) < MinPasswordLength {
-		return &ConfigError{
-			Code:    ErrCodeWeakPassword,
-			Message: fmt.Sprintf("password must be at least %d characters long", MinPasswordLength),
-		}
+	if c.Password != "" && len(c.Password) < 8 {
+		return &ConfigError{Code: ErrCodeWeakPassword, Message: "password must be at least 8 characters"}
 	}
 
 	if c.Retry.Enabled {
 		if c.Retry.InitialWait <= 0 {
-			return &ConfigError{
-				Code:    ErrCodeInvalidRetry,
-				Message: fmt.Sprintf("initial wait must be greater than 0, got %v", c.Retry.InitialWait),
-			}
+			return &ConfigError{Code: ErrCodeInvalidRetry, Message: "initial wait must be positive"}
 		}
-
 		if c.Retry.MaxWait <= 0 {
-			return &ConfigError{
-				Code:    ErrCodeInvalidRetry,
-				Message: fmt.Sprintf("max wait must be greater than 0, got %v", c.Retry.MaxWait),
-			}
+			return &ConfigError{Code: ErrCodeInvalidRetry, Message: "max wait must be positive"}
 		}
-
 		if c.Retry.MaxRetries <= 0 {
-			return &ConfigError{
-				Code:    ErrCodeInvalidRetry,
-				Message: fmt.Sprintf("max retries must be greater than 0, got %d", c.Retry.MaxRetries),
-			}
+			return &ConfigError{Code: ErrCodeInvalidRetry, Message: "max retries must be positive"}
 		}
 	}
 
 	if c.BulkSize <= 0 {
-		return &ConfigError{
-			Code:    ErrCodeInvalidBulkSize,
-			Message: fmt.Sprintf("bulk size must be greater than 0, got %d", c.BulkSize),
-		}
+		return &ConfigError{Code: ErrCodeInvalidBulkSize, Message: "bulk size must be positive"}
 	}
 
 	if c.FlushInterval <= 0 {
-		return &ConfigError{
-			Code:    ErrCodeInvalidFlush,
-			Message: fmt.Sprintf("flush interval must be greater than 0, got %v", c.FlushInterval),
-		}
+		return &ConfigError{Code: ErrCodeInvalidFlush, Message: "flush interval must be positive"}
 	}
 
-	if c.TLS.Enabled {
-		if !c.TLS.InsecureSkipVerify {
-			if c.TLS.CertFile == "" {
-				return &ConfigError{
-					Code:    ErrCodeInvalidTLS,
-					Message: "TLS certificate file is required when TLS is enabled and insecure_skip_verify is false",
-				}
-			}
-
-			if c.TLS.KeyFile == "" {
-				return &ConfigError{
-					Code:    ErrCodeInvalidTLS,
-					Message: "TLS key file is required when TLS is enabled and insecure_skip_verify is false",
-				}
-			}
+	if c.TLS != nil && c.TLS.Enabled {
+		if c.TLS.CertFile == "" || c.TLS.KeyFile == "" {
+			return &ConfigError{Code: ErrCodeInvalidTLS, Message: "cert and key files are required for TLS"}
 		}
 	}
 
@@ -246,9 +206,9 @@ func ExampleConfig() {
 	WithAPIKey("ha_id:ha_key")(haCfg)
 	WithIndexName("ha_index")(haCfg)
 	WithRetryEnabled(true)(haCfg)
-	WithInitialWait(2 * time.Second)(haCfg)
-	WithMaxWait(10 * time.Second)(haCfg)
-	WithMaxRetries(5)(haCfg)
+	WithInitialWait(HAInitialWait)(haCfg)
+	WithMaxWait(HAMaxWait)(haCfg)
+	WithMaxRetries(HAMaxRetries)(haCfg)
 
 	// Validate configurations
 	_ = basicCfg.Validate()

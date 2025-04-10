@@ -30,7 +30,7 @@ func NewTableRenderer(logger logger.Interface) *TableRenderer {
 }
 
 // handleIndexError handles common error cases for index operations
-func (r *TableRenderer) handleIndexError(operation string, index string, err error, action string, details string) error {
+func (r *TableRenderer) handleIndexError(operation, index string, err error, action, details string) error {
 	r.logger.Error(fmt.Sprintf("Failed to %s for index", operation),
 		"index", index,
 		"error", err,
@@ -119,12 +119,11 @@ func (l *Lister) Start(ctx context.Context) error {
 
 	// Test storage connection
 	if err := l.storage.TestConnection(ctx); err != nil {
-		l.logger.Error("Failed to connect to storage",
-			"error", err,
-			"action", "Check Elasticsearch connection settings and ensure the service is running",
-			"details", "This could be due to incorrect host/port, network issues, or Elasticsearch being down",
+		return fmt.Errorf(
+			"failed to connect to storage: %w. Check Elasticsearch connection settings "+
+				"and ensure the service is running",
+			err,
 		)
-		return fmt.Errorf("failed to connect to storage: %w. Check Elasticsearch connection settings and ensure the service is running", err)
 	}
 
 	// List indices

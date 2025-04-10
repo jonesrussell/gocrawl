@@ -2,6 +2,7 @@ package elasticsearch_test
 
 import (
 	"encoding/base64"
+	"errors"
 	"testing"
 	"time"
 
@@ -70,7 +71,7 @@ func TestConfig_Validate(t *testing.T) {
 				IndexName: "test",
 			},
 			wantErr: true,
-			errCode: elasticsearch.ErrCodeEmptyAPIKey,
+			errCode: elasticsearch.ErrCodeMissingAPIKey,
 		},
 		{
 			name: "invalid API key format",
@@ -80,7 +81,7 @@ func TestConfig_Validate(t *testing.T) {
 				IndexName: "test",
 			},
 			wantErr: true,
-			errCode: elasticsearch.ErrCodeInvalidAPIKey,
+			errCode: elasticsearch.ErrCodeInvalidFormat,
 		},
 		{
 			name: "weak password",
@@ -160,7 +161,8 @@ func TestConfig_Validate(t *testing.T) {
 			err := tt.config.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				if configErr, ok := err.(*elasticsearch.ConfigError); ok {
+				var configErr *elasticsearch.ConfigError
+				if errors.As(err, &configErr) {
 					require.Equal(t, tt.errCode, configErr.Code)
 				} else {
 					t.Errorf("expected ConfigError, got %T", err)
