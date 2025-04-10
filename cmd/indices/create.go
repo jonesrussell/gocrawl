@@ -53,13 +53,13 @@ func NewCreator(
 	config config.Interface,
 	logger logger.Interface,
 	storage types.Interface,
-	index string,
+	params CreateParams,
 ) *Creator {
 	return &Creator{
 		config:  config,
 		logger:  logger,
 		storage: storage,
-		index:   index,
+		index:   params.IndexName,
 	}
 }
 
@@ -94,7 +94,12 @@ func (c *Creator) Start(ctx context.Context) error {
 	return nil
 }
 
-// NewCreateCommand creates a new create command
+// CreateParams holds the parameters for the create command
+type CreateParams struct {
+	ConfigPath string
+	IndexName  string
+}
+
 func NewCreateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [index-name]",
@@ -104,46 +109,44 @@ This command creates a new index in the Elasticsearch cluster with the specified
 The index will be created with default settings unless overridden by configuration.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Create a context
-			ctx := cmd.Context()
-
-			// Get config path from flag or use default
+			// Get config path from flags
 			configPath, _ := cmd.Flags().GetString("config")
 
-			// Initialize the Fx application
-			fxApp := fx.New(
-				fx.NopLogger,
+			// Create Fx application
+			app := fx.New(
+				// Provide config path string
+				fx.Provide(func() string { return configPath }),
+				// Provide create params
+				fx.Provide(func() CreateParams {
+					return CreateParams{
+						ConfigPath: configPath,
+						IndexName:  args[0],
+					}
+				}),
+				// Use the indices module
 				Module,
-				fx.Provide(
-					func() context.Context { return ctx },
-					func() string { return args[0] },    // index name
-					func() string { return configPath }, // config path
-				),
-				fx.Invoke(func(lc fx.Lifecycle, creator *Creator) {
-					lc.Append(fx.Hook{
-						OnStart: func(ctx context.Context) error {
-							return creator.Start(ctx)
-						},
-						OnStop: func(context.Context) error {
-							return nil
-						},
-					})
+				// Invoke create command
+				fx.Invoke(func(c *Creator) error {
+					return c.Start(cmd.Context())
 				}),
 			)
 
-			// Start the application
-			if err := fxApp.Start(ctx); err != nil {
-				return fmt.Errorf("error starting application: %w", err)
+			// Start application
+			if err := app.Start(context.Background()); err != nil {
+				return fmt.Errorf("failed to start application: %w", err)
 			}
 
-			// Stop the application
-			if err := fxApp.Stop(ctx); err != nil {
-				return fmt.Errorf("error stopping application: %w", err)
+			// Stop application
+			if err := app.Stop(context.Background()); err != nil {
+				return fmt.Errorf("failed to stop application: %w", err)
 			}
 
 			return nil
 		},
 	}
+
+	// Add flags
+	cmd.Flags().StringP("config", "c", "config.yaml", "Path to config file")
 
 	return cmd
 }

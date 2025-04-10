@@ -18,17 +18,21 @@ var Module = fx.Module("indices",
 	config.Module,
 	storage.Module,
 	sources.Module,
+	logger.Module,
 	fx.Provide(
-		NewCreator,
-		NewLister,
-		func() *logger.Config {
-			return &logger.Config{
-				Level:       logger.InfoLevel,
-				Development: true,
-				Encoding:    "console",
+		func() logger.Params {
+			return logger.Params{
+				Config: &logger.Config{
+					Level:       logger.InfoLevel,
+					Development: true,
+					Encoding:    "console",
+				},
 			}
 		},
-		logger.New,
+		NewCreator,
+		NewLister,
+		NewTableRenderer,
+		NewDeleter,
 	),
 )
 

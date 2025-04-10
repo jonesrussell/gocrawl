@@ -12,7 +12,6 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -173,18 +172,10 @@ func NewListCommand() *cobra.Command {
 			app := fx.New(
 				// Provide config path string
 				fx.Provide(func() string { return configPath }),
-				// Provide config module
-				config.Module,
-				// Provide storage module
-				storage.Module,
-				// Provide logger module
-				logger.Module,
-				// Provide Lister
-				fx.Provide(NewLister),
-				// Provide TableRenderer
-				fx.Provide(NewTableRenderer),
+				// Use the indices module
+				Module,
 				// Invoke list command
-				fx.Invoke(func(l *Lister, r *TableRenderer) error {
+				fx.Invoke(func(l *Lister) error {
 					return l.Start(cmd.Context())
 				}),
 			)

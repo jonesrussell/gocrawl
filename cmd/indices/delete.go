@@ -35,18 +35,16 @@ func NewDeleter(
 	logger logger.Interface,
 	storage storagetypes.Interface,
 	sources sources.Interface,
-	indices []string,
-	force bool,
-	sourceName string,
+	params DeleteParams,
 ) *Deleter {
 	return &Deleter{
 		config:     config,
 		logger:     logger,
 		storage:    storage,
 		sources:    sources,
-		indices:    indices,
-		force:      force,
-		sourceName: sourceName,
+		indices:    params.Indices,
+		force:      params.Force,
+		sourceName: params.SourceName,
 	}
 }
 
@@ -186,52 +184,72 @@ func (d *Deleter) confirmDeletion(indicesToDelete []string) error {
 	return nil
 }
 
-// NewDeleteCommand creates a new delete command
-func NewDeleteCommand() *cobra.Command {
-	var (
-		force      bool
-		sourceName string
-	)
+// DeleteParams holds the parameters for the delete command
+type DeleteParams struct {
+	ConfigPath string
+	SourceName string
+	Force      bool
+	Indices    []string
+}
 
+func NewDeleteCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete [indices...]",
+		Use:   "delete [index-name...]",
 		Short: "Delete one or more Elasticsearch indices",
 		Long: `Delete one or more Elasticsearch indices.
-		
-You can specify one or more indices to delete, or use the --source flag to delete indices for a specific source.`,
+This command allows you to delete one or more indices from the Elasticsearch cluster.
+You can specify indices by name or by source name.`,
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get flags
+			configPath, _ := cmd.Flags().GetString("config")
+			sourceName, _ := cmd.Flags().GetString("source")
+			force, _ := cmd.Flags().GetBool("force")
+
+			// Validate args
 			if err := ValidateDeleteArgs(sourceName, args); err != nil {
 				return err
 			}
 
-			// Create a context
-			ctx := cmd.Context()
-
-			// Get config path from flag or use default
-			configPath, _ := cmd.Flags().GetString("config")
-
+			// Create Fx application
 			app := fx.New(
-				fx.NopLogger,
+				// Provide config path string
+				fx.Provide(func() string { return configPath }),
+				// Provide delete params
+				fx.Provide(func() DeleteParams {
+					return DeleteParams{
+						ConfigPath: configPath,
+						SourceName: sourceName,
+						Force:      force,
+						Indices:    args,
+					}
+				}),
+				// Use the indices module
 				Module,
-				fx.Provide(
-					func() context.Context { return ctx },
-					func() string { return configPath }, // config path
-					func() []string { return args },
-					func() bool { return force },
-					func() string { return sourceName },
-					NewDeleter,
-				),
-				fx.Invoke(func(deleter *Deleter) error {
-					return deleter.Start(ctx)
+				// Invoke delete command
+				fx.Invoke(func(d *Deleter) error {
+					return d.Start(cmd.Context())
 				}),
 			)
 
-			return app.Start(ctx)
+			// Start application
+			if err := app.Start(context.Background()); err != nil {
+				return fmt.Errorf("failed to start application: %w", err)
+			}
+
+			// Stop application
+			if err := app.Stop(context.Background()); err != nil {
+				return fmt.Errorf("failed to stop application: %w", err)
+			}
+
+			return nil
 		},
 	}
 
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Skip confirmation prompt")
-	cmd.Flags().StringVarP(&sourceName, "source", "s", "", "Delete indices for a specific source")
+	// Add flags
+	cmd.Flags().StringP("config", "c", "config.yaml", "Path to config file")
+	cmd.Flags().StringP("source", "s", "", "Delete indices for the specified source")
+	cmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
 
 	return cmd
 }
