@@ -192,33 +192,27 @@ func (c *Config) Validate() error {
 
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
-	defaultAddresses := []string{DefaultAddresses}
-	tls := &TLSConfig{
-		Enabled:            false,
-		InsecureSkipVerify: false, // Changed default to false for better security
-	}
-
 	return &Config{
-		Addresses: defaultAddresses,
-		Cloud: struct {
-			ID     string `yaml:"id"`
-			APIKey string `yaml:"api_key"`
-		}{},
-		TLS: tls,
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "gocrawl",
+		TLS: &TLSConfig{
+			Enabled:            false, // TLS disabled by default
+			InsecureSkipVerify: false, // Secure by default
+		},
 		Retry: struct {
 			Enabled     bool          `yaml:"enabled"`
 			InitialWait time.Duration `yaml:"initial_wait"`
 			MaxWait     time.Duration `yaml:"max_wait"`
 			MaxRetries  int           `yaml:"max_retries"`
 		}{
-			Enabled:     DefaultRetryEnabled,
-			InitialWait: DefaultInitialWait,
-			MaxWait:     DefaultMaxWait,
+			Enabled:     true,
+			InitialWait: time.Second,
+			MaxWait:     time.Minute,
 			MaxRetries:  DefaultMaxRetries,
 		},
-		BulkSize:      DefaultBulkSize,
-		FlushInterval: DefaultFlushInterval,
-		DiscoverNodes: DefaultDiscoverNodes,
+		BulkSize:      DefaultBulkSize,      // Set default bulk size
+		FlushInterval: DefaultFlushInterval, // Set default flush interval
+		DiscoverNodes: false,                // Default to false to prevent node discovery
 	}
 }
 

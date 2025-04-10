@@ -50,16 +50,18 @@ tasks:
   indices:delete:
     desc: "Delete one or more Elasticsearch indices"
     cmds:
-      - |
-        if [ "{{.SOURCE}}" != "" ]; then
-          go run main.go indices delete --source "{{.SOURCE}}" {{if .FORCE}}--force{{end}}
-        else
-          go run main.go indices delete {{.CLI_ARGS}}
-        fi
-    ignore_error: true
+      - go run main.go indices delete {{.CLI_ARGS}} {{if eq .FORCE "true"}}--force{{end}}
     interactive: true
     vars:
-      SOURCE: '{{.SOURCE | default ""}}'
+      FORCE: '{{.FORCE | default "false"}}'
+
+  indices:delete:source:
+    desc: "Delete indices for a specific source"
+    cmds:
+      - go run main.go indices delete --source "{{.SOURCE}}" {{if eq .FORCE "true"}}--force{{end}}
+    interactive: true
+    vars:
+      SOURCE: '{{.SOURCE}}'
       FORCE: '{{.FORCE | default "false"}}'
 
   job:

@@ -126,12 +126,16 @@ Example:
 			// Create a context
 			ctx := cmd.Context()
 
+			// Get config path from flag or use default
+			configPath, _ := cmd.Flags().GetString("config")
+
 			// Initialize the Fx application
 			fxApp := fx.New(
 				fx.NopLogger,
 				Module,
 				fx.Provide(
 					func() context.Context { return ctx },
+					func() string { return configPath }, // Provide config path
 				),
 				fx.Invoke(func(lc fx.Lifecycle, lister *Lister) {
 					lc.Append(fx.Hook{

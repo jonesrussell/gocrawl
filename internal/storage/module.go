@@ -31,17 +31,13 @@ func createTransport(esConfig *elasticsearch.Config, logger logger.Interface) (*
 
 	clonedTransport := transport.Clone()
 
-	// Configure TLS if needed
-	if esConfig.TLS != nil && esConfig.TLS.Enabled {
-		clonedTransport.TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify,
-		}
-		if esConfig.TLS.InsecureSkipVerify {
-			logger.Warn("TLS certificate verification is disabled")
-		}
-	} else {
-		// Use default TLS configuration which performs certificate verification
-		clonedTransport.TLSClientConfig = &tls.Config{}
+	// Configure TLS
+	clonedTransport.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify,
+	}
+
+	if esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify {
+		logger.Warn("TLS certificate verification is disabled")
 	}
 
 	return clonedTransport, nil

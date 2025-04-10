@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -98,7 +99,9 @@ func (d *Deleter) Start(ctx context.Context) error {
 	// Confirm deletion if needed
 	if !d.force {
 		if err := d.confirmDeletion(filtered.toDelete); err != nil {
-			return err
+			d.logger.Info("Deletion cancelled", "error", err)
+			// Return nil for user cancellation to avoid showing usage
+			return nil
 		}
 	}
 
@@ -162,13 +165,24 @@ func (d *Deleter) confirmDeletion(indicesToDelete []string) error {
 		fmt.Fprintf(os.Stdout, "  - %s\n", index)
 	}
 	fmt.Fprintf(os.Stdout, "\nContinue? (y/N): ")
-	var response string
-	if _, err := fmt.Scanln(&response); err != nil {
+
+	// Read a single byte to handle EOF and newline cases
+	var response [1]byte
+	n, err := os.Stdin.Read(response[:])
+	if err != nil && err != io.EOF {
 		return fmt.Errorf("failed to read user input: %w", err)
 	}
-	if response != "y" && response != "Y" {
-		return nil
+
+	// If no input or newline, treat as 'N'
+	if n == 0 || response[0] == '\n' {
+		return fmt.Errorf("deletion cancelled by user")
 	}
+
+	// Only proceed if input is 'y' or 'Y'
+	if response[0] != 'y' && response[0] != 'Y' {
+		return fmt.Errorf("deletion cancelled by user")
+	}
+
 	return nil
 }
 
