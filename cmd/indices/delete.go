@@ -13,6 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -210,6 +211,7 @@ type DeleteParams struct {
 	Indices    []string
 }
 
+// NewDeleteCommand creates a new delete command
 func NewDeleteCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete [index-name...]",
@@ -233,6 +235,16 @@ You can specify indices by name or by source name.`,
 			app := fx.New(
 				// Provide config path string
 				fx.Provide(func() string { return configPath }),
+				// Provide logger params
+				fx.Provide(func() logger.Params {
+					return logger.Params{
+						Config: &logger.Config{
+							Level:       logger.InfoLevel,
+							Development: true,
+							Encoding:    "console",
+						},
+					}
+				}),
 				// Provide delete params
 				fx.Provide(func() DeleteParams {
 					return DeleteParams{
@@ -242,7 +254,11 @@ You can specify indices by name or by source name.`,
 						Indices:    args,
 					}
 				}),
-				// Use the indices module
+				// Include all required modules
+				config.Module,
+				storage.Module,
+				logger.Module,
+				sources.Module,
 				Module,
 				// Invoke delete command
 				fx.Invoke(func(d *Deleter) error {

@@ -1,4 +1,4 @@
-// Package indices implements the indices command.
+// Package indices provides commands for managing Elasticsearch indices.
 package indices
 
 import (
@@ -6,38 +6,36 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
-// Module provides the indices command dependencies.
+// Module provides the indices module for dependency injection.
 var Module = fx.Module("indices",
-	config.Module,
-	storage.Module,
-	sources.Module,
-	logger.Module,
 	fx.Provide(
-		func() logger.Params {
-			return logger.Params{
-				Config: &logger.Config{
-					Level:       logger.InfoLevel,
-					Development: true,
-					Encoding:    "console",
-				},
-			}
-		},
 		NewCreator,
 		NewLister,
 		NewTableRenderer,
 		NewDeleter,
-		func(cfg *config.Config) config.Interface {
-			return cfg
-		},
 	),
 )
+
+// RegisterCommands registers the indices commands with the root command.
+func RegisterCommands(rootCmd *cobra.Command) {
+	indicesCmd := &cobra.Command{
+		Use:   "indices",
+		Short: "Manage Elasticsearch indices",
+	}
+
+	indicesCmd.AddCommand(
+		NewListCommand(),
+		NewCreateCommand(),
+		NewDeleteCommand(),
+	)
+
+	rootCmd.AddCommand(indicesCmd)
+}
 
 // NewIndices creates a new indices command.
 func NewIndices(p struct {

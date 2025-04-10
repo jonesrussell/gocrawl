@@ -9,6 +9,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -100,6 +101,7 @@ type CreateParams struct {
 	IndexName  string
 }
 
+// NewCreateCommand creates a new create command
 func NewCreateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [index-name]",
@@ -116,6 +118,16 @@ The index will be created with default settings unless overridden by configurati
 			app := fx.New(
 				// Provide config path string
 				fx.Provide(func() string { return configPath }),
+				// Provide logger params
+				fx.Provide(func() logger.Params {
+					return logger.Params{
+						Config: &logger.Config{
+							Level:       logger.InfoLevel,
+							Development: true,
+							Encoding:    "console",
+						},
+					}
+				}),
 				// Provide create params
 				fx.Provide(func() CreateParams {
 					return CreateParams{
@@ -123,7 +135,10 @@ The index will be created with default settings unless overridden by configurati
 						IndexName:  args[0],
 					}
 				}),
-				// Use the indices module
+				// Include all required modules
+				config.Module,
+				storage.Module,
+				logger.Module,
 				Module,
 				// Invoke create command
 				fx.Invoke(func(c *Creator) error {
