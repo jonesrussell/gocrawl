@@ -3,13 +3,10 @@ package testutils
 import (
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 )
-
-var setupMutex sync.Mutex
 
 // TestSetup holds test environment configuration
 type TestSetup struct {

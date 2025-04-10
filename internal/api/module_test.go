@@ -198,6 +198,7 @@ func setupTestApp(t *testing.T) *testServer {
 
 // TestAPIModuleInitialization verifies that the API module can be initialized with all required dependencies.
 func TestAPIModuleInitialization(t *testing.T) {
+	t.Parallel()
 	ts := setupTestApp(t)
 	defer ts.app.RequireStop()
 
@@ -334,6 +335,7 @@ func TestSearchEndpoint(t *testing.T) {
 
 // TestLoggerDependencyRegression verifies that the logger dependency is properly injected.
 func TestLoggerDependencyRegression(t *testing.T) {
+	t.Parallel()
 	ts := setupTestApp(t)
 	defer ts.app.RequireStop()
 
@@ -383,6 +385,7 @@ func TestModule(t *testing.T) {
 }
 
 func TestSecurityMiddleware(t *testing.T) {
+	t.Parallel()
 	// Create test dependencies
 	serverConfig := &server.Config{}
 	serverConfig.SecurityEnabled = true

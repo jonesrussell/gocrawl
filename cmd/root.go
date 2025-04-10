@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -38,8 +37,6 @@ var (
 It provides a flexible and extensible framework for building custom crawlers.`,
 		PersistentPreRunE: setupConfig,
 	}
-
-	cfg config.Interface
 )
 
 // setupConfig handles configuration file setup for all commands.

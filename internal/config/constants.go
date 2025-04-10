@@ -26,7 +26,7 @@ const (
 	// DefaultRateLimit is the default delay between requests
 	DefaultRateLimit = 2 * time.Second
 	// DefaultMaxDepth is the default maximum crawl depth
-	DefaultMaxDepth = 2
+	DefaultMaxDepth = 3
 	// DefaultParallelism is the default number of concurrent crawlers
 	DefaultParallelism = 2
 
@@ -37,7 +37,7 @@ const (
 	DefaultWriteTimeout = 15 * time.Second
 
 	// DefaultIdleTimeout is the default HTTP server idle timeout
-	DefaultIdleTimeout = 60 * time.Second
+	DefaultIdleTimeout = 120 * time.Second
 
 	// DefaultServerAddress is the default HTTP server address
 	DefaultServerAddress = ":8080"
@@ -61,7 +61,7 @@ const (
 	DefaultLogMaxBackups = 3
 
 	// DefaultLogMaxAge is the default maximum number of days to retain old log files
-	DefaultLogMaxAge = 28
+	DefaultLogMaxAge = 30
 
 	// DefaultLogCompress determines if the rotated log files should be compressed
 	DefaultLogCompress = true
@@ -97,7 +97,7 @@ const (
 	defaultMaxRetries = 3
 
 	// DefaultServerPort is the default server port
-	DefaultServerPort = "8080"
+	DefaultServerPort = 8080
 
 	// Constants for default configuration values
 	defaultMaxAge             = 86400 // 24 hours in seconds
@@ -105,7 +105,7 @@ const (
 
 	// Default rate limits
 	defaultCrawlerRateLimit = "1s"
-	defaultRandomDelay      = "500ms"
+	defaultRandomDelay      = 500 * time.Millisecond
 
 	// Default Elasticsearch settings
 	defaultESAddress = "http://localhost:9200"
@@ -115,6 +115,20 @@ const (
 	defaultAppName    = "gocrawl"
 	defaultAppVersion = "1.0.0"
 	defaultAppEnv     = "development"
+
+	// Default values for various configurations
+	DefaultMaxRetries          = 3
+	DefaultBulkSize            = 1000
+	DefaultFlushInterval       = 30 * time.Second
+	DefaultPriority            = 5
+	DefaultMaxPriority         = 10
+	DefaultTimeout             = 10 * time.Second
+	DefaultMaxHeaderBytes      = 1 << 20            // 1 MB
+	DefaultStorageMaxSize      = 1024 * 1024 * 1024 // 1 GB
+	DefaultStorageMaxItems     = 10000
+	DefaultMaxIdleConns        = 100
+	DefaultIdleConnTimeout     = 90 * time.Second
+	DefaultTLSHandshakeTimeout = 10 * time.Second
 )
 
 // ValidHTTPMethods defines the valid HTTP methods

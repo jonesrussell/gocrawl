@@ -341,26 +341,6 @@ func extractArticleSelectorsFromConfig(selectors types.ArticleSelectors) article
 	}
 }
 
-// loaderConfigWrapper wraps a loader.Config to provide article selector conversion.
-type loaderConfigWrapper struct {
-	loader.Config
-}
-
-// GetArticleSelectors returns the article selectors from the loader config.
-func (w loaderConfigWrapper) GetArticleSelectors() ArticleSelectors {
-	return getArticleSelectorsFromSelector(extractArticleSelectorsFromLoader(w.Config.Selectors.Article))
-}
-
-// sourceWrapper wraps a types.Source to provide article selector conversion.
-type sourceWrapper struct {
-	types.Source
-}
-
-// GetArticleSelectors returns the article selectors from the source.
-func (w sourceWrapper) GetArticleSelectors() ArticleSelectors {
-	return getArticleSelectorsFromSelector(extractArticleSelectorsFromConfig(w.Source.Selectors.Article))
-}
-
 // NewSelectorConfigFromLoader creates a new SelectorConfig from a loader.Config.
 func NewSelectorConfigFromLoader(src loader.Config) SelectorConfig {
 	return SelectorConfig{

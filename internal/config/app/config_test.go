@@ -1,8 +1,9 @@
-package app
+package app_test
 
 import (
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/stretchr/testify/require"
 )
 
@@ -11,12 +12,12 @@ func TestConfig_Validate(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		config  *Config
+		config  *app.Config
 		wantErr bool
 	}{
 		{
 			name: "valid configuration",
-			config: &Config{
+			config: &app.Config{
 				Environment: "development",
 				Name:        "test",
 				Version:     "1.0.0",
@@ -25,7 +26,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "missing environment",
-			config: &Config{
+			config: &app.Config{
 				Name:    "test",
 				Version: "1.0.0",
 			},
@@ -33,7 +34,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid environment",
-			config: &Config{
+			config: &app.Config{
 				Environment: "invalid",
 				Name:        "test",
 				Version:     "1.0.0",
@@ -42,7 +43,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "missing name",
-			config: &Config{
+			config: &app.Config{
 				Environment: "development",
 				Version:     "1.0.0",
 			},
@@ -50,7 +51,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "missing version",
-			config: &Config{
+			config: &app.Config{
 				Environment: "development",
 				Name:        "test",
 			},
@@ -58,8 +59,11 @@ func TestConfig_Validate(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i := range tests {
+		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := test.config.Validate()
 			if test.wantErr {
 				require.Error(t, err)
@@ -75,13 +79,13 @@ func TestNew(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		opts     []Option
-		expected *Config
+		opts     []app.Option
+		expected *app.Config
 	}{
 		{
 			name: "default configuration",
 			opts: nil,
-			expected: &Config{
+			expected: &app.Config{
 				Environment: "development",
 				Name:        "gocrawl",
 				Version:     "0.1.0",
@@ -90,13 +94,13 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name: "custom configuration",
-			opts: []Option{
-				WithEnvironment("production"),
-				WithName("custom"),
-				WithVersion("2.0.0"),
-				WithDebug(true),
+			opts: []app.Option{
+				app.WithEnvironment("production"),
+				app.WithName("custom"),
+				app.WithVersion("2.0.0"),
+				app.WithDebug(true),
 			},
-			expected: &Config{
+			expected: &app.Config{
 				Environment: "production",
 				Name:        "custom",
 				Version:     "2.0.0",
@@ -106,11 +110,10 @@ func TestNew(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := New(tt.opts...)
+			cfg := app.New(tt.opts...)
 			require.Equal(t, tt.expected, cfg)
 		})
 	}

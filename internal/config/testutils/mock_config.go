@@ -30,81 +30,43 @@ type MockConfig struct {
 // GetSources implements config.Interface.
 func (m *MockConfig) GetSources() []types.Source {
 	args := m.Called()
-	if args.Get(0) == nil {
-		return []types.Source{}
-	}
-	return args.Get(0).([]types.Source)
+	sources, _ := args.Get(0).([]types.Source)
+	return sources
 }
 
 // GetCrawlerConfig implements config.Interface.
 func (m *MockConfig) GetCrawlerConfig() *crawler.Config {
 	args := m.Called()
-	if args.Get(0) == nil {
-		return &crawler.Config{
-			BaseURL:     "http://test.com",
-			MaxDepth:    defaultMaxDepth,
-			RateLimit:   time.Second,
-			RandomDelay: time.Second,
-			IndexName:   "test_index",
-			SourceFile:  "", // Empty to prevent loading from file
-		}
-	}
-	return args.Get(0).(*crawler.Config)
+	cfg, _ := args.Get(0).(*crawler.Config)
+	return cfg
 }
 
 // GetLogConfig implements config.Interface.
 func (m *MockConfig) GetLogConfig() *log.Config {
 	args := m.Called()
-	if args.Get(0) == nil {
-		return &log.Config{
-			Level:      "info",
-			Format:     "json",
-			Output:     "stdout",
-			MaxSize:    100,
-			MaxBackups: 3,
-			MaxAge:     28,
-			Compress:   true,
-		}
-	}
-	return args.Get(0).(*log.Config)
+	cfg, _ := args.Get(0).(*log.Config)
+	return cfg
 }
 
 // GetAppConfig implements config.Interface.
 func (m *MockConfig) GetAppConfig() *app.Config {
 	args := m.Called()
-	if args.Get(0) == nil {
-		return &app.Config{
-			Environment: "test",
-			Name:        "gocrawl",
-			Version:     "1.0.0",
-			Debug:       false,
-		}
-	}
-	return args.Get(0).(*app.Config)
+	cfg, _ := args.Get(0).(*app.Config)
+	return cfg
 }
 
 // GetElasticsearchConfig implements config.Interface.
 func (m *MockConfig) GetElasticsearchConfig() *elasticsearch.Config {
 	args := m.Called()
-	if args.Get(0) == nil {
-		return &elasticsearch.Config{
-			Addresses: []string{"http://localhost:9200"},
-			IndexName: "test_index",
-		}
-	}
-	return args.Get(0).(*elasticsearch.Config)
+	cfg, _ := args.Get(0).(*elasticsearch.Config)
+	return cfg
 }
 
 // GetServerConfig implements config.Interface.
 func (m *MockConfig) GetServerConfig() *server.Config {
 	args := m.Called()
-	if args.Get(0) == nil {
-		return &server.Config{
-			SecurityEnabled: false,
-			APIKey:          "",
-		}
-	}
-	return args.Get(0).(*server.Config)
+	cfg, _ := args.Get(0).(*server.Config)
+	return cfg
 }
 
 // GetCommand implements config.Interface.
@@ -119,13 +81,8 @@ func (m *MockConfig) GetCommand() string {
 // GetPriorityConfig implements config.Interface.
 func (m *MockConfig) GetPriorityConfig() *priority.Config {
 	args := m.Called()
-	if args.Get(0) == nil {
-		return &priority.Config{
-			DefaultPriority: 1,
-			Rules:           []priority.Rule{},
-		}
-	}
-	return args.Get(0).(*priority.Config)
+	cfg, _ := args.Get(0).(*priority.Config)
+	return cfg
 }
 
 // Ensure MockConfig implements config.Interface
