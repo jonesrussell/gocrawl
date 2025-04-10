@@ -52,7 +52,7 @@ A simple web crawler built in Go that fetches and processes web pages, storing r
    ELASTIC_PASSWORD: your_password
    ELASTICSEARCH_API_KEY: your_api_key
    ELASTIC_INDEX_NAME: articles
-   ELASTIC_SKIP_TLS: true
+   ELASTICSEARCH_SKIP_TLS: true
 
    CRAWLER_BASE_URL: https://www.elliotlaketoday.com/opp-beat
    CRAWLER_MAX_DEPTH: 2

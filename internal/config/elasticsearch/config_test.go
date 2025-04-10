@@ -1,6 +1,7 @@
 package elasticsearch_test
 
 import (
+	"encoding/base64"
 	"testing"
 	"time"
 
@@ -11,16 +12,19 @@ import (
 func TestConfig_Validate(t *testing.T) {
 	t.Parallel()
 
+	validAPIKey := base64.StdEncoding.EncodeToString([]byte("test_key"))
+
 	tests := []struct {
 		name    string
 		config  *elasticsearch.Config
 		wantErr bool
+		errCode string
 	}{
 		{
 			name: "valid configuration",
 			config: &elasticsearch.Config{
 				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "test_id:test_key",
+				APIKey:    validAPIKey,
 				IndexName: "test",
 				Retry: struct {
 					Enabled     bool          `yaml:"enabled"`
@@ -42,19 +46,21 @@ func TestConfig_Validate(t *testing.T) {
 			name: "empty addresses",
 			config: &elasticsearch.Config{
 				Addresses: []string{},
-				APIKey:    "test_id:test_key",
+				APIKey:    validAPIKey,
 				IndexName: "test",
 			},
 			wantErr: true,
+			errCode: elasticsearch.ErrCodeEmptyAddresses,
 		},
 		{
 			name: "empty index name",
 			config: &elasticsearch.Config{
 				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "test_id:test_key",
+				APIKey:    validAPIKey,
 				IndexName: "",
 			},
 			wantErr: true,
+			errCode: elasticsearch.ErrCodeEmptyIndexName,
 		},
 		{
 			name: "empty API key",
@@ -64,21 +70,34 @@ func TestConfig_Validate(t *testing.T) {
 				IndexName: "test",
 			},
 			wantErr: true,
+			errCode: elasticsearch.ErrCodeEmptyAPIKey,
 		},
 		{
 			name: "invalid API key format",
 			config: &elasticsearch.Config{
 				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "invalid",
+				APIKey:    "not_base64_encoded",
 				IndexName: "test",
 			},
 			wantErr: true,
+			errCode: elasticsearch.ErrCodeInvalidAPIKey,
+		},
+		{
+			name: "weak password",
+			config: &elasticsearch.Config{
+				Addresses: []string{"http://localhost:9200"},
+				APIKey:    "test_id:test_key",
+				IndexName: "test",
+				Password:  "weak",
+			},
+			wantErr: true,
+			errCode: elasticsearch.ErrCodeWeakPassword,
 		},
 		{
 			name: "invalid retry configuration",
 			config: &elasticsearch.Config{
 				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "test_id:test_key",
+				APIKey:    validAPIKey,
 				IndexName: "test",
 				Retry: struct {
 					Enabled     bool          `yaml:"enabled"`
@@ -93,32 +112,35 @@ func TestConfig_Validate(t *testing.T) {
 				},
 			},
 			wantErr: true,
+			errCode: elasticsearch.ErrCodeInvalidRetry,
 		},
 		{
 			name: "invalid bulk size",
 			config: &elasticsearch.Config{
 				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "test_id:test_key",
+				APIKey:    validAPIKey,
 				IndexName: "test",
 				BulkSize:  0,
 			},
 			wantErr: true,
+			errCode: elasticsearch.ErrCodeInvalidBulkSize,
 		},
 		{
 			name: "invalid flush interval",
 			config: &elasticsearch.Config{
 				Addresses:     []string{"http://localhost:9200"},
-				APIKey:        "test_id:test_key",
+				APIKey:        validAPIKey,
 				IndexName:     "test",
 				FlushInterval: 0,
 			},
 			wantErr: true,
+			errCode: elasticsearch.ErrCodeInvalidFlush,
 		},
 		{
 			name: "invalid TLS configuration",
 			config: &elasticsearch.Config{
 				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "test_id:test_key",
+				APIKey:    validAPIKey,
 				IndexName: "test",
 				TLS: &elasticsearch.TLSConfig{
 					Enabled:  true,
@@ -127,6 +149,7 @@ func TestConfig_Validate(t *testing.T) {
 				},
 			},
 			wantErr: true,
+			errCode: elasticsearch.ErrCodeInvalidTLS,
 		},
 	}
 
@@ -137,6 +160,11 @@ func TestConfig_Validate(t *testing.T) {
 			err := tt.config.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
+				if configErr, ok := err.(*elasticsearch.ConfigError); ok {
+					require.Equal(t, tt.errCode, configErr.Code)
+				} else {
+					t.Errorf("expected ConfigError, got %T", err)
+				}
 			} else {
 				require.NoError(t, err)
 			}

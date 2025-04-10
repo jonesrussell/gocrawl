@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	stdlog "log"
 	"strings"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
-	"go.uber.org/zap"
 )
 
 const (
@@ -28,12 +28,11 @@ func ValidateConfig(cfg *Config) error {
 		return errors.New("configuration is required")
 	}
 
-	logger.Debug("Starting config validation",
-		zap.String("environment", cfg.App.Environment))
+	stdlog.Printf("Starting config validation, environment: %s", cfg.App.Environment)
 
 	// Validate environment first
 	if cfg.App.Environment == "" {
-		logger.Error("Environment validation failed: environment cannot be empty")
+		stdlog.Printf("Environment validation failed: environment cannot be empty")
 		return &ValidationError{
 			Field:  "app.environment",
 			Value:  cfg.App.Environment,
@@ -51,54 +50,53 @@ func ValidateConfig(cfg *Config) error {
 		}
 	}
 	if !isValidEnv {
-		logger.Error("Environment validation failed",
-			zap.String("environment", cfg.App.Environment))
+		stdlog.Printf("Environment validation failed: %s", cfg.App.Environment)
 		return &ValidationError{
 			Field:  "app.environment",
 			Value:  cfg.App.Environment,
 			Reason: "invalid environment",
 		}
 	}
-	logger.Debug("Environment validation passed")
+	stdlog.Printf("Environment validation passed")
 
 	// Validate log config
 	if err := validateLogConfig(cfg.Logger); err != nil {
-		logger.Error("Log config validation failed", zap.Error(err))
+		stdlog.Printf("Log config validation failed: %v", err)
 		return err
 	}
-	logger.Debug("Log config validation passed")
+	stdlog.Printf("Log config validation passed")
 
 	// Validate crawler config
 	if err := validateCrawlerConfig(cfg.Crawler); err != nil {
-		logger.Error("Crawler config validation failed", zap.Error(err))
+		stdlog.Printf("Crawler config validation failed: %v", err)
 		return err
 	}
-	logger.Debug("Crawler config validation passed")
+	stdlog.Printf("Crawler config validation passed")
 
 	// Validate Elasticsearch config
 	if err := validateElasticsearchConfig(cfg.Elasticsearch); err != nil {
-		logger.Error("Elasticsearch config validation failed", zap.Error(err))
+		stdlog.Printf("Elasticsearch config validation failed: %v", err)
 		return err
 	}
-	logger.Debug("Elasticsearch config validation passed")
+	stdlog.Printf("Elasticsearch config validation passed")
 
 	// Validate app config last
 	if err := validateAppConfig(cfg.App); err != nil {
-		logger.Error("App config validation failed", zap.Error(err))
+		stdlog.Printf("App config validation failed: %v", err)
 		return &ValidationError{
 			Field:  "app",
 			Value:  cfg.App,
 			Reason: err.Error(),
 		}
 	}
-	logger.Debug("App config validation passed")
+	stdlog.Printf("App config validation passed")
 
 	// Validate sources last
 	if err := validateSources(cfg.Sources); err != nil {
-		logger.Error("Sources validation failed", zap.Error(err))
+		stdlog.Printf("Sources validation failed: %v", err)
 		return err
 	}
-	logger.Debug("Sources validation passed")
+	stdlog.Printf("Sources validation passed")
 
 	return nil
 }

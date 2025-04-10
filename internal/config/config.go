@@ -6,35 +6,27 @@ package config
 import (
 	"errors"
 	"fmt"
+	stdlog "log"
+	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
-	"github.com/jonesrussell/gocrawl/internal/config/log"
+	logconfig "github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/storage"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
-
-var logger *zap.Logger
-
-func init() {
-	var err error
-	logger, err = zap.NewProduction()
-	if err != nil {
-		panic(fmt.Sprintf("failed to create logger: %v", err))
-	}
-}
 
 // Config represents the application configuration.
 type Config struct {
 	// Environment is the application environment (development, staging, production)
 	Environment string `yaml:"environment"`
 	// Logger holds logging-specific configuration
-	Logger *log.Config `yaml:"logger"`
+	Logger *logconfig.Config `yaml:"logger"`
 	// Server holds server-specific configuration
 	Server *server.Config `yaml:"server"`
 	// Priority holds priority-specific configuration
@@ -57,12 +49,11 @@ type Config struct {
 func newConfig() *Config {
 	esConfig := elasticsearch.NewConfig()
 	esConfig.IndexName = "gocrawl"
-	esConfig.APIKey = "test:test" // Default API key for development
-	esConfig.TLS.Enabled = false  // Disable TLS by default for development
+	esConfig.TLS.Enabled = false // Disable TLS by default for development
 
 	return &Config{
 		Environment:   "development",
-		Logger:        log.NewConfig(),
+		Logger:        logconfig.NewConfig(),
 		Server:        server.NewConfig(),
 		Priority:      priority.NewConfig(),
 		Storage:       storage.NewConfig(),
@@ -108,20 +99,116 @@ func (c *Config) Validate() error {
 
 // LoadConfig loads the configuration from the given path.
 func LoadConfig(path string) (*Config, error) {
+	// Load .env files
+	if err := godotenv.Load(".env", ".env.development"); err != nil {
+		stdlog.Printf("Warning: Error loading .env files: %v", err)
+	}
+
 	v := viper.New()
 	v.SetConfigFile(path)
 	v.SetConfigType("yaml")
+
+	// Replace dots with underscores in env variables
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Enable reading env variables
 	v.AutomaticEnv()
 
+	// Allow empty environment variables for optional fields
+	v.AllowEmptyEnv(true)
+
+	// Bind environment variables to configuration fields
+	v.BindEnv("elasticsearch.api_key", "ELASTICSEARCH_API_KEY")
+	v.BindEnv("elasticsearch.addresses", "ELASTICSEARCH_HOSTS")
+	v.BindEnv("elasticsearch.index_name", "ELASTICSEARCH_INDEX_PREFIX")
+	v.BindEnv("elasticsearch.username", "ELASTIC_USERNAME")
+	v.BindEnv("elasticsearch.password", "ELASTIC_PASSWORD")
+	v.BindEnv("elasticsearch.cloud.id", "ELASTICSEARCH_CLOUD_ID")
+	v.BindEnv("elasticsearch.cloud.api_key", "ELASTICSEARCH_CLOUD_API_KEY")
+	v.BindEnv("elasticsearch.tls.enabled", "ELASTIC_TLS_ENABLED")
+	v.BindEnv("elasticsearch.tls.cert_file", "ELASTIC_TLS_CERT_FILE")
+	v.BindEnv("elasticsearch.tls.key_file", "ELASTIC_TLS_KEY_FILE")
+	v.BindEnv("elasticsearch.tls.ca_file", "ELASTIC_TLS_CA_FILE")
+	v.BindEnv("elasticsearch.tls.insecure_skip_verify", "ELASTICSEARCH_SKIP_TLS")
+	v.BindEnv("elasticsearch.retry.enabled", "ELASTICSEARCH_RETRY_ENABLED")
+	v.BindEnv("elasticsearch.retry.initial_wait", "ELASTICSEARCH_RETRY_INITIAL_WAIT")
+	v.BindEnv("elasticsearch.retry.max_wait", "ELASTICSEARCH_RETRY_MAX_WAIT")
+	v.BindEnv("elasticsearch.retry.max_retries", "ELASTICSEARCH_MAX_RETRIES")
+	v.BindEnv("elasticsearch.bulk_size", "ELASTICSEARCH_BULK_SIZE")
+	v.BindEnv("elasticsearch.flush_interval", "ELASTICSEARCH_FLUSH_INTERVAL")
+
+	// Read config file (if it exists)
 	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed to read config: %w", err)
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFoundError) {
+			return nil, fmt.Errorf("failed to read config: %w", err)
+		}
+		// Config file not found, using defaults and environment variables
+		stdlog.Println("No config file found, using defaults and environment variables")
 	}
+
+	// Log environment variables that are set
+	configKeys := []string{
+		"app.name",
+		"app.env",
+		"app.debug",
+		"server.port",
+		"server.read_timeout",
+		"server.write_timeout",
+		"server.idle_timeout",
+		"elasticsearch.addresses",
+		"elasticsearch.api_key",
+		"elasticsearch.index_name",
+		"elasticsearch.max_retries",
+		"elasticsearch.retry_initial_wait",
+		"elasticsearch.retry_max_wait",
+		"crawler.max_depth",
+		"crawler.parallelism",
+		"crawler.max_age",
+		"crawler.rate_limit",
+		"log.level",
+		"log.format",
+		"elastic.username",
+		"elastic.password",
+		"elastic.skip_tls",
+		"elastic.ca_fingerprint",
+		"gocrawl.port",
+		"gocrawl.api_key",
+	}
+
+	for _, key := range configKeys {
+		if v.IsSet(key) {
+			// Mask sensitive values in the log message
+			if strings.Contains(key, "api_key") || strings.Contains(key, "password") {
+				stdlog.Printf("Using environment variable %s for %s (value masked)", strings.ReplaceAll(key, ".", "_"), key)
+			} else {
+				stdlog.Printf("Using environment variable %s for %s: %v", strings.ReplaceAll(key, ".", "_"), key, v.Get(key))
+			}
+		}
+	}
+
+	// Debug log Elasticsearch configuration
+	stdlog.Printf("Debug: Elasticsearch API Key from Viper: %v", v.Get("elasticsearch.api_key"))
+	stdlog.Printf("Debug: ELASTICSEARCH_API_KEY env var: %v", v.Get("ELASTICSEARCH_API_KEY"))
 
 	cfg := newConfig()
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Explicitly set API key from environment variable
+	if apiKey := v.GetString("ELASTICSEARCH_API_KEY"); apiKey != "" {
+		cfg.Elasticsearch.APIKey = apiKey
+		stdlog.Printf("Debug: Set Elasticsearch API key from environment variable")
+	}
+
+	// Explicitly set TLS skip verify from environment variable
+	if skipTLS := v.GetBool("ELASTICSEARCH_SKIP_TLS"); skipTLS {
+		cfg.Elasticsearch.TLS.InsecureSkipVerify = true
+		stdlog.Printf("Debug: Set Elasticsearch TLS skip verify to true")
+	}
+
+	// Validate the configuration
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
@@ -135,7 +222,7 @@ func (c *Config) GetAppConfig() *app.Config {
 }
 
 // GetLogConfig returns the logging configuration.
-func (c *Config) GetLogConfig() *log.Config {
+func (c *Config) GetLogConfig() *logconfig.Config {
 	return c.Logger
 }
 

@@ -51,7 +51,7 @@ jobs:
       GOCRAWL_API_KEY: test_api_key
       
       # TLS Configuration (disabled for tests)
-      ELASTIC_SKIP_TLS: true
+      ELASTICSEARCH_SKIP_TLS: true
       ELASTIC_CERT_PATH: ""
       ELASTIC_KEY_PATH: ""
       ELASTIC_CA_PATH: ""

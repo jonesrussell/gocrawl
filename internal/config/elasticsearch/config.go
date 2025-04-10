@@ -1,8 +1,9 @@
 package elasticsearch
 
 import (
-	"errors"
+	"encoding/base64"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -16,17 +17,43 @@ const (
 	DefaultMaxRetries    = 3
 	DefaultBulkSize      = 1000
 	DefaultFlushInterval = 30 * time.Second
+	MinPasswordLength    = 8
 )
+
+// Error codes for configuration validation
+const (
+	ErrCodeEmptyAddresses  = "EMPTY_ADDRESSES"
+	ErrCodeEmptyIndexName  = "EMPTY_INDEX_NAME"
+	ErrCodeEmptyAPIKey     = "EMPTY_API_KEY"
+	ErrCodeInvalidAPIKey   = "INVALID_API_KEY"
+	ErrCodeInvalidRetry    = "INVALID_RETRY"
+	ErrCodeInvalidBulkSize = "INVALID_BULK_SIZE"
+	ErrCodeInvalidFlush    = "INVALID_FLUSH_INTERVAL"
+	ErrCodeInvalidTLS      = "INVALID_TLS"
+	ErrCodeWeakPassword    = "WEAK_PASSWORD"
+)
+
+// ConfigError represents a configuration validation error
+type ConfigError struct {
+	Code    string
+	Message string
+}
+
+func (e *ConfigError) Error() string {
+	return fmt.Sprintf("[%s] %s", e.Code, e.Message)
+}
 
 // Config represents Elasticsearch configuration settings.
 type Config struct {
-	// Addresses is a list of Elasticsearch node addresses
+	// Addresses is a list of Elasticsearch node addresses.
+	// Multiple addresses can be provided for high availability.
+	// Example: ["http://node1:9200", "http://node2:9200"]
 	Addresses []string `yaml:"addresses"`
-	// APIKey is the API key for authentication
+	// APIKey is the base64 encoded API key for authentication
 	APIKey string `yaml:"api_key"`
 	// Username is the username for authentication
 	Username string `yaml:"username"`
-	// Password is the password for authentication
+	// Password is the password for authentication (minimum 8 characters)
 	Password string `yaml:"password"`
 	// IndexName is the name of the index
 	IndexName string `yaml:"index_name"`
@@ -61,56 +88,105 @@ type TLSConfig struct {
 	// CAFile is the path to the CA certificate file
 	CAFile string `yaml:"ca_file"`
 	// InsecureSkipVerify indicates whether to skip certificate verification
+	// WARNING: Setting this to true in production is not recommended
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
 }
 
 // Validate checks if the configuration is valid.
 func (c *Config) Validate() error {
 	if len(c.Addresses) == 0 {
-		return errors.New("elasticsearch addresses cannot be empty")
+		return &ConfigError{
+			Code:    ErrCodeEmptyAddresses,
+			Message: "elasticsearch addresses cannot be empty",
+		}
 	}
 
 	if c.IndexName == "" {
-		return errors.New("elasticsearch index name cannot be empty")
+		return &ConfigError{
+			Code:    ErrCodeEmptyIndexName,
+			Message: "elasticsearch index name cannot be empty",
+		}
 	}
 
 	if c.APIKey == "" {
-		return errors.New("elasticsearch API key cannot be empty")
+		return &ConfigError{
+			Code:    ErrCodeEmptyAPIKey,
+			Message: "elasticsearch API key cannot be empty",
+		}
+	}
+
+	// Log the API key for debugging
+	log.Printf("Validating API key: %s", c.APIKey)
+
+	// Check if API key is valid base64
+	if _, err := base64.StdEncoding.DecodeString(c.APIKey); err != nil {
+		log.Printf("Base64 decode error: %v", err)
+		return &ConfigError{
+			Code:    ErrCodeInvalidAPIKey,
+			Message: "API key must be base64 encoded",
+		}
+	}
+
+	if c.Password != "" && len(c.Password) < MinPasswordLength {
+		return &ConfigError{
+			Code:    ErrCodeWeakPassword,
+			Message: fmt.Sprintf("password must be at least %d characters long", MinPasswordLength),
+		}
 	}
 
 	if c.Retry.Enabled {
 		if c.Retry.InitialWait <= 0 {
-			return fmt.Errorf("initial wait must be greater than 0, got %v", c.Retry.InitialWait)
+			return &ConfigError{
+				Code:    ErrCodeInvalidRetry,
+				Message: fmt.Sprintf("initial wait must be greater than 0, got %v", c.Retry.InitialWait),
+			}
 		}
 
 		if c.Retry.MaxWait <= 0 {
-			return fmt.Errorf("max wait must be greater than 0, got %v", c.Retry.MaxWait)
+			return &ConfigError{
+				Code:    ErrCodeInvalidRetry,
+				Message: fmt.Sprintf("max wait must be greater than 0, got %v", c.Retry.MaxWait),
+			}
 		}
 
 		if c.Retry.MaxRetries <= 0 {
-			return fmt.Errorf("max retries must be greater than 0, got %d", c.Retry.MaxRetries)
+			return &ConfigError{
+				Code:    ErrCodeInvalidRetry,
+				Message: fmt.Sprintf("max retries must be greater than 0, got %d", c.Retry.MaxRetries),
+			}
 		}
 	}
 
 	if c.BulkSize <= 0 {
-		return fmt.Errorf("bulk size must be greater than 0, got %d", c.BulkSize)
+		return &ConfigError{
+			Code:    ErrCodeInvalidBulkSize,
+			Message: fmt.Sprintf("bulk size must be greater than 0, got %d", c.BulkSize),
+		}
 	}
 
 	if c.FlushInterval <= 0 {
-		return fmt.Errorf("flush interval must be greater than 0, got %v", c.FlushInterval)
+		return &ConfigError{
+			Code:    ErrCodeInvalidFlush,
+			Message: fmt.Sprintf("flush interval must be greater than 0, got %v", c.FlushInterval),
+		}
 	}
 
 	if c.TLS.Enabled {
 		if !c.TLS.InsecureSkipVerify {
 			if c.TLS.CertFile == "" {
-				return errors.New("TLS certificate file is required when TLS is enabled and insecure_skip_verify is false")
+				return &ConfigError{
+					Code:    ErrCodeInvalidTLS,
+					Message: "TLS certificate file is required when TLS is enabled and insecure_skip_verify is false",
+				}
 			}
 
 			if c.TLS.KeyFile == "" {
-				return errors.New("TLS key file is required when TLS is enabled and insecure_skip_verify is false")
+				return &ConfigError{
+					Code:    ErrCodeInvalidTLS,
+					Message: "TLS key file is required when TLS is enabled and insecure_skip_verify is false",
+				}
 			}
 		}
-		// When insecure_skip_verify is true, we don't need certificate files
 	}
 
 	return nil
@@ -121,7 +197,7 @@ func NewConfig() *Config {
 	defaultAddresses := []string{DefaultAddresses}
 	tls := &TLSConfig{
 		Enabled:            false,
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: false, // Changed default to false for better security
 	}
 
 	return &Config{
@@ -145,6 +221,47 @@ func NewConfig() *Config {
 		BulkSize:      DefaultBulkSize,
 		FlushInterval: DefaultFlushInterval,
 	}
+}
+
+// ExampleConfig demonstrates common configuration patterns.
+func ExampleConfig() {
+	// Basic configuration
+	basicCfg := NewConfig()
+	WithAddresses([]string{"http://localhost:9200"})(basicCfg)
+	WithAPIKey("my_id:my_key")(basicCfg)
+	WithIndexName("my_index")(basicCfg)
+
+	// Cloud configuration
+	cloudCfg := NewConfig()
+	WithCloudID("my-cloud-id")(cloudCfg)
+	WithCloudAPIKey("my-cloud-key")(cloudCfg)
+
+	// TLS configuration
+	tlsCfg := NewConfig()
+	WithTLSEnabled(true)(tlsCfg)
+	WithTLSCertFile("cert.pem")(tlsCfg)
+	WithTLSKeyFile("key.pem")(tlsCfg)
+	WithTLSCAFile("ca.pem")(tlsCfg)
+
+	// High availability configuration
+	haCfg := NewConfig()
+	WithAddresses([]string{
+		"http://node1:9200",
+		"http://node2:9200",
+		"http://node3:9200",
+	})(haCfg)
+	WithAPIKey("ha_id:ha_key")(haCfg)
+	WithIndexName("ha_index")(haCfg)
+	WithRetryEnabled(true)(haCfg)
+	WithInitialWait(2 * time.Second)(haCfg)
+	WithMaxWait(10 * time.Second)(haCfg)
+	WithMaxRetries(5)(haCfg)
+
+	// Validate configurations
+	_ = basicCfg.Validate()
+	_ = cloudCfg.Validate()
+	_ = tlsCfg.Validate()
+	_ = haCfg.Validate()
 }
 
 // Option is a function that configures an Elasticsearch configuration.

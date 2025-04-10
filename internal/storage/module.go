@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -56,7 +57,6 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 	logger.Debug("Creating Elasticsearch client configuration",
 		"addresses", esConfig.Addresses,
 		"hasAPIKey", esConfig.APIKey != "",
-		"apiKeyLength", len(esConfig.APIKey),
 		"hasUsername", esConfig.Username != "",
 		"hasPassword", esConfig.Password != "",
 		"tlsEnabled", esConfig.TLS != nil && esConfig.TLS.Enabled,
@@ -74,7 +74,7 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 	cfg := es.Config{
 		Addresses: esConfig.Addresses,
 		Transport: transport,
-		// The API key is already in the format id:api_key, no need to modify it
+		// The API key is already in the correct format (base64 encoded id:api_key)
 		APIKey: esConfig.APIKey,
 		// Client configuration
 		EnableMetrics:           true,
@@ -118,6 +118,7 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 		return nil, errors.New("API key is required")
 	}
 
+	// Log detailed configuration information
 	logger.Debug("Elasticsearch configuration",
 		"addresses", esConfig.Addresses,
 		"hasAPIKey", esConfig.APIKey != "",
@@ -152,6 +153,11 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 	}()
 
 	if res.IsError() {
+		// Log the full error response
+		body, _ := io.ReadAll(res.Body)
+		logger.Error("Elasticsearch ping error",
+			"status", res.StatusCode,
+			"error", string(body))
 		return nil, fmt.Errorf("failed to connect to Elasticsearch: %s", res.String())
 	}
 
