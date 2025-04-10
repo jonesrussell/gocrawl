@@ -1,9 +1,10 @@
-package testutils
+package testutils_test
 
 import (
 	"os"
 	"testing"
 
+	"github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +20,7 @@ func TestSetupTestEnvironment(t *testing.T) {
 		t.Setenv("TEST_VAR", "test_value")
 
 		// Setup test environment
-		cleanup := SetupTestEnv(t)
+		cleanup := testutils.SetupTestEnv(t)
 		defer cleanup()
 
 		// Verify environment is cleared

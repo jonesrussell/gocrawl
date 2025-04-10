@@ -20,7 +20,7 @@ type Field struct {
 	// Key is the field name
 	Key string
 	// Value is the field value
-	Value interface{}
+	Value any
 }
 
 type ConfigValue struct {

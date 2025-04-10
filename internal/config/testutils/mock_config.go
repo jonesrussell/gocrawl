@@ -1,8 +1,6 @@
 package testutils
 
 import (
-	"time"
-
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
@@ -14,15 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-const (
-	defaultMaxDepth     = 3
-	defaultParallelism  = 2
-	defaultReadTimeout  = 15 * time.Second
-	defaultWriteTimeout = 15 * time.Second
-	defaultIdleTimeout  = 60 * time.Second
-)
-
-// MockConfig is a mock implementation of the config.Interface for testing.
+// MockConfig is a mock implementation of the Config interface
 type MockConfig struct {
 	mock.Mock
 }

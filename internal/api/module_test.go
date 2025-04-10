@@ -232,6 +232,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Create request
 			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			w := httptest.NewRecorder()
@@ -314,6 +315,7 @@ func TestSearchEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Create request
 			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
 			req.Header.Set("Content-Type", "application/json")
@@ -414,6 +416,7 @@ func TestSecurityMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 			if tt.apiKey != "" {

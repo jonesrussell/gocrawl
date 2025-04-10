@@ -140,7 +140,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 					"content": req.Query,
 				},
 			},
-			"size": 10,
+			"size": defaultSearchSize,
 		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, types.APIError{

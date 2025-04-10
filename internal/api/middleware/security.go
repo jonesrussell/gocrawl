@@ -122,6 +122,11 @@ func (m *SecurityMiddleware) addSecurityHeaders(c *gin.Context) {
 	c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 }
 
+// isAllowedOrigin checks if CORS is allowed
+func (m *SecurityMiddleware) isAllowedOrigin() bool {
+	return !m.config.SecurityEnabled
+}
+
 // handleCORS handles CORS headers and preflight requests
 func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
 	origin := c.GetHeader("Origin")
@@ -129,8 +134,8 @@ func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
 		return nil
 	}
 
-	// Check if origin is allowed
-	if !m.isAllowedOrigin(origin) {
+	// Check if CORS is allowed
+	if !m.isAllowedOrigin() {
 		return fmt.Errorf("origin not allowed: %s", origin)
 	}
 
@@ -147,15 +152,6 @@ func (m *SecurityMiddleware) handleCORS(c *gin.Context) error {
 	}
 
 	return nil
-}
-
-// isAllowedOrigin checks if the given origin is allowed
-func (m *SecurityMiddleware) isAllowedOrigin(origin string) bool {
-	// Since server.Config has a simpler structure, we need to handle CORS differently
-	if !m.config.SecurityEnabled {
-		return true // If security is disabled, allow all origins
-	}
-	return false // If security is enabled but no CORS config, deny all
 }
 
 // rateLimit applies rate limiting to the request
