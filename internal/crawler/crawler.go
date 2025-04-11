@@ -377,38 +377,46 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	// Get the crawler's context
 	ctx := c.state.Context()
 
-	// Process the HTML content
-	if c.contentProcessor != nil && c.contentProcessor.CanProcess(e) {
-		err := c.contentProcessor.Process(ctx, e)
-		if err != nil {
-			c.logger.Error("Failed to process content", "error", err)
-			c.state.IncrementError()
-		}
-	}
+	// Detect content type
+	contentType := c.detectContentType(e)
 
-	// Process the article
-	if c.articleProcessor != nil && c.articleProcessor.CanProcess(e) {
-		err := c.articleProcessor.Process(ctx, e)
-		if err != nil {
-			c.logger.Error("Failed to process article", "error", err)
-			c.state.IncrementError()
-		}
-	}
-
-	// Process with additional processors
-	for _, processor := range c.processors {
-		if processor.CanProcess(e) {
-			err := processor.Process(ctx, e)
-			if err != nil {
-				c.logger.Error("Failed to process with additional processor",
-					"processor", processor.ContentType(),
-					"error", err)
-				c.state.IncrementError()
+	// Process with the appropriate processor
+	var processor common.Processor
+	switch contentType {
+	case common.ContentTypeArticle:
+		processor = c.articleProcessor
+	case common.ContentTypePage:
+		processor = c.contentProcessor
+	default:
+		// Try additional processors
+		for _, p := range c.processors {
+			if p.CanProcess(e) {
+				processor = p
+				break
 			}
 		}
 	}
 
+	if processor != nil {
+		err := processor.Process(ctx, e)
+		if err != nil {
+			c.logger.Error("Failed to process content",
+				"error", err,
+				"type", contentType)
+			c.state.IncrementError()
+		}
+	}
+
 	c.state.IncrementProcessed()
+}
+
+// detectContentType detects the type of content in the HTML element
+func (c *Crawler) detectContentType(e *colly.HTMLElement) common.ContentType {
+	// Check for article-specific elements
+	if e.DOM.Find("article").Length() > 0 || e.DOM.Find(".article").Length() > 0 {
+		return common.ContentTypeArticle
+	}
+	return common.ContentTypePage
 }
 
 // AddProcessor adds a new processor to the crawler.
