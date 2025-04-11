@@ -135,12 +135,25 @@ func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
 		return errors.New("source cannot be nil")
 	}
 
-	if crawlErr := c.crawl(source); crawlErr != nil {
-		c.logger.Error("Failed to crawl source",
-			"error", crawlErr,
-			"source", source.Name)
-		return fmt.Errorf("failed to crawl source: %w", crawlErr)
+	// Set up the collector for this source
+	c.configureCollector(source)
+
+	// Set up callbacks
+	c.collector.OnHTML("html", c.ProcessHTML)
+
+	// Start visiting URLs
+	for _, url := range source.StartURLs {
+		if err := c.collector.Visit(url); err != nil {
+			c.logger.Error("Failed to visit URL",
+				"url", url,
+				"error", err)
+			c.IncrementError()
+		}
 	}
+
+	// Wait for the collector to finish
+	c.collector.Wait()
+
 	return nil
 }
 
@@ -153,13 +166,16 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	}
 
 	// Validate index exists
-	exists, err := c.indexManager.IndexExists(ctx, sourceName)
+	exists, err := c.indexManager.IndexExists(ctx, source.Index)
 	if err != nil {
 		return fmt.Errorf("failed to check index existence: %w", err)
 	}
 	if !exists {
-		return fmt.Errorf("index not found: %s", sourceName)
+		return fmt.Errorf("index not found: %s", source.Index)
 	}
+
+	// Initialize state with context and source name
+	c.state.Start(ctx, sourceName)
 
 	// Configure collector for this source
 	c.configureCollector(source)
@@ -345,9 +361,12 @@ func (c *Crawler) Reset() {
 
 // ProcessHTML processes the HTML content.
 func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
+	// Get the crawler's context
+	ctx := c.state.Context()
+
 	// Process the HTML content
 	if c.contentProcessor != nil && c.contentProcessor.CanProcess(e) {
-		err := c.contentProcessor.Process(c.state.Context(), e)
+		err := c.contentProcessor.Process(ctx, e)
 		if err != nil {
 			c.logger.Error("Failed to process content", "error", err)
 			c.state.IncrementError()
@@ -356,7 +375,7 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 
 	// Process the article
 	if c.articleProcessor != nil && c.articleProcessor.CanProcess(e) {
-		err := c.articleProcessor.Process(c.state.Context(), e)
+		err := c.articleProcessor.Process(ctx, e)
 		if err != nil {
 			c.logger.Error("Failed to process article", "error", err)
 			c.state.IncrementError()
@@ -366,7 +385,7 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	// Process with additional processors
 	for _, processor := range c.processors {
 		if processor.CanProcess(e) {
-			err := processor.Process(c.state.Context(), e)
+			err := processor.Process(ctx, e)
 			if err != nil {
 				c.logger.Error("Failed to process with additional processor",
 					"processor", processor.ContentType(),

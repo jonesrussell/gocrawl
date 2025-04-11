@@ -68,7 +68,10 @@ var Module = fx.Options(
 		storage.NewElasticsearchIndexManager,
 
 		// Signal handler
-		signal.NewSignalHandler,
+		fx.Annotate(
+			signal.NewSignalHandler,
+			fx.As(new(signal.Interface)),
+		),
 
 		// Article processor
 		article.ProvideArticleProcessor,

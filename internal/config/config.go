@@ -188,6 +188,16 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
+	// Create a temporary logger for config loading
+	tempLogger, err := logger.New(&logger.Config{
+		Level:       logger.InfoLevel,
+		Development: true,
+		Encoding:    "console",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary logger: %w", err)
+	}
+
 	// Unmarshal config
 	var cfg Config
 	if err := v.Unmarshal(&cfg, func(config *mapstructure.DecoderConfig) {
@@ -199,6 +209,9 @@ func LoadConfig() (*Config, error) {
 	}); err != nil {
 		return nil, err
 	}
+
+	// Set the logger
+	cfg.logger = tempLogger
 
 	// Load sources from the specified file
 	if cfg.Crawler != nil && cfg.Crawler.SourceFile != "" {
