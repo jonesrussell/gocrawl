@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -36,29 +37,34 @@ Specify the source name as an argument.`,
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
+		// Set up signal handling with a no-op logger initially
+		handler := signal.NewSignalHandler(logger.NewNoOp())
+		cleanup := handler.Setup(ctx)
+		defer cleanup()
+
 		// Initialize the Fx application
 		fxApp := fx.New(
 			Module,
-			// Override context and source name
+			// Override context and source name with proper names
 			fx.Provide(
-				func() context.Context { return ctx },
-				func() string { return sourceName },
+				fx.Annotate(
+					func() context.Context { return ctx },
+					fx.ResultTags(`name:"crawlContext"`),
+				),
+				fx.Annotate(
+					func() string { return sourceName },
+					fx.ResultTags(`name:"sourceName"`),
+				),
 			),
 		)
+
+		// Set the fx app for coordinated shutdown
+		handler.SetFXApp(fxApp)
 
 		// Start the application
 		if err := fxApp.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start application: %w", err)
 		}
-
-		// Get the handler from the Fx application
-		var handler *signal.SignalHandler
-		if err := fx.Populate(fxApp, &handler); err != nil {
-			return fmt.Errorf("failed to get signal handler: %v", err)
-		}
-
-		// Set the fx app for coordinated shutdown
-		handler.SetFXApp(fxApp)
 
 		// Wait for completion signal
 		handler.Wait()
