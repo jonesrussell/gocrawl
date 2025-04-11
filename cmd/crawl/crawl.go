@@ -67,7 +67,9 @@ Specify the source name as an argument.`,
 		}
 
 		// Wait for completion signal
-		handler.Wait()
+		if err := handler.Wait(); err != nil {
+			return fmt.Errorf("failed to wait for handler: %w", err)
+		}
 
 		return nil
 	},

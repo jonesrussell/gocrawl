@@ -228,7 +228,9 @@ You can send POST requests to /search with a JSON body containing the search par
 		}
 
 		// Wait for shutdown signal
-		handler.Wait()
+		if err := handler.Wait(); err != nil {
+			return fmt.Errorf("failed to wait for handler: %w", err)
+		}
 
 		return nil
 	},

@@ -52,13 +52,30 @@ func (m *MockIndexManager) GetMapping(ctx context.Context, name string) (map[str
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(map[string]any), args.Error(1)
+	mapping, ok := args.Get(0).(map[string]any)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return mapping, args.Error(1)
 }
 
 // UpdateMapping implements interfaces.IndexManager
 func (m *MockIndexManager) UpdateMapping(ctx context.Context, name string, mapping map[string]any) error {
 	args := m.Called(ctx, name, mapping)
 	return args.Error(0)
+}
+
+// GetIndex implements interfaces.IndexManager
+func (m *MockIndexManager) GetIndex(ctx context.Context, name string) (map[string]any, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	index, ok := args.Get(0).(map[string]any)
+	if !ok {
+		return nil, args.Error(1)
+	}
+	return index, args.Error(1)
 }
 
 // Ensure MockIndexManager implements interfaces.IndexManager

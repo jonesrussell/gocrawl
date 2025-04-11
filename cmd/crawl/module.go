@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -13,7 +12,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -59,32 +57,16 @@ var Module = fx.Options(
 		},
 
 		// Event bus
-		func(logger logger.Interface) *events.EventBus {
-			return events.NewEventBus(logger)
-		},
+		events.NewEventBus,
 
 		// Index manager
-		func(client *elasticsearch.Client, logger logger.Interface) interfaces.IndexManager {
-			return storage.NewElasticsearchIndexManager(client, logger)
-		},
+		storage.NewElasticsearchIndexManager,
 
 		// Signal handler
-		fx.Annotate(
-			func(logger logger.Interface) *signal.SignalHandler {
-				return signal.NewSignalHandler(logger)
-			},
-			fx.As(new(signal.Interface)),
-		),
+		signal.NewSignalHandler,
 
 		// Article processor
-		func(
-			logger logger.Interface,
-			config config.Interface,
-			storage storagetypes.Interface,
-			service article.Interface,
-		) *article.ArticleProcessor {
-			return article.ProvideArticleProcessor(logger, config, storage, service)
-		},
+		article.ProvideArticleProcessor,
 
 		// Content processor
 		func(

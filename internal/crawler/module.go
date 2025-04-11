@@ -99,11 +99,16 @@ func NewCrawler(
 	// Disable URL revisiting
 	collector.AllowURLRevisit = false
 
-	collector.Limit(&colly.LimitRule{
+	if err := collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: cfg.RandomDelay,
 		Parallelism: cfg.MaxConcurrency,
-	})
+	}); err != nil {
+		logger.Error("Failed to set rate limit",
+			"error", err,
+			"randomDelay", cfg.RandomDelay,
+			"parallelism", cfg.MaxConcurrency)
+	}
 
 	crawler := &Crawler{
 		logger:           logger,

@@ -184,7 +184,9 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Wait for shutdown signal
-	handler.Wait()
+	if err := handler.Wait(); err != nil {
+		return fmt.Errorf("failed to wait for handler: %w", err)
+	}
 
 	return nil
 }

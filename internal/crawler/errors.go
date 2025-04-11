@@ -36,20 +36,20 @@ var (
 	ErrArticleProcessingFailed = errors.New("article processing failed")
 )
 
-// ErrorWrapper wraps an error with additional context.
-type ErrorWrapper struct {
-	err     error
-	context string
+// WrapperError wraps an error with additional context.
+type WrapperError struct {
+	Err     error
+	Context string
 }
 
 // Error returns the error message.
-func (e *ErrorWrapper) Error() string {
-	return fmt.Sprintf("%s: %v", e.context, e.err)
+func (e *WrapperError) Error() string {
+	return fmt.Sprintf("%s: %v", e.Context, e.Err)
 }
 
 // Unwrap returns the underlying error.
-func (e *ErrorWrapper) Unwrap() error {
-	return e.err
+func (e *WrapperError) Unwrap() error {
+	return e.Err
 }
 
 // WrapError wraps an error with additional context.
@@ -57,9 +57,9 @@ func WrapError(err error, context string) error {
 	if err == nil {
 		return nil
 	}
-	return &ErrorWrapper{
-		err:     err,
-		context: context,
+	return &WrapperError{
+		Err:     err,
+		Context: context,
 	}
 }
 
@@ -106,4 +106,12 @@ func IsContentProcessingFailedError(err error) bool {
 // IsArticleProcessingFailedError returns true if the error is an article processing failed error.
 func IsArticleProcessingFailedError(err error) bool {
 	return errors.Is(err, ErrArticleProcessingFailed)
+}
+
+// NewWrapperError creates a new error wrapper.
+func NewWrapperError(err error, context string) error {
+	return &WrapperError{
+		Err:     err,
+		Context: context,
+	}
 }

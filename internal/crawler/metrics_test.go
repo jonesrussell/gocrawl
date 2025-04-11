@@ -60,7 +60,7 @@ func TestCrawlerMetrics(t *testing.T) {
 		startTime := time.Now()
 
 		// Start multiple goroutines to update metrics
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			go func() {
 				metrics.Update(startTime, 1, 0)
 			}()

@@ -113,5 +113,8 @@ func (m *MockSources) GetMetrics() sourceutils.SourcesMetrics {
 	if args.Get(0) == nil {
 		return sourceutils.SourcesMetrics{}
 	}
-	return args.Get(0).(sourceutils.SourcesMetrics)
+	if metrics, ok := args.Get(0).(sourceutils.SourcesMetrics); ok {
+		return metrics
+	}
+	return sourceutils.SourcesMetrics{}
 }

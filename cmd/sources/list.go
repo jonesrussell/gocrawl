@@ -116,7 +116,9 @@ func RunList(cmd *cobra.Command, _ []string) error {
 
 	// Only wait for shutdown signal if there was an error
 	if listErr != nil {
-		handler.Wait()
+		if err := handler.Wait(); err != nil {
+			return fmt.Errorf("failed to wait for handler: %w", err)
+		}
 	}
 
 	return listErr

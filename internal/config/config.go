@@ -19,6 +19,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/storage"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 )
@@ -303,4 +304,31 @@ func (c *Config) GetStorageConfig() *storage.Config {
 // GetConfigFile returns the path to the configuration file.
 func (c *Config) GetConfigFile() string {
 	return viper.ConfigFileUsed()
+}
+
+// LoadSources loads sources from the specified file.
+func (c *Config) LoadSources(logger logger.Interface) error {
+	if c.Crawler.SourceFile == "" {
+		return errors.New("source file not specified")
+	}
+
+	logger.Info("Loading sources from file", "file", c.Crawler.SourceFile)
+
+	// Get the absolute path to the sources file
+	sourcesPath := filepath.Join(filepath.Dir(viper.ConfigFileUsed()), c.Crawler.SourceFile)
+	sourcesViper := viper.New()
+	sourcesViper.SetConfigFile(sourcesPath)
+	sourcesViper.SetConfigType("yaml")
+
+	if err := sourcesViper.ReadInConfig(); err != nil {
+		return fmt.Errorf("failed to read sources file: %w", err)
+	}
+
+	var sources []types.Source
+	if err := sourcesViper.UnmarshalKey("sources", &sources); err != nil {
+		return fmt.Errorf("failed to unmarshal sources: %w", err)
+	}
+
+	c.Sources = sources
+	return nil
 }

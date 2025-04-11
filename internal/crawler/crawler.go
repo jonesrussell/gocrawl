@@ -94,7 +94,7 @@ func newCrawlerState() *crawlerState {
 }
 
 // Update updates the state with new values.
-func (s *crawlerState) Update(startTime time.Time, processed int64, errors int64) {
+func (s *crawlerState) Update(startTime time.Time, processed, errors int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.startTime = startTime
@@ -466,28 +466,15 @@ func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) {
 
 // crawl performs the actual crawling process.
 func (c *Crawler) crawl(ctx context.Context, source *sourceutils.SourceConfig) error {
-	c.state.mu.Lock()
-	c.state.currentSource = source.Name
-	c.state.isRunning = true
-	c.state.mu.Unlock()
-
-	defer func() {
-		c.state.mu.Lock()
-		c.state.isRunning = false
-		c.state.mu.Unlock()
-	}()
-
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		// Start the crawler
-		if err := c.collector.Visit(source.URL); err != nil {
-			return fmt.Errorf("failed to visit source URL: %w", err)
-		}
-		return nil
+	if source == nil {
+		return errors.New("source cannot be nil")
 	}
+
+	crawlErr := c.crawl(ctx, source)
+	if crawlErr != nil {
+		return fmt.Errorf("failed to crawl source %s: %w", source.Name, crawlErr)
+	}
+	return nil
 }
 
 // Stop stops the crawler.
@@ -682,7 +669,7 @@ func (c *Crawler) GetProcessingDuration() time.Duration {
 }
 
 // Update updates the metrics with new values.
-func (c *Crawler) Update(startTime time.Time, processed int64, errors int64) {
+func (c *Crawler) Update(startTime time.Time, processed, errors int64) {
 	c.state.Update(startTime, processed, errors)
 }
 

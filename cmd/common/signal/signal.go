@@ -46,7 +46,7 @@ type SignalHandler struct {
 	logger          logger.Interface
 	done            chan struct{}
 	mu              sync.Mutex
-	app             interface{} // Can be *fx.App or func() error
+	app             any // Can be *fx.App or func() error
 	state           shutdownState
 	stateMu         sync.RWMutex
 	resources       []func() error
@@ -54,6 +54,7 @@ type SignalHandler struct {
 	shutdownTimeout time.Duration
 	cleanup         func()
 	shutdownError   error
+	signals         []os.Signal
 }
 
 // NewSignalHandler creates a new signal handler.
@@ -108,8 +109,8 @@ func (h *SignalHandler) RequestShutdown() {
 	}
 }
 
-// SetFXApp sets the FX application for coordinated shutdown
-func (h *SignalHandler) SetFXApp(app interface{}) {
+// SetFXApp sets the FX app instance.
+func (h *SignalHandler) SetFXApp(app any) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.app = app

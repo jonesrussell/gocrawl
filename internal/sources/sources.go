@@ -45,6 +45,71 @@ func ConvertSourceConfig(source *Config) *types.Source {
 	return sourceutils.ConvertToConfigSource(source)
 }
 
+// createSelectorConfig creates a new SelectorConfig from the given selectors
+func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
+	var articleSelectors sourceutils.ArticleSelectors
+
+	switch s := selectors.(type) {
+	case types.ArticleSelectors:
+		articleSelectors = sourceutils.ArticleSelectors{
+			Container:     s.Container,
+			Title:         s.Title,
+			Body:          s.Body,
+			Intro:         s.Intro,
+			Byline:        s.Byline,
+			PublishedTime: s.PublishedTime,
+			TimeAgo:       s.TimeAgo,
+			JSONLD:        s.JSONLD,
+			Section:       s.Section,
+			Keywords:      s.Keywords,
+			Description:   s.Description,
+			OGTitle:       s.OGTitle,
+			OGDescription: s.OGDescription,
+			OGImage:       s.OGImage,
+			OgURL:         s.OgURL,
+			Canonical:     s.Canonical,
+			WordCount:     s.WordCount,
+			PublishDate:   s.PublishDate,
+			Category:      s.Category,
+			Tags:          s.Tags,
+			Author:        s.Author,
+			BylineName:    s.BylineName,
+		}
+	case loader.ArticleSelectors:
+		articleSelectors = sourceutils.ArticleSelectors{
+			Container:     s.Container,
+			Title:         s.Title,
+			Body:          s.Body,
+			Intro:         s.Intro,
+			Byline:        s.Byline,
+			PublishedTime: s.PublishedTime,
+			TimeAgo:       s.TimeAgo,
+			JSONLD:        s.JSONLD,
+			Section:       s.Section,
+			Keywords:      s.Keywords,
+			Description:   s.Description,
+			OGTitle:       s.OGTitle,
+			OGDescription: s.OGDescription,
+			OGImage:       s.OGImage,
+			OgURL:         s.OgURL,
+			Canonical:     s.Canonical,
+			WordCount:     s.WordCount,
+			PublishDate:   s.PublishDate,
+			Category:      s.Category,
+			Tags:          s.Tags,
+			Author:        s.Author,
+			BylineName:    s.BylineName,
+		}
+	default:
+		// Return empty selectors for unknown types
+		articleSelectors = sourceutils.ArticleSelectors{}
+	}
+
+	return sourceutils.SelectorConfig{
+		Article: articleSelectors,
+	}
+}
+
 // convertSourceConfig converts a types.Source to a sourceutils.SourceConfig
 func convertSourceConfig(src types.Source) sourceutils.SourceConfig {
 	// Parse the rate limit duration
@@ -63,33 +128,8 @@ func convertSourceConfig(src types.Source) sourceutils.SourceConfig {
 		MaxDepth:       src.MaxDepth,
 		Time:           src.Time,
 		Index:          src.Index,
-		Selectors: sourceutils.SelectorConfig{
-			Article: sourceutils.ArticleSelectors{
-				Container:     src.Selectors.Article.Container,
-				Title:         src.Selectors.Article.Title,
-				Body:          src.Selectors.Article.Body,
-				Intro:         src.Selectors.Article.Intro,
-				Byline:        src.Selectors.Article.Byline,
-				PublishedTime: src.Selectors.Article.PublishedTime,
-				TimeAgo:       src.Selectors.Article.TimeAgo,
-				JSONLD:        src.Selectors.Article.JSONLD,
-				Section:       src.Selectors.Article.Section,
-				Keywords:      src.Selectors.Article.Keywords,
-				Description:   src.Selectors.Article.Description,
-				OGTitle:       src.Selectors.Article.OGTitle,
-				OGDescription: src.Selectors.Article.OGDescription,
-				OGImage:       src.Selectors.Article.OGImage,
-				OgURL:         src.Selectors.Article.OgURL,
-				Canonical:     src.Selectors.Article.Canonical,
-				WordCount:     src.Selectors.Article.WordCount,
-				PublishDate:   src.Selectors.Article.PublishDate,
-				Category:      src.Selectors.Article.Category,
-				Tags:          src.Selectors.Article.Tags,
-				Author:        src.Selectors.Article.Author,
-				BylineName:    src.Selectors.Article.BylineName,
-			},
-		},
-		Rules: src.Rules,
+		Selectors:      createSelectorConfig(src.Selectors.Article),
+		Rules:          src.Rules,
 	}
 }
 
@@ -187,7 +227,16 @@ func convertLoaderConfig(cfg loader.Config) sourceutils.SourceConfig {
 			}
 		case int, int64, float64:
 			// Convert numeric value to duration in seconds
-			rateLimit = time.Duration(v.(int)) * time.Second
+			switch val := v.(type) {
+			case int:
+				rateLimit = time.Duration(val) * time.Second
+			case int64:
+				rateLimit = time.Duration(val) * time.Second
+			case float64:
+				rateLimit = time.Duration(val) * time.Second
+			default:
+				rateLimit = time.Second
+			}
 		default:
 			// Use default value for unknown types
 			rateLimit = time.Second
@@ -211,33 +260,8 @@ func convertLoaderConfig(cfg loader.Config) sourceutils.SourceConfig {
 			Time:           cfg.Time,
 			Index:          cfg.Index,
 			ArticleIndex:   cfg.ArticleIndex,
-			Selectors: sourceutils.SelectorConfig{
-				Article: sourceutils.ArticleSelectors{
-					Container:     cfg.Selectors.Article.Container,
-					Title:         cfg.Selectors.Article.Title,
-					Body:          cfg.Selectors.Article.Body,
-					Intro:         cfg.Selectors.Article.Intro,
-					Byline:        cfg.Selectors.Article.Byline,
-					PublishedTime: cfg.Selectors.Article.PublishedTime,
-					TimeAgo:       cfg.Selectors.Article.TimeAgo,
-					JSONLD:        cfg.Selectors.Article.JSONLD,
-					Section:       cfg.Selectors.Article.Section,
-					Keywords:      cfg.Selectors.Article.Keywords,
-					Description:   cfg.Selectors.Article.Description,
-					OGTitle:       cfg.Selectors.Article.OGTitle,
-					OGDescription: cfg.Selectors.Article.OGDescription,
-					OGImage:       cfg.Selectors.Article.OGImage,
-					OgURL:         cfg.Selectors.Article.OgURL,
-					Canonical:     cfg.Selectors.Article.Canonical,
-					WordCount:     cfg.Selectors.Article.WordCount,
-					PublishDate:   cfg.Selectors.Article.PublishDate,
-					Category:      cfg.Selectors.Article.Category,
-					Tags:          cfg.Selectors.Article.Tags,
-					Author:        cfg.Selectors.Article.Author,
-					BylineName:    cfg.Selectors.Article.BylineName,
-				},
-			},
-			Rules: types.Rules{},
+			Selectors:      createSelectorConfig(cfg.Selectors.Article),
+			Rules:          types.Rules{},
 		}
 	}
 
@@ -257,33 +281,8 @@ func convertLoaderConfig(cfg loader.Config) sourceutils.SourceConfig {
 		Time:           cfg.Time,
 		Index:          cfg.Index,
 		ArticleIndex:   cfg.ArticleIndex,
-		Selectors: sourceutils.SelectorConfig{
-			Article: sourceutils.ArticleSelectors{
-				Container:     cfg.Selectors.Article.Container,
-				Title:         cfg.Selectors.Article.Title,
-				Body:          cfg.Selectors.Article.Body,
-				Intro:         cfg.Selectors.Article.Intro,
-				Byline:        cfg.Selectors.Article.Byline,
-				PublishedTime: cfg.Selectors.Article.PublishedTime,
-				TimeAgo:       cfg.Selectors.Article.TimeAgo,
-				JSONLD:        cfg.Selectors.Article.JSONLD,
-				Section:       cfg.Selectors.Article.Section,
-				Keywords:      cfg.Selectors.Article.Keywords,
-				Description:   cfg.Selectors.Article.Description,
-				OGTitle:       cfg.Selectors.Article.OGTitle,
-				OGDescription: cfg.Selectors.Article.OGDescription,
-				OGImage:       cfg.Selectors.Article.OGImage,
-				OgURL:         cfg.Selectors.Article.OgURL,
-				Canonical:     cfg.Selectors.Article.Canonical,
-				WordCount:     cfg.Selectors.Article.WordCount,
-				PublishDate:   cfg.Selectors.Article.PublishDate,
-				Category:      cfg.Selectors.Article.Category,
-				Tags:          cfg.Selectors.Article.Tags,
-				Author:        cfg.Selectors.Article.Author,
-				BylineName:    cfg.Selectors.Article.BylineName,
-			},
-		},
-		Rules: types.Rules{},
+		Selectors:      createSelectorConfig(cfg.Selectors.Article),
+		Rules:          types.Rules{},
 	}
 }
 

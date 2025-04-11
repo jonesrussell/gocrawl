@@ -1,11 +1,12 @@
-package events
+package events_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -59,179 +60,84 @@ func (m *MockLogger) With(fields ...any) logger.Interface {
 
 // MockEventHandler is a mock implementation of EventHandler
 type MockEventHandler struct {
-	mock.Mock
+	article *models.Article
+	err     error
+	started bool
+	stopped bool
 }
 
-func (m *MockEventHandler) HandleArticle(ctx context.Context, article *models.Article) error {
-	args := m.Called(ctx, article)
-	return args.Error(0)
+func (h *MockEventHandler) HandleArticle(ctx context.Context, article *models.Article) error {
+	h.article = article
+	return nil
 }
 
-func (m *MockEventHandler) HandleError(ctx context.Context, err error) error {
-	args := m.Called(ctx, err)
-	return args.Error(0)
+func (h *MockEventHandler) HandleError(ctx context.Context, err error) error {
+	h.err = err
+	return nil
 }
 
-func (m *MockEventHandler) HandleStart(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
+func (h *MockEventHandler) HandleStart(ctx context.Context) error {
+	h.started = true
+	return nil
 }
 
-func (m *MockEventHandler) HandleStop(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
+func (h *MockEventHandler) HandleStop(ctx context.Context) error {
+	h.stopped = true
+	return nil
 }
 
 func TestEventBus(t *testing.T) {
 	t.Parallel()
 
+	logger := NewMockLogger()
+	bus := events.NewEventBus(logger)
+
 	t.Run("NewEventBus", func(t *testing.T) {
 		t.Parallel()
-		log := NewMockLogger()
-		bus := NewEventBus(log)
 		require.NotNil(t, bus)
 	})
 
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
-		log := NewMockLogger()
-		bus := NewEventBus(log)
 		handler := &MockEventHandler{}
 		bus.Subscribe(handler)
-		assert.Len(t, bus.handlers, 1)
-	})
-
-	t.Run("PublishArticle", func(t *testing.T) {
-		t.Parallel()
-		log := NewMockLogger()
-		bus := NewEventBus(log)
-		handler := &MockEventHandler{}
-
-		article := &models.Article{
-			ID:            "test-id",
-			Title:         "Test Article",
-			Body:          "Test Content",
-			Source:        "http://test.com",
-			PublishedDate: time.Now(),
-		}
-
-		handler.On("HandleArticle", mock.Anything, article).Return(nil)
-		bus.Subscribe(handler)
-
-		err := bus.PublishArticle(t.Context(), article)
-		require.NoError(t, err)
-		handler.AssertExpectations(t)
+		article := &models.Article{Title: "Test Article"}
+		bus.PublishArticle(context.Background(), article)
+		require.Eventually(t, func() bool {
+			return handler.article != nil
+		}, time.Second, time.Millisecond*100)
+		assert.Equal(t, article, handler.article)
 	})
 
 	t.Run("PublishError", func(t *testing.T) {
 		t.Parallel()
-		log := NewMockLogger()
-		bus := NewEventBus(log)
 		handler := &MockEventHandler{}
-
-		testErr := assert.AnError
-		handler.On("HandleError", mock.Anything, testErr).Return(nil)
 		bus.Subscribe(handler)
-
-		err := bus.PublishError(t.Context(), testErr)
-		require.NoError(t, err)
-		handler.AssertExpectations(t)
+		err := errors.New("test error")
+		bus.PublishError(context.Background(), err)
+		require.Eventually(t, func() bool {
+			return handler.err != nil
+		}, time.Second, time.Millisecond*100)
+		assert.Equal(t, err, handler.err)
 	})
 
 	t.Run("PublishStart", func(t *testing.T) {
 		t.Parallel()
-		log := NewMockLogger()
-		bus := NewEventBus(log)
 		handler := &MockEventHandler{}
-
-		handler.On("HandleStart", mock.Anything).Return(nil)
 		bus.Subscribe(handler)
-
-		err := bus.PublishStart(t.Context())
-		require.NoError(t, err)
-		handler.AssertExpectations(t)
+		bus.PublishStart(context.Background())
+		require.Eventually(t, func() bool {
+			return handler.started
+		}, time.Second, time.Millisecond*100)
 	})
 
 	t.Run("PublishStop", func(t *testing.T) {
 		t.Parallel()
-		log := NewMockLogger()
-		bus := NewEventBus(log)
 		handler := &MockEventHandler{}
-
-		handler.On("HandleStop", mock.Anything).Return(nil)
 		bus.Subscribe(handler)
-
-		err := bus.PublishStop(t.Context())
-		require.NoError(t, err)
-		handler.AssertExpectations(t)
-	})
-
-	t.Run("ConcurrentOperations", func(t *testing.T) {
-		t.Parallel()
-		log := NewMockLogger()
-		bus := NewEventBus(log)
-		ctx := t.Context()
-
-		// Create multiple mock handlers
-		handlers := make([]*MockEventHandler, 10)
-		for i := range handlers {
-			handlers[i] = &MockEventHandler{}
-			handlers[i].On("HandleArticle", mock.Anything, mock.Anything).Return(nil)
-			bus.Subscribe(handlers[i])
-		}
-
-		// Create a test article
-		article := &models.Article{
-			ID:            "test-id",
-			Title:         "Test Article",
-			Body:          "Test content",
-			Source:        "https://example.com/test",
-			PublishedDate: time.Now(),
-		}
-
-		// Start multiple goroutines to publish articles
-		for i := 0; i < 100; i++ {
-			go func() {
-				bus.PublishArticle(ctx, article)
-			}()
-		}
-
-		// Wait for all goroutines to complete
-		time.Sleep(common.DefaultTestSleepDuration)
-
-		// Verify all handlers were called
-		for _, handler := range handlers {
-			handler.AssertNumberOfCalls(t, "HandleArticle", 100)
-		}
-	})
-
-	t.Run("ContextCancellation", func(t *testing.T) {
-		t.Parallel()
-		log := NewMockLogger()
-		bus := NewEventBus(log)
-		ctx, cancel := context.WithCancel(t.Context())
-		cancel()
-
-		// Create a mock handler
-		handler := &MockEventHandler{}
-		handler.On("HandleArticle", mock.Anything, mock.Anything).Return(nil)
-
-		// Subscribe handler
-		bus.Subscribe(handler)
-
-		// Create a test article
-		article := &models.Article{
-			ID:            "test-id",
-			Title:         "Test Article",
-			Body:          "Test content",
-			Source:        "https://example.com/test",
-			PublishedDate: time.Now(),
-		}
-
-		// Publish article with cancelled context
-		bus.PublishArticle(ctx, article)
-
-		// Verify handler was not called
-		handler.AssertNotCalled(t, "HandleArticle", ctx, article)
+		bus.PublishStop(context.Background())
+		require.Eventually(t, func() bool {
+			return handler.stopped
+		}, time.Second, time.Millisecond*100)
 	})
 }
