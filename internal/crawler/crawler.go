@@ -377,37 +377,61 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	// Get the crawler's context
 	ctx := c.state.Context()
 
-	// Detect content type
-	contentType := c.detectContentType(e)
-
-	// Process with the appropriate processor
-	var processor common.Processor
-	switch contentType {
-	case common.ContentTypeArticle:
-		processor = c.articleProcessor
-	case common.ContentTypePage:
-		processor = c.contentProcessor
-	default:
-		// Try additional processors
-		for _, p := range c.processors {
-			if p.CanProcess(e) {
-				processor = p
-				break
-			}
-		}
+	// Detect content type and get appropriate processor
+	processor := c.selectProcessor(e)
+	if processor == nil {
+		c.state.IncrementProcessed()
+		return
 	}
 
-	if processor != nil {
-		err := processor.Process(ctx, e)
-		if err != nil {
-			c.logger.Error("Failed to process content",
-				"error", err,
-				"type", contentType)
-			c.state.IncrementError()
-		}
+	// Process the content
+	err := processor.Process(ctx, e)
+	if err != nil {
+		c.logger.Error("Failed to process content",
+			"error", err,
+			"type", c.detectContentType(e))
+		c.state.IncrementError()
 	}
 
 	c.state.IncrementProcessed()
+}
+
+// selectProcessor selects the appropriate processor for the given HTML element
+func (c *Crawler) selectProcessor(e *colly.HTMLElement) common.Processor {
+	contentType := c.detectContentType(e)
+
+	// Try to get a processor for the specific content type
+	processor := c.getProcessorForType(contentType)
+	if processor != nil {
+		return processor
+	}
+
+	// Fallback: Try additional processors
+	for _, p := range c.processors {
+		if p.CanProcess(e) {
+			return p
+		}
+	}
+
+	return nil
+}
+
+// getProcessorForType returns a processor for the given content type
+func (c *Crawler) getProcessorForType(contentType common.ContentType) common.Processor {
+	switch contentType {
+	case common.ContentTypeArticle:
+		return c.articleProcessor
+	case common.ContentTypePage:
+		return c.contentProcessor
+	case common.ContentTypeVideo, common.ContentTypeImage, common.ContentTypeHTML, common.ContentTypeJob:
+		// Try to find a processor for the specific content type
+		for _, p := range c.processors {
+			if p.ContentType() == contentType {
+				return p
+			}
+		}
+	}
+	return nil
 }
 
 // detectContentType detects the type of content in the HTML element
