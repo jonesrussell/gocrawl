@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 
-	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -114,11 +113,18 @@ var Module = fx.Options(
 			handler signal.Interface,
 			sourceName string,
 		) {
+			// Set up signal handling
+			cleanup := handler.Setup(context.Background())
+			lc.Append(fx.Hook{
+				OnStop: func(ctx context.Context) error {
+					cleanup()
+					return nil
+				},
+			})
+
+			// Set up crawler lifecycle
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
-					// Set up signal handling
-					handler.Setup(ctx)
-
 					// Start the crawler
 					if err := crawler.Start(ctx, sourceName); err != nil {
 						return fmt.Errorf("failed to start crawler: %w", err)
@@ -126,16 +132,12 @@ var Module = fx.Options(
 
 					// Start a goroutine to wait for crawler completion
 					go func() {
-						// Create a timeout context for waiting for crawler completion
-						waitCtx, waitCancel := context.WithTimeout(ctx, cmdcommon.DefaultCrawlerTimeout)
-						defer waitCancel()
-
 						// Wait for crawler to complete
 						select {
 						case <-crawler.Done():
 							logger.Info("Crawler finished processing")
-						case <-waitCtx.Done():
-							logger.Info("Crawler reached timeout limit")
+						case <-ctx.Done():
+							logger.Info("Crawler context cancelled")
 						}
 
 						// Signal completion to the signal handler
@@ -145,11 +147,8 @@ var Module = fx.Options(
 					return nil
 				},
 				OnStop: func(ctx context.Context) error {
-					// Stop the crawler with timeout
-					stopCtx, stopCancel := context.WithTimeout(ctx, cmdcommon.DefaultShutdownTimeout)
-					defer stopCancel()
-
-					if err := crawler.Stop(stopCtx); err != nil {
+					// Stop the crawler
+					if err := crawler.Stop(ctx); err != nil {
 						return fmt.Errorf("failed to stop crawler: %w", err)
 					}
 					return nil

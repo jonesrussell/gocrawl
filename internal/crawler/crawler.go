@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -145,6 +147,49 @@ func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
 	// Set up callbacks
 	c.collector.OnHTML("html", c.ProcessHTML)
 
+	// Set up link following
+	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		if link == "" {
+			return
+		}
+
+		// Convert relative URLs to absolute
+		link = e.Request.AbsoluteURL(link)
+
+		// Parse the URL to get the domain
+		parsedURL, err := url.Parse(link)
+		if err != nil {
+			c.logger.Error("Failed to parse URL",
+				"link", link,
+				"error", err)
+			return
+		}
+
+		// Check if the domain is allowed
+		allowed := false
+		for _, domain := range source.AllowedDomains {
+			if strings.HasSuffix(parsedURL.Host, domain) {
+				allowed = true
+				break
+			}
+		}
+
+		if !allowed {
+			return
+		}
+
+		// Visit the link
+		if err := e.Request.Visit(link); err != nil {
+			if err != colly.ErrAlreadyVisited {
+				c.logger.Error("Failed to visit link",
+					"link", link,
+					"error", err)
+				c.IncrementError()
+			}
+		}
+	})
+
 	// Start visiting URLs
 	for _, url := range source.StartURLs {
 		c.logger.Debug("Visiting URL",
@@ -163,6 +208,11 @@ func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
 	c.logger.Debug("Collector finished",
 		"processed", c.state.GetProcessedCount(),
 		"errors", c.state.GetErrorCount())
+
+	// Wait for all processors to finish
+	c.logger.Debug("Waiting for processors to finish")
+	c.wg.Wait()
+	c.logger.Debug("Processors finished")
 
 	// Signal completion
 	c.logger.Debug("Signaling completion")
