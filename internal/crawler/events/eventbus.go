@@ -53,13 +53,18 @@ func (b *EventBus) PublishArticle(ctx context.Context, article *models.Article) 
 
 // PublishError publishes an error event to all handlers.
 func (b *EventBus) PublishError(ctx context.Context, err error) {
-	if err := ctx.Err(); err != nil {
+	if err == nil {
+		return
+	}
+
+	if ctxErr := ctx.Err(); ctxErr != nil {
 		return
 	}
 
 	for _, handler := range b.handlers {
-		if handlerErr := handler.HandleError(ctx, err); handlerErr != nil {
-			b.logger.Error("Error handling error event",
+		handlerErr := handler.HandleError(ctx, err)
+		if handlerErr != nil {
+			b.logger.Error("Failed to handle error",
 				"error", handlerErr,
 				"original_error", err)
 		}
