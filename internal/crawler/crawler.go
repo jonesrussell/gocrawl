@@ -481,15 +481,17 @@ func (c *Crawler) crawl(ctx context.Context, source *sourceutils.SourceConfig) e
 		c.state.mu.Unlock()
 	}()
 
-	// Start the crawler
-	if err := c.collector.Visit(source.URL); err != nil {
-		return fmt.Errorf("failed to start crawler: %w", err)
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		// Start the crawler
+		if err := c.collector.Visit(source.URL); err != nil {
+			return fmt.Errorf("failed to visit source URL: %w", err)
+		}
+		return nil
 	}
-
-	// Wait for the crawler to finish
-	c.collector.Wait()
-
-	return nil
 }
 
 // Stop stops the crawler.

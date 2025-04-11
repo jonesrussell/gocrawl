@@ -269,6 +269,12 @@ func (p *ArticleProcessor) GetProcessor(contentType common.ContentType) (common.
 	return nil, fmt.Errorf("unsupported content type: %s", contentType)
 }
 
+// RegisterProcessor implements the ProcessorRegistry interface.
+// Since ArticleProcessor only handles articles, this is a no-op.
+func (p *ArticleProcessor) RegisterProcessor(processor common.ContentProcessor) {
+	// ArticleProcessor only handles articles, so we don't need to register other processors
+}
+
 // Ensure ArticleProcessor implements required interfaces
 var (
 	_ common.ContentProcessor = (*ArticleProcessor)(nil)

@@ -10,6 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
@@ -98,21 +99,11 @@ func NewCrawler(
 	// Disable URL revisiting
 	collector.AllowURLRevisit = false
 
-	// Configure collector
-	collector.DetectCharset = true
-	collector.CheckHead = true
-	collector.DisallowedDomains = cfg.DisallowedDomains
-	collector.UserAgent = cfg.UserAgent
-	collector.IgnoreRobotsTxt = !cfg.RespectRobotsTxt
-
-	// Set rate limiting
-	if cfg.Delay > 0 {
-		collector.Limit(&colly.LimitRule{
-			DomainGlob:  "*",
-			RandomDelay: cfg.RandomDelay,
-			Parallelism: cfg.MaxConcurrency,
-		})
-	}
+	collector.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		RandomDelay: cfg.RandomDelay,
+		Parallelism: cfg.MaxConcurrency,
+	})
 
 	crawler := &Crawler{
 		logger:           logger,
@@ -122,6 +113,10 @@ func NewCrawler(
 		contentProcessor: contentProcessor,
 		bus:              bus,
 		collector:        collector,
+		state:            newCrawlerState(),
+		registry:         newProcessorRegistry(),
+		done:             make(chan struct{}),
+		articleChannel:   make(chan *models.Article, ArticleChannelBufferSize),
 	}
 
 	// Set up callbacks
