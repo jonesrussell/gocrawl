@@ -206,6 +206,22 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Create a cancellable context for the crawler
 	c.ctx, c.cancel = context.WithCancel(ctx)
 
+	// Initialize collector if not already set
+	if c.collector == nil {
+		c.collector = colly.NewCollector(
+			colly.MaxDepth(source.MaxDepth),
+			colly.Async(true),
+			colly.AllowedDomains(),
+			colly.ParseHTTPErrorResponse(),
+		)
+		// Disable URL revisiting
+		c.collector.AllowURLRevisit = false
+		// Configure collector
+		c.collector.DetectCharset = true
+		c.collector.CheckHead = true
+		c.collector.DisallowedDomains = []string{}
+	}
+
 	// Configure collector with context
 	if configErr := c.configureCollector(source); configErr != nil {
 		c.cancel() // Clean up context on error

@@ -19,6 +19,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/storage"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 )
 
@@ -150,6 +151,13 @@ func LoadConfig() (*Config, error) {
 	// Use the global Viper instance
 	v := viper.GetViper()
 
+	// Set up Viper
+	v.SetConfigType("yaml")
+	v.SetConfigName("config")
+	v.AddConfigPath(".")
+	v.AddConfigPath("$HOME/.gocrawl")
+	v.AddConfigPath("/etc/gocrawl")
+
 	// Set defaults
 	setDefaults(v)
 
@@ -182,7 +190,13 @@ func LoadConfig() (*Config, error) {
 
 	// Unmarshal config
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
+	if err := v.Unmarshal(&cfg, func(config *mapstructure.DecoderConfig) {
+		config.TagName = "yaml"
+		config.DecodeHook = mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+		)
+	}); err != nil {
 		return nil, err
 	}
 
@@ -198,62 +212,27 @@ func LoadConfig() (*Config, error) {
 		fmt.Printf("Loading sources from file: %s\n", cfg.Crawler.SourceFile)
 
 		// Get the absolute path to the sources file
-		sourceFilePath := cfg.Crawler.SourceFile
-		if !filepath.IsAbs(sourceFilePath) {
-			// If the path is relative, make it absolute relative to the config file
-			configDir := filepath.Dir(v.ConfigFileUsed())
-			sourceFilePath = filepath.Join(configDir, sourceFilePath)
-		}
-
-		fmt.Printf("Source file absolute path: %s\n", sourceFilePath)
-
-		// Create a new Viper instance for the sources file
+		sourcesPath := filepath.Join(filepath.Dir(v.ConfigFileUsed()), cfg.Crawler.SourceFile)
 		sourcesViper := viper.New()
-		sourcesViper.SetConfigFile(sourceFilePath)
-		sourcesViper.SetConfigType("yaml") // Explicitly set YAML type
+		sourcesViper.SetConfigFile(sourcesPath)
+		sourcesViper.SetConfigType("yaml")
 
-		// Read the sources file
 		if err := sourcesViper.ReadInConfig(); err != nil {
-			fmt.Printf("Error reading sources file: %v\n", err)
 			return nil, fmt.Errorf("failed to read sources file: %w", err)
 		}
 
-		fmt.Printf("Sources file loaded successfully\n")
-
-		// Debug: Print all keys in sources file
-		allKeys = sourcesViper.AllKeys()
-		fmt.Printf("Keys in sources file: %v\n", allKeys)
-
-		// Debug: Print raw config
-		settings = sourcesViper.AllSettings()
-		fmt.Printf("Raw sources config: %+v\n", settings)
-
-		// Get the sources directly from the map
-		if sources, ok := settings["sources"].([]interface{}); ok {
-			fmt.Printf("Found %d sources in file\n", len(sources))
-			// Convert the sources to the correct type
-			cfg.Sources = make([]types.Source, len(sources))
-			for i, src := range sources {
-				if srcMap, ok := src.(map[string]interface{}); ok {
-					// Convert the map to a Source struct
-					source := types.Source{}
-					if name, ok := srcMap["name"].(string); ok {
-						source.Name = name
-					}
-					if url, ok := srcMap["url"].(string); ok {
-						source.URL = url
-					}
-					// Add other fields as needed
-					cfg.Sources[i] = source
-				}
-			}
-		} else {
-			fmt.Printf("No sources found in file\n")
+		var sources []types.Source
+		if err := sourcesViper.UnmarshalKey("sources", &sources); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal sources: %w", err)
 		}
+
+		cfg.Sources = sources
 	}
 
-	// Ensure TLS config is initialized
-	ensureTLSConfig(&cfg, v)
+	// Validate the configuration
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 
 	return &cfg, nil
 }
@@ -292,20 +271,6 @@ func bindEnvVars(v *viper.Viper) error {
 	}
 
 	return nil
-}
-
-// ensureTLSConfig ensures TLS configuration is properly initialized
-func ensureTLSConfig(cfg *Config, v *viper.Viper) {
-	if cfg.Elasticsearch.TLS == nil {
-		cfg.Elasticsearch.TLS = &elasticsearch.TLSConfig{
-			InsecureSkipVerify: true,
-		}
-	}
-
-	// Force TLS settings from environment
-	if v.IsSet("elasticsearch.tls.insecure_skip_verify") {
-		cfg.Elasticsearch.TLS.InsecureSkipVerify = v.GetBool("elasticsearch.tls.insecure_skip_verify")
-	}
 }
 
 // GetAppConfig returns the application configuration.

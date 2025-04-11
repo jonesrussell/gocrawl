@@ -44,6 +44,12 @@ func SetupCollector(
 	bus := events.NewBus()
 	sources := sources.NewSources(&source, log)
 
+	// Get crawler configuration
+	crawlerCfg := cfg.GetCrawlerConfig()
+	if crawlerCfg == nil {
+		return nil, errors.New("crawler configuration is required")
+	}
+
 	// Create crawler using the module's provider
 	result := crawler.ProvideCrawler(
 		log,
@@ -51,6 +57,7 @@ func SetupCollector(
 		sources,
 		processors,
 		bus,
+		crawlerCfg,
 	)
 
 	// Configure crawler with source settings

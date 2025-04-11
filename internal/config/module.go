@@ -2,6 +2,7 @@
 package config
 
 import (
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"go.uber.org/fx"
 )
 
@@ -13,5 +14,9 @@ var Module = fx.Module("config",
 			LoadConfig,
 			fx.As(new(Interface)),
 		),
+		// Provide crawler config
+		func(cfg Interface) *crawler.Config {
+			return cfg.GetCrawlerConfig()
+		},
 	),
 )

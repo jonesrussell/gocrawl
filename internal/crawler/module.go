@@ -7,6 +7,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -17,8 +18,6 @@ import (
 const (
 	// ArticleChannelBufferSize is the buffer size for the article channel.
 	ArticleChannelBufferSize = 100
-	// DefaultMaxDepth is the default maximum depth for crawling
-	DefaultMaxDepth = 3
 )
 
 // Result defines the crawler module's output.
@@ -34,6 +33,7 @@ func ProvideCrawler(
 	sources sources.Interface,
 	processors []common.Processor,
 	bus *events.Bus,
+	cfg *crawler.Config,
 ) Result {
 	// Find article and content processors
 	var articleProcessor, contentProcessor common.Processor
@@ -52,6 +52,7 @@ func ProvideCrawler(
 		articleProcessor,
 		contentProcessor,
 		bus,
+		cfg,
 	)
 
 	logger.Info("Created crawler instance")
@@ -64,11 +65,11 @@ func ProvideCrawler(
 var Module = fx.Module("crawler",
 	fx.Provide(
 		// Provide the collector
-		func(logger logger.Interface, debugger debug.Debugger) *colly.Collector {
+		func(logger logger.Interface, debugger debug.Debugger, cfg *crawler.Config) *colly.Collector {
 			return colly.NewCollector(
-				colly.MaxDepth(DefaultMaxDepth),
+				colly.MaxDepth(cfg.MaxDepth),
 				colly.Async(true),
-				colly.AllowedDomains(),
+				colly.AllowedDomains(cfg.AllowedDomains...),
 				colly.ParseHTTPErrorResponse(),
 			)
 		},
@@ -85,11 +86,12 @@ func NewCrawler(
 	articleProcessor common.Processor,
 	contentProcessor common.Processor,
 	bus *events.Bus,
+	cfg *crawler.Config,
 ) Interface {
 	collector := colly.NewCollector(
-		colly.MaxDepth(DefaultMaxDepth),
+		colly.MaxDepth(cfg.MaxDepth),
 		colly.Async(true),
-		colly.AllowedDomains(),
+		colly.AllowedDomains(cfg.AllowedDomains...),
 		colly.ParseHTTPErrorResponse(),
 	)
 
@@ -99,7 +101,18 @@ func NewCrawler(
 	// Configure collector
 	collector.DetectCharset = true
 	collector.CheckHead = true
-	collector.DisallowedDomains = []string{}
+	collector.DisallowedDomains = cfg.DisallowedDomains
+	collector.UserAgent = cfg.UserAgent
+	collector.IgnoreRobotsTxt = !cfg.RespectRobotsTxt
+
+	// Set rate limiting
+	if cfg.Delay > 0 {
+		collector.Limit(&colly.LimitRule{
+			DomainGlob:  "*",
+			RandomDelay: cfg.RandomDelay,
+			Parallelism: cfg.MaxConcurrency,
+		})
+	}
 
 	crawler := &Crawler{
 		Logger:           logger,

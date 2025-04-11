@@ -97,23 +97,28 @@ Specify the source name as an argument.`,
 
 				lc.Append(fx.Hook{
 					OnStart: func(ctx context.Context) error {
+						// Start the crawler
 						if err := crawler.Start(ctx, sourceName); err != nil {
-							return err
+							return fmt.Errorf("failed to start crawler: %w", err)
 						}
 
-						// Wait for crawler to complete with timeout
+						// Start a goroutine to wait for crawler completion
 						go func() {
 							// Create a timeout context for waiting
 							waitCtx, waitCancel := context.WithTimeout(ctx, crawlerTimeout)
 							defer waitCancel()
 
+							// Wait for crawler to complete
+							crawler.Wait()
+
+							// Check if we timed out
 							select {
 							case <-waitCtx.Done():
 								crawler.logger.Info("Crawler reached timeout limit")
 							default:
-								crawler.Wait()
 								crawler.logger.Info("Crawler finished processing")
 							}
+
 							// Signal completion to the signal handler
 							handler.RequestShutdown()
 						}()
@@ -121,7 +126,14 @@ Specify the source name as an argument.`,
 						return nil
 					},
 					OnStop: func(ctx context.Context) error {
-						return crawler.Stop(ctx)
+						// Stop the crawler with timeout
+						stopCtx, stopCancel := context.WithTimeout(ctx, shutdownTimeout)
+						defer stopCancel()
+
+						if err := crawler.Stop(stopCtx); err != nil {
+							return fmt.Errorf("failed to stop crawler: %w", err)
+						}
+						return nil
 					},
 				})
 			}),
