@@ -82,6 +82,7 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 func Execute() {
 	log, err := logger.New(logger.DefaultConfig())
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create logger: %v\n", err)
 		os.Exit(1)
 	}
 

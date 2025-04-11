@@ -32,7 +32,7 @@ func ProvideCrawler(
 	indexManager storagetypes.IndexManager,
 	sources sources.Interface,
 	processors []common.Processor,
-	bus *events.Bus,
+	bus *events.EventBus,
 	cfg *crawler.Config,
 ) Result {
 	// Find article and content processors
@@ -85,7 +85,7 @@ func NewCrawler(
 	sources sources.Interface,
 	articleProcessor common.Processor,
 	contentProcessor common.Processor,
-	bus *events.Bus,
+	bus *events.EventBus,
 	cfg *crawler.Config,
 ) Interface {
 	collector := colly.NewCollector(

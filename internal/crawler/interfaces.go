@@ -7,8 +7,14 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 )
+
+// Core Interfaces
 
 // CrawlerInterface defines the core functionality of a crawler.
 type CrawlerInterface interface {
@@ -17,7 +23,7 @@ type CrawlerInterface interface {
 	// Stop gracefully stops the crawler.
 	Stop(ctx context.Context) error
 	// Subscribe adds a handler for crawler events.
-	Subscribe(handler EventHandler)
+	Subscribe(handler events.EventHandler)
 	// GetMetrics returns the current crawler metrics.
 	GetMetrics() *common.Metrics
 }
@@ -84,28 +90,32 @@ type ArticleStorage interface {
 	ListArticles(ctx context.Context, query string) ([]*models.Article, error)
 }
 
-// EventHandler handles crawler events.
-type EventHandler interface {
-	// HandleArticle handles a discovered article.
-	HandleArticle(ctx context.Context, article *models.Article) error
-	// HandleError handles a crawler error.
-	HandleError(ctx context.Context, err error) error
-	// HandleStart handles crawler start.
-	HandleStart(ctx context.Context) error
-	// HandleStop handles crawler stop.
-	HandleStop(ctx context.Context) error
-}
+// Extended Interface
 
-// EventBus manages event distribution.
-type EventBus interface {
-	// Subscribe adds an event handler.
-	Subscribe(handler EventHandler)
-	// PublishArticle publishes an article event.
-	PublishArticle(ctx context.Context, article *models.Article) error
-	// PublishError publishes an error event.
-	PublishError(ctx context.Context, err error) error
-	// PublishStart publishes a start event.
-	PublishStart(ctx context.Context) error
-	// PublishStop publishes a stop event.
-	PublishStop(ctx context.Context) error
+// Interface extends CrawlerInterface with additional methods specific to our implementation.
+// It provides access to configuration, metrics, and internal components.
+type Interface interface {
+	// Embed the core crawler interface
+	CrawlerInterface
+
+	// SetRateLimit sets the rate limit for the crawler
+	SetRateLimit(duration time.Duration) error
+	// SetMaxDepth sets the maximum depth for the crawler
+	SetMaxDepth(depth int)
+	// SetCollector sets the collector for the crawler
+	SetCollector(collector *colly.Collector)
+	// GetIndexManager returns the index manager
+	GetIndexManager() interfaces.IndexManager
+	// Wait waits for the crawler to complete
+	Wait()
+	// SetTestServerURL sets the test server URL
+	SetTestServerURL(url string)
+	// GetLogger returns the logger
+	GetLogger() logger.Interface
+	// GetSource returns the source
+	GetSource() sources.Interface
+	// GetProcessors returns the processors
+	GetProcessors() []common.Processor
+	// GetArticleChannel returns the article channel
+	GetArticleChannel() chan *models.Article
 }

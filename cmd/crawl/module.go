@@ -59,7 +59,9 @@ var Module = fx.Options(
 		},
 
 		// Event bus
-		events.NewBus,
+		func(logger logger.Interface) *events.EventBus {
+			return events.NewEventBus(logger)
+		},
 
 		// Index manager
 		func(client *elasticsearch.Client, logger logger.Interface) interfaces.IndexManager {

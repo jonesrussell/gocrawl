@@ -44,7 +44,7 @@ var (
 type Crawler struct {
 	collector        *colly.Collector
 	Logger           logger.Interface
-	bus              *events.Bus
+	bus              *events.EventBus
 	indexManager     interfaces.IndexManager
 	sources          sources.Interface
 	articleProcessor common.Processor
@@ -357,7 +357,7 @@ func (c *Crawler) Stop(ctx context.Context) error {
 }
 
 // Subscribe adds a content handler to receive discovered content.
-func (c *Crawler) Subscribe(handler events.Handler) {
+func (c *Crawler) Subscribe(handler events.EventHandler) {
 	c.bus.Subscribe(handler)
 }
 

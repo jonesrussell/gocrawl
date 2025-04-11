@@ -41,7 +41,7 @@ func SetupCollector(
 ) (crawler.Interface, error) {
 	// Create dependencies
 	indexManager := testutils.NewMockIndexManager()
-	bus := events.NewBus()
+	bus := events.NewEventBus(log)
 	sources := sources.NewSources(&source, log)
 
 	// Get crawler configuration
@@ -76,20 +76,17 @@ func SetupCollector(
 //
 // Returns:
 //   - error: Any error that occurred during configuration
-func ConfigureCrawler(
-	c crawler.Interface,
-	source sources.Config,
-) error {
+func ConfigureCrawler(c crawler.Interface, source sources.Config) error {
 	if source.URL == "" {
 		return errors.New("source URL is required")
 	}
 
-	// Set rate limit
+	// Configure rate limit
 	if err := c.SetRateLimit(source.RateLimit); err != nil {
 		return fmt.Errorf("failed to set rate limit: %w", err)
 	}
 
-	// Set max depth
+	// Configure max depth
 	c.SetMaxDepth(source.MaxDepth)
 
 	return nil

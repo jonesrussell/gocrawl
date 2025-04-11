@@ -84,7 +84,7 @@ func (m *MockCrawler) GetArticleChannel() chan *models.Article {
 	return m.articleChannel
 }
 
-func (m *MockCrawler) Subscribe(handler events.Handler) {
+func (m *MockCrawler) Subscribe(handler events.EventHandler) {
 	m.Called(handler)
 }
 

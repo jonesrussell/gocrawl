@@ -87,8 +87,8 @@ func NewMockCrawler() *MockCrawler {
 	return &MockCrawler{}
 }
 
-// Subscribe mocks the Subscribe method
-func (m *MockCrawler) Subscribe(handler events.Handler) {
+// Subscribe adds a content handler to receive discovered content.
+func (m *MockCrawler) Subscribe(handler events.EventHandler) {
 	m.Called(handler)
 }
 
