@@ -54,7 +54,7 @@ func (s *Storage) createContextWithTimeout(
 // IndexDocument indexes a document in Elasticsearch
 func (s *Storage) IndexDocument(ctx context.Context, index, id string, document any) error {
 	if s.client == nil {
-		return errors.New("elasticsearch client is not initialized")
+		return fmt.Errorf("elasticsearch client is not initialized")
 	}
 
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
@@ -62,8 +62,11 @@ func (s *Storage) IndexDocument(ctx context.Context, index, id string, document 
 
 	body, err := json.Marshal(document)
 	if err != nil {
-		s.logger.Error("Failed to index document", "error", err)
-		return fmt.Errorf("error marshaling document: %w", err)
+		s.logger.Error("Failed to marshal document for indexing",
+			"error", err,
+			"index", index,
+			"docID", id)
+		return fmt.Errorf("failed to marshal document for indexing: %w", err)
 	}
 
 	res, err := s.client.Index(
@@ -74,18 +77,27 @@ func (s *Storage) IndexDocument(ctx context.Context, index, id string, document 
 		s.client.Index.WithRefresh("true"),
 	)
 	if err != nil {
-		s.logger.Error("Failed to index document", "error", err)
-		return fmt.Errorf("error indexing document: %w", err)
+		s.logger.Error("Failed to index document",
+			"error", err,
+			"index", index,
+			"docID", id)
+		return fmt.Errorf("failed to index document: %w", err)
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
-			s.logger.Error("Error closing response body", "error", closeErr)
+			s.logger.Error("Failed to close response body",
+				"error", closeErr,
+				"index", index,
+				"docID", id)
 		}
 	}()
 
 	if res.IsError() {
-		s.logger.Error("Failed to index document", "error", res.String())
-		return fmt.Errorf("error indexing document: %s", res.String())
+		s.logger.Error("Elasticsearch returned error response",
+			"error", res.String(),
+			"index", index,
+			"docID", id)
+		return fmt.Errorf("elasticsearch error: %s", res.String())
 	}
 
 	s.logger.Info("Document indexed successfully",

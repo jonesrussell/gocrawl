@@ -15,3 +15,18 @@ const (
 	// in a reasonable time.
 	DefaultOperationTimeout = 30 * time.Second
 )
+
+const (
+	// DefaultTestSleepDuration is the default sleep duration for tests
+	DefaultTestSleepDuration = 100 * time.Millisecond
+	// DefaultMaxRetries is the default number of retries for failed requests
+	DefaultMaxRetries = 3
+	// DefaultMaxDepth is the default maximum depth for crawling
+	DefaultMaxDepth = 2
+	// DefaultRateLimit is the default rate limit for requests
+	DefaultRateLimit = 2 * time.Second
+	// DefaultBufferSize is the default size for channel buffers
+	DefaultBufferSize = 100
+	// DefaultMaxConcurrency is the default maximum number of concurrent requests
+	DefaultMaxConcurrency = 2
+)

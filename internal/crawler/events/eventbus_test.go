@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -117,7 +118,7 @@ func TestEventBus(t *testing.T) {
 		handler.On("HandleArticle", mock.Anything, article).Return(nil)
 		bus.Subscribe(handler)
 
-		err := bus.PublishArticle(context.Background(), article)
+		err := bus.PublishArticle(t.Context(), article)
 		require.NoError(t, err)
 		handler.AssertExpectations(t)
 	})
@@ -132,7 +133,7 @@ func TestEventBus(t *testing.T) {
 		handler.On("HandleError", mock.Anything, testErr).Return(nil)
 		bus.Subscribe(handler)
 
-		err := bus.PublishError(context.Background(), testErr)
+		err := bus.PublishError(t.Context(), testErr)
 		require.NoError(t, err)
 		handler.AssertExpectations(t)
 	})
@@ -146,7 +147,7 @@ func TestEventBus(t *testing.T) {
 		handler.On("HandleStart", mock.Anything).Return(nil)
 		bus.Subscribe(handler)
 
-		err := bus.PublishStart(context.Background())
+		err := bus.PublishStart(t.Context())
 		require.NoError(t, err)
 		handler.AssertExpectations(t)
 	})
@@ -160,7 +161,7 @@ func TestEventBus(t *testing.T) {
 		handler.On("HandleStop", mock.Anything).Return(nil)
 		bus.Subscribe(handler)
 
-		err := bus.PublishStop(context.Background())
+		err := bus.PublishStop(t.Context())
 		require.NoError(t, err)
 		handler.AssertExpectations(t)
 	})
@@ -169,7 +170,7 @@ func TestEventBus(t *testing.T) {
 		t.Parallel()
 		log := NewMockLogger()
 		bus := NewEventBus(log)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Create multiple mock handlers
 		handlers := make([]*MockEventHandler, 10)
@@ -196,7 +197,7 @@ func TestEventBus(t *testing.T) {
 		}
 
 		// Wait for all goroutines to complete
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(common.DefaultTestSleepDuration)
 
 		// Verify all handlers were called
 		for _, handler := range handlers {
@@ -208,7 +209,7 @@ func TestEventBus(t *testing.T) {
 		t.Parallel()
 		log := NewMockLogger()
 		bus := NewEventBus(log)
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		// Create a mock handler

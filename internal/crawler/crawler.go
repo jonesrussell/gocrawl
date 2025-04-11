@@ -33,6 +33,20 @@ const (
 	DefaultStopTimeout = 30 * time.Second
 	// DefaultPollInterval is the default interval for polling crawler status
 	DefaultPollInterval = 100 * time.Millisecond
+	// DefaultMaxRetries is the default number of retries for failed requests
+	DefaultMaxRetries = 3
+	// DefaultMaxDepth is the default maximum depth for crawling
+	DefaultMaxDepth = 2
+	// DefaultRateLimit is the default rate limit for requests
+	DefaultRateLimit = 2 * time.Second
+	// DefaultRandomDelay is the default random delay between requests
+	DefaultRandomDelay = 5 * time.Second
+	// DefaultBufferSize is the default size for channel buffers
+	DefaultBufferSize = 100
+	// DefaultMaxConcurrency is the default maximum number of concurrent requests
+	DefaultMaxConcurrency = 2
+	// DefaultTestSleepDuration is the default sleep duration for tests
+	DefaultTestSleepDuration = 100 * time.Millisecond
 )
 
 // Crawler implements the Processor interface for web crawling.
@@ -420,52 +434,29 @@ func (r *processorRegistry) GetProcessor(contentType common.ContentType) (common
 	return processor, nil
 }
 
-// setupCallbacks sets up the collector callbacks
-func (c *Crawler) setupCallbacks() {
-	c.collector.OnHTML("article", func(e *colly.HTMLElement) {
-		article := &models.Article{
-			ID:        e.Request.URL.String(),
-			Title:     e.ChildText("h1"),
-			Body:      e.ChildText(".content"),
-			Source:    c.state.currentSource,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		}
-
-		select {
-		case c.articleChannel <- article:
-			c.metrics.UpdateMetrics(true)
-		default:
-			c.logger.Warn("Article channel full, dropping article")
-		}
-	})
-
-	c.collector.OnError(func(r *colly.Response, err error) {
-		c.logger.Error("Crawler error",
-			zap.String("url", r.Request.URL.String()),
-			zap.Error(err),
-		)
-		c.metrics.UpdateMetrics(false)
-	})
-}
-
 // configureCollector configures the collector with the given source configuration.
 func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) {
-	c.collector = colly.NewCollector(
-		colly.AllowedDomains(source.AllowedDomains...),
-		colly.MaxDepth(source.MaxDepth),
-		colly.Async(true),
-	)
+	if source == nil {
+		return
+	}
 
-	// Set rate limits
+	// Set rate limit
+	rateLimit := common.DefaultRateLimit
+	if source.RateLimit > 0 {
+		rateLimit = source.RateLimit
+	}
 	c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		RandomDelay: source.RateLimit,
-		Parallelism: 1, // Default parallelism
+		RandomDelay: rateLimit,
+		Parallelism: common.DefaultMaxConcurrency,
 	})
 
-	// Set up callbacks
-	c.setupCallbacks()
+	// Set max depth
+	if source.MaxDepth > 0 {
+		c.collector.MaxDepth = source.MaxDepth
+	} else {
+		c.collector.MaxDepth = common.DefaultMaxDepth
+	}
 }
 
 // crawl performs the actual crawling process.

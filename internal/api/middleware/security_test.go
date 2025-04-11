@@ -12,8 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -301,4 +303,86 @@ func TestSecurityHeaders(t *testing.T) {
 	for header, expectedValue := range headers {
 		assert.Equal(t, expectedValue, w.Header().Get(header))
 	}
+}
+
+func TestMetrics(t *testing.T) {
+	cfg := &server.Config{
+		SecurityEnabled: true,
+		APIKey:          "test-key",
+		Address:         ":8080",
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
+	}
+	router, securityMiddleware := setupTestRouter(t, cfg)
+
+	// Set a shorter window for testing
+	securityMiddleware.SetRateLimitWindow(5 * time.Second)
+
+	// Set up mock time provider with a fixed start time
+	startTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	mockTime := &mockTimeProvider{currentTime: startTime}
+	securityMiddleware.SetTimeProvider(mockTime)
+
+	// Start cleanup goroutine with a context that we can cancel
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// Start cleanup in a goroutine
+	cleanupDone := make(chan struct{})
+	go func() {
+		securityMiddleware.Cleanup(ctx)
+		close(cleanupDone)
+	}()
+
+	// Make requests from the same IP
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodPost, "/test", http.NoBody)
+	require.NoError(t, err)
+	req.Header.Set("X-Api-Key", "test-key")
+	req.RemoteAddr = "127.0.0.1"
+
+	// First request should succeed
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "First request should succeed")
+
+	// Second request should succeed
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "Second request should succeed")
+
+	// Third request should be rate limited
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusTooManyRequests, w.Code, "Third request should be rate limited")
+
+	// Advance time by 5 seconds and 1 millisecond to ensure we're past the window
+	mockTime.Advance(5*time.Second + time.Millisecond)
+
+	// Give the cleanup goroutine a chance to run
+	time.Sleep(100 * time.Millisecond)
+
+	// Request should succeed again after window expires
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "Request after window should succeed")
+
+	// Cancel the context to stop the cleanup goroutine
+	cancel()
+
+	// Wait for cleanup to finish with a timeout
+	select {
+	case <-cleanupDone:
+		// Cleanup finished successfully
+	case <-time.After(2 * time.Second):
+		t.Fatal("Cleanup goroutine did not finish within timeout")
+	}
+
+	// Wait for goroutine to complete
+	time.Sleep(common.DefaultTestSleepDuration)
+
+	// Verify metrics
+	metrics := metrics.NewMetrics()
+	assert.Equal(t, int64(1), metrics.GetProcessedCount())
+	assert.Equal(t, int64(0), metrics.GetErrorCount())
 }

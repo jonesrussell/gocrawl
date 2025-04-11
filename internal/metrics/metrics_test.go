@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,4 +59,20 @@ func TestCurrentSource(t *testing.T) {
 
 	metrics.SetCurrentSource("test")
 	assert.Equal(t, "test", metrics.GetCurrentSource())
+}
+
+func TestUpdateMetricsConcurrently(t *testing.T) {
+	metrics := NewMetrics()
+
+	// Start a goroutine to update metrics
+	go func() {
+		metrics.UpdateMetrics(true)
+	}()
+
+	// Wait for goroutine to complete
+	time.Sleep(common.DefaultTestSleepDuration)
+
+	// Verify metrics
+	assert.Equal(t, int64(1), metrics.GetProcessedCount())
+	assert.Equal(t, int64(0), metrics.GetErrorCount())
 }

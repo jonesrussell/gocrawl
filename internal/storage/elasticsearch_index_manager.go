@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -56,7 +55,9 @@ func (m *ElasticsearchIndexManager) EnsureIndex(ctx context.Context, name string
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
-			m.logger.Error("Error closing response body", "error", closeErr)
+			m.logger.Error("Failed to close response body",
+				"error", closeErr,
+				"index", name)
 		}
 	}()
 
@@ -80,7 +81,9 @@ func (m *ElasticsearchIndexManager) DeleteIndex(ctx context.Context, name string
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
-			m.logger.Error("Error closing response body", "error", closeErr)
+			m.logger.Error("Failed to close response body",
+				"error", closeErr,
+				"index", name)
 		}
 	}()
 
@@ -107,7 +110,9 @@ func (m *ElasticsearchIndexManager) IndexExists(ctx context.Context, name string
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
-			m.logger.Error("Error closing response body", "error", closeErr)
+			m.logger.Error("Failed to close response body",
+				"error", closeErr,
+				"index", name)
 		}
 	}()
 
@@ -131,7 +136,13 @@ func (m *ElasticsearchIndexManager) UpdateMapping(ctx context.Context, name stri
 	if err != nil {
 		return fmt.Errorf("failed to update mapping: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			m.logger.Error("Failed to close response body",
+				"error", closeErr,
+				"index", name)
+		}
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("failed to update mapping: %s", res.String())
@@ -151,7 +162,13 @@ func (m *ElasticsearchIndexManager) GetMapping(ctx context.Context, name string)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mapping: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			m.logger.Error("Failed to close response body",
+				"error", closeErr,
+				"index", name)
+		}
+	}()
 
 	if res.IsError() {
 		return nil, fmt.Errorf("failed to get mapping: %s", res.String())
@@ -169,5 +186,5 @@ func (m *ElasticsearchIndexManager) GetMapping(ctx context.Context, name string)
 		}
 	}
 
-	return nil, errors.New("unexpected mapping format")
+	return nil, fmt.Errorf("unexpected mapping format for index %s", name)
 }
