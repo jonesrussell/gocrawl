@@ -3,8 +3,6 @@ package crawler
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net/url"
 	"strings"
 	"sync"
@@ -31,13 +29,6 @@ const (
 	DefaultStopTimeout = 30 * time.Second
 	// DefaultPollInterval is the default interval for polling crawler status
 	DefaultPollInterval = 100 * time.Millisecond
-)
-
-var (
-	// ErrCrawlerTimeout is returned when the crawler times out while starting
-	ErrCrawlerTimeout = errors.New("timeout starting crawler")
-	// ErrCrawlerContextCancelled is returned when the context is cancelled while starting the crawler
-	ErrCrawlerContextCancelled = errors.New("context cancelled while starting crawler")
 )
 
 // Crawler implements the crawler interface
@@ -163,7 +154,7 @@ func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) error {
 		// If no allowed domains specified, extract domain from source URL
 		domain, err := sourceutils.ExtractDomain(source.URL)
 		if err != nil {
-			return fmt.Errorf("failed to extract domain from source URL: %w", err)
+			return WrapError(err, "failed to extract domain from source URL")
 		}
 		// Add both www and non-www versions of the domain
 		if strings.HasPrefix(domain, "www.") {
@@ -193,7 +184,7 @@ func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) error {
 		Parallelism: DefaultParallelism,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to set rate limit: %w", err)
+		return WrapError(err, "failed to set rate limit")
 	}
 
 	// Disable URL revisiting
@@ -212,7 +203,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Get source configuration
 	source := c.sources.FindByName(sourceName)
 	if source == nil {
-		return fmt.Errorf("source not found: %s", sourceName)
+		return ErrSourceNotFound
 	}
 
 	// Set the current source
@@ -221,16 +212,16 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Validate that required index exists
 	exists, err := c.indexManager.IndexExists(ctx, source.Index)
 	if err != nil {
-		return fmt.Errorf("failed to check index: %w", err)
+		return WrapError(err, "failed to check index")
 	}
 	if !exists {
-		return fmt.Errorf("index %s does not exist", source.Index)
+		return ErrIndexNotFound
 	}
 
 	// Get list of sources to validate configuration
 	_, err = c.sources.GetSources()
 	if err != nil {
-		return fmt.Errorf("failed to get sources: %w", err)
+		return WrapError(err, "failed to get sources")
 	}
 
 	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
@@ -239,7 +230,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.collector = nil
 	err = c.configureCollector(source)
 	if err != nil {
-		return fmt.Errorf("failed to configure collector: %w", err)
+		return WrapError(err, "failed to configure collector")
 	}
 
 	// Set up callbacks first to ensure they're ready
@@ -248,135 +239,81 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Create a cancellable context for the crawler
 	c.ctx, c.cancel = context.WithCancel(ctx)
 
-	// Start the crawl by visiting the source URL
-	c.Logger.Info("Visiting source URL", "url", source.URL)
-	if err := c.collector.Visit(source.URL); err != nil {
-		c.cancel() // Clean up context on error
-		return fmt.Errorf("failed to start crawling: %w", err)
-	}
+	// Start the crawler
+	c.isRunning = true
+	c.startTime = time.Now()
+	c.done = make(chan struct{})
+	c.articleChannel = make(chan *models.Article, 100)
 
-	// Wait for the collector to finish or context cancellation
-	done := make(chan struct{})
+	// Start the crawler in a goroutine
+	c.wg.Add(1)
 	go func() {
-		defer close(done)
+		defer c.wg.Done()
+		defer close(c.done)
+		defer close(c.articleChannel)
+
+		// Start the crawler
+		err := c.collector.Visit(source.URL)
+		if err != nil {
+			c.Logger.Error("Failed to start crawler", "error", err)
+			return
+		}
+
+		// Wait for the crawler to finish
 		c.collector.Wait()
 	}()
 
-	select {
-	case <-done:
-		// Crawler finished normally
-		c.Logger.Info("Crawler finished processing")
-		c.cancel() // Clean up context
-		return nil
-	case <-c.ctx.Done():
-		// Context was cancelled, abort all pending requests
-		c.Logger.Info("Context cancelled, aborting crawler")
-		// Stop the collector and clean up
-		if err := c.Stop(ctx); err != nil {
-			c.Logger.Error("Error stopping crawler", "error", err)
-		}
-		return ErrCrawlerContextCancelled
-	case <-ctx.Done():
-		// Parent context was cancelled, propagate cancellation
-		c.cancel()
-		// Stop the collector and clean up
-		if err := c.Stop(ctx); err != nil {
-			c.Logger.Error("Error stopping crawler", "error", err)
-		}
-		return ErrCrawlerContextCancelled
-	}
+	return nil
 }
 
 // Stop stops the crawler.
 func (c *Crawler) Stop(ctx context.Context) error {
-	c.Logger.Info("Stopping crawler")
-
-	// Set running state to false first
-	c.isRunning = false
-
-	// Cancel the crawler's context first to stop all goroutines
-	if c.cancel != nil {
-		c.cancel()
+	if !c.isRunning {
+		return nil
 	}
 
-	// Create a timeout context for stopping
-	stopCtx, stopCancel := context.WithTimeout(ctx, DefaultStopTimeout)
-	defer stopCancel()
+	// Cancel the context
+	c.cancel()
 
-	// Stop the collector with timeout
-	collectorDone := make(chan struct{})
-	go func() {
-		defer close(collectorDone)
-		if c.collector != nil {
-			// Abort all pending requests
-			c.collector.OnRequest(func(r *colly.Request) {
-				r.Abort()
-			})
-			// Wait for collector to finish
-			c.collector.Wait()
-		}
-	}()
-
-	// Wait for collector to stop or timeout
+	// Wait for the crawler to stop
 	select {
-	case <-collectorDone:
-		c.Logger.Info("Collector stopped successfully")
-	case <-stopCtx.Done():
-		c.Logger.Warn("Timeout waiting for collector to stop")
-		// Force cleanup if timeout occurs
-		c.collector = nil
+	case <-c.done:
+		c.isRunning = false
+		return nil
 	case <-ctx.Done():
-		c.Logger.Warn("Context cancelled while stopping collector")
-		// Force cleanup if context is cancelled
-		c.collector = nil
+		return ctx.Err()
 	}
-
-	// Wait for all processing goroutines to complete
-	done := make(chan struct{})
-	go func() {
-		c.wg.Wait()
-		close(done)
-	}()
-
-	// Wait for processing to complete or timeout
-	select {
-	case <-done:
-		c.Logger.Info("All processing completed")
-	case <-stopCtx.Done():
-		c.Logger.Warn("Timeout waiting for processing to complete")
-	case <-ctx.Done():
-		c.Logger.Warn("Context cancelled while waiting for processing")
-	}
-
-	// Clean up resources
-	c.collector = nil
-	c.ctx = nil
-	c.cancel = nil
-
-	return nil
 }
 
-// Subscribe adds a content handler to receive discovered content.
+// Subscribe subscribes to crawler events.
 func (c *Crawler) Subscribe(handler events.EventHandler) {
 	c.bus.Subscribe(handler)
 }
 
-// SetRateLimit sets the crawler's rate limit.
+// SetRateLimit sets the rate limit for the crawler.
 func (c *Crawler) SetRateLimit(duration time.Duration) error {
-	if rateErr := c.collector.Limit(&colly.LimitRule{
+	if c.collector == nil {
+		return ErrInvalidConfig
+	}
+
+	err := c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Delay:       duration,
 		RandomDelay: 0,
 		Parallelism: DefaultParallelism,
-	}); rateErr != nil {
-		return fmt.Errorf("error setting rate limit: %w", rateErr)
+	})
+	if err != nil {
+		return WrapError(err, "failed to set rate limit")
 	}
+
 	return nil
 }
 
-// SetMaxDepth sets the maximum crawl depth.
+// SetMaxDepth sets the maximum depth for the crawler.
 func (c *Crawler) SetMaxDepth(depth int) {
-	c.collector.MaxDepth = depth
+	if c.collector != nil {
+		c.collector.MaxDepth = depth
+	}
 }
 
 // SetCollector sets the collector for the crawler.
@@ -384,20 +321,17 @@ func (c *Crawler) SetCollector(collector *colly.Collector) {
 	c.collector = collector
 }
 
-// GetIndexManager returns the index manager
+// GetIndexManager returns the index manager.
 func (c *Crawler) GetIndexManager() interfaces.IndexManager {
 	return c.indexManager
 }
 
-// Wait blocks until the crawler has finished processing all queued requests.
+// Wait waits for the crawler to finish.
 func (c *Crawler) Wait() {
-	c.collector.Wait()
-	if c.done != nil {
-		<-c.done
-	}
+	c.wg.Wait()
 }
 
-// GetMetrics returns the current crawler metrics.
+// GetMetrics returns the crawler metrics.
 func (c *Crawler) GetMetrics() *common.Metrics {
 	return &common.Metrics{
 		ProcessedCount:     c.processedCount,
@@ -407,60 +341,30 @@ func (c *Crawler) GetMetrics() *common.Metrics {
 	}
 }
 
-// ProcessHTML processes HTML content from a source.
+// ProcessHTML processes the HTML content.
 func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
-	// Log the element being processed
-	c.Logger.Debug("Processing HTML element", "tag", e.Name, "url", e.Request.URL.String())
-
-	// Process article content
-	c.handleArticle(e)
-
-	// Process general content
-	c.handleContent(e)
-}
-
-// handleArticle processes an article using the article processor
-func (c *Crawler) handleArticle(e *colly.HTMLElement) {
-	// Get the source configuration for this URL
-	source := c.sources.FindByName(c.currentSource)
-	if source == nil {
-		c.Logger.Error("Failed to find source configuration",
-			"component", "crawler",
-			"url", e.Request.URL.String(),
-			"source", c.currentSource)
-		c.errorCount++
-		return
+	// Process the HTML content
+	if c.contentProcessor != nil {
+		err := c.contentProcessor.Process(c.ctx, e)
+		if err != nil {
+			c.Logger.Error("Failed to process content", "error", err)
+			c.errorCount++
+		}
 	}
 
-	// Set the correct index name in the context
-	e.Request.Ctx.Put("index", source.ArticleIndex)
-
-	if err := c.articleProcessor.ProcessHTML(c.ctx, e); err != nil {
-		c.Logger.Error("Failed to process article",
-			"component", "crawler",
-			"url", e.Request.URL.String(),
-			"index", source.ArticleIndex,
-			"error", err)
-		c.errorCount++
-	} else {
-		c.processedCount++
+	// Process the article
+	if c.articleProcessor != nil {
+		err := c.articleProcessor.Process(c.ctx, e)
+		if err != nil {
+			c.Logger.Error("Failed to process article", "error", err)
+			c.errorCount++
+		}
 	}
+
+	c.processedCount++
 }
 
-// handleContent processes content using the content processor
-func (c *Crawler) handleContent(e *colly.HTMLElement) {
-	if err := c.contentProcessor.ProcessHTML(c.ctx, e); err != nil {
-		c.Logger.Error("Failed to process content",
-			"component", "crawler",
-			"url", e.Request.URL.String(),
-			"error", err)
-		c.errorCount++
-	} else {
-		c.processedCount++
-	}
-}
-
-// SetTestServerURL sets the test server URL for testing purposes
+// SetTestServerURL sets the test server URL.
 func (c *Crawler) SetTestServerURL(url string) {
 	c.testServerURL = url
 }
@@ -483,4 +387,83 @@ func (c *Crawler) GetProcessors() []common.Processor {
 // GetArticleChannel returns the article channel.
 func (c *Crawler) GetArticleChannel() chan *models.Article {
 	return c.articleChannel
+}
+
+// IsRunning returns whether the crawler is running.
+func (c *Crawler) IsRunning() bool {
+	return c.isRunning
+}
+
+// StartTime returns when the crawler started.
+func (c *Crawler) StartTime() time.Time {
+	return c.startTime
+}
+
+// CurrentSource returns the current source being crawled.
+func (c *Crawler) CurrentSource() string {
+	return c.currentSource
+}
+
+// Context returns the crawler's context.
+func (c *Crawler) Context() context.Context {
+	return c.ctx
+}
+
+// Cancel cancels the crawler's context.
+func (c *Crawler) Cancel() {
+	if c.cancel != nil {
+		c.cancel()
+	}
+}
+
+// IncrementProcessed increments the processed count.
+func (c *Crawler) IncrementProcessed() {
+	c.processedCount++
+}
+
+// IncrementError increments the error count.
+func (c *Crawler) IncrementError() {
+	c.errorCount++
+}
+
+// GetProcessedCount returns the number of processed items.
+func (c *Crawler) GetProcessedCount() int64 {
+	return c.processedCount
+}
+
+// GetErrorCount returns the number of errors.
+func (c *Crawler) GetErrorCount() int64 {
+	return c.errorCount
+}
+
+// GetStartTime returns when tracking started.
+func (c *Crawler) GetStartTime() time.Time {
+	return c.startTime
+}
+
+// GetLastProcessedTime returns the time of the last processed item.
+func (c *Crawler) GetLastProcessedTime() time.Time {
+	return time.Now() // Since we don't track this explicitly, return current time
+}
+
+// GetProcessingDuration returns the total processing duration.
+func (c *Crawler) GetProcessingDuration() time.Duration {
+	if !c.isRunning {
+		return time.Duration(0)
+	}
+	return time.Since(c.startTime)
+}
+
+// Update updates the metrics with new values.
+func (c *Crawler) Update(startTime time.Time, processed int64, errors int64) {
+	c.startTime = startTime
+	c.processedCount = processed
+	c.errorCount = errors
+}
+
+// Reset resets all metrics to zero.
+func (c *Crawler) Reset() {
+	c.processedCount = 0
+	c.errorCount = 0
+	c.startTime = time.Time{}
 }
