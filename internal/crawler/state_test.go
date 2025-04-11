@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,15 +13,18 @@ import (
 func TestState(t *testing.T) {
 	t.Parallel()
 
+	// Create a test logger
+	testLogger := logger.NewNoOp()
+
 	t.Run("NewState", func(t *testing.T) {
 		t.Parallel()
-		s := crawler.NewState()
+		s := crawler.NewState(testLogger)
 		assert.NotNil(t, s)
 	})
 
 	t.Run("StartStop", func(t *testing.T) {
 		t.Parallel()
-		s := crawler.NewState()
+		s := crawler.NewState(testLogger)
 		ctx := t.Context()
 
 		// Test Start
@@ -39,7 +43,7 @@ func TestState(t *testing.T) {
 
 	t.Run("ContextCancellation", func(t *testing.T) {
 		t.Parallel()
-		s := crawler.NewState()
+		s := crawler.NewState(testLogger)
 		ctx := t.Context()
 
 		s.Start(ctx, "test-source")
@@ -57,7 +61,7 @@ func TestState(t *testing.T) {
 
 	t.Run("ConcurrentAccess", func(t *testing.T) {
 		t.Parallel()
-		s := crawler.NewState()
+		s := crawler.NewState(testLogger)
 
 		// Start multiple goroutines to access state
 		done := make(chan struct{})
@@ -81,7 +85,7 @@ func TestState(t *testing.T) {
 
 	t.Run("StateTransitions", func(t *testing.T) {
 		t.Parallel()
-		s := crawler.NewState()
+		s := crawler.NewState(testLogger)
 		ctx := t.Context()
 
 		// Test multiple start/stop cycles

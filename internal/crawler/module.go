@@ -118,7 +118,7 @@ func NewCrawler(
 		contentProcessor: contentProcessor,
 		bus:              bus,
 		collector:        collector,
-		state:            NewState(),
+		state:            NewState(logger),
 		registry:         newProcessorRegistry(),
 		done:             make(chan struct{}),
 		articleChannel:   make(chan *models.Article, ArticleChannelBufferSize),

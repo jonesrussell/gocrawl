@@ -203,12 +203,25 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	// Cancel the context
 	c.state.Cancel()
 
-	// Wait for the crawler to stop
+	// Create a done channel for the collector
+	collectorDone := make(chan struct{})
+
+	// Start a goroutine to wait for the collector and wait group
+	go func() {
+		defer close(collectorDone)
+		c.collector.Wait()
+		c.wg.Wait()
+	}()
+
+	// Wait for either the collector to finish or the context to be done
 	select {
-	case <-c.done:
+	case <-collectorDone:
 		c.state.Stop()
 		return nil
 	case <-ctx.Done():
+		// If we hit the deadline, log the timeout and return
+		c.logger.Warn("Crawler shutdown timed out",
+			"timeout", ctx.Err())
 		return ctx.Err()
 	}
 }

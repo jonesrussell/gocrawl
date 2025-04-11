@@ -5,6 +5,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // State implements the CrawlerState and CrawlerMetrics interfaces.
@@ -18,11 +20,14 @@ type State struct {
 	processedCount    int64
 	errorCount        int64
 	lastProcessedTime time.Time
+	logger            logger.Interface
 }
 
 // NewState creates a new crawler state.
-func NewState() *State {
-	return &State{}
+func NewState(logger logger.Interface) *State {
+	return &State{
+		logger: logger,
+	}
 }
 
 // IsRunning returns whether the crawler is running.
@@ -76,13 +81,23 @@ func (s *State) Start(ctx context.Context, sourceName string) {
 func (s *State) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.isRunning = false
-	s.currentSource = ""
+
+	// Cancel any existing context
 	if s.cancel != nil {
 		s.cancel()
 		s.cancel = nil
 	}
+
+	// Reset state
+	s.isRunning = false
+	s.currentSource = ""
 	s.ctx = nil
+
+	// Log metrics
+	s.logger.Info("Crawler stopped",
+		"processed", s.processedCount,
+		"errors", s.errorCount,
+		"duration", time.Since(s.startTime))
 }
 
 // Update updates the metrics with new values.
