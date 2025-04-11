@@ -12,10 +12,10 @@ This document outlines the steps to migrate from the current crawler implementat
    - [x] Implement `EventBus`
 
 2. Create new test files:
-   - [x] Create `state_test.go`
-   - [x] Create `metrics_test.go`
-   - [x] Create `processor_test.go`
-   - [x] Create `storage_test.go`
+   - [ ] Create `state_test.go`
+   - [ ] Create `metrics_test.go`
+   - [ ] Create `processor_test.go`
+   - [ ] Create `storage_test.go`
    - [ ] Create `eventbus_test.go`
 
 ## Phase 2: Core Crawler Implementation
