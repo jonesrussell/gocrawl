@@ -4,8 +4,7 @@ package common
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
+	"io"
 
 	"github.com/gocolly/colly/v2"
 )
@@ -22,67 +21,66 @@ const (
 	ContentTypeVideo ContentType = "video"
 	// ContentTypeImage represents image content
 	ContentTypeImage ContentType = "image"
+	// ContentTypeHTML represents HTML content
+	ContentTypeHTML ContentType = "html"
+	// ContentTypeJob represents job content
+	ContentTypeJob ContentType = "job"
 )
 
-// ContentProcessor defines the base interface for all content processors
+// ContentProcessor defines the interface for processing different types of content.
 type ContentProcessor interface {
-	// ContentType returns the type of content this processor handles
+	// ContentType returns the type of content this processor can handle.
 	ContentType() ContentType
-	// CanProcess checks if this processor can handle the given content
+
+	// CanProcess checks if the processor can handle the given content.
 	CanProcess(content any) bool
-	// Process processes the content and returns the processed result
+
+	// Process handles the content processing.
 	Process(ctx context.Context, content any) error
-	// GetMetrics returns processing metrics
-	GetMetrics() *Metrics
 }
 
-// HTMLProcessor extends ContentProcessor for HTML content
+// HTMLProcessor defines the interface for processing HTML content.
 type HTMLProcessor interface {
 	ContentProcessor
-	// ProcessHTML processes HTML content
-	ProcessHTML(ctx context.Context, e *colly.HTMLElement) error
+
+	// ParseHTML parses HTML content from a reader.
+	ParseHTML(r io.Reader) error
+
+	// ExtractLinks extracts links from the parsed HTML.
+	ExtractLinks() ([]string, error)
+
+	// ExtractContent extracts the main content from the parsed HTML.
+	ExtractContent() (string, error)
 }
 
-// JobProcessor extends ContentProcessor for job-based processing
+// JobProcessor defines the interface for processing jobs.
 type JobProcessor interface {
 	ContentProcessor
-	// ProcessJob processes a job and its items
-	ProcessJob(ctx context.Context, job *Job)
+
+	// ProcessJob processes a job and its items.
+	ProcessJob(ctx context.Context, job *Job) error
+
+	// ValidateJob validates a job before processing.
+	ValidateJob(job *Job) error
 }
 
 // ProcessorRegistry manages content processors
-type ProcessorRegistry struct {
-	processors map[ContentType]ContentProcessor
-	mu         sync.RWMutex
+type ProcessorRegistry interface {
+	// RegisterProcessor registers a new content processor.
+	RegisterProcessor(processor ContentProcessor)
+
+	// GetProcessor returns a processor for the given content type.
+	GetProcessor(contentType ContentType) (ContentProcessor, error)
+
+	// ProcessContent processes content using the appropriate processor.
+	ProcessContent(ctx context.Context, contentType ContentType, content any) error
 }
 
-// NewProcessorRegistry creates a new processor registry
-func NewProcessorRegistry() *ProcessorRegistry {
-	return &ProcessorRegistry{
-		processors: make(map[ContentType]ContentProcessor),
-	}
-}
-
-// RegisterProcessor registers a new content processor
-func (r *ProcessorRegistry) RegisterProcessor(p ContentProcessor) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.processors[p.ContentType()] = p
-}
-
-// GetProcessor returns a processor for the given content type
-func (r *ProcessorRegistry) GetProcessor(contentType ContentType) (ContentProcessor, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	p, ok := r.processors[contentType]
-	return p, ok
-}
-
-// Processor combines ContentProcessor, HTMLProcessor, and JobProcessor with lifecycle methods
+// Processor combines multiple processing capabilities.
 type Processor interface {
-	ContentProcessor
 	HTMLProcessor
 	JobProcessor
+	ProcessorRegistry
 	// Start initializes the processor
 	Start(ctx context.Context) error
 	// Stop cleans up the processor
@@ -168,34 +166,54 @@ func (p *NoopProcessor) ContentType() ContentType {
 	return ContentTypePage
 }
 
-// CanProcess implements Processor.CanProcess
+// CanProcess implements ContentProcessor.CanProcess
 func (p *NoopProcessor) CanProcess(content any) bool {
 	return true
 }
 
-// Process implements Processor.Process
+// Process implements ContentProcessor.Process
 func (p *NoopProcessor) Process(ctx context.Context, content any) error {
 	return nil
 }
 
-// ProcessHTML implements HTMLProcessor.ProcessHTML
-func (p *NoopProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
+// ParseHTML implements HTMLProcessor.ParseHTML
+func (p *NoopProcessor) ParseHTML(r io.Reader) error {
 	return nil
 }
 
+// ExtractLinks implements HTMLProcessor.ExtractLinks
+func (p *NoopProcessor) ExtractLinks() ([]string, error) {
+	return nil, nil
+}
+
+// ExtractContent implements HTMLProcessor.ExtractContent
+func (p *NoopProcessor) ExtractContent() (string, error) {
+	return "", nil
+}
+
 // ProcessJob implements JobProcessor.ProcessJob
-func (p *NoopProcessor) ProcessJob(ctx context.Context, job *Job) {
+func (p *NoopProcessor) ProcessJob(ctx context.Context, job *Job) error {
+	return nil
+}
+
+// ValidateJob implements JobProcessor.ValidateJob
+func (p *NoopProcessor) ValidateJob(job *Job) error {
+	return nil
+}
+
+// RegisterProcessor implements ProcessorRegistry.RegisterProcessor
+func (p *NoopProcessor) RegisterProcessor(processor ContentProcessor) {
 	// No-op implementation
 }
 
-// GetMetrics implements ContentProcessor.GetMetrics
-func (p *NoopProcessor) GetMetrics() *Metrics {
-	return &Metrics{
-		ProcessedCount:     0,
-		ErrorCount:         0,
-		LastProcessedTime:  time.Time{},
-		ProcessingDuration: 0,
-	}
+// GetProcessor implements ProcessorRegistry.GetProcessor
+func (p *NoopProcessor) GetProcessor(contentType ContentType) (ContentProcessor, error) {
+	return p, nil
+}
+
+// ProcessContent implements ProcessorRegistry.ProcessContent
+func (p *NoopProcessor) ProcessContent(ctx context.Context, contentType ContentType, content any) error {
+	return nil
 }
 
 // Start implements Processor.Start

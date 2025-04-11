@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -54,8 +55,8 @@ func (p *ContentProcessor) Stop(ctx context.Context) error {
 	return nil
 }
 
-// ProcessJob processes a job and its items.
-func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
+// ProcessJob implements common.Processor.ProcessJob
+func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) error {
 	start := time.Now()
 	defer func() {
 		p.metrics.ProcessingDuration += time.Since(start)
@@ -69,7 +70,7 @@ func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 			"error", ctx.Err(),
 		)
 		p.metrics.ErrorCount++
-		return
+		return ctx.Err()
 	default:
 		// Process the job
 		p.Logger.Info("Processing job",
@@ -84,6 +85,7 @@ func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 		// 4. Handling errors and retries
 
 		p.metrics.ProcessedCount++
+		return nil
 	}
 }
 
@@ -134,31 +136,31 @@ func (p *ContentProcessor) GetMetrics() *common.Metrics {
 	return p.metrics
 }
 
-// ProcessContent implements the collector.Processor interface
-func (p *ContentProcessor) ProcessContent(e *colly.HTMLElement) {
-	p.Logger.Debug("Processing content from HTML",
-		"component", "content/processor",
-		"url", e.Request.URL.String())
-
-	content := p.ContentService.ExtractContent(e)
-	if content == nil {
-		p.Logger.Debug("No content extracted",
-			"component", "content/processor",
-			"url", e.Request.URL.String())
-		return
+// ProcessContent implements common.Processor.ProcessContent
+func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType common.ContentType, content any) error {
+	// For content processing, we only handle page content
+	if contentType != common.ContentTypePage {
+		return fmt.Errorf("unsupported content type: %v", contentType)
 	}
 
-	p.Logger.Debug("Content extracted",
-		"component", "content/processor",
-		"url", e.Request.URL.String(),
-		"title", content.Title)
+	e, ok := content.(*colly.HTMLElement)
+	if !ok {
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
+	}
 
-	if err := p.Storage.IndexDocument(context.Background(), p.IndexName, content.ID, content); err != nil {
+	// Process the content using the ContentService
+	if err := p.Storage.IndexDocument(ctx, p.IndexName, e.Request.URL.String(), e); err != nil {
 		p.Logger.Error("Failed to index content",
 			"component", "content/processor",
-			"contentID", content.ID,
+			"contentID", e.Request.URL.String(),
 			"error", err)
+		p.metrics.ErrorCount++
+		return err
 	}
+
+	p.metrics.ProcessedCount++
+	p.metrics.LastProcessedTime = time.Now()
+	return nil
 }
 
 // Process processes the content and returns the processed result
@@ -192,6 +194,53 @@ func (p *ContentProcessor) CanProcess(content any) bool {
 // ContentType implements ContentProcessor.ContentType
 func (p *ContentProcessor) ContentType() common.ContentType {
 	return common.ContentTypePage
+}
+
+// ExtractContent implements common.Processor.ExtractContent
+func (p *ContentProcessor) ExtractContent() (string, error) {
+	// For content processing, we extract the raw content from the HTML element
+	// This is a no-op implementation since we process content directly in ProcessHTML
+	return "", nil
+}
+
+// ExtractLinks implements common.Processor.ExtractLinks
+func (p *ContentProcessor) ExtractLinks() ([]string, error) {
+	// For content processing, we don't need to extract links
+	// as we process the content directly
+	return nil, nil
+}
+
+// GetProcessor implements common.Processor.GetProcessor
+func (p *ContentProcessor) GetProcessor(contentType common.ContentType) (common.ContentProcessor, error) {
+	// For content processing, we only handle page content
+	if contentType != common.ContentTypePage {
+		return nil, fmt.Errorf("unsupported content type: %v", contentType)
+	}
+	return p, nil
+}
+
+// ParseHTML implements common.Processor.ParseHTML
+func (p *ContentProcessor) ParseHTML(r io.Reader) error {
+	// For content processing, we don't need to parse raw HTML
+	// as we process the content directly in ProcessHTML
+	return nil
+}
+
+// RegisterProcessor implements common.Processor.RegisterProcessor
+func (p *ContentProcessor) RegisterProcessor(processor common.ContentProcessor) {
+	// For content processing, we don't need to register additional processors
+	// as we handle all content types directly
+}
+
+// ValidateJob implements common.Processor.ValidateJob
+func (p *ContentProcessor) ValidateJob(job *common.Job) error {
+	if job == nil {
+		return errors.New("job cannot be nil")
+	}
+	if job.ID == "" {
+		return errors.New("job ID cannot be empty")
+	}
+	return nil
 }
 
 // Ensure ContentProcessor implements common.Processor

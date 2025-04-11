@@ -7,16 +7,17 @@ import (
 	"time"
 )
 
-// State implements the CrawlerState interface.
+// State implements the CrawlerState and CrawlerMetrics interfaces.
 type State struct {
-	mu             sync.RWMutex
-	isRunning      bool
-	startTime      time.Time
-	currentSource  string
-	ctx            context.Context
-	cancel         context.CancelFunc
-	processedCount int64
-	errorCount     int64
+	mu                sync.RWMutex
+	isRunning         bool
+	startTime         time.Time
+	currentSource     string
+	ctx               context.Context
+	cancel            context.CancelFunc
+	processedCount    int64
+	errorCount        int64
+	lastProcessedTime time.Time
 }
 
 // NewState creates a new crawler state.
@@ -121,4 +122,36 @@ func (s *State) GetErrorCount() int64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.errorCount
+}
+
+// GetLastProcessedTime returns the time of the last processed item.
+func (s *State) GetLastProcessedTime() time.Time {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.lastProcessedTime
+}
+
+// GetProcessingDuration returns the total processing duration.
+func (s *State) GetProcessingDuration() time.Duration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !s.isRunning {
+		return time.Duration(0)
+	}
+	return time.Since(s.startTime)
+}
+
+// IncrementProcessed increments the processed count.
+func (s *State) IncrementProcessed() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.processedCount++
+	s.lastProcessedTime = time.Now()
+}
+
+// IncrementError increments the error count.
+func (s *State) IncrementError() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.errorCount++
 }

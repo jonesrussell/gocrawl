@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -136,8 +137,15 @@ func (p *ArticleProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement
 	return nil
 }
 
+// ExtractContent implements HTMLProcessor.ExtractContent
+func (p *ArticleProcessor) ExtractContent() (string, error) {
+	// For article processing, we don't need to extract raw content
+	// as we process the structured article data instead
+	return "", nil
+}
+
 // ProcessJob implements JobProcessor.ProcessJob
-func (p *ArticleProcessor) ProcessJob(ctx context.Context, job *common.Job) {
+func (p *ArticleProcessor) ProcessJob(ctx context.Context, job *common.Job) error {
 	start := time.Now()
 	defer func() {
 		p.metrics.ProcessingDuration += time.Since(start)
@@ -151,7 +159,7 @@ func (p *ArticleProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 			"error", ctx.Err(),
 		)
 		p.metrics.ErrorCount++
-		return
+		return ctx.Err()
 	default:
 		// Process the job
 		p.Logger.Info("Processing job",
@@ -166,6 +174,7 @@ func (p *ArticleProcessor) ProcessJob(ctx context.Context, job *common.Job) {
 		// 4. Handling errors and retries
 
 		p.metrics.ProcessedCount++
+		return nil
 	}
 }
 
@@ -218,6 +227,31 @@ func (p *ArticleProcessor) Start(ctx context.Context) error {
 // Stop implements Processor.Stop
 func (p *ArticleProcessor) Stop(ctx context.Context) error {
 	p.Logger.Info("Stopping article processor")
+	return nil
+}
+
+// ExtractLinks implements HTMLProcessor.ExtractLinks
+func (p *ArticleProcessor) ExtractLinks() ([]string, error) {
+	// For article processing, we don't need to extract links
+	// as we process the structured article data instead
+	return nil, nil
+}
+
+// ValidateJob implements JobProcessor.ValidateJob
+func (p *ArticleProcessor) ValidateJob(job *common.Job) error {
+	if job == nil {
+		return errors.New("job cannot be nil")
+	}
+	if job.ID == "" {
+		return errors.New("job ID cannot be empty")
+	}
+	return nil
+}
+
+// ParseHTML implements HTMLProcessor.ParseHTML
+func (p *ArticleProcessor) ParseHTML(r io.Reader) error {
+	// For article processing, we don't need to parse raw HTML
+	// as we process the structured article data instead
 	return nil
 }
 
