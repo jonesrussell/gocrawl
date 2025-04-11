@@ -3,6 +3,7 @@ package signal
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -30,9 +31,9 @@ const (
 // Interface defines the signal handler interface.
 type Interface interface {
 	Setup(ctx context.Context) func()
-	SetFXApp(app *fx.App)
+	SetFXApp(app interface{})
 	RequestShutdown()
-	Wait() bool
+	Wait() error
 	AddResource(closer func() error)
 	GetState() string
 	SetLogger(logger logger.Interface)
@@ -43,9 +44,9 @@ type Interface interface {
 // SignalHandler handles OS signals and graceful shutdown.
 type SignalHandler struct {
 	logger          logger.Interface
-	app             *fx.App
 	done            chan struct{}
-	testMode        bool
+	mu              sync.Mutex
+	app             interface{} // Can be *fx.App or func() error
 	state           shutdownState
 	stateMu         sync.RWMutex
 	resources       []func() error
@@ -67,43 +68,51 @@ func NewSignalHandler(logger logger.Interface) *SignalHandler {
 
 // Setup sets up signal handling.
 func (h *SignalHandler) Setup(ctx context.Context) func() {
-	// Create signal channel
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start signal handling goroutine
 	go func() {
 		select {
-		case <-ctx.Done():
-			h.logger.Info("Context cancelled, initiating shutdown")
-			h.shutdown()
 		case sig := <-sigChan:
 			h.logger.Info("Received signal, initiating shutdown", "signal", sig)
-			h.shutdown()
+			h.RequestShutdown()
+		case <-ctx.Done():
+			h.logger.Info("Context cancelled, initiating shutdown")
+			h.RequestShutdown()
 		}
 	}()
 
-	// Return cleanup function
 	return func() {
 		signal.Stop(sigChan)
 		close(sigChan)
 	}
 }
 
-// SetFXApp sets the Fx application for coordinated shutdown.
-func (h *SignalHandler) SetFXApp(app *fx.App) {
-	h.app = app
-}
-
-// RequestShutdown requests a graceful shutdown.
-func (h *SignalHandler) RequestShutdown() {
-	h.shutdown()
-}
-
-// Wait waits for shutdown to complete and returns true if shutdown completed successfully.
-func (h *SignalHandler) Wait() bool {
+// Wait blocks until shutdown is complete and returns any error that occurred during shutdown
+func (h *SignalHandler) Wait() error {
 	<-h.done
-	return h.shutdownError == nil
+	return h.shutdownError
+}
+
+// RequestShutdown initiates graceful shutdown
+func (h *SignalHandler) RequestShutdown() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	select {
+	case <-h.done:
+		// Already closed
+	default:
+		h.shutdown() // Call shutdown before closing done channel
+		close(h.done)
+	}
+}
+
+// SetFXApp sets the FX application for coordinated shutdown
+func (h *SignalHandler) SetFXApp(app interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.app = app
 }
 
 // AddResource adds a resource that needs to be closed during shutdown.
@@ -147,11 +156,6 @@ func (h *SignalHandler) IsShuttingDown() bool {
 	return h.state == stateShuttingDown
 }
 
-// SetTestMode enables test mode.
-func (h *SignalHandler) SetTestMode(enabled bool) {
-	h.testMode = enabled
-}
-
 // SetShutdownTimeout sets the shutdown timeout.
 func (h *SignalHandler) SetShutdownTimeout(timeout time.Duration) {
 	h.shutdownTimeout = timeout
@@ -174,30 +178,80 @@ func (h *SignalHandler) shutdown() {
 
 	// Stop the Fx application if set
 	if h.app != nil {
-		if err := h.app.Stop(ctx); err != nil {
-			h.logger.Error("Error stopping application", "error", err)
-			h.shutdownError = err
+		// Create a channel to receive the result of stopping the app
+		done := make(chan error, 1)
+		go func() {
+			var err error
+			switch app := h.app.(type) {
+			case *fx.App:
+				err = app.Stop(ctx)
+			case func() error:
+				err = app()
+			default:
+				err = fmt.Errorf("unsupported app type: %T", h.app)
+			}
+			done <- err
+		}()
+
+		// Wait for app to stop or timeout
+		select {
+		case err := <-done:
+			if err != nil {
+				h.logger.Error("Error stopping application", "error", err)
+				h.shutdownError = err
+			}
+		case <-ctx.Done():
+			h.logger.Error("Timeout stopping application", "error", ctx.Err())
+			h.shutdownError = ctx.Err()
 		}
 	}
 
-	// Close all resources
+	// Close all resources with timeout
 	h.resourcesMu.Lock()
+	defer h.resourcesMu.Unlock()
+
 	for _, closer := range h.resources {
-		if err := closer(); err != nil {
-			h.logger.Error("Error closing resource", "error", err)
-			h.shutdownError = err
+		// Create a channel to receive the result of closing the resource
+		done := make(chan error, 1)
+		go func(c func() error) {
+			done <- c()
+		}(closer)
+
+		// Wait for resource to close or timeout
+		select {
+		case err := <-done:
+			if err != nil {
+				h.logger.Error("Error closing resource", "error", err)
+				h.shutdownError = err
+			}
+		case <-ctx.Done():
+			h.logger.Error("Timeout closing resource", "error", ctx.Err())
+			h.shutdownError = ctx.Err()
+			return // Return from the function to stop processing more resources
 		}
 	}
-	h.resourcesMu.Unlock()
 
 	// Call cleanup function if set
 	if h.cleanup != nil {
-		h.cleanup()
+		// Create a channel to receive the result of cleanup
+		done := make(chan struct{})
+		go func() {
+			h.cleanup()
+			close(done)
+		}()
+
+		// Wait for cleanup to complete or timeout
+		select {
+		case <-done:
+			// Cleanup completed successfully
+		case <-ctx.Done():
+			h.logger.Error("Timeout during cleanup", "error", ctx.Err())
+			h.shutdownError = ctx.Err()
+		}
 	}
 
 	// Update state and close done channel
 	h.stateMu.Lock()
 	h.state = stateShutdownComplete
 	h.stateMu.Unlock()
-	close(h.done)
 }

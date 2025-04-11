@@ -80,6 +80,9 @@ func (c *Crawler) setupCallbacks() {
 				return
 			}
 
+			// Process the HTML content
+			c.ProcessHTML(e)
+
 			// Log the link being processed
 			if visitErr := e.Request.Visit(urlStr); visitErr != nil {
 				// Log expected cases as debug instead of error
@@ -258,16 +261,24 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	select {
 	case <-done:
 		// Crawler finished normally
+		c.Logger.Info("Crawler finished processing")
 		c.cancel() // Clean up context
 		return nil
 	case <-c.ctx.Done():
 		// Context was cancelled, abort all pending requests
 		c.Logger.Info("Context cancelled, aborting crawler")
-		// The context cancellation will trigger request aborts in the callbacks
+		// Stop the collector and clean up
+		if err := c.Stop(ctx); err != nil {
+			c.Logger.Error("Error stopping crawler", "error", err)
+		}
 		return ErrCrawlerContextCancelled
 	case <-ctx.Done():
 		// Parent context was cancelled, propagate cancellation
 		c.cancel()
+		// Stop the collector and clean up
+		if err := c.Stop(ctx); err != nil {
+			c.Logger.Error("Error stopping crawler", "error", err)
+		}
 		return ErrCrawlerContextCancelled
 	}
 }
@@ -275,6 +286,9 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 // Stop stops the crawler.
 func (c *Crawler) Stop(ctx context.Context) error {
 	c.Logger.Info("Stopping crawler")
+
+	// Set running state to false first
+	c.isRunning = false
 
 	// Cancel the crawler's context first to stop all goroutines
 	if c.cancel != nil {
@@ -290,7 +304,11 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	go func() {
 		defer close(collectorDone)
 		if c.collector != nil {
-			// The context cancellation will trigger request aborts in the callbacks
+			// Abort all pending requests
+			c.collector.OnRequest(func(r *colly.Request) {
+				r.Abort()
+			})
+			// Wait for collector to finish
 			c.collector.Wait()
 		}
 	}()
@@ -301,8 +319,29 @@ func (c *Crawler) Stop(ctx context.Context) error {
 		c.Logger.Info("Collector stopped successfully")
 	case <-stopCtx.Done():
 		c.Logger.Warn("Timeout waiting for collector to stop")
+		// Force cleanup if timeout occurs
+		c.collector = nil
 	case <-ctx.Done():
 		c.Logger.Warn("Context cancelled while stopping collector")
+		// Force cleanup if context is cancelled
+		c.collector = nil
+	}
+
+	// Wait for all processing goroutines to complete
+	done := make(chan struct{})
+	go func() {
+		c.wg.Wait()
+		close(done)
+	}()
+
+	// Wait for processing to complete or timeout
+	select {
+	case <-done:
+		c.Logger.Info("All processing completed")
+	case <-stopCtx.Done():
+		c.Logger.Warn("Timeout waiting for processing to complete")
+	case <-ctx.Done():
+		c.Logger.Warn("Context cancelled while waiting for processing")
 	}
 
 	// Clean up resources

@@ -245,9 +245,9 @@ func NewJobCommand(log logger.Interface) *cobra.Command {
 			// Update the signal handler with the real logger
 			handler.SetLogger(log)
 
-			// Wait for shutdown signal
-			if !handler.Wait() {
-				return errors.New("job scheduler shutdown timeout or context cancellation")
+			// Wait for completion signal
+			if err := handler.Wait(); err != nil {
+				return fmt.Errorf("error during shutdown: %w", err)
 			}
 
 			return nil
