@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -19,6 +19,11 @@ import (
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
+
+// Processor defines the interface for content processors.
+type Processor interface {
+	Process(ctx context.Context, content any) error
+}
 
 const (
 	// ArticleChannelBufferSize is the buffer size for the article channel.
@@ -91,8 +96,8 @@ var Module = fx.Options(
 		},
 
 		// Processors slice
-		func(articleProcessor *article.ArticleProcessor, contentProcessor *content.ContentProcessor) []common.Processor {
-			return []common.Processor{articleProcessor, contentProcessor}
+		func(articleProcessor *article.ArticleProcessor, contentProcessor *content.ContentProcessor) []Processor {
+			return []Processor{articleProcessor, contentProcessor}
 		},
 	),
 
@@ -120,8 +125,8 @@ var Module = fx.Options(
 
 					// Start a goroutine to wait for crawler completion
 					go func() {
-						// Create a timeout context for waiting
-						waitCtx, waitCancel := context.WithTimeout(ctx, crawlerTimeout)
+						// Create a timeout context for waiting for crawler completion
+						waitCtx, waitCancel := context.WithTimeout(ctx, common.DefaultCrawlerTimeout)
 						defer waitCancel()
 
 						// Wait for crawler to complete
@@ -140,7 +145,7 @@ var Module = fx.Options(
 				},
 				OnStop: func(ctx context.Context) error {
 					// Stop the crawler with timeout
-					stopCtx, stopCancel := context.WithTimeout(ctx, shutdownTimeout)
+					stopCtx, stopCancel := context.WithTimeout(ctx, common.DefaultShutdownTimeout)
 					defer stopCancel()
 
 					if err := crawler.Stop(stopCtx); err != nil {

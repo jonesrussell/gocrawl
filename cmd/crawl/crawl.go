@@ -5,19 +5,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-)
-
-const (
-	// crawlerTimeout is the maximum time to wait for the crawler to complete.
-	crawlerTimeout = 30 * time.Minute
-	// shutdownTimeout is the maximum time to wait for graceful shutdown.
-	shutdownTimeout = 30 * time.Second
 )
 
 // Cmd represents the crawl command
@@ -28,14 +20,10 @@ var Cmd = &cobra.Command{
 Specify the source name as an argument.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Trim quotes from source name
 		sourceName := strings.Trim(args[0], "\"")
+		ctx := cmd.Context()
 
-		// Create a cancellable context
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
-		// Set up signal handling with a no-op logger initially
+		// Set up signal handling
 		handler := signal.NewSignalHandler(logger.NewNoOp())
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
@@ -43,7 +31,6 @@ Specify the source name as an argument.`,
 		// Initialize the Fx application
 		fxApp := fx.New(
 			Module,
-			// Override context and source name with proper names
 			fx.Provide(
 				fx.Annotate(
 					func() context.Context { return ctx },
@@ -59,17 +46,12 @@ Specify the source name as an argument.`,
 		// Set the fx app for coordinated shutdown
 		handler.SetFXApp(fxApp)
 
-		// Start the application
+		// Start the application and wait for completion
 		if err := fxApp.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start application: %w", err)
 		}
 
-		// Wait for completion signal
-		if err := handler.Wait(); err != nil {
-			return fmt.Errorf("failed to wait for handler: %w", err)
-		}
-
-		return nil
+		return handler.Wait()
 	},
 }
 
