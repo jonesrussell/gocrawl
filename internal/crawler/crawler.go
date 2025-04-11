@@ -135,6 +135,10 @@ func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
 		return errors.New("source cannot be nil")
 	}
 
+	c.logger.Debug("Starting crawl for source",
+		"source", source.Name,
+		"urls", source.StartURLs)
+
 	// Set up the collector for this source
 	c.configureCollector(source)
 
@@ -143,6 +147,8 @@ func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
 
 	// Start visiting URLs
 	for _, url := range source.StartURLs {
+		c.logger.Debug("Visiting URL",
+			"url", url)
 		if err := c.collector.Visit(url); err != nil {
 			c.logger.Error("Failed to visit URL",
 				"url", url,
@@ -151,8 +157,14 @@ func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
 		}
 	}
 
+	c.logger.Debug("Waiting for collector to finish")
 	// Wait for the collector to finish
 	c.collector.Wait()
+	c.logger.Debug("Collector finished")
+
+	// Signal completion
+	close(c.done)
+	c.logger.Debug("Signaled completion")
 
 	return nil
 }
@@ -374,23 +386,28 @@ func (c *Crawler) Reset() {
 
 // ProcessHTML processes the HTML content.
 func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
-	// Get the crawler's context
-	ctx := c.state.Context()
-
 	// Detect content type and get appropriate processor
 	processor := c.selectProcessor(e)
 	if processor == nil {
+		c.logger.Debug("No processor found for content",
+			"url", e.Request.URL.String(),
+			"type", c.detectContentType(e))
 		c.state.IncrementProcessed()
 		return
 	}
 
 	// Process the content
-	err := processor.Process(ctx, e)
+	err := processor.Process(c.state.Context(), e)
 	if err != nil {
 		c.logger.Error("Failed to process content",
 			"error", err,
+			"url", e.Request.URL.String(),
 			"type", c.detectContentType(e))
 		c.state.IncrementError()
+	} else {
+		c.logger.Debug("Successfully processed content",
+			"url", e.Request.URL.String(),
+			"type", c.detectContentType(e))
 	}
 
 	c.state.IncrementProcessed()
@@ -436,8 +453,15 @@ func (c *Crawler) getProcessorForType(contentType common.ContentType) common.Pro
 
 // detectContentType detects the type of content in the HTML element
 func (c *Crawler) detectContentType(e *colly.HTMLElement) common.ContentType {
-	// Check for article-specific elements
-	if e.DOM.Find("article").Length() > 0 || e.DOM.Find(".article").Length() > 0 {
+	// Check for article-specific elements and metadata
+	hasArticleTag := e.DOM.Find("article").Length() > 0
+	hasArticleClass := e.DOM.Find(".article").Length() > 0
+	hasArticleMeta := e.DOM.Find("meta[property='og:type'][content='article']").Length() > 0
+	hasPublicationDate := e.DOM.Find("time[datetime], .published-date, .post-date").Length() > 0
+	hasAuthor := e.DOM.Find(".author, .byline, meta[name='author']").Length() > 0
+
+	// If it has multiple article indicators, it's likely an article
+	if (hasArticleTag || hasArticleClass) && (hasPublicationDate || hasAuthor || hasArticleMeta) {
 		return common.ContentTypeArticle
 	}
 
@@ -456,8 +480,8 @@ func (c *Crawler) detectContentType(e *colly.HTMLElement) common.ContentType {
 		return common.ContentTypeJob
 	}
 
-	// Default to HTML content type
-	return common.ContentTypeHTML
+	// Default to page content type
+	return common.ContentTypePage
 }
 
 // AddProcessor adds a new processor to the crawler.
