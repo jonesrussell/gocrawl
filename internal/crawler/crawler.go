@@ -259,12 +259,32 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	go func() {
 		defer c.wg.Done()
 		c.logger.Debug("Starting crawl goroutine")
-		if crawlErr := c.crawl(source); crawlErr != nil {
-			c.logger.Error("Failed to crawl source",
-				"source", source.Name,
-				"error", crawlErr)
+
+		// Create a done channel for the crawl
+		crawlDone := make(chan struct{})
+		defer close(crawlDone)
+
+		// Start a goroutine to handle the crawl
+		go func() {
+			defer close(crawlDone)
+			if crawlErr := c.crawl(source); crawlErr != nil {
+				c.logger.Error("Failed to crawl source",
+					"source", source.Name,
+					"error", crawlErr)
+			}
+		}()
+
+		// Wait for either the crawl to complete or the context to be cancelled
+		select {
+		case <-crawlDone:
+			c.logger.Debug("Crawl goroutine finished")
+		case <-ctx.Done():
+			c.logger.Debug("Crawl context cancelled")
+			// Ensure the collector is stopped
+			if c.collector != nil {
+				c.collector.Wait()
+			}
 		}
-		c.logger.Debug("Crawl goroutine finished")
 	}()
 
 	return nil
@@ -292,6 +312,16 @@ func (c *Crawler) Stop(ctx context.Context) error {
 		c.wg.Wait()
 		c.logger.Debug("Wait group finished")
 	}()
+
+	// Create a timeout context for the collector
+	_, collectorCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer collectorCancel()
+
+	// Stop the collector
+	if c.collector != nil {
+		c.logger.Debug("Stopping collector")
+		c.collector.Wait()
+	}
 
 	// Wait for either the wait group to finish or the context to be done
 	select {
