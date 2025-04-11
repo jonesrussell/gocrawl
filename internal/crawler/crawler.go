@@ -416,7 +416,24 @@ func (c *Crawler) detectContentType(e *colly.HTMLElement) common.ContentType {
 	if e.DOM.Find("article").Length() > 0 || e.DOM.Find(".article").Length() > 0 {
 		return common.ContentTypeArticle
 	}
-	return common.ContentTypePage
+
+	// Check for video content
+	if e.DOM.Find("video").Length() > 0 || e.DOM.Find(".video").Length() > 0 {
+		return common.ContentTypeVideo
+	}
+
+	// Check for image content
+	if e.DOM.Find("img").Length() > 0 || e.DOM.Find(".image").Length() > 0 {
+		return common.ContentTypeImage
+	}
+
+	// Check for job listings
+	if e.DOM.Find(".job-listing").Length() > 0 || e.DOM.Find(".job-posting").Length() > 0 {
+		return common.ContentTypeJob
+	}
+
+	// Default to HTML content type
+	return common.ContentTypeHTML
 }
 
 // AddProcessor adds a new processor to the crawler.
