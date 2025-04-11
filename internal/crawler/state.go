@@ -9,12 +9,14 @@ import (
 
 // State implements the CrawlerState interface.
 type State struct {
-	mu            sync.RWMutex
-	isRunning     bool
-	startTime     time.Time
-	currentSource string
-	ctx           context.Context
-	cancel        context.CancelFunc
+	mu             sync.RWMutex
+	isRunning      bool
+	startTime      time.Time
+	currentSource  string
+	ctx            context.Context
+	cancel         context.CancelFunc
+	processedCount int64
+	errorCount     int64
 }
 
 // NewState creates a new crawler state.
@@ -80,4 +82,43 @@ func (s *State) Stop() {
 		s.cancel = nil
 	}
 	s.ctx = nil
+}
+
+// Update updates the state with new values.
+func (s *State) Update(startTime time.Time, processed int64, errors int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.startTime = startTime
+	s.processedCount = processed
+	s.errorCount = errors
+}
+
+// Reset resets the state to its initial values.
+func (s *State) Reset() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.isRunning = false
+	s.startTime = time.Time{}
+	s.currentSource = ""
+	s.processedCount = 0
+	s.errorCount = 0
+	if s.cancel != nil {
+		s.cancel()
+		s.cancel = nil
+	}
+	s.ctx = nil
+}
+
+// GetProcessedCount returns the number of processed items.
+func (s *State) GetProcessedCount() int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.processedCount
+}
+
+// GetErrorCount returns the number of errors.
+func (s *State) GetErrorCount() int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.errorCount
 }

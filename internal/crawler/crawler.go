@@ -40,18 +40,11 @@ type Crawler struct {
 	sources          sources.Interface
 	articleProcessor common.Processor
 	contentProcessor common.Processor
-	testServerURL    string
-	processedCount   int64
-	errorCount       int64
-	startTime        time.Time
-	isRunning        bool
+	state            *State
 	done             chan struct{}
-	ctx              context.Context
-	cancel           context.CancelFunc
 	wg               sync.WaitGroup
 	articleChannel   chan *models.Article
 	processors       []common.Processor
-	currentSource    string
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -61,7 +54,7 @@ func (c *Crawler) setupCallbacks() {
 	// Let Colly handle link discovery with context awareness
 	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		select {
-		case <-c.ctx.Done():
+		case <-c.state.Context().Done():
 			e.Request.Abort()
 			return
 		default:
@@ -116,7 +109,7 @@ func (c *Crawler) setupCallbacks() {
 	// Add context-aware request handling
 	c.collector.OnRequest(func(r *colly.Request) {
 		select {
-		case <-c.ctx.Done():
+		case <-c.state.Context().Done():
 			r.Abort()
 			return
 		default:
@@ -126,7 +119,7 @@ func (c *Crawler) setupCallbacks() {
 
 	c.collector.OnResponse(func(r *colly.Response) {
 		select {
-		case <-c.ctx.Done():
+		case <-c.state.Context().Done():
 			return
 		default:
 			c.Logger.Info("Crawled", "url", r.Request.URL.String(), "status", r.StatusCode)
@@ -135,7 +128,7 @@ func (c *Crawler) setupCallbacks() {
 
 	c.collector.OnError(func(r *colly.Response, err error) {
 		select {
-		case <-c.ctx.Done():
+		case <-c.state.Context().Done():
 			return
 		default:
 			c.Logger.Error("Error while crawling",
@@ -206,9 +199,6 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		return ErrSourceNotFound
 	}
 
-	// Set the current source
-	c.currentSource = sourceName
-
 	// Validate that required index exists
 	exists, err := c.indexManager.IndexExists(ctx, source.Index)
 	if err != nil {
@@ -236,12 +226,11 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Set up callbacks first to ensure they're ready
 	c.setupCallbacks()
 
-	// Create a cancellable context for the crawler
-	c.ctx, c.cancel = context.WithCancel(ctx)
+	// Initialize state
+	c.state = NewState().(*State)
+	c.state.Start(ctx, sourceName)
 
 	// Start the crawler
-	c.isRunning = true
-	c.startTime = time.Now()
 	c.done = make(chan struct{})
 	c.articleChannel = make(chan *models.Article, 100)
 
@@ -268,17 +257,17 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 // Stop stops the crawler.
 func (c *Crawler) Stop(ctx context.Context) error {
-	if !c.isRunning {
+	if !c.state.IsRunning() {
 		return nil
 	}
 
 	// Cancel the context
-	c.cancel()
+	c.state.Cancel()
 
 	// Wait for the crawler to stop
 	select {
 	case <-c.done:
-		c.isRunning = false
+		c.state.Stop()
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
@@ -334,10 +323,10 @@ func (c *Crawler) Wait() {
 // GetMetrics returns the crawler metrics.
 func (c *Crawler) GetMetrics() *common.Metrics {
 	return &common.Metrics{
-		ProcessedCount:     c.processedCount,
-		ErrorCount:         c.errorCount,
+		ProcessedCount:     c.state.GetProcessedCount(),
+		ErrorCount:         c.state.GetErrorCount(),
 		LastProcessedTime:  time.Now(),
-		ProcessingDuration: time.Since(c.startTime),
+		ProcessingDuration: time.Since(c.state.StartTime()),
 	}
 }
 
@@ -345,28 +334,23 @@ func (c *Crawler) GetMetrics() *common.Metrics {
 func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	// Process the HTML content
 	if c.contentProcessor != nil {
-		err := c.contentProcessor.Process(c.ctx, e)
+		err := c.contentProcessor.Process(c.state.Context(), e)
 		if err != nil {
 			c.Logger.Error("Failed to process content", "error", err)
-			c.errorCount++
+			c.state.Update(c.state.StartTime(), c.state.GetProcessedCount(), c.state.GetErrorCount()+1)
 		}
 	}
 
 	// Process the article
 	if c.articleProcessor != nil {
-		err := c.articleProcessor.Process(c.ctx, e)
+		err := c.articleProcessor.Process(c.state.Context(), e)
 		if err != nil {
 			c.Logger.Error("Failed to process article", "error", err)
-			c.errorCount++
+			c.state.Update(c.state.StartTime(), c.state.GetProcessedCount(), c.state.GetErrorCount()+1)
 		}
 	}
 
-	c.processedCount++
-}
-
-// SetTestServerURL sets the test server URL.
-func (c *Crawler) SetTestServerURL(url string) {
-	c.testServerURL = url
+	c.state.Update(c.state.StartTime(), c.state.GetProcessedCount()+1, c.state.GetErrorCount())
 }
 
 // GetLogger returns the logger.
@@ -391,54 +375,52 @@ func (c *Crawler) GetArticleChannel() chan *models.Article {
 
 // IsRunning returns whether the crawler is running.
 func (c *Crawler) IsRunning() bool {
-	return c.isRunning
+	return c.state.IsRunning()
 }
 
 // StartTime returns when the crawler started.
 func (c *Crawler) StartTime() time.Time {
-	return c.startTime
+	return c.state.StartTime()
 }
 
 // CurrentSource returns the current source being crawled.
 func (c *Crawler) CurrentSource() string {
-	return c.currentSource
+	return c.state.CurrentSource()
 }
 
 // Context returns the crawler's context.
 func (c *Crawler) Context() context.Context {
-	return c.ctx
+	return c.state.Context()
 }
 
 // Cancel cancels the crawler's context.
 func (c *Crawler) Cancel() {
-	if c.cancel != nil {
-		c.cancel()
-	}
+	c.state.Cancel()
 }
 
 // IncrementProcessed increments the processed count.
 func (c *Crawler) IncrementProcessed() {
-	c.processedCount++
+	c.state.Update(c.state.StartTime(), c.state.GetProcessedCount()+1, c.state.GetErrorCount())
 }
 
 // IncrementError increments the error count.
 func (c *Crawler) IncrementError() {
-	c.errorCount++
+	c.state.Update(c.state.StartTime(), c.state.GetProcessedCount(), c.state.GetErrorCount()+1)
 }
 
 // GetProcessedCount returns the number of processed items.
 func (c *Crawler) GetProcessedCount() int64 {
-	return c.processedCount
+	return c.state.GetProcessedCount()
 }
 
 // GetErrorCount returns the number of errors.
 func (c *Crawler) GetErrorCount() int64 {
-	return c.errorCount
+	return c.state.GetErrorCount()
 }
 
 // GetStartTime returns when tracking started.
 func (c *Crawler) GetStartTime() time.Time {
-	return c.startTime
+	return c.state.StartTime()
 }
 
 // GetLastProcessedTime returns the time of the last processed item.
@@ -448,22 +430,18 @@ func (c *Crawler) GetLastProcessedTime() time.Time {
 
 // GetProcessingDuration returns the total processing duration.
 func (c *Crawler) GetProcessingDuration() time.Duration {
-	if !c.isRunning {
+	if !c.state.IsRunning() {
 		return time.Duration(0)
 	}
-	return time.Since(c.startTime)
+	return time.Since(c.state.StartTime())
 }
 
 // Update updates the metrics with new values.
 func (c *Crawler) Update(startTime time.Time, processed int64, errors int64) {
-	c.startTime = startTime
-	c.processedCount = processed
-	c.errorCount = errors
+	c.state.Update(startTime, processed, errors)
 }
 
 // Reset resets all metrics to zero.
 func (c *Crawler) Reset() {
-	c.processedCount = 0
-	c.errorCount = 0
-	c.startTime = time.Time{}
+	c.state.Reset()
 }

@@ -116,8 +116,6 @@ type Interface interface {
 	GetIndexManager() interfaces.IndexManager
 	// Wait waits for the crawler to complete
 	Wait()
-	// SetTestServerURL sets the test server URL
-	SetTestServerURL(url string)
 	// GetLogger returns the logger
 	GetLogger() logger.Interface
 	// GetSource returns the source
