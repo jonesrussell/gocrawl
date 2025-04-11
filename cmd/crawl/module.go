@@ -125,14 +125,11 @@ var Module = fx.Options(
 						defer waitCancel()
 
 						// Wait for crawler to complete
-						crawler.Wait()
-
-						// Check if we timed out
 						select {
+						case <-crawler.Done():
+							logger.Info("Crawler finished processing")
 						case <-waitCtx.Done():
 							logger.Info("Crawler reached timeout limit")
-						default:
-							logger.Info("Crawler finished processing")
 						}
 
 						// Signal completion to the signal handler

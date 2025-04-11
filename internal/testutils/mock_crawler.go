@@ -84,6 +84,15 @@ func (m *MockCrawler) GetArticleChannel() chan *models.Article {
 	return m.articleChannel
 }
 
+// Done implements Interface.
+func (m *MockCrawler) Done() <-chan struct{} {
+	args := m.Called()
+	if c, ok := args.Get(0).(<-chan struct{}); ok {
+		return c
+	}
+	return nil
+}
+
 func (m *MockCrawler) Subscribe(handler events.EventHandler) {
 	m.Called(handler)
 }

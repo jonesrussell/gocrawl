@@ -160,17 +160,23 @@ func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
 	c.logger.Debug("Waiting for collector to finish")
 	// Wait for the collector to finish
 	c.collector.Wait()
-	c.logger.Debug("Collector finished")
+	c.logger.Debug("Collector finished",
+		"processed", c.state.GetProcessedCount(),
+		"errors", c.state.GetErrorCount())
 
 	// Signal completion
+	c.logger.Debug("Signaling completion")
 	close(c.done)
-	c.logger.Debug("Signaled completion")
+	c.logger.Debug("Completion signaled")
 
 	return nil
 }
 
 // Start begins the crawling process for a given source.
 func (c *Crawler) Start(ctx context.Context, sourceName string) error {
+	c.logger.Debug("Starting crawler",
+		"source", sourceName)
+
 	// Validate source exists
 	source := c.sources.FindByName(sourceName)
 	if source == nil {
@@ -196,11 +202,13 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
+		c.logger.Debug("Starting crawl goroutine")
 		if crawlErr := c.crawl(source); crawlErr != nil {
 			c.logger.Error("Failed to crawl source",
 				"source", source.Name,
 				"error", crawlErr)
 		}
+		c.logger.Debug("Crawl goroutine finished")
 	}()
 
 	return nil
@@ -208,12 +216,15 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 // Stop stops the crawler.
 func (c *Crawler) Stop(ctx context.Context) error {
+	c.logger.Debug("Stopping crawler")
 	if !c.state.IsRunning() {
+		c.logger.Debug("Crawler already stopped")
 		return nil
 	}
 
 	// Cancel the context
 	c.state.Cancel()
+	c.logger.Debug("Context cancelled")
 
 	// Create a done channel for the collector
 	collectorDone := make(chan struct{})
@@ -221,14 +232,17 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	// Start a goroutine to wait for the collector and wait group
 	go func() {
 		defer close(collectorDone)
+		c.logger.Debug("Waiting for collector and wait group")
 		c.collector.Wait()
 		c.wg.Wait()
+		c.logger.Debug("Collector and wait group finished")
 	}()
 
 	// Wait for either the collector to finish or the context to be done
 	select {
 	case <-collectorDone:
 		c.state.Stop()
+		c.logger.Debug("Crawler stopped successfully")
 		return nil
 	case <-ctx.Done():
 		// If we hit the deadline, log the timeout and return
@@ -312,6 +326,11 @@ func (c *Crawler) GetProcessors() []common.Processor {
 // GetArticleChannel returns the article channel.
 func (c *Crawler) GetArticleChannel() chan *models.Article {
 	return c.articleChannel
+}
+
+// Done returns a channel that's closed when the crawler is done.
+func (c *Crawler) Done() <-chan struct{} {
+	return c.done
 }
 
 // IsRunning returns whether the crawler is running.

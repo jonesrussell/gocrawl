@@ -126,4 +126,6 @@ type Interface interface {
 	GetProcessors() []common.Processor
 	// GetArticleChannel returns the article channel
 	GetArticleChannel() chan *models.Article
+	// Done returns a channel that's closed when the crawler is done
+	Done() <-chan struct{}
 }

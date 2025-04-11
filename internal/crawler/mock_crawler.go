@@ -82,6 +82,15 @@ func (m *MockCrawler) GetArticleChannel() chan *models.Article {
 	return nil
 }
 
+// Done implements Interface.
+func (m *MockCrawler) Done() <-chan struct{} {
+	args := m.Called()
+	if c, ok := args.Get(0).(<-chan struct{}); ok {
+		return c
+	}
+	return nil
+}
+
 // NewMockCrawler creates a new mock crawler instance.
 func NewMockCrawler() *MockCrawler {
 	return &MockCrawler{}
