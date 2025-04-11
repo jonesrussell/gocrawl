@@ -6,10 +6,11 @@ package article
 import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -23,7 +24,7 @@ type Manager struct {
 	logger  logger.Interface
 	config  config.Interface
 	sources sources.Interface
-	storage types.Interface
+	storage storagetypes.Interface
 }
 
 // Module provides article-related dependencies.
@@ -44,7 +45,7 @@ func NewArticleManager(
 	logger logger.Interface,
 	config config.Interface,
 	sources sources.Interface,
-	storage types.Interface,
+	storage storagetypes.Interface,
 ) *Manager {
 	return &Manager{
 		logger:  logger,
@@ -58,23 +59,25 @@ func NewArticleManager(
 func NewArticleService(
 	logger logger.Interface,
 	config config.Interface,
-	storage types.Interface,
+	storage storagetypes.Interface,
 ) Interface {
 	srcs := config.GetSources()
-	if len(srcs) == 0 {
-		logger.Warn("No sources configured")
-		return nil
-	}
+	var selectors types.ArticleSelectors
 
-	// For now, we'll use the first source's selectors
-	source := srcs[0]
-	if len(srcs) > 1 {
-		logger.Warn("Multiple sources configured, using first source's selectors")
+	if len(srcs) == 0 {
+		logger.Warn("No sources configured, using default selectors")
+		selectors = (&types.ArticleSelectors{}).Default()
+	} else {
+		// For now, we'll use the first source's selectors
+		selectors = srcs[0].Selectors.Article
+		if len(srcs) > 1 {
+			logger.Warn("Multiple sources configured, using first source's selectors")
+		}
 	}
 
 	return NewService(
 		logger,
-		source.Selectors.Article,
+		selectors,
 		storage,
 		"articles",
 	)
@@ -84,7 +87,7 @@ func NewArticleService(
 func ProvideArticleProcessor(
 	logger logger.Interface,
 	config config.Interface,
-	storage types.Interface,
+	storage storagetypes.Interface,
 	service Interface,
 ) *ArticleProcessor {
 	return &ArticleProcessor{
