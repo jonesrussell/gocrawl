@@ -4,7 +4,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	stdlog "log"
 	"strings"
 	"time"
 
@@ -28,11 +27,8 @@ func ValidateConfig(cfg *Config) error {
 		return errors.New("configuration is required")
 	}
 
-	stdlog.Printf("Starting config validation, environment: %s", cfg.App.Environment)
-
 	// Validate environment first
 	if cfg.App.Environment == "" {
-		stdlog.Printf("Environment validation failed: environment cannot be empty")
 		return &ValidationError{
 			Field:  "app.environment",
 			Value:  cfg.App.Environment,
@@ -50,53 +46,41 @@ func ValidateConfig(cfg *Config) error {
 		}
 	}
 	if !isValidEnv {
-		stdlog.Printf("Environment validation failed: %s", cfg.App.Environment)
 		return &ValidationError{
 			Field:  "app.environment",
 			Value:  cfg.App.Environment,
 			Reason: "invalid environment",
 		}
 	}
-	stdlog.Printf("Environment validation passed")
 
 	// Validate log config
 	if err := validateLogConfig(cfg.Logger); err != nil {
-		stdlog.Printf("Log config validation failed: %v", err)
 		return err
 	}
-	stdlog.Printf("Log config validation passed")
 
 	// Validate crawler config
 	if err := validateCrawlerConfig(cfg.Crawler); err != nil {
-		stdlog.Printf("Crawler config validation failed: %v", err)
 		return err
 	}
-	stdlog.Printf("Crawler config validation passed")
 
 	// Validate Elasticsearch config
 	if err := validateElasticsearchConfig(cfg.Elasticsearch); err != nil {
-		stdlog.Printf("Elasticsearch config validation failed: %v", err)
 		return err
 	}
-	stdlog.Printf("Elasticsearch config validation passed")
 
 	// Validate app config last
 	if err := validateAppConfig(cfg.App); err != nil {
-		stdlog.Printf("App config validation failed: %v", err)
 		return &ValidationError{
 			Field:  "app",
 			Value:  cfg.App,
 			Reason: err.Error(),
 		}
 	}
-	stdlog.Printf("App config validation passed")
 
 	// Validate sources last
 	if err := validateSources(cfg.Sources); err != nil {
-		stdlog.Printf("Sources validation failed: %v", err)
 		return err
 	}
-	stdlog.Printf("Sources validation passed")
 
 	return nil
 }
