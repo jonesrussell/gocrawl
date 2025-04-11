@@ -20,7 +20,7 @@ func TestState(t *testing.T) {
 
 	t.Run("StartStop", func(t *testing.T) {
 		t.Parallel()
-		s := crawler.NewState().(*crawler.State)
+		s := crawler.NewState()
 		ctx := t.Context()
 
 		// Test Start
@@ -39,7 +39,7 @@ func TestState(t *testing.T) {
 
 	t.Run("ContextCancellation", func(t *testing.T) {
 		t.Parallel()
-		s := crawler.NewState().(*crawler.State)
+		s := crawler.NewState()
 		ctx := t.Context()
 
 		s.Start(ctx, "test-source")
@@ -57,7 +57,7 @@ func TestState(t *testing.T) {
 
 	t.Run("ConcurrentAccess", func(t *testing.T) {
 		t.Parallel()
-		s := crawler.NewState().(*crawler.State)
+		s := crawler.NewState()
 
 		// Start multiple goroutines to access state
 		done := make(chan struct{})
@@ -81,7 +81,7 @@ func TestState(t *testing.T) {
 
 	t.Run("StateTransitions", func(t *testing.T) {
 		t.Parallel()
-		s := crawler.NewState().(*crawler.State)
+		s := crawler.NewState()
 		ctx := t.Context()
 
 		// Test multiple start/stop cycles

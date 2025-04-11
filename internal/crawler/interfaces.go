@@ -54,6 +54,8 @@ type CrawlerState interface {
 	Context() context.Context
 	// Cancel cancels the crawler's context.
 	Cancel()
+	// Stop stops the crawler.
+	Stop()
 }
 
 // CrawlerMetrics tracks crawler statistics.

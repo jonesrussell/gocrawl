@@ -21,7 +21,7 @@ type State struct {
 }
 
 // NewState creates a new crawler state.
-func NewState() CrawlerState {
+func NewState() *State {
 	return &State{}
 }
 

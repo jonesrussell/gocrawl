@@ -3,8 +3,10 @@ package crawler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -33,7 +35,7 @@ func NewStorage(
 // SaveArticle saves an article to storage.
 func (s *Storage) SaveArticle(ctx context.Context, article *models.Article) error {
 	if article == nil {
-		return fmt.Errorf("article is nil")
+		return errors.New("article is nil")
 	}
 
 	if err := s.storage.IndexDocument(ctx, s.indexName, article.ID, article); err != nil {
@@ -53,7 +55,7 @@ func (s *Storage) SaveArticle(ctx context.Context, article *models.Article) erro
 // GetArticle retrieves an article from storage.
 func (s *Storage) GetArticle(ctx context.Context, id string) (*models.Article, error) {
 	if id == "" {
-		return nil, fmt.Errorf("article ID is empty")
+		return nil, errors.New("article ID is empty")
 	}
 
 	article := &models.Article{}
@@ -79,7 +81,7 @@ func (s *Storage) ListArticles(ctx context.Context, query string) ([]*models.Art
 				"fields": []string{"title^2", "body", "description"},
 			},
 		},
-		"size": 100, // Default size of 100
+		"size": common.DefaultBufferSize,
 	}
 
 	// Execute the search
@@ -94,15 +96,15 @@ func (s *Storage) ListArticles(ctx context.Context, query string) ([]*models.Art
 	// Convert results to articles
 	articles := make([]*models.Article, 0, len(results))
 	for _, result := range results {
-		if article, ok := result.(*models.Article); ok {
+		if article, isArticle := result.(*models.Article); isArticle {
 			articles = append(articles, article)
 		} else {
 			// Try to unmarshal if it's a map
-			if m, ok := result.(map[string]any); ok {
-				article := &models.Article{}
-				if data, err := json.Marshal(m); err == nil {
-					if err := json.Unmarshal(data, article); err == nil {
-						articles = append(articles, article)
+			if m, isMap := result.(map[string]any); isMap {
+				newArticle := &models.Article{}
+				if data, marshalErr := json.Marshal(m); marshalErr == nil {
+					if unmarshalErr := json.Unmarshal(data, newArticle); unmarshalErr == nil {
+						articles = append(articles, newArticle)
 					}
 				}
 			}
