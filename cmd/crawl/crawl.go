@@ -11,8 +11,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
-	"go.uber.org/zap"
 )
 
 const (
@@ -44,7 +42,7 @@ Specify the source name as an argument.`,
 		cleanup := handler.Setup(ctx)
 		defer cleanup()
 
-		// Initialize the Fx application with reduced verbosity
+		// Initialize the Fx application
 		fxApp := fx.New(
 			Module,
 			// Override context and source name with proper names
@@ -58,10 +56,6 @@ Specify the source name as an argument.`,
 					fx.ResultTags(`name:"sourceName"`),
 				),
 			),
-			// Reduce Fx logging verbosity
-			fx.WithLogger(func(log *zap.Logger) fxevent.Logger {
-				return &fxevent.ZapLogger{Logger: log.WithOptions(zap.WithCaller(false))}
-			}),
 		)
 
 		// Set the fx app for coordinated shutdown

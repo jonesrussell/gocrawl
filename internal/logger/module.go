@@ -2,6 +2,8 @@
 package logger
 
 import (
+	"os"
+
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -34,27 +36,78 @@ func Constructor(params Params) (Interface, error) {
 	config := params.Config
 	if config == nil {
 		config = &Config{
-			Level:       InfoLevel,
-			Development: false,
-			Encoding:    "json",
+			Level:            InfoLevel,
+			Development:      true,
+			Encoding:         "console",
+			OutputPaths:      []string{"stdout"},
+			ErrorOutputPaths: []string{"stderr"},
+			EnableColor:      true,
 		}
 	}
 
-	zapConfig := zap.NewProductionConfig()
-	if config.Development {
-		zapConfig = zap.NewDevelopmentConfig()
+	// Create encoder config
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "ts",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		FunctionKey:    zapcore.OmitKey,
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	zapConfig.Level = zap.NewAtomicLevelAt(levelToZap(config.Level))
-	zapConfig.Encoding = config.Encoding
-	zapConfig.OutputPaths = config.OutputPaths
-	zapConfig.ErrorOutputPaths = config.ErrorOutputPaths
-
-	zapLogger, err := zapConfig.Build()
-	if err != nil {
-		return nil, err
+	// Configure level encoder based on development mode and color settings
+	if config.Development && config.EnableColor {
+		encoderConfig.EncodeLevel = func(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+			var color string
+			switch l {
+			case zapcore.DebugLevel:
+				color = ColorDebug
+			case zapcore.InfoLevel:
+				color = ColorInfo
+			case zapcore.WarnLevel:
+				color = ColorWarn
+			case zapcore.ErrorLevel:
+				color = ColorError
+			case zapcore.DPanicLevel:
+				color = ColorError
+			case zapcore.PanicLevel:
+				color = ColorError
+			case zapcore.FatalLevel:
+				color = ColorFatal
+			case zapcore.InvalidLevel:
+				color = ColorReset
+			default:
+				color = ColorReset
+			}
+			enc.AppendString(color + l.CapitalString() + ColorReset)
+		}
+	} else {
+		encoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
 	}
 
+	// Create core
+	var core zapcore.Core
+	if config.Encoding == "json" {
+		core = zapcore.NewCore(
+			zapcore.NewJSONEncoder(encoderConfig),
+			zapcore.AddSync(os.Stdout),
+			levelToZap(config.Level),
+		)
+	} else {
+		core = zapcore.NewCore(
+			zapcore.NewConsoleEncoder(encoderConfig),
+			zapcore.AddSync(os.Stdout),
+			levelToZap(config.Level),
+		)
+	}
+
+	// Create logger
+	zapLogger := zap.New(core)
 	return &logger{
 		zapLogger: zapLogger,
 		config:    config,
