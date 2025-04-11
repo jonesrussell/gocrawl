@@ -200,44 +200,31 @@ func LoadConfig() (*Config, error) {
 
 	// Unmarshal config
 	var cfg Config
-	if err := v.Unmarshal(&cfg, func(config *mapstructure.DecoderConfig) {
+	if unmarshalErr := v.Unmarshal(&cfg, func(config *mapstructure.DecoderConfig) {
 		config.TagName = "yaml"
 		config.DecodeHook = mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(),
 			mapstructure.StringToSliceHookFunc(","),
 		)
-	}); err != nil {
-		return nil, err
+	}); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
+	}
+
+	// Load sources from sources.yaml if it exists
+	if sourcesViper := viper.New(); sourcesViper.ReadInConfig() == nil {
+		var sources []types.Source
+		if unmarshalErr := sourcesViper.UnmarshalKey("sources", &sources); unmarshalErr != nil {
+			return nil, fmt.Errorf("failed to unmarshal sources config: %w", unmarshalErr)
+		}
+		cfg.Sources = sources
 	}
 
 	// Set the logger
 	cfg.logger = tempLogger
 
-	// Load sources from the specified file
-	if cfg.Crawler != nil && cfg.Crawler.SourceFile != "" {
-		cfg.logger.Info("Loading sources from file", "file", cfg.Crawler.SourceFile)
-
-		// Get the absolute path to the sources file
-		sourcesPath := filepath.Join(filepath.Dir(v.ConfigFileUsed()), cfg.Crawler.SourceFile)
-		sourcesViper := viper.New()
-		sourcesViper.SetConfigFile(sourcesPath)
-		sourcesViper.SetConfigType("yaml")
-
-		if err := sourcesViper.ReadInConfig(); err != nil {
-			return nil, fmt.Errorf("failed to read sources file: %w", err)
-		}
-
-		var sources []types.Source
-		if err := sourcesViper.UnmarshalKey("sources", &sources); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal sources: %w", err)
-		}
-
-		cfg.Sources = sources
-	}
-
 	// Validate the configuration
-	if err := cfg.Validate(); err != nil {
-		return nil, err
+	if validateErr := cfg.Validate(); validateErr != nil {
+		return nil, fmt.Errorf("invalid config: %w", validateErr)
 	}
 
 	return &cfg, nil
