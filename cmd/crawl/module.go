@@ -1,150 +1,129 @@
-// Package crawl implements the crawl command.
+// Package crawl implements the crawl command for fetching and processing web content.
 package crawl
 
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
-// CommandDeps holds the dependencies for the crawl command.
+// CommandDeps represents the dependencies required by the crawl command.
 type CommandDeps struct {
 	fx.In
 
 	Context     context.Context `name:"crawlContext"`
 	SourceName  string          `name:"sourceName"`
-	Config      config.Interface
 	Logger      logger.Interface
-	Storage     storagetypes.Interface
 	Crawler     crawler.Interface
-	Sources     sources.Interface
+	Sources     *sources.Sources
 	Handler     *signal.SignalHandler `name:"signalHandler"`
 	ArticleChan chan *models.Article  `name:"crawlerArticleChannel"`
 	Processors  []common.Processor    `group:"processors"`
 }
 
-// Module provides the crawl command's dependencies.
+// CrawlerCommand represents the crawl command.
+type CrawlerCommand struct {
+	crawler     crawler.Interface
+	logger      logger.Interface
+	processors  []common.Processor
+	articleChan chan *models.Article
+	done        chan struct{}
+}
+
+// NewCrawlerCommand creates a new crawl command.
+func NewCrawlerCommand(
+	logger logger.Interface,
+	crawler crawler.Interface,
+	processors []common.Processor,
+	articleChan chan *models.Article,
+) *CrawlerCommand {
+	return &CrawlerCommand{
+		crawler:     crawler,
+		logger:      logger,
+		processors:  processors,
+		articleChan: articleChan,
+		done:        make(chan struct{}),
+	}
+}
+
+// Start starts the crawler.
+func (c *CrawlerCommand) Start(ctx context.Context, sourceName string) error {
+	// Start crawler
+	c.logger.Info("Starting crawler...", "source", sourceName)
+	if err := c.crawler.Start(ctx, sourceName); err != nil {
+		return fmt.Errorf("failed to start crawler: %w", err)
+	}
+
+	// Process articles from the crawler's channel
+	go func() {
+		defer close(c.done)
+		crawlerChan := c.crawler.GetArticleChannel()
+		for {
+			select {
+			case <-ctx.Done():
+				c.logger.Info("Context cancelled, stopping article processing")
+				return
+			case article, ok := <-crawlerChan:
+				if !ok {
+					c.logger.Info("Crawler article channel closed")
+					return
+				}
+
+				// Forward article to the command's channel
+				select {
+				case c.articleChan <- article:
+					// Article forwarded successfully
+				case <-ctx.Done():
+					c.logger.Info("Context cancelled while forwarding article")
+					return
+				}
+
+				// Create a job for each article with timeout
+				job := &common.Job{
+					ID:        article.ID,
+					URL:       article.Source,
+					Status:    "pending",
+					CreatedAt: article.CreatedAt,
+					UpdatedAt: article.UpdatedAt,
+				}
+
+				// Process the article using each processor with timeout
+				for _, processor := range c.processors {
+					// Create a timeout context for each processor
+					processorCtx, processorCancel := context.WithTimeout(ctx, 30*time.Second)
+					processor.ProcessJob(processorCtx, job)
+					processorCancel()
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
+// Stop stops the crawler.
+func (c *CrawlerCommand) Stop(ctx context.Context) error {
+	return c.crawler.Stop(ctx)
+}
+
+// Wait waits for the crawler to finish processing.
+func (c *CrawlerCommand) Wait() {
+	c.crawler.Wait()
+	<-c.done
+}
+
+// Module provides the crawl command module for dependency injection.
 var Module = fx.Module("crawl",
-	// Core dependencies
-	config.Module,
-	logger.Module,
-	sources.Module,
-	storage.Module,
-	crawler.Module,
-	article.Module,
-	content.Module,
-
-	// Provide command channels
+	// Include all required modules
 	fx.Provide(
-		NewCrawler,
-		fx.Annotate(
-			func() chan struct{} {
-				return make(chan struct{})
-			},
-			fx.ResultTags(`name:"shutdownChan"`),
-		),
-		fx.Annotate(
-			func() chan *models.Article {
-				return make(chan *models.Article)
-			},
-			fx.ResultTags(`name:"crawlerArticleChannel"`),
-		),
-	),
-
-	// Provide index names
-	fx.Provide(
-		fx.Annotate(
-			func(sources sources.Interface, sourceName string) string {
-				source := sources.FindByName(sourceName)
-				if source == nil {
-					panic(fmt.Sprintf("failed to get source %s: source not found", sourceName))
-				}
-				return source.Index
-			},
-			fx.ParamTags(`name:"sourceName"`),
-			fx.ResultTags(`name:"indexName"`),
-		),
-		fx.Annotate(
-			func(sources sources.Interface, sourceName string) string {
-				source := sources.FindByName(sourceName)
-				if source == nil {
-					panic(fmt.Sprintf("failed to get source %s: source not found", sourceName))
-				}
-				return source.Index
-			},
-			fx.ParamTags(`name:"sourceName"`),
-			fx.ResultTags(`name:"contentIndex"`),
-		),
-	),
-
-	// Provide crawler instance
-	fx.Provide(
-		fx.Annotate(
-			func(
-				logger logger.Interface,
-				indexManager storagetypes.IndexManager,
-				sources sources.Interface,
-				processors []common.Processor,
-				bus *events.Bus,
-			) crawler.Interface {
-				// Find article and content processors
-				var articleProcessor, contentProcessor common.Processor
-				for _, p := range processors {
-					if p.ContentType() == common.ContentTypeArticle {
-						articleProcessor = p
-					} else if p.ContentType() == common.ContentTypePage {
-						contentProcessor = p
-					}
-				}
-
-				return crawler.NewCrawler(
-					logger,
-					indexManager,
-					sources,
-					articleProcessor,
-					contentProcessor,
-					bus,
-				)
-			},
-			fx.ResultTags(`name:"crawler"`),
-		),
+		NewCrawlerCommand,
 	),
 )
-
-// Params holds the crawl command's parameters
-type Params struct {
-	fx.In
-	Sources sources.Interface `json:"sources,omitempty"`
-	Logger  logger.Interface
-
-	// Lifecycle manages the application's startup and shutdown hooks
-	Lifecycle fx.Lifecycle `json:"lifecycle,omitempty"`
-
-	// CrawlerInstance handles the core crawling functionality
-	CrawlerInstance crawler.Interface `json:"crawler_instance,omitempty"`
-
-	// Config holds the application configuration
-	Config config.Interface `json:"config,omitempty"`
-
-	// Context provides the context for the crawl operation
-	Context context.Context `name:"crawlContext" json:"context,omitempty"`
-
-	// Processors is a slice of content processors, injected as a group
-	Processors []common.Processor `group:"processors" json:"processors,omitempty"`
-
-	// Done is a channel that signals when the crawl operation is complete
-	Done chan struct{} `name:"crawlDone" json:"done,omitempty"`
-}

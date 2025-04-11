@@ -3,28 +3,28 @@ package testutils
 import (
 	"context"
 
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockIndexManager implements storagetypes.IndexManager for testing.
+// MockIndexManager implements interfaces.IndexManager for testing.
 type MockIndexManager struct {
 	mock.Mock
 }
 
-// EnsureIndex implements storagetypes.IndexManager
-func (m *MockIndexManager) EnsureIndex(ctx context.Context, name string) error {
-	args := m.Called(ctx, name)
+// EnsureIndex implements interfaces.IndexManager
+func (m *MockIndexManager) EnsureIndex(ctx context.Context, name string, mapping any) error {
+	args := m.Called(ctx, name, mapping)
 	return args.Error(0)
 }
 
-// DeleteIndex implements storagetypes.IndexManager
+// DeleteIndex implements interfaces.IndexManager
 func (m *MockIndexManager) DeleteIndex(ctx context.Context, name string) error {
 	args := m.Called(ctx, name)
 	return args.Error(0)
 }
 
-// ListIndices implements storagetypes.IndexManager
+// ListIndices implements interfaces.IndexManager
 func (m *MockIndexManager) ListIndices(ctx context.Context) ([]string, error) {
 	args := m.Called(ctx)
 	if err := args.Error(1); err != nil {
@@ -40,16 +40,31 @@ func (m *MockIndexManager) ListIndices(ctx context.Context) ([]string, error) {
 	return nil, ErrInvalidResult
 }
 
-// IndexExists implements storagetypes.IndexManager
+// IndexExists implements interfaces.IndexManager
 func (m *MockIndexManager) IndexExists(ctx context.Context, name string) (bool, error) {
 	args := m.Called(ctx, name)
 	return args.Bool(0), args.Error(1)
 }
 
-// Ensure MockIndexManager implements storagetypes.IndexManager
-var _ storagetypes.IndexManager = (*MockIndexManager)(nil)
+// GetMapping implements interfaces.IndexManager
+func (m *MockIndexManager) GetMapping(ctx context.Context, name string) (map[string]any, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]any), args.Error(1)
+}
 
-// NewMockIndexManager creates a new MockIndexManager instance.
+// UpdateMapping implements interfaces.IndexManager
+func (m *MockIndexManager) UpdateMapping(ctx context.Context, name string, mapping map[string]any) error {
+	args := m.Called(ctx, name, mapping)
+	return args.Error(0)
+}
+
+// Ensure MockIndexManager implements interfaces.IndexManager
+var _ interfaces.IndexManager = (*MockIndexManager)(nil)
+
+// NewMockIndexManager creates a new mock index manager instance.
 func NewMockIndexManager() *MockIndexManager {
 	return &MockIndexManager{}
 }

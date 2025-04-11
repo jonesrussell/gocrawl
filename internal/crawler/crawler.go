@@ -7,15 +7,17 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
@@ -43,7 +45,7 @@ type Crawler struct {
 	collector        *colly.Collector
 	Logger           logger.Interface
 	bus              *events.Bus
-	indexManager     storagetypes.IndexManager
+	indexManager     interfaces.IndexManager
 	sources          sources.Interface
 	articleProcessor common.Processor
 	contentProcessor common.Processor
@@ -55,6 +57,9 @@ type Crawler struct {
 	done             chan struct{}
 	ctx              context.Context
 	cancel           context.CancelFunc
+	wg               sync.WaitGroup
+	articleChannel   chan *models.Article
+	processors       []common.Processor
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -346,7 +351,7 @@ func (c *Crawler) SetCollector(collector *colly.Collector) {
 }
 
 // GetIndexManager returns the index manager
-func (c *Crawler) GetIndexManager() storagetypes.IndexManager {
+func (c *Crawler) GetIndexManager() interfaces.IndexManager {
 	return c.indexManager
 }
 
@@ -409,4 +414,24 @@ func (c *Crawler) handleContent(e *colly.HTMLElement) {
 // SetTestServerURL sets the test server URL for testing purposes
 func (c *Crawler) SetTestServerURL(url string) {
 	c.testServerURL = url
+}
+
+// GetLogger returns the logger.
+func (c *Crawler) GetLogger() logger.Interface {
+	return c.Logger
+}
+
+// GetSource returns the source.
+func (c *Crawler) GetSource() sources.Interface {
+	return c.sources
+}
+
+// GetProcessors returns the processors.
+func (c *Crawler) GetProcessors() []common.Processor {
+	return c.processors
+}
+
+// GetArticleChannel returns the article channel.
+func (c *Crawler) GetArticleChannel() chan *models.Article {
+	return c.articleChannel
 }

@@ -49,6 +49,9 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to get absolute path for config file: %w", err)
 		}
 		cfgFile = absPath
+	} else {
+		// Default to config.yaml in the current directory
+		cfgFile = "config.yaml"
 	}
 
 	// Initialize Viper
@@ -69,6 +72,11 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 		commandName = fmt.Sprintf("%s %s", cmd.Parent().Name(), cmd.Name())
 	}
 	viper.Set("command", commandName)
+
+	// Print debug information
+	fmt.Printf("Config file: %s\n", cfgFile)
+	fmt.Printf("Config file exists: %v\n", viper.ConfigFileUsed() != "")
+	fmt.Printf("Crawler config: %+v\n", viper.Get("crawler"))
 
 	return nil
 }

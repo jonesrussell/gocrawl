@@ -6,6 +6,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
+	"github.com/stretchr/testify/mock"
 )
 
 // TestInterface defines the interface for testing source operations.
@@ -79,8 +80,8 @@ func (s *TestSources) ValidateSource(source *sourceutils.SourceConfig) error {
 }
 
 // GetMetrics returns the current metrics.
-func (s *TestSources) GetMetrics() sources.Metrics {
-	return sources.Metrics{
+func (s *TestSources) GetMetrics() sourceutils.SourcesMetrics {
+	return sourceutils.SourcesMetrics{
 		SourceCount: int64(len(s.sources)),
 		LastUpdated: time.Now(),
 	}
@@ -99,4 +100,18 @@ func (s *TestSources) FindByName(name string) *sourceutils.SourceConfig {
 // GetSources retrieves all source configurations.
 func (s *TestSources) GetSources() ([]sourceutils.SourceConfig, error) {
 	return s.sources, nil
+}
+
+type MockSources struct {
+	mock.Mock
+	metrics *sourceutils.SourcesMetrics
+}
+
+// GetMetrics implements sources.Interface.
+func (m *MockSources) GetMetrics() sourceutils.SourcesMetrics {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return sourceutils.SourcesMetrics{}
+	}
+	return args.Get(0).(sourceutils.SourcesMetrics)
 }

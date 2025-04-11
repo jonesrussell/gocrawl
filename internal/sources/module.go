@@ -3,11 +3,13 @@
 package sources
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"go.uber.org/fx"
 )
 
@@ -22,7 +24,10 @@ const (
 // Module provides the sources module for dependency injection.
 var Module = fx.Module("sources",
 	fx.Provide(
-		NewSourcesFromConfig,
+		fx.Annotate(
+			ProvideSources,
+			fx.As(new(Interface)),
+		),
 	),
 )
 
@@ -34,18 +39,21 @@ type ModuleParams struct {
 	Logger logger.Interface
 }
 
-// Result defines the sources module's output.
+// Result defines the output of the sources module.
 type Result struct {
 	fx.Out
 
 	Sources Interface
 }
 
-// ProvideSources creates a new Sources instance.
-func ProvideSources(params ModuleParams) Result {
-	return Result{
-		Sources: NewSourcesFromConfig(params.Config, params.Logger),
+// ProvideSources creates a new Sources instance from the given configuration.
+func ProvideSources(params ModuleParams) (Interface, error) {
+	sources, err := LoadSources(params.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load sources: %w", err)
 	}
+
+	return sources, nil
 }
 
 // NewConfig creates a new source configuration.
@@ -67,9 +75,7 @@ func NewSources(cfg *Config, logger logger.Interface) *Sources {
 	return &Sources{
 		sources: []Config{*cfg},
 		logger:  logger,
-		metrics: Metrics{
-			SourceCount: 1,
-		},
+		metrics: sourceutils.NewSourcesMetrics(),
 	}
 }
 

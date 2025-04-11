@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
@@ -146,9 +147,8 @@ func (c *Config) Validate() error {
 
 // LoadConfig loads the configuration from the given path.
 func LoadConfig() (*Config, error) {
-	v := viper.New()
-	v.SetConfigName("config")
-	v.AddConfigPath(".")
+	// Use the global Viper instance
+	v := viper.GetViper()
 
 	// Set defaults
 	setDefaults(v)
@@ -161,7 +161,7 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	// Read config file if exists
+	// Read the config file if it exists
 	if err := v.ReadInConfig(); err != nil {
 		var configFileNotFound viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFound) {
@@ -169,10 +169,87 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
+	fmt.Printf("Config file: %s\n", v.ConfigFileUsed())
+	fmt.Printf("Config file exists: %v\n", v.ConfigFileUsed() != "")
+
+	// Debug: Print all keys in config
+	allKeys := v.AllKeys()
+	fmt.Printf("Config keys: %v\n", allKeys)
+
+	// Debug: Print raw config
+	settings := v.AllSettings()
+	fmt.Printf("Raw config: %+v\n", settings)
+
 	// Unmarshal config
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, err
+	}
+
+	// Debug crawler config
+	if cfg.Crawler != nil {
+		fmt.Printf("Crawler config after unmarshal: %+v\n", cfg.Crawler)
+	} else {
+		fmt.Printf("Warning: Crawler config is nil after unmarshal\n")
+	}
+
+	// Load sources from the specified file
+	if cfg.Crawler != nil && cfg.Crawler.SourceFile != "" {
+		fmt.Printf("Loading sources from file: %s\n", cfg.Crawler.SourceFile)
+
+		// Get the absolute path to the sources file
+		sourceFilePath := cfg.Crawler.SourceFile
+		if !filepath.IsAbs(sourceFilePath) {
+			// If the path is relative, make it absolute relative to the config file
+			configDir := filepath.Dir(v.ConfigFileUsed())
+			sourceFilePath = filepath.Join(configDir, sourceFilePath)
+		}
+
+		fmt.Printf("Source file absolute path: %s\n", sourceFilePath)
+
+		// Create a new Viper instance for the sources file
+		sourcesViper := viper.New()
+		sourcesViper.SetConfigFile(sourceFilePath)
+		sourcesViper.SetConfigType("yaml") // Explicitly set YAML type
+
+		// Read the sources file
+		if err := sourcesViper.ReadInConfig(); err != nil {
+			fmt.Printf("Error reading sources file: %v\n", err)
+			return nil, fmt.Errorf("failed to read sources file: %w", err)
+		}
+
+		fmt.Printf("Sources file loaded successfully\n")
+
+		// Debug: Print all keys in sources file
+		allKeys = sourcesViper.AllKeys()
+		fmt.Printf("Keys in sources file: %v\n", allKeys)
+
+		// Debug: Print raw config
+		settings = sourcesViper.AllSettings()
+		fmt.Printf("Raw sources config: %+v\n", settings)
+
+		// Get the sources directly from the map
+		if sources, ok := settings["sources"].([]interface{}); ok {
+			fmt.Printf("Found %d sources in file\n", len(sources))
+			// Convert the sources to the correct type
+			cfg.Sources = make([]types.Source, len(sources))
+			for i, src := range sources {
+				if srcMap, ok := src.(map[string]interface{}); ok {
+					// Convert the map to a Source struct
+					source := types.Source{}
+					if name, ok := srcMap["name"].(string); ok {
+						source.Name = name
+					}
+					if url, ok := srcMap["url"].(string); ok {
+						source.URL = url
+					}
+					// Add other fields as needed
+					cfg.Sources[i] = source
+				}
+			}
+		} else {
+			fmt.Printf("No sources found in file\n")
+		}
 	}
 
 	// Ensure TLS config is initialized
@@ -274,4 +351,9 @@ func (c *Config) GetCommand() string {
 // GetStorageConfig returns the storage configuration.
 func (c *Config) GetStorageConfig() *storage.Config {
 	return c.Storage
+}
+
+// GetConfigFile returns the path to the configuration file.
+func (c *Config) GetConfigFile() string {
+	return viper.ConfigFileUsed()
 }

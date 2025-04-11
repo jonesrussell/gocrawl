@@ -8,50 +8,80 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockCrawler is a mock implementation of the crawler.Interface for testing.
+// MockCrawler implements the crawler interface for testing.
 type MockCrawler struct {
 	mock.Mock
-	Logger           logger.Interface
-	indexManager     storagetypes.IndexManager
-	sources          sources.Interface
-	articleProcessor common.Processor
-	contentProcessor common.Processor
-	bus              *events.Bus
+	indexManager   interfaces.IndexManager
+	source         sources.Interface
+	processors     []common.Processor
+	articleChannel chan *models.Article
+	logger         logger.Interface
 }
 
 // NewMockCrawler creates a new mock crawler instance.
 func NewMockCrawler(
+	indexManager interfaces.IndexManager,
+	source sources.Interface,
+	processors []common.Processor,
+	articleChannel chan *models.Article,
 	logger logger.Interface,
-	indexManager storagetypes.IndexManager,
-	sources sources.Interface,
-	articleProcessor common.Processor,
-	contentProcessor common.Processor,
-	bus *events.Bus,
-) crawler.Interface {
+) *MockCrawler {
 	return &MockCrawler{
-		Logger:           logger,
-		indexManager:     indexManager,
-		sources:          sources,
-		articleProcessor: articleProcessor,
-		contentProcessor: contentProcessor,
-		bus:              bus,
+		indexManager:   indexManager,
+		source:         source,
+		processors:     processors,
+		articleChannel: articleChannel,
+		logger:         logger,
 	}
 }
 
-func (m *MockCrawler) Start(ctx context.Context, source string) error {
-	args := m.Called(ctx, source)
+// Start implements Interface.
+func (m *MockCrawler) Start(ctx context.Context, sourceName string) error {
+	args := m.Called(ctx, sourceName)
 	return args.Error(0)
 }
 
+// Stop implements Interface.
 func (m *MockCrawler) Stop(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
+}
+
+// Wait implements Interface.
+func (m *MockCrawler) Wait() {
+	m.Called()
+}
+
+// GetIndexManager implements Interface.
+func (m *MockCrawler) GetIndexManager() interfaces.IndexManager {
+	return m.indexManager
+}
+
+// GetLogger implements Interface.
+func (m *MockCrawler) GetLogger() logger.Interface {
+	return m.logger
+}
+
+// GetSource implements Interface.
+func (m *MockCrawler) GetSource() sources.Interface {
+	return m.source
+}
+
+// GetProcessors implements Interface.
+func (m *MockCrawler) GetProcessors() []common.Processor {
+	return m.processors
+}
+
+// GetArticleChannel implements Interface.
+func (m *MockCrawler) GetArticleChannel() chan *models.Article {
+	return m.articleChannel
 }
 
 func (m *MockCrawler) Subscribe(handler events.Handler) {
@@ -69,14 +99,6 @@ func (m *MockCrawler) SetMaxDepth(depth int) {
 
 func (m *MockCrawler) SetCollector(collector *colly.Collector) {
 	m.Called(collector)
-}
-
-func (m *MockCrawler) GetIndexManager() storagetypes.IndexManager {
-	return m.indexManager
-}
-
-func (m *MockCrawler) Wait() {
-	m.Called()
 }
 
 func (m *MockCrawler) GetMetrics() *common.Metrics {

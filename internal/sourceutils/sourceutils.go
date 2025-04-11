@@ -10,6 +10,22 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
+// SourcesMetrics contains metrics about the source manager.
+type SourcesMetrics struct {
+	// SourceCount is the number of sources.
+	SourceCount int64
+	// LastUpdated is the time the metrics were last updated.
+	LastUpdated time.Time
+}
+
+// NewSourcesMetrics creates a new SourcesMetrics instance.
+func NewSourcesMetrics() *SourcesMetrics {
+	return &SourcesMetrics{
+		SourceCount: 0,
+		LastUpdated: time.Now(),
+	}
+}
+
 // SourceConfig represents a source configuration.
 type SourceConfig struct {
 	Name           string
@@ -20,6 +36,7 @@ type SourceConfig struct {
 	MaxDepth       int
 	Time           []string
 	Index          string
+	ArticleIndex   string
 	Selectors      SelectorConfig
 	Rules          types.Rules
 }
@@ -66,7 +83,7 @@ func ConvertToConfigSource(source *SourceConfig) *types.Source {
 		URL:            source.URL,
 		AllowedDomains: source.AllowedDomains,
 		StartURLs:      source.StartURLs,
-		RateLimit:      source.RateLimit,
+		RateLimit:      source.RateLimit.String(),
 		MaxDepth:       source.MaxDepth,
 		Time:           source.Time,
 		Index:          source.Index,

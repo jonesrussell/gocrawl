@@ -4,7 +4,6 @@ package sources
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
@@ -23,7 +22,7 @@ type Interface interface {
 	// ValidateSource validates a source configuration.
 	ValidateSource(source *sourceutils.SourceConfig) error
 	// GetMetrics returns the current metrics.
-	GetMetrics() Metrics
+	GetMetrics() sourceutils.SourcesMetrics
 	// FindByName finds a source by name. Returns nil if not found.
 	FindByName(name string) *sourceutils.SourceConfig
 	// GetSources retrieves all source configurations.
@@ -34,14 +33,6 @@ type Interface interface {
 type Params struct {
 	// Logger is the logger to use.
 	Logger logger.Interface
-}
-
-// Metrics contains metrics about the source manager.
-type Metrics struct {
-	// SourceCount is the number of sources.
-	SourceCount int64
-	// LastUpdated is the time the metrics were last updated.
-	LastUpdated time.Time
 }
 
 // ErrInvalidSource is returned when a source is invalid.

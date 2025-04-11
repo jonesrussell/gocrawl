@@ -217,7 +217,7 @@ func (m *MockIndexManager) GetMapping(ctx context.Context, index string) (map[st
 }
 
 // UpdateMapping implements interfaces.IndexManager.
-func (m *MockIndexManager) UpdateMapping(ctx context.Context, index string, mapping any) error {
+func (m *MockIndexManager) UpdateMapping(ctx context.Context, index string, mapping map[string]any) error {
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }

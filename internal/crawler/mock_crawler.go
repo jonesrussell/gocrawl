@@ -8,25 +8,83 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockCrawler is a mock implementation of the crawler interface
+// MockCrawler implements the crawler interface for testing.
 type MockCrawler struct {
 	mock.Mock
 }
 
-// Start mocks the Start method
+// Start implements Interface.
 func (m *MockCrawler) Start(ctx context.Context, sourceName string) error {
 	args := m.Called(ctx, sourceName)
 	return args.Error(0)
 }
 
-// Stop mocks the Stop method
+// Stop implements Interface.
 func (m *MockCrawler) Stop(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
+}
+
+// Wait implements Interface.
+func (m *MockCrawler) Wait() {
+	m.Called()
+}
+
+// GetIndexManager implements Interface.
+func (m *MockCrawler) GetIndexManager() interfaces.IndexManager {
+	args := m.Called()
+	if im, ok := args.Get(0).(interfaces.IndexManager); ok {
+		return im
+	}
+	return nil
+}
+
+// GetLogger implements Interface.
+func (m *MockCrawler) GetLogger() logger.Interface {
+	args := m.Called()
+	if l, ok := args.Get(0).(logger.Interface); ok {
+		return l
+	}
+	return nil
+}
+
+// GetSource implements Interface.
+func (m *MockCrawler) GetSource() sources.Interface {
+	args := m.Called()
+	if s, ok := args.Get(0).(sources.Interface); ok {
+		return s
+	}
+	return nil
+}
+
+// GetProcessors implements Interface.
+func (m *MockCrawler) GetProcessors() []common.Processor {
+	args := m.Called()
+	if p, ok := args.Get(0).([]common.Processor); ok {
+		return p
+	}
+	return nil
+}
+
+// GetArticleChannel implements Interface.
+func (m *MockCrawler) GetArticleChannel() chan *models.Article {
+	args := m.Called()
+	if c, ok := args.Get(0).(chan *models.Article); ok {
+		return c
+	}
+	return nil
+}
+
+// NewMockCrawler creates a new mock crawler instance.
+func NewMockCrawler() *MockCrawler {
+	return &MockCrawler{}
 }
 
 // Subscribe mocks the Subscribe method
@@ -48,23 +106,6 @@ func (m *MockCrawler) SetMaxDepth(depth int) {
 // SetCollector mocks the SetCollector method
 func (m *MockCrawler) SetCollector(collector *colly.Collector) {
 	m.Called(collector)
-}
-
-// GetIndexManager returns the index manager.
-func (m *MockCrawler) GetIndexManager() storagetypes.IndexManager {
-	args := m.Called()
-	if args.Get(0) == nil {
-		return nil
-	}
-	if im, ok := args.Get(0).(storagetypes.IndexManager); ok {
-		return im
-	}
-	return nil
-}
-
-// Wait mocks the Wait method
-func (m *MockCrawler) Wait() {
-	m.Called()
 }
 
 // GetMetrics returns the crawler metrics.

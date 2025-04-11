@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -91,16 +92,16 @@ func (m *MockSourceManager) ValidateSource(source *sources.Config) error {
 }
 
 // GetMetrics implements sources.Interface
-func (m *MockSourceManager) GetMetrics() sources.Metrics {
+func (m *MockSourceManager) GetMetrics() sourceutils.SourcesMetrics {
 	args := m.Called()
 	result := args.Get(0)
 	if result == nil {
-		return sources.Metrics{}
+		return sourceutils.SourcesMetrics{}
 	}
-	if val, ok := result.(sources.Metrics); ok {
+	if val, ok := result.(sourceutils.SourcesMetrics); ok {
 		return val
 	}
-	return sources.Metrics{}
+	return sourceutils.SourcesMetrics{}
 }
 
 // Ensure MockSourceManager implements sources.Interface

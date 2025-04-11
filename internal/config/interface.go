@@ -32,6 +32,8 @@ type Interface interface {
 	GetStorageConfig() *storage.Config
 	// GetCommand returns the current command.
 	GetCommand() string
+	// GetConfigFile returns the path to the configuration file.
+	GetConfigFile() string
 	// Validate validates the configuration based on the current command.
 	Validate() error
 }

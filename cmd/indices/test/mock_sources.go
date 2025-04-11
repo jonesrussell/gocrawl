@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/stretchr/testify/mock"
 )
@@ -52,11 +51,11 @@ func (m *MockSources) ValidateSource(source *sourceutils.SourceConfig) error {
 	return args.Error(0)
 }
 
-func (m *MockSources) GetMetrics() sources.Metrics {
+func (m *MockSources) GetMetrics() sourceutils.SourcesMetrics {
 	args := m.Called()
-	val, ok := args.Get(0).(sources.Metrics)
+	val, ok := args.Get(0).(sourceutils.SourcesMetrics)
 	if !ok {
-		return sources.Metrics{}
+		return sourceutils.SourcesMetrics{}
 	}
 	return val
 }

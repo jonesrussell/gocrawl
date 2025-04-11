@@ -37,6 +37,8 @@ type Config struct {
 	Delay time.Duration `yaml:"delay"`
 	// RandomDelay is the random delay to add to the base delay
 	RandomDelay time.Duration `yaml:"random_delay"`
+	// SourceFile is the path to the sources configuration file
+	SourceFile string `yaml:"source_file"`
 }
 
 // Validate validates the crawler configuration.
@@ -71,6 +73,7 @@ func New(opts ...Option) *Config {
 		RespectRobotsTxt:  true,
 		AllowedDomains:    []string{"*"},
 		DisallowedDomains: []string{},
+		SourceFile:        "sources.yml",
 	}
 
 	for _, opt := range opts {
