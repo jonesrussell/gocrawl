@@ -103,8 +103,21 @@ func (s *Storage) IndexDocument(ctx context.Context, index, id string, document 
 	s.logger.Info("Document indexed successfully",
 		"index", index,
 		"docID", id,
-		"type", fmt.Sprintf("%T", document))
+		"type", fmt.Sprintf("%T", document),
+		"url", getURLFromDocument(document))
 	return nil
+}
+
+// getURLFromDocument extracts the URL from a document
+func getURLFromDocument(doc any) string {
+	switch v := doc.(type) {
+	case *models.Article:
+		return v.Source
+	case *models.Content:
+		return v.URL
+	default:
+		return ""
+	}
 }
 
 // BulkIndex performs bulk indexing of documents
