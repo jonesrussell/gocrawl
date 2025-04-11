@@ -177,17 +177,6 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
-	fmt.Printf("Config file: %s\n", v.ConfigFileUsed())
-	fmt.Printf("Config file exists: %v\n", v.ConfigFileUsed() != "")
-
-	// Debug: Print all keys in config
-	allKeys := v.AllKeys()
-	fmt.Printf("Config keys: %v\n", allKeys)
-
-	// Debug: Print raw config
-	settings := v.AllSettings()
-	fmt.Printf("Raw config: %+v\n", settings)
-
 	// Unmarshal config
 	var cfg Config
 	if err := v.Unmarshal(&cfg, func(config *mapstructure.DecoderConfig) {
@@ -198,13 +187,6 @@ func LoadConfig() (*Config, error) {
 		)
 	}); err != nil {
 		return nil, err
-	}
-
-	// Debug crawler config
-	if cfg.Crawler != nil {
-		fmt.Printf("Crawler config after unmarshal: %+v\n", cfg.Crawler)
-	} else {
-		fmt.Printf("Warning: Crawler config is nil after unmarshal\n")
 	}
 
 	// Load sources from the specified file

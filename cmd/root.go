@@ -73,11 +73,6 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 	}
 	viper.Set("command", commandName)
 
-	// Print debug information
-	fmt.Printf("Config file: %s\n", cfgFile)
-	fmt.Printf("Config file exists: %v\n", viper.ConfigFileUsed() != "")
-	fmt.Printf("Crawler config: %+v\n", viper.Get("crawler"))
-
 	return nil
 }
 
