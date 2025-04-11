@@ -11,7 +11,40 @@
   - [ ] Add proper interface documentation
   - [ ] Add proper examples
 
-### 2. Config Package Improvements
+### 2. Crawler Refactoring
+- [ ] Define Core Interfaces
+  - [ ] Create crawler.Interface for main crawler functionality
+  - [ ] Create crawler.Config for configuration
+  - [ ] Create crawler.State for runtime state
+  - [ ] Create crawler.Metrics for metrics tracking
+  - [ ] Create crawler.Processor for content processing
+  - [ ] Create crawler.Storage for data persistence
+  - [ ] Create crawler.EventBus for event handling
+- [ ] Implement New Structure
+  - [ ] Create new crawler package structure
+  - [ ] Implement core interfaces
+  - [ ] Add proper error types
+  - [ ] Add proper documentation
+  - [ ] Add proper examples
+- [ ] Migration Plan
+  - [ ] Create migration guide
+  - [ ] Implement changes incrementally
+  - [ ] Update tests for new structure
+  - [ ] Update documentation
+  - [ ] Add deprecation notices
+- [ ] Testing
+  - [ ] Add interface tests
+  - [ ] Add implementation tests
+  - [ ] Add integration tests
+  - [ ] Add performance tests
+  - [ ] Add concurrent tests
+- [ ] Monitoring
+  - [ ] Add metrics for crawler operations
+  - [ ] Add tracing for critical paths
+  - [ ] Add logging improvements
+  - [ ] Add health checks
+
+### 3. Config Package Improvements
 - [x] Split module.go into focused files
   - [x] Create viper.go for Viper setup
   - [x] Create server.go for server config
@@ -66,7 +99,7 @@
   - [ ] Add metrics for hot reload events
   - [ ] Add tracing for config operations
 
-### 3. HTTP Client Error Handling
+### 4. HTTP Client Error Handling
 - [ ] Add proper response body closure
   - [ ] Add defer statements
   - [ ] Add error handling
@@ -80,7 +113,7 @@
   - [ ] Add timeout errors
   - [ ] Add tests
 
-### 4. Module Reorganization
+### 5. Module Reorganization
 - [ ] Create separate storage module
   - [ ] Move storage interface to internal/storage
   - [ ] Create storage module for dependency injection
@@ -92,7 +125,7 @@
   - [ ] Add metrics tests
   - [ ] Update commands to use new metrics module
 
-### 5. Test Utilities Enhancement
+### 6. Test Utilities Enhancement
 - [x] Implement MockProcessor for testing
   - [x] Add Process method
   - [x] Add CanProcess method
