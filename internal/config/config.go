@@ -46,6 +46,16 @@ type Config struct {
 	Sources []types.Source `yaml:"sources"`
 	// Command is the current command being executed
 	Command string `yaml:"command"`
+	viper   *viper.Viper
+	logger  logger.Interface
+}
+
+// NewConfig creates a new config instance.
+func NewConfig(logger logger.Interface) *Config {
+	return &Config{
+		viper:  viper.New(),
+		logger: logger,
+	}
 }
 
 // validateBasicConfig validates the basic configuration that's common to all commands
@@ -192,7 +202,7 @@ func LoadConfig() (*Config, error) {
 
 	// Load sources from the specified file
 	if cfg.Crawler != nil && cfg.Crawler.SourceFile != "" {
-		fmt.Printf("Loading sources from file: %s\n", cfg.Crawler.SourceFile)
+		cfg.logger.Info("Loading sources from file", "file", cfg.Crawler.SourceFile)
 
 		// Get the absolute path to the sources file
 		sourcesPath := filepath.Join(filepath.Dir(v.ConfigFileUsed()), cfg.Crawler.SourceFile)

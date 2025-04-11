@@ -54,7 +54,6 @@ type SignalHandler struct {
 	shutdownTimeout time.Duration
 	cleanup         func()
 	shutdownError   error
-	signals         []os.Signal
 }
 
 // NewSignalHandler creates a new signal handler.

@@ -2,7 +2,6 @@ package testutils
 
 import (
 	"context"
-	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
@@ -14,77 +13,71 @@ type TestInterface interface {
 	sources.Interface
 }
 
-// TestSources implements TestInterface for testing.
+// TestSources implements the TestInterface interface.
 type TestSources struct {
+	mock.Mock
 	sources []sourceutils.SourceConfig
 }
 
 // NewTestSources creates a new TestSources instance.
-func NewTestSources(sources []sourceutils.SourceConfig) TestInterface {
+func NewTestSources(sources []sourceutils.SourceConfig) *TestSources {
 	return &TestSources{
 		sources: sources,
 	}
 }
 
-// ListSources retrieves all sources.
-func (s *TestSources) ListSources(ctx context.Context) ([]*sourceutils.SourceConfig, error) {
-	result := make([]*sourceutils.SourceConfig, len(s.sources))
-	for i := range s.sources {
-		result[i] = &s.sources[i]
+// GetSource implements sources.Interface.
+func (s *TestSources) GetSource(ctx context.Context, name string) (*sourceutils.SourceConfig, error) {
+	args := s.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return result, nil
+	return &s.sources[0], args.Error(1)
 }
 
-// AddSource adds a new source.
-func (s *TestSources) AddSource(ctx context.Context, source *sourceutils.SourceConfig) error {
-	// Set default index name if not provided
-	if source.Index == "" {
-		source.Index = "content"
-	}
-
-	s.sources = append(s.sources, *source)
-	return nil
+// AddSource implements sources.Interface.
+func (s *TestSources) AddSource(ctx context.Context, source sourceutils.SourceConfig) error {
+	args := s.Called(ctx, source)
+	return args.Error(0)
 }
 
-// UpdateSource updates an existing source.
-func (s *TestSources) UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error {
-	for i := range s.sources {
-		if s.sources[i].Name == source.Name {
-			s.sources[i] = *source
-			return nil
-		}
-	}
-	return sources.ErrSourceNotFound
+// UpdateSource implements sources.Interface.
+func (s *TestSources) UpdateSource(ctx context.Context, source sourceutils.SourceConfig) error {
+	args := s.Called(ctx, source)
+	return args.Error(0)
 }
 
-// DeleteSource deletes a source by name.
+// DeleteSource implements sources.Interface.
 func (s *TestSources) DeleteSource(ctx context.Context, name string) error {
-	for i := range s.sources {
-		if s.sources[i].Name == name {
-			s.sources = append(s.sources[:i], s.sources[i+1:]...)
-			return nil
-		}
-	}
-	return sources.ErrSourceNotFound
+	args := s.Called(ctx, name)
+	return args.Error(0)
 }
 
-// ValidateSource validates a source configuration.
-func (s *TestSources) ValidateSource(source *sourceutils.SourceConfig) error {
-	if source == nil {
-		return sources.ErrInvalidSource
+// ListSources implements sources.Interface.
+func (s *TestSources) ListSources(ctx context.Context) ([]sourceutils.SourceConfig, error) {
+	args := s.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-
-	// Convert to types.Source and validate
-	typesSource := sourceutils.ConvertToConfigSource(source)
-	return typesSource.Validate()
+	return s.sources, args.Error(1)
 }
 
-// GetMetrics returns the current metrics.
+// ValidateSource implements sources.Interface.
+func (s *TestSources) ValidateSource(source sourceutils.SourceConfig) error {
+	args := s.Called(source)
+	return args.Error(0)
+}
+
+// GetMetrics implements sources.Interface.
 func (s *TestSources) GetMetrics() sourceutils.SourcesMetrics {
-	return sourceutils.SourcesMetrics{
-		SourceCount: int64(len(s.sources)),
-		LastUpdated: time.Now(),
+	args := s.Called()
+	if args.Get(0) == nil {
+		return sourceutils.SourcesMetrics{}
 	}
+	if metrics, ok := args.Get(0).(sourceutils.SourcesMetrics); ok {
+		return metrics
+	}
+	return sourceutils.SourcesMetrics{}
 }
 
 // FindByName finds a source by name.
@@ -104,7 +97,6 @@ func (s *TestSources) GetSources() ([]sourceutils.SourceConfig, error) {
 
 type MockSources struct {
 	mock.Mock
-	metrics *sourceutils.SourcesMetrics
 }
 
 // GetMetrics implements sources.Interface.

@@ -113,8 +113,8 @@ func (l *Loader) loadRawSources() ([]map[string]any, error) {
 
 	sources := make([]map[string]any, 0, len(sourcesArray))
 	for _, src := range sourcesArray {
-		srcMap, ok := src.(map[string]any)
-		if !ok {
+		srcMap, srcOk := src.(map[string]any)
+		if !srcOk {
 			continue
 		}
 		sources = append(sources, srcMap)
@@ -131,11 +131,11 @@ func (l *Loader) validateAndConvertSources(sources []map[string]any) ([]Config, 
 
 	configs := make([]Config, 0, len(sources))
 	for _, src := range sources {
-		cfg, err := l.convertToConfig(src)
-		if err != nil {
+		cfg, convertErr := l.convertToConfig(src)
+		if convertErr != nil {
 			continue
 		}
-		if err := l.validateConfig(&cfg); err != nil {
+		if validateErr := l.validateConfig(&cfg); validateErr != nil {
 			continue
 		}
 		configs = append(configs, cfg)
@@ -163,8 +163,8 @@ func (l *Loader) convertToConfig(src map[string]any) (Config, error) {
 		return Config{}, fmt.Errorf("failed to create decoder: %w", err)
 	}
 
-	if err := decoder.Decode(src); err != nil {
-		return Config{}, fmt.Errorf("failed to decode source: %w", err)
+	if decodeErr := decoder.Decode(src); decodeErr != nil {
+		return Config{}, fmt.Errorf("failed to decode source: %w", decodeErr)
 	}
 
 	return cfg, nil
@@ -192,9 +192,7 @@ func (l *Loader) validateConfig(cfg *Config) error {
 		return fmt.Errorf("invalid rate limit: %w", err)
 	}
 
-	if err := l.validateMaxDepth(cfg); err != nil {
-		return fmt.Errorf("invalid max depth: %w", err)
-	}
+	l.validateMaxDepth(cfg)
 
 	if err := l.validateTime(cfg); err != nil {
 		return fmt.Errorf("invalid time: %w", err)
@@ -240,11 +238,10 @@ func (l *Loader) validateRateLimit(cfg *Config) error {
 }
 
 // validateMaxDepth validates the max depth.
-func (l *Loader) validateMaxDepth(cfg *Config) error {
+func (l *Loader) validateMaxDepth(cfg *Config) {
 	if cfg.MaxDepth <= 0 {
 		cfg.MaxDepth = 2 // Default max depth
 	}
-	return nil
 }
 
 // validateTime validates the time format.

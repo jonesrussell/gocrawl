@@ -1,21 +1,22 @@
-package metrics
+package metrics_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewMetrics(t *testing.T) {
-	metrics := NewMetrics()
+	metrics := metrics.NewMetrics()
 	assert.NotNil(t, metrics)
 	assert.False(t, metrics.GetStartTime().IsZero())
 }
 
 func TestUpdateMetrics(t *testing.T) {
-	metrics := NewMetrics()
+	metrics := metrics.NewMetrics()
 
 	// Test successful processing
 	metrics.UpdateMetrics(true)
@@ -30,7 +31,7 @@ func TestUpdateMetrics(t *testing.T) {
 }
 
 func TestResetMetrics(t *testing.T) {
-	metrics := NewMetrics()
+	metrics := metrics.NewMetrics()
 	metrics.UpdateMetrics(true)
 	metrics.UpdateMetrics(false)
 	metrics.SetCurrentSource("test")
@@ -44,7 +45,7 @@ func TestResetMetrics(t *testing.T) {
 }
 
 func TestProcessingDuration(t *testing.T) {
-	metrics := NewMetrics()
+	metrics := metrics.NewMetrics()
 	initialDuration := metrics.GetProcessingDuration()
 
 	time.Sleep(100 * time.Millisecond)
@@ -54,7 +55,7 @@ func TestProcessingDuration(t *testing.T) {
 }
 
 func TestCurrentSource(t *testing.T) {
-	metrics := NewMetrics()
+	metrics := metrics.NewMetrics()
 	assert.Empty(t, metrics.GetCurrentSource())
 
 	metrics.SetCurrentSource("test")
@@ -62,7 +63,7 @@ func TestCurrentSource(t *testing.T) {
 }
 
 func TestUpdateMetricsConcurrently(t *testing.T) {
-	metrics := NewMetrics()
+	metrics := metrics.NewMetrics()
 
 	// Start a goroutine to update metrics
 	go func() {

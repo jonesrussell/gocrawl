@@ -98,7 +98,13 @@ var Module = fx.Options(
 
 	// Invoke the crawler lifecycle
 	fx.Invoke(fx.Annotate(
-		func(lc fx.Lifecycle, logger logger.Interface, crawler crawler.Interface, handler signal.Interface, sourceName string) {
+		func(
+			lc fx.Lifecycle,
+			logger logger.Interface,
+			crawler crawler.Interface,
+			handler signal.Interface,
+			sourceName string,
+		) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
 					// Set up signal handling

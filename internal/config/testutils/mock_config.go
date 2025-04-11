@@ -31,6 +31,8 @@ const (
 	DefaultMaxRetries     = 3
 	DefaultBulkSize       = 1000
 	DefaultFlushInterval  = 30 * time.Second
+	// DefaultMaxWait is the default maximum wait time for operations.
+	DefaultMaxWait = 5 * time.Second
 )
 
 // MockConfig is a mock implementation of the Config interface
@@ -198,7 +200,7 @@ func NewMockConfig() *MockConfig {
 			}{
 				Enabled:     true,
 				InitialWait: 1 * time.Second,
-				MaxWait:     5 * time.Second,
+				MaxWait:     DefaultMaxWait,
 				MaxRetries:  DefaultMaxRetries,
 			},
 			BulkSize:      DefaultBulkSize,

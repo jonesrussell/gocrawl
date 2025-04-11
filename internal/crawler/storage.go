@@ -74,15 +74,7 @@ func (s *Storage) GetArticle(ctx context.Context, id string) (*models.Article, e
 // ListArticles lists articles matching the query.
 func (s *Storage) ListArticles(ctx context.Context, query string) ([]*models.Article, error) {
 	// Create a search query
-	searchQuery := map[string]any{
-		"query": map[string]any{
-			"multi_match": map[string]any{
-				"query":  query,
-				"fields": []string{"title^2", "body", "description"},
-			},
-		},
-		"size": common.DefaultBufferSize,
-	}
+	searchQuery := s.createSearchQuery(query)
 
 	// Execute the search
 	results, err := s.storage.Search(ctx, s.indexName, searchQuery)
@@ -94,27 +86,85 @@ func (s *Storage) ListArticles(ctx context.Context, query string) ([]*models.Art
 	}
 
 	// Convert results to articles
-	articles := make([]*models.Article, 0, len(results))
-	for _, result := range results {
-		if article, isArticle := result.(*models.Article); isArticle {
-			articles = append(articles, article)
-		} else {
-			// Try to unmarshal if it's a map
-			if m, isMap := result.(map[string]any); isMap {
-				newArticle := &models.Article{}
-				if data, marshalErr := json.Marshal(m); marshalErr == nil {
-					if unmarshalErr := json.Unmarshal(data, newArticle); unmarshalErr == nil {
-						articles = append(articles, newArticle)
-					}
-				}
-			}
-		}
+	articles, err := s.convertResultsToArticles(results)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert results: %w", err)
 	}
 
 	s.logger.Debug("Listed articles",
 		"query", query,
 		"count", len(articles))
 	return articles, nil
+}
+
+// createSearchQuery creates a search query for articles.
+func (s *Storage) createSearchQuery(query string) map[string]any {
+	return map[string]any{
+		"query": map[string]any{
+			"multi_match": map[string]any{
+				"query":  query,
+				"fields": []string{"title^2", "body", "description"},
+			},
+		},
+		"size": common.DefaultBufferSize,
+	}
+}
+
+// convertResultsToArticles converts search results to articles.
+func (s *Storage) convertResultsToArticles(results []any) ([]*models.Article, error) {
+	articles := make([]*models.Article, 0, len(results))
+	for _, result := range results {
+		article, err := s.convertResultToArticle(result)
+		if err != nil {
+			continue
+		}
+		articles = append(articles, article)
+	}
+	return articles, nil
+}
+
+// convertResultToArticle converts a single result to an article.
+func (s *Storage) convertResultToArticle(result any) (*models.Article, error) {
+	if article, isArticle := result.(*models.Article); isArticle {
+		return article, nil
+	}
+
+	if m, isMap := result.(map[string]any); isMap {
+		newArticle := &models.Article{}
+		data, err := json.Marshal(m)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal result: %w", err)
+		}
+		if err := json.Unmarshal(data, newArticle); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal article: %w", err)
+		}
+		return newArticle, nil
+	}
+
+	return nil, fmt.Errorf("unsupported result type: %T", result)
+}
+
+// Store stores the result in the appropriate storage.
+func (s *Storage) Store(ctx context.Context, result any) error {
+	if result == nil {
+		return errors.New("result cannot be nil")
+	}
+
+	// Handle article storage
+	if article, isArticle := result.(*models.Article); isArticle {
+		if article == nil {
+			return errors.New("article cannot be nil")
+		}
+
+		// Store article
+		if err := s.SaveArticle(ctx, article); err != nil {
+			return fmt.Errorf("failed to save article: %w", err)
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("unsupported result type: %T", result)
 }
 
 // Ensure Storage implements ArticleStorage interface

@@ -14,11 +14,9 @@ import (
 )
 
 const (
-	// processorTimeout is the timeout for each processor
-	processorTimeout = 30 * time.Second
-	// crawlerTimeout is the timeout for waiting for the crawler to complete
-	crawlerTimeout = 5 * time.Minute
-	// shutdownTimeout is the timeout for graceful shutdown
+	// crawlerTimeout is the maximum time to wait for the crawler to complete.
+	crawlerTimeout = 30 * time.Minute
+	// shutdownTimeout is the maximum time to wait for graceful shutdown.
 	shutdownTimeout = 30 * time.Second
 )
 
