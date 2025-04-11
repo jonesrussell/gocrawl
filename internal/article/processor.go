@@ -210,12 +210,18 @@ func (p *ArticleProcessor) ProcessHTMLElement(e *colly.HTMLElement) {
 	}
 }
 
-// ProcessContent implements the collector.Processor interface
-func (p *ArticleProcessor) ProcessContent(e *colly.HTMLElement) {
-	// Skip content pages - we only process articles
-	p.Logger.Debug("Skipping content page in article processor",
-		"component", "article/processor",
-		"url", e.Request.URL.String())
+// ProcessContent implements the ProcessorRegistry.ProcessContent method
+func (p *ArticleProcessor) ProcessContent(ctx context.Context, contentType common.ContentType, content any) error {
+	if contentType != common.ContentTypeArticle {
+		return fmt.Errorf("unsupported content type: %s", contentType)
+	}
+
+	e, ok := content.(*colly.HTMLElement)
+	if !ok {
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
+	}
+
+	return p.ProcessHTML(ctx, e)
 }
 
 // Start implements Processor.Start
@@ -253,6 +259,14 @@ func (p *ArticleProcessor) ParseHTML(r io.Reader) error {
 	// For article processing, we don't need to parse raw HTML
 	// as we process the structured article data instead
 	return nil
+}
+
+// GetProcessor returns a processor for the given content type.
+func (p *ArticleProcessor) GetProcessor(contentType common.ContentType) (common.ContentProcessor, error) {
+	if contentType == common.ContentTypeArticle {
+		return p, nil
+	}
+	return nil, fmt.Errorf("unsupported content type: %s", contentType)
 }
 
 // Ensure ArticleProcessor implements required interfaces

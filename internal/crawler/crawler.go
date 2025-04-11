@@ -3,19 +3,19 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/fsd42/gocrawl/internal/logger"
-	"github.com/fsd42/gocrawl/internal/metrics"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
@@ -51,6 +51,8 @@ type Crawler struct {
 	wg               sync.WaitGroup
 	articleChannel   chan *models.Article
 	processors       []common.Processor
+	config           *Config
+	esClient         *elasticsearch.Client
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -59,12 +61,15 @@ var _ CrawlerMetrics = (*Crawler)(nil)
 
 // crawlerState tracks the crawler's state.
 type crawlerState struct {
-	startTime time.Time
-	processed int64
-	errors    int64
-	mu        sync.RWMutex
-	ctx       context.Context
-	isRunning bool
+	startTime         time.Time
+	processedCount    int64
+	errorCount        int64
+	lastProcessedTime time.Time
+	mu                sync.RWMutex
+	ctx               context.Context
+	cancel            context.CancelFunc
+	isRunning         bool
+	currentSource     string
 }
 
 // newCrawlerState creates a new crawler state.
@@ -79,8 +84,8 @@ func (s *crawlerState) Update(startTime time.Time, processed int64, errors int64
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.startTime = startTime
-	s.processed = processed
-	s.errors = errors
+	s.processedCount = processed
+	s.errorCount = errors
 }
 
 // Reset resets the state to zero.
@@ -88,45 +93,76 @@ func (s *crawlerState) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.startTime = time.Now()
-	s.processed = 0
-	s.errors = 0
+	s.processedCount = 0
+	s.errorCount = 0
+	s.lastProcessedTime = time.Time{}
 	s.isRunning = false
+	s.currentSource = ""
+	if s.cancel != nil {
+		s.cancel()
+		s.cancel = nil
+	}
+	s.ctx = nil
 }
 
 // GetProcessedCount returns the number of processed items.
 func (s *crawlerState) GetProcessedCount() int64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.processed
+	return s.processedCount
 }
 
 // GetErrorCount returns the number of errors.
 func (s *crawlerState) GetErrorCount() int64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.errors
+	return s.errorCount
 }
 
 // IncrementProcessed increments the processed count.
 func (s *crawlerState) IncrementProcessed() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.processed++
+	s.processedCount++
+	s.lastProcessedTime = time.Now()
 }
 
 // IncrementError increments the error count.
 func (s *crawlerState) IncrementError() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.errors++
+	s.errorCount++
 }
 
 // Start initializes the state with a context.
-func (s *crawlerState) Start(ctx context.Context) {
+func (s *crawlerState) Start(ctx context.Context, source string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.ctx = ctx
+	s.ctx, s.cancel = context.WithCancel(ctx)
 	s.isRunning = true
+	s.currentSource = source
+}
+
+// Stop cleans up the state.
+func (s *crawlerState) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.isRunning = false
+	s.currentSource = ""
+	if s.cancel != nil {
+		s.cancel()
+		s.cancel = nil
+	}
+	s.ctx = nil
+}
+
+// Cancel cancels the context.
+func (s *crawlerState) Cancel() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancel != nil {
+		s.cancel()
+	}
 }
 
 // IsRunning returns whether the state is running.
@@ -143,14 +179,95 @@ func (s *crawlerState) Context() context.Context {
 	return s.ctx
 }
 
-// NewCrawler creates a new crawler instance.
-func NewCrawler(logger logger.Interface, metrics *metrics.Metrics) *Crawler {
-	return &Crawler{
-		logger:   logger,
-		metrics:  metrics,
-		registry: newProcessorRegistry(),
-		state:    newCrawlerState(),
+// CurrentSource returns the current source.
+func (s *crawlerState) CurrentSource() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.currentSource
+}
+
+// GetLastProcessedTime returns the time of the last processed item.
+func (s *crawlerState) GetLastProcessedTime() time.Time {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.lastProcessedTime
+}
+
+// GetProcessingDuration returns the total processing duration.
+func (s *crawlerState) GetProcessingDuration() time.Duration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !s.isRunning {
+		return 0
 	}
+	return time.Since(s.startTime)
+}
+
+// StartTime returns the start time of the crawler.
+func (s *crawlerState) StartTime() time.Time {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.startTime
+}
+
+// zapLoggerWrapper wraps a *zap.Logger to implement logger.Interface
+type zapLoggerWrapper struct {
+	logger *zap.Logger
+}
+
+// NewZapLoggerWrapper creates a new wrapper around a zap logger
+func NewZapLoggerWrapper(logger *zap.Logger) logger.Interface {
+	return &zapLoggerWrapper{logger: logger}
+}
+
+// Debug implements logger.Interface
+func (w *zapLoggerWrapper) Debug(msg string, fields ...any) {
+	w.logger.Debug(msg, toZapFields(fields)...)
+}
+
+// Info implements logger.Interface
+func (w *zapLoggerWrapper) Info(msg string, fields ...any) {
+	w.logger.Info(msg, toZapFields(fields)...)
+}
+
+// Warn implements logger.Interface
+func (w *zapLoggerWrapper) Warn(msg string, fields ...any) {
+	w.logger.Warn(msg, toZapFields(fields)...)
+}
+
+// Error implements logger.Interface
+func (w *zapLoggerWrapper) Error(msg string, fields ...any) {
+	w.logger.Error(msg, toZapFields(fields)...)
+}
+
+// Fatal implements logger.Interface
+func (w *zapLoggerWrapper) Fatal(msg string, fields ...any) {
+	w.logger.Fatal(msg, toZapFields(fields)...)
+}
+
+// With implements logger.Interface
+func (w *zapLoggerWrapper) With(fields ...any) logger.Interface {
+	return &zapLoggerWrapper{logger: w.logger.With(toZapFields(fields)...)}
+}
+
+// toZapFields converts a list of any fields to zap.Field
+func toZapFields(fields []any) []zap.Field {
+	if len(fields)%2 != 0 {
+		return []zap.Field{zap.Error(errors.New("invalid fields: must be key-value pairs"))}
+	}
+
+	zapFields := make([]zap.Field, 0, len(fields)/2)
+	for i := 0; i < len(fields); i += 2 {
+		key, ok := fields[i].(string)
+		if !ok {
+			return []zap.Field{zap.Error(errors.New("invalid fields: keys must be strings"))}
+		}
+
+		value := fields[i+1]
+		zapFields = append(zapFields, zap.Any(key, value))
+	}
+
+	return zapFields
 }
 
 // ContentType returns the type of content this processor can handle.
@@ -242,10 +359,33 @@ func (c *Crawler) ProcessContent(ctx context.Context, contentType common.Content
 	return processor.Process(ctx, content)
 }
 
-// Start initializes the processor.
-func (c *Crawler) Start(ctx context.Context, source string) error {
-	c.logger.Info("Starting crawler", zap.String("source", source))
-	c.state.Start(ctx)
+// Start begins the crawling process for a given source.
+func (c *Crawler) Start(ctx context.Context, sourceName string) error {
+	// Validate source exists
+	source := c.sources.FindByName(sourceName)
+	if source == nil {
+		return fmt.Errorf("source not found: %s", sourceName)
+	}
+
+	// Validate index exists
+	exists, err := c.indexManager.IndexExists(ctx, sourceName)
+	if err != nil {
+		return fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("index not found: %s", sourceName)
+	}
+
+	// Configure collector for this source
+	c.configureCollector(source)
+
+	// Start crawler in a goroutine
+	go func() {
+		if err := c.crawl(ctx, source); err != nil {
+			c.logger.Error("Crawler error", zap.Error(err))
+		}
+	}()
+
 	return nil
 }
 
@@ -282,206 +422,72 @@ func (r *processorRegistry) GetProcessor(contentType common.ContentType) (common
 
 // setupCallbacks sets up the collector callbacks
 func (c *Crawler) setupCallbacks() {
-	// Let Colly handle link discovery with context awareness
-	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		select {
-		case <-c.state.Context().Done():
-			e.Request.Abort()
-			return
-		default:
-			// Get the URL and check if it's a valid link
-			urlStr := e.Attr("href")
-			if urlStr == "" || urlStr == "#" || strings.HasPrefix(urlStr, "#") {
-				// Skip empty links and anchor links
-				return
-			}
-
-			// Process the HTML content
-			c.ProcessHTML(e)
-
-			// Log the link being processed
-			if visitErr := e.Request.Visit(urlStr); visitErr != nil {
-				// Log expected cases as debug instead of error
-				if strings.Contains(visitErr.Error(), "URL already visited") {
-					// Skip logging already visited URLs to reduce noise
-					return
-				} else if strings.Contains(visitErr.Error(), "Forbidden domain") {
-					c.logger.Debug("Skipping forbidden domain", "url", urlStr)
-				} else if strings.Contains(visitErr.Error(), "Max depth limit reached") {
-					// Check if this is actually a forbidden domain
-					parsedURL, err := url.Parse(urlStr)
-					if err == nil {
-						domain := parsedURL.Hostname()
-						isAllowed := false
-						for _, allowedDomain := range c.collector.AllowedDomains {
-							if strings.HasSuffix(domain, allowedDomain) {
-								isAllowed = true
-								break
-							}
-						}
-						if !isAllowed {
-							c.logger.Debug("Skipping forbidden domain", "url", urlStr)
-						} else {
-							c.logger.Debug("Max depth limit reached", "url", urlStr)
-						}
-					} else {
-						c.logger.Debug("Max depth limit reached", "url", urlStr)
-					}
-				} else if strings.Contains(visitErr.Error(), "Missing URL") {
-					// Skip missing URL errors as they're usually from invalid links
-					return
-				} else {
-					c.logger.Error("Failed to visit link", "url", urlStr, "error", visitErr)
-				}
-			}
+	c.collector.OnHTML("article", func(e *colly.HTMLElement) {
+		article := &models.Article{
+			ID:        e.Request.URL.String(),
+			Title:     e.ChildText("h1"),
+			Body:      e.ChildText(".content"),
+			Source:    c.state.currentSource,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		}
-	})
 
-	// Add context-aware request handling
-	c.collector.OnRequest(func(r *colly.Request) {
 		select {
-		case <-c.state.Context().Done():
-			r.Abort()
-			return
+		case c.articleChannel <- article:
+			c.metrics.UpdateMetrics(true)
 		default:
-			c.logger.Info("Crawling", "url", r.URL.String())
-		}
-	})
-
-	c.collector.OnResponse(func(r *colly.Response) {
-		select {
-		case <-c.state.Context().Done():
-			return
-		default:
-			c.logger.Info("Crawled", "url", r.Request.URL.String(), "status", r.StatusCode)
+			c.logger.Warn("Article channel full, dropping article")
 		}
 	})
 
 	c.collector.OnError(func(r *colly.Response, err error) {
-		select {
-		case <-c.state.Context().Done():
-			return
-		default:
-			c.logger.Error("Error while crawling",
-				"url", r.Request.URL.String(),
-				"status", r.StatusCode,
-				"error", err)
-		}
+		c.logger.Error("Crawler error",
+			zap.String("url", r.Request.URL.String()),
+			zap.Error(err),
+		)
+		c.metrics.UpdateMetrics(false)
 	})
 }
 
 // configureCollector configures the collector with the given source configuration.
-func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) error {
-	// Set allowed domains from source configuration
-	allowedDomains := source.AllowedDomains
-	if len(allowedDomains) == 0 {
-		// If no allowed domains specified, extract domain from source URL
-		domain, err := sourceutils.ExtractDomain(source.URL)
-		if err != nil {
-			return WrapError(err, "failed to extract domain from source URL")
-		}
-		// Add both www and non-www versions of the domain
-		if strings.HasPrefix(domain, "www.") {
-			allowedDomains = []string{domain, strings.TrimPrefix(domain, "www.")}
-		} else {
-			allowedDomains = []string{domain, "www." + domain}
-		}
-	}
-
-	c.logger.Debug("Setting up collector", "allowed_domains", allowedDomains, "source_url", source.URL)
-
-	// Create collector with basic settings, ignoring global domain restrictions
+func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) {
 	c.collector = colly.NewCollector(
+		colly.AllowedDomains(source.AllowedDomains...),
 		colly.MaxDepth(source.MaxDepth),
 		colly.Async(true),
-		colly.ParseHTTPErrorResponse(),
 	)
 
-	// Set allowed domains explicitly to override any global settings
-	c.collector.AllowedDomains = allowedDomains
-
-	// Set up rate limiting
-	err := c.collector.Limit(&colly.LimitRule{
+	// Set rate limits
+	c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Delay:       source.RateLimit,
-		RandomDelay: 0,
-		Parallelism: DefaultParallelism,
+		RandomDelay: source.RateLimit,
+		Parallelism: 1, // Default parallelism
 	})
-	if err != nil {
-		return WrapError(err, "failed to set rate limit")
-	}
 
-	// Disable URL revisiting
-	c.collector.AllowURLRevisit = false
-	// Configure collector
-	c.collector.DetectCharset = true
-	c.collector.CheckHead = true
-	// Set user agent to avoid being blocked
-	c.collector.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-
-	return nil
+	// Set up callbacks
+	c.setupCallbacks()
 }
 
-// Start starts the crawler for the given source.
-func (c *Crawler) Start(ctx context.Context, sourceName string) error {
-	// Get source configuration
-	source := c.sources.FindByName(sourceName)
-	if source == nil {
-		return ErrSourceNotFound
-	}
+// crawl performs the actual crawling process.
+func (c *Crawler) crawl(ctx context.Context, source *sourceutils.SourceConfig) error {
+	c.state.mu.Lock()
+	c.state.currentSource = source.Name
+	c.state.isRunning = true
+	c.state.mu.Unlock()
 
-	// Validate that required index exists
-	exists, err := c.indexManager.IndexExists(ctx, source.Index)
-	if err != nil {
-		return WrapError(err, "failed to check index")
-	}
-	if !exists {
-		return ErrIndexNotFound
-	}
-
-	// Get list of sources to validate configuration
-	_, err = c.sources.GetSources()
-	if err != nil {
-		return WrapError(err, "failed to get sources")
-	}
-
-	c.logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
-
-	// Always create a new collector for each start
-	c.collector = nil
-	err = c.configureCollector(source)
-	if err != nil {
-		return WrapError(err, "failed to configure collector")
-	}
-
-	// Set up callbacks first to ensure they're ready
-	c.setupCallbacks()
-
-	// Initialize state
-	c.state = newCrawlerState()
-	c.state.Start(ctx)
+	defer func() {
+		c.state.mu.Lock()
+		c.state.isRunning = false
+		c.state.mu.Unlock()
+	}()
 
 	// Start the crawler
-	c.done = make(chan struct{})
-	c.articleChannel = make(chan *models.Article, 100)
+	if err := c.collector.Visit(source.URL); err != nil {
+		return fmt.Errorf("failed to start crawler: %w", err)
+	}
 
-	// Start the crawler in a goroutine
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		defer close(c.done)
-		defer close(c.articleChannel)
-
-		// Start the crawler
-		err := c.collector.Visit(source.URL)
-		if err != nil {
-			c.logger.Error("Failed to start crawler", "error", err)
-			return
-		}
-
-		// Wait for the crawler to finish
-		c.collector.Wait()
-	}()
+	// Wait for the crawler to finish
+	c.collector.Wait()
 
 	return nil
 }

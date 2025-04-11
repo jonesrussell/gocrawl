@@ -115,7 +115,7 @@ func NewCrawler(
 	}
 
 	crawler := &Crawler{
-		Logger:           logger,
+		logger:           logger,
 		indexManager:     indexManager,
 		sources:          sources,
 		articleProcessor: articleProcessor,
@@ -126,15 +126,15 @@ func NewCrawler(
 
 	// Set up callbacks
 	collector.OnRequest(func(r *colly.Request) {
-		crawler.Logger.Info("Visiting", "url", r.URL.String())
+		crawler.logger.Info("Visiting", "url", r.URL.String())
 	})
 
 	collector.OnResponse(func(r *colly.Response) {
-		crawler.Logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
+		crawler.logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
 	})
 
 	collector.OnError(func(r *colly.Response, err error) {
-		crawler.Logger.Error("Error while crawling",
+		crawler.logger.Error("Error while crawling",
 			"url", r.Request.URL.String(),
 			"status", r.StatusCode,
 			"error", err)
