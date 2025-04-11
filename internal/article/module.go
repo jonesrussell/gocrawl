@@ -31,7 +31,11 @@ var Module = fx.Options(
 	fx.Provide(
 		NewArticleManager,
 		NewArticleService,
-		ProvideArticleProcessor,
+		fx.Annotate(
+			ProvideArticleProcessor,
+			fx.ResultTags(`group:"processors"`, `name:"articleProcessor"`),
+			fx.As(new(common.Processor)),
+		),
 	),
 )
 

@@ -43,18 +43,19 @@ var Module = fx.Module("content",
 			cfg config.Interface,
 			log logger.Interface,
 			storage types.Interface,
-		) (Interface, error) {
-			return NewService(log, storage), nil
+		) Interface {
+			return NewService(log, storage)
 		},
 		// Provide content processor with both group and name tags
 		fx.Annotate(
-			func(p ProcessorParams) common.Processor {
+			func(p ProcessorParams) *ContentProcessor {
 				// Create processor
 				processor := NewContentProcessor(p)
 				p.Logger.Debug("Created content processor", "type", fmt.Sprintf("%T", processor))
 				return processor
 			},
 			fx.ResultTags(`group:"processors"`, `name:"contentProcessor"`),
+			fx.As(new(common.Processor)),
 		),
 	),
 )

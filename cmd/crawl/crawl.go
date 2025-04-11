@@ -9,8 +9,10 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
@@ -18,6 +20,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -59,6 +62,8 @@ Specify the source name as an argument.`,
 			logger.Module,
 			crawler.Module,
 			sources.Module,
+			article.Module,
+			content.Module,
 			Module, // Include the crawl command module
 			// Provide context and source name
 			fx.Provide(
@@ -80,11 +85,40 @@ Specify the source name as an argument.`,
 				return make(chan *models.Article, 100)
 			}),
 			// Provide processors
-			fx.Provide(func() []common.Processor {
-				return []common.Processor{
-					// Add your processors here
-				}
-			}),
+			fx.Provide(
+				// Provide article processor
+				func(
+					logger logger.Interface,
+					config config.Interface,
+					storage storagetypes.Interface,
+					service article.Interface,
+				) *article.ArticleProcessor {
+					return article.ProvideArticleProcessor(logger, config, storage, service)
+				},
+				// Provide content processor
+				func(
+					logger logger.Interface,
+					service content.Interface,
+					storage storagetypes.Interface,
+				) *content.ContentProcessor {
+					return content.NewContentProcessor(content.ProcessorParams{
+						Logger:    logger,
+						Service:   service,
+						Storage:   storage,
+						IndexName: "content",
+					})
+				},
+				// Provide processor slice
+				func(
+					articleProcessor *article.ArticleProcessor,
+					contentProcessor *content.ContentProcessor,
+				) []common.Processor {
+					return []common.Processor{
+						articleProcessor,
+						contentProcessor,
+					}
+				},
+			),
 			// Provide the event bus
 			fx.Provide(events.NewBus),
 			// Provide the IndexManager
