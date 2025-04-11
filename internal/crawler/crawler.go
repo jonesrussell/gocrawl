@@ -445,11 +445,16 @@ func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) {
 	if source.RateLimit > 0 {
 		rateLimit = source.RateLimit
 	}
-	c.collector.Limit(&colly.LimitRule{
+	if err := c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		RandomDelay: rateLimit,
 		Parallelism: common.DefaultMaxConcurrency,
-	})
+	}); err != nil {
+		c.logger.Error("Failed to set rate limit",
+			"error", err,
+			"rateLimit", rateLimit,
+			"parallelism", common.DefaultMaxConcurrency)
+	}
 
 	// Set max depth
 	if source.MaxDepth > 0 {
