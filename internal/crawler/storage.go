@@ -86,10 +86,7 @@ func (s *Storage) ListArticles(ctx context.Context, query string) ([]*models.Art
 	}
 
 	// Convert results to articles
-	articles, err := s.convertResultsToArticles(results)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert results: %w", err)
-	}
+	articles := s.convertResultsToArticles(results)
 
 	s.logger.Debug("Listed articles",
 		"query", query,
@@ -111,7 +108,7 @@ func (s *Storage) createSearchQuery(query string) map[string]any {
 }
 
 // convertResultsToArticles converts search results to articles.
-func (s *Storage) convertResultsToArticles(results []any) ([]*models.Article, error) {
+func (s *Storage) convertResultsToArticles(results []any) []*models.Article {
 	articles := make([]*models.Article, 0, len(results))
 	for _, result := range results {
 		article, err := s.convertResultToArticle(result)
@@ -120,7 +117,7 @@ func (s *Storage) convertResultsToArticles(results []any) ([]*models.Article, er
 		}
 		articles = append(articles, article)
 	}
-	return articles, nil
+	return articles
 }
 
 // convertResultToArticle converts a single result to an article.
@@ -135,8 +132,8 @@ func (s *Storage) convertResultToArticle(result any) (*models.Article, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal result: %w", err)
 		}
-		if err := json.Unmarshal(data, newArticle); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal article: %w", err)
+		if unmarshalErr := json.Unmarshal(data, newArticle); unmarshalErr != nil {
+			return nil, fmt.Errorf("failed to unmarshal article: %w", unmarshalErr)
 		}
 		return newArticle, nil
 	}

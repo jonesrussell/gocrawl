@@ -31,7 +31,7 @@ const (
 // Interface defines the signal handler interface.
 type Interface interface {
 	Setup(ctx context.Context) func()
-	SetFXApp(app interface{})
+	SetFXApp(app any)
 	RequestShutdown()
 	Wait() error
 	AddResource(closer func() error)
