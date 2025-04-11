@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -72,16 +73,46 @@ func (c *Crawler) setupCallbacks() {
 			e.Request.Abort()
 			return
 		default:
+			// Get the URL and check if it's a valid link
+			urlStr := e.Attr("href")
+			if urlStr == "" || urlStr == "#" || strings.HasPrefix(urlStr, "#") {
+				// Skip empty links and anchor links
+				return
+			}
+
 			// Log the link being processed
-			c.Logger.Debug("Processing link", "url", e.Attr("href"))
-			if visitErr := e.Request.Visit(e.Attr("href")); visitErr != nil {
+			if visitErr := e.Request.Visit(urlStr); visitErr != nil {
 				// Log expected cases as debug instead of error
 				if strings.Contains(visitErr.Error(), "URL already visited") {
-					c.Logger.Debug("URL already visited", "url", e.Attr("href"))
+					// Skip logging already visited URLs to reduce noise
+					return
 				} else if strings.Contains(visitErr.Error(), "Forbidden domain") {
-					c.Logger.Debug("Skipping forbidden domain", "url", e.Attr("href"))
+					c.Logger.Debug("Skipping forbidden domain", "url", urlStr)
+				} else if strings.Contains(visitErr.Error(), "Max depth limit reached") {
+					// Check if this is actually a forbidden domain
+					parsedURL, err := url.Parse(urlStr)
+					if err == nil {
+						domain := parsedURL.Hostname()
+						isAllowed := false
+						for _, allowedDomain := range c.collector.AllowedDomains {
+							if strings.HasSuffix(domain, allowedDomain) {
+								isAllowed = true
+								break
+							}
+						}
+						if !isAllowed {
+							c.Logger.Debug("Skipping forbidden domain", "url", urlStr)
+						} else {
+							c.Logger.Debug("Max depth limit reached", "url", urlStr)
+						}
+					} else {
+						c.Logger.Debug("Max depth limit reached", "url", urlStr)
+					}
+				} else if strings.Contains(visitErr.Error(), "Missing URL") {
+					// Skip missing URL errors as they're usually from invalid links
+					return
 				} else {
-					c.Logger.Error("Failed to visit link", "url", e.Attr("href"), "error", visitErr)
+					c.Logger.Error("Failed to visit link", "url", urlStr, "error", visitErr)
 				}
 			}
 		}
@@ -94,7 +125,7 @@ func (c *Crawler) setupCallbacks() {
 			r.Abort()
 			return
 		default:
-			c.Logger.Debug("Visiting", "url", r.URL.String())
+			c.Logger.Info("Crawling", "url", r.URL.String())
 		}
 	})
 
@@ -103,7 +134,7 @@ func (c *Crawler) setupCallbacks() {
 		case <-c.ctx.Done():
 			return
 		default:
-			c.Logger.Debug("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
+			c.Logger.Info("Crawled", "url", r.Request.URL.String(), "status", r.StatusCode)
 		}
 	})
 
