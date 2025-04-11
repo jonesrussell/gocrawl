@@ -52,22 +52,18 @@ func (b *EventBus) PublishArticle(ctx context.Context, article *models.Article) 
 }
 
 // PublishError publishes an error event to all handlers.
-func (b *EventBus) PublishError(ctx context.Context, err error) error {
+func (b *EventBus) PublishError(ctx context.Context, err error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return
 	}
-
-	b.mu.RLock()
-	defer b.mu.RUnlock()
 
 	for _, handler := range b.handlers {
-		if err := handler.HandleError(ctx, err); err != nil {
-			b.logger.Error("failed to handle error event",
-				"error", err,
-			)
+		if handlerErr := handler.HandleError(ctx, err); handlerErr != nil {
+			b.logger.Error("Error handling error event",
+				"error", handlerErr,
+				"original_error", err)
 		}
 	}
-	return nil
 }
 
 // PublishStart publishes a start event to all handlers.

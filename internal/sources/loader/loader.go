@@ -22,14 +22,16 @@ var (
 
 // Config represents a source configuration loaded from a file.
 type Config struct {
-	Name         string          `mapstructure:"name"`
-	URL          string          `mapstructure:"url"`
-	RateLimit    interface{}     `mapstructure:"rate_limit"` // Can be string or number
-	MaxDepth     int             `mapstructure:"max_depth"`
-	Time         []string        `mapstructure:"time"`
-	ArticleIndex string          `mapstructure:"article_index"`
-	Index        string          `mapstructure:"index"`
-	Selectors    SourceSelectors `mapstructure:"selectors"`
+	Name         string            `mapstructure:"name"`
+	URL          string            `mapstructure:"url"`
+	RateLimit    any               `mapstructure:"rate_limit"` // Can be string or number
+	MaxDepth     int               `mapstructure:"max_depth"`
+	Time         []string          `mapstructure:"time"`
+	ArticleIndex string            `mapstructure:"article_index"`
+	Index        string            `mapstructure:"index"`
+	Selectors    SourceSelectors   `mapstructure:"selectors"`
+	UserAgent    string            `mapstructure:"user_agent"`
+	Headers      map[string]string `mapstructure:"headers"`
 }
 
 // SourceSelectors defines the selectors for a source.
@@ -98,20 +100,20 @@ func (l *Loader) LoadSources() ([]Config, error) {
 }
 
 // loadRawSources loads the raw source data from the configuration.
-func (l *Loader) loadRawSources() ([]map[string]interface{}, error) {
+func (l *Loader) loadRawSources() ([]map[string]any, error) {
 	if !l.viper.IsSet("sources") {
 		return nil, ErrNoSources
 	}
 
 	sourcesRaw := l.viper.Get("sources")
-	sourcesArray, ok := sourcesRaw.([]interface{})
+	sourcesArray, ok := sourcesRaw.([]any)
 	if !ok {
 		return nil, ErrInvalidSourceFormat
 	}
 
-	sources := make([]map[string]interface{}, 0, len(sourcesArray))
+	sources := make([]map[string]any, 0, len(sourcesArray))
 	for _, src := range sourcesArray {
-		srcMap, ok := src.(map[string]interface{})
+		srcMap, ok := src.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -122,7 +124,7 @@ func (l *Loader) loadRawSources() ([]map[string]interface{}, error) {
 }
 
 // validateAndConvertSources validates and converts the sources to Config structs.
-func (l *Loader) validateAndConvertSources(sources []map[string]interface{}) ([]Config, error) {
+func (l *Loader) validateAndConvertSources(sources []map[string]any) ([]Config, error) {
 	if len(sources) == 0 {
 		return nil, ErrNoSources
 	}
@@ -147,7 +149,7 @@ func (l *Loader) validateAndConvertSources(sources []map[string]interface{}) ([]
 }
 
 // convertToConfig converts a raw source map to a Config struct.
-func (l *Loader) convertToConfig(src map[string]interface{}) (Config, error) {
+func (l *Loader) convertToConfig(src map[string]any) (Config, error) {
 	var cfg Config
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:           &cfg,

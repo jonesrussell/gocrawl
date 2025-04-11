@@ -15,6 +15,24 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+const (
+	DefaultHTTPPort       = 8080
+	DefaultReadTimeout    = 15 * time.Second
+	DefaultWriteTimeout   = 15 * time.Second
+	DefaultIdleTimeout    = 90 * time.Second
+	DefaultMaxHeaderBytes = 1 << 20
+	DefaultMaxDepth       = 3
+	DefaultMaxConcurrency = 2
+	DefaultRequestTimeout = 30 * time.Second
+	DefaultDelay          = 2 * time.Second
+	DefaultRandomDelay    = 500 * time.Millisecond
+	DefaultPriority       = 5
+	DefaultMaxPriority    = 10
+	DefaultMaxRetries     = 3
+	DefaultBulkSize       = 1000
+	DefaultFlushInterval  = 30 * time.Second
+)
+
 // MockConfig is a mock implementation of the Config interface
 type MockConfig struct {
 	mock.Mock
@@ -125,11 +143,11 @@ func NewMockConfig() *MockConfig {
 		},
 		ServerConfig: &server.Config{
 			Host:           "localhost",
-			Port:           8080,
-			ReadTimeout:    15 * time.Second,
-			WriteTimeout:   15 * time.Second,
-			IdleTimeout:    90 * time.Second,
-			MaxHeaderBytes: 1 << 20,
+			Port:           DefaultHTTPPort,
+			ReadTimeout:    DefaultReadTimeout,
+			WriteTimeout:   DefaultWriteTimeout,
+			IdleTimeout:    DefaultIdleTimeout,
+			MaxHeaderBytes: DefaultMaxHeaderBytes,
 			TLS: struct {
 				Enabled  bool   `yaml:"enabled"`
 				CertFile string `yaml:"cert_file"`
@@ -145,25 +163,25 @@ func NewMockConfig() *MockConfig {
 			},
 		},
 		CrawlerConfig: &crawler.Config{
-			MaxDepth:         3,
-			MaxConcurrency:   2,
-			RequestTimeout:   30 * time.Second,
+			MaxDepth:         DefaultMaxDepth,
+			MaxConcurrency:   DefaultMaxConcurrency,
+			RequestTimeout:   DefaultRequestTimeout,
 			UserAgent:        "gocrawl/1.0",
 			RespectRobotsTxt: true,
 			AllowedDomains:   []string{"*"},
-			Delay:            2 * time.Second,
-			RandomDelay:      500 * time.Millisecond,
+			Delay:            DefaultDelay,
+			RandomDelay:      DefaultRandomDelay,
 		},
 		PriorityConfig: &priority.Config{
-			DefaultPriority:   5,
-			MaxPriority:       10,
+			DefaultPriority:   DefaultPriority,
+			MaxPriority:       DefaultMaxPriority,
 			MinPriority:       1,
 			PriorityIncrement: 1,
 			PriorityDecrement: 1,
 			Rules: []priority.Rule{
 				{
 					Pattern:  ".*",
-					Priority: 5,
+					Priority: DefaultPriority,
 				},
 			},
 		},
@@ -179,12 +197,12 @@ func NewMockConfig() *MockConfig {
 				MaxRetries  int           `yaml:"max_retries"`
 			}{
 				Enabled:     true,
-				InitialWait: time.Second,
-				MaxWait:     time.Minute,
-				MaxRetries:  3,
+				InitialWait: 1 * time.Second,
+				MaxWait:     5 * time.Second,
+				MaxRetries:  DefaultMaxRetries,
 			},
-			BulkSize:      1000,
-			FlushInterval: 30 * time.Second,
+			BulkSize:      DefaultBulkSize,
+			FlushInterval: DefaultFlushInterval,
 		},
 		StorageConfig: &storage.Config{
 			Type: "elasticsearch",

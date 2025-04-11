@@ -345,10 +345,10 @@ func (c *Crawler) ProcessJob(ctx context.Context, job *common.Job) error {
 // ValidateJob validates a job before processing.
 func (c *Crawler) ValidateJob(job *common.Job) error {
 	if job == nil {
-		return fmt.Errorf("job cannot be nil")
+		return errors.New("job cannot be nil")
 	}
 	if job.URL == "" {
-		return fmt.Errorf("job URL cannot be empty")
+		return errors.New("job URL cannot be empty")
 	}
 	return nil
 }
