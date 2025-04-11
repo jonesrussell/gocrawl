@@ -28,7 +28,6 @@ var Module = fx.Options(
 	config.Module,
 	storage.Module,
 	logger.Module,
-	crawler.Module,
 	sources.Module,
 	article.Module,
 	content.Module,
@@ -74,88 +73,88 @@ var Module = fx.Options(
 			},
 			fx.As(new(signal.Interface)),
 		),
-	),
 
-	// Provide processors
-	fx.Provide(
 		// Article processor
-		fx.Annotate(
-			func(
-				logger logger.Interface,
-				config config.Interface,
-				storage storagetypes.Interface,
-				service article.Interface,
-			) *article.ArticleProcessor {
-				return article.ProvideArticleProcessor(logger, config, storage, service)
-			},
-			fx.As(new(common.Processor)),
-			fx.ResultTags(`group:"processors"`),
-		),
+		func(
+			logger logger.Interface,
+			config config.Interface,
+			storage storagetypes.Interface,
+			service article.Interface,
+		) *article.ArticleProcessor {
+			return article.ProvideArticleProcessor(logger, config, storage, service)
+		},
 
 		// Content processor
-		fx.Annotate(
-			func(
-				logger logger.Interface,
-				service content.Interface,
-				storage storagetypes.Interface,
-			) *content.ContentProcessor {
-				return content.NewContentProcessor(content.ProcessorParams{
-					Logger:    logger,
-					Service:   service,
-					Storage:   storage,
-					IndexName: "content",
-				})
-			},
-			fx.As(new(common.Processor)),
-			fx.ResultTags(`group:"processors"`),
-		),
+		func(
+			logger logger.Interface,
+			service content.Interface,
+			storage storagetypes.Interface,
+		) *content.ContentProcessor {
+			return content.NewContentProcessor(content.ProcessorParams{
+				Logger:    logger,
+				Service:   service,
+				Storage:   storage,
+				IndexName: "content",
+			})
+		},
+
+		// Processors slice
+		func(articleProcessor *article.ArticleProcessor, contentProcessor *content.ContentProcessor) []common.Processor {
+			return []common.Processor{articleProcessor, contentProcessor}
+		},
 	),
 
+	// Include crawler module after processors are provided
+	crawler.Module,
+
 	// Invoke the crawler lifecycle
-	fx.Invoke(func(lc fx.Lifecycle, logger logger.Interface, crawler crawler.Interface, handler signal.Interface, sourceName string) {
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				// Set up signal handling
-				handler.Setup(ctx)
+	fx.Invoke(fx.Annotate(
+		func(lc fx.Lifecycle, logger logger.Interface, crawler crawler.Interface, handler signal.Interface, sourceName string) {
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					// Set up signal handling
+					handler.Setup(ctx)
 
-				// Start the crawler
-				if err := crawler.Start(ctx, sourceName); err != nil {
-					return fmt.Errorf("failed to start crawler: %w", err)
-				}
-
-				// Start a goroutine to wait for crawler completion
-				go func() {
-					// Create a timeout context for waiting
-					waitCtx, waitCancel := context.WithTimeout(ctx, crawlerTimeout)
-					defer waitCancel()
-
-					// Wait for crawler to complete
-					crawler.Wait()
-
-					// Check if we timed out
-					select {
-					case <-waitCtx.Done():
-						logger.Info("Crawler reached timeout limit")
-					default:
-						logger.Info("Crawler finished processing")
+					// Start the crawler
+					if err := crawler.Start(ctx, sourceName); err != nil {
+						return fmt.Errorf("failed to start crawler: %w", err)
 					}
 
-					// Signal completion to the signal handler
-					handler.RequestShutdown()
-				}()
+					// Start a goroutine to wait for crawler completion
+					go func() {
+						// Create a timeout context for waiting
+						waitCtx, waitCancel := context.WithTimeout(ctx, crawlerTimeout)
+						defer waitCancel()
 
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				// Stop the crawler with timeout
-				stopCtx, stopCancel := context.WithTimeout(ctx, shutdownTimeout)
-				defer stopCancel()
+						// Wait for crawler to complete
+						crawler.Wait()
 
-				if err := crawler.Stop(stopCtx); err != nil {
-					return fmt.Errorf("failed to stop crawler: %w", err)
-				}
-				return nil
-			},
-		})
-	}),
+						// Check if we timed out
+						select {
+						case <-waitCtx.Done():
+							logger.Info("Crawler reached timeout limit")
+						default:
+							logger.Info("Crawler finished processing")
+						}
+
+						// Signal completion to the signal handler
+						handler.RequestShutdown()
+					}()
+
+					return nil
+				},
+				OnStop: func(ctx context.Context) error {
+					// Stop the crawler with timeout
+					stopCtx, stopCancel := context.WithTimeout(ctx, shutdownTimeout)
+					defer stopCancel()
+
+					if err := crawler.Stop(stopCtx); err != nil {
+						return fmt.Errorf("failed to stop crawler: %w", err)
+					}
+					return nil
+				},
+			})
+		},
+		fx.ParamTags(``, ``, ``, ``, `name:"sourceName"`),
+	)),
 )
