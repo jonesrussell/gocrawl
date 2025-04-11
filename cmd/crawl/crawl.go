@@ -7,20 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/article"
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/content"
-	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -49,137 +36,29 @@ Specify the source name as an argument.`,
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		// Set up signal handling with a no-op logger initially
-		handler := signal.NewSignalHandler(logger.NewNoOp())
-		cleanup := handler.Setup(ctx)
-		defer cleanup()
-
 		// Initialize the Fx application
 		fxApp := fx.New(
-			// Include all required modules
-			config.Module,
-			storage.Module,
-			logger.Module,
-			crawler.Module,
-			sources.Module,
-			article.Module,
-			content.Module,
-			Module, // Include the crawl command module
-			// Provide context and source name
+			Module,
+			// Override context and source name
 			fx.Provide(
 				func() context.Context { return ctx },
 				func() string { return sourceName },
 			),
-			// Provide logger params
-			fx.Provide(func() logger.Params {
-				return logger.Params{
-					Config: &logger.Config{
-						Level:       logger.InfoLevel,
-						Development: true,
-						Encoding:    "console",
-					},
-				}
-			}),
-			// Provide article channel
-			fx.Provide(func() chan *models.Article {
-				return make(chan *models.Article, 100)
-			}),
-			// Provide processors
-			fx.Provide(
-				// Provide article processor
-				func(
-					logger logger.Interface,
-					config config.Interface,
-					storage storagetypes.Interface,
-					service article.Interface,
-				) *article.ArticleProcessor {
-					return article.ProvideArticleProcessor(logger, config, storage, service)
-				},
-				// Provide content processor
-				func(
-					logger logger.Interface,
-					service content.Interface,
-					storage storagetypes.Interface,
-				) *content.ContentProcessor {
-					return content.NewContentProcessor(content.ProcessorParams{
-						Logger:    logger,
-						Service:   service,
-						Storage:   storage,
-						IndexName: "content",
-					})
-				},
-				// Provide processor slice
-				func(
-					articleProcessor *article.ArticleProcessor,
-					contentProcessor *content.ContentProcessor,
-				) []common.Processor {
-					return []common.Processor{
-						articleProcessor,
-						contentProcessor,
-					}
-				},
-			),
-			// Provide the event bus
-			fx.Provide(events.NewBus),
-			// Provide the IndexManager
-			fx.Provide(func(client *elasticsearch.Client, logger logger.Interface) interfaces.IndexManager {
-				return storage.NewElasticsearchIndexManager(client, logger)
-			}),
-			fx.Invoke(func(lc fx.Lifecycle, crawler *CrawlerCommand) {
-				// Update the signal handler with the real logger
-				handler.SetLogger(crawler.logger)
-
-				lc.Append(fx.Hook{
-					OnStart: func(ctx context.Context) error {
-						// Start the crawler
-						if err := crawler.Start(ctx, sourceName); err != nil {
-							return fmt.Errorf("failed to start crawler: %w", err)
-						}
-
-						// Start a goroutine to wait for crawler completion
-						go func() {
-							// Create a timeout context for waiting
-							waitCtx, waitCancel := context.WithTimeout(ctx, crawlerTimeout)
-							defer waitCancel()
-
-							// Wait for crawler to complete
-							crawler.Wait()
-
-							// Check if we timed out
-							select {
-							case <-waitCtx.Done():
-								crawler.logger.Info("Crawler reached timeout limit")
-							default:
-								crawler.logger.Info("Crawler finished processing")
-							}
-
-							// Signal completion to the signal handler
-							handler.RequestShutdown()
-						}()
-
-						return nil
-					},
-					OnStop: func(ctx context.Context) error {
-						// Stop the crawler with timeout
-						stopCtx, stopCancel := context.WithTimeout(ctx, shutdownTimeout)
-						defer stopCancel()
-
-						if err := crawler.Stop(stopCtx); err != nil {
-							return fmt.Errorf("failed to stop crawler: %w", err)
-						}
-						return nil
-					},
-				})
-			}),
 		)
-
-		// Set the fx app for coordinated shutdown
-		handler.SetFXApp(fxApp)
 
 		// Start the application
 		if err := fxApp.Start(ctx); err != nil {
 			return fmt.Errorf("failed to start application: %w", err)
 		}
+
+		// Get the handler from the Fx application
+		var handler *signal.SignalHandler
+		if err := fx.Populate(fxApp, &handler); err != nil {
+			return fmt.Errorf("failed to get signal handler: %v", err)
+		}
+
+		// Set the fx app for coordinated shutdown
+		handler.SetFXApp(fxApp)
 
 		// Wait for completion signal
 		handler.Wait()

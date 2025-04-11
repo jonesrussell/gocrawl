@@ -72,6 +72,8 @@ func (c *Crawler) setupCallbacks() {
 			e.Request.Abort()
 			return
 		default:
+			// Log the link being processed
+			c.Logger.Debug("Processing link", "url", e.Attr("href"))
 			if visitErr := e.Request.Visit(e.Attr("href")); visitErr != nil {
 				// Log expected cases as debug instead of error
 				if strings.Contains(visitErr.Error(), "URL already visited") {
@@ -116,16 +118,58 @@ func (c *Crawler) setupCallbacks() {
 				"error", err)
 		}
 	})
+}
 
-	// Add context-aware HTML processing
-	c.collector.OnHTML("*", func(e *colly.HTMLElement) {
-		select {
-		case <-c.ctx.Done():
-			return
-		default:
-			c.ProcessHTML(e)
+// configureCollector configures the collector with the given source configuration.
+func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) error {
+	// Set allowed domains from source configuration
+	allowedDomains := source.AllowedDomains
+	if len(allowedDomains) == 0 {
+		// If no allowed domains specified, extract domain from source URL
+		domain, err := sourceutils.ExtractDomain(source.URL)
+		if err != nil {
+			return fmt.Errorf("failed to extract domain from source URL: %w", err)
 		}
+		// Add both www and non-www versions of the domain
+		if strings.HasPrefix(domain, "www.") {
+			allowedDomains = []string{domain, strings.TrimPrefix(domain, "www.")}
+		} else {
+			allowedDomains = []string{domain, "www." + domain}
+		}
+	}
+
+	c.Logger.Debug("Setting up collector", "allowed_domains", allowedDomains, "source_url", source.URL)
+
+	// Create collector with basic settings, ignoring global domain restrictions
+	c.collector = colly.NewCollector(
+		colly.MaxDepth(source.MaxDepth),
+		colly.Async(true),
+		colly.ParseHTTPErrorResponse(),
+	)
+
+	// Set allowed domains explicitly to override any global settings
+	c.collector.AllowedDomains = allowedDomains
+
+	// Set up rate limiting
+	err := c.collector.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Delay:       source.RateLimit,
+		RandomDelay: 0,
+		Parallelism: DefaultParallelism,
 	})
+	if err != nil {
+		return fmt.Errorf("failed to set rate limit: %w", err)
+	}
+
+	// Disable URL revisiting
+	c.collector.AllowURLRevisit = false
+	// Configure collector
+	c.collector.DetectCharset = true
+	c.collector.CheckHead = true
+	// Set user agent to avoid being blocked
+	c.collector.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+
+	return nil
 }
 
 // Start starts the crawler for the given source.
@@ -153,32 +197,11 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	c.Logger.Info("Starting crawler", "source", sourceName, "url", source.URL)
 
-	// Initialize collector if not already set
-	if c.collector == nil {
-		// Set allowed domains from source configuration
-		allowedDomains := source.AllowedDomains
-		if len(allowedDomains) == 0 {
-			// If no allowed domains specified, extract domain from source URL
-			domain, err := sourceutils.ExtractDomain(source.URL)
-			if err != nil {
-				return fmt.Errorf("failed to extract domain from source URL: %w", err)
-			}
-			allowedDomains = []string{domain}
-		}
-
-		c.collector = colly.NewCollector(
-			colly.MaxDepth(source.MaxDepth),
-			colly.Async(true),
-			colly.AllowedDomains(allowedDomains...),
-			colly.ParseHTTPErrorResponse(),
-		)
-		// Disable URL revisiting
-		c.collector.AllowURLRevisit = false
-		// Configure collector
-		c.collector.DetectCharset = true
-		c.collector.CheckHead = true
-		// Set user agent to avoid being blocked
-		c.collector.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+	// Always create a new collector for each start
+	c.collector = nil
+	err = c.configureCollector(source)
+	if err != nil {
+		return fmt.Errorf("failed to configure collector: %w", err)
 	}
 
 	// Set up callbacks first to ensure they're ready
@@ -186,10 +209,11 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	// Create a cancellable context for the crawler
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	defer c.cancel()
 
 	// Start the crawl by visiting the source URL
+	c.Logger.Info("Visiting source URL", "url", source.URL)
 	if err := c.collector.Visit(source.URL); err != nil {
+		c.cancel() // Clean up context on error
 		return fmt.Errorf("failed to start crawling: %w", err)
 	}
 
@@ -203,11 +227,16 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	select {
 	case <-done:
 		// Crawler finished normally
+		c.cancel() // Clean up context
 		return nil
 	case <-c.ctx.Done():
 		// Context was cancelled, abort all pending requests
 		c.Logger.Info("Context cancelled, aborting crawler")
 		// The context cancellation will trigger request aborts in the callbacks
+		return ErrCrawlerContextCancelled
+	case <-ctx.Done():
+		// Parent context was cancelled, propagate cancellation
+		c.cancel()
 		return ErrCrawlerContextCancelled
 	}
 }
@@ -215,7 +244,6 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 // Stop stops the crawler.
 func (c *Crawler) Stop(ctx context.Context) error {
 	c.Logger.Info("Stopping crawler")
-	c.isRunning = false
 
 	// Cancel the crawler's context first to stop all goroutines
 	if c.cancel != nil {
@@ -230,7 +258,10 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	collectorDone := make(chan struct{})
 	go func() {
 		defer close(collectorDone)
-		c.collector.Wait()
+		if c.collector != nil {
+			// The context cancellation will trigger request aborts in the callbacks
+			c.collector.Wait()
+		}
 	}()
 
 	// Wait for collector to stop or timeout
@@ -243,21 +274,8 @@ func (c *Crawler) Stop(ctx context.Context) error {
 		c.Logger.Warn("Context cancelled while stopping collector")
 	}
 
-	// Wait for background goroutine to finish
-	if c.done != nil {
-		select {
-		case <-c.done:
-			c.Logger.Info("Crawler stopped successfully")
-		case <-stopCtx.Done():
-			c.Logger.Warn("Timeout waiting for crawler to stop")
-		case <-ctx.Done():
-			c.Logger.Warn("Context cancelled while waiting for crawler to stop")
-		}
-	}
-
 	// Clean up resources
 	c.collector = nil
-	c.done = nil
 	c.ctx = nil
 	c.cancel = nil
 
