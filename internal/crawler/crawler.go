@@ -60,6 +60,7 @@ type Crawler struct {
 	wg               sync.WaitGroup
 	articleChannel   chan *models.Article
 	processors       []common.Processor
+	currentSource    string
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -213,6 +214,9 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	if source == nil {
 		return fmt.Errorf("source not found: %s", sourceName)
 	}
+
+	// Set the current source
+	c.currentSource = sourceName
 
 	// Validate that required index exists
 	exists, err := c.indexManager.IndexExists(ctx, source.Index)
@@ -417,10 +421,25 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 
 // handleArticle processes an article using the article processor
 func (c *Crawler) handleArticle(e *colly.HTMLElement) {
+	// Get the source configuration for this URL
+	source := c.sources.FindByName(c.currentSource)
+	if source == nil {
+		c.Logger.Error("Failed to find source configuration",
+			"component", "crawler",
+			"url", e.Request.URL.String(),
+			"source", c.currentSource)
+		c.errorCount++
+		return
+	}
+
+	// Set the correct index name in the context
+	e.Request.Ctx.Put("index", source.ArticleIndex)
+
 	if err := c.articleProcessor.ProcessHTML(c.ctx, e); err != nil {
 		c.Logger.Error("Failed to process article",
 			"component", "crawler",
 			"url", e.Request.URL.String(),
+			"index", source.ArticleIndex,
 			"error", err)
 		c.errorCount++
 	} else {
