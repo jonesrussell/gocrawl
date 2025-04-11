@@ -85,8 +85,8 @@ func (s *State) Stop() {
 	s.ctx = nil
 }
 
-// Update updates the state with new values.
-func (s *State) Update(startTime time.Time, processed int64, errors int64) {
+// Update updates the metrics with new values.
+func (s *State) Update(startTime time.Time, processed, errors int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.startTime = startTime

@@ -20,6 +20,11 @@ import (
 	"go.uber.org/fx"
 )
 
+const (
+	// ArticleChannelBufferSize is the buffer size for the article channel.
+	ArticleChannelBufferSize = 100
+)
+
 // Module provides the crawl command module for dependency injection.
 var Module = fx.Options(
 	// Include all required modules
@@ -46,7 +51,7 @@ var Module = fx.Options(
 		// Article channel
 		fx.Annotate(
 			func() chan *models.Article {
-				return make(chan *models.Article, 100)
+				return make(chan *models.Article, ArticleChannelBufferSize)
 			},
 			fx.ResultTags(`name:"crawlerArticleChannel"`),
 		),

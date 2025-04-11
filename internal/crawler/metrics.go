@@ -75,9 +75,10 @@ func (m *Metrics) GetProcessingDuration() time.Duration {
 }
 
 // Update updates the metrics with new values.
-func (m *Metrics) Update(startTime time.Time, processed int64, errors int64) {
+func (m *Metrics) Update(startTime time.Time, processed, errors int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.startTime = startTime
 	m.processedCount = processed
 	m.errorCount = errors
 	m.lastProcessed = time.Now()

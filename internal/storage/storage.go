@@ -54,7 +54,7 @@ func (s *Storage) createContextWithTimeout(
 // IndexDocument indexes a document in Elasticsearch
 func (s *Storage) IndexDocument(ctx context.Context, index, id string, document any) error {
 	if s.client == nil {
-		return fmt.Errorf("elasticsearch client is not initialized")
+		return errors.New("elasticsearch client is not initialized")
 	}
 
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)

@@ -4,6 +4,7 @@ package sources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -184,7 +185,7 @@ func LoadSources(cfg config.Interface) (*Sources, error) {
 	}
 
 	// No sources found
-	return nil, fmt.Errorf("no sources found in configuration")
+	return nil, errors.New("no sources found in configuration")
 }
 
 // loadSourcesFromFile attempts to load sources from a file
@@ -200,7 +201,7 @@ func loadSourcesFromFile(path string) ([]sourceutils.SourceConfig, error) {
 	}
 
 	if len(configs) == 0 {
-		return nil, fmt.Errorf("no sources found in file")
+		return nil, errors.New("no sources found in file")
 	}
 
 	// Convert loaded configs to our source type

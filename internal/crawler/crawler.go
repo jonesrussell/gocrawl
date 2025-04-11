@@ -16,7 +16,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
-	"go.uber.org/zap"
 )
 
 const (
@@ -165,10 +164,14 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Configure collector for this source
 	c.configureCollector(source)
 
-	// Start crawler in a goroutine
+	// Start crawling in a goroutine
+	c.wg.Add(1)
 	go func() {
-		if err := c.crawl(source); err != nil {
-			c.logger.Error("Crawler error", zap.Error(err))
+		defer c.wg.Done()
+		if crawlErr := c.crawl(source); crawlErr != nil {
+			c.logger.Error("Failed to crawl source",
+				"source", source.Name,
+				"error", crawlErr)
 		}
 	}()
 
