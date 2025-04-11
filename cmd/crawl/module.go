@@ -138,11 +138,6 @@ var Module = fx.Module("crawl",
 	sources.Module,
 	article.Module,
 	content.Module,
-	// Provide context and source name
-	fx.Provide(
-		func() context.Context { return context.Background() },
-		func() string { return "" }, // Will be overridden by command
-	),
 	// Provide logger params
 	fx.Provide(func() logger.Params {
 		return logger.Params{
