@@ -12,18 +12,19 @@
   - [ ] Add proper examples
 
 ### 2. Crawler Refactoring
-- [ ] Define Core Interfaces
-  - [ ] Create crawler.Interface for main crawler functionality
-  - [ ] Create crawler.Config for configuration
-  - [ ] Create crawler.State for runtime state
-  - [ ] Create crawler.Metrics for metrics tracking
-  - [ ] Create crawler.Processor for content processing
-  - [ ] Create crawler.Storage for data persistence
-  - [ ] Create crawler.EventBus for event handling
+- [x] Define Core Interfaces
+  - [x] Create crawler.Interface for main crawler functionality
+  - [x] Create crawler.Config for configuration
+  - [x] Create crawler.State for runtime state
+  - [x] Create crawler.Metrics for metrics tracking
+  - [x] Create crawler.Processor for content processing
+  - [x] Create crawler.Storage for data persistence
+  - [x] Create crawler.EventBus for event handling
 - [ ] Implement New Structure
-  - [ ] Create new crawler package structure
-  - [ ] Implement core interfaces
-  - [ ] Add proper error types
+  - [x] Create new crawler package structure
+  - [x] Implement core interfaces
+  - [x] Add proper error handling
+  - [x] Add proper logging
   - [ ] Add proper documentation
   - [ ] Add proper examples
 - [ ] Migration Plan

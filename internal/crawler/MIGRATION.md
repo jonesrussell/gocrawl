@@ -7,24 +7,24 @@ This document outlines the steps to migrate from the current crawler implementat
 1. Create new interface implementations:
    - [x] Implement `CrawlerState`
    - [x] Implement `CrawlerMetrics`
-   - [ ] Implement `ContentProcessor`
-   - [ ] Implement `ArticleStorage`
-   - [ ] Implement `EventBus`
+   - [x] Implement `ContentProcessor`
+   - [x] Implement `ArticleStorage`
+   - [x] Implement `EventBus`
 
 2. Create new test files:
    - [x] Create `state_test.go`
    - [x] Create `metrics_test.go`
-   - [ ] Create `processor_test.go`
-   - [ ] Create `storage_test.go`
+   - [x] Create `processor_test.go`
+   - [x] Create `storage_test.go`
    - [ ] Create `eventbus_test.go`
 
 ## Phase 2: Core Crawler Implementation
 1. Create new crawler implementation:
-   - [ ] Create `crawler.go` with new implementation
-   - [ ] Implement `CrawlerInterface`
-   - [ ] Use new interfaces for dependencies
-   - [ ] Add proper error handling
-   - [ ] Add proper logging
+   - [x] Create `crawler.go` with new implementation
+   - [x] Implement `CrawlerInterface`
+   - [x] Use new interfaces for dependencies
+   - [x] Add proper error handling
+   - [x] Add proper logging
 
 2. Create tests:
    - [ ] Create `crawler_test.go`
@@ -43,6 +43,39 @@ This document outlines the steps to migrate from the current crawler implementat
    - [ ] Update `module.go`
    - [ ] Update `fx.go`
    - [ ] Update `cobra.go`
+
+## Next Steps
+1. Create `eventbus_test.go`:
+   - [ ] Add tests for `Subscribe`
+   - [ ] Add tests for `PublishArticle`
+   - [ ] Add tests for `PublishError`
+   - [ ] Add tests for `PublishStart`
+   - [ ] Add tests for `PublishStop`
+   - [ ] Add tests for concurrent operations
+   - [ ] Add tests for error handling
+   - [ ] Add tests for context cancellation
+
+2. Create `crawler_test.go`:
+   - [ ] Add tests for `Start`
+   - [ ] Add tests for `Stop`
+   - [ ] Add tests for `Subscribe`
+   - [ ] Add tests for `SetRateLimit`
+   - [ ] Add tests for `SetMaxDepth`
+   - [ ] Add tests for `SetCollector`
+   - [ ] Add tests for `GetIndexManager`
+   - [ ] Add tests for `Wait`
+   - [ ] Add tests for `GetMetrics`
+   - [ ] Add tests for `ProcessHTML`
+   - [ ] Add tests for concurrent operations
+   - [ ] Add tests for error handling
+   - [ ] Add tests for context cancellation
+
+3. Update documentation:
+   - [ ] Add package documentation
+   - [ ] Add interface documentation
+   - [ ] Add function documentation
+   - [ ] Add examples
+   - [ ] Add migration guide
 
 ## Phase 4: Testing and Validation
 1. Test new implementation:

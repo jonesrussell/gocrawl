@@ -4,8 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"go.uber.org/zap"
-
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
@@ -13,11 +12,11 @@ import (
 type EventBus struct {
 	mu       sync.RWMutex
 	handlers []EventHandler
-	logger   *zap.Logger
+	logger   logger.Interface
 }
 
 // NewEventBus creates a new EventBus instance.
-func NewEventBus(logger *zap.Logger) *EventBus {
+func NewEventBus(logger logger.Interface) *EventBus {
 	return &EventBus{
 		handlers: make([]EventHandler, 0),
 		logger:   logger,
@@ -43,9 +42,9 @@ func (b *EventBus) PublishArticle(ctx context.Context, article *models.Article) 
 	for _, handler := range b.handlers {
 		if err := handler.HandleArticle(ctx, article); err != nil {
 			b.logger.Error("failed to handle article event",
-				zap.Error(err),
-				zap.String("articleID", article.ID),
-				zap.String("url", article.Source),
+				"error", err,
+				"articleID", article.ID,
+				"url", article.Source,
 			)
 		}
 	}
@@ -64,7 +63,7 @@ func (b *EventBus) PublishError(ctx context.Context, err error) error {
 	for _, handler := range b.handlers {
 		if err := handler.HandleError(ctx, err); err != nil {
 			b.logger.Error("failed to handle error event",
-				zap.Error(err),
+				"error", err,
 			)
 		}
 	}
@@ -83,7 +82,7 @@ func (b *EventBus) PublishStart(ctx context.Context) error {
 	for _, handler := range b.handlers {
 		if err := handler.HandleStart(ctx); err != nil {
 			b.logger.Error("failed to handle start event",
-				zap.Error(err),
+				"error", err,
 			)
 		}
 	}
@@ -102,7 +101,7 @@ func (b *EventBus) PublishStop(ctx context.Context) error {
 	for _, handler := range b.handlers {
 		if err := handler.HandleStop(ctx); err != nil {
 			b.logger.Error("failed to handle stop event",
-				zap.Error(err),
+				"error", err,
 			)
 		}
 	}
