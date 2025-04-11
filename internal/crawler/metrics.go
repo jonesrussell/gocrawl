@@ -12,10 +12,12 @@ type Metrics struct {
 	processedCount int64
 	errorCount     int64
 	startTime      time.Time
+	lastProcessed  time.Time
+	duration       time.Duration
 }
 
-// NewMetrics creates a new metrics tracker.
-func NewMetrics() CrawlerMetrics {
+// NewCrawlerMetrics creates a new metrics tracker.
+func NewCrawlerMetrics() CrawlerMetrics {
 	return &Metrics{
 		startTime: time.Now(),
 	}
@@ -26,6 +28,8 @@ func (m *Metrics) IncrementProcessed() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.processedCount++
+	m.lastProcessed = time.Now()
+	m.duration = time.Since(m.startTime)
 }
 
 // IncrementError increments the error count.
@@ -56,6 +60,30 @@ func (m *Metrics) GetStartTime() time.Time {
 	return m.startTime
 }
 
+// GetLastProcessedTime returns the time of the last processed item.
+func (m *Metrics) GetLastProcessedTime() time.Time {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastProcessed
+}
+
+// GetProcessingDuration returns the total processing duration.
+func (m *Metrics) GetProcessingDuration() time.Duration {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.duration
+}
+
+// Update updates the metrics with new values.
+func (m *Metrics) Update(startTime time.Time, processed int64, errors int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.processedCount = processed
+	m.errorCount = errors
+	m.lastProcessed = time.Now()
+	m.duration = time.Since(startTime)
+}
+
 // Reset resets all metrics to zero.
 func (m *Metrics) Reset() {
 	m.mu.Lock()
@@ -63,4 +91,6 @@ func (m *Metrics) Reset() {
 	m.processedCount = 0
 	m.errorCount = 0
 	m.startTime = time.Now()
+	m.lastProcessed = time.Time{}
+	m.duration = 0
 }

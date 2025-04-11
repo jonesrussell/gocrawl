@@ -68,6 +68,14 @@ type CrawlerMetrics interface {
 	GetErrorCount() int64
 	// GetStartTime returns when tracking started.
 	GetStartTime() time.Time
+	// GetLastProcessedTime returns the time of the last processed item.
+	GetLastProcessedTime() time.Time
+	// GetProcessingDuration returns the total processing duration.
+	GetProcessingDuration() time.Duration
+	// Update updates the metrics with new values.
+	Update(startTime time.Time, processed int64, errors int64)
+	// Reset resets all metrics to zero.
+	Reset()
 }
 
 // ContentProcessor handles content processing.

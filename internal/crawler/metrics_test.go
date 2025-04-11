@@ -1,120 +1,77 @@
-package crawler_test
+package crawler
 
 import (
 	"testing"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestMetrics(t *testing.T) {
+func TestCrawlerMetrics(t *testing.T) {
 	t.Parallel()
 
-	t.Run("NewMetrics", func(t *testing.T) {
+	t.Run("NewCrawlerMetrics", func(t *testing.T) {
 		t.Parallel()
-		m := crawler.NewMetrics()
-		assert.NotNil(t, m)
-		assert.NotZero(t, m.GetStartTime())
+		metrics := NewCrawlerMetrics()
+		require.NotNil(t, metrics)
+		assert.Equal(t, int64(0), metrics.GetProcessedCount())
+		assert.Equal(t, int64(0), metrics.GetErrorCount())
+		assert.True(t, metrics.GetLastProcessedTime().IsZero())
+		assert.Equal(t, time.Duration(0), metrics.GetProcessingDuration())
 	})
 
-	t.Run("IncrementProcessed", func(t *testing.T) {
+	t.Run("UpdateMetrics", func(t *testing.T) {
 		t.Parallel()
-		m := crawler.NewMetrics().(*crawler.Metrics)
+		metrics := NewCrawlerMetrics()
 
-		// Test initial count
-		assert.Equal(t, int64(0), m.GetProcessedCount())
+		// Update metrics
+		startTime := time.Now()
+		metrics.Update(startTime, 10, 2)
 
-		// Test increment
-		m.IncrementProcessed()
-		assert.Equal(t, int64(1), m.GetProcessedCount())
-
-		// Test multiple increments
-		for range 5 {
-			m.IncrementProcessed()
-		}
-		assert.Equal(t, int64(6), m.GetProcessedCount())
+		// Verify metrics
+		assert.Equal(t, int64(10), metrics.GetProcessedCount())
+		assert.Equal(t, int64(2), metrics.GetErrorCount())
+		assert.True(t, metrics.GetLastProcessedTime().After(startTime))
+		assert.True(t, metrics.GetProcessingDuration() > 0)
 	})
 
-	t.Run("IncrementError", func(t *testing.T) {
+	t.Run("ResetMetrics", func(t *testing.T) {
 		t.Parallel()
-		m := crawler.NewMetrics().(*crawler.Metrics)
+		metrics := NewCrawlerMetrics()
 
-		// Test initial count
-		assert.Equal(t, int64(0), m.GetErrorCount())
+		// Update metrics
+		startTime := time.Now()
+		metrics.Update(startTime, 10, 2)
 
-		// Test increment
-		m.IncrementError()
-		assert.Equal(t, int64(1), m.GetErrorCount())
+		// Reset metrics
+		metrics.Reset()
 
-		// Test multiple increments
-		for range 5 {
-			m.IncrementError()
-		}
-		assert.Equal(t, int64(6), m.GetErrorCount())
+		// Verify metrics are reset
+		assert.Equal(t, int64(0), metrics.GetProcessedCount())
+		assert.Equal(t, int64(0), metrics.GetErrorCount())
+		assert.True(t, metrics.GetLastProcessedTime().IsZero())
+		assert.Equal(t, time.Duration(0), metrics.GetProcessingDuration())
 	})
 
-	t.Run("ConcurrentAccess", func(t *testing.T) {
+	t.Run("ConcurrentUpdates", func(t *testing.T) {
 		t.Parallel()
-		m := crawler.NewMetrics().(*crawler.Metrics)
+		metrics := NewCrawlerMetrics()
+		startTime := time.Now()
 
-		// Start multiple goroutines to access metrics
-		done := make(chan struct{})
-		for range 10 {
+		// Start multiple goroutines to update metrics
+		for i := 0; i < 100; i++ {
 			go func() {
-				for range 100 {
-					m.IncrementProcessed()
-					m.IncrementError()
-					m.GetProcessedCount()
-					m.GetErrorCount()
-					m.GetStartTime()
-				}
-				done <- struct{}{}
+				metrics.Update(startTime, 1, 0)
 			}()
 		}
 
 		// Wait for all goroutines to complete
-		for range 10 {
-			<-done
-		}
-
-		// Verify final counts
-		assert.Equal(t, int64(1000), m.GetProcessedCount())
-		assert.Equal(t, int64(1000), m.GetErrorCount())
-	})
-
-	t.Run("Reset", func(t *testing.T) {
-		t.Parallel()
-		m := crawler.NewMetrics().(*crawler.Metrics)
-
-		// Add some metrics
-		for range 5 {
-			m.IncrementProcessed()
-			m.IncrementError()
-		}
-
-		// Store original start time
-		originalStartTime := m.GetStartTime()
-
-		// Reset metrics
-		m.Reset()
-
-		// Verify reset
-		assert.Equal(t, int64(0), m.GetProcessedCount())
-		assert.Equal(t, int64(0), m.GetErrorCount())
-		assert.True(t, m.GetStartTime().After(originalStartTime))
-	})
-
-	t.Run("StartTime", func(t *testing.T) {
-		t.Parallel()
-		m := crawler.NewMetrics().(*crawler.Metrics)
-
-		// Verify start time is recent
-		startTime := m.GetStartTime()
-		assert.Less(t, time.Since(startTime), time.Second)
-
-		// Verify start time doesn't change
 		time.Sleep(100 * time.Millisecond)
-		assert.Equal(t, startTime, m.GetStartTime())
+
+		// Verify metrics
+		assert.Equal(t, int64(100), metrics.GetProcessedCount())
+		assert.True(t, metrics.GetLastProcessedTime().After(startTime))
+		assert.True(t, metrics.GetProcessingDuration() > 0)
 	})
 }
