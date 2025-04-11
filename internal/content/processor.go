@@ -106,6 +106,16 @@ func (p *ContentProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement
 		Type:      "page",
 		URL:       e.Request.URL.String(),
 		CreatedAt: time.Now(),
+		Metadata: map[string]any{
+			"title":          e.ChildText("title"),
+			"description":    e.ChildAttr("meta[name=description]", "content"),
+			"keywords":       e.ChildAttr("meta[name=keywords]", "content"),
+			"author":         e.ChildAttr("meta[name=author]", "content"),
+			"og:title":       e.ChildAttr("meta[property=og:title]", "content"),
+			"og:description": e.ChildAttr("meta[property=og:description]", "content"),
+			"og:image":       e.ChildAttr("meta[property=og:image]", "content"),
+			"og:url":         e.ChildAttr("meta[property=og:url]", "content"),
+		},
 	}
 
 	// Process the content using the ContentService
