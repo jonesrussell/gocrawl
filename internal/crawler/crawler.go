@@ -181,12 +181,14 @@ func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
 
 		// Visit the link
 		if err := e.Request.Visit(link); err != nil {
-			if err != colly.ErrAlreadyVisited {
-				c.logger.Error("Failed to visit link",
-					"link", link,
-					"error", err)
-				c.IncrementError()
+			// Skip logging expected errors
+			if err == colly.ErrAlreadyVisited || err == colly.ErrMaxDepth {
+				return
 			}
+			c.logger.Error("Failed to visit link",
+				"link", link,
+				"error", err)
+			c.IncrementError()
 		}
 	})
 
@@ -195,6 +197,10 @@ func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
 		c.logger.Debug("Visiting URL",
 			"url", url)
 		if err := c.collector.Visit(url); err != nil {
+			// Skip logging expected errors
+			if err == colly.ErrAlreadyVisited || err == colly.ErrMaxDepth {
+				continue
+			}
 			c.logger.Error("Failed to visit URL",
 				"url", url,
 				"error", err)
@@ -276,21 +282,20 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	c.state.Cancel()
 	c.logger.Debug("Context cancelled")
 
-	// Create a done channel for the collector
-	collectorDone := make(chan struct{})
+	// Create a done channel for the wait group
+	waitDone := make(chan struct{})
 
-	// Start a goroutine to wait for the collector and wait group
+	// Start a goroutine to wait for the wait group
 	go func() {
-		defer close(collectorDone)
-		c.logger.Debug("Waiting for collector and wait group")
-		c.collector.Wait()
+		defer close(waitDone)
+		c.logger.Debug("Waiting for wait group")
 		c.wg.Wait()
-		c.logger.Debug("Collector and wait group finished")
+		c.logger.Debug("Wait group finished")
 	}()
 
-	// Wait for either the collector to finish or the context to be done
+	// Wait for either the wait group to finish or the context to be done
 	select {
-	case <-collectorDone:
+	case <-waitDone:
 		c.state.Stop()
 		c.logger.Debug("Crawler stopped successfully")
 		return nil
