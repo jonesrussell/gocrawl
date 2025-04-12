@@ -41,18 +41,10 @@ var Module = fx.Options(
 
 	// Provide base dependencies
 	fx.Provide(
-		// Debug flag
-		fx.Annotate(
-			func() bool {
-				return false // Default to false if not provided
-			},
-			fx.ResultTags(`name:"debug"`),
-		),
-
 		// Logger params
-		func(debug bool) logger.Params {
+		func(config config.Interface) logger.Params {
 			level := logger.InfoLevel
-			if debug {
+			if config.GetAppConfig().Debug {
 				level = logger.DebugLevel
 			}
 			return logger.Params{

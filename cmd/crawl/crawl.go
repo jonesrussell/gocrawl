@@ -9,6 +9,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
@@ -66,11 +67,11 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 				func() string { return sourceName },
 				fx.ResultTags(`name:"sourceName"`),
 			),
-			fx.Annotate(
-				func() bool { return cmd.Root().Flags().Lookup("debug").Value.String() == "true" },
-				fx.ResultTags(`name:"debug"`),
-			),
 		),
+		fx.Invoke(func(config config.Interface) {
+			// Set debug mode from command line flag
+			config.GetAppConfig().Debug = cmd.Root().Flags().Lookup("debug").Value.String() == "true"
+		}),
 		fx.Invoke(func(crawler crawler.Interface) {
 			// Start the crawler
 			log.Debug("Starting crawler")
