@@ -39,8 +39,7 @@ const (
 	columnWidthContentRatio = 3 // Content column takes 2/3 of table width
 )
 
-// Params holds the parameters required for executing a search operation.
-// It uses fx.In for dependency injection of required components.
+// Params holds the search operation parameters
 type Params struct {
 	fx.In
 
@@ -51,11 +50,11 @@ type Params struct {
 	// SearchManager is the service responsible for executing searches
 	SearchManager api.SearchManager
 	// IndexName specifies which Elasticsearch index to search
-	IndexName string `name:"indexName"`
+	IndexName string
 	// Query contains the search query string
-	Query string `name:"query"`
+	Query string
 	// ResultSize determines how many results to return
-	ResultSize int `name:"resultSize"`
+	ResultSize int
 }
 
 // Result represents a search result
@@ -143,19 +142,10 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	fxApp := fx.New(
 		searchModule,
 		fx.Provide(
-			// Provide search parameters with appropriate tags for dependency injection
-			fx.Annotate(
-				func() string { return queryStr },
-				fx.ResultTags(`name:"query"`),
-			),
-			fx.Annotate(
-				func() string { return indexName },
-				fx.ResultTags(`name:"indexName"`),
-			),
-			fx.Annotate(
-				func() int { return size },
-				fx.ResultTags(`name:"resultSize"`),
-			),
+			// Provide search parameters
+			func() string { return queryStr },  // Query
+			func() string { return indexName }, // IndexName
+			func() int { return size },         // ResultSize
 		),
 		fx.Invoke(func(lc fx.Lifecycle, p Params) {
 			lc.Append(fx.Hook{
