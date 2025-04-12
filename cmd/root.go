@@ -40,9 +40,6 @@ var (
 		Long: `gocrawl is a web crawler that helps you collect and process content from various sources.
 It provides a flexible and extensible framework for building custom crawlers.`,
 	}
-
-	// log is the global logger instance
-	log logger.Interface
 )
 
 const (
@@ -348,8 +345,42 @@ func validateConfig(cmd *cobra.Command) error {
 	return nil
 }
 
-// initLogger initializes the global logger instance
-func initLogger() error {
+// Execute is the entry point for the CLI application.
+// It runs the root command and handles any errors that occur during execution.
+// If an error occurs, it prints the error message and exits with status code 1.
+func Execute() {
+	// Initialize logger first
+	log, err := initLogger()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create a context with the logger and configuration
+	ctx := context.WithValue(context.Background(), common.LoggerKey, log)
+	ctx = context.WithValue(ctx, common.ConfigKey, viper.GetViper())
+
+	rootCmd.SetContext(ctx)
+
+	// Add commands
+	rootCmd.AddCommand(
+		job.NewJobCommand(log),         // Main job command with fx
+		job.NewJobSubCommands(log),     // Job subcommands
+		indices.Command(),              // For managing Elasticsearch indices
+		sources.NewSourcesCommand(log), // For managing web content sources
+		crawlcmd.Command(),             // For crawling web content
+		httpdcmd.Command(),             // For running the HTTP server
+		search.Command(),               // For searching content in Elasticsearch
+	)
+
+	if executeErr := rootCmd.Execute(); executeErr != nil {
+		log.Error("Failed to execute command", "error", executeErr)
+		os.Exit(1)
+	}
+}
+
+// initLogger initializes a new logger instance
+func initLogger() (logger.Interface, error) {
 	// Get log level from config
 	logLevel := viper.GetString("logger.level")
 	level := logger.InfoLevel
@@ -382,10 +413,9 @@ func initLogger() error {
 		OutputPaths: []string{viper.GetString("logger.output")},
 	}
 
-	var err error
-	log, err = logger.New(logConfig)
+	log, err := logger.New(logConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create logger: %w", err)
+		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Log the current log level
@@ -398,40 +428,7 @@ func initLogger() error {
 		zap.Bool("debug", debug),
 		zap.Bool("development", logConfig.Development))
 
-	return nil
-}
-
-// Execute is the entry point for the CLI application.
-// It runs the root command and handles any errors that occur during execution.
-// If an error occurs, it prints the error message and exits with status code 1.
-func Execute() {
-	// Initialize logger first
-	if err := initLogger(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Create a context with the logger and configuration
-	ctx := context.WithValue(context.Background(), common.LoggerKey, log)
-	ctx = context.WithValue(ctx, common.ConfigKey, viper.GetViper())
-
-	rootCmd.SetContext(ctx)
-
-	// Add commands
-	rootCmd.AddCommand(
-		job.NewJobCommand(log),         // Main job command with fx
-		job.NewJobSubCommands(log),     // Job subcommands
-		indices.Command(),              // For managing Elasticsearch indices
-		sources.NewSourcesCommand(log), // For managing web content sources
-		crawlcmd.Command(),             // For crawling web content
-		httpdcmd.Command(),             // For running the HTTP server
-		search.Command(),               // For searching content in Elasticsearch
-	)
-
-	if executeErr := rootCmd.Execute(); executeErr != nil {
-		log.Error("Failed to execute command", "error", executeErr)
-		os.Exit(1)
-	}
+	return log, nil
 }
 
 // init initializes the root command and its subcommands.
