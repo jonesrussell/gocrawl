@@ -24,30 +24,140 @@ const (
 	stateShutdownComplete
 )
 
+// Interface defines the contract for signal handling.
 type Interface interface {
 	Setup(ctx context.Context) func()
-	SetFXApp(app any)
 	RequestShutdown()
 	Wait() error
-	AddResource(closer func() error)
 	GetState() string
 	SetLogger(logger logger.Interface)
-	SetCleanup(cleanup func())
 	IsShuttingDown() bool
 }
 
+// ResourceManager handles resource cleanup during shutdown.
+type ResourceManager struct {
+	mu        sync.Mutex
+	resources []func() error
+	cleanup   func()
+}
+
+// NewResourceManager creates a new ResourceManager instance.
+func NewResourceManager() *ResourceManager {
+	return &ResourceManager{
+		resources: make([]func() error, 0),
+	}
+}
+
+// AddResource registers a resource for graceful shutdown.
+func (rm *ResourceManager) AddResource(closer func() error) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.resources = append(rm.resources, closer)
+}
+
+// SetCleanup registers a cleanup function.
+func (rm *ResourceManager) SetCleanup(cleanup func()) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.cleanup = cleanup
+}
+
+// CloseResources safely closes all resources.
+func (rm *ResourceManager) CloseResources(ctx context.Context, logger logger.Interface) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	var lastErr error
+	for _, closer := range rm.resources {
+		done := make(chan error, 1)
+		go func(c func() error) { done <- c() }(closer)
+
+		select {
+		case err := <-done:
+			if err != nil {
+				logger.Error("Error closing resource", "error", err)
+				lastErr = err
+			}
+		case <-ctx.Done():
+			logger.Error("Timeout closing resource", "error", ctx.Err())
+			return ctx.Err()
+		}
+	}
+
+	if rm.cleanup != nil {
+		logger.Info("Performing cleanup")
+		rm.cleanup()
+	}
+
+	return lastErr
+}
+
+// AppManager handles application lifecycle during shutdown.
+type AppManager struct {
+	mu  sync.Mutex
+	app any
+}
+
+// NewAppManager creates a new AppManager instance.
+func NewAppManager() *AppManager {
+	return &AppManager{}
+}
+
+// SetApp sets the application for coordinated shutdown.
+func (am *AppManager) SetApp(app any) {
+	am.mu.Lock()
+	defer am.mu.Unlock()
+	am.app = app
+}
+
+// StopApp stops the application gracefully.
+func (am *AppManager) StopApp(ctx context.Context, logger logger.Interface) error {
+	am.mu.Lock()
+	defer am.mu.Unlock()
+
+	if am.app == nil {
+		return nil
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		var err error
+		switch app := am.app.(type) {
+		case *fx.App:
+			err = app.Stop(ctx)
+		case func() error:
+			err = app()
+		default:
+			err = fmt.Errorf("unsupported app type: %T", am.app)
+		}
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			logger.Error("Error stopping application", "error", err)
+			return err
+		}
+	case <-ctx.Done():
+		logger.Error("Timeout stopping application", "error", ctx.Err())
+		return ctx.Err()
+	}
+
+	return nil
+}
+
+// SignalHandler implements the signal handling interface.
 type SignalHandler struct {
 	logger          logger.Interface
 	done            chan struct{}
 	mu              sync.Mutex
-	app             any
 	state           shutdownState
 	stateMu         sync.RWMutex
-	resources       []func() error
-	resourcesMu     sync.Mutex
 	shutdownTimeout time.Duration
-	cleanup         func()
 	shutdownError   error
+	resourceManager *ResourceManager
+	appManager      *AppManager
 }
 
 // NewSignalHandler creates a new SignalHandler instance.
@@ -57,6 +167,8 @@ func NewSignalHandler(logger logger.Interface) *SignalHandler {
 		done:            make(chan struct{}),
 		state:           stateRunning,
 		shutdownTimeout: DefaultShutdownTimeout,
+		resourceManager: NewResourceManager(),
+		appManager:      NewAppManager(),
 	}
 }
 
@@ -107,70 +219,17 @@ func (h *SignalHandler) shutdown() {
 	ctx, cancel := context.WithTimeout(context.Background(), h.shutdownTimeout)
 	defer cancel()
 
-	h.stopApp(ctx)
-	h.closeResources(ctx)
+	// Stop the application first
+	if err := h.appManager.StopApp(ctx, h.logger); err != nil {
+		h.shutdownError = err
+	}
 
-	if h.cleanup != nil {
-		h.logger.Info("Performing cleanup")
-		h.cleanup()
+	// Then close resources
+	if err := h.resourceManager.CloseResources(ctx, h.logger); err != nil {
+		h.shutdownError = err
 	}
 
 	h.transitionState(stateShutdownComplete)
-}
-
-// stopApp stops the fx app or any other application.
-func (h *SignalHandler) stopApp(ctx context.Context) {
-	if h.app == nil {
-		return
-	}
-
-	done := make(chan error, 1)
-	go func() {
-		var err error
-		switch app := h.app.(type) {
-		case *fx.App:
-			err = app.Stop(ctx)
-		case func() error:
-			err = app()
-		default:
-			err = fmt.Errorf("unsupported app type: %T", h.app)
-		}
-		done <- err
-	}()
-
-	select {
-	case err := <-done:
-		if err != nil {
-			h.logger.Error("Error stopping application", "error", err)
-			h.shutdownError = err
-		}
-	case <-ctx.Done():
-		h.logger.Error("Timeout stopping application", "error", ctx.Err())
-		h.shutdownError = ctx.Err()
-	}
-}
-
-// closeResources safely closes all resources.
-func (h *SignalHandler) closeResources(ctx context.Context) {
-	h.resourcesMu.Lock()
-	defer h.resourcesMu.Unlock()
-
-	for _, closer := range h.resources {
-		done := make(chan error, 1)
-		go func(c func() error) { done <- c() }(closer)
-
-		select {
-		case err := <-done:
-			if err != nil {
-				h.logger.Error("Error closing resource", "error", err)
-				h.shutdownError = err
-			}
-		case <-ctx.Done():
-			h.logger.Error("Timeout closing resource", "error", ctx.Err())
-			h.shutdownError = ctx.Err()
-			return
-		}
-	}
 }
 
 // transitionState safely updates the shutdown state.
@@ -180,6 +239,7 @@ func (h *SignalHandler) transitionState(newState shutdownState) {
 	h.state = newState
 }
 
+// GetState returns the current shutdown state as a string.
 func (h *SignalHandler) GetState() string {
 	h.stateMu.RLock()
 	defer h.stateMu.RUnlock()
@@ -196,28 +256,9 @@ func (h *SignalHandler) GetState() string {
 	}
 }
 
-// SetFXApp sets the Fx app for coordinated shutdown.
-func (h *SignalHandler) SetFXApp(app any) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.app = app
-}
-
-// AddResource registers a resource for graceful shutdown.
-func (h *SignalHandler) AddResource(closer func() error) {
-	h.resourcesMu.Lock()
-	defer h.resourcesMu.Unlock()
-	h.resources = append(h.resources, closer)
-}
-
 // SetLogger updates the logger.
 func (h *SignalHandler) SetLogger(logger logger.Interface) {
 	h.logger = logger
-}
-
-// SetCleanup registers a cleanup function.
-func (h *SignalHandler) SetCleanup(cleanup func()) {
-	h.cleanup = cleanup
 }
 
 // IsShuttingDown checks if shutdown is in progress.
@@ -230,4 +271,19 @@ func (h *SignalHandler) IsShuttingDown() bool {
 // SetShutdownTimeout updates the shutdown timeout duration.
 func (h *SignalHandler) SetShutdownTimeout(timeout time.Duration) {
 	h.shutdownTimeout = timeout
+}
+
+// AddResource registers a resource for graceful shutdown.
+func (h *SignalHandler) AddResource(closer func() error) {
+	h.resourceManager.AddResource(closer)
+}
+
+// SetCleanup registers a cleanup function.
+func (h *SignalHandler) SetCleanup(cleanup func()) {
+	h.resourceManager.SetCleanup(cleanup)
+}
+
+// SetFXApp sets the Fx app for coordinated shutdown.
+func (h *SignalHandler) SetFXApp(app any) {
+	h.appManager.SetApp(app)
 }
