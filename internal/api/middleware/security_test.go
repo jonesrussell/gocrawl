@@ -17,6 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/fx/fxevent"
 )
 
 // mockLogger implements common.Logger for testing
@@ -34,10 +35,18 @@ func (m *mockLogger) Errorf(format string, args ...any) { m.Called(format, args)
 func (m *mockLogger) Sync() error                       { return m.Called().Error(0) }
 func (m *mockLogger) With(fields ...any) logger.Interface {
 	args := m.Called(fields)
-	if args.Get(0) == nil {
-		return m
+	if result, ok := args.Get(0).(logger.Interface); ok {
+		return result
 	}
-	return args.Get(0).(logger.Interface)
+	return m
+}
+
+func (m *mockLogger) NewFxLogger() fxevent.Logger {
+	args := m.Called()
+	if result, ok := args.Get(0).(fxevent.Logger); ok {
+		return result
+	}
+	return &fxevent.NopLogger
 }
 
 // mockTimeProvider implements TimeProvider for testing

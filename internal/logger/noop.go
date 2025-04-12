@@ -1,5 +1,7 @@
 package logger
 
+import "go.uber.org/fx/fxevent"
+
 // NoOpLogger is a no-op implementation of Interface
 type NoOpLogger struct{}
 
@@ -26,4 +28,9 @@ func (l *NoOpLogger) Fatal(msg string, fields ...any) {}
 // With implements Interface
 func (l *NoOpLogger) With(fields ...any) Interface {
 	return l
+}
+
+// NewFxLogger implements Interface
+func (l *NoOpLogger) NewFxLogger() fxevent.Logger {
+	return &fxevent.NopLogger
 }

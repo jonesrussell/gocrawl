@@ -12,50 +12,60 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx/fxevent"
 )
 
-// MockLogger implements logger.Interface for testing.
+// MockLogger is a mock implementation of logger.Interface
 type MockLogger struct {
 	mock.Mock
 }
 
-// NewMockLogger creates a new mock logger instance.
+// NewMockLogger creates a new mock logger instance
 func NewMockLogger() *MockLogger {
 	return &MockLogger{}
 }
 
-// Info implements logger.Interface.
-func (m *MockLogger) Info(msg string, fields ...any) {
-	m.Called(msg, fields)
-}
-
-// Error implements logger.Interface.
-func (m *MockLogger) Error(msg string, fields ...any) {
-	m.Called(msg, fields)
-}
-
-// Debug implements logger.Interface.
+// Debug implements logger.Interface
 func (m *MockLogger) Debug(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Warn implements logger.Interface.
+// Info implements logger.Interface
+func (m *MockLogger) Info(msg string, fields ...any) {
+	m.Called(msg, fields)
+}
+
+// Warn implements logger.Interface
 func (m *MockLogger) Warn(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Fatal implements logger.Interface.
+// Error implements logger.Interface
+func (m *MockLogger) Error(msg string, fields ...any) {
+	m.Called(msg, fields)
+}
+
+// Fatal implements logger.Interface
 func (m *MockLogger) Fatal(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// With implements logger.Interface.
+// With implements logger.Interface
 func (m *MockLogger) With(fields ...any) logger.Interface {
 	args := m.Called(fields)
 	if result, ok := args.Get(0).(logger.Interface); ok {
 		return result
 	}
-	return NewMockLogger()
+	return m
+}
+
+// NewFxLogger implements logger.Interface
+func (m *MockLogger) NewFxLogger() fxevent.Logger {
+	args := m.Called()
+	if result, ok := args.Get(0).(fxevent.Logger); ok {
+		return result
+	}
+	return &fxevent.NopLogger
 }
 
 // MockEventHandler is a mock implementation of EventHandler

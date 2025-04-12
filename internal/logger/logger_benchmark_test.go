@@ -1,9 +1,8 @@
-package logger_test
+package logger
 
 import (
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -16,38 +15,49 @@ func BenchmarkLogger(b *testing.B) {
 	}
 	defer zapLogger.Sync()
 
-	logConfig := &logger.Config{
-		Level:       logger.InfoLevel,
-		Development: false,
+	logConfig := &Config{
+		Level:       DebugLevel,
+		Development: true,
 	}
-	log := createLogger(zapLogger, logConfig)
+	log := &logger{
+		zapLogger: zapLogger,
+		config:    logConfig,
+	}
+
+	// Run benchmarks
+	b.Run("Debug", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			log.Debug("test message", "key", "value")
+		}
+	})
 
 	b.Run("Info", func(b *testing.B) {
-		for range b.N {
-			log.Info("benchmark message", "key", "value")
+		for i := 0; i < b.N; i++ {
+			log.Info("test message", "key", "value")
 		}
 	})
 
-	b.Run("InfoWithFields", func(b *testing.B) {
-		for range b.N {
-			log.Info("benchmark message",
-				"key1", "value1",
-				"key2", "value2",
-				"key3", "value3",
-			)
-		}
-	})
-
-	b.Run("With", func(b *testing.B) {
-		for range b.N {
-			child := log.With("key", "value")
-			child.Info("benchmark message")
+	b.Run("Warn", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			log.Warn("test message", "key", "value")
 		}
 	})
 
 	b.Run("Error", func(b *testing.B) {
-		for range b.N {
-			log.Error("benchmark error", "error", "test error")
+		for i := 0; i < b.N; i++ {
+			log.Error("test message", "key", "value")
+		}
+	})
+
+	b.Run("With", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			log.With("key", "value")
+		}
+	})
+
+	b.Run("NewFxLogger", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			log.NewFxLogger()
 		}
 	})
 }

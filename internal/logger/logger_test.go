@@ -1,33 +1,32 @@
-package logger_test
+package logger
 
 import (
 	"testing"
 
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 func TestNewLogger(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  *logger.Config
+		config  *Config
 		wantErr bool
 	}{
 		{
 			name: "development logger with debug",
-			config: &logger.Config{
+			config: &Config{
 				Development: true,
-				Level:       logger.DebugLevel,
+				Level:       DebugLevel,
 				Encoding:    "console",
 			},
 			wantErr: false,
 		},
 		{
 			name: "production logger",
-			config: &logger.Config{
+			config: &Config{
 				Development: false,
-				Level:       logger.InfoLevel,
+				Level:       InfoLevel,
 				Encoding:    "json",
 			},
 			wantErr: false,
@@ -69,22 +68,22 @@ func TestNewLogger(t *testing.T) {
 func TestNewDevelopmentLogger(t *testing.T) {
 	tests := []struct {
 		name      string
-		level     logger.Level
+		level     Level
 		expectErr bool
 	}{
 		{
 			name:      "debug level",
-			level:     logger.DebugLevel,
+			level:     DebugLevel,
 			expectErr: false,
 		},
 		{
 			name:      "info level",
-			level:     logger.InfoLevel,
+			level:     InfoLevel,
 			expectErr: false,
 		},
 		{
 			name:      "warn level",
-			level:     logger.WarnLevel,
+			level:     WarnLevel,
 			expectErr: false,
 		},
 	}
@@ -102,7 +101,7 @@ func TestNewDevelopmentLogger(t *testing.T) {
 			defer zapLogger.Sync()
 
 			// Create our logger
-			logConfig := &logger.Config{
+			logConfig := &Config{
 				Level:       tt.level,
 				Development: true,
 			}
@@ -120,22 +119,22 @@ func TestNewDevelopmentLogger(t *testing.T) {
 func TestNewProductionLogger(t *testing.T) {
 	tests := []struct {
 		name      string
-		level     logger.Level
+		level     Level
 		expectErr bool
 	}{
 		{
 			name:      "info level",
-			level:     logger.InfoLevel,
+			level:     InfoLevel,
 			expectErr: false,
 		},
 		{
 			name:      "warn level",
-			level:     logger.WarnLevel,
+			level:     WarnLevel,
 			expectErr: false,
 		},
 		{
 			name:      "error level",
-			level:     logger.ErrorLevel,
+			level:     ErrorLevel,
 			expectErr: false,
 		},
 	}
@@ -153,7 +152,7 @@ func TestNewProductionLogger(t *testing.T) {
 			defer zapLogger.Sync()
 
 			// Create our logger
-			logConfig := &logger.Config{
+			logConfig := &Config{
 				Level:       tt.level,
 				Development: false,
 			}
@@ -176,8 +175,8 @@ func TestLoggerMethods(t *testing.T) {
 	}
 	defer zapLogger.Sync()
 
-	logConfig := &logger.Config{
-		Level:       logger.DebugLevel,
+	logConfig := &Config{
+		Level:       DebugLevel,
 		Development: true,
 	}
 	log := createLogger(zapLogger, logConfig)
@@ -198,8 +197,8 @@ func TestLoggerEdgeCases(t *testing.T) {
 	}
 	defer zapLogger.Sync()
 
-	logConfig := &logger.Config{
-		Level:       logger.DebugLevel,
+	logConfig := &Config{
+		Level:       DebugLevel,
 		Development: true,
 	}
 	log := createLogger(zapLogger, logConfig)
@@ -236,26 +235,8 @@ func TestLoggerEdgeCases(t *testing.T) {
 	})
 }
 
-// Helper function to convert logger.Level to zapcore.Level
-func levelToZap(level logger.Level) zapcore.Level {
-	switch level {
-	case logger.DebugLevel:
-		return zapcore.DebugLevel
-	case logger.InfoLevel:
-		return zapcore.InfoLevel
-	case logger.WarnLevel:
-		return zapcore.WarnLevel
-	case logger.ErrorLevel:
-		return zapcore.ErrorLevel
-	case logger.FatalLevel:
-		return zapcore.FatalLevel
-	default:
-		return zapcore.InfoLevel
-	}
-}
-
 // Helper function to create a logger implementation
-func createLogger(zapLogger *zap.Logger, config *logger.Config) logger.Interface {
+func createLogger(zapLogger *zap.Logger, config *Config) Interface {
 	// Create a test logger that implements the Interface
 	return &testLogger{
 		zapLogger: zapLogger,
@@ -266,7 +247,7 @@ func createLogger(zapLogger *zap.Logger, config *logger.Config) logger.Interface
 // testLogger implements logger.Interface for testing
 type testLogger struct {
 	zapLogger *zap.Logger
-	config    *logger.Config
+	config    *Config
 }
 
 // Debug logs a debug message
@@ -295,29 +276,16 @@ func (l *testLogger) Fatal(msg string, fields ...any) {
 }
 
 // With creates a child logger with additional fields
-func (l *testLogger) With(fields ...any) logger.Interface {
+func (l *testLogger) With(fields ...any) Interface {
 	return &testLogger{
 		zapLogger: l.zapLogger.With(toZapFields(fields)...),
 		config:    l.config,
 	}
 }
 
-// toZapFields converts a list of any fields to zap.Field
-func toZapFields(fields []any) []zap.Field {
-	if len(fields)%2 != 0 {
-		return []zap.Field{zap.Error(logger.ErrInvalidFields)}
-	}
-
-	zapFields := make([]zap.Field, 0, len(fields)/2)
-	for i := 0; i < len(fields); i += 2 {
-		key, ok := fields[i].(string)
-		if !ok {
-			return []zap.Field{zap.Error(logger.ErrInvalidFields)}
-		}
-
-		value := fields[i+1]
-		zapFields = append(zapFields, zap.Any(key, value))
-	}
-
-	return zapFields
+// NewFxLogger creates a new Fx logger
+func (l *testLogger) NewFxLogger() fxevent.Logger {
+	return NewFxLogger(l.zapLogger)
 }
+
+// Remove duplicate toZapFields function and use the package's function

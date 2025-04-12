@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"go.uber.org/fx/fxevent"
 )
 
 // DebugLogger is a wrapper around the main logger for debug-specific logging.
@@ -62,6 +63,11 @@ func (d *DebugLogger) Fatal(msg string, fields ...any) {
 // With creates a child logger with additional fields.
 func (d *DebugLogger) With(fields ...any) logger.Interface {
 	return &DebugLogger{log: d.log.With(fields...)}
+}
+
+// NewFxLogger implements logger.Interface
+func (d *DebugLogger) NewFxLogger() fxevent.Logger {
+	return d.log.NewFxLogger()
 }
 
 // Ensure DebugLogger implements both interfaces

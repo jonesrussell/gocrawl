@@ -4,6 +4,7 @@ package testutils
 import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/fx/fxevent"
 )
 
 // MockLogger implements logger.Interface for testing
@@ -44,6 +45,15 @@ func (m *MockLogger) With(fields ...any) logger.Interface {
 	}
 	// Return a default logger if type assertion fails
 	return NewMockLogger()
+}
+
+// NewFxLogger implements logger.Interface
+func (m *MockLogger) NewFxLogger() fxevent.Logger {
+	args := m.Called()
+	if result, ok := args.Get(0).(fxevent.Logger); ok {
+		return result
+	}
+	return &fxevent.NopLogger
 }
 
 // Ensure MockLogger implements logger.Interface

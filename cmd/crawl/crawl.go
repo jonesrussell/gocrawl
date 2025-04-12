@@ -14,6 +14,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 // Cmd represents the crawl command.
@@ -59,6 +60,10 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		fx.Invoke(func(config config.Interface) {
 			// Set debug mode from command line flag
 			config.GetAppConfig().Debug = cmd.Root().Flags().Lookup("debug").Value.String() == "true"
+		}),
+		// Suppress Fx's default logging and use our logger format
+		fx.WithLogger(func(log logger.Interface) fxevent.Logger {
+			return log.NewFxLogger()
 		}),
 		fx.Invoke(func(lc fx.Lifecycle, crawlerSvc crawler.Interface, h signal.Interface) {
 			handler = h

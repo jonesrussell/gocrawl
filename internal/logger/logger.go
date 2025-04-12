@@ -4,6 +4,7 @@ package logger
 import (
 	"os"
 
+	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -136,6 +137,11 @@ func (l *logger) With(fields ...any) Interface {
 		zapLogger: l.zapLogger.With(toZapFields(fields)...),
 		config:    l.config,
 	}
+}
+
+// NewFxLogger creates a new Fx logger.
+func (l *logger) NewFxLogger() fxevent.Logger {
+	return NewFxLogger(l.zapLogger)
 }
 
 // toZapFields converts a list of any fields to zap.Field.

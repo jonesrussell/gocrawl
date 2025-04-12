@@ -2,6 +2,7 @@ package testing
 
 import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"go.uber.org/fx/fxevent"
 )
 
 // NopLogger is a no-op implementation of logger.Interface
@@ -41,4 +42,9 @@ func (l *NopLogger) Fatal(msg string, fields ...any) {}
 // With implements logger.Interface
 func (l *NopLogger) With(fields ...any) logger.Interface {
 	return l
+}
+
+// NewFxLogger implements logger.Interface
+func (l *NopLogger) NewFxLogger() fxevent.Logger {
+	return &fxevent.NopLogger
 }
