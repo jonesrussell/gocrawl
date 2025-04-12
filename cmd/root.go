@@ -213,7 +213,7 @@ func bindFlags(cmd *cobra.Command) error {
 
 // setupConfig handles configuration file setup for all commands.
 // It ensures the config file path is absolute and configures Viper.
-func setupConfig(cmd *cobra.Command, args []string) error {
+func setupConfig(cmd *cobra.Command) error {
 	// Step 1: Set default values first
 	setDefaults()
 
@@ -395,7 +395,7 @@ func init() {
 
 	// Initialize configuration on startup
 	cobra.OnInitialize(func() {
-		if err := setupConfig(rootCmd, nil); err != nil {
+		if err := setupConfig(rootCmd); err != nil {
 			fmt.Fprintf(os.Stderr, "Error initializing config: %v\n", err)
 			os.Exit(1)
 		}
