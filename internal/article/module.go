@@ -64,12 +64,13 @@ func NewArticleService(
 	srcs := config.GetSources()
 	if len(srcs) == 0 {
 		logger.Warn("No sources configured, using default selectors")
-		return NewService(
+		service := NewService(
 			logger,
 			(&types.ArticleSelectors{}).Default(),
 			storage,
 			"articles",
 		)
+		return service
 	}
 
 	// Create service with default selectors
@@ -78,23 +79,37 @@ func NewArticleService(
 		(&types.ArticleSelectors{}).Default(),
 		storage,
 		"articles",
-	).(*Service)
+	)
 
 	// Add source-specific selectors
-	for _, src := range srcs {
-		service.AddSourceSelectors(src.Name, src.Selectors.Article)
+	for i := range srcs {
+		service.AddSourceSelectors(srcs[i].Name, srcs[i].Selectors.Article)
 	}
 
 	return service
 }
 
-// ProvideArticleProcessor creates a new article processor.
+// ProvideArticleProcessor provides the article processor.
 func ProvideArticleProcessor(
 	logger logger.Interface,
 	config config.Interface,
 	storage storagetypes.Interface,
-	service Interface,
-) *ArticleProcessor {
+) (*ArticleProcessor, error) {
+	selectors := types.ArticleSelectors{
+		Title:         "h1",
+		Description:   "meta[name=description]",
+		Author:        ".author",
+		PublishedTime: "time[datetime]",
+		Body:          "article",
+	}
+
+	service := NewService(
+		logger,
+		selectors,
+		storage,
+		"articles",
+	)
+
 	return &ArticleProcessor{
 		Logger:         logger,
 		ArticleService: service,
@@ -102,5 +117,24 @@ func ProvideArticleProcessor(
 		IndexName:      "articles",
 		ArticleChan:    make(chan *models.Article, ArticleChannelBufferSize),
 		metrics:        &common.Metrics{},
-	}
+	}, nil
+}
+
+// NewProcessor creates a new article processor.
+func NewProcessor(
+	logger logger.Interface,
+	service Interface,
+	jobService common.JobService,
+	storage storagetypes.Interface,
+	indexName string,
+	articleChan chan *models.Article,
+) *ArticleProcessor {
+	return NewArticleProcessor(ProcessorParams{
+		Logger:      logger,
+		Service:     service,
+		JobService:  jobService,
+		Storage:     storage,
+		IndexName:   indexName,
+		ArticleChan: articleChan,
+	})
 }

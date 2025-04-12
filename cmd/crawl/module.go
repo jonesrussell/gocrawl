@@ -41,13 +41,28 @@ var Module = fx.Options(
 
 	// Provide base dependencies
 	fx.Provide(
+		// Debug flag
+		fx.Annotate(
+			func() bool {
+				return false // Default to false if not provided
+			},
+			fx.ResultTags(`name:"debug"`),
+		),
+
 		// Logger params
-		func() logger.Params {
+		func(debug bool) logger.Params {
+			level := logger.InfoLevel
+			if debug {
+				level = logger.DebugLevel
+			}
 			return logger.Params{
 				Config: &logger.Config{
-					Level:       logger.InfoLevel,
-					Development: true,
-					Encoding:    "console",
+					Level:            level,
+					Development:      true,
+					Encoding:         "console",
+					OutputPaths:      []string{"stdout"},
+					ErrorOutputPaths: []string{"stderr"},
+					EnableColor:      true,
 				},
 			}
 		},

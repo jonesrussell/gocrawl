@@ -22,6 +22,8 @@ import (
 const (
 	// DefaultChannelBufferSize is the default size for buffered channels.
 	DefaultChannelBufferSize = 100
+	// RandomDelayDivisor is used to calculate random delay from rate limit
+	RandomDelayDivisor = 2
 )
 
 // App represents the main application structure.
@@ -85,7 +87,7 @@ func SetupCollector(
 	err = c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Delay:       source.RateLimit,
-		RandomDelay: source.RateLimit / 2,
+		RandomDelay: source.RateLimit / RandomDelayDivisor,
 		Parallelism: crawlerconfig.DefaultParallelism,
 	})
 	if err != nil {

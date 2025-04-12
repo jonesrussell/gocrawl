@@ -27,8 +27,8 @@ var (
 	// It can be set via the --config flag or defaults to config.yaml.
 	cfgFile string
 
-	// debug enables debug mode for all commands
-	debug bool
+	// Debug enables debug mode for all commands
+	Debug bool
 
 	// rootCmd represents the root command for the GoCrawl CLI.
 	// It serves as the base command that all subcommands are attached to.
@@ -82,7 +82,11 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 // It runs the root command and handles any errors that occur during execution.
 // If an error occurs, it prints the error message and exits with status code 1.
 func Execute() {
-	log, err := logger.New(logger.DefaultConfig())
+	config := logger.DefaultConfig()
+	if Debug {
+		config.Level = logger.DebugLevel
+	}
+	log, err := logger.New(config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create logger: %v\n", err)
 		os.Exit(1)
@@ -125,5 +129,5 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
 
 	// Add the persistent --debug flag to all commands
-	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug mode")
+	rootCmd.PersistentFlags().BoolVar(&Debug, "debug", false, "enable debug mode")
 }

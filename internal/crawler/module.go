@@ -4,12 +4,12 @@
 package crawler
 
 import (
-	"crypto/tls"
 	"net/http"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/transport"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
@@ -22,6 +22,18 @@ import (
 const (
 	// ArticleChannelBufferSize is the buffer size for the article channel.
 	ArticleChannelBufferSize = 100
+	// DefaultMaxIdleConns is the default maximum number of idle connections.
+	DefaultMaxIdleConns = 100
+	// DefaultMaxIdleConnsPerHost is the default maximum number of idle connections per host.
+	DefaultMaxIdleConnsPerHost = 10
+	// DefaultIdleConnTimeout is the default idle connection timeout.
+	DefaultIdleConnTimeout = 90 * time.Second
+	// DefaultTLSHandshakeTimeout is the default TLS handshake timeout.
+	DefaultTLSHandshakeTimeout = 10 * time.Second
+	// DefaultResponseHeaderTimeout is the default response header timeout.
+	DefaultResponseHeaderTimeout = 30 * time.Second
+	// DefaultExpectContinueTimeout is the default expect continue timeout.
+	DefaultExpectContinueTimeout = 1 * time.Second
 )
 
 // Result defines the crawler module's output.
@@ -108,18 +120,28 @@ func NewCrawler(
 	}
 
 	// Configure transport with more reasonable settings
+	tlsConfig, err := transport.NewTLSConfig(cfg)
+	if err != nil {
+		logger.Error("Failed to create TLS configuration",
+			"error", err)
+		return nil
+	}
+
 	collector.WithTransport(&http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
+		TLSClientConfig:       tlsConfig,
 		DisableKeepAlives:     false,
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   10,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConns:          DefaultMaxIdleConns,
+		MaxIdleConnsPerHost:   DefaultMaxIdleConnsPerHost,
+		IdleConnTimeout:       DefaultIdleConnTimeout,
+		ResponseHeaderTimeout: DefaultResponseHeaderTimeout,
+		ExpectContinueTimeout: DefaultExpectContinueTimeout,
 	})
+
+	if cfg.TLS.InsecureSkipVerify {
+		logger.Warn("TLS certificate verification is disabled. This is not recommended for production use.",
+			"component", "crawler",
+			"warning", "This makes HTTPS connections vulnerable to man-in-the-middle attacks")
+	}
 
 	// Set up callbacks
 	collector.OnRequest(func(r *colly.Request) {

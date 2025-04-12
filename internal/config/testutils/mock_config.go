@@ -3,6 +3,8 @@ package testutils
 import (
 	"time"
 
+	"crypto/tls"
+
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
@@ -173,6 +175,14 @@ func NewMockConfig() *MockConfig {
 			AllowedDomains:   []string{"*"},
 			Delay:            DefaultDelay,
 			RandomDelay:      DefaultRandomDelay,
+			SourceFile:       "sources.yml",
+			Debug:            false,
+			TLS: crawler.TLSConfig{
+				InsecureSkipVerify:       false,
+				MinVersion:               tls.VersionTLS12,
+				MaxVersion:               0,
+				PreferServerCipherSuites: true,
+			},
 		},
 		PriorityConfig: &priority.Config{
 			DefaultPriority:   DefaultPriority,

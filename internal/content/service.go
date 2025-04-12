@@ -116,24 +116,6 @@ var contentTypePatterns = map[string][]string{
 	"system":   {"/wp-json", "/wp-admin"},
 }
 
-// cleanBody cleans and extracts text from HTML content
-func cleanBody(content any) string {
-	var selection *goquery.Selection
-
-	switch v := content.(type) {
-	case *colly.HTMLElement:
-		selection = v.DOM
-	case *goquery.Selection:
-		selection = v
-	default:
-		return ""
-	}
-
-	// Remove unwanted elements
-	selection.Find("script, style, noscript, iframe, form").Remove()
-	return strings.TrimSpace(selection.Text())
-}
-
 // ExtractContent extracts content from an HTML element
 func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 	s.Logger.Debug("Extracting content", "url", e.Request.URL.String())
@@ -192,12 +174,10 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 	// Determine content type using source-specific patterns
 	contentType := s.DetermineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
 
-	// Extract body using source-specific selectors
-	body := ""
-	if bodySelector, ok := rules.ContentSelectors["body"]; ok && bodySelector != "" {
-		body = cleanBody(e.DOM.Find(bodySelector))
-	} else {
-		body = cleanBody(e)
+	// Get the body text
+	body := e.ChildText("body")
+	if body == "" {
+		body = e.Text
 	}
 
 	// Create content object
@@ -261,8 +241,8 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
 	for key, selector := range rules.MetadataSelectors {
 		if value := e.ChildAttr(selector, "content"); value != "" {
 			metadata[key] = value
-		} else if value := e.ChildText(selector); value != "" {
-			metadata[key] = value
+		} else if textValue := e.ChildText(selector); textValue != "" {
+			metadata[key] = textValue
 		}
 	}
 

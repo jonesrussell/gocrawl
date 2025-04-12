@@ -61,9 +61,9 @@ func (s *Service) AddSourceSelectors(sourceName string, selectors types.ArticleS
 // getSelectorsForURL returns the appropriate selectors for the given URL
 func (s *Service) getSelectorsForURL(url string) types.ArticleSelectors {
 	// Try to find matching source selectors
-	for sourceName, selectors := range s.SourceSelectors {
+	for sourceName := range s.SourceSelectors {
 		if strings.Contains(url, sourceName) {
-			return selectors
+			return s.SourceSelectors[sourceName]
 		}
 	}
 	return s.DefaultSelectors

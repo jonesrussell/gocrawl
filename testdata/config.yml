@@ -51,4 +51,6 @@ crawler:
   rate_limit: 2s
   random_delay: 500ms
   parallelism: 2
-  source_file: testdata/sources.yml 
+  source_file: testdata/sources.yml
+  tls:
+    insecure_skip_verify: true  # Allow insecure TLS for testing 

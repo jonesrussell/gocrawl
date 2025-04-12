@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"time"
@@ -41,6 +42,8 @@ type Config struct {
 	SourceFile string `yaml:"source_file"`
 	// Debug enables debug logging
 	Debug bool `yaml:"debug"`
+	// TLS contains TLS configuration
+	TLS TLSConfig `yaml:"tls"`
 }
 
 // Validate validates the crawler configuration.
@@ -60,7 +63,7 @@ func (c *Config) Validate() error {
 	if c.RandomDelay < 0 {
 		return errors.New("random_delay must be non-negative")
 	}
-	return nil
+	return c.TLS.Validate()
 }
 
 // New creates a new crawler configuration with the given options.
@@ -77,6 +80,12 @@ func New(opts ...Option) *Config {
 		DisallowedDomains: []string{},
 		SourceFile:        "sources.yml",
 		Debug:             false,
+		TLS: TLSConfig{
+			InsecureSkipVerify:       false, // Default to secure TLS verification
+			MinVersion:               tls.VersionTLS12,
+			MaxVersion:               0, // Use highest supported version
+			PreferServerCipherSuites: true,
+		},
 	}
 
 	for _, opt := range opts {
@@ -168,4 +177,48 @@ func ParseRateLimit(limit string) (time.Duration, error) {
 	}
 
 	return duration, nil
+}
+
+// TLSConfig holds TLS-related configuration settings.
+type TLSConfig struct {
+	// InsecureSkipVerify controls whether a client verifies the server's certificate chain and host name.
+	// If InsecureSkipVerify is true, TLS accepts any certificate presented by the server
+	// and any host name in that certificate.
+	// In this mode, TLS is susceptible to man-in-the-middle attacks. This should be used
+	// only for testing or with trusted sources.
+	// Default: false
+	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
+
+	// MinVersion is the minimum TLS version that is acceptable.
+	// Default: TLS 1.2
+	MinVersion uint16 `yaml:"min_version"`
+
+	// MaxVersion is the maximum TLS version that is acceptable.
+	// If zero, the maximum version supported by this package is used, which is currently TLS 1.3.
+	// Default: 0 (use highest supported version)
+	MaxVersion uint16 `yaml:"max_version"`
+
+	// PreferServerCipherSuites controls whether the server's preference for cipher suites is honored.
+	// If true, the server's preference is used. If false, the client's preference is used.
+	// Default: true
+	PreferServerCipherSuites bool `yaml:"prefer_server_cipher_suites"`
+}
+
+// NewTLSConfig creates a new TLS configuration with secure defaults.
+func NewTLSConfig() *TLSConfig {
+	return &TLSConfig{
+		InsecureSkipVerify:       false,
+		MinVersion:               tls.VersionTLS12,
+		MaxVersion:               0, // Use highest supported version
+		PreferServerCipherSuites: true,
+	}
+}
+
+// Validate validates the TLS configuration.
+func (c *TLSConfig) Validate() error {
+	if c.InsecureSkipVerify {
+		return errors.New("insecure_skip_verify is enabled. This is not recommended for " +
+			"production use as it makes HTTPS connections vulnerable to man-in-the-middle attacks")
+	}
+	return nil
 }

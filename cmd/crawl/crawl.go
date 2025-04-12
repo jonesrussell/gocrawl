@@ -3,6 +3,7 @@ package crawl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -28,9 +29,16 @@ Specify the source name as an argument.`,
 func runCrawl(cmd *cobra.Command, args []string) error {
 	sourceName := strings.Trim(args[0], "\"")
 	cmdCtx := cmd.Context()
-	log := cmd.Root().Context().Value(common.LoggerKey).(logger.Interface)
+	loggerValue := cmd.Root().Context().Value(common.LoggerKey)
+	if loggerValue == nil {
+		return errors.New("logger not found in context")
+	}
+	log, ok := loggerValue.(logger.Interface)
+	if !ok {
+		return errors.New("invalid logger type in context")
+	}
 
-	log.Info("Starting crawl", "source", sourceName)
+	log.Info("Setting up crawl", "source", sourceName)
 
 	// Create a new context for the crawler and Fx application.
 	crawlCtx, cancel := context.WithCancel(cmdCtx)
@@ -57,6 +65,10 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 			fx.Annotate(
 				func() string { return sourceName },
 				fx.ResultTags(`name:"sourceName"`),
+			),
+			fx.Annotate(
+				func() bool { return cmd.Root().Flags().Lookup("debug").Value.String() == "true" },
+				fx.ResultTags(`name:"debug"`),
 			),
 		),
 		fx.Invoke(func(crawler crawler.Interface) {

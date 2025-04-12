@@ -9,11 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"crypto/tls"
-
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/transport"
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -22,6 +21,11 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
+)
+
+const (
+	// RandomDelayDivisor is used to calculate random delay from rate limit
+	RandomDelayDivisor = 2
 )
 
 // Crawler implements the Processor interface for web crawling.
@@ -93,7 +97,7 @@ func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types
 }
 
 // setupCollector configures the collector with the given source settings
-func (c *Crawler) setupCollector(source *types.Source) {
+func (c *Crawler) setupCollector(source *types.Source) error {
 	c.logger.Debug("Setting up collector",
 		"max_depth", source.MaxDepth,
 		"allowed_domains", source.AllowedDomains)
@@ -132,33 +136,43 @@ func (c *Crawler) setupCollector(source *types.Source) {
 	err = c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Delay:       rateLimit,
-		RandomDelay: rateLimit / 2,
+		RandomDelay: rateLimit / RandomDelayDivisor,
 		Parallelism: crawlerconfig.DefaultParallelism,
 	})
 	if err != nil {
-		c.logger.Error("Failed to set rate limit",
-			"error", err)
+		return fmt.Errorf("failed to set rate limit: %w", err)
 	}
 
 	// Configure transport with more reasonable settings
+	tlsConfig, err := transport.NewTLSConfig(c.cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create TLS configuration: %w", err)
+	}
+
 	c.collector.WithTransport(&http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
+		TLSClientConfig:       tlsConfig,
 		DisableKeepAlives:     false,
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   10,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConns:          transport.DefaultMaxIdleConns,
+		MaxIdleConnsPerHost:   transport.DefaultMaxIdleConnsPerHost,
+		IdleConnTimeout:       transport.DefaultIdleConnTimeout,
+		ResponseHeaderTimeout: transport.DefaultResponseHeaderTimeout,
+		ExpectContinueTimeout: transport.DefaultExpectContinueTimeout,
 	})
+
+	if c.cfg.TLS.InsecureSkipVerify {
+		c.logger.Warn("TLS certificate verification is disabled. This is not recommended for production use.",
+			"component", "crawler",
+			"source", source.Name,
+			"warning", "This makes HTTPS connections vulnerable to man-in-the-middle attacks")
+	}
 
 	c.logger.Debug("Collector configured",
 		"max_depth", source.MaxDepth,
 		"allowed_domains", source.AllowedDomains,
 		"rate_limit", rateLimit,
 		"parallelism", crawlerconfig.DefaultParallelism)
+
+	return nil
 }
 
 // setupCallbacks configures the collector's callbacks
@@ -206,7 +220,10 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	}
 
 	// Set up collector
-	c.setupCollector(source)
+	err = c.setupCollector(source)
+	if err != nil {
+		return fmt.Errorf("failed to setup collector: %w", err)
+	}
 
 	// Set up callbacks
 	c.setupCallbacks(ctx)
@@ -220,8 +237,8 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		"url", source.URL)
 
 	// Visit the source URL
-	if err := c.collector.Visit(source.URL); err != nil {
-		return fmt.Errorf("failed to visit source URL: %w", err)
+	if visitErr := c.collector.Visit(source.URL); visitErr != nil {
+		return fmt.Errorf("failed to visit source URL: %w", visitErr)
 	}
 
 	// Wait for the crawler to finish

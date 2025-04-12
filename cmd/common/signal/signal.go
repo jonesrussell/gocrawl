@@ -151,7 +151,7 @@ func (am *AppManager) StopApp(ctx context.Context, logger logger.Interface) erro
 type SignalHandler struct {
 	logger          logger.Interface
 	done            chan struct{}
-	mu              sync.Mutex
+	shutdownChan    chan struct{}
 	state           shutdownState
 	stateMu         sync.RWMutex
 	shutdownTimeout time.Duration
@@ -162,11 +162,12 @@ type SignalHandler struct {
 	cancel          context.CancelFunc
 }
 
-// NewSignalHandler creates a new SignalHandler instance.
+// NewSignalHandler creates a new signal handler.
 func NewSignalHandler(logger logger.Interface) *SignalHandler {
 	return &SignalHandler{
 		logger:          logger,
 		done:            make(chan struct{}),
+		shutdownChan:    make(chan struct{}),
 		state:           stateRunning,
 		shutdownTimeout: DefaultShutdownTimeout,
 		resourceManager: NewResourceManager(),

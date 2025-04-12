@@ -64,7 +64,8 @@ func NewContentService(
 	}
 
 	// Add source-specific rules
-	for _, src := range srcs {
+	for i := range srcs {
+		src := &srcs[i]
 		rules := ContentRules{
 			ContentTypePatterns: contentTypePatterns,
 			ExcludePatterns:     make([]string, 0),
@@ -86,7 +87,12 @@ func NewContentService(
 			}
 		}
 
-		service.(*Service).AddSourceRules(src.Name, rules)
+		if svc, ok := service.(*Service); ok {
+			svc.AddSourceRules(src.Name, rules)
+		} else {
+			logger.Error("Failed to add source rules: invalid service type",
+				"source", src.Name)
+		}
 	}
 
 	return service

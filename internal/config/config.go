@@ -216,11 +216,8 @@ func LoadConfig() (*Config, error) {
 	sourcesViper.SetConfigName("sources")
 	sourcesViper.AddConfigPath(".")
 
-	if err := sourcesViper.ReadInConfig(); err != nil {
-		var configFileNotFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFound) {
-			return nil, fmt.Errorf("failed to read sources config: %w", err)
-		}
+	if configErr := sourcesViper.ReadInConfig(); configErr != nil {
+		return nil, fmt.Errorf("failed to read sources config: %w", configErr)
 	} else {
 		var sources []types.Source
 		if unmarshalErr := sourcesViper.UnmarshalKey("sources", &sources); unmarshalErr != nil {

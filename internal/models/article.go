@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/gocolly/colly/v2"
+)
 
 type Article struct {
 	// Unique identifier for the article
@@ -23,6 +27,8 @@ type Article struct {
 	Intro string `json:"intro" mapstructure:"intro"`
 	// Article description (often from meta tags)
 	Description string `json:"description" mapstructure:"description"`
+	// Raw HTML content
+	HTML *colly.HTMLElement `json:"-" mapstructure:"-"`
 
 	// Open Graph metadata
 	// Open Graph title
