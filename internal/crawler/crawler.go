@@ -45,6 +45,7 @@ type Crawler struct {
 	linkHandler      *LinkHandler
 	htmlProcessor    *HTMLProcessor
 	cfg              *crawlerconfig.Config
+	abortChan        chan struct{} // Channel to signal abort
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -179,12 +180,17 @@ func (c *Crawler) setupCollector(source *types.Source) error {
 func (c *Crawler) setupCallbacks(ctx context.Context) {
 	// Set up request callback
 	c.collector.OnRequest(func(r *colly.Request) {
-		if ctx.Err() != nil {
+		select {
+		case <-ctx.Done():
 			r.Abort()
 			return
+		case <-c.abortChan:
+			r.Abort()
+			return
+		default:
+			c.logger.Debug("Visiting URL",
+				"url", r.URL.String())
 		}
-		c.logger.Debug("Visiting URL",
-			"url", r.URL.String())
 	})
 
 	// Set up HTML processing
@@ -206,12 +212,29 @@ func (c *Crawler) setupCallbacks(ctx context.Context) {
 
 	// Set up link following
 	c.collector.OnHTML("a[href]", c.linkHandler.HandleLink)
+
+	// Set up scraped callback to handle abort
+	c.collector.OnScraped(func(r *colly.Response) {
+		select {
+		case <-ctx.Done():
+			r.Request.Abort()
+			return
+		case <-c.abortChan:
+			r.Request.Abort()
+			return
+		default:
+			// Continue processing
+		}
+	})
 }
 
 // Start begins the crawling process for a given source.
 func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.logger.Debug("Starting crawler",
 		"source", sourceName)
+
+	// Initialize abort channel
+	c.abortChan = make(chan struct{})
 
 	// Validate source
 	source, err := c.validateSource(ctx, sourceName)
@@ -259,10 +282,13 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	c.state.Cancel()
 	c.logger.Debug("Context cancelled")
 
-	// Stop accepting new requests
-	c.collector.OnRequest(func(r *colly.Request) {
-		r.Abort()
-	})
+	// Signal abort to all goroutines
+	close(c.abortChan)
+	c.logger.Debug("Abort signal sent")
+
+	// Wait for the collector to finish
+	c.logger.Debug("Waiting for collector to finish")
+	c.collector.Wait()
 
 	// Create a done channel for the wait group
 	waitDone := make(chan struct{})

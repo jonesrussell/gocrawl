@@ -150,7 +150,7 @@ func (am *AppManager) StopApp(ctx context.Context, logger logger.Interface) erro
 // SignalHandler handles OS signals and application shutdown.
 type SignalHandler struct {
 	logger          logger.Interface
-	done            chan struct{}
+	Done            chan struct{}
 	shutdownChan    chan struct{}
 	state           shutdownState
 	stateMu         sync.RWMutex
@@ -166,7 +166,7 @@ type SignalHandler struct {
 func NewSignalHandler(logger logger.Interface) *SignalHandler {
 	return &SignalHandler{
 		logger:          logger,
-		done:            make(chan struct{}),
+		Done:            make(chan struct{}),
 		shutdownChan:    make(chan struct{}),
 		state:           stateRunning,
 		shutdownTimeout: DefaultShutdownTimeout,
@@ -209,13 +209,20 @@ func (h *SignalHandler) RequestShutdown() {
 	if h.state == stateRunning {
 		h.state = stateShuttingDown
 		h.logger.Info("Initiating graceful shutdown")
+		// Cancel the context first
+		if h.cancel != nil {
+			h.cancel()
+		}
+		// Signal shutdown
+		close(h.shutdownChan)
+		// Start shutdown process
 		go h.shutdown()
 	}
 }
 
 // Wait waits for shutdown to complete.
 func (h *SignalHandler) Wait() error {
-	<-h.done
+	<-h.Done
 	return h.shutdownError
 }
 
@@ -271,8 +278,22 @@ func (h *SignalHandler) SetFXApp(app any) {
 // shutdown performs the actual shutdown process.
 func (h *SignalHandler) shutdown() {
 	// Create a context with timeout for shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), h.shutdownTimeout)
+	ctx, cancel := context.WithTimeout(h.ctx, h.shutdownTimeout)
 	defer cancel()
+
+	// Wait for shutdown signal or timeout
+	select {
+	case <-h.shutdownChan:
+		// Continue with shutdown
+	case <-ctx.Done():
+		h.logger.Error("Shutdown timed out", "error", ctx.Err())
+		h.shutdownError = ctx.Err()
+		h.stateMu.Lock()
+		h.state = stateShutdownComplete
+		h.stateMu.Unlock()
+		close(h.Done)
+		return
+	}
 
 	// Close resources
 	if err := h.resourceManager.CloseResources(ctx, h.logger); err != nil {
@@ -286,16 +307,11 @@ func (h *SignalHandler) shutdown() {
 		h.shutdownError = err
 	}
 
-	// Cancel the context
-	if h.cancel != nil {
-		h.cancel()
-	}
-
 	// Mark shutdown as complete
 	h.stateMu.Lock()
 	h.state = stateShutdownComplete
 	h.stateMu.Unlock()
 
 	// Signal completion
-	close(h.done)
+	close(h.Done)
 }
