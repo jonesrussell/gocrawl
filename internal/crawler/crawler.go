@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/transport"
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
@@ -124,11 +123,6 @@ func (c *Crawler) setupCollector(source *types.Source) error {
 		opts = append(opts, colly.AllowedDomains(source.AllowedDomains...))
 	}
 
-	// Configure debug logging if enabled
-	if c.cfg.Debug {
-		opts = append(opts, colly.Debugger(&debug.LogDebugger{}))
-	}
-
 	c.collector = colly.NewCollector(opts...)
 
 	// Parse and set rate limit
@@ -185,6 +179,14 @@ func (c *Crawler) setupCollector(source *types.Source) error {
 
 // setupCallbacks configures the collector's callbacks
 func (c *Crawler) setupCallbacks(ctx context.Context) {
+	// Set up response callback
+	c.collector.OnResponse(func(r *colly.Response) {
+		c.logger.Debug("Received response",
+			"url", r.Request.URL.String(),
+			"status", r.StatusCode,
+			"headers", r.Headers)
+	})
+
 	// Set up request callback
 	c.collector.OnRequest(func(r *colly.Request) {
 		select {
@@ -218,7 +220,9 @@ func (c *Crawler) setupCallbacks(ctx context.Context) {
 	})
 
 	// Set up link following
-	c.collector.OnHTML("a[href]", c.linkHandler.HandleLink)
+	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		c.linkHandler.HandleLink(e)
+	})
 
 	// Set up scraped callback to handle abort
 	c.collector.OnScraped(func(r *colly.Response) {
@@ -261,15 +265,20 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Start the crawler state
 	c.state.Start(ctx, sourceName)
 
-	// Start the crawler
-	c.logger.Info("Starting crawl",
-		"source", sourceName,
-		"url", source.URL)
-
 	// Visit the source URL
+	c.logger.Debug("Attempting to visit URL",
+		"url", source.URL,
+		"allowed_domains", source.AllowedDomains)
+
 	if visitErr := c.collector.Visit(source.URL); visitErr != nil {
+		c.logger.Error("Failed to visit source URL",
+			"error", visitErr,
+			"url", source.URL)
 		return fmt.Errorf("failed to visit source URL: %w", visitErr)
 	}
+
+	c.logger.Debug("Successfully initiated visit",
+		"url", source.URL)
 
 	// Wait for the crawler to finish
 	c.collector.Wait()
