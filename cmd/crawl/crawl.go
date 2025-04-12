@@ -30,25 +30,35 @@ Specify the source name as an argument.`,
 func runCrawl(cmd *cobra.Command, args []string) error {
 	sourceName := strings.Trim(args[0], "\"")
 	cmdCtx := cmd.Context()
-	loggerValue := cmd.Root().Context().Value(common.LoggerKey)
-	if loggerValue == nil {
+	log := common.GetLoggerFromContext(cmdCtx)
+	if log == nil {
 		return errors.New("logger not found in context")
-	}
-	log, ok := loggerValue.(logger.Interface)
-	if !ok {
-		return errors.New("invalid logger type in context")
 	}
 
 	log.Info("Setting up crawl", "source", sourceName)
 
-	// Set debug mode from command line flag
-	debug := cmd.Root().Flags().Lookup("debug").Value.String() == "true"
+	// Set debug mode from configuration
+	config := common.GetConfigFromContext(cmdCtx)
+	if config == nil {
+		return errors.New("configuration not found in context")
+	}
+	debug := config.GetBool("app.debug") || config.GetString("logger.level") == "debug"
 	if debug {
-		log.Info("Debug mode enabled")
+		log.Debug("Debug mode enabled")
+		log.Debug("Configuration loaded",
+			"max_depth", config.GetInt("crawler.max_depth"),
+			"rate_limit", config.GetString("crawler.rate_limit"),
+			"user_agent", config.GetString("crawler.user_agent"),
+		)
 	}
 
 	// Initialize the Fx application.
-	log.Debug("Initializing Fx application")
+	log.Debug("Initializing Fx application with modules",
+		"source", sourceName,
+		"context_available", cmdCtx != nil,
+		"logger_available", log != nil,
+	)
+
 	var handler signal.Interface
 	fxApp := fx.New(
 		Module,
@@ -68,14 +78,19 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		),
 		// Suppress Fx's default logging and use our logger format
 		fx.WithLogger(func(log logger.Interface) fxevent.Logger {
-			return log.NewFxLogger()
+			return logger.NewFxLogger(log)
 		}),
 		fx.Invoke(func(lc fx.Lifecycle, crawlerSvc crawler.Interface, h signal.Interface) {
 			handler = h
 			// Register lifecycle hooks
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
-					log.Debug("Starting crawler")
+					log.Debug("Starting crawler lifecycle",
+						"source", sourceName,
+						"context_available", ctx != nil,
+						"crawler_available", crawlerSvc != nil,
+					)
+
 					if err := crawlerSvc.Start(ctx, sourceName); err != nil {
 						log.Error("Failed to start crawler", "error", err)
 						return err
@@ -83,19 +98,23 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 
 					// Monitor crawler completion in background
 					go func() {
+						log.Debug("Starting crawler monitoring goroutine")
 						select {
 						case <-crawlerSvc.Done():
-							log.Info("Crawler finished processing")
+							log.Info("Crawler finished processing", "source", sourceName)
 							handler.RequestShutdown()
 						case <-ctx.Done():
-							log.Info("Crawler context cancelled")
+							log.Info("Crawler context cancelled", "source", sourceName)
 							// Create a timeout context for stopping the crawler
 							stopCtx, stopCancel := context.WithTimeout(context.Background(), crawler.DefaultStopTimeout)
 							defer stopCancel()
 
 							// Stop the crawler gracefully
 							if err := crawlerSvc.Stop(stopCtx); err != nil {
-								log.Error("Failed to stop crawler gracefully", "error", err)
+								log.Error("Failed to stop crawler gracefully",
+									"error", err,
+									"source", sourceName,
+								)
 							}
 							handler.RequestShutdown()
 						}
@@ -104,14 +123,17 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 					return nil
 				},
 				OnStop: func(ctx context.Context) error {
-					log.Info("Stopping crawler")
+					log.Debug("Stopping crawler lifecycle", "source", sourceName)
 					// Create a timeout context for stopping the crawler
 					stopCtx, stopCancel := context.WithTimeout(context.Background(), crawler.DefaultStopTimeout)
 					defer stopCancel()
 
 					// Stop the crawler gracefully
 					if err := crawlerSvc.Stop(stopCtx); err != nil {
-						log.Error("Failed to stop crawler gracefully", "error", err)
+						log.Error("Failed to stop crawler gracefully",
+							"error", err,
+							"source", sourceName,
+						)
 						return err
 					}
 					return nil
@@ -121,26 +143,37 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	)
 
 	// Start the Fx application.
-	log.Debug("Starting Fx application")
+	log.Debug("Starting Fx application", "source", sourceName)
 	if err := fxApp.Start(cmdCtx); err != nil {
-		log.Error("Failed to start application", "error", err)
+		log.Error("Failed to start application",
+			"error", err,
+			"source", sourceName,
+		)
 		return fmt.Errorf("failed to start application: %w", err)
 	}
-	log.Info("Fx application started successfully")
+	log.Info("Fx application started successfully", "source", sourceName)
 
 	// Wait for shutdown signal
+	log.Debug("Waiting for shutdown signal", "source", sourceName)
 	if err := handler.Wait(); err != nil {
-		log.Error("Error during shutdown", "error", err)
+		log.Error("Error during shutdown",
+			"error", err,
+			"source", sourceName,
+		)
 		return fmt.Errorf("shutdown error: %w", err)
 	}
 
 	// Stop the Fx application
-	log.Info("Stopping Fx application")
+	log.Debug("Stopping Fx application", "source", sourceName)
 	if err := fxApp.Stop(cmdCtx); err != nil {
-		log.Error("Failed to stop application", "error", err)
+		log.Error("Failed to stop application",
+			"error", err,
+			"source", sourceName,
+		)
 		return fmt.Errorf("failed to stop application: %w", err)
 	}
 
+	log.Info("Crawl completed successfully", "source", sourceName)
 	return nil
 }
 

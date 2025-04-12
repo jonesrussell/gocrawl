@@ -321,21 +321,25 @@ func initLogger() error {
 	// Get log level from config
 	logLevel := viper.GetString("logger.level")
 	level := logger.InfoLevel
-	switch logLevel {
-	case "debug":
-		level = logger.DebugLevel
-	case "info":
-		level = logger.InfoLevel
-	case "warn":
-		level = logger.WarnLevel
-	case "error":
-		level = logger.ErrorLevel
-	}
 
 	// Override with debug flag if set
 	if Debug {
 		level = logger.DebugLevel
-		fmt.Fprintf(os.Stderr, "Debug mode enabled, setting log level to DEBUG\n")
+		// Set debug in viper to ensure it's available in the context
+		viper.Set("app.debug", true)
+		viper.Set("logger.level", "debug")
+		logLevel = "debug"
+	} else {
+		switch logLevel {
+		case "debug":
+			level = logger.DebugLevel
+		case "info":
+			level = logger.InfoLevel
+		case "warn":
+			level = logger.WarnLevel
+		case "error":
+			level = logger.ErrorLevel
+		}
 	}
 
 	// Create logger with configuration
@@ -353,6 +357,9 @@ func initLogger() error {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
+	// Log the current log level
+	log.Debug("Logger initialized", "level", logLevel, "debug", Debug)
+
 	return nil
 }
 
@@ -366,8 +373,10 @@ func Execute() {
 		os.Exit(1)
 	}
 
-	// Create a context with the logger
+	// Create a context with the logger and configuration
 	ctx := context.WithValue(context.Background(), common.LoggerKey, log)
+	ctx = context.WithValue(ctx, common.ConfigKey, viper.GetViper())
+
 	rootCmd.SetContext(ctx)
 
 	// Add commands

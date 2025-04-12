@@ -2,16 +2,15 @@ package logger
 
 import (
 	"go.uber.org/fx/fxevent"
-	"go.uber.org/zap"
 )
 
 // NewFxLogger creates a new Fx logger that uses our custom logger.
-func NewFxLogger(logger *zap.Logger) *fxLogger {
-	return &fxLogger{logger: logger}
+func NewFxLogger(log Interface) fxevent.Logger {
+	return &fxLogger{log: log}
 }
 
 type fxLogger struct {
-	logger *zap.Logger
+	log Interface
 }
 
 func (l *fxLogger) LogEvent(event fxevent.Event) {
@@ -44,137 +43,136 @@ func (l *fxLogger) LogEvent(event fxevent.Event) {
 }
 
 func (l *fxLogger) logOnStartExecuting(e *fxevent.OnStartExecuting) {
-	l.logger.Debug("OnStart hook executing",
-		zap.String("callee", e.FunctionName),
-		zap.String("caller", e.CallerName),
+	l.log.Debug("OnStart hook executing",
+		"callee", e.FunctionName,
+		"caller", e.CallerName,
 	)
 }
 
 func (l *fxLogger) logOnStartExecuted(e *fxevent.OnStartExecuted) {
 	if e.Err != nil {
-		l.logger.Error("OnStart hook failed",
-			zap.String("callee", e.FunctionName),
-			zap.String("caller", e.CallerName),
-			zap.Error(e.Err),
+		l.log.Error("OnStart hook failed",
+			"callee", e.FunctionName,
+			"caller", e.CallerName,
+			"error", e.Err,
 		)
 	} else {
-		l.logger.Debug("OnStart hook executed",
-			zap.String("callee", e.FunctionName),
-			zap.String("caller", e.CallerName),
-			zap.String("runtime", e.Runtime.String()),
+		l.log.Debug("OnStart hook executed",
+			"callee", e.FunctionName,
+			"caller", e.CallerName,
+			"runtime", e.Runtime.String(),
 		)
 	}
 }
 
 func (l *fxLogger) logOnStopExecuting(e *fxevent.OnStopExecuting) {
-	l.logger.Debug("OnStop hook executing",
-		zap.String("callee", e.FunctionName),
-		zap.String("caller", e.CallerName),
+	l.log.Debug("OnStop hook executing",
+		"callee", e.FunctionName,
+		"caller", e.CallerName,
 	)
 }
 
 func (l *fxLogger) logOnStopExecuted(e *fxevent.OnStopExecuted) {
 	if e.Err != nil {
-		l.logger.Error("OnStop hook failed",
-			zap.String("callee", e.FunctionName),
-			zap.String("caller", e.CallerName),
-			zap.Error(e.Err),
+		l.log.Error("OnStop hook failed",
+			"callee", e.FunctionName,
+			"caller", e.CallerName,
+			"error", e.Err,
 		)
 	} else {
-		l.logger.Debug("OnStop hook executed",
-			zap.String("callee", e.FunctionName),
-			zap.String("caller", e.CallerName),
-			zap.String("runtime", e.Runtime.String()),
+		l.log.Debug("OnStop hook executed",
+			"callee", e.FunctionName,
+			"caller", e.CallerName,
+			"runtime", e.Runtime.String(),
 		)
 	}
 }
 
 func (l *fxLogger) logSupplied(e *fxevent.Supplied) {
 	if e.Err != nil {
-		l.logger.Error("Error encountered while applying options",
-			zap.String("type", e.TypeName),
-			zap.Error(e.Err),
+		l.log.Error("Error encountered while applying options",
+			"type", e.TypeName,
+			"error", e.Err,
 		)
 	} else {
-		l.logger.Debug("Supplied",
-			zap.String("type", e.TypeName),
+		l.log.Debug("Supplied",
+			"type", e.TypeName,
 		)
 	}
 }
 
 func (l *fxLogger) logProvided(e *fxevent.Provided) {
 	for _, rtype := range e.OutputTypeNames {
-		l.logger.Debug("Provided",
-			zap.String("constructor", e.ConstructorName),
-			zap.String("type", rtype),
+		l.log.Debug("Provided",
+			"constructor", e.ConstructorName,
+			"type", rtype,
 		)
 	}
 	if e.Err != nil {
-		l.logger.Error("Error encountered while applying options",
-			zap.String("constructor", e.ConstructorName),
-			zap.Error(e.Err),
+		l.log.Error("Error encountered while providing options",
+			"constructor", e.ConstructorName,
+			"error", e.Err,
 		)
 	}
 }
 
 func (l *fxLogger) logReplaced(e *fxevent.Replaced) {
 	for _, rtype := range e.OutputTypeNames {
-		l.logger.Debug("Replaced",
-			zap.String("type", rtype),
+		l.log.Debug("Replaced",
+			"type", rtype,
 		)
 	}
 	if e.Err != nil {
-		l.logger.Error("Error encountered while replacing",
-			zap.Error(e.Err),
+		l.log.Error("Error encountered while replacing options",
+			"error", e.Err,
 		)
 	}
 }
 
 func (l *fxLogger) logDecorated(e *fxevent.Decorated) {
 	for _, rtype := range e.OutputTypeNames {
-		l.logger.Debug("Decorated",
-			zap.String("decorator", e.DecoratorName),
-			zap.String("type", rtype),
+		l.log.Debug("Decorated",
+			"decorator", e.DecoratorName,
+			"type", rtype,
 		)
 	}
 	if e.Err != nil {
-		l.logger.Error("Error encountered while applying options",
-			zap.String("decorator", e.DecoratorName),
-			zap.Error(e.Err),
+		l.log.Error("Error encountered while decorating options",
+			"decorator", e.DecoratorName,
+			"error", e.Err,
 		)
 	}
 }
 
 func (l *fxLogger) logInvoked(e *fxevent.Invoked) {
 	if e.Err != nil {
-		l.logger.Error("Error encountered while applying options",
-			zap.String("function", e.FunctionName),
-			zap.Error(e.Err),
+		l.log.Error("Error encountered while invoking function",
+			"function", e.FunctionName,
+			"error", e.Err,
 		)
 	} else {
-		l.logger.Debug("Invoked",
-			zap.String("function", e.FunctionName),
+		l.log.Debug("Invoked",
+			"function", e.FunctionName,
 		)
 	}
 }
 
 func (l *fxLogger) logStopped(e *fxevent.Stopped) {
 	if e.Err != nil {
-		l.logger.Error("Error encountered while stopping",
-			zap.Error(e.Err),
+		l.log.Error("Error encountered while stopping",
+			"error", e.Err,
 		)
 	} else {
-		l.logger.Info("Stopped")
+		l.log.Debug("Stopped")
 	}
 }
 
 func (l *fxLogger) logRolledBack(e *fxevent.RolledBack) {
-	l.logger.Error("Start failed, rolling back",
-		zap.Error(e.Err),
+	l.log.Error("Rolled back",
+		"error", e.Err,
 	)
 }
 
-// logStarted logs a Started event
 func (l *fxLogger) logStarted() {
-	l.logger.Info("Started")
+	l.log.Debug("Started")
 }

@@ -93,16 +93,9 @@ linters:
             - '!internal/config/*'
             - '!internal/common/*'
           deny:
-            - pkg: github.com/jonesrussell/gocrawl/internal/logger.Interface
-              desc: Use common.Logger type alias instead of logger.Interface directly
             - pkg: github.com/jonesrussell/gocrawl/internal/storage/types.Interface
               desc: Use common.Storage type alias instead of storage.Interface directly
             - pkg: github.com/jonesrussell/gocrawl/internal/sources.Interface
-              desc: Use common.SourceManager type alias instead of sources.Interface directly
-            - pkg: github.com/jonesrussell/gocrawl/internal/sources.Config
-              desc: Use common.SourceConfig type alias instead of sources.Config directly
-            - pkg: github.com/jonesrussell/gocrawl/internal/config.Interface
-              desc: Use common.Config type alias instead of config.Interface directly
     errcheck:
       check-type-assertions: true
     exhaustive:

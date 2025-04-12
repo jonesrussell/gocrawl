@@ -2,7 +2,6 @@
 package logger
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config/app"
@@ -37,6 +36,18 @@ var Module = fx.Module("logger",
 					EncodeCaller:   zapcore.ShortCallerEncoder,
 				}
 
+				// Set log level based on config and debug flag
+				var level Level = InfoLevel
+				if params.Config != nil {
+					level = params.Config.Level
+				}
+				if params.App != nil && (params.App.Debug || params.Config.Development) {
+					level = DebugLevel
+				}
+
+				// Convert to zap level
+				zapLevel := levelToZap(level)
+
 				// Check if we should enable color
 				enableColor := false
 				if params.Config != nil {
@@ -44,20 +55,8 @@ var Module = fx.Module("logger",
 				}
 				if enableColor || (params.App != nil && params.App.Debug) {
 					encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-					fmt.Fprintf(os.Stderr, "Color output enabled\n")
 				} else {
 					encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-					fmt.Fprintf(os.Stderr, "Color output disabled\n")
-				}
-
-				// Set log level based on config and debug flag
-				level := zapcore.InfoLevel
-				if params.Config != nil {
-					level = levelToZap(params.Config.Level)
-				}
-				if params.App != nil && params.App.Debug {
-					level = zapcore.DebugLevel
-					fmt.Fprintf(os.Stderr, "Debug mode enabled, setting log level to DEBUG\n")
 				}
 
 				// Create core with appropriate encoder based on config
@@ -71,18 +70,25 @@ var Module = fx.Module("logger",
 					core = zapcore.NewCore(
 						zapcore.NewJSONEncoder(encoderConfig),
 						zapcore.AddSync(os.Stdout),
-						level,
+						zapLevel,
 					)
 				} else {
 					core = zapcore.NewCore(
 						zapcore.NewConsoleEncoder(encoderConfig),
 						zapcore.AddSync(os.Stdout),
-						level,
+						zapLevel,
 					)
 				}
 
-				// Create logger with caller info enabled
-				return zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel)), nil
+				// Create logger with development mode if enabled
+				var zapLogger *zap.Logger
+				if params.App != nil && (params.App.Debug || params.Config.Development) {
+					zapLogger = zap.New(core, zap.Development(), zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+				} else {
+					zapLogger = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+				}
+
+				return zapLogger, nil
 			},
 			fx.ResultTags(`name:"zapLogger"`),
 		),
