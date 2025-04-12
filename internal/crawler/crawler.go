@@ -5,8 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
+
+	"crypto/tls"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -101,7 +104,21 @@ func (c *Crawler) setupCollector(source *types.Source) {
 		colly.Async(true),
 		colly.AllowedDomains(source.AllowedDomains...),
 		colly.ParseHTTPErrorResponse(),
+		colly.IgnoreRobotsTxt(),
 	)
+
+	// Configure transport to handle HTTP/2 better
+	c.collector.WithTransport(&http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			NextProtos:         []string{"http/1.1"},
+		},
+		DisableKeepAlives:     true,
+		MaxIdleConns:          0,
+		MaxIdleConnsPerHost:   0,
+		ResponseHeaderTimeout: 30 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	})
 }
 
 // setupCallbacks configures the collector's callbacks

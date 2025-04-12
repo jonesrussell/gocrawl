@@ -3,6 +3,7 @@ package crawler
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/gocolly/colly/v2"
 )
@@ -22,14 +23,17 @@ func NewLinkHandler(c *Crawler) *LinkHandler {
 // HandleLink processes a single link from an HTML element.
 func (h *LinkHandler) HandleLink(e *colly.HTMLElement) {
 	link := e.Attr("href")
-	if link == "" || link == "#" {
+	if link == "" {
 		return
 	}
 
 	err := e.Request.Visit(link)
 	if err != nil &&
 		!errors.Is(err, colly.ErrAlreadyVisited) &&
-		!errors.Is(err, colly.ErrMaxDepth) {
+		!errors.Is(err, colly.ErrMaxDepth) &&
+		err.Error() != "Missing URL" &&
+		err.Error() != "Forbidden domain" &&
+		!strings.Contains(err.Error(), "protocol error") {
 		h.crawler.logger.Error("Failed to visit link",
 			"url", link,
 			"error", err)

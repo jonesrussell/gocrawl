@@ -105,7 +105,7 @@ var Module = fx.Options(
 	crawler.Module,
 
 	// Invoke the crawler lifecycle
-	fx.Invoke(fx.Annotate(
+	fx.Invoke(
 		func(
 			lc fx.Lifecycle,
 			logger logger.Interface,
@@ -144,6 +144,5 @@ var Module = fx.Options(
 				},
 			})
 		},
-		fx.ParamTags(``, ``, ``, ``, `name:"sourceName"`),
-	)),
+	),
 )

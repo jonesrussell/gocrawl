@@ -11,11 +11,6 @@ var Module = fx.Module("job",
 		// Provide scheduler
 		fx.Annotate(
 			NewScheduler,
-			fx.ParamTags(
-				``,
-				``,
-				``,
-			),
 		),
 	),
 )

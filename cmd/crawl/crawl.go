@@ -40,10 +40,7 @@ Specify the source name as an argument.`,
 					func() context.Context { return crawlCtx },
 					fx.ResultTags(`name:"crawlContext"`),
 				),
-				fx.Annotate(
-					func() string { return sourceName },
-					fx.ResultTags(`name:"sourceName"`),
-				),
+				func() string { return sourceName },
 			),
 		)
 
