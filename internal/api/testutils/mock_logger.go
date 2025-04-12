@@ -18,36 +18,33 @@ func NewMockLogger() *MockLogger {
 }
 
 // Debug logs a debug message.
-func (m *MockLogger) Debug(msg string, fields ...logger.Field) {
+func (m *MockLogger) Debug(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
 // Info logs an info message.
-func (m *MockLogger) Info(msg string, fields ...logger.Field) {
+func (m *MockLogger) Info(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
 // Warn logs a warning message.
-func (m *MockLogger) Warn(msg string, fields ...logger.Field) {
+func (m *MockLogger) Warn(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
 // Error logs an error message.
-func (m *MockLogger) Error(msg string, fields ...logger.Field) {
+func (m *MockLogger) Error(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
 // Fatal logs a fatal message and exits.
-func (m *MockLogger) Fatal(msg string, fields ...logger.Field) {
+func (m *MockLogger) Fatal(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
 // With creates a new logger with the given fields.
-func (m *MockLogger) With(fields ...logger.Field) logger.Interface {
-	args := m.Called(fields)
-	if ret, ok := args.Get(0).(logger.Interface); ok {
-		return ret
-	}
+func (m *MockLogger) With(fields ...any) logger.Interface {
+	m.Called(fields)
 	return m
 }
 

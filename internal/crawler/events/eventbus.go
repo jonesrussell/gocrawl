@@ -103,7 +103,7 @@ func (b *EventBus) PublishStop(ctx context.Context) error {
 	for _, handler := range b.handlers {
 		if err := handler.HandleStop(ctx); err != nil {
 			b.logger.Error("failed to handle stop event",
-				logger.Field{Key: "error", Value: err},
+				"error", err,
 			)
 		}
 	}
@@ -113,16 +113,16 @@ func (b *EventBus) PublishStop(ctx context.Context) error {
 // HandleError handles an error that occurred during event processing.
 func (b *EventBus) HandleError(err error, article *models.Article) {
 	b.logger.Error("Error processing article",
-		logger.Field{Key: "error", Value: err},
-		logger.Field{Key: "articleID", Value: article.ID},
-		logger.Field{Key: "url", Value: article.Source},
+		"error", err,
+		"articleID", article.ID,
+		"url", article.Source,
 	)
 }
 
 // HandleHandlerError handles an error that occurred in an event handler.
 func (b *EventBus) HandleHandlerError(handlerErr error, err error) {
 	b.logger.Error("Error in event handler",
-		logger.Field{Key: "error", Value: handlerErr},
-		logger.Field{Key: "original_error", Value: err},
+		"error", handlerErr,
+		"original_error", err,
 	)
 }

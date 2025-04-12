@@ -14,16 +14,16 @@ func NewNopLogger() logger.Interface {
 }
 
 // Debug logs a debug message.
-func (l *NopLogger) Debug(msg string, fields ...logger.Field) {}
+func (l *NopLogger) Debug(msg string, fields ...any) {}
 
 // Info logs an info message.
-func (l *NopLogger) Info(msg string, fields ...logger.Field) {}
+func (l *NopLogger) Info(msg string, fields ...any) {}
 
 // Warn logs a warning message.
-func (l *NopLogger) Warn(msg string, fields ...logger.Field) {}
+func (l *NopLogger) Warn(msg string, fields ...any) {}
 
 // Error logs an error message.
-func (l *NopLogger) Error(msg string, fields ...logger.Field) {}
+func (l *NopLogger) Error(msg string, fields ...any) {}
 
 // Errorf implements logger.Interface
 func (l *NopLogger) Errorf(format string, args ...any) {}
@@ -37,10 +37,10 @@ func (l *NopLogger) Sync() error {
 }
 
 // Fatal logs a fatal message and exits.
-func (l *NopLogger) Fatal(msg string, fields ...logger.Field) {}
+func (l *NopLogger) Fatal(msg string, fields ...any) {}
 
 // With creates a new logger with the given fields.
-func (l *NopLogger) With(fields ...logger.Field) logger.Interface {
+func (l *NopLogger) With(fields ...any) logger.Interface {
 	return l
 }
 

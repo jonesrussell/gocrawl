@@ -10,6 +10,11 @@ func NewNoOpLogger() Interface {
 	return &NoOpLogger{}
 }
 
+// NewNoOp creates a new no-op logger instance.
+func NewNoOp() Interface {
+	return &NoOpLogger{}
+}
+
 // Debug logs a debug message.
 func (l *NoOpLogger) Debug(msg string, fields ...any) {}
 

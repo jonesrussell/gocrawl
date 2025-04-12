@@ -25,27 +25,27 @@ type mockLogger struct {
 	mock.Mock
 }
 
-func (m *mockLogger) Debug(msg string, fields ...logger.Field) {
+func (m *mockLogger) Debug(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-func (m *mockLogger) Info(msg string, fields ...logger.Field) {
+func (m *mockLogger) Info(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-func (m *mockLogger) Warn(msg string, fields ...logger.Field) {
+func (m *mockLogger) Warn(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-func (m *mockLogger) Error(msg string, fields ...logger.Field) {
+func (m *mockLogger) Error(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-func (m *mockLogger) Fatal(msg string, fields ...logger.Field) {
+func (m *mockLogger) Fatal(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-func (m *mockLogger) With(fields ...logger.Field) logger.Interface {
+func (m *mockLogger) With(fields ...any) logger.Interface {
 	args := m.Called(fields)
 	if ret, ok := args.Get(0).(logger.Interface); ok {
 		return ret
