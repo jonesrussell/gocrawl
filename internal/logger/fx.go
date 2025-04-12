@@ -18,7 +18,7 @@ func NewFxLogger(log Interface) fxevent.Logger {
 }
 
 // logSuccessOrError is a helper method for logging success or error events.
-func (l *fxLogger) logSuccessOrError(successMsg, errorMsg string, err error, fields ...interface{}) {
+func (l *fxLogger) logSuccessOrError(successMsg, errorMsg string, err error, fields ...any) {
 	if err != nil {
 		l.log.Error(errorMsg, append(fields, "error", err)...)
 	} else {
@@ -66,7 +66,7 @@ func (l *fxLogger) logTypeEvent(msg string, e errorEvent, typeName string) {
 }
 
 // logMultiTypeEvent is a helper method for logging events with multiple types.
-func (l *fxLogger) logMultiTypeEvent(msg string, e multiTypeEvent, additionalFields ...interface{}) {
+func (l *fxLogger) logMultiTypeEvent(msg string, e multiTypeEvent, additionalFields ...any) {
 	for _, rtype := range e.GetOutputTypeNames() {
 		l.log.Debug(msg, append(additionalFields, "type", rtype)...)
 	}
@@ -236,41 +236,39 @@ type multiTypeEventHandler struct {
 
 // Handle implements the eventHandler interface for multi-type events.
 func (h *multiTypeEventHandler) Handle(log Interface, event fxevent.Event) {
-	switch e := event.(type) {
-	case *fxevent.Provided:
-		for _, rtype := range e.OutputTypeNames {
-			log.Debug(h.successMsg,
-				"constructor", e.ConstructorName,
-				"type", rtype,
-			)
+	switch event.(type) {
+	case *fxevent.Provided, *fxevent.Replaced, *fxevent.Decorated:
+		var outputTypes []string
+		var constructorName, decoratorName string
+		var err error
+
+		switch ev := event.(type) {
+		case *fxevent.Provided:
+			outputTypes = ev.OutputTypeNames
+			constructorName = ev.ConstructorName
+			err = ev.Err
+		case *fxevent.Replaced:
+			outputTypes = ev.OutputTypeNames
+			err = ev.Err
+		case *fxevent.Decorated:
+			outputTypes = ev.OutputTypeNames
+			decoratorName = ev.DecoratorName
+			err = ev.Err
 		}
-		if e.Err != nil {
-			log.Error(h.errorMsg,
-				"error", e.Err,
-			)
+
+		for _, rtype := range outputTypes {
+			fields := []any{"type", rtype}
+			if constructorName != "" {
+				fields = append(fields, "constructor", constructorName)
+			}
+			if decoratorName != "" {
+				fields = append(fields, "decorator", decoratorName)
+			}
+			log.Debug(h.successMsg, fields...)
 		}
-	case *fxevent.Replaced:
-		for _, rtype := range e.OutputTypeNames {
-			log.Debug(h.successMsg,
-				"type", rtype,
-			)
-		}
-		if e.Err != nil {
-			log.Error(h.errorMsg,
-				"error", e.Err,
-			)
-		}
-	case *fxevent.Decorated:
-		for _, rtype := range e.OutputTypeNames {
-			log.Debug(h.successMsg,
-				"decorator", e.DecoratorName,
-				"type", rtype,
-			)
-		}
-		if e.Err != nil {
-			log.Error(h.errorMsg,
-				"error", e.Err,
-			)
+
+		if err != nil {
+			log.Error(h.errorMsg, "error", err)
 		}
 	}
 }
@@ -337,39 +335,27 @@ type simpleEventHandler struct {
 
 // Handle implements the eventHandler interface for simple events.
 func (h *simpleEventHandler) Handle(log Interface, event fxevent.Event) {
-	switch e := event.(type) {
-	case *fxevent.Supplied:
-		if e.Err != nil {
-			log.Error(h.errorMsg,
-				"type", e.TypeName,
-				"error", e.Err,
-			)
-		} else {
-			log.Debug(h.successMsg,
-				"type", e.TypeName,
-			)
+	switch event.(type) {
+	case *fxevent.Supplied, *fxevent.Invoked, *fxevent.LoggerInitialized:
+		var err error
+		var fields []any
+
+		switch ev := event.(type) {
+		case *fxevent.Supplied:
+			err = ev.Err
+			fields = []any{"type", ev.TypeName}
+		case *fxevent.Invoked:
+			err = ev.Err
+			fields = []any{"function", ev.FunctionName}
+		case *fxevent.LoggerInitialized:
+			err = ev.Err
+			fields = []any{"function", ev.ConstructorName}
 		}
-	case *fxevent.Invoked:
-		if e.Err != nil {
-			log.Error(h.errorMsg,
-				"function", e.FunctionName,
-				"error", e.Err,
-			)
+
+		if err != nil {
+			log.Error(h.errorMsg, append(fields, "error", err)...)
 		} else {
-			log.Debug(h.successMsg,
-				"function", e.FunctionName,
-			)
-		}
-	case *fxevent.LoggerInitialized:
-		if e.Err != nil {
-			log.Error(h.errorMsg,
-				"function", e.ConstructorName,
-				"error", e.Err,
-			)
-		} else {
-			log.Debug(h.successMsg,
-				"function", e.ConstructorName,
-			)
+			log.Debug(h.successMsg, fields...)
 		}
 	}
 }
@@ -384,22 +370,24 @@ func (h *signalEventHandler) Handle(log Interface, event fxevent.Event) {
 		log.Info("Received signal",
 			"signal", e.Signal,
 		)
-	case *fxevent.Stopped:
-		if e.Err != nil {
-			log.Error("Stop failed",
-				"error", e.Err,
-			)
+	case *fxevent.Stopped, *fxevent.RolledBack, *fxevent.Started:
+		var err error
+		var msg string
+		switch ev := event.(type) {
+		case *fxevent.Stopped:
+			err = ev.Err
+			msg = "Stop failed"
+		case *fxevent.RolledBack:
+			err = ev.Err
+			msg = "Start failed, rolling back"
+		case *fxevent.Started:
+			err = ev.Err
+			msg = "Start failed"
 		}
-	case *fxevent.RolledBack:
-		log.Error("Start failed, rolling back",
-			"error", e.Err,
-		)
-	case *fxevent.Started:
-		if e.Err != nil {
-			log.Error("Start failed",
-				"error", e.Err,
-			)
-		} else {
+
+		if err != nil {
+			log.Error(msg, "error", err)
+		} else if _, ok := event.(*fxevent.Started); ok {
 			log.Info("Started")
 		}
 	}
