@@ -37,8 +37,8 @@ func (s *State) IsRunning() bool {
 	return s.isRunning
 }
 
-// StartTime returns when the crawler started.
-func (s *State) StartTime() time.Time {
+// GetStartTime returns when the crawler started.
+func (s *State) GetStartTime() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.startTime

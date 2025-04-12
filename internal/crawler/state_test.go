@@ -31,7 +31,7 @@ func TestState(t *testing.T) {
 		s.Start(ctx, "test-source")
 		assert.True(t, s.IsRunning())
 		assert.Equal(t, "test-source", s.CurrentSource())
-		assert.NotZero(t, s.StartTime())
+		assert.NotZero(t, s.GetStartTime())
 		assert.NotNil(t, s.Context())
 
 		// Test Stop
@@ -70,7 +70,7 @@ func TestState(t *testing.T) {
 				for range 100 {
 					s.IsRunning()
 					s.CurrentSource()
-					s.StartTime()
+					s.GetStartTime()
 					s.Context()
 				}
 				done <- struct{}{}
@@ -100,4 +100,12 @@ func TestState(t *testing.T) {
 			assert.Empty(t, s.CurrentSource())
 		}
 	})
+}
+
+func TestState_Start(t *testing.T) {
+	s := crawler.NewState(nil)
+	s.Start(t.Context(), "test")
+	assert.True(t, s.IsRunning())
+	assert.Equal(t, "test", s.CurrentSource())
+	assert.NotZero(t, s.GetStartTime())
 }
