@@ -133,7 +133,12 @@ func executeCrawl(
 		return
 	}
 
-	c.Wait()
+	if waitErr := c.Wait(); waitErr != nil {
+		log.Error("Error waiting for crawler to complete",
+			"error", waitErr,
+			"source", source.Name)
+		return
+	}
 	log.Info("Crawl completed", "source", source.Name)
 }
 

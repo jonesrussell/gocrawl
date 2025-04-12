@@ -209,11 +209,17 @@ func (s *Service) DetermineContentType(url string, metadata map[string]any, json
 
 	// First try JSON-LD type
 	if jsonLDType != "" {
+		s.Logger.Debug("Using JSON-LD type",
+			"url", url,
+			"type", jsonLDType)
 		return strings.ToLower(jsonLDType)
 	}
 
 	// Then try metadata type
 	if metaType, ok := metadata["type"].(string); ok {
+		s.Logger.Debug("Using metadata type",
+			"url", url,
+			"type", metaType)
 		return strings.ToLower(metaType)
 	}
 
@@ -222,12 +228,19 @@ func (s *Service) DetermineContentType(url string, metadata map[string]any, json
 	for category, patterns := range rules.ContentTypePatterns {
 		for _, pattern := range patterns {
 			if strings.Contains(urlLower, pattern) {
+				s.Logger.Debug("Using URL pattern type",
+					"url", url,
+					"pattern", pattern,
+					"type", category)
 				return category
 			}
 		}
 	}
 
 	// Default to webpage
+	s.Logger.Debug("Using default type",
+		"url", url,
+		"type", "webpage")
 	return "webpage"
 }
 
@@ -269,6 +282,10 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
 			}
 		}
 	})
+
+	s.Logger.Debug("Extracted metadata",
+		"url", e.Request.URL.String(),
+		"metadata", metadata)
 
 	return metadata
 }

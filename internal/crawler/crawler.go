@@ -293,9 +293,10 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	}
 }
 
-// Wait waits for the crawler to finish.
-func (c *Crawler) Wait() {
+// Wait waits for the crawler to complete
+func (c *Crawler) Wait() error {
 	c.wg.Wait()
+	return nil
 }
 
 // Done returns a channel that's closed when the crawler is done.

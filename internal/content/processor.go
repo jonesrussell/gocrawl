@@ -126,8 +126,8 @@ func (p *ContentProcessor) GetMetrics() *common.Metrics {
 
 // ProcessContent implements common.Processor.ProcessContent
 func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType common.ContentType, content any) error {
-	// For content processing, we only handle page content
-	if contentType != common.ContentTypePage {
+	// Handle both page and image content types
+	if contentType != common.ContentTypePage && contentType != common.ContentTypeImage {
 		return fmt.Errorf("unsupported content type: %v", contentType)
 	}
 
@@ -236,7 +236,7 @@ func (p *ContentProcessor) ExtractLinks() ([]string, error) {
 
 // GetProcessor implements common.Processor.GetProcessor
 func (p *ContentProcessor) GetProcessor(contentType common.ContentType) (common.ContentProcessor, error) {
-	// For content processing, we only handle page content
+	// For content processing, we handle page content
 	if contentType != common.ContentTypePage {
 		return nil, fmt.Errorf("unsupported content type: %v", contentType)
 	}

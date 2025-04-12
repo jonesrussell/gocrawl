@@ -33,8 +33,9 @@ func (m *MockCrawler) Stop(ctx context.Context) error {
 }
 
 // Wait implements Interface.
-func (m *MockCrawler) Wait() {
-	m.Called()
+func (m *MockCrawler) Wait() error {
+	args := m.Called()
+	return args.Error(0)
 }
 
 // GetIndexManager implements Interface.

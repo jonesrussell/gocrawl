@@ -117,7 +117,7 @@ type Interface interface {
 	// GetIndexManager returns the index manager
 	GetIndexManager() interfaces.IndexManager
 	// Wait waits for the crawler to complete
-	Wait()
+	Wait() error
 	// GetLogger returns the logger
 	GetLogger() logger.Interface
 	// GetSource returns the source

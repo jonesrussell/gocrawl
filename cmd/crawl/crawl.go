@@ -72,18 +72,34 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 			// Set debug mode from command line flag
 			config.GetAppConfig().Debug = cmd.Root().Flags().Lookup("debug").Value.String() == "true"
 		}),
-		fx.Invoke(func(crawler crawler.Interface) {
+		fx.Invoke(func(crawlerSvc crawler.Interface) {
 			// Start the crawler
 			log.Debug("Starting crawler")
-			if err := crawler.Start(crawlCtx, sourceName); err != nil {
+			if err := crawlerSvc.Start(crawlCtx, sourceName); err != nil {
 				log.Error("Failed to start crawler", "error", err)
+				handler.RequestShutdown()
 				return
 			}
 
-			// Wait for crawler to complete
-			crawler.Wait()
-			log.Info("Crawler finished processing")
-			handler.RequestShutdown()
+			// Wait for crawler to complete or context cancellation
+			go func() {
+				// Wait for either the crawler to finish or context cancellation
+				select {
+				case <-crawlerSvc.Done():
+					log.Info("Crawler finished processing")
+				case <-crawlCtx.Done():
+					log.Info("Crawler context cancelled")
+					// Create a timeout context for stopping the crawler
+					stopCtx, stopCancel := context.WithTimeout(context.Background(), crawler.DefaultStopTimeout)
+					defer stopCancel()
+
+					// Stop the crawler gracefully
+					if err := crawlerSvc.Stop(stopCtx); err != nil {
+						log.Error("Failed to stop crawler gracefully", "error", err)
+					}
+				}
+				handler.RequestShutdown()
+			}()
 		}),
 	)
 
@@ -98,20 +114,12 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	}
 	log.Info("Fx application started successfully")
 
-	// Wait for either context cancellation or shutdown completion
+	// Wait for context cancellation
 	log.Debug("Waiting for crawl completion or cancellation")
-	select {
-	case <-crawlCtx.Done():
-		log.Info("Crawl context finished", "error", crawlCtx.Err())
-		return fmt.Errorf("crawl context finished: %w", crawlCtx.Err())
-	default:
-		if handler.IsShuttingDown() {
-			log.Info("Shutdown initiated, waiting for completion")
-			return handler.Wait()
-		}
-		log.Info("Crawl completed successfully")
-		return nil
-	}
+	<-crawlCtx.Done()
+	log.Info("Crawl context finished", "error", crawlCtx.Err())
+	handler.RequestShutdown()
+	return handler.Wait()
 }
 
 // Command returns the crawl command for use in the root command.
