@@ -113,24 +113,11 @@ var Module = fx.Options(
 			handler signal.Interface,
 			sourceName string,
 		) {
-			// Set up signal handling
-			cleanup := handler.Setup(context.Background())
-			lc.Append(fx.Hook{
-				OnStop: func(ctx context.Context) error {
-					cleanup()
-					return nil
-				},
-			})
-
 			// Set up crawler lifecycle
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
-					// Create a context with timeout for the crawler
-					crawlCtx, cancel := context.WithTimeout(ctx, common.DefaultOperationTimeout)
-					defer cancel()
-
 					// Start the crawler
-					if err := crawler.Start(crawlCtx, sourceName); err != nil {
+					if err := crawler.Start(ctx, sourceName); err != nil {
 						return fmt.Errorf("failed to start crawler: %w", err)
 					}
 
@@ -140,23 +127,17 @@ var Module = fx.Options(
 						select {
 						case <-crawler.Done():
 							logger.Info("Crawler finished processing")
-						case <-crawlCtx.Done():
+							handler.RequestShutdown()
+						case <-ctx.Done():
 							logger.Info("Crawler context cancelled")
 						}
-
-						// Signal completion to the signal handler
-						handler.RequestShutdown()
 					}()
 
 					return nil
 				},
 				OnStop: func(ctx context.Context) error {
-					// Create a context with timeout for stopping the crawler
-					stopCtx, cancel := context.WithTimeout(ctx, common.DefaultOperationTimeout)
-					defer cancel()
-
 					// Stop the crawler
-					if err := crawler.Stop(stopCtx); err != nil {
+					if err := crawler.Stop(ctx); err != nil {
 						return fmt.Errorf("failed to stop crawler: %w", err)
 					}
 					return nil

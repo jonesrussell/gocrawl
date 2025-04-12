@@ -22,7 +22,7 @@ func NewLinkHandler(c *Crawler) *LinkHandler {
 // HandleLink processes a single link from an HTML element.
 func (h *LinkHandler) HandleLink(e *colly.HTMLElement) {
 	link := e.Attr("href")
-	if link == "" {
+	if link == "" || link == "#" {
 		return
 	}
 
