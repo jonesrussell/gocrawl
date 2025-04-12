@@ -2,6 +2,7 @@
 package crawl
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common"
@@ -24,15 +25,13 @@ Specify the source name as an argument.`,
 }
 
 // setupCrawlerConfig creates and validates the crawler configuration
-func setupCrawlerConfig() (*crawler.Config, error) {
-	cfg := &crawler.Config{
+func setupCrawlerConfig() *crawler.Config {
+	return &crawler.Config{
 		MaxDepth:    viper.GetInt("crawler.max_depth"),
 		RateLimit:   viper.GetDuration("crawler.rate_limit"),
 		Parallelism: viper.GetInt("crawler.parallelism"),
 		UserAgent:   viper.GetString("crawler.user_agent"),
 	}
-
-	return cfg, nil
 }
 
 // setupAppConfig creates the application configuration
@@ -48,14 +47,14 @@ func setupAppConfig() *app.Config {
 // runCrawl executes the crawl command
 func runCrawl(cmd *cobra.Command, args []string) error {
 	// Get logger from context
-	log := cmd.Context().Value(common.LoggerKey).(logger.Interface)
-
-	// Setup configurations
-	crawlerConfig, err := setupCrawlerConfig()
-	if err != nil {
-		return fmt.Errorf("failed to setup crawler config: %w", err)
+	loggerValue := cmd.Context().Value(common.LoggerKey)
+	log, ok := loggerValue.(logger.Interface)
+	if !ok {
+		return errors.New("logger not found in context or invalid type")
 	}
 
+	// Setup configurations
+	crawlerConfig := setupCrawlerConfig()
 	appConfig := setupAppConfig()
 
 	// Create Fx app
@@ -69,16 +68,18 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	)
 
 	// Start the application
-	if err := fxApp.Start(cmd.Context()); err != nil {
-		return fmt.Errorf("failed to start application: %w", err)
+	startErr := fxApp.Start(cmd.Context())
+	if startErr != nil {
+		return fmt.Errorf("failed to start application: %w", startErr)
 	}
 
 	// Wait for interrupt signal
 	<-cmd.Context().Done()
 
 	// Stop the application
-	if err := fxApp.Stop(cmd.Context()); err != nil {
-		return fmt.Errorf("failed to stop application: %w", err)
+	stopErr := fxApp.Stop(cmd.Context())
+	if stopErr != nil {
+		return fmt.Errorf("failed to stop application: %w", stopErr)
 	}
 
 	return nil
