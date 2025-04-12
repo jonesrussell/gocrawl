@@ -3,7 +3,6 @@ package crawl
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/article"
@@ -103,47 +102,4 @@ var Module = fx.Options(
 
 	// Include crawler module after processors are provided
 	crawler.Module,
-
-	// Invoke the crawler lifecycle
-	fx.Invoke(
-		func(
-			lc fx.Lifecycle,
-			logger logger.Interface,
-			crawler crawler.Interface,
-			handler signal.Interface,
-			sourceName string,
-		) {
-			// Set up crawler lifecycle
-			lc.Append(fx.Hook{
-				OnStart: func(ctx context.Context) error {
-					// Start the crawler
-					if err := crawler.Start(ctx, sourceName); err != nil {
-						return fmt.Errorf("failed to start crawler: %w", err)
-					}
-
-					// Start a goroutine to wait for crawler completion
-					go func() {
-						// Wait for crawler to complete
-						select {
-						case <-crawler.Done():
-							logger.Info("Crawler finished processing")
-							handler.RequestShutdown()
-						case <-ctx.Done():
-							logger.Info("Crawler context cancelled")
-							handler.RequestShutdown()
-						}
-					}()
-
-					return nil
-				},
-				OnStop: func(ctx context.Context) error {
-					// Stop the crawler
-					if err := crawler.Stop(ctx); err != nil {
-						return fmt.Errorf("failed to stop crawler: %w", err)
-					}
-					return nil
-				},
-			})
-		},
-	),
 )

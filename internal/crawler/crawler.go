@@ -237,7 +237,26 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 				}
 			}()
 
-			c.visitURLs(crawlCtx, source.StartURLs)
+			// Get start URLs from both url and start_urls fields
+			startURLs := make([]string, 0)
+			if source.URL != "" {
+				startURLs = append(startURLs, source.URL)
+			}
+			if len(source.StartURLs) > 0 {
+				startURLs = append(startURLs, source.StartURLs...)
+			}
+
+			if len(startURLs) == 0 {
+				c.logger.Warn("No start URLs configured for source",
+					"source", sourceName)
+				return
+			}
+
+			c.logger.Debug("Visiting start URLs",
+				"source", sourceName,
+				"urls", startURLs)
+
+			c.visitURLs(crawlCtx, startURLs)
 
 			c.logger.Debug("Waiting for collector to finish")
 			c.collector.Wait()

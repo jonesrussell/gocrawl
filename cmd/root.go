@@ -3,11 +3,13 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -85,6 +87,10 @@ func Execute() {
 		fmt.Fprintf(os.Stderr, "Failed to create logger: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Create a context with the logger
+	ctx := context.WithValue(context.Background(), common.LoggerKey, log)
+	rootCmd.SetContext(ctx)
 
 	// Add commands
 	rootCmd.AddCommand(
