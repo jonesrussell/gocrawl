@@ -17,7 +17,7 @@ import (
 const (
 	// DefaultShutdownTimeout is the default timeout for graceful shutdown
 	DefaultShutdownTimeout = 30 * time.Second
-	// DefaultHealthCheckInterval is the interval for health checks
+	// DefaultHealthCheckInterval is the default interval for health checks
 	DefaultHealthCheckInterval = 500 * time.Millisecond
 )
 
@@ -238,7 +238,7 @@ func (h *SignalHandler) RequestShutdown() {
 
 // Wait waits for the signal handler to complete
 func (h *SignalHandler) Wait() error {
-	// Create a ticker for health checks
+	// Create a ticker for periodic health checks
 	ticker := time.NewTicker(DefaultHealthCheckInterval)
 	defer ticker.Stop()
 
@@ -342,7 +342,7 @@ func (h *SignalHandler) StateChan() <-chan string {
 	stateChan := make(chan string, 1)
 
 	go func() {
-		ticker := time.NewTicker(500 * time.Millisecond)
+		ticker := time.NewTicker(DefaultHealthCheckInterval)
 		defer ticker.Stop()
 		defer close(stateChan)
 

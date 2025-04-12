@@ -39,7 +39,7 @@ func (l *fxLogger) LogEvent(event fxevent.Event) {
 	case *fxevent.RolledBack:
 		l.logRolledBack(e)
 	case *fxevent.Started:
-		l.logStarted(e)
+		l.logStarted()
 	}
 }
 
@@ -174,6 +174,7 @@ func (l *fxLogger) logRolledBack(e *fxevent.RolledBack) {
 	)
 }
 
-func (l *fxLogger) logStarted(e *fxevent.Started) {
+// logStarted logs a Started event
+func (l *fxLogger) logStarted() {
 	l.logger.Info("Started")
 }

@@ -157,6 +157,7 @@ var Module = fx.Options(
 				return manager, nil
 			},
 			fx.ResultTags(`name:"indexManager"`),
+			fx.As(new(interfaces.IndexManager)),
 		),
 
 		// Signal handler with lifecycle integration
