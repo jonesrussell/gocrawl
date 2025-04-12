@@ -1,6 +1,8 @@
 package logger
 
 import (
+	"time"
+
 	"go.uber.org/fx/fxevent"
 )
 
@@ -14,6 +16,64 @@ func NewFxLogger(log Interface) fxevent.Logger {
 	return &fxLogger{log: log}
 }
 
+// logSuccessOrError is a helper method for logging success or error events.
+func (l *fxLogger) logSuccessOrError(successMsg, errorMsg string, err error, fields ...interface{}) {
+	if err != nil {
+		l.log.Error(errorMsg, append(fields, "error", err)...)
+	} else {
+		l.log.Debug(successMsg, fields...)
+	}
+}
+
+// hookEvent represents an event with function and caller information.
+type hookEvent interface {
+	GetFunctionName() string
+	GetCallerName() string
+}
+
+// errorEvent represents an event with an error field.
+type errorEvent interface {
+	GetErr() error
+}
+
+// multiTypeEvent represents an event with multiple types and an error.
+type multiTypeEvent interface {
+	errorEvent
+	GetOutputTypeNames() []string
+}
+
+// logHookEvent is a helper method for logging hook events (OnStart/OnStop).
+func (l *fxLogger) logHookEvent(prefix string, e hookEvent, err error, runtime time.Duration) {
+	l.logSuccessOrError(
+		prefix+" hook executed",
+		prefix+" hook failed",
+		err,
+		"callee", e.GetFunctionName(),
+		"caller", e.GetCallerName(),
+		"runtime", runtime,
+	)
+}
+
+// logTypeEvent is a helper method for logging events with type information.
+func (l *fxLogger) logTypeEvent(msg string, e errorEvent, typeName string) {
+	l.logSuccessOrError(
+		msg,
+		"Error encountered while "+msg,
+		e.GetErr(),
+		"type", typeName,
+	)
+}
+
+// logMultiTypeEvent is a helper method for logging events with multiple types.
+func (l *fxLogger) logMultiTypeEvent(msg string, e multiTypeEvent, additionalFields ...interface{}) {
+	for _, rtype := range e.GetOutputTypeNames() {
+		l.log.Debug(msg, append(additionalFields, "type", rtype)...)
+	}
+	if e.GetErr() != nil {
+		l.log.Error("Error encountered while "+msg, append(additionalFields, "error", e.GetErr())...)
+	}
+}
+
 // LogOnStartExecuting logs the OnStartExecuting event.
 func (l *fxLogger) LogOnStartExecuting(e *fxevent.OnStartExecuting) {
 	l.log.Debug("OnStart hook executing",
@@ -24,19 +84,14 @@ func (l *fxLogger) LogOnStartExecuting(e *fxevent.OnStartExecuting) {
 
 // LogOnStartExecuted logs the OnStartExecuted event.
 func (l *fxLogger) LogOnStartExecuted(e *fxevent.OnStartExecuted) {
-	if e.Err != nil {
-		l.log.Error("OnStart hook failed",
-			"callee", e.FunctionName,
-			"caller", e.CallerName,
-			"error", e.Err,
-		)
-	} else {
-		l.log.Debug("OnStart hook executed",
-			"callee", e.FunctionName,
-			"caller", e.CallerName,
-			"runtime", e.Runtime,
-		)
-	}
+	l.logSuccessOrError(
+		"OnStart hook executed",
+		"OnStart hook failed",
+		e.Err,
+		"callee", e.FunctionName,
+		"caller", e.CallerName,
+		"runtime", e.Runtime,
+	)
 }
 
 // LogOnStopExecuting logs the OnStopExecuting event.
@@ -49,33 +104,24 @@ func (l *fxLogger) LogOnStopExecuting(e *fxevent.OnStopExecuting) {
 
 // LogOnStopExecuted logs the OnStopExecuted event.
 func (l *fxLogger) LogOnStopExecuted(e *fxevent.OnStopExecuted) {
-	if e.Err != nil {
-		l.log.Error("OnStop hook failed",
-			"callee", e.FunctionName,
-			"caller", e.CallerName,
-			"error", e.Err,
-		)
-	} else {
-		l.log.Debug("OnStop hook executed",
-			"callee", e.FunctionName,
-			"caller", e.CallerName,
-			"runtime", e.Runtime,
-		)
-	}
+	l.logSuccessOrError(
+		"OnStop hook executed",
+		"OnStop hook failed",
+		e.Err,
+		"callee", e.FunctionName,
+		"caller", e.CallerName,
+		"runtime", e.Runtime,
+	)
 }
 
 // LogSupplied logs the Supplied event.
 func (l *fxLogger) LogSupplied(e *fxevent.Supplied) {
-	if e.Err != nil {
-		l.log.Error("Error encountered while applying options",
-			"type", e.TypeName,
-			"error", e.Err,
-		)
-	} else {
-		l.log.Debug("Supplied",
-			"type", e.TypeName,
-		)
-	}
+	l.logSuccessOrError(
+		"Supplied",
+		"Error encountered while applying options",
+		e.Err,
+		"type", e.TypeName,
+	)
 }
 
 // LogProvided logs the Provided event.
@@ -124,16 +170,12 @@ func (l *fxLogger) LogDecorated(e *fxevent.Decorated) {
 
 // LogInvoked logs the Invoked event.
 func (l *fxLogger) LogInvoked(e *fxevent.Invoked) {
-	if e.Err != nil {
-		l.log.Error("Invoke failed",
-			"function", e.FunctionName,
-			"error", e.Err,
-		)
-	} else {
-		l.log.Debug("Invoked",
-			"function", e.FunctionName,
-		)
-	}
+	l.logSuccessOrError(
+		"Invoked",
+		"Invoke failed",
+		e.Err,
+		"function", e.FunctionName,
+	)
 }
 
 // LogStopping logs the Stopping event.
@@ -172,15 +214,12 @@ func (l *fxLogger) LogStarted(e *fxevent.Started) {
 
 // LogLoggerInitialized logs the LoggerInitialized event.
 func (l *fxLogger) LogLoggerInitialized(e *fxevent.LoggerInitialized) {
-	if e.Err != nil {
-		l.log.Error("Custom logger initialization failed",
-			"error", e.Err,
-		)
-	} else {
-		l.log.Debug("Initialized custom fxevent.Logger",
-			"function", e.ConstructorName,
-		)
-	}
+	l.logSuccessOrError(
+		"Initialized custom fxevent.Logger",
+		"Custom logger initialization failed",
+		e.Err,
+		"function", e.ConstructorName,
+	)
 }
 
 // LogEvent logs an fx event.
