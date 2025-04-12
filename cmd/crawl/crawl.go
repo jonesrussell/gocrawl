@@ -13,6 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 // Cmd represents the crawl command.
@@ -43,13 +44,25 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	}
 	debug := config.GetBool("app.debug") || config.GetString("logger.level") == "debug"
 	if debug {
-		log.Debug("Debug mode enabled")
-		log.Debug("Configuration loaded",
-			"max_depth", config.GetInt("crawler.max_depth"),
-			"rate_limit", config.GetString("crawler.rate_limit"),
-			"user_agent", config.GetString("crawler.user_agent"),
+		log.Debug("Debug mode enabled",
+			"app.debug", config.GetBool("app.debug"),
+			"logger.level", config.GetString("logger.level"),
+			"config_development", config.GetBool("logger.development"),
 		)
 	}
+
+	// Log important configuration values once
+	log.Info("Configuration values",
+		"app.debug", config.GetBool("app.debug"),
+		"logger.level", config.GetString("logger.level"),
+		"logger.format", config.GetString("logger.format"),
+		"logger.output", config.GetString("logger.output"),
+		"crawler.max_depth", config.GetInt("crawler.max_depth"),
+		"crawler.rate_limit", config.GetString("crawler.rate_limit"),
+		"crawler.user_agent", config.GetString("crawler.user_agent"),
+		"elasticsearch.url", config.GetString("elasticsearch.url"),
+		"elasticsearch.index_prefix", config.GetString("elasticsearch.index_prefix"),
+	)
 
 	// Initialize the Fx application.
 	log.Debug("Initializing Fx application with modules",
@@ -76,28 +89,21 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 			),
 		),
 		// Configure Fx logger with debug level and more detailed logging
-		// fx.WithLogger(func(log logger.Interface) fxevent.Logger {
-		// 	// Create a new logger with debug level for Fx events
-		// 	fxLog := log.With(
-		// 		"component", "fx",
-		// 		"debug", debug,
-		// 		"source", sourceName,
-		// 	)
-		// 	// Log initialization start with structured fields
-		// 	fxLog.Debug("Starting Fx application initialization",
-		// 		"source", sourceName,
-		// 		"debug_enabled", debug,
-		// 		"context_available", cmdCtx != nil,
-		// 	)
-		// 	// Create Fx logger with debug level
-		// 	fxLogger := logger.NewFxLogger(fxLog)
-		// 	// Log initial Fx event to verify logging
-		// 	fxLog.Debug("Fx logger initialized",
-		// 		"source", sourceName,
-		// 		"debug_enabled", debug,
-		// 	)
-		// 	return fxLogger
-		// }),
+		fx.WithLogger(func(log logger.Interface) fxevent.Logger {
+			// Create a new logger with debug level for Fx events
+			fxLog := log.With(
+				"component", "fx",
+				"debug", debug,
+				"source", sourceName,
+			)
+			// Create Fx logger with debug level
+			fxLogger := logger.NewFxLogger(fxLog)
+			// Set debug level for Fx events
+			if debug {
+				fxLog.Debug("Fx logger configured with debug level")
+			}
+			return fxLogger
+		}),
 		fx.Invoke(func(lc fx.Lifecycle, crawlerSvc crawler.Interface, h signal.Interface) {
 			handler = h
 			// Register lifecycle hooks

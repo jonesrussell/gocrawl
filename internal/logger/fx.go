@@ -43,158 +43,136 @@ func (l *fxLogger) LogEvent(event fxevent.Event) {
 }
 
 func (l *fxLogger) logOnStartExecuting(e *fxevent.OnStartExecuting) {
-	l.log.Debug("OnStart hook executing",
+	l.log.Debug("Fx: OnStart hook executing",
 		"callee", e.FunctionName,
 		"caller", e.CallerName,
-		"event", "OnStartExecuting",
 	)
 }
 
 func (l *fxLogger) logOnStartExecuted(e *fxevent.OnStartExecuted) {
 	if e.Err != nil {
-		l.log.Error("OnStart hook failed",
+		l.log.Error("Fx: OnStart hook failed",
 			"callee", e.FunctionName,
 			"caller", e.CallerName,
 			"error", e.Err,
-			"event", "OnStartExecuted",
 		)
 	} else {
-		l.log.Debug("OnStart hook executed",
+		l.log.Info("Fx: OnStart hook executed",
 			"callee", e.FunctionName,
 			"caller", e.CallerName,
 			"runtime", e.Runtime.String(),
-			"event", "OnStartExecuted",
 		)
 	}
 }
 
 func (l *fxLogger) logOnStopExecuting(e *fxevent.OnStopExecuting) {
-	l.log.Debug("OnStop hook executing",
+	l.log.Debug("Fx: OnStop hook executing",
 		"callee", e.FunctionName,
 		"caller", e.CallerName,
-		"event", "OnStopExecuting",
 	)
 }
 
 func (l *fxLogger) logOnStopExecuted(e *fxevent.OnStopExecuted) {
 	if e.Err != nil {
-		l.log.Error("OnStop hook failed",
+		l.log.Error("Fx: OnStop hook failed",
 			"callee", e.FunctionName,
 			"caller", e.CallerName,
 			"error", e.Err,
-			"event", "OnStopExecuted",
 		)
 	} else {
-		l.log.Debug("OnStop hook executed",
+		l.log.Info("Fx: OnStop hook executed",
 			"callee", e.FunctionName,
 			"caller", e.CallerName,
 			"runtime", e.Runtime.String(),
-			"event", "OnStopExecuted",
 		)
 	}
 }
 
 func (l *fxLogger) logSupplied(e *fxevent.Supplied) {
 	if e.Err != nil {
-		l.log.Error("Error encountered while applying options",
+		l.log.Error("Fx: Error applying options",
 			"type", e.TypeName,
 			"error", e.Err,
-			"event", "Supplied",
 		)
 	} else {
-		l.log.Debug("Supplied",
+		l.log.Debug("Fx: Supplied",
 			"type", e.TypeName,
-			"event", "Supplied",
 		)
 	}
 }
 
 func (l *fxLogger) logProvided(e *fxevent.Provided) {
 	for _, rtype := range e.OutputTypeNames {
-		l.log.Debug("Provided",
+		l.log.Info("Fx: Provided",
 			"constructor", e.ConstructorName,
 			"type", rtype,
-			"event", "Provided",
 		)
 	}
 	if e.Err != nil {
-		l.log.Error("Error encountered while providing options",
+		l.log.Error("Fx: Error providing options",
 			"constructor", e.ConstructorName,
 			"error", e.Err,
-			"event", "Provided",
 		)
 	}
 }
 
 func (l *fxLogger) logReplaced(e *fxevent.Replaced) {
 	for _, rtype := range e.OutputTypeNames {
-		l.log.Debug("Replaced",
+		l.log.Debug("Fx: Replaced",
 			"type", rtype,
-			"event", "Replaced",
 		)
 	}
 	if e.Err != nil {
-		l.log.Error("Error encountered while replacing options",
+		l.log.Error("Fx: Error replacing options",
 			"error", e.Err,
-			"event", "Replaced",
 		)
 	}
 }
 
 func (l *fxLogger) logDecorated(e *fxevent.Decorated) {
 	for _, rtype := range e.OutputTypeNames {
-		l.log.Debug("Decorated",
+		l.log.Debug("Fx: Decorated",
 			"decorator", e.DecoratorName,
 			"type", rtype,
-			"event", "Decorated",
 		)
 	}
 	if e.Err != nil {
-		l.log.Error("Error encountered while decorating options",
+		l.log.Error("Fx: Error decorating options",
 			"decorator", e.DecoratorName,
 			"error", e.Err,
-			"event", "Decorated",
 		)
 	}
 }
 
 func (l *fxLogger) logInvoked(e *fxevent.Invoked) {
 	if e.Err != nil {
-		l.log.Error("Error encountered while invoking function",
+		l.log.Error("Fx: Error invoking function",
 			"function", e.FunctionName,
 			"error", e.Err,
-			"event", "Invoked",
 		)
 	} else {
-		l.log.Debug("Invoked",
+		l.log.Debug("Fx: Invoked",
 			"function", e.FunctionName,
-			"event", "Invoked",
 		)
 	}
 }
 
 func (l *fxLogger) logStopped(e *fxevent.Stopped) {
 	if e.Err != nil {
-		l.log.Error("Error encountered while stopping",
+		l.log.Error("Fx: Error stopping",
 			"error", e.Err,
-			"event", "Stopped",
 		)
 	} else {
-		l.log.Debug("Stopped",
-			"event", "Stopped",
-		)
+		l.log.Info("Fx: Stopped")
 	}
 }
 
 func (l *fxLogger) logRolledBack(e *fxevent.RolledBack) {
-	l.log.Error("Rolled back",
+	l.log.Error("Fx: Rolled back",
 		"error", e.Err,
-		"event", "RolledBack",
 	)
 }
 
 func (l *fxLogger) logStarted() {
-	l.log.Debug("Started",
-		"event", "Started",
-	)
+	l.log.Info("Fx: Started")
 }

@@ -39,7 +39,6 @@ var Module = fx.Module("crawl",
 	// Include required modules
 	config.Module,
 	storage.Module,
-	logger.Module,
 	sources.Module,
 	article.Module,
 	content.Module,

@@ -2,7 +2,6 @@
 package logger
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config/app"
@@ -22,6 +21,18 @@ var Module = fx.Module("logger",
 	fx.Provide(
 		fx.Annotate(
 			func(params Params) (*zap.Logger, error) {
+				// Set log level based on config and debug flag
+				var level Level = InfoLevel
+				if params.Config != nil {
+					level = params.Config.Level
+				}
+				if params.App != nil && (params.App.Debug || params.Config.Development) {
+					level = DebugLevel
+				}
+
+				// Convert to zap level
+				zapLevel := levelToZap(level)
+
 				// Create encoder config first
 				encoderConfig := zapcore.EncoderConfig{
 					TimeKey:        "ts",
@@ -36,21 +47,6 @@ var Module = fx.Module("logger",
 					EncodeDuration: zapcore.SecondsDurationEncoder,
 					EncodeCaller:   zapcore.ShortCallerEncoder,
 				}
-
-				// Set log level based on config and debug flag
-				var level Level = InfoLevel
-				if params.Config != nil {
-					level = params.Config.Level
-				}
-				if params.App != nil && (params.App.Debug || params.Config.Development) {
-					level = DebugLevel
-					// Log debug mode enablement
-					fmt.Printf("Debug mode enabled: app.Debug=%v, config.Development=%v\n",
-						params.App.Debug, params.Config.Development)
-				}
-
-				// Convert to zap level
-				zapLevel := levelToZap(level)
 
 				// Check if we should enable color
 				enableColor := false
@@ -70,29 +66,42 @@ var Module = fx.Module("logger",
 					encoding = params.Config.Encoding
 				}
 
+				// Create the output
+				output := zapcore.AddSync(os.Stdout)
+
+				// Create level enabler
+				levelEnabler := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+					return lvl >= zapLevel
+				})
+
 				if encoding == "json" {
 					core = zapcore.NewCore(
 						zapcore.NewJSONEncoder(encoderConfig),
-						zapcore.AddSync(os.Stdout),
-						zapLevel,
+						output,
+						levelEnabler,
 					)
 				} else {
 					core = zapcore.NewCore(
 						zapcore.NewConsoleEncoder(encoderConfig),
-						zapcore.AddSync(os.Stdout),
-						zapLevel,
+						output,
+						levelEnabler,
 					)
 				}
 
-				// Create logger with development mode if enabled
-				var zapLogger *zap.Logger
-				if params.App != nil && (params.App.Debug || params.Config.Development) {
-					zapLogger = zap.New(core, zap.Development(), zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
-					// Log logger creation with debug mode
-					fmt.Printf("Created Zap logger in debug mode: level=%v, development=%v\n",
-						level, params.Config.Development)
-				} else {
-					zapLogger = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+				// Create logger
+				zapLogger := zap.New(core,
+					zap.AddCaller(),
+					zap.AddStacktrace(zapcore.ErrorLevel),
+				)
+
+				// Log debug mode enablement if applicable
+				if level == DebugLevel {
+					zapLogger.Debug("Debug mode enabled",
+						zap.Bool("app.Debug", params.App.Debug),
+						zap.Bool("config.Development", params.Config.Development),
+						zap.String("level", string(level)),
+						zap.String("zapLevel", zapLevel.String()),
+					)
 				}
 
 				return zapLogger, nil
@@ -112,16 +121,16 @@ var Module = fx.Module("logger",
 
 // levelToZap converts a logger.Level to a zapcore.Level.
 func levelToZap(level Level) zapcore.Level {
-	switch level {
-	case DebugLevel:
+	switch string(level) {
+	case string(DebugLevel):
 		return zapcore.DebugLevel
-	case InfoLevel:
+	case string(InfoLevel):
 		return zapcore.InfoLevel
-	case WarnLevel:
+	case string(WarnLevel):
 		return zapcore.WarnLevel
-	case ErrorLevel:
+	case string(ErrorLevel):
 		return zapcore.ErrorLevel
-	case FatalLevel:
+	case string(FatalLevel):
 		return zapcore.FatalLevel
 	default:
 		return zapcore.InfoLevel
