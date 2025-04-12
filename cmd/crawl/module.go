@@ -134,7 +134,7 @@ var Module = fx.Options(
 				// Create a new Sources instance with just the requested source
 				return sources.NewSources(&requestedSource, logger), nil
 			},
-			fx.ParamTags(`name:"sourceName"`),
+			fx.ParamTags(``, ``, `name:"sourceName"`),
 		),
 
 		// Event bus with error handling
