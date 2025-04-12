@@ -98,37 +98,15 @@ func (p *ContentProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement
 		p.metrics.ProcessingDuration += time.Since(start)
 	}()
 
-	// Extract content data
-	content := &models.Content{
-		ID:        uuid.New().String(),
-		Title:     e.ChildText("h1"),
-		Body:      e.ChildText("article"),
-		Type:      "page",
-		URL:       e.Request.URL.String(),
-		CreatedAt: time.Now(),
-		Metadata: map[string]any{
-			"title":          e.ChildText("title"),
-			"description":    e.ChildAttr("meta[name=description]", "content"),
-			"keywords":       e.ChildAttr("meta[name=keywords]", "content"),
-			"author":         e.ChildAttr("meta[name=author]", "content"),
-			"og:title":       e.ChildAttr("meta[property=og:title]", "content"),
-			"og:description": e.ChildAttr("meta[property=og:description]", "content"),
-			"og:image":       e.ChildAttr("meta[property=og:image]", "content"),
-			"og:url":         e.ChildAttr("meta[property=og:url]", "content"),
-		},
+	// Extract content using the ContentService
+	content := p.ContentService.ExtractContent(e)
+	if content == nil {
+		p.Logger.Debug("No content extracted",
+			"url", e.Request.URL.String())
+		return nil
 	}
 
-	// Process the content using the ContentService
-	processedContent := p.ContentService.Process(ctx, content.ID)
-	if processedContent == "" {
-		p.Logger.Error("Failed to process content",
-			"component", "content/processor",
-			"contentID", content.ID)
-		p.metrics.ErrorCount++
-		return errors.New("failed to process content: empty result")
-	}
-
-	// Store the processed content
+	// Store the content
 	if err := p.Storage.IndexDocument(ctx, p.IndexName, content.ID, content); err != nil {
 		p.Logger.Error("Failed to index content",
 			"component", "content/processor",
@@ -158,37 +136,15 @@ func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType commo
 		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
 	}
 
-	// Extract content data
-	contentData := &models.Content{
-		ID:        uuid.New().String(),
-		Title:     e.ChildText("h1"),
-		Body:      e.ChildText("article"),
-		Type:      "page",
-		URL:       e.Request.URL.String(),
-		CreatedAt: time.Now(),
-		Metadata: map[string]any{
-			"title":          e.ChildText("title"),
-			"description":    e.ChildAttr("meta[name=description]", "content"),
-			"keywords":       e.ChildAttr("meta[name=keywords]", "content"),
-			"author":         e.ChildAttr("meta[name=author]", "content"),
-			"og:title":       e.ChildAttr("meta[property=og:title]", "content"),
-			"og:description": e.ChildAttr("meta[property=og:description]", "content"),
-			"og:image":       e.ChildAttr("meta[property=og:image]", "content"),
-			"og:url":         e.ChildAttr("meta[property=og:url]", "content"),
-		},
+	// Extract content using the ContentService
+	contentData := p.ContentService.ExtractContent(e)
+	if contentData == nil {
+		p.Logger.Debug("No content extracted",
+			"url", e.Request.URL.String())
+		return nil
 	}
 
-	// Process the content using the ContentService
-	processedContent := p.ContentService.Process(ctx, contentData.ID)
-	if processedContent == "" {
-		p.Logger.Error("Failed to process content",
-			"component", "content/processor",
-			"contentID", contentData.ID)
-		p.metrics.ErrorCount++
-		return errors.New("failed to process content: empty result")
-	}
-
-	// Store the processed content
+	// Store the content
 	if err := p.Storage.IndexDocument(ctx, p.IndexName, contentData.ID, contentData); err != nil {
 		p.Logger.Error("Failed to index content",
 			"component", "content/processor",
@@ -198,8 +154,6 @@ func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType commo
 		return err
 	}
 
-	p.metrics.ProcessedCount++
-	p.metrics.LastProcessedTime = time.Now()
 	return nil
 }
 

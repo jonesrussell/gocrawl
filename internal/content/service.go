@@ -30,6 +30,22 @@ type Service struct {
 	Logger    logger.Interface
 	Storage   types.Interface
 	IndexName string
+	// SourceRules maps source names to their content processing rules
+	SourceRules map[string]ContentRules
+	// DefaultRules is used when no source-specific rules are found
+	DefaultRules ContentRules
+}
+
+// ContentRules defines the rules for processing content from a specific source
+type ContentRules struct {
+	// ContentTypePatterns maps content types to their URL patterns
+	ContentTypePatterns map[string][]string
+	// ExcludePatterns are URL patterns to exclude from processing
+	ExcludePatterns []string
+	// MetadataSelectors defines selectors for extracting metadata
+	MetadataSelectors map[string]string
+	// ContentSelectors defines selectors for extracting content
+	ContentSelectors map[string]string
 }
 
 // Ensure Service implements Interface
@@ -37,7 +53,39 @@ var _ Interface = (*Service)(nil)
 
 // NewService creates a new Service instance
 func NewService(logger logger.Interface, storage types.Interface) Interface {
-	return &Service{Logger: logger, Storage: storage}
+	return &Service{
+		Logger:      logger,
+		Storage:     storage,
+		SourceRules: make(map[string]ContentRules),
+		DefaultRules: ContentRules{
+			ContentTypePatterns: contentTypePatterns,
+			MetadataSelectors: map[string]string{
+				"title":       "title",
+				"description": "meta[name=description]",
+				"keywords":    "meta[name=keywords]",
+				"author":      "meta[name=author]",
+			},
+			ContentSelectors: map[string]string{
+				"body": "article",
+			},
+		},
+	}
+}
+
+// AddSourceRules adds content processing rules for a specific source
+func (s *Service) AddSourceRules(sourceName string, rules ContentRules) {
+	s.SourceRules[sourceName] = rules
+}
+
+// getRulesForURL returns the appropriate content rules for the given URL
+func (s *Service) getRulesForURL(url string) ContentRules {
+	// Try to find matching source rules
+	for sourceName, rules := range s.SourceRules {
+		if strings.Contains(url, sourceName) {
+			return rules
+		}
+	}
+	return s.DefaultRules
 }
 
 type JSONLDMetadata struct {
@@ -68,13 +116,44 @@ var contentTypePatterns = map[string][]string{
 	"system":   {"/wp-json", "/wp-admin"},
 }
 
+// cleanBody cleans and extracts text from HTML content
+func cleanBody(content any) string {
+	var selection *goquery.Selection
+
+	switch v := content.(type) {
+	case *colly.HTMLElement:
+		selection = v.DOM
+	case *goquery.Selection:
+		selection = v
+	default:
+		return ""
+	}
+
+	// Remove unwanted elements
+	selection.Find("script, style, noscript, iframe, form").Remove()
+	return strings.TrimSpace(selection.Text())
+}
+
 // ExtractContent extracts content from an HTML element
 func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 	s.Logger.Debug("Extracting content", "url", e.Request.URL.String())
 
+	// Get rules for this URL
+	rules := s.getRulesForURL(e.Request.URL.String())
+
+	// Check if URL matches any exclude patterns
+	url := e.Request.URL.String()
+	for _, pattern := range rules.ExcludePatterns {
+		if strings.Contains(url, pattern) {
+			s.Logger.Debug("URL matches exclude pattern, skipping",
+				"url", url,
+				"pattern", pattern)
+			return nil
+		}
+	}
+
 	var jsonLD JSONLDMetadata
 	var parsedDate time.Time
-	var contentType string
 
 	// Extract metadata
 	metadata := s.ExtractMetadata(e)
@@ -110,8 +189,16 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 		}
 	}
 
-	// Determine content type
-	contentType = s.DetermineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
+	// Determine content type using source-specific patterns
+	contentType := s.DetermineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
+
+	// Extract body using source-specific selectors
+	body := ""
+	if bodySelector, ok := rules.ContentSelectors["body"]; ok && bodySelector != "" {
+		body = cleanBody(e.DOM.Find(bodySelector))
+	} else {
+		body = cleanBody(e)
+	}
 
 	// Create content object
 	content := &models.Content{
@@ -119,7 +206,7 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 		Title:     jsonLD.Name,
 		URL:       e.Request.URL.String(),
 		Type:      contentType,
-		Body:      cleanBody(e),
+		Body:      body,
 		CreatedAt: parsedDate,
 		Metadata:  metadata,
 	}
@@ -137,6 +224,9 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 
 // DetermineContentType determines the content type based on URL and metadata
 func (s *Service) DetermineContentType(url string, metadata map[string]any, jsonLDType string) string {
+	// Get rules for this URL
+	rules := s.getRulesForURL(url)
+
 	// First try JSON-LD type
 	if jsonLDType != "" {
 		return strings.ToLower(jsonLDType)
@@ -147,9 +237,9 @@ func (s *Service) DetermineContentType(url string, metadata map[string]any, json
 		return strings.ToLower(metaType)
 	}
 
-	// Try to detect from URL
+	// Try to detect from URL using source-specific patterns
 	urlLower := strings.ToLower(url)
-	for category, patterns := range contentTypePatterns {
+	for category, patterns := range rules.ContentTypePatterns {
 		for _, pattern := range patterns {
 			if strings.Contains(urlLower, pattern) {
 				return category
@@ -163,9 +253,20 @@ func (s *Service) DetermineContentType(url string, metadata map[string]any, json
 
 // ExtractMetadata extracts metadata from various sources in the HTML
 func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
+	// Get rules for this URL
+	rules := s.getRulesForURL(e.Request.URL.String())
 	metadata := make(map[string]any)
 
-	// Extract OpenGraph metadata first (highest precedence)
+	// Extract metadata using source-specific selectors
+	for key, selector := range rules.MetadataSelectors {
+		if value := e.ChildAttr(selector, "content"); value != "" {
+			metadata[key] = value
+		} else if value := e.ChildText(selector); value != "" {
+			metadata[key] = value
+		}
+	}
+
+	// Extract OpenGraph metadata (highest precedence)
 	e.ForEach(`meta[property^="og:"]`, func(_ int, el *colly.HTMLElement) {
 		property := el.Attr("property")
 		content := el.Attr("content")
@@ -185,17 +286,6 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
 			key := name[8:] // Remove "twitter:" prefix
 			if _, exists := metadata[key]; !exists {
 				metadata[key] = content
-			}
-		}
-	})
-
-	// Extract other meta tags (lowest precedence)
-	e.ForEach(`meta[name]`, func(_ int, el *colly.HTMLElement) {
-		name := el.Attr("name")
-		content := el.Attr("content")
-		if name != "" && content != "" {
-			if _, exists := metadata[name]; !exists {
-				metadata[name] = content
 			}
 		}
 	})
@@ -225,32 +315,6 @@ func (s *Service) parseDate(logger logger.Interface, dateStr string) time.Time {
 	}
 
 	return time.Time{}
-}
-
-// cleanBody removes excluded tags and elements from the body content
-func cleanBody(e *colly.HTMLElement) string {
-	// Get a copy of the body element for manipulation
-	bodyEl := e.DOM
-
-	// Remove all style and script tags directly
-	bodyEl.Find("style,script").Remove()
-
-	// Remove other excluded elements
-	excludedSelectors := []string{
-		"header", "footer", "nav", "aside",
-		".advertisement", ".ads", ".social-share",
-		".comments", ".related-posts", ".newsletter",
-		"iframe", "noscript", "form", "button",
-		".cookie-notice", ".popup", ".modal",
-		".newsletter-signup", ".social-buttons",
-	}
-
-	for _, selector := range excludedSelectors {
-		bodyEl.Find(selector).Remove()
-	}
-
-	// Get the cleaned text
-	return bodyEl.Text()
 }
 
 // Process processes a single string content

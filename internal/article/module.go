@@ -72,18 +72,20 @@ func NewArticleService(
 		)
 	}
 
-	// Create a map of source names to their selectors
-	sourceSelectors := make(map[string]types.ArticleSelectors)
-	for _, src := range srcs {
-		sourceSelectors[src.Name] = src.Selectors.Article
-	}
-
-	return NewService(
+	// Create service with default selectors
+	service := NewService(
 		logger,
-		(&types.ArticleSelectors{}).Default(), // Default selectors as fallback
+		(&types.ArticleSelectors{}).Default(),
 		storage,
 		"articles",
-	)
+	).(*Service)
+
+	// Add source-specific selectors
+	for _, src := range srcs {
+		service.AddSourceSelectors(src.Name, src.Selectors.Article)
+	}
+
+	return service
 }
 
 // ProvideArticleProcessor creates a new article processor.
