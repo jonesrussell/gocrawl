@@ -85,32 +85,16 @@ func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types
 	// Convert to types.Source
 	source := sourceutils.ConvertToConfigSource(selectedSource)
 
-	// Create article index if it doesn't exist
-	articleIndex := source.Index + "_articles"
-	exists, err := c.indexManager.IndexExists(ctx, articleIndex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check article index existence: %w", err)
+	// Ensure article index exists
+	articleIndex := fmt.Sprintf("%s-articles", sourceName)
+	if indexErr := c.indexManager.EnsureArticleIndex(ctx, articleIndex); indexErr != nil {
+		return nil, fmt.Errorf("failed to ensure article index exists: %w", indexErr)
 	}
 
-	if !exists {
-		c.logger.Info("Creating article index", "index", articleIndex)
-		if err := c.indexManager.EnsureArticleIndex(ctx, articleIndex); err != nil {
-			return nil, fmt.Errorf("failed to create article index: %w", err)
-		}
-	}
-
-	// Create content index if it doesn't exist
-	contentIndex := source.Index + "_content"
-	exists, err = c.indexManager.IndexExists(ctx, contentIndex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check content index existence: %w", err)
-	}
-
-	if !exists {
-		c.logger.Info("Creating content index", "index", contentIndex)
-		if err := c.indexManager.EnsureContentIndex(ctx, contentIndex); err != nil {
-			return nil, fmt.Errorf("failed to create content index: %w", err)
-		}
+	// Ensure content index exists
+	contentIndex := fmt.Sprintf("%s-content", sourceName)
+	if contentErr := c.indexManager.EnsureContentIndex(ctx, contentIndex); contentErr != nil {
+		return nil, fmt.Errorf("failed to ensure content index exists: %w", contentErr)
 	}
 
 	return source, nil

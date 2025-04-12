@@ -248,11 +248,29 @@ var Module = fx.Module("storage",
 		NewStorage,
 		// Provide search manager
 		NewSearchManager,
-		// Provide index manager
+		// Index manager with error handling
 		fx.Annotate(
-			func(client *es.Client, logger logger.Interface) interfaces.IndexManager {
-				return NewElasticsearchIndexManager(client, logger)
+			func(
+				config config.Interface,
+				logger logger.Interface,
+				client *es.Client,
+			) (interfaces.IndexManager, error) {
+				logger.Debug("Creating Elasticsearch index manager")
+
+				if client == nil {
+					logger.Error("Elasticsearch client not initialized")
+					return nil, errors.New("elasticsearch client not initialized")
+				}
+
+				manager := NewElasticsearchIndexManager(client, logger)
+				if manager == nil {
+					logger.Error("Failed to create Elasticsearch index manager")
+					return nil, errors.New("failed to create Elasticsearch index manager")
+				}
+
+				return manager, nil
 			},
+			fx.ResultTags(`name:"indexManager"`),
 			fx.As(new(interfaces.IndexManager)),
 		),
 	),
