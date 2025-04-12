@@ -46,6 +46,7 @@ func (l *fxLogger) logOnStartExecuting(e *fxevent.OnStartExecuting) {
 	l.log.Debug("OnStart hook executing",
 		"callee", e.FunctionName,
 		"caller", e.CallerName,
+		"event", "OnStartExecuting",
 	)
 }
 
@@ -55,12 +56,14 @@ func (l *fxLogger) logOnStartExecuted(e *fxevent.OnStartExecuted) {
 			"callee", e.FunctionName,
 			"caller", e.CallerName,
 			"error", e.Err,
+			"event", "OnStartExecuted",
 		)
 	} else {
 		l.log.Debug("OnStart hook executed",
 			"callee", e.FunctionName,
 			"caller", e.CallerName,
 			"runtime", e.Runtime.String(),
+			"event", "OnStartExecuted",
 		)
 	}
 }
@@ -69,6 +72,7 @@ func (l *fxLogger) logOnStopExecuting(e *fxevent.OnStopExecuting) {
 	l.log.Debug("OnStop hook executing",
 		"callee", e.FunctionName,
 		"caller", e.CallerName,
+		"event", "OnStopExecuting",
 	)
 }
 
@@ -78,12 +82,14 @@ func (l *fxLogger) logOnStopExecuted(e *fxevent.OnStopExecuted) {
 			"callee", e.FunctionName,
 			"caller", e.CallerName,
 			"error", e.Err,
+			"event", "OnStopExecuted",
 		)
 	} else {
 		l.log.Debug("OnStop hook executed",
 			"callee", e.FunctionName,
 			"caller", e.CallerName,
 			"runtime", e.Runtime.String(),
+			"event", "OnStopExecuted",
 		)
 	}
 }
@@ -93,10 +99,12 @@ func (l *fxLogger) logSupplied(e *fxevent.Supplied) {
 		l.log.Error("Error encountered while applying options",
 			"type", e.TypeName,
 			"error", e.Err,
+			"event", "Supplied",
 		)
 	} else {
 		l.log.Debug("Supplied",
 			"type", e.TypeName,
+			"event", "Supplied",
 		)
 	}
 }
@@ -106,12 +114,14 @@ func (l *fxLogger) logProvided(e *fxevent.Provided) {
 		l.log.Debug("Provided",
 			"constructor", e.ConstructorName,
 			"type", rtype,
+			"event", "Provided",
 		)
 	}
 	if e.Err != nil {
 		l.log.Error("Error encountered while providing options",
 			"constructor", e.ConstructorName,
 			"error", e.Err,
+			"event", "Provided",
 		)
 	}
 }
@@ -120,11 +130,13 @@ func (l *fxLogger) logReplaced(e *fxevent.Replaced) {
 	for _, rtype := range e.OutputTypeNames {
 		l.log.Debug("Replaced",
 			"type", rtype,
+			"event", "Replaced",
 		)
 	}
 	if e.Err != nil {
 		l.log.Error("Error encountered while replacing options",
 			"error", e.Err,
+			"event", "Replaced",
 		)
 	}
 }
@@ -134,12 +146,14 @@ func (l *fxLogger) logDecorated(e *fxevent.Decorated) {
 		l.log.Debug("Decorated",
 			"decorator", e.DecoratorName,
 			"type", rtype,
+			"event", "Decorated",
 		)
 	}
 	if e.Err != nil {
 		l.log.Error("Error encountered while decorating options",
 			"decorator", e.DecoratorName,
 			"error", e.Err,
+			"event", "Decorated",
 		)
 	}
 }
@@ -149,10 +163,12 @@ func (l *fxLogger) logInvoked(e *fxevent.Invoked) {
 		l.log.Error("Error encountered while invoking function",
 			"function", e.FunctionName,
 			"error", e.Err,
+			"event", "Invoked",
 		)
 	} else {
 		l.log.Debug("Invoked",
 			"function", e.FunctionName,
+			"event", "Invoked",
 		)
 	}
 }
@@ -161,18 +177,24 @@ func (l *fxLogger) logStopped(e *fxevent.Stopped) {
 	if e.Err != nil {
 		l.log.Error("Error encountered while stopping",
 			"error", e.Err,
+			"event", "Stopped",
 		)
 	} else {
-		l.log.Debug("Stopped")
+		l.log.Debug("Stopped",
+			"event", "Stopped",
+		)
 	}
 }
 
 func (l *fxLogger) logRolledBack(e *fxevent.RolledBack) {
 	l.log.Error("Rolled back",
 		"error", e.Err,
+		"event", "RolledBack",
 	)
 }
 
 func (l *fxLogger) logStarted() {
-	l.log.Debug("Started")
+	l.log.Debug("Started",
+		"event", "Started",
+	)
 }

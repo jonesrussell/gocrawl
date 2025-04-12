@@ -2,6 +2,7 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/jonesrussell/gocrawl/internal/config/app"
@@ -43,6 +44,9 @@ var Module = fx.Module("logger",
 				}
 				if params.App != nil && (params.App.Debug || params.Config.Development) {
 					level = DebugLevel
+					// Log debug mode enablement
+					fmt.Printf("Debug mode enabled: app.Debug=%v, config.Development=%v\n",
+						params.App.Debug, params.Config.Development)
 				}
 
 				// Convert to zap level
@@ -84,6 +88,9 @@ var Module = fx.Module("logger",
 				var zapLogger *zap.Logger
 				if params.App != nil && (params.App.Debug || params.Config.Development) {
 					zapLogger = zap.New(core, zap.Development(), zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+					// Log logger creation with debug mode
+					fmt.Printf("Created Zap logger in debug mode: level=%v, development=%v\n",
+						level, params.Config.Development)
 				} else {
 					zapLogger = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 				}

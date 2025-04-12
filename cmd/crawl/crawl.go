@@ -13,7 +13,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 )
 
 // Cmd represents the crawl command.
@@ -76,10 +75,29 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 				fx.As(new(logger.Interface)),
 			),
 		),
-		// Suppress Fx's default logging and use our logger format
-		fx.WithLogger(func(log logger.Interface) fxevent.Logger {
-			return logger.NewFxLogger(log)
-		}),
+		// Configure Fx logger with debug level and more detailed logging
+		// fx.WithLogger(func(log logger.Interface) fxevent.Logger {
+		// 	// Create a new logger with debug level for Fx events
+		// 	fxLog := log.With(
+		// 		"component", "fx",
+		// 		"debug", debug,
+		// 		"source", sourceName,
+		// 	)
+		// 	// Log initialization start with structured fields
+		// 	fxLog.Debug("Starting Fx application initialization",
+		// 		"source", sourceName,
+		// 		"debug_enabled", debug,
+		// 		"context_available", cmdCtx != nil,
+		// 	)
+		// 	// Create Fx logger with debug level
+		// 	fxLogger := logger.NewFxLogger(fxLog)
+		// 	// Log initial Fx event to verify logging
+		// 	fxLog.Debug("Fx logger initialized",
+		// 		"source", sourceName,
+		// 		"debug_enabled", debug,
+		// 	)
+		// 	return fxLogger
+		// }),
 		fx.Invoke(func(lc fx.Lifecycle, crawlerSvc crawler.Interface, h signal.Interface) {
 			handler = h
 			// Register lifecycle hooks

@@ -242,61 +242,109 @@ func (c *Crawler) setupCallbacks(ctx context.Context) {
 // Start begins the crawling process for a given source.
 func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.logger.Debug("Starting crawler",
-		"source", sourceName)
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 
 	// Initialize abort channel
 	c.abortChan = make(chan struct{})
-	c.logger.Debug("Initialized abort channel")
+	c.logger.Debug("Initialized abort channel",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 
 	// Validate source
-	c.logger.Debug("Validating source", "source", sourceName)
+	c.logger.Debug("Validating source",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 	source, err := c.validateSource(ctx, sourceName)
 	if err != nil {
-		c.logger.Error("Failed to validate source", "error", err)
+		c.logger.Error("Failed to validate source",
+			"error", err,
+			"source", sourceName,
+			"debug_enabled", c.cfg.Debug,
+		)
 		return fmt.Errorf("failed to validate source: %w", err)
 	}
 	c.logger.Debug("Source validated successfully",
 		"url", source.URL,
-		"allowed_domains", source.AllowedDomains)
+		"allowed_domains", source.AllowedDomains,
+		"debug_enabled", c.cfg.Debug,
+	)
 
 	// Set up collector
-	c.logger.Debug("Setting up collector")
+	c.logger.Debug("Setting up collector",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 	err = c.setupCollector(source)
 	if err != nil {
-		c.logger.Error("Failed to setup collector", "error", err)
+		c.logger.Error("Failed to setup collector",
+			"error", err,
+			"source", sourceName,
+			"debug_enabled", c.cfg.Debug,
+		)
 		return fmt.Errorf("failed to setup collector: %w", err)
 	}
-	c.logger.Debug("Collector setup completed")
+	c.logger.Debug("Collector setup completed",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 
 	// Set up callbacks
-	c.logger.Debug("Setting up callbacks")
+	c.logger.Debug("Setting up callbacks",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 	c.setupCallbacks(ctx)
-	c.logger.Debug("Callbacks setup completed")
+	c.logger.Debug("Callbacks setup completed",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 
 	// Start the crawler state
-	c.logger.Debug("Starting crawler state")
+	c.logger.Debug("Starting crawler state",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 	c.state.Start(ctx, sourceName)
-	c.logger.Debug("Crawler state started")
+	c.logger.Debug("Crawler state started",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 
 	// Visit the source URL
 	c.logger.Debug("Attempting to visit URL",
 		"url", source.URL,
-		"allowed_domains", source.AllowedDomains)
+		"allowed_domains", source.AllowedDomains,
+		"debug_enabled", c.cfg.Debug,
+	)
 
 	if visitErr := c.collector.Visit(source.URL); visitErr != nil {
 		c.logger.Error("Failed to visit source URL",
 			"error", visitErr,
-			"url", source.URL)
+			"url", source.URL,
+			"debug_enabled", c.cfg.Debug,
+		)
 		return fmt.Errorf("failed to visit source URL: %w", visitErr)
 	}
 
 	c.logger.Debug("Successfully initiated visit",
-		"url", source.URL)
+		"url", source.URL,
+		"debug_enabled", c.cfg.Debug,
+	)
 
 	// Wait for the crawler to finish
-	c.logger.Debug("Waiting for collector to finish")
+	c.logger.Debug("Waiting for collector to finish",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 	c.collector.Wait()
-	c.logger.Debug("Collector finished")
+	c.logger.Debug("Collector finished",
+		"source", sourceName,
+		"debug_enabled", c.cfg.Debug,
+	)
 
 	return nil
 }

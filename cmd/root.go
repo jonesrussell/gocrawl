@@ -163,7 +163,7 @@ func setDefaults() {
 	viper.SetDefault("app.debug", false)
 
 	// Logger defaults
-	viper.SetDefault("logger.level", "info")
+	viper.SetDefault("logger.level", "debug")
 	viper.SetDefault("logger.format", "console")
 	viper.SetDefault("logger.output", "stdout")
 	viper.SetDefault("logger.enable_color", true)
@@ -185,6 +185,53 @@ func setDefaults() {
 	viper.SetDefault("elasticsearch.sniff", false)
 	viper.SetDefault("elasticsearch.healthcheck", true)
 	viper.SetDefault("elasticsearch.retry_on_conflict", 3)
+}
+
+// loadEnvFile loads environment variables from .env file if it exists
+func loadEnvFile() error {
+	if err := godotenv.Load(); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to load .env file: %w", err)
+		}
+		// .env file not found is not an error - we'll use environment variables
+	}
+	return nil
+}
+
+// loadConfigFile loads the configuration file from the specified path or default locations
+func loadConfigFile() error {
+	if cfgFile != "" {
+		absPath, err := filepath.Abs(cfgFile)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for config file: %w", err)
+		}
+		cfgFile = absPath
+		viper.SetConfigFile(cfgFile)
+	} else {
+		// Set up default configuration paths and name
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get user home directory: %w", err)
+		}
+
+		viper.SetConfigType("yaml")
+		viper.SetConfigName("config")
+
+		// Search paths in order of priority
+		viper.AddConfigPath(".")                             // Current directory
+		viper.AddConfigPath(filepath.Join(home, ".crawler")) // User config directory
+		viper.AddConfigPath("/etc/crawler")                  // System config directory
+	}
+
+	// Read the config file
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return fmt.Errorf("failed to read config file: %w", err)
+		}
+		// Config file not found is not an error - we'll use defaults
+	}
+
+	return nil
 }
 
 // bindFlags binds all command flags to viper configuration.
@@ -211,8 +258,7 @@ func bindFlags(cmd *cobra.Command) error {
 	return nil
 }
 
-// setupConfig handles configuration file setup for all commands.
-// It ensures the config file path is absolute and configures Viper.
+// setupConfig handles configuration file setup for all commands
 func setupConfig(cmd *cobra.Command) error {
 	// Step 1: Set default values first
 	setDefaults()
@@ -224,51 +270,21 @@ func setupConfig(cmd *cobra.Command) error {
 	}
 
 	// Step 3: Load .env file if it exists
-	if err := godotenv.Load(); err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to load .env file: %w", err)
-		}
-		// .env file not found is not an error - we'll use environment variables
+	if err := loadEnvFile(); err != nil {
+		return err
 	}
 
-	// Step 4: Get the absolute path to the config file if specified
-	if cfgFile != "" {
-		absPath, err := filepath.Abs(cfgFile)
-		if err != nil {
-			return fmt.Errorf("failed to get absolute path for config file: %w", err)
-		}
-		cfgFile = absPath
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Set up default configuration paths and name
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("failed to get user home directory: %w", err)
-		}
-
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("config")
-
-		// Search paths in order of priority
-		viper.AddConfigPath(".")                             // Current directory
-		viper.AddConfigPath(filepath.Join(home, ".crawler")) // User config directory
-		viper.AddConfigPath("/etc/crawler")                  // System config directory
+	// Step 4: Load configuration file
+	if err := loadConfigFile(); err != nil {
+		return err
 	}
 
-	// Step 5: Read the config file
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return fmt.Errorf("failed to read config file: %w", err)
-		}
-		// Config file not found is not an error - we'll use defaults
-	}
-
-	// Step 6: Bind command flags to viper
+	// Step 5: Bind command flags to viper
 	if err := bindFlags(cmd); err != nil {
 		return fmt.Errorf("failed to bind flags: %w", err)
 	}
 
-	// Step 7: Validate configuration
+	// Step 6: Validate configuration
 	if err := validateConfig(cmd); err != nil {
 		return fmt.Errorf("configuration validation failed: %w", err)
 	}
@@ -276,7 +292,7 @@ func setupConfig(cmd *cobra.Command) error {
 	return nil
 }
 
-// validateConfig performs configuration validation based on the current command.
+// validateConfig performs configuration validation based on the current command
 func validateConfig(cmd *cobra.Command) error {
 	// Validate app configuration
 	if !viper.IsSet("app.name") {
@@ -322,14 +338,13 @@ func initLogger() error {
 	logLevel := viper.GetString("logger.level")
 	level := logger.InfoLevel
 
-	// Override with debug flag if set
-	if Debug {
+	// Check debug flag from Viper first
+	debug := viper.GetBool("app.debug")
+	if debug {
 		level = logger.DebugLevel
-		// Set debug in viper to ensure it's available in the context
-		viper.Set("app.debug", true)
-		viper.Set("logger.level", "debug")
 		logLevel = "debug"
 	} else {
+		// Fall back to log level from config
 		switch logLevel {
 		case "debug":
 			level = logger.DebugLevel
@@ -345,7 +360,7 @@ func initLogger() error {
 	// Create logger with configuration
 	logConfig := &logger.Config{
 		Level:       level,
-		Development: Debug,
+		Development: debug,
 		Encoding:    viper.GetString("logger.format"),
 		EnableColor: true, // Always enable color in debug mode
 		OutputPaths: []string{viper.GetString("logger.output")},
@@ -358,7 +373,7 @@ func initLogger() error {
 	}
 
 	// Log the current log level
-	log.Debug("Logger initialized", "level", logLevel, "debug", Debug)
+	log.Debug("Logger initialized", "level", logLevel, "debug", debug)
 
 	return nil
 }
