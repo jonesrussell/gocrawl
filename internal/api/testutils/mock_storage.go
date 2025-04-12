@@ -221,3 +221,15 @@ func (m *MockIndexManager) UpdateMapping(ctx context.Context, index string, mapp
 	args := m.Called(ctx, index, mapping)
 	return args.Error(0)
 }
+
+// EnsureArticleIndex implements interfaces.IndexManager.
+func (m *MockIndexManager) EnsureArticleIndex(ctx context.Context, name string) error {
+	args := m.Called(ctx, name)
+	return args.Error(0)
+}
+
+// EnsureContentIndex implements interfaces.IndexManager.
+func (m *MockIndexManager) EnsureContentIndex(ctx context.Context, name string) error {
+	args := m.Called(ctx, name)
+	return args.Error(0)
+}

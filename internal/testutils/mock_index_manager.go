@@ -78,6 +78,18 @@ func (m *MockIndexManager) GetIndex(ctx context.Context, name string) (map[strin
 	return index, args.Error(1)
 }
 
+// EnsureArticleIndex implements interfaces.IndexManager
+func (m *MockIndexManager) EnsureArticleIndex(ctx context.Context, name string) error {
+	args := m.Called(ctx, name)
+	return args.Error(0)
+}
+
+// EnsureContentIndex implements interfaces.IndexManager
+func (m *MockIndexManager) EnsureContentIndex(ctx context.Context, name string) error {
+	args := m.Called(ctx, name)
+	return args.Error(0)
+}
+
 // Ensure MockIndexManager implements interfaces.IndexManager
 var _ interfaces.IndexManager = (*MockIndexManager)(nil)
 

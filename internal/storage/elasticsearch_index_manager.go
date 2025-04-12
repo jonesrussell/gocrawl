@@ -188,3 +188,71 @@ func (m *ElasticsearchIndexManager) GetMapping(ctx context.Context, name string)
 
 	return nil, fmt.Errorf("unexpected mapping format for index %s", name)
 }
+
+// EnsureArticleIndex ensures that an article index exists with the appropriate mapping.
+func (m *ElasticsearchIndexManager) EnsureArticleIndex(ctx context.Context, name string) error {
+	articleMapping := map[string]any{
+		"mappings": map[string]any{
+			"properties": map[string]any{
+				"title": map[string]any{
+					"type": "text",
+				},
+				"content": map[string]any{
+					"type": "text",
+				},
+				"url": map[string]any{
+					"type": "keyword",
+				},
+				"published_at": map[string]any{
+					"type": "date",
+				},
+				"source": map[string]any{
+					"type": "keyword",
+				},
+				"author": map[string]any{
+					"type": "keyword",
+				},
+				"tags": map[string]any{
+					"type": "keyword",
+				},
+				"categories": map[string]any{
+					"type": "keyword",
+				},
+			},
+		},
+	}
+	return m.EnsureIndex(ctx, name, articleMapping)
+}
+
+// EnsureContentIndex ensures that a content index exists with the appropriate mapping.
+func (m *ElasticsearchIndexManager) EnsureContentIndex(ctx context.Context, name string) error {
+	contentMapping := map[string]any{
+		"mappings": map[string]any{
+			"properties": map[string]any{
+				"title": map[string]any{
+					"type": "text",
+				},
+				"content": map[string]any{
+					"type": "text",
+				},
+				"url": map[string]any{
+					"type": "keyword",
+				},
+				"last_modified": map[string]any{
+					"type": "date",
+				},
+				"source": map[string]any{
+					"type": "keyword",
+				},
+				"type": map[string]any{
+					"type": "keyword",
+				},
+				"metadata": map[string]any{
+					"type":    "object",
+					"enabled": false,
+				},
+			},
+		},
+	}
+	return m.EnsureIndex(ctx, name, contentMapping)
+}
