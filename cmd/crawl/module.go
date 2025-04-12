@@ -3,7 +3,11 @@ package crawl
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -11,6 +15,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -27,6 +32,8 @@ type Processor interface {
 const (
 	// ArticleChannelBufferSize is the buffer size for the article channel.
 	ArticleChannelBufferSize = 100
+	// DefaultInitTimeout is the default timeout for module initialization.
+	DefaultInitTimeout = 30 * time.Second
 )
 
 // Module provides the crawl command module for dependency injection.
@@ -59,54 +66,176 @@ var Module = fx.Options(
 			}
 		},
 
-		// Article channel
+		// Article channel with lifecycle management
 		fx.Annotate(
-			func() chan *models.Article {
-				return make(chan *models.Article, ArticleChannelBufferSize)
+			func(lc fx.Lifecycle) chan *models.Article {
+				ch := make(chan *models.Article, ArticleChannelBufferSize)
+
+				lc.Append(fx.Hook{
+					OnStop: func(ctx context.Context) error {
+						close(ch)
+						return nil
+					},
+				})
+
+				return ch
 			},
 			fx.ResultTags(`name:"crawlerArticleChannel"`),
 		),
 
-		// Sources
+		// Sources with error handling
 		func(config config.Interface, logger logger.Interface) (*sources.Sources, error) {
-			return sources.LoadSources(config)
+			logger.Debug("Loading sources from configuration")
+
+			src, err := sources.LoadSources(config)
+			if err != nil {
+				logger.Error("Failed to load sources",
+					"error", err,
+				)
+				return nil, fmt.Errorf("failed to load sources: %w", err)
+			}
+
+			// Validate loaded sources
+			sourceConfigs, err := src.GetSources()
+			if err != nil {
+				logger.Error("Failed to get source configurations",
+					"error", err,
+				)
+				return nil, fmt.Errorf("failed to get source configurations: %w", err)
+			}
+
+			if len(sourceConfigs) == 0 {
+				logger.Error("No sources configured")
+				return nil, errors.New("no sources configured in configuration file")
+			}
+
+			// Log source details
+			for _, cfg := range sourceConfigs {
+				logger.Info("Loaded source configuration",
+					"name", cfg.Name,
+					"url", cfg.URL,
+					"index", cfg.Index,
+					"max_depth", cfg.MaxDepth,
+					"rate_limit", cfg.RateLimit,
+				)
+			}
+
+			return src, nil
 		},
 
-		// Event bus
-		events.NewEventBus,
+		// Event bus with error handling
+		func(logger logger.Interface) (*events.EventBus, error) {
+			logger.Debug("Creating event bus")
+			bus := events.NewEventBus(logger)
+			if bus == nil {
+				logger.Error("Failed to create event bus")
+				return nil, errors.New("failed to create event bus")
+			}
+			return bus, nil
+		},
 
-		// Index manager
-		storage.NewElasticsearchIndexManager,
+		// Index manager with error handling
+		func(config config.Interface, logger logger.Interface, client *elasticsearch.Client) (interfaces.IndexManager, error) {
+			logger.Debug("Creating Elasticsearch index manager")
 
-		// Signal handler
+			if client == nil {
+				logger.Error("Elasticsearch client not initialized")
+				return nil, errors.New("elasticsearch client not initialized")
+			}
+
+			manager := storage.NewElasticsearchIndexManager(client, logger)
+			if manager == nil {
+				logger.Error("Failed to create Elasticsearch index manager")
+				return nil, errors.New("failed to create Elasticsearch index manager")
+			}
+
+			return manager, nil
+		},
+
+		// Signal handler with lifecycle integration
 		fx.Annotate(
-			signal.NewSignalHandler,
+			func(lc fx.Lifecycle, logger logger.Interface) signal.Interface {
+				handler := signal.NewSignalHandler(logger)
+
+				lc.Append(fx.Hook{
+					OnStop: func(ctx context.Context) error {
+						handler.RequestShutdown()
+						return handler.Wait()
+					},
+				})
+
+				return handler
+			},
 			fx.As(new(signal.Interface)),
 		),
 
 		// Article processor
 		article.ProvideArticleProcessor,
 
-		// Content processor
+		// Content processor with configuration
 		func(
 			logger logger.Interface,
 			service content.Interface,
 			storage storagetypes.Interface,
-		) *content.ContentProcessor {
+			sources *sources.Sources,
+		) (*content.ContentProcessor, error) {
+			if sources == nil {
+				return nil, errors.New("sources not initialized")
+			}
+
+			sourceConfigs, err := sources.GetSources()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get sources: %w", err)
+			}
+
+			if len(sourceConfigs) == 0 {
+				return nil, errors.New("no sources configured")
+			}
+
+			indexName := sourceConfigs[0].Index
+			if indexName == "" {
+				indexName = "content" // Fallback to default
+			}
+
 			return content.NewContentProcessor(content.ProcessorParams{
 				Logger:    logger,
 				Service:   service,
 				Storage:   storage,
-				IndexName: "content",
-			})
+				IndexName: indexName,
+			}), nil
 		},
 
-		// Processors slice
-		func(articleProcessor *article.ArticleProcessor, contentProcessor *content.ContentProcessor) []common.Processor {
-			return []common.Processor{articleProcessor, contentProcessor}
+		// Processors slice with error handling
+		func(
+			articleProcessor *article.ArticleProcessor,
+			contentProcessor *content.ContentProcessor,
+			logger logger.Interface,
+		) ([]common.Processor, error) {
+			if articleProcessor == nil || contentProcessor == nil {
+				return nil, errors.New("processors not initialized")
+			}
+
+			return []common.Processor{articleProcessor, contentProcessor}, nil
 		},
 	),
 
 	// Include crawler module after processors are provided
 	crawler.Module,
+
+	// Add initialization timeout
+	fx.Invoke(func(lc fx.Lifecycle) {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				initCtx, cancel := context.WithTimeout(ctx, DefaultInitTimeout)
+				defer cancel()
+
+				select {
+				case <-initCtx.Done():
+					return fmt.Errorf("module initialization timed out after %v", DefaultInitTimeout)
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			},
+		})
+	}),
 )

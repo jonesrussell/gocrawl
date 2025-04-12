@@ -68,18 +68,25 @@ func (rm *ResourceManager) CloseResources(ctx context.Context, logger logger.Int
 	defer rm.mu.Unlock()
 
 	var lastErr error
-	for _, closer := range rm.resources {
+	for i, closer := range rm.resources {
 		done := make(chan error, 1)
-		go func(c func() error) { done <- c() }(closer)
+		go func(idx int, c func() error) {
+			err := c()
+			if err == nil {
+				logger.Info("Resource closed successfully", "index", idx)
+			} else {
+				logger.Error("Failed to close resource", "index", idx, "error", err)
+			}
+			done <- err
+		}(i, closer)
 
 		select {
 		case err := <-done:
 			if err != nil {
-				logger.Error("Error closing resource", "error", err)
 				lastErr = err
 			}
 		case <-ctx.Done():
-			logger.Error("Timeout closing resource", "error", ctx.Err())
+			logger.Error("Timeout closing resource", "index", i, "error", ctx.Err())
 			return ctx.Err()
 		}
 	}
@@ -185,13 +192,17 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 
 	// Start signal handling goroutine
 	go func() {
-		select {
-		case sig := <-sigChan:
+		defer signal.Stop(sigChan)
+		defer close(sigChan)
+
+		for sig := range sigChan {
 			h.logger.Info("Received signal", "signal", sig)
-			h.RequestShutdown()
-		case <-h.ctx.Done():
-			h.logger.Info("Context cancelled")
-			h.RequestShutdown()
+			if !h.IsShuttingDown() {
+				h.RequestShutdown()
+				return
+			} else {
+				h.logger.Info("Already shutting down, ignoring signal", "signal", sig)
+			}
 		}
 	}()
 
@@ -314,4 +325,35 @@ func (h *SignalHandler) shutdown() {
 
 	// Signal completion
 	close(h.Done)
+}
+
+// StateChan returns a channel that emits the current state of the handler.
+// The channel will be closed when the handler is shutdown.
+func (h *SignalHandler) StateChan() <-chan string {
+	stateChan := make(chan string, 1)
+
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		defer close(stateChan)
+
+		for {
+			select {
+			case <-ticker.C:
+				state := h.GetState()
+				select {
+				case stateChan <- state:
+					if state == "shutdown complete" {
+						return
+					}
+				default:
+					// Skip if channel is full
+				}
+			case <-h.Done:
+				return
+			}
+		}
+	}()
+
+	return stateChan
 }
