@@ -14,7 +14,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config/crawler"
+	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
@@ -22,37 +22,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
-)
-
-const (
-	// DefaultRandomDelayFactor is used to calculate random delay for rate limiting
-	DefaultRandomDelayFactor = 2
-	// DefaultParallelism is the default number of parallel requests
-	DefaultParallelism = 2
-	// DefaultStartTimeout is the default timeout for starting the crawler
-	DefaultStartTimeout = 30 * time.Second
-	// DefaultStopTimeout is the default timeout for stopping the crawler
-	DefaultStopTimeout = 30 * time.Second
-	// DefaultPollInterval is the default interval for polling crawler status
-	DefaultPollInterval = 100 * time.Millisecond
-	// DefaultMaxRetries is the default number of retries for failed requests
-	DefaultMaxRetries = 3
-	// DefaultMaxDepth is the default maximum depth for crawling
-	DefaultMaxDepth = 2
-	// DefaultRateLimit is the default rate limit for requests
-	DefaultRateLimit = 2 * time.Second
-	// DefaultRandomDelay is the default random delay between requests
-	DefaultRandomDelay = 5 * time.Second
-	// DefaultBufferSize is the default size for channel buffers
-	DefaultBufferSize = 100
-	// DefaultMaxConcurrency is the default maximum number of concurrent requests
-	DefaultMaxConcurrency = 2
-	// DefaultTestSleepDuration is the default sleep duration for tests
-	DefaultTestSleepDuration = 100 * time.Millisecond
-	// DefaultZapFieldsCapacity is the default capacity for zap fields slice.
-	DefaultZapFieldsCapacity = 2
-	// CollectorStartTimeout is the timeout for collector initialization
-	CollectorStartTimeout = 5 * time.Second
 )
 
 // Crawler implements the Processor interface for web crawling.
@@ -71,7 +40,7 @@ type Crawler struct {
 	processors       []common.Processor
 	linkHandler      *LinkHandler
 	htmlProcessor    *HTMLProcessor
-	cfg              *crawler.Config
+	cfg              *crawlerconfig.Config
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -155,16 +124,16 @@ func (c *Crawler) setupCollector(source *types.Source) {
 	if err != nil {
 		c.logger.Error("Failed to parse rate limit, using default",
 			"rate_limit", source.RateLimit,
-			"default", DefaultRateLimit,
+			"default", crawlerconfig.DefaultRateLimit,
 			"error", err)
-		rateLimit = DefaultRateLimit
+		rateLimit = crawlerconfig.DefaultRateLimit
 	}
 
 	err = c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Delay:       rateLimit,
 		RandomDelay: rateLimit / 2,
-		Parallelism: DefaultParallelism,
+		Parallelism: crawlerconfig.DefaultParallelism,
 	})
 	if err != nil {
 		c.logger.Error("Failed to set rate limit",
@@ -189,7 +158,7 @@ func (c *Crawler) setupCollector(source *types.Source) {
 		"max_depth", source.MaxDepth,
 		"allowed_domains", source.AllowedDomains,
 		"rate_limit", rateLimit,
-		"parallelism", DefaultParallelism)
+		"parallelism", crawlerconfig.DefaultParallelism)
 }
 
 // setupCallbacks configures the collector's callbacks
@@ -230,92 +199,33 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.logger.Debug("Starting crawler",
 		"source", sourceName)
 
-	// Validate source and index
+	// Validate source
 	source, err := c.validateSource(ctx, sourceName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to validate source: %w", err)
 	}
 
-	// Initialize state
-	c.state.Start(ctx, sourceName)
-
-	// Setup collector first
+	// Set up collector
 	c.setupCollector(source)
 
-	// Then setup callbacks
+	// Set up callbacks
 	c.setupCallbacks(ctx)
 
-	c.logger.Debug("Crawler setup complete",
-		"url", source.URL,
-		"allowed_domains", source.AllowedDomains,
-		"max_depth", source.MaxDepth,
-		"rate_limit", source.RateLimit)
+	// Start the crawler state
+	c.state.Start(ctx, sourceName)
 
-	// Start crawling in a goroutine
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		c.logger.Debug("Starting crawl goroutine")
+	// Start the crawler
+	c.logger.Info("Starting crawl",
+		"source", sourceName,
+		"url", source.URL)
 
-		crawlDone := make(chan struct{})
-		crawlCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
+	// Visit the source URL
+	if err := c.collector.Visit(source.URL); err != nil {
+		return fmt.Errorf("failed to visit source URL: %w", err)
+	}
 
-		// Start a goroutine to handle the crawl
-		go func() {
-			defer func() {
-				select {
-				case <-crawlDone:
-					// Channel already closed
-				default:
-					close(crawlDone)
-				}
-			}()
-
-			if source.URL == "" {
-				c.logger.Warn("No URL configured for source",
-					"source", sourceName)
-				return
-			}
-
-			c.logger.Debug("Visiting URL",
-				"source", sourceName,
-				"url", source.URL)
-
-			select {
-			case <-crawlCtx.Done():
-				c.logger.Debug("Crawl cancelled before visiting URL")
-				return
-			default:
-				if visitErr := c.collector.Visit(source.URL); visitErr != nil {
-					c.logger.Error("Failed to visit URL",
-						"url", source.URL,
-						"error", visitErr,
-						"error_type", fmt.Sprintf("%T", visitErr))
-					c.IncrementError()
-					return
-				}
-
-				c.logger.Debug("Waiting for collector to finish")
-				c.collector.Wait()
-				c.logger.Debug("Collector finished",
-					"processed", c.state.GetProcessedCount(),
-					"errors", c.state.GetErrorCount())
-			}
-		}()
-
-		select {
-		case <-crawlDone:
-			c.logger.Debug("Crawl goroutine finished")
-		case <-ctx.Done():
-			c.logger.Debug("Crawl context cancelled")
-			cancel()
-			c.collector.OnRequest(func(r *colly.Request) {
-				r.Abort()
-			})
-			c.collector.Wait()
-		}
-	}()
+	// Wait for the crawler to finish
+	c.collector.Wait()
 
 	return nil
 }

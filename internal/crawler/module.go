@@ -4,8 +4,11 @@
 package crawler
 
 import (
+	"crypto/tls"
+	"net/http"
+	"time"
+
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -65,15 +68,6 @@ func ProvideCrawler(
 // Module provides the crawler module for dependency injection.
 var Module = fx.Module("crawler",
 	fx.Provide(
-		// Provide the collector
-		func(logger logger.Interface, debugger debug.Debugger, cfg *crawler.Config) *colly.Collector {
-			return colly.NewCollector(
-				colly.MaxDepth(cfg.MaxDepth),
-				colly.Async(true),
-				colly.AllowedDomains(cfg.AllowedDomains...),
-				colly.ParseHTTPErrorResponse(),
-			)
-		},
 		// Provide the crawler
 		ProvideCrawler,
 	),
@@ -94,24 +88,58 @@ func NewCrawler(
 		colly.Async(true),
 		colly.AllowedDomains(cfg.AllowedDomains...),
 		colly.ParseHTTPErrorResponse(),
+		colly.IgnoreRobotsTxt(),
+		colly.UserAgent(cfg.UserAgent),
+		colly.AllowURLRevisit(),
 	)
 
-	// Disable URL revisiting
-	collector.AllowURLRevisit = false
-
+	// Configure rate limiting
 	if err := collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
+		Delay:       cfg.Delay,
 		RandomDelay: cfg.RandomDelay,
 		Parallelism: cfg.MaxConcurrency,
 	}); err != nil {
 		logger.Error("Failed to set rate limit",
 			"error", err,
+			"delay", cfg.Delay,
 			"randomDelay", cfg.RandomDelay,
 			"parallelism", cfg.MaxConcurrency)
 	}
 
-	crawler := &Crawler{
+	// Configure transport with more reasonable settings
+	collector.WithTransport(&http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+		DisableKeepAlives:     false,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	})
+
+	// Set up callbacks
+	collector.OnRequest(func(r *colly.Request) {
+		logger.Info("Visiting", "url", r.URL.String())
+	})
+
+	collector.OnResponse(func(r *colly.Response) {
+		logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
+	})
+
+	collector.OnError(func(r *colly.Response, err error) {
+		logger.Error("Error while crawling",
+			"url", r.Request.URL.String(),
+			"status", r.StatusCode,
+			"error", err)
+	})
+
+	c := &Crawler{
 		logger:           logger,
+		collector:        collector,
 		bus:              bus,
 		indexManager:     indexManager,
 		sources:          sources,
@@ -120,28 +148,12 @@ func NewCrawler(
 		state:            NewState(logger),
 		done:             make(chan struct{}),
 		articleChannel:   make(chan *models.Article, ArticleChannelBufferSize),
-		collector:        collector,
+		processors:       make([]common.Processor, 0),
+		cfg:              cfg,
 	}
 
-	// Initialize handlers
-	crawler.linkHandler = NewLinkHandler(crawler)
-	crawler.htmlProcessor = NewHTMLProcessor(crawler)
+	c.linkHandler = NewLinkHandler(c)
+	c.htmlProcessor = NewHTMLProcessor(c)
 
-	// Set up callbacks
-	collector.OnRequest(func(r *colly.Request) {
-		crawler.logger.Info("Visiting", "url", r.URL.String())
-	})
-
-	collector.OnResponse(func(r *colly.Response) {
-		crawler.logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
-	})
-
-	collector.OnError(func(r *colly.Response, err error) {
-		crawler.logger.Error("Error while crawling",
-			"url", r.Request.URL.String(),
-			"status", r.StatusCode,
-			"error", err)
-	})
-
-	return crawler
+	return c
 }

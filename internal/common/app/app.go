@@ -11,6 +11,7 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -81,12 +82,14 @@ func SetupCollector(
 	)
 
 	// Set up rate limiting
-	if rateErr := c.Limit(&colly.LimitRule{
+	err = c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		RandomDelay: source.RateLimit,
-		Parallelism: crawler.DefaultParallelism,
-	}); rateErr != nil {
-		return nil, fmt.Errorf("error setting rate limit: %w", rateErr)
+		Delay:       source.RateLimit,
+		RandomDelay: source.RateLimit / 2,
+		Parallelism: crawlerconfig.DefaultParallelism,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error setting rate limit: %w", err)
 	}
 
 	// Create a new crawler using fx
