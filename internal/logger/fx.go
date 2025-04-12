@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"reflect"
 	"time"
 
 	"go.uber.org/fx/fxevent"
@@ -222,36 +223,232 @@ func (l *fxLogger) LogLoggerInitialized(e *fxevent.LoggerInitialized) {
 	)
 }
 
+// eventHandler defines the interface for handling fx events.
+type eventHandler interface {
+	Handle(log Interface, event fxevent.Event)
+}
+
+// multiTypeEventHandler handles events with multiple types.
+type multiTypeEventHandler struct {
+	successMsg string
+	errorMsg   string
+}
+
+// Handle implements the eventHandler interface for multi-type events.
+func (h *multiTypeEventHandler) Handle(log Interface, event fxevent.Event) {
+	switch e := event.(type) {
+	case *fxevent.Provided:
+		for _, rtype := range e.OutputTypeNames {
+			log.Debug(h.successMsg,
+				"constructor", e.ConstructorName,
+				"type", rtype,
+			)
+		}
+		if e.Err != nil {
+			log.Error(h.errorMsg,
+				"error", e.Err,
+			)
+		}
+	case *fxevent.Replaced:
+		for _, rtype := range e.OutputTypeNames {
+			log.Debug(h.successMsg,
+				"type", rtype,
+			)
+		}
+		if e.Err != nil {
+			log.Error(h.errorMsg,
+				"error", e.Err,
+			)
+		}
+	case *fxevent.Decorated:
+		for _, rtype := range e.OutputTypeNames {
+			log.Debug(h.successMsg,
+				"decorator", e.DecoratorName,
+				"type", rtype,
+			)
+		}
+		if e.Err != nil {
+			log.Error(h.errorMsg,
+				"error", e.Err,
+			)
+		}
+	}
+}
+
+// hookEventHandler handles hook events (OnStart/OnStop).
+type hookEventHandler struct {
+	prefix string
+}
+
+// Handle implements the eventHandler interface for hook events.
+func (h *hookEventHandler) Handle(log Interface, event fxevent.Event) {
+	switch event.(type) {
+	case *fxevent.OnStartExecuting, *fxevent.OnStopExecuting:
+		var functionName, callerName string
+		switch ev := event.(type) {
+		case *fxevent.OnStartExecuting:
+			functionName = ev.FunctionName
+			callerName = ev.CallerName
+		case *fxevent.OnStopExecuting:
+			functionName = ev.FunctionName
+			callerName = ev.CallerName
+		}
+		log.Debug(h.prefix+" hook executing",
+			"callee", functionName,
+			"caller", callerName,
+		)
+	case *fxevent.OnStartExecuted, *fxevent.OnStopExecuted:
+		var functionName, callerName string
+		var err error
+		var runtime time.Duration
+		switch ev := event.(type) {
+		case *fxevent.OnStartExecuted:
+			functionName = ev.FunctionName
+			callerName = ev.CallerName
+			err = ev.Err
+			runtime = ev.Runtime
+		case *fxevent.OnStopExecuted:
+			functionName = ev.FunctionName
+			callerName = ev.CallerName
+			err = ev.Err
+			runtime = ev.Runtime
+		}
+		if err != nil {
+			log.Error(h.prefix+" hook failed",
+				"callee", functionName,
+				"caller", callerName,
+				"error", err,
+			)
+		} else {
+			log.Debug(h.prefix+" hook executed",
+				"callee", functionName,
+				"caller", callerName,
+				"runtime", runtime,
+			)
+		}
+	}
+}
+
+// simpleEventHandler handles simple success/error events.
+type simpleEventHandler struct {
+	successMsg string
+	errorMsg   string
+}
+
+// Handle implements the eventHandler interface for simple events.
+func (h *simpleEventHandler) Handle(log Interface, event fxevent.Event) {
+	switch e := event.(type) {
+	case *fxevent.Supplied:
+		if e.Err != nil {
+			log.Error(h.errorMsg,
+				"type", e.TypeName,
+				"error", e.Err,
+			)
+		} else {
+			log.Debug(h.successMsg,
+				"type", e.TypeName,
+			)
+		}
+	case *fxevent.Invoked:
+		if e.Err != nil {
+			log.Error(h.errorMsg,
+				"function", e.FunctionName,
+				"error", e.Err,
+			)
+		} else {
+			log.Debug(h.successMsg,
+				"function", e.FunctionName,
+			)
+		}
+	case *fxevent.LoggerInitialized:
+		if e.Err != nil {
+			log.Error(h.errorMsg,
+				"function", e.ConstructorName,
+				"error", e.Err,
+			)
+		} else {
+			log.Debug(h.successMsg,
+				"function", e.ConstructorName,
+			)
+		}
+	}
+}
+
+// signalEventHandler handles signal-related events.
+type signalEventHandler struct{}
+
+// Handle implements the eventHandler interface for signal events.
+func (h *signalEventHandler) Handle(log Interface, event fxevent.Event) {
+	switch e := event.(type) {
+	case *fxevent.Stopping:
+		log.Info("Received signal",
+			"signal", e.Signal,
+		)
+	case *fxevent.Stopped:
+		if e.Err != nil {
+			log.Error("Stop failed",
+				"error", e.Err,
+			)
+		}
+	case *fxevent.RolledBack:
+		log.Error("Start failed, rolling back",
+			"error", e.Err,
+		)
+	case *fxevent.Started:
+		if e.Err != nil {
+			log.Error("Start failed",
+				"error", e.Err,
+			)
+		} else {
+			log.Info("Started")
+		}
+	}
+}
+
+// eventHandlers maps event types to their handlers.
+var eventHandlers = map[reflect.Type]eventHandler{
+	reflect.TypeOf(&fxevent.Provided{}): &multiTypeEventHandler{
+		successMsg: "Provided",
+		errorMsg:   "Error encountered while applying options",
+	},
+	reflect.TypeOf(&fxevent.Replaced{}): &multiTypeEventHandler{
+		successMsg: "Replaced",
+		errorMsg:   "Error encountered while replacing",
+	},
+	reflect.TypeOf(&fxevent.Decorated{}): &multiTypeEventHandler{
+		successMsg: "Decorated",
+		errorMsg:   "Error encountered while applying options",
+	},
+	reflect.TypeOf(&fxevent.OnStartExecuting{}): &hookEventHandler{prefix: "OnStart"},
+	reflect.TypeOf(&fxevent.OnStartExecuted{}):  &hookEventHandler{prefix: "OnStart"},
+	reflect.TypeOf(&fxevent.OnStopExecuting{}):  &hookEventHandler{prefix: "OnStop"},
+	reflect.TypeOf(&fxevent.OnStopExecuted{}):   &hookEventHandler{prefix: "OnStop"},
+	reflect.TypeOf(&fxevent.Supplied{}): &simpleEventHandler{
+		successMsg: "Supplied",
+		errorMsg:   "Error encountered while applying options",
+	},
+	reflect.TypeOf(&fxevent.Invoked{}): &simpleEventHandler{
+		successMsg: "Invoked",
+		errorMsg:   "Invoke failed",
+	},
+	reflect.TypeOf(&fxevent.LoggerInitialized{}): &simpleEventHandler{
+		successMsg: "Initialized custom fxevent.Logger",
+		errorMsg:   "Custom logger initialization failed",
+	},
+	reflect.TypeOf(&fxevent.Stopping{}):   &signalEventHandler{},
+	reflect.TypeOf(&fxevent.Stopped{}):    &signalEventHandler{},
+	reflect.TypeOf(&fxevent.RolledBack{}): &signalEventHandler{},
+	reflect.TypeOf(&fxevent.Started{}):    &signalEventHandler{},
+}
+
 // LogEvent logs an fx event.
 func (l *fxLogger) LogEvent(event fxevent.Event) {
-	switch e := event.(type) {
-	case *fxevent.OnStartExecuting:
-		l.LogOnStartExecuting(e)
-	case *fxevent.OnStartExecuted:
-		l.LogOnStartExecuted(e)
-	case *fxevent.OnStopExecuting:
-		l.LogOnStopExecuting(e)
-	case *fxevent.OnStopExecuted:
-		l.LogOnStopExecuted(e)
-	case *fxevent.Supplied:
-		l.LogSupplied(e)
-	case *fxevent.Provided:
-		l.LogProvided(e)
-	case *fxevent.Replaced:
-		l.LogReplaced(e)
-	case *fxevent.Decorated:
-		l.LogDecorated(e)
-	case *fxevent.Invoked:
-		l.LogInvoked(e)
-	case *fxevent.Stopping:
-		l.LogStopping(e)
-	case *fxevent.Stopped:
-		l.LogStopped(e)
-	case *fxevent.RolledBack:
-		l.LogRolledBack(e)
-	case *fxevent.Started:
-		l.LogStarted(e)
-	case *fxevent.LoggerInitialized:
-		l.LogLoggerInitialized(e)
+	handler, ok := eventHandlers[reflect.TypeOf(event)]
+	if !ok {
+		l.log.Error("Unknown event type",
+			"type", reflect.TypeOf(event),
+		)
+		return
 	}
+	handler.Handle(l.log, event)
 }
