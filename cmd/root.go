@@ -41,24 +41,172 @@ It provides a flexible and extensible framework for building custom crawlers.`,
 	}
 )
 
+// bindEnvVars binds environment variables to configuration keys
+func bindEnvVars() error {
+	// App configuration
+	if err := viper.BindEnv("app.name", "APP_NAME"); err != nil {
+		return fmt.Errorf("failed to bind app.name: %w", err)
+	}
+	if err := viper.BindEnv("app.environment", "APP_ENV"); err != nil {
+		return fmt.Errorf("failed to bind app.environment: %w", err)
+	}
+	if err := viper.BindEnv("app.debug", "APP_DEBUG"); err != nil {
+		return fmt.Errorf("failed to bind app.debug: %w", err)
+	}
+
+	// Server configuration
+	if err := viper.BindEnv("server.port", "SERVER_PORT"); err != nil {
+		return fmt.Errorf("failed to bind server.port: %w", err)
+	}
+	if err := viper.BindEnv("server.read_timeout", "SERVER_READ_TIMEOUT"); err != nil {
+		return fmt.Errorf("failed to bind server.read_timeout: %w", err)
+	}
+	if err := viper.BindEnv("server.write_timeout", "SERVER_WRITE_TIMEOUT"); err != nil {
+		return fmt.Errorf("failed to bind server.write_timeout: %w", err)
+	}
+	if err := viper.BindEnv("server.idle_timeout", "SERVER_IDLE_TIMEOUT"); err != nil {
+		return fmt.Errorf("failed to bind server.idle_timeout: %w", err)
+	}
+
+	// Elasticsearch configuration
+	if err := viper.BindEnv("elasticsearch.hosts", "ELASTICSEARCH_HOSTS"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.hosts: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.api_key", "ELASTICSEARCH_API_KEY"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.api_key: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.index_prefix", "ELASTICSEARCH_INDEX_PREFIX"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.index_prefix: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.max_retries", "ELASTICSEARCH_MAX_RETRIES"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.max_retries: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.retry_initial_wait", "ELASTICSEARCH_RETRY_INITIAL_WAIT"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.retry_initial_wait: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.retry_max_wait", "ELASTICSEARCH_RETRY_MAX_WAIT"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.retry_max_wait: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.discover_nodes", "ELASTICSEARCH_DISCOVER_NODES"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.discover_nodes: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.tls_insecure_skip_verify", "ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.tls_insecure_skip_verify: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.ca_fingerprint", "ELASTICSEARCH_CA_FINGERPRINT"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.ca_fingerprint: %w", err)
+	}
+
+	// Crawler configuration
+	if err := viper.BindEnv("crawler.max_depth", "CRAWLER_MAX_DEPTH"); err != nil {
+		return fmt.Errorf("failed to bind crawler.max_depth: %w", err)
+	}
+	if err := viper.BindEnv("crawler.parallelism", "CRAWLER_PARALLELISM"); err != nil {
+		return fmt.Errorf("failed to bind crawler.parallelism: %w", err)
+	}
+	if err := viper.BindEnv("crawler.max_age", "CRAWLER_MAX_AGE"); err != nil {
+		return fmt.Errorf("failed to bind crawler.max_age: %w", err)
+	}
+	if err := viper.BindEnv("crawler.rate_limit", "CRAWLER_RATE_LIMIT"); err != nil {
+		return fmt.Errorf("failed to bind crawler.rate_limit: %w", err)
+	}
+	if err := viper.BindEnv("crawler.debugger.enabled", "CRAWLER_DEBUGGER_ENABLED"); err != nil {
+		return fmt.Errorf("failed to bind crawler.debugger.enabled: %w", err)
+	}
+	if err := viper.BindEnv("crawler.debugger.level", "CRAWLER_DEBUGGER_LEVEL"); err != nil {
+		return fmt.Errorf("failed to bind crawler.debugger.level: %w", err)
+	}
+	if err := viper.BindEnv("crawler.debugger.format", "CRAWLER_DEBUGGER_FORMAT"); err != nil {
+		return fmt.Errorf("failed to bind crawler.debugger.format: %w", err)
+	}
+	if err := viper.BindEnv("crawler.debugger.output", "CRAWLER_DEBUGGER_OUTPUT"); err != nil {
+		return fmt.Errorf("failed to bind crawler.debugger.output: %w", err)
+	}
+	if err := viper.BindEnv("crawler.debugger.file", "CRAWLER_DEBUGGER_FILE"); err != nil {
+		return fmt.Errorf("failed to bind crawler.debugger.file: %w", err)
+	}
+
+	// Logging configuration
+	if err := viper.BindEnv("logger.level", "LOG_LEVEL"); err != nil {
+		return fmt.Errorf("failed to bind logger.level: %w", err)
+	}
+	if err := viper.BindEnv("logger.format", "LOG_FORMAT"); err != nil {
+		return fmt.Errorf("failed to bind logger.format: %w", err)
+	}
+
+	return nil
+}
+
+// setDefaults sets default values for configuration keys
+func setDefaults() {
+	// App defaults
+	viper.SetDefault("app.name", "gocrawl")
+	viper.SetDefault("app.version", "1.0.0")
+	viper.SetDefault("app.environment", "development")
+	viper.SetDefault("app.debug", false)
+
+	// Logger defaults
+	viper.SetDefault("logger.level", "info")
+	viper.SetDefault("logger.format", "console")
+	viper.SetDefault("logger.output", "stdout")
+	viper.SetDefault("logger.enable_color", true)
+
+	// Crawler defaults
+	viper.SetDefault("crawler.max_depth", 10)
+	viper.SetDefault("crawler.max_retries", 3)
+	viper.SetDefault("crawler.rate_limit", "1s")
+	viper.SetDefault("crawler.timeout", "30s")
+	viper.SetDefault("crawler.user_agent", "GoCrawl/1.0")
+
+	// Storage defaults
+	viper.SetDefault("storage.type", "elasticsearch")
+	viper.SetDefault("storage.batch_size", 100)
+	viper.SetDefault("storage.flush_interval", "5s")
+
+	// Elasticsearch defaults
+	viper.SetDefault("elasticsearch.url", "http://localhost:9200")
+	viper.SetDefault("elasticsearch.sniff", false)
+	viper.SetDefault("elasticsearch.healthcheck", true)
+	viper.SetDefault("elasticsearch.retry_on_conflict", 3)
+}
+
 // setupConfig handles configuration file setup for all commands.
 // It ensures the config file path is absolute and configures Viper.
 func setupConfig(cmd *cobra.Command, args []string) error {
-	// Get the absolute path to the config file
+	// Set default values first
+	setDefaults()
+
+	// Get the absolute path to the config file if specified
 	if cfgFile != "" {
 		absPath, err := filepath.Abs(cfgFile)
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path for config file: %w", err)
 		}
 		cfgFile = absPath
+		viper.SetConfigFile(cfgFile)
 	} else {
-		// Default to config.yaml in the current directory
-		cfgFile = "config.yaml"
+		// Set up default configuration paths and name
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get user home directory: %w", err)
+		}
+
+		viper.SetConfigType("yaml")
+		viper.SetConfigName("config")
+
+		// Search paths in order of priority
+		viper.AddConfigPath(".")                // Current directory
+		viper.AddConfigPath(home + "/.gocrawl") // User's config directory
+		viper.AddConfigPath("/etc/gocrawl")     // System config directory
 	}
 
-	// Initialize Viper
-	viper.SetConfigFile(cfgFile)
+	// Enable environment variable binding
 	viper.AutomaticEnv()
+
+	// Bind specific environment variables
+	if err := bindEnvVars(); err != nil {
+		return fmt.Errorf("failed to bind environment variables: %w", err)
+	}
 
 	// Read the config file
 	if err := viper.ReadInConfig(); err != nil {
@@ -66,6 +214,10 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 		if !errors.As(err, &configFileNotFound) {
 			return fmt.Errorf("failed to read config file: %w", err)
 		}
+		// Log that we're using default values
+		fmt.Fprintln(os.Stderr, "No config file found, using default values")
+	} else {
+		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
 	// Set the command name in the configuration
@@ -125,9 +277,21 @@ func Execute() {
 //   - job: For managing scheduled crawl jobs
 //   - search: For searching content in Elasticsearch
 func init() {
-	// Add the persistent --config flag to all commands
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
+	// Initialize configuration on startup
+	cobra.OnInitialize(func() {
+		if err := setupConfig(rootCmd, nil); err != nil {
+			fmt.Fprintf(os.Stderr, "Error initializing config: %v\n", err)
+			os.Exit(1)
+		}
+	})
 
-	// Add the persistent --debug flag to all commands
+	// Global flags
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yaml, ~/.gocrawl/config.yaml, or /etc/gocrawl/config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&Debug, "debug", false, "enable debug mode")
+
+	// Bind flags to viper
+	if err := viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug")); err != nil {
+		fmt.Fprintf(os.Stderr, "Error binding debug flag: %v\n", err)
+		os.Exit(1)
+	}
 }
