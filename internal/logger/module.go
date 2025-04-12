@@ -5,7 +5,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 // Params holds the parameters for creating a new logger.
@@ -24,21 +23,3 @@ var Module = fx.Module("logger",
 		return zap.NewNop()
 	}),
 )
-
-// levelToZap converts a logger.Level to a zapcore.Level.
-func levelToZap(level Level) zapcore.Level {
-	switch string(level) {
-	case string(DebugLevel):
-		return zapcore.DebugLevel
-	case string(InfoLevel):
-		return zapcore.InfoLevel
-	case string(WarnLevel):
-		return zapcore.WarnLevel
-	case string(ErrorLevel):
-		return zapcore.ErrorLevel
-	case string(FatalLevel):
-		return zapcore.FatalLevel
-	default:
-		return zapcore.InfoLevel
-	}
-}
