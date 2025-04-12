@@ -147,7 +147,7 @@ func (am *AppManager) StopApp(ctx context.Context, logger logger.Interface) erro
 	return nil
 }
 
-// SignalHandler implements the signal handling interface.
+// SignalHandler handles OS signals and application shutdown.
 type SignalHandler struct {
 	logger          logger.Interface
 	done            chan struct{}
@@ -158,6 +158,8 @@ type SignalHandler struct {
 	shutdownError   error
 	resourceManager *ResourceManager
 	appManager      *AppManager
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
 // NewSignalHandler creates a new SignalHandler instance.
@@ -172,18 +174,22 @@ func NewSignalHandler(logger logger.Interface) *SignalHandler {
 	}
 }
 
-// Setup initializes signal handling.
+// Setup sets up signal handling and returns a cleanup function.
 func (h *SignalHandler) Setup(ctx context.Context) func() {
+	h.ctx, h.cancel = context.WithCancel(ctx)
+
+	// Set up signal handling
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// Start signal handling goroutine
 	go func() {
 		select {
 		case sig := <-sigChan:
-			h.logger.Info("Received signal, initiating shutdown", "signal", sig)
+			h.logger.Info("Received signal", "signal", sig)
 			h.RequestShutdown()
-		case <-ctx.Done():
-			h.logger.Info("Context cancelled, initiating shutdown")
+		case <-h.ctx.Done():
+			h.logger.Info("Context cancelled")
 			h.RequestShutdown()
 		}
 	}()
@@ -194,52 +200,25 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 	}
 }
 
-// Wait blocks until shutdown completes.
+// RequestShutdown initiates a graceful shutdown.
+func (h *SignalHandler) RequestShutdown() {
+	h.stateMu.Lock()
+	defer h.stateMu.Unlock()
+
+	if h.state == stateRunning {
+		h.state = stateShuttingDown
+		h.logger.Info("Initiating graceful shutdown")
+		go h.shutdown()
+	}
+}
+
+// Wait waits for shutdown to complete.
 func (h *SignalHandler) Wait() error {
 	<-h.done
 	return h.shutdownError
 }
 
-// RequestShutdown safely initiates shutdown.
-func (h *SignalHandler) RequestShutdown() {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if h.state != stateRunning {
-		return
-	}
-	h.shutdown()
-	close(h.done)
-}
-
-// shutdown performs the actual shutdown.
-func (h *SignalHandler) shutdown() {
-	h.transitionState(stateShuttingDown)
-
-	ctx, cancel := context.WithTimeout(context.Background(), h.shutdownTimeout)
-	defer cancel()
-
-	// Stop the application first
-	if err := h.appManager.StopApp(ctx, h.logger); err != nil {
-		h.shutdownError = err
-	}
-
-	// Then close resources
-	if err := h.resourceManager.CloseResources(ctx, h.logger); err != nil {
-		h.shutdownError = err
-	}
-
-	h.transitionState(stateShutdownComplete)
-}
-
-// transitionState safely updates the shutdown state.
-func (h *SignalHandler) transitionState(newState shutdownState) {
-	h.stateMu.Lock()
-	defer h.stateMu.Unlock()
-	h.state = newState
-}
-
-// GetState returns the current shutdown state as a string.
+// GetState returns the current state of the handler.
 func (h *SignalHandler) GetState() string {
 	h.stateMu.RLock()
 	defer h.stateMu.RUnlock()
@@ -250,40 +229,72 @@ func (h *SignalHandler) GetState() string {
 	case stateShuttingDown:
 		return "shutting down"
 	case stateShutdownComplete:
-		return "completed"
+		return "shutdown complete"
 	default:
 		return "unknown"
 	}
 }
 
-// SetLogger updates the logger.
+// SetLogger sets the logger for the handler.
 func (h *SignalHandler) SetLogger(logger logger.Interface) {
 	h.logger = logger
 }
 
-// IsShuttingDown checks if shutdown is in progress.
+// IsShuttingDown returns whether the handler is shutting down.
 func (h *SignalHandler) IsShuttingDown() bool {
 	h.stateMu.RLock()
 	defer h.stateMu.RUnlock()
 	return h.state == stateShuttingDown
 }
 
-// SetShutdownTimeout updates the shutdown timeout duration.
+// SetShutdownTimeout sets the shutdown timeout.
 func (h *SignalHandler) SetShutdownTimeout(timeout time.Duration) {
 	h.shutdownTimeout = timeout
 }
 
-// AddResource registers a resource for graceful shutdown.
+// AddResource adds a resource to be closed during shutdown.
 func (h *SignalHandler) AddResource(closer func() error) {
 	h.resourceManager.AddResource(closer)
 }
 
-// SetCleanup registers a cleanup function.
+// SetCleanup sets the cleanup function.
 func (h *SignalHandler) SetCleanup(cleanup func()) {
 	h.resourceManager.SetCleanup(cleanup)
 }
 
-// SetFXApp sets the Fx app for coordinated shutdown.
+// SetFXApp sets the Fx application for shutdown.
 func (h *SignalHandler) SetFXApp(app any) {
 	h.appManager.SetApp(app)
+}
+
+// shutdown performs the actual shutdown process.
+func (h *SignalHandler) shutdown() {
+	// Create a context with timeout for shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), h.shutdownTimeout)
+	defer cancel()
+
+	// Close resources
+	if err := h.resourceManager.CloseResources(ctx, h.logger); err != nil {
+		h.logger.Error("Error closing resources", "error", err)
+		h.shutdownError = err
+	}
+
+	// Stop the Fx application if set
+	if err := h.appManager.StopApp(ctx, h.logger); err != nil {
+		h.logger.Error("Error stopping application", "error", err)
+		h.shutdownError = err
+	}
+
+	// Cancel the context
+	if h.cancel != nil {
+		h.cancel()
+	}
+
+	// Mark shutdown as complete
+	h.stateMu.Lock()
+	h.state = stateShutdownComplete
+	h.stateMu.Unlock()
+
+	// Signal completion
+	close(h.done)
 }

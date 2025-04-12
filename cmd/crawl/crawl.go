@@ -56,26 +56,15 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to start application: %w", err)
 	}
 
-	// Create a channel to signal completion
-	done := make(chan error, 1)
-
-	// Start a goroutine to wait for context cancellation
-	go func() {
-		select {
-		case <-cmdCtx.Done():
-			cancel()
-			done <- fmt.Errorf("command context cancelled: %w", cmdCtx.Err())
-		case <-crawlCtx.Done():
-			done <- fmt.Errorf("crawl context finished: %w", crawlCtx.Err())
-		}
-	}()
-
 	// Wait for either context cancellation or shutdown completion
 	select {
-	case err := <-done:
-		return err
+	case <-crawlCtx.Done():
+		return fmt.Errorf("crawl context finished: %w", crawlCtx.Err())
 	default:
-		return handler.Wait()
+		if handler.IsShuttingDown() {
+			return handler.Wait()
+		}
+		return nil
 	}
 }
 

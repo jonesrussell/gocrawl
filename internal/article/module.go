@@ -62,22 +62,25 @@ func NewArticleService(
 	storage storagetypes.Interface,
 ) Interface {
 	srcs := config.GetSources()
-	var selectors types.ArticleSelectors
-
 	if len(srcs) == 0 {
 		logger.Warn("No sources configured, using default selectors")
-		selectors = (&types.ArticleSelectors{}).Default()
-	} else {
-		// For now, we'll use the first source's selectors
-		selectors = srcs[0].Selectors.Article
-		if len(srcs) > 1 {
-			logger.Warn("Multiple sources configured, using first source's selectors")
-		}
+		return NewService(
+			logger,
+			(&types.ArticleSelectors{}).Default(),
+			storage,
+			"articles",
+		)
+	}
+
+	// Create a map of source names to their selectors
+	sourceSelectors := make(map[string]types.ArticleSelectors)
+	for _, src := range srcs {
+		sourceSelectors[src.Name] = src.Selectors.Article
 	}
 
 	return NewService(
 		logger,
-		selectors,
+		(&types.ArticleSelectors{}).Default(), // Default selectors as fallback
 		storage,
 		"articles",
 	)

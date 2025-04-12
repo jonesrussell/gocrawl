@@ -210,8 +210,18 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
 	}
 
-	// Load sources from sources.yaml if it exists
-	if sourcesViper := viper.New(); sourcesViper.ReadInConfig() == nil {
+	// Load sources from sources.yml or sources.yaml if they exist
+	sourcesViper := viper.New()
+	sourcesViper.SetConfigType("yaml")
+	sourcesViper.SetConfigName("sources")
+	sourcesViper.AddConfigPath(".")
+
+	if err := sourcesViper.ReadInConfig(); err != nil {
+		var configFileNotFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFound) {
+			return nil, fmt.Errorf("failed to read sources config: %w", err)
+		}
+	} else {
 		var sources []types.Source
 		if unmarshalErr := sourcesViper.UnmarshalKey("sources", &sources); unmarshalErr != nil {
 			return nil, fmt.Errorf("failed to unmarshal sources config: %w", unmarshalErr)

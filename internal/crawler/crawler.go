@@ -80,12 +80,35 @@ var _ CrawlerMetrics = (*Crawler)(nil)
 
 // validateSource validates the source and its index
 func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types.Source, error) {
-	sourceConfig := c.sources.FindByName(sourceName)
-	if sourceConfig == nil {
+	// Get all sources
+	sourceConfigs, err := c.sources.GetSources()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sources: %w", err)
+	}
+
+	// If no sources are configured, return an error
+	if len(sourceConfigs) == 0 {
+		return nil, errors.New("no sources configured")
+	}
+
+	// Find the requested source
+	var selectedSource *sourceutils.SourceConfig
+	for i := range sourceConfigs {
+		if sourceConfigs[i].Name == sourceName {
+			selectedSource = &sourceConfigs[i]
+			break
+		}
+	}
+
+	// If source not found, return an error
+	if selectedSource == nil {
 		return nil, fmt.Errorf("source not found: %s", sourceName)
 	}
 
-	source := sourceutils.ConvertToConfigSource(sourceConfig)
+	// Convert to types.Source
+	source := sourceutils.ConvertToConfigSource(selectedSource)
+
+	// Validate index
 	exists, err := c.indexManager.IndexExists(ctx, source.Index)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check index existence: %w", err)

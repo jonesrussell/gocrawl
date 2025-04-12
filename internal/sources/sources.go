@@ -332,57 +332,32 @@ func (s *Sources) ListSources(ctx context.Context) ([]*sourceutils.SourceConfig,
 
 // AddSource adds a new source.
 func (s *Sources) AddSource(ctx context.Context, source *sourceutils.SourceConfig) error {
-	if source == nil {
-		return ErrInvalidSource
+	if err := s.ValidateSource(source); err != nil {
+		return err
 	}
-
-	// Check if source already exists
-	for i := range s.sources {
-		if s.sources[i].Name == source.Name {
-			return ErrSourceExists
-		}
-	}
-
-	// Set default index name if not provided
-	if source.Index == "" {
-		source.Index = "content"
-	}
-
-	// Add the new source
 	s.sources = append(s.sources, *source)
 	s.metrics.SourceCount = int64(len(s.sources))
 	s.metrics.LastUpdated = time.Now()
-
 	return nil
 }
 
 // UpdateSource updates an existing source.
 func (s *Sources) UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error {
-	if source == nil {
-		return ErrInvalidSource
+	if err := s.ValidateSource(source); err != nil {
+		return err
 	}
-
-	// Find and update the source
-	found := false
 	for i := range s.sources {
 		if s.sources[i].Name == source.Name {
 			s.sources[i] = *source
-			found = true
-			break
+			s.metrics.LastUpdated = time.Now()
+			return nil
 		}
 	}
-
-	if !found {
-		return ErrSourceNotFound
-	}
-
-	s.metrics.LastUpdated = time.Now()
-	return nil
+	return fmt.Errorf("source not found: %s", source.Name)
 }
 
 // DeleteSource deletes a source by name.
 func (s *Sources) DeleteSource(ctx context.Context, name string) error {
-	// Find and remove the source
 	for i := range s.sources {
 		if s.sources[i].Name == name {
 			s.sources = append(s.sources[:i], s.sources[i+1:]...)
@@ -391,19 +366,24 @@ func (s *Sources) DeleteSource(ctx context.Context, name string) error {
 			return nil
 		}
 	}
-
-	return ErrSourceNotFound
+	return fmt.Errorf("source not found: %s", name)
 }
 
 // ValidateSource validates a source configuration.
 func (s *Sources) ValidateSource(source *sourceutils.SourceConfig) error {
 	if source == nil {
-		return ErrInvalidSource
+		return errors.New("source is nil")
 	}
-
-	// Convert to types.Source and validate
-	typesSource := ConvertSourceConfig(source)
-	return typesSource.Validate()
+	if source.Name == "" {
+		return errors.New("source name is required")
+	}
+	if source.URL == "" {
+		return errors.New("source URL is required")
+	}
+	if source.Index == "" {
+		return errors.New("source index is required")
+	}
+	return nil
 }
 
 // GetMetrics returns the current metrics.
@@ -418,49 +398,12 @@ func (s *Sources) GetSources() ([]sourceutils.SourceConfig, error) {
 
 // FindByName finds a source by name.
 func (s *Sources) FindByName(name string) *sourceutils.SourceConfig {
-	// If no sources are loaded, try to create a default source
-	if len(s.sources) == 0 {
-		// Create a default source based on the name
-		defaultSource := &types.Source{
-			Name:           name,
-			URL:            fmt.Sprintf("https://%s", strings.ReplaceAll(name, " ", "")),
-			AllowedDomains: []string{strings.ReplaceAll(name, " ", "")},
-			StartURLs:      []string{fmt.Sprintf("https://%s", strings.ReplaceAll(name, " ", ""))},
-			MaxDepth:       DefaultMaxDepth,
-			RateLimit:      DefaultRateLimit.String(),
-			Index:          "content",
-			Rules:          types.Rules{},
-		}
-
-		// Convert to sourceutils.SourceConfig
-		sourceConfig := convertSourceConfig(*defaultSource)
-		s.sources = append(s.sources, sourceConfig)
-		return &sourceConfig
-	}
-
-	// Search for the source in the loaded sources
 	for i := range s.sources {
-		if strings.EqualFold(s.sources[i].Name, name) {
+		if s.sources[i].Name == name {
 			return &s.sources[i]
 		}
 	}
-
-	// If not found, create a default source
-	defaultSource := &types.Source{
-		Name:           name,
-		URL:            fmt.Sprintf("https://%s", strings.ReplaceAll(name, " ", "")),
-		AllowedDomains: []string{strings.ReplaceAll(name, " ", "")},
-		StartURLs:      []string{fmt.Sprintf("https://%s", strings.ReplaceAll(name, " ", ""))},
-		MaxDepth:       DefaultMaxDepth,
-		RateLimit:      DefaultRateLimit.String(),
-		Index:          "content",
-		Rules:          types.Rules{},
-	}
-
-	// Convert to sourceutils.SourceConfig
-	sourceConfig := convertSourceConfig(*defaultSource)
-	s.sources = append(s.sources, sourceConfig)
-	return &sourceConfig
+	return nil
 }
 
 // articleSelector represents the selectors for article content.
