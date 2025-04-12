@@ -42,6 +42,12 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 
 	log.Info("Setting up crawl", "source", sourceName)
 
+	// Set debug mode from command line flag
+	debug := cmd.Root().Flags().Lookup("debug").Value.String() == "true"
+	if debug {
+		log.Info("Debug mode enabled")
+	}
+
 	// Initialize the Fx application.
 	log.Debug("Initializing Fx application")
 	var handler signal.Interface
@@ -60,10 +66,23 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 				func() logger.Interface { return log },
 				fx.As(new(logger.Interface)),
 			),
+			fx.Annotate(
+				func(cfg config.Interface) logger.Params {
+					return logger.Params{
+						Config: &logger.Config{
+							Level:       logger.InfoLevel,
+							Development: cfg.GetAppConfig().Debug,
+							Encoding:    "console",
+						},
+						App: cfg.GetAppConfig(),
+					}
+				},
+				fx.ResultTags(`name:"loggerParams"`),
+			),
 		),
 		fx.Invoke(func(config config.Interface) {
-			// Set debug mode from command line flag
-			config.GetAppConfig().Debug = cmd.Root().Flags().Lookup("debug").Value.String() == "true"
+			// Set debug mode in config
+			config.GetAppConfig().Debug = debug
 		}),
 		// Suppress Fx's default logging and use our logger format
 		fx.WithLogger(func(log logger.Interface) fxevent.Logger {

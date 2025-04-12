@@ -246,24 +246,37 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	// Initialize abort channel
 	c.abortChan = make(chan struct{})
+	c.logger.Debug("Initialized abort channel")
 
 	// Validate source
+	c.logger.Debug("Validating source", "source", sourceName)
 	source, err := c.validateSource(ctx, sourceName)
 	if err != nil {
+		c.logger.Error("Failed to validate source", "error", err)
 		return fmt.Errorf("failed to validate source: %w", err)
 	}
+	c.logger.Debug("Source validated successfully",
+		"url", source.URL,
+		"allowed_domains", source.AllowedDomains)
 
 	// Set up collector
+	c.logger.Debug("Setting up collector")
 	err = c.setupCollector(source)
 	if err != nil {
+		c.logger.Error("Failed to setup collector", "error", err)
 		return fmt.Errorf("failed to setup collector: %w", err)
 	}
+	c.logger.Debug("Collector setup completed")
 
 	// Set up callbacks
+	c.logger.Debug("Setting up callbacks")
 	c.setupCallbacks(ctx)
+	c.logger.Debug("Callbacks setup completed")
 
 	// Start the crawler state
+	c.logger.Debug("Starting crawler state")
 	c.state.Start(ctx, sourceName)
+	c.logger.Debug("Crawler state started")
 
 	// Visit the source URL
 	c.logger.Debug("Attempting to visit URL",
@@ -281,7 +294,9 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		"url", source.URL)
 
 	// Wait for the crawler to finish
+	c.logger.Debug("Waiting for collector to finish")
 	c.collector.Wait()
+	c.logger.Debug("Collector finished")
 
 	return nil
 }

@@ -39,6 +39,9 @@ var (
 It provides a flexible and extensible framework for building custom crawlers.`,
 		PersistentPreRunE: setupConfig,
 	}
+
+	// log is the global logger instance
+	log logger.Interface
 )
 
 // bindEnvVars binds environment variables to configuration keys
@@ -164,7 +167,7 @@ func setDefaults() {
 	viper.SetDefault("storage.flush_interval", "5s")
 
 	// Elasticsearch defaults
-	viper.SetDefault("elasticsearch.url", "http://localhost:9200")
+	viper.SetDefault("elasticsearch.url", "https://localhost:9200")
 	viper.SetDefault("elasticsearch.sniff", false)
 	viper.SetDefault("elasticsearch.healthcheck", true)
 	viper.SetDefault("elasticsearch.retry_on_conflict", 3)
@@ -230,17 +233,36 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// initLogger initializes the global logger instance
+func initLogger() error {
+	// Create logger with debug level if debug flag is set
+	logConfig := &logger.Config{
+		Level:       logger.InfoLevel,
+		Development: Debug,
+		Encoding:    "console",
+		EnableColor: true,
+		OutputPaths: []string{"stdout"},
+	}
+	if Debug {
+		logConfig.Level = logger.DebugLevel
+	}
+
+	var err error
+	log, err = logger.New(logConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	return nil
+}
+
 // Execute is the entry point for the CLI application.
 // It runs the root command and handles any errors that occur during execution.
 // If an error occurs, it prints the error message and exits with status code 1.
 func Execute() {
-	config := logger.DefaultConfig()
-	if Debug {
-		config.Level = logger.DebugLevel
-	}
-	log, err := logger.New(config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create logger: %v\n", err)
+	// Initialize logger first
+	if err := initLogger(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -277,6 +299,16 @@ func Execute() {
 //   - job: For managing scheduled crawl jobs
 //   - search: For searching content in Elasticsearch
 func init() {
+	// Global flags
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yaml, ~/.gocrawl/config.yaml, or /etc/gocrawl/config.yaml)")
+	rootCmd.PersistentFlags().BoolVar(&Debug, "debug", false, "enable debug mode")
+
+	// Bind flags to viper immediately
+	if err := viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug")); err != nil {
+		fmt.Fprintf(os.Stderr, "Error binding debug flag: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Initialize configuration on startup
 	cobra.OnInitialize(func() {
 		if err := setupConfig(rootCmd, nil); err != nil {
@@ -284,14 +316,4 @@ func init() {
 			os.Exit(1)
 		}
 	})
-
-	// Global flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yaml, ~/.gocrawl/config.yaml, or /etc/gocrawl/config.yaml)")
-	rootCmd.PersistentFlags().BoolVar(&Debug, "debug", false, "enable debug mode")
-
-	// Bind flags to viper
-	if err := viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug")); err != nil {
-		fmt.Fprintf(os.Stderr, "Error binding debug flag: %v\n", err)
-		os.Exit(1)
-	}
 }

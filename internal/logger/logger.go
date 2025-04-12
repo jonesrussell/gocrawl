@@ -44,7 +44,7 @@ func New(cfg *Config) (Interface, error) {
 	}
 
 	// Configure level encoder based on development mode and color settings
-	if cfg.Development && cfg.EnableColor {
+	if cfg.EnableColor {
 		encoderConfig.EncodeLevel = func(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 			var color string
 			switch l {
@@ -70,8 +70,11 @@ func New(cfg *Config) (Interface, error) {
 			enc.AppendString(color + l.CapitalString() + ColorReset)
 		}
 	} else {
-		encoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
+		encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	}
+
+	// Convert logger level to zapcore level
+	zapLevel := levelToZap(cfg.Level)
 
 	// Create core
 	var core zapcore.Core
@@ -79,18 +82,24 @@ func New(cfg *Config) (Interface, error) {
 		core = zapcore.NewCore(
 			zapcore.NewJSONEncoder(encoderConfig),
 			zapcore.AddSync(os.Stdout),
-			zapcore.InfoLevel,
+			zapLevel,
 		)
 	} else {
 		core = zapcore.NewCore(
 			zapcore.NewConsoleEncoder(encoderConfig),
 			zapcore.AddSync(os.Stdout),
-			zapcore.InfoLevel,
+			zapLevel,
 		)
 	}
 
-	// Create logger
-	zapLogger := zap.New(core)
+	// Create logger with development mode if enabled
+	var zapLogger *zap.Logger
+	if cfg.Development {
+		zapLogger = zap.New(core, zap.Development(), zap.AddCaller())
+	} else {
+		zapLogger = zap.New(core, zap.AddCaller())
+	}
+
 	return &logger{
 		zapLogger: zapLogger,
 		config:    cfg,
