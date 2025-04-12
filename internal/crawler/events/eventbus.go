@@ -120,7 +120,7 @@ func (b *EventBus) HandleError(err error, article *models.Article) {
 }
 
 // HandleHandlerError handles an error that occurred in an event handler.
-func (b *EventBus) HandleHandlerError(handlerErr error, err error) {
+func (b *EventBus) HandleHandlerError(handlerErr, err error) {
 	b.logger.Error("Error in event handler",
 		"error", handlerErr,
 		"original_error", err,

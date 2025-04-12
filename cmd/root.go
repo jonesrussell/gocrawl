@@ -53,9 +53,8 @@ const (
 	logLevelError               = "error"
 )
 
-// bindEnvVars binds environment variables to configuration keys
-func bindEnvVars() error {
-	// App configuration
+// bindAppEnvVars binds app-related environment variables
+func bindAppEnvVars() error {
 	if err := viper.BindEnv("app.name", "APP_NAME"); err != nil {
 		return fmt.Errorf("failed to bind app.name: %w", err)
 	}
@@ -65,8 +64,11 @@ func bindEnvVars() error {
 	if err := viper.BindEnv("app.debug", "APP_DEBUG"); err != nil {
 		return fmt.Errorf("failed to bind app.debug: %w", err)
 	}
+	return nil
+}
 
-	// Server configuration
+// bindServerEnvVars binds server-related environment variables
+func bindServerEnvVars() error {
 	if err := viper.BindEnv("server.port", "SERVER_PORT"); err != nil {
 		return fmt.Errorf("failed to bind server.port: %w", err)
 	}
@@ -79,8 +81,11 @@ func bindEnvVars() error {
 	if err := viper.BindEnv("server.idle_timeout", "SERVER_IDLE_TIMEOUT"); err != nil {
 		return fmt.Errorf("failed to bind server.idle_timeout: %w", err)
 	}
+	return nil
+}
 
-	// Elasticsearch configuration
+// bindElasticsearchEnvVars binds Elasticsearch-related environment variables
+func bindElasticsearchEnvVars() error {
 	if err := viper.BindEnv("elasticsearch.hosts", "ELASTICSEARCH_HOSTS"); err != nil {
 		return fmt.Errorf("failed to bind elasticsearch.hosts: %w", err)
 	}
@@ -102,10 +107,7 @@ func bindEnvVars() error {
 	if err := viper.BindEnv("elasticsearch.discover_nodes", "ELASTICSEARCH_DISCOVER_NODES"); err != nil {
 		return fmt.Errorf("failed to bind elasticsearch.discover_nodes: %w", err)
 	}
-	if err := viper.BindEnv(
-		"elasticsearch.tls_insecure_skip_verify",
-		"ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY",
-	); err != nil {
+	if err := viper.BindEnv("elasticsearch.tls_insecure_skip_verify", "ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY"); err != nil {
 		return fmt.Errorf("failed to bind elasticsearch.tls_insecure_skip_verify: %w", err)
 	}
 	if err := viper.BindEnv("elasticsearch.ca_fingerprint", "ELASTICSEARCH_CA_FINGERPRINT"); err != nil {
@@ -117,8 +119,11 @@ func bindEnvVars() error {
 	if err := viper.BindEnv("elasticsearch.password", "ELASTICSEARCH_PASSWORD"); err != nil {
 		return fmt.Errorf("failed to bind elasticsearch.password: %w", err)
 	}
+	return nil
+}
 
-	// Crawler configuration
+// bindCrawlerEnvVars binds crawler-related environment variables
+func bindCrawlerEnvVars() error {
 	if err := viper.BindEnv("crawler.max_depth", "CRAWLER_MAX_DEPTH"); err != nil {
 		return fmt.Errorf("failed to bind crawler.max_depth: %w", err)
 	}
@@ -146,23 +151,51 @@ func bindEnvVars() error {
 	if err := viper.BindEnv("crawler.debugger.file", "CRAWLER_DEBUGGER_FILE"); err != nil {
 		return fmt.Errorf("failed to bind crawler.debugger.file: %w", err)
 	}
+	return nil
+}
 
-	// Logging configuration
+// bindLoggerEnvVars binds logger-related environment variables
+func bindLoggerEnvVars() error {
 	if err := viper.BindEnv("logger.level", "LOG_LEVEL"); err != nil {
 		return fmt.Errorf("failed to bind logger.level: %w", err)
 	}
 	if err := viper.BindEnv("logger.format", "LOG_FORMAT"); err != nil {
 		return fmt.Errorf("failed to bind logger.format: %w", err)
 	}
+	return nil
+}
 
-	// Server Security Configuration
+// bindServerSecurityEnvVars binds server security-related environment variables
+func bindServerSecurityEnvVars() error {
 	if err := viper.BindEnv("server.port", "GOCRAWL_PORT"); err != nil {
 		return fmt.Errorf("failed to bind server.port: %w", err)
 	}
 	if err := viper.BindEnv("server.api_key", "GOCRAWL_API_KEY"); err != nil {
 		return fmt.Errorf("failed to bind server.api_key: %w", err)
 	}
+	return nil
+}
 
+// bindEnvVars binds all environment variables to configuration keys
+func bindEnvVars() error {
+	if err := bindAppEnvVars(); err != nil {
+		return err
+	}
+	if err := bindServerEnvVars(); err != nil {
+		return err
+	}
+	if err := bindElasticsearchEnvVars(); err != nil {
+		return err
+	}
+	if err := bindCrawlerEnvVars(); err != nil {
+		return err
+	}
+	if err := bindLoggerEnvVars(); err != nil {
+		return err
+	}
+	if err := bindServerSecurityEnvVars(); err != nil {
+		return err
+	}
 	return nil
 }
 

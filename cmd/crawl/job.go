@@ -37,7 +37,8 @@ func (s *JobService) Start(ctx context.Context) error {
 	}
 
 	// Start crawling each source
-	for _, cfg := range sourceConfigs {
+	for i := range sourceConfigs {
+		cfg := &sourceConfigs[i]
 		s.logger.Info("Starting crawl for source", "source", cfg.Name)
 		// TODO: Implement actual crawling logic here
 	}
