@@ -14,7 +14,12 @@ import (
 	"go.uber.org/fx"
 )
 
-const DefaultShutdownTimeout = 30 * time.Second
+const (
+	// DefaultShutdownTimeout is the default timeout for graceful shutdown
+	DefaultShutdownTimeout = 30 * time.Second
+	// DefaultHealthCheckInterval is the interval for health checks
+	DefaultHealthCheckInterval = 500 * time.Millisecond
+)
 
 type shutdownState int
 
@@ -231,8 +236,12 @@ func (h *SignalHandler) RequestShutdown() {
 	}
 }
 
-// Wait waits for shutdown to complete.
+// Wait waits for the signal handler to complete
 func (h *SignalHandler) Wait() error {
+	// Create a ticker for health checks
+	ticker := time.NewTicker(DefaultHealthCheckInterval)
+	defer ticker.Stop()
+
 	<-h.Done
 	return h.shutdownError
 }

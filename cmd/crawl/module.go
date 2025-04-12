@@ -135,22 +135,29 @@ var Module = fx.Options(
 		},
 
 		// Index manager with error handling
-		func(config config.Interface, logger logger.Interface, client *elasticsearch.Client) (interfaces.IndexManager, error) {
-			logger.Debug("Creating Elasticsearch index manager")
+		fx.Annotate(
+			func(
+				config config.Interface,
+				logger logger.Interface,
+				client *elasticsearch.Client,
+			) (interfaces.IndexManager, error) {
+				logger.Debug("Creating Elasticsearch index manager")
 
-			if client == nil {
-				logger.Error("Elasticsearch client not initialized")
-				return nil, errors.New("elasticsearch client not initialized")
-			}
+				if client == nil {
+					logger.Error("Elasticsearch client not initialized")
+					return nil, errors.New("elasticsearch client not initialized")
+				}
 
-			manager := storage.NewElasticsearchIndexManager(client, logger)
-			if manager == nil {
-				logger.Error("Failed to create Elasticsearch index manager")
-				return nil, errors.New("failed to create Elasticsearch index manager")
-			}
+				manager := storage.NewElasticsearchIndexManager(client, logger)
+				if manager == nil {
+					logger.Error("Failed to create Elasticsearch index manager")
+					return nil, errors.New("failed to create Elasticsearch index manager")
+				}
 
-			return manager, nil
-		},
+				return manager, nil
+			},
+			fx.ResultTags(`name:"indexManager"`),
+		),
 
 		// Signal handler with lifecycle integration
 		fx.Annotate(
