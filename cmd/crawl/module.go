@@ -125,8 +125,12 @@ var Module = fx.Options(
 			// Set up crawler lifecycle
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
+					// Create a context with timeout for the crawler
+					crawlCtx, cancel := context.WithTimeout(ctx, common.DefaultOperationTimeout)
+					defer cancel()
+
 					// Start the crawler
-					if err := crawler.Start(ctx, sourceName); err != nil {
+					if err := crawler.Start(crawlCtx, sourceName); err != nil {
 						return fmt.Errorf("failed to start crawler: %w", err)
 					}
 
@@ -136,7 +140,7 @@ var Module = fx.Options(
 						select {
 						case <-crawler.Done():
 							logger.Info("Crawler finished processing")
-						case <-ctx.Done():
+						case <-crawlCtx.Done():
 							logger.Info("Crawler context cancelled")
 						}
 
@@ -147,8 +151,12 @@ var Module = fx.Options(
 					return nil
 				},
 				OnStop: func(ctx context.Context) error {
+					// Create a context with timeout for stopping the crawler
+					stopCtx, cancel := context.WithTimeout(ctx, common.DefaultOperationTimeout)
+					defer cancel()
+
 					// Stop the crawler
-					if err := crawler.Stop(ctx); err != nil {
+					if err := crawler.Stop(stopCtx); err != nil {
 						return fmt.Errorf("failed to stop crawler: %w", err)
 					}
 					return nil

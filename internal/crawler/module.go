@@ -9,10 +9,10 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -30,7 +30,7 @@ type Result struct {
 // ProvideCrawler creates a new crawler instance with the given dependencies.
 func ProvideCrawler(
 	logger logger.Interface,
-	indexManager storagetypes.IndexManager,
+	indexManager interfaces.IndexManager,
 	sources sources.Interface,
 	processors []common.Processor,
 	bus *events.EventBus,
@@ -48,11 +48,11 @@ func ProvideCrawler(
 
 	crawler := NewCrawler(
 		logger,
+		bus,
 		indexManager,
 		sources,
 		articleProcessor,
 		contentProcessor,
-		bus,
 		cfg,
 	)
 
@@ -82,11 +82,11 @@ var Module = fx.Module("crawler",
 // NewCrawler creates a new crawler instance.
 func NewCrawler(
 	logger logger.Interface,
-	indexManager storagetypes.IndexManager,
+	bus *events.EventBus,
+	indexManager interfaces.IndexManager,
 	sources sources.Interface,
 	articleProcessor common.Processor,
 	contentProcessor common.Processor,
-	bus *events.EventBus,
 	cfg *crawler.Config,
 ) Interface {
 	collector := colly.NewCollector(
@@ -112,16 +112,20 @@ func NewCrawler(
 
 	crawler := &Crawler{
 		logger:           logger,
+		bus:              bus,
 		indexManager:     indexManager,
 		sources:          sources,
 		articleProcessor: articleProcessor,
 		contentProcessor: contentProcessor,
-		bus:              bus,
-		collector:        collector,
 		state:            NewState(logger),
 		done:             make(chan struct{}),
 		articleChannel:   make(chan *models.Article, ArticleChannelBufferSize),
+		collector:        collector,
 	}
+
+	// Initialize handlers
+	crawler.linkHandler = NewLinkHandler(crawler)
+	crawler.htmlProcessor = NewHTMLProcessor(crawler)
 
 	// Set up callbacks
 	collector.OnRequest(func(r *colly.Request) {

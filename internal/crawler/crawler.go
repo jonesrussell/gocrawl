@@ -5,13 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -65,6 +64,8 @@ type Crawler struct {
 	wg               sync.WaitGroup
 	articleChannel   chan *models.Article
 	processors       []common.Processor
+	linkHandler      *LinkHandler
+	htmlProcessor    *HTMLProcessor
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -74,31 +75,106 @@ var _ CrawlerMetrics = (*Crawler)(nil)
 // Core Crawler Methods
 // -------------------
 
+// validateSource validates the source and its index
+func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types.Source, error) {
+	sourceConfig := c.sources.FindByName(sourceName)
+	if sourceConfig == nil {
+		return nil, fmt.Errorf("source not found: %s", sourceName)
+	}
+
+	source := sourceutils.ConvertToConfigSource(sourceConfig)
+	exists, err := c.indexManager.IndexExists(ctx, source.Index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("index not found: %s", source.Index)
+	}
+
+	return source, nil
+}
+
+// setupCollector configures the collector with the given source settings
+func (c *Crawler) setupCollector(source *types.Source) {
+	c.collector = colly.NewCollector(
+		colly.MaxDepth(source.MaxDepth),
+		colly.Async(true),
+		colly.AllowedDomains(source.AllowedDomains...),
+		colly.ParseHTTPErrorResponse(),
+	)
+}
+
+// setupCallbacks configures the collector's callbacks
+func (c *Crawler) setupCallbacks(ctx context.Context) {
+	// Set up request callback
+	c.collector.OnRequest(func(r *colly.Request) {
+		if ctx.Err() != nil {
+			r.Abort()
+			return
+		}
+		c.logger.Debug("Visiting URL",
+			"url", r.URL.String())
+	})
+
+	// Set up HTML processing
+	c.collector.OnHTML("html", c.htmlProcessor.ProcessHTML)
+
+	// Set up error handling
+	c.collector.OnError(func(r *colly.Response, visitErr error) {
+		c.logger.Error("Error while crawling",
+			"url", r.Request.URL.String(),
+			"status", r.StatusCode,
+			"error", visitErr)
+
+		if errors.Is(visitErr, colly.ErrAlreadyVisited) || errors.Is(visitErr, colly.ErrMaxDepth) {
+			return
+		}
+
+		c.IncrementError()
+	})
+
+	// Set up link following
+	c.collector.OnHTML("a[href]", c.linkHandler.HandleLink)
+}
+
+// visitURLs visits the given URLs with error handling
+func (c *Crawler) visitURLs(ctx context.Context, urls []string) {
+	for _, url := range urls {
+		select {
+		case <-ctx.Done():
+			c.logger.Debug("Crawl cancelled while visiting URLs")
+			return
+		default:
+			if visitErr := c.collector.Visit(url); visitErr != nil {
+				if errors.Is(visitErr, colly.ErrAlreadyVisited) || errors.Is(visitErr, colly.ErrMaxDepth) {
+					continue
+				}
+				c.logger.Error("Failed to visit URL",
+					"url", url,
+					"error", visitErr)
+				c.IncrementError()
+			}
+		}
+	}
+}
+
 // Start begins the crawling process for a given source.
 func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.logger.Debug("Starting crawler",
 		"source", sourceName)
 
-	// Validate source exists
-	source := c.sources.FindByName(sourceName)
-	if source == nil {
-		return fmt.Errorf("source not found: %s", sourceName)
-	}
-
-	// Validate index exists
-	exists, err := c.indexManager.IndexExists(ctx, source.Index)
+	// Validate source and index
+	source, err := c.validateSource(ctx, sourceName)
 	if err != nil {
-		return fmt.Errorf("failed to check index existence: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("index not found: %s", source.Index)
+		return err
 	}
 
-	// Initialize state with context and source name
+	// Initialize state
 	c.state.Start(ctx, sourceName)
 
-	// Configure collector for this source
-	c.configureCollector(source)
+	// Setup collector and callbacks
+	c.setupCollector(source)
+	c.setupCallbacks(ctx)
 
 	// Start crawling in a goroutine
 	c.wg.Add(1)
@@ -106,30 +182,40 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		defer c.wg.Done()
 		c.logger.Debug("Starting crawl goroutine")
 
-		// Create a done channel for the crawl
 		crawlDone := make(chan struct{})
-		defer close(crawlDone)
+		crawlCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
 
 		// Start a goroutine to handle the crawl
 		go func() {
-			defer close(crawlDone)
-			if crawlErr := c.crawl(source); crawlErr != nil {
-				c.logger.Error("Failed to crawl source",
-					"source", source.Name,
-					"error", crawlErr)
-			}
+			defer func() {
+				select {
+				case <-crawlDone:
+					// Channel already closed
+				default:
+					close(crawlDone)
+				}
+			}()
+
+			c.visitURLs(crawlCtx, source.StartURLs)
+
+			c.logger.Debug("Waiting for collector to finish")
+			c.collector.Wait()
+			c.logger.Debug("Collector finished",
+				"processed", c.state.GetProcessedCount(),
+				"errors", c.state.GetErrorCount())
 		}()
 
-		// Wait for either the crawl to complete or the context to be cancelled
 		select {
 		case <-crawlDone:
 			c.logger.Debug("Crawl goroutine finished")
 		case <-ctx.Done():
 			c.logger.Debug("Crawl context cancelled")
-			// Ensure the collector is stopped
-			if c.collector != nil {
-				c.collector.Wait()
-			}
+			cancel()
+			c.collector.OnRequest(func(r *colly.Request) {
+				r.Abort()
+			})
+			c.collector.Wait()
 		}
 	}()
 
@@ -148,6 +234,11 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	c.state.Cancel()
 	c.logger.Debug("Context cancelled")
 
+	// Stop accepting new requests
+	c.collector.OnRequest(func(r *colly.Request) {
+		r.Abort()
+	})
+
 	// Create a done channel for the wait group
 	waitDone := make(chan struct{})
 	defer close(waitDone)
@@ -160,23 +251,6 @@ func (c *Crawler) Stop(ctx context.Context) error {
 		c.logger.Debug("Wait group finished")
 	}()
 
-	// Create a context with timeout for collector initialization
-	collectorCtx, collectorCancel := context.WithTimeout(ctx, CollectorStartTimeout)
-	defer collectorCancel()
-
-	// Stop the collector
-	if c.collector != nil {
-		c.logger.Debug("Stopping collector")
-		// Use collectorCtx to ensure we don't wait indefinitely
-		select {
-		case <-collectorCtx.Done():
-			c.logger.Warn("Collector stop timed out",
-				"timeout", collectorCtx.Err())
-		default:
-			c.collector.Wait()
-		}
-	}
-
 	// Wait for either the wait group to finish or the context to be done
 	select {
 	case <-waitDone:
@@ -184,9 +258,13 @@ func (c *Crawler) Stop(ctx context.Context) error {
 		c.logger.Debug("Crawler stopped successfully")
 		return nil
 	case <-ctx.Done():
-		// If we hit the deadline, log the timeout and return
-		c.logger.Warn("Crawler shutdown timed out",
-			"timeout", ctx.Err())
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			c.logger.Warn("Crawler shutdown timed out",
+				"timeout", ctx.Err())
+		} else {
+			c.logger.Warn("Crawler shutdown cancelled",
+				"error", ctx.Err())
+		}
 		return ctx.Err()
 	}
 }
@@ -285,34 +363,22 @@ func (c *Crawler) Reset() {
 // Collector Management
 // ------------------
 
-// configureCollector configures the collector with the given source configuration.
-func (c *Crawler) configureCollector(source *sourceutils.SourceConfig) {
-	if source == nil {
+// SetMaxDepth sets the maximum depth for the crawler.
+func (c *Crawler) SetMaxDepth(depth int) {
+	if c.collector == nil {
 		return
 	}
 
-	// Create collector config
 	config := NewCollectorConfig()
-	if source.RateLimit > 0 {
-		config.RateLimit = source.RateLimit
-	}
-	if source.MaxDepth > 0 {
-		config.MaxDepth = source.MaxDepth
-	}
+	config.MaxDepth = depth
 
-	// Set rate limit
-	if err := c.collector.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		RandomDelay: config.RateLimit,
-		Parallelism: config.MaxConcurrency,
-	}); err != nil {
-		c.logger.Error("Failed to set rate limit",
+	if err := config.Validate(); err != nil {
+		c.logger.Error("Invalid max depth",
 			"error", err,
-			"rateLimit", config.RateLimit,
-			"parallelism", config.MaxConcurrency)
+			"depth", depth)
+		return
 	}
 
-	// Set max depth
 	c.collector.MaxDepth = config.MaxDepth
 }
 
@@ -342,25 +408,6 @@ func (c *Crawler) SetRateLimit(duration time.Duration) error {
 	return nil
 }
 
-// SetMaxDepth sets the maximum depth for the crawler.
-func (c *Crawler) SetMaxDepth(depth int) {
-	if c.collector == nil {
-		return
-	}
-
-	config := NewCollectorConfig()
-	config.MaxDepth = depth
-
-	if err := config.Validate(); err != nil {
-		c.logger.Error("Invalid max depth",
-			"error", err,
-			"depth", depth)
-		return
-	}
-
-	c.collector.MaxDepth = config.MaxDepth
-}
-
 // SetCollector sets the collector for the crawler.
 func (c *Crawler) SetCollector(collector *colly.Collector) {
 	c.collector = collector
@@ -371,7 +418,7 @@ func (c *Crawler) SetCollector(collector *colly.Collector) {
 
 // selectProcessor selects the appropriate processor for the given HTML element
 func (c *Crawler) selectProcessor(e *colly.HTMLElement) common.Processor {
-	contentType := c.detectContentType(e)
+	contentType := c.htmlProcessor.detectContentType(e)
 
 	// Try to get a processor for the specific content type
 	processor := c.getProcessorForType(contentType)
@@ -405,39 +452,6 @@ func (c *Crawler) getProcessorForType(contentType common.ContentType) common.Pro
 		}
 	}
 	return nil
-}
-
-// detectContentType detects the type of content in the HTML element
-func (c *Crawler) detectContentType(e *colly.HTMLElement) common.ContentType {
-	// Check for article-specific elements and metadata
-	hasArticleTag := e.DOM.Find("article").Length() > 0
-	hasArticleClass := e.DOM.Find(".article").Length() > 0
-	hasArticleMeta := e.DOM.Find("meta[property='og:type'][content='article']").Length() > 0
-	hasPublicationDate := e.DOM.Find("time[datetime], .published-date, .post-date").Length() > 0
-	hasAuthor := e.DOM.Find(".author, .byline, meta[name='author']").Length() > 0
-
-	// If it has multiple article indicators, it's likely an article
-	if (hasArticleTag || hasArticleClass) && (hasPublicationDate || hasAuthor || hasArticleMeta) {
-		return common.ContentTypeArticle
-	}
-
-	// Check for video content
-	if e.DOM.Find("video").Length() > 0 || e.DOM.Find(".video").Length() > 0 {
-		return common.ContentTypeVideo
-	}
-
-	// Check for image content
-	if e.DOM.Find("img").Length() > 0 || e.DOM.Find(".image").Length() > 0 {
-		return common.ContentTypeImage
-	}
-
-	// Check for job listings
-	if e.DOM.Find(".job-listing").Length() > 0 || e.DOM.Find(".job-posting").Length() > 0 {
-		return common.ContentTypeJob
-	}
-
-	// Default to page content type
-	return common.ContentTypePage
 }
 
 // AddProcessor adds a new processor to the crawler.
@@ -491,131 +505,6 @@ func (c *Crawler) GetIndexManager() interfaces.IndexManager {
 	return c.indexManager
 }
 
-// handleLink processes a single link from an HTML element.
-func (c *Crawler) handleLink(e *colly.HTMLElement, source *sourceutils.SourceConfig) {
-	link := e.Attr("href")
-	if link == "" {
-		return
-	}
-
-	// Convert relative URLs to absolute
-	link = e.Request.AbsoluteURL(link)
-
-	// Parse the URL to get the domain
-	parsedURL, err := url.Parse(link)
-	if err != nil {
-		c.logger.Error("Failed to parse URL",
-			"link", link,
-			"error", err)
-		return
-	}
-
-	// Check if the domain is allowed
-	if !c.isDomainAllowed(parsedURL.Host, source.AllowedDomains) {
-		return
-	}
-
-	// Visit the link
-	if visitErr := e.Request.Visit(link); visitErr != nil {
-		// Check for expected errors
-		if errors.Is(visitErr, colly.ErrAlreadyVisited) || errors.Is(visitErr, colly.ErrMaxDepth) {
-			return
-		}
-
-		c.logger.Error("Failed to visit link",
-			"url", link,
-			"error", visitErr)
-	}
-}
-
-// isDomainAllowed checks if a domain is in the allowed domains list.
-func (c *Crawler) isDomainAllowed(host string, allowedDomains []string) bool {
-	for _, domain := range allowedDomains {
-		if strings.HasSuffix(host, domain) {
-			return true
-		}
-	}
-	return false
-}
-
-// visitURLs visits a list of URLs and handles errors.
-func (c *Crawler) visitURLs(urls []string) {
-	for _, url := range urls {
-		c.logger.Debug("Visiting URL",
-			"url", url)
-		if err := c.collector.Visit(url); err != nil {
-			// Skip logging expected errors
-			if errors.Is(err, colly.ErrAlreadyVisited) || errors.Is(err, colly.ErrMaxDepth) {
-				continue
-			}
-			c.logger.Error("Failed to visit URL",
-				"url", url,
-				"error", err)
-			c.IncrementError()
-		}
-	}
-}
-
-// crawl processes a single source.
-func (c *Crawler) crawl(source *sourceutils.SourceConfig) error {
-	if source == nil {
-		return errors.New("source cannot be nil")
-	}
-
-	c.logger.Debug("Starting crawl for source",
-		"source", source.Name,
-		"urls", source.StartURLs)
-
-	// Set up the collector for this source
-	c.configureCollector(source)
-
-	// Set up callbacks
-	c.collector.OnHTML("html", c.ProcessHTML)
-
-	// Handle errors
-	c.collector.OnError(func(r *colly.Response, visitErr error) {
-		c.logger.Error("Error while crawling",
-			"url", r.Request.URL.String(),
-			"status", r.StatusCode,
-			"error", visitErr)
-
-		// Check for expected errors
-		if errors.Is(visitErr, colly.ErrAlreadyVisited) || errors.Is(visitErr, colly.ErrMaxDepth) {
-			return
-		}
-
-		// Increment error count for unexpected errors
-		c.IncrementError()
-	})
-
-	// Set up link following
-	c.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		c.handleLink(e, source)
-	})
-
-	// Start visiting URLs
-	c.visitURLs(source.StartURLs)
-
-	c.logger.Debug("Waiting for collector to finish")
-	// Wait for the collector to finish
-	c.collector.Wait()
-	c.logger.Debug("Collector finished",
-		"processed", c.state.GetProcessedCount(),
-		"errors", c.state.GetErrorCount())
-
-	// Wait for all processors to finish
-	c.logger.Debug("Waiting for processors to finish")
-	c.wg.Wait()
-	c.logger.Debug("Processors finished")
-
-	// Signal completion
-	c.logger.Debug("Signaling completion")
-	close(c.done)
-	c.logger.Debug("Completion signaled")
-
-	return nil
-}
-
 // ProcessHTML processes the HTML content.
 func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	// Detect content type and get appropriate processor
@@ -623,7 +512,7 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	if processor == nil {
 		c.logger.Debug("No processor found for content",
 			"url", e.Request.URL.String(),
-			"type", c.detectContentType(e))
+			"type", c.htmlProcessor.detectContentType(e))
 		c.state.IncrementProcessed()
 		return
 	}
@@ -634,12 +523,12 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 		c.logger.Error("Failed to process content",
 			"error", err,
 			"url", e.Request.URL.String(),
-			"type", c.detectContentType(e))
+			"type", c.htmlProcessor.detectContentType(e))
 		c.state.IncrementError()
 	} else {
 		c.logger.Debug("Successfully processed content",
 			"url", e.Request.URL.String(),
-			"type", c.detectContentType(e))
+			"type", c.htmlProcessor.detectContentType(e))
 	}
 
 	c.state.IncrementProcessed()

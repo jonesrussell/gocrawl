@@ -21,11 +21,15 @@ Specify the source name as an argument.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceName := strings.Trim(args[0], "\"")
-		ctx := cmd.Context()
+		cmdCtx := cmd.Context()
+
+		// Create a new context for the crawler and Fx application
+		crawlCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		// Set up signal handling
 		handler := signal.NewSignalHandler(logger.NewNoOp())
-		cleanup := handler.Setup(ctx)
+		cleanup := handler.Setup(crawlCtx)
 		defer cleanup()
 
 		// Initialize the Fx application
@@ -33,7 +37,7 @@ Specify the source name as an argument.`,
 			Module,
 			fx.Provide(
 				fx.Annotate(
-					func() context.Context { return ctx },
+					func() context.Context { return crawlCtx },
 					fx.ResultTags(`name:"crawlContext"`),
 				),
 				fx.Annotate(
@@ -47,11 +51,18 @@ Specify the source name as an argument.`,
 		handler.SetFXApp(fxApp)
 
 		// Start the application and wait for completion
-		if err := fxApp.Start(ctx); err != nil {
+		if err := fxApp.Start(crawlCtx); err != nil {
 			return fmt.Errorf("failed to start application: %w", err)
 		}
 
-		return handler.Wait()
+		// Wait for either the crawler to complete or the command context to be cancelled
+		select {
+		case <-cmdCtx.Done():
+			cancel()
+			return cmdCtx.Err()
+		case <-crawlCtx.Done():
+			return crawlCtx.Err()
+		}
 	},
 }
 
