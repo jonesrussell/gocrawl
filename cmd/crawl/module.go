@@ -130,6 +130,7 @@ var Module = fx.Options(
 							handler.RequestShutdown()
 						case <-ctx.Done():
 							logger.Info("Crawler context cancelled")
+							handler.RequestShutdown()
 						}
 					}()
 

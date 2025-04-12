@@ -258,14 +258,13 @@ func (c *Crawler) Stop(ctx context.Context) error {
 
 	// Create a done channel for the wait group
 	waitDone := make(chan struct{})
-	defer close(waitDone)
 
 	// Start a goroutine to wait for the wait group
 	go func() {
-		defer close(waitDone)
 		c.logger.Debug("Waiting for wait group")
 		c.wg.Wait()
 		c.logger.Debug("Wait group finished")
+		close(waitDone)
 	}()
 
 	// Wait for either the wait group to finish or the context to be done

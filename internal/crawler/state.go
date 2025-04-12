@@ -64,6 +64,7 @@ func (s *State) Cancel() {
 	defer s.mu.Unlock()
 	if s.cancel != nil {
 		s.cancel()
+		s.cancel = nil
 	}
 }
 
