@@ -56,6 +56,10 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 				func() string { return sourceName },
 				fx.ResultTags(`name:"sourceName"`),
 			),
+			fx.Annotate(
+				func() logger.Interface { return log },
+				fx.As(new(logger.Interface)),
+			),
 		),
 		fx.Invoke(func(config config.Interface) {
 			// Set debug mode from command line flag

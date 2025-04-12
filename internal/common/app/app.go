@@ -163,12 +163,10 @@ var Module = fx.Module("app",
 		config.LoadConfig,
 		// Provide logger
 		func() (logger.Interface, error) {
-			return logger.Constructor(logger.Params{
-				Config: &logger.Config{
-					Level:       logger.InfoLevel,
-					Development: true,
-					Encoding:    "console",
-				},
+			return logger.New(&logger.Config{
+				Level:       logger.InfoLevel,
+				Development: true,
+				Encoding:    "console",
 			})
 		},
 		// Provide event bus
@@ -180,22 +178,18 @@ var Module = fx.Module("app",
 
 // ProvideLogger provides a logger for the application.
 func ProvideLogger() (logger.Interface, error) {
-	return logger.Constructor(logger.Params{
-		Config: &logger.Config{
-			Level:       logger.InfoLevel,
-			Development: true,
-			Encoding:    "console",
-		},
+	return logger.New(&logger.Config{
+		Level:       logger.InfoLevel,
+		Development: true,
+		Encoding:    "console",
 	})
 }
 
 // NewLogger creates a new logger.
 func NewLogger() (logger.Interface, error) {
-	return logger.Constructor(logger.Params{
-		Config: &logger.Config{
-			Level:       logger.InfoLevel,
-			Development: true,
-			Encoding:    "console",
-		},
+	return logger.New(&logger.Config{
+		Level:       logger.InfoLevel,
+		Development: true,
+		Encoding:    "console",
 	})
 }

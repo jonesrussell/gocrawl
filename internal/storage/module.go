@@ -248,7 +248,7 @@ var Module = fx.Module("storage",
 		NewStorage,
 		// Provide search manager
 		NewSearchManager,
-		// Index manager with error handling
+		// Provide index manager
 		fx.Annotate(
 			func(
 				config config.Interface,

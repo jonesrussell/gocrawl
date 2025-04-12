@@ -80,8 +80,10 @@ func ProvideCrawler(
 // Module provides the crawler module for dependency injection.
 var Module = fx.Module("crawler",
 	fx.Provide(
-		// Provide the crawler
-		ProvideCrawler,
+		fx.Annotate(
+			ProvideCrawler,
+			fx.ParamTags(``, `name:"indexManager"`, ``, ``, ``, ``),
+		),
 	),
 )
 
