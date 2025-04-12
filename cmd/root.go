@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -99,6 +98,12 @@ func bindEnvVars() error {
 	if err := viper.BindEnv("elasticsearch.ca_fingerprint", "ELASTICSEARCH_CA_FINGERPRINT"); err != nil {
 		return fmt.Errorf("failed to bind elasticsearch.ca_fingerprint: %w", err)
 	}
+	if err := viper.BindEnv("elasticsearch.username", "ELASTICSEARCH_USERNAME"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.username: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.password", "ELASTICSEARCH_PASSWORD"); err != nil {
+		return fmt.Errorf("failed to bind elasticsearch.password: %w", err)
+	}
 
 	// Crawler configuration
 	if err := viper.BindEnv("crawler.max_depth", "CRAWLER_MAX_DEPTH"); err != nil {
@@ -135,6 +140,14 @@ func bindEnvVars() error {
 	}
 	if err := viper.BindEnv("logger.format", "LOG_FORMAT"); err != nil {
 		return fmt.Errorf("failed to bind logger.format: %w", err)
+	}
+
+	// Server Security Configuration
+	if err := viper.BindEnv("server.port", "GOCRAWL_PORT"); err != nil {
+		return fmt.Errorf("failed to bind server.port: %w", err)
+	}
+	if err := viper.BindEnv("server.api_key", "GOCRAWL_API_KEY"); err != nil {
+		return fmt.Errorf("failed to bind server.api_key: %w", err)
 	}
 
 	return nil
@@ -179,6 +192,12 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 	// Set default values first
 	setDefaults()
 
+	// Enable environment variable binding
+	viper.AutomaticEnv()
+	if err := bindEnvVars(); err != nil {
+		return fmt.Errorf("failed to bind environment variables: %w", err)
+	}
+
 	// Get the absolute path to the config file if specified
 	if cfgFile != "" {
 		absPath, err := filepath.Abs(cfgFile)
@@ -198,37 +217,21 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 		viper.SetConfigName("config")
 
 		// Search paths in order of priority
-		viper.AddConfigPath(".")                // Current directory
-		viper.AddConfigPath(home + "/.gocrawl") // User's config directory
-		viper.AddConfigPath("/etc/gocrawl")     // System config directory
-	}
-
-	// Enable environment variable binding
-	viper.AutomaticEnv()
-
-	// Bind specific environment variables
-	if err := bindEnvVars(); err != nil {
-		return fmt.Errorf("failed to bind environment variables: %w", err)
+		viper.AddConfigPath(".")                             // Current directory
+		viper.AddConfigPath(filepath.Join(home, ".crawler")) // User config directory
+		viper.AddConfigPath("/etc/crawler")                  // System config directory
 	}
 
 	// Read the config file
 	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFound) {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return fmt.Errorf("failed to read config file: %w", err)
 		}
-		// Log that we're using default values
-		fmt.Fprintln(os.Stderr, "No config file found, using default values")
-	} else {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		// Config file not found is not an error - we'll use defaults
 	}
 
-	// Set the command name in the configuration
-	commandName := cmd.Name()
-	if cmd.Parent() != nil {
-		commandName = fmt.Sprintf("%s %s", cmd.Parent().Name(), cmd.Name())
-	}
-	viper.Set("command", commandName)
+	// Set debug mode from command line flag
+	viper.Set("app.debug", Debug)
 
 	return nil
 }

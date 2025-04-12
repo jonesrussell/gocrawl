@@ -68,22 +68,43 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 			),
 			fx.Annotate(
 				func(cfg config.Interface) logger.Params {
+					logCfg := cfg.GetLogConfig()
+					appCfg := cfg.GetAppConfig()
+
+					// Convert log level string to logger.Level
+					var level logger.Level
+					switch logCfg.Level {
+					case "debug":
+						level = logger.DebugLevel
+					case "info":
+						level = logger.InfoLevel
+					case "warn":
+						level = logger.WarnLevel
+					case "error":
+						level = logger.ErrorLevel
+					default:
+						level = logger.InfoLevel
+					}
+
+					// Override level if debug mode is enabled
+					if appCfg.Debug {
+						level = logger.DebugLevel
+					}
+
 					return logger.Params{
 						Config: &logger.Config{
-							Level:       logger.InfoLevel,
-							Development: cfg.GetAppConfig().Debug,
-							Encoding:    "console",
+							Level:       level,
+							Development: appCfg.Debug || appCfg.Environment == "development",
+							Encoding:    logCfg.Format,
+							EnableColor: true, // Always enable color for console output
+							OutputPaths: []string{logCfg.Output},
 						},
-						App: cfg.GetAppConfig(),
+						App: appCfg,
 					}
 				},
 				fx.ResultTags(`name:"loggerParams"`),
 			),
 		),
-		fx.Invoke(func(config config.Interface) {
-			// Set debug mode in config
-			config.GetAppConfig().Debug = debug
-		}),
 		// Suppress Fx's default logging and use our logger format
 		fx.WithLogger(func(log logger.Interface) fxevent.Logger {
 			return log.NewFxLogger()
