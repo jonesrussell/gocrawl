@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -79,12 +80,12 @@ func (rm *ResourceManager) CloseResources(ctx context.Context, log logger.Interf
 			err := c()
 			if err == nil {
 				log.Info("Resource closed successfully",
-					"index", fmt.Sprint(idx),
+					"index", strconv.Itoa(idx),
 				)
 			} else {
 				log.Error("Failed to close resource",
-					"index", fmt.Sprint(idx),
 					"error", err,
+					"index", strconv.Itoa(idx),
 				)
 			}
 			done <- err
@@ -97,7 +98,7 @@ func (rm *ResourceManager) CloseResources(ctx context.Context, log logger.Interf
 			}
 		case <-ctx.Done():
 			log.Error("Timeout closing resource",
-				"index", fmt.Sprint(i),
+				"index", strconv.Itoa(i),
 				"error", ctx.Err(),
 			)
 			return ctx.Err()
