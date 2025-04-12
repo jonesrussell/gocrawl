@@ -68,7 +68,7 @@ func (rm *ResourceManager) SetCleanup(cleanup func()) {
 }
 
 // CloseResources safely closes all resources.
-func (rm *ResourceManager) CloseResources(ctx context.Context, logger logger.Interface) error {
+func (rm *ResourceManager) CloseResources(ctx context.Context, log logger.Interface) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
@@ -78,9 +78,14 @@ func (rm *ResourceManager) CloseResources(ctx context.Context, logger logger.Int
 		go func(idx int, c func() error) {
 			err := c()
 			if err == nil {
-				logger.Info("Resource closed successfully", "index", idx)
+				log.Info("Resource closed successfully",
+					"index", fmt.Sprint(idx),
+				)
 			} else {
-				logger.Error("Failed to close resource", "index", idx, "error", err)
+				log.Error("Failed to close resource",
+					"index", fmt.Sprint(idx),
+					"error", err,
+				)
 			}
 			done <- err
 		}(i, closer)
@@ -91,13 +96,16 @@ func (rm *ResourceManager) CloseResources(ctx context.Context, logger logger.Int
 				lastErr = err
 			}
 		case <-ctx.Done():
-			logger.Error("Timeout closing resource", "index", i, "error", ctx.Err())
+			log.Error("Timeout closing resource",
+				"index", fmt.Sprint(i),
+				"error", ctx.Err(),
+			)
 			return ctx.Err()
 		}
 	}
 
 	if rm.cleanup != nil {
-		logger.Info("Performing cleanup")
+		log.Info("Performing cleanup")
 		rm.cleanup()
 	}
 
@@ -123,7 +131,7 @@ func (am *AppManager) SetApp(app any) {
 }
 
 // StopApp stops the application gracefully.
-func (am *AppManager) StopApp(ctx context.Context, logger logger.Interface) error {
+func (am *AppManager) StopApp(ctx context.Context, log logger.Interface) error {
 	am.mu.Lock()
 	defer am.mu.Unlock()
 
@@ -148,11 +156,15 @@ func (am *AppManager) StopApp(ctx context.Context, logger logger.Interface) erro
 	select {
 	case err := <-done:
 		if err != nil {
-			logger.Error("Error stopping application", "error", err)
+			log.Error("Error stopping application",
+				"error", err,
+			)
 			return err
 		}
 	case <-ctx.Done():
-		logger.Error("Timeout stopping application", "error", ctx.Err())
+		log.Error("Timeout stopping application",
+			"error", ctx.Err(),
+		)
 		return ctx.Err()
 	}
 
@@ -175,9 +187,9 @@ type SignalHandler struct {
 }
 
 // NewSignalHandler creates a new signal handler.
-func NewSignalHandler(logger logger.Interface) *SignalHandler {
+func NewSignalHandler(log logger.Interface) *SignalHandler {
 	return &SignalHandler{
-		logger:          logger,
+		logger:          log,
 		Done:            make(chan struct{}),
 		shutdownChan:    make(chan struct{}),
 		state:           stateRunning,
@@ -201,12 +213,16 @@ func (h *SignalHandler) Setup(ctx context.Context) func() {
 		defer close(sigChan)
 
 		for sig := range sigChan {
-			h.logger.Info("Received signal", "signal", sig)
+			h.logger.Info("Received signal",
+				"signal", sig.String(),
+			)
 			if !h.IsShuttingDown() {
 				h.RequestShutdown()
 				return
 			} else {
-				h.logger.Info("Already shutting down, ignoring signal", "signal", sig)
+				h.logger.Info("Already shutting down, ignoring signal",
+					"signal", sig.String(),
+				)
 			}
 		}
 	}()
@@ -264,8 +280,8 @@ func (h *SignalHandler) GetState() string {
 }
 
 // SetLogger sets the logger for the handler.
-func (h *SignalHandler) SetLogger(logger logger.Interface) {
-	h.logger = logger
+func (h *SignalHandler) SetLogger(log logger.Interface) {
+	h.logger = log
 }
 
 // IsShuttingDown returns whether the handler is shutting down.
@@ -306,7 +322,9 @@ func (h *SignalHandler) shutdown() {
 	case <-h.shutdownChan:
 		// Continue with shutdown
 	case <-ctx.Done():
-		h.logger.Error("Shutdown timed out", "error", ctx.Err())
+		h.logger.Error("Shutdown timed out",
+			"error", ctx.Err(),
+		)
 		h.shutdownError = ctx.Err()
 		h.stateMu.Lock()
 		h.state = stateShutdownComplete
@@ -317,13 +335,17 @@ func (h *SignalHandler) shutdown() {
 
 	// Close resources
 	if err := h.resourceManager.CloseResources(ctx, h.logger); err != nil {
-		h.logger.Error("Error closing resources", "error", err)
+		h.logger.Error("Error closing resources",
+			"error", err,
+		)
 		h.shutdownError = err
 	}
 
 	// Stop the Fx application if set
 	if err := h.appManager.StopApp(ctx, h.logger); err != nil {
-		h.logger.Error("Error stopping application", "error", err)
+		h.logger.Error("Error stopping application",
+			"error", err,
+		)
 		h.shutdownError = err
 	}
 

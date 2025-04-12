@@ -25,26 +25,38 @@ type mockLogger struct {
 	mock.Mock
 }
 
-func (m *mockLogger) Info(msg string, fields ...any)    { m.Called(msg, fields) }
-func (m *mockLogger) Error(msg string, fields ...any)   { m.Called(msg, fields) }
-func (m *mockLogger) Debug(msg string, fields ...any)   { m.Called(msg, fields) }
-func (m *mockLogger) Warn(msg string, fields ...any)    { m.Called(msg, fields) }
-func (m *mockLogger) Fatal(msg string, fields ...any)   { m.Called(msg, fields) }
-func (m *mockLogger) Printf(format string, args ...any) { m.Called(format, args) }
-func (m *mockLogger) Errorf(format string, args ...any) { m.Called(format, args) }
-func (m *mockLogger) Sync() error                       { return m.Called().Error(0) }
-func (m *mockLogger) With(fields ...any) logger.Interface {
+func (m *mockLogger) Debug(msg string, fields ...logger.Field) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) Info(msg string, fields ...logger.Field) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) Warn(msg string, fields ...logger.Field) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) Error(msg string, fields ...logger.Field) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) Fatal(msg string, fields ...logger.Field) {
+	m.Called(msg, fields)
+}
+
+func (m *mockLogger) With(fields ...logger.Field) logger.Interface {
 	args := m.Called(fields)
-	if result, ok := args.Get(0).(logger.Interface); ok {
-		return result
+	if ret, ok := args.Get(0).(logger.Interface); ok {
+		return ret
 	}
 	return m
 }
 
 func (m *mockLogger) NewFxLogger() fxevent.Logger {
 	args := m.Called()
-	if result, ok := args.Get(0).(fxevent.Logger); ok {
-		return result
+	if ret, ok := args.Get(0).(fxevent.Logger); ok {
+		return ret
 	}
 	return &fxevent.NopLogger
 }

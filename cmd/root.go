@@ -13,6 +13,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 
 	"github.com/joho/godotenv"
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
@@ -373,7 +374,14 @@ func initLogger() error {
 	}
 
 	// Log the current log level
-	log.Debug("Logger initialized", "level", logLevel, "debug", debug)
+	log.Debug("Root logger initialized",
+		zap.String("level", logLevel),
+		zap.Bool("debug", debug),
+		zap.Bool("development", logConfig.Development))
+	log.Info("Root logger ready",
+		zap.String("level", logLevel),
+		zap.Bool("debug", debug),
+		zap.Bool("development", logConfig.Development))
 
 	return nil
 }

@@ -5,7 +5,7 @@ import (
 	"go.uber.org/fx/fxevent"
 )
 
-// NopLogger is a no-op implementation of logger.Interface
+// NopLogger is a no-op logger for testing.
 type NopLogger struct{}
 
 // NewNopLogger creates a new no-op logger.
@@ -13,17 +13,17 @@ func NewNopLogger() logger.Interface {
 	return &NopLogger{}
 }
 
-// Debug implements logger.Interface
-func (l *NopLogger) Debug(msg string, fields ...any) {}
+// Debug logs a debug message.
+func (l *NopLogger) Debug(msg string, fields ...logger.Field) {}
 
-// Info implements logger.Interface
-func (l *NopLogger) Info(msg string, fields ...any) {}
+// Info logs an info message.
+func (l *NopLogger) Info(msg string, fields ...logger.Field) {}
 
-// Warn implements logger.Interface
-func (l *NopLogger) Warn(msg string, fields ...any) {}
+// Warn logs a warning message.
+func (l *NopLogger) Warn(msg string, fields ...logger.Field) {}
 
-// Error implements logger.Interface
-func (l *NopLogger) Error(msg string, fields ...any) {}
+// Error logs an error message.
+func (l *NopLogger) Error(msg string, fields ...logger.Field) {}
 
 // Errorf implements logger.Interface
 func (l *NopLogger) Errorf(format string, args ...any) {}
@@ -36,11 +36,11 @@ func (l *NopLogger) Sync() error {
 	return nil
 }
 
-// Fatal implements logger.Interface
-func (l *NopLogger) Fatal(msg string, fields ...any) {}
+// Fatal logs a fatal message and exits.
+func (l *NopLogger) Fatal(msg string, fields ...logger.Field) {}
 
-// With implements logger.Interface
-func (l *NopLogger) With(fields ...any) logger.Interface {
+// With creates a new logger with the given fields.
+func (l *NopLogger) With(fields ...logger.Field) logger.Interface {
 	return l
 }
 

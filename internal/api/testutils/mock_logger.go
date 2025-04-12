@@ -7,49 +7,48 @@ import (
 	"go.uber.org/fx/fxevent"
 )
 
-// MockLogger implements logger.Interface for testing.
+// MockLogger is a mock logger for testing.
 type MockLogger struct {
 	mock.Mock
 }
 
-// NewMockLogger creates a new mock logger instance.
+// NewMockLogger creates a new mock logger.
 func NewMockLogger() *MockLogger {
 	return &MockLogger{}
 }
 
-// Info implements logger.Interface.
-func (m *MockLogger) Info(msg string, fields ...any) {
+// Debug logs a debug message.
+func (m *MockLogger) Debug(msg string, fields ...logger.Field) {
 	m.Called(msg, fields)
 }
 
-// Error implements logger.Interface.
-func (m *MockLogger) Error(msg string, fields ...any) {
+// Info logs an info message.
+func (m *MockLogger) Info(msg string, fields ...logger.Field) {
 	m.Called(msg, fields)
 }
 
-// Debug implements logger.Interface.
-func (m *MockLogger) Debug(msg string, fields ...any) {
+// Warn logs a warning message.
+func (m *MockLogger) Warn(msg string, fields ...logger.Field) {
 	m.Called(msg, fields)
 }
 
-// Warn implements logger.Interface.
-func (m *MockLogger) Warn(msg string, fields ...any) {
+// Error logs an error message.
+func (m *MockLogger) Error(msg string, fields ...logger.Field) {
 	m.Called(msg, fields)
 }
 
-// Fatal implements logger.Interface.
-func (m *MockLogger) Fatal(msg string, fields ...any) {
+// Fatal logs a fatal message and exits.
+func (m *MockLogger) Fatal(msg string, fields ...logger.Field) {
 	m.Called(msg, fields)
 }
 
-// With implements logger.Interface.
-func (m *MockLogger) With(fields ...any) logger.Interface {
+// With creates a new logger with the given fields.
+func (m *MockLogger) With(fields ...logger.Field) logger.Interface {
 	args := m.Called(fields)
-	if result, ok := args.Get(0).(logger.Interface); ok {
-		return result
+	if ret, ok := args.Get(0).(logger.Interface); ok {
+		return ret
 	}
-	// Return a default logger if type assertion fails
-	return NewMockLogger()
+	return m
 }
 
 // NewFxLogger implements logger.Interface

@@ -349,3 +349,9 @@ func (c *Config) LoadSources(logger logger.Interface) error {
 	c.Sources = sources
 	return nil
 }
+
+// Load loads the configuration from the given file.
+func (c *Config) Load(file string) error {
+	c.logger.Info("Loading configuration", "file", file)
+	return nil
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
+	"go.uber.org/zap"
 )
 
 // Cmd represents the crawl command.
@@ -35,7 +36,12 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		return errors.New("logger not found in context")
 	}
 
-	log.Info("Setting up crawl", "source", sourceName)
+	log.Debug("Crawl command starting",
+		zap.String("source", sourceName),
+		zap.Bool("debug", cmd.Flag("debug").Value.String() == "true"))
+	log.Info("Setting up crawl",
+		zap.String("source", sourceName),
+		zap.Bool("debug", cmd.Flag("debug").Value.String() == "true"))
 
 	// Set debug mode from configuration
 	config := common.GetConfigFromContext(cmdCtx)
@@ -45,10 +51,9 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	debug := config.GetBool("app.debug") || config.GetString("logger.level") == "debug"
 	if debug {
 		log.Debug("Debug mode enabled",
-			"app.debug", config.GetBool("app.debug"),
-			"logger.level", config.GetString("logger.level"),
-			"config_development", config.GetBool("logger.development"),
-		)
+			zap.Bool("app.debug", config.GetBool("app.debug")),
+			zap.String("logger.level", config.GetString("logger.level")),
+			zap.Bool("config_development", config.GetBool("logger.development")))
 	}
 
 	// Log important configuration values once
@@ -66,10 +71,9 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 
 	// Initialize the Fx application.
 	log.Debug("Initializing Fx application with modules",
-		"source", sourceName,
-		"context_available", cmdCtx != nil,
-		"logger_available", log != nil,
-	)
+		zap.String("source", sourceName),
+		zap.Bool("context_available", cmdCtx != nil),
+		zap.Bool("logger_available", log != nil))
 
 	var handler signal.Interface
 	fxApp := fx.New(
@@ -92,9 +96,9 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		fx.WithLogger(func(log logger.Interface) fxevent.Logger {
 			// Create a new logger with debug level for Fx events
 			fxLog := log.With(
-				"component", "fx",
-				"debug", debug,
-				"source", sourceName,
+				zap.String("component", "fx"),
+				zap.Bool("debug", debug),
+				zap.String("source", sourceName),
 			)
 			// Create Fx logger with debug level
 			fxLogger := logger.NewFxLogger(fxLog)
