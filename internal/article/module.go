@@ -33,8 +33,38 @@ var Module = fx.Options(
 		NewArticleManager,
 		NewArticleService,
 		fx.Annotate(
-			ProvideArticleProcessor,
-			fx.ResultTags(`group:"processors"`, `name:"articleProcessor"`),
+			func(
+				logger logger.Interface,
+				config config.Interface,
+				storage storagetypes.Interface,
+				jobService common.JobService,
+			) (*ArticleProcessor, error) {
+				selectors := types.ArticleSelectors{
+					Title:         "h1",
+					Description:   "meta[name=description]",
+					Author:        ".author",
+					PublishedTime: "time[datetime]",
+					Body:          "article",
+				}
+
+				service := NewService(
+					logger,
+					selectors,
+					storage,
+					"articles",
+				)
+
+				return &ArticleProcessor{
+					Logger:         logger,
+					ArticleService: service,
+					Storage:        storage,
+					IndexName:      "articles",
+					ArticleChan:    make(chan *models.Article, ArticleChannelBufferSize),
+					JobService:     jobService,
+					metrics:        &common.Metrics{},
+				}, nil
+			},
+			fx.ResultTags(`name:"articleProcessor"`),
 			fx.As(new(common.Processor)),
 		),
 	),
@@ -87,37 +117,6 @@ func NewArticleService(
 	}
 
 	return service
-}
-
-// ProvideArticleProcessor provides the article processor.
-func ProvideArticleProcessor(
-	logger logger.Interface,
-	config config.Interface,
-	storage storagetypes.Interface,
-) (*ArticleProcessor, error) {
-	selectors := types.ArticleSelectors{
-		Title:         "h1",
-		Description:   "meta[name=description]",
-		Author:        ".author",
-		PublishedTime: "time[datetime]",
-		Body:          "article",
-	}
-
-	service := NewService(
-		logger,
-		selectors,
-		storage,
-		"articles",
-	)
-
-	return &ArticleProcessor{
-		Logger:         logger,
-		ArticleService: service,
-		Storage:        storage,
-		IndexName:      "articles",
-		ArticleChan:    make(chan *models.Article, ArticleChannelBufferSize),
-		metrics:        &common.Metrics{},
-	}, nil
 }
 
 // NewProcessor creates a new article processor.

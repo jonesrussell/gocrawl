@@ -18,6 +18,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -51,6 +52,13 @@ var Module = fx.Module("crawl",
 				return make(chan *models.Article, 100)
 			},
 			fx.ResultTags(`name:"crawlerArticleChannel"`),
+		),
+		// Provide content index name
+		fx.Annotate(
+			func() string {
+				return "content"
+			},
+			fx.ResultTags(`name:"contentIndexName"`),
 		),
 		// Provide sources
 		fx.Annotate(
@@ -98,13 +106,39 @@ var Module = fx.Module("crawl",
 		),
 		// Provide processors
 		fx.Annotate(
-			func(articleProcessor, contentProcessor common.Processor) []common.Processor {
-				if articleProcessor == nil || contentProcessor == nil {
-					return nil
+			func(in struct {
+				fx.In
+				ArticleProcessor common.Processor `name:"articleProcessor"`
+				ContentProcessor common.Processor `name:"contentProcessor"`
+			}) []common.Processor {
+				return []common.Processor{
+					in.ArticleProcessor,
+					in.ContentProcessor,
 				}
-				return []common.Processor{articleProcessor, contentProcessor}
 			},
-			fx.ParamTags(`name:"articleProcessor" group:"processors"`, `name:"contentProcessor" group:"processors"`),
+		),
+		// Provide JobService
+		fx.Annotate(
+			ProvideJobService,
+			fx.As(new(common.JobService)),
+		),
+		// Provide content processor params
+		fx.Annotate(
+			func(p struct {
+				fx.In
+				Logger    logger.Interface
+				Service   content.Interface
+				Storage   storagetypes.Interface
+				IndexName string `name:"contentIndexName"`
+			}) content.ProcessorParams {
+				return content.ProcessorParams{
+					Logger:    p.Logger,
+					Service:   p.Service,
+					Storage:   p.Storage,
+					IndexName: p.IndexName,
+				}
+			},
+			fx.ResultTags(`name:"contentProcessorParams"`),
 		),
 	),
 )
