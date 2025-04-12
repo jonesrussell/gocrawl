@@ -45,6 +45,17 @@ It provides a flexible and extensible framework for building custom crawlers.`,
 	log logger.Interface
 )
 
+const (
+	defaultCrawlerMaxDepth      = 10
+	defaultCrawlerMaxRetries    = 3
+	defaultStorageBatchSize     = 100
+	defaultElasticsearchRetries = 3
+	logLevelDebug               = "debug"
+	logLevelInfo                = "info"
+	logLevelWarn                = "warn"
+	logLevelError               = "error"
+)
+
 // bindEnvVars binds environment variables to configuration keys
 func bindEnvVars() error {
 	// App configuration
@@ -94,7 +105,10 @@ func bindEnvVars() error {
 	if err := viper.BindEnv("elasticsearch.discover_nodes", "ELASTICSEARCH_DISCOVER_NODES"); err != nil {
 		return fmt.Errorf("failed to bind elasticsearch.discover_nodes: %w", err)
 	}
-	if err := viper.BindEnv("elasticsearch.tls_insecure_skip_verify", "ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY"); err != nil {
+	if err := viper.BindEnv(
+		"elasticsearch.tls_insecure_skip_verify",
+		"ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY",
+	); err != nil {
 		return fmt.Errorf("failed to bind elasticsearch.tls_insecure_skip_verify: %w", err)
 	}
 	if err := viper.BindEnv("elasticsearch.ca_fingerprint", "ELASTICSEARCH_CA_FINGERPRINT"); err != nil {
@@ -170,22 +184,22 @@ func setDefaults() {
 	viper.SetDefault("logger.enable_color", true)
 
 	// Crawler defaults
-	viper.SetDefault("crawler.max_depth", 10)
-	viper.SetDefault("crawler.max_retries", 3)
+	viper.SetDefault("crawler.max_depth", defaultCrawlerMaxDepth)
+	viper.SetDefault("crawler.max_retries", defaultCrawlerMaxRetries)
 	viper.SetDefault("crawler.rate_limit", "1s")
 	viper.SetDefault("crawler.timeout", "30s")
 	viper.SetDefault("crawler.user_agent", "GoCrawl/1.0")
 
 	// Storage defaults
 	viper.SetDefault("storage.type", "elasticsearch")
-	viper.SetDefault("storage.batch_size", 100)
+	viper.SetDefault("storage.batch_size", defaultStorageBatchSize)
 	viper.SetDefault("storage.flush_interval", "5s")
 
 	// Elasticsearch defaults
 	viper.SetDefault("elasticsearch.url", "https://localhost:9200")
 	viper.SetDefault("elasticsearch.sniff", false)
 	viper.SetDefault("elasticsearch.healthcheck", true)
-	viper.SetDefault("elasticsearch.retry_on_conflict", 3)
+	viper.SetDefault("elasticsearch.retry_on_conflict", defaultElasticsearchRetries)
 }
 
 // loadEnvFile loads environment variables from .env file if it exists
@@ -226,7 +240,8 @@ func loadConfigFile() error {
 
 	// Read the config file
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFoundError) {
 			return fmt.Errorf("failed to read config file: %w", err)
 		}
 		// Config file not found is not an error - we'll use defaults
@@ -326,7 +341,7 @@ func validateConfig(cmd *cobra.Command) error {
 
 	// Validate log level
 	logLevel := viper.GetString("log.level")
-	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
+	if logLevel != logLevelDebug && logLevel != logLevelInfo && logLevel != logLevelWarn && logLevel != logLevelError {
 		return fmt.Errorf("invalid log level: %s", logLevel)
 	}
 
@@ -422,7 +437,12 @@ func Execute() {
 // init initializes the root command and its subcommands.
 func init() {
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yaml, ~/.crawler/config.yaml, or /etc/crawler/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(
+		&cfgFile,
+		"config",
+		"",
+		"config file (default is ./config.yaml, ~/.crawler/config.yaml, or /etc/crawler/config.yaml)",
+	)
 	rootCmd.PersistentFlags().BoolVar(&Debug, "debug", false, "enable debug mode")
 
 	// Initialize configuration on startup

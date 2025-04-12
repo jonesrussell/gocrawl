@@ -31,7 +31,8 @@ const (
 	// ArticleChannelBufferSize is the buffer size for the article channel.
 	ArticleChannelBufferSize = 100
 	// DefaultInitTimeout is the default timeout for module initialization.
-	DefaultInitTimeout = 30 * time.Second
+	DefaultInitTimeout       = 30 * time.Second
+	articleChannelBufferSize = 100
 )
 
 // Module provides the crawl command module for dependency injection.
@@ -48,7 +49,7 @@ var Module = fx.Module("crawl",
 		// Provide article channel
 		fx.Annotate(
 			func() chan *models.Article {
-				return make(chan *models.Article, 100)
+				return make(chan *models.Article, articleChannelBufferSize)
 			},
 			fx.ResultTags(`name:"crawlerArticleChannel"`),
 		),
