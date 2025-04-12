@@ -37,41 +37,54 @@ var Module = fx.Module("logger",
 					EncodeCaller:   zapcore.ShortCallerEncoder,
 				}
 
-				// Always enable color in development mode
-				encoderConfig.EncodeLevel = func(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
-					var color string
-					switch l {
-					case zapcore.DebugLevel:
-						color = ColorDebug
-					case zapcore.InfoLevel:
-						color = ColorInfo
-					case zapcore.WarnLevel:
-						color = ColorWarn
-					case zapcore.ErrorLevel:
-						color = ColorError
-					case zapcore.DPanicLevel:
-						color = ColorError
-					case zapcore.PanicLevel:
-						color = ColorError
-					case zapcore.FatalLevel:
-						color = ColorFatal
-					case zapcore.InvalidLevel:
-						color = ColorReset
-					default:
-						color = ColorReset
+				// Set color encoding based on config
+				if params.Config != nil && params.Config.EnableColor {
+					encoderConfig.EncodeLevel = func(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+						var color string
+						switch l {
+						case zapcore.DebugLevel:
+							color = ColorDebug
+						case zapcore.InfoLevel:
+							color = ColorInfo
+						case zapcore.WarnLevel:
+							color = ColorWarn
+						case zapcore.ErrorLevel:
+							color = ColorError
+						case zapcore.DPanicLevel:
+							color = ColorError
+						case zapcore.PanicLevel:
+							color = ColorError
+						case zapcore.FatalLevel:
+							color = ColorFatal
+						case zapcore.InvalidLevel:
+							color = ColorReset
+						default:
+							color = ColorReset
+						}
+						enc.AppendString(color + l.CapitalString() + ColorReset)
 					}
-					enc.AppendString(color + l.CapitalString() + ColorReset)
+				} else {
+					encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 				}
 
-				// Create core with debug level if debug flag is set
-				var core zapcore.Core
+				// Set log level based on config and debug flag
 				level := zapcore.InfoLevel
+				if params.Config != nil {
+					level = levelToZap(params.Config.Level)
+				}
 				if params.App != nil && params.App.Debug {
 					level = zapcore.DebugLevel
 					fmt.Fprintf(os.Stderr, "Debug mode enabled, setting log level to DEBUG\n")
 				}
 
-				if config := params.Config; config != nil && config.Encoding == "json" {
+				// Create core with appropriate encoder based on config
+				var core zapcore.Core
+				encoding := "console"
+				if params.Config != nil {
+					encoding = params.Config.Encoding
+				}
+
+				if encoding == "json" {
 					core = zapcore.NewCore(
 						zapcore.NewJSONEncoder(encoderConfig),
 						zapcore.AddSync(os.Stdout),

@@ -9,7 +9,6 @@ import (
 
 	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/cmd/common/signal"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
@@ -65,44 +64,6 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 			fx.Annotate(
 				func() logger.Interface { return log },
 				fx.As(new(logger.Interface)),
-			),
-			fx.Annotate(
-				func(cfg config.Interface) logger.Params {
-					logCfg := cfg.GetLogConfig()
-					appCfg := cfg.GetAppConfig()
-
-					// Convert log level string to logger.Level
-					var level logger.Level
-					switch logCfg.Level {
-					case "debug":
-						level = logger.DebugLevel
-					case "info":
-						level = logger.InfoLevel
-					case "warn":
-						level = logger.WarnLevel
-					case "error":
-						level = logger.ErrorLevel
-					default:
-						level = logger.InfoLevel
-					}
-
-					// Override level if debug mode is enabled
-					if appCfg.Debug {
-						level = logger.DebugLevel
-					}
-
-					return logger.Params{
-						Config: &logger.Config{
-							Level:       level,
-							Development: appCfg.Debug || appCfg.Environment == "development",
-							Encoding:    logCfg.Format,
-							EnableColor: true, // Always enable color for console output
-							OutputPaths: []string{logCfg.Output},
-						},
-						App: appCfg,
-					}
-				},
-				fx.ResultTags(`name:"loggerParams"`),
 			),
 		),
 		// Suppress Fx's default logging and use our logger format

@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/joho/godotenv"
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
 	httpdcmd "github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/indices"
@@ -36,7 +38,6 @@ var (
 		Short: "A web crawler for collecting and processing content",
 		Long: `gocrawl is a web crawler that helps you collect and process content from various sources.
 It provides a flexible and extensible framework for building custom crawlers.`,
-		PersistentPreRunE: setupConfig,
 	}
 
 	// log is the global logger instance
@@ -186,19 +187,116 @@ func setDefaults() {
 	viper.SetDefault("elasticsearch.retry_on_conflict", 3)
 }
 
+// printConfig prints the current configuration for debugging
+func printConfig() {
+	fmt.Println("\nConfiguration Load Order:")
+	fmt.Println("1. Default Values:")
+	fmt.Printf("   - app.name: %v\n", viper.Get("app.name"))
+	fmt.Printf("   - app.environment: %v\n", viper.Get("app.environment"))
+	fmt.Printf("   - app.debug: %v\n", viper.Get("app.debug"))
+	fmt.Printf("   - logger.level: %v\n", viper.Get("logger.level"))
+	fmt.Printf("   - logger.format: %v\n", viper.Get("logger.format"))
+	fmt.Printf("   - elasticsearch.hosts: %v\n", viper.Get("elasticsearch.hosts"))
+	fmt.Printf("   - elasticsearch.username: %v\n", viper.Get("elasticsearch.username"))
+	fmt.Printf("   - elasticsearch.password: %v\n", viper.Get("elasticsearch.password"))
+	fmt.Printf("   - crawler.max_depth: %v\n", viper.Get("crawler.max_depth"))
+	fmt.Printf("   - crawler.rate_limit: %v\n", viper.Get("crawler.rate_limit"))
+
+	fmt.Println("\n2. Environment Variables:")
+	fmt.Printf("   - APP_NAME: %v\n", os.Getenv("APP_NAME"))
+	fmt.Printf("   - APP_ENV: %v\n", os.Getenv("APP_ENV"))
+	fmt.Printf("   - APP_DEBUG: %v\n", os.Getenv("APP_DEBUG"))
+	fmt.Printf("   - LOG_LEVEL: %v\n", os.Getenv("LOG_LEVEL"))
+	fmt.Printf("   - LOG_FORMAT: %v\n", os.Getenv("LOG_FORMAT"))
+	fmt.Printf("   - ELASTICSEARCH_HOSTS: %v\n", os.Getenv("ELASTICSEARCH_HOSTS"))
+	fmt.Printf("   - ELASTICSEARCH_USERNAME: %v\n", os.Getenv("ELASTICSEARCH_USERNAME"))
+	fmt.Printf("   - ELASTICSEARCH_PASSWORD: %v\n", os.Getenv("ELASTICSEARCH_PASSWORD"))
+	fmt.Printf("   - CRAWLER_MAX_DEPTH: %v\n", os.Getenv("CRAWLER_MAX_DEPTH"))
+	fmt.Printf("   - CRAWLER_RATE_LIMIT: %v\n", os.Getenv("CRAWLER_RATE_LIMIT"))
+
+	fmt.Println("\n3. Config File Values:")
+	if viper.ConfigFileUsed() != "" {
+		fmt.Printf("   Using config file: %v\n", viper.ConfigFileUsed())
+		fmt.Printf("   - app.name: %v\n", viper.Get("app.name"))
+		fmt.Printf("   - app.environment: %v\n", viper.Get("app.environment"))
+		fmt.Printf("   - app.debug: %v\n", viper.Get("app.debug"))
+		fmt.Printf("   - logger.level: %v\n", viper.Get("logger.level"))
+		fmt.Printf("   - logger.format: %v\n", viper.Get("logger.format"))
+		fmt.Printf("   - elasticsearch.hosts: %v\n", viper.Get("elasticsearch.hosts"))
+		fmt.Printf("   - elasticsearch.username: %v\n", viper.Get("elasticsearch.username"))
+		fmt.Printf("   - elasticsearch.password: %v\n", viper.Get("elasticsearch.password"))
+		fmt.Printf("   - crawler.max_depth: %v\n", viper.Get("crawler.max_depth"))
+		fmt.Printf("   - crawler.rate_limit: %v\n", viper.Get("crawler.rate_limit"))
+	} else {
+		fmt.Println("   No config file used")
+	}
+
+	fmt.Println("\n4. Final Values (after all sources):")
+	fmt.Printf("   - app.name: %v\n", viper.Get("app.name"))
+	fmt.Printf("   - app.environment: %v\n", viper.Get("app.environment"))
+	fmt.Printf("   - app.debug: %v\n", viper.Get("app.debug"))
+	fmt.Printf("   - logger.level: %v\n", viper.Get("logger.level"))
+	fmt.Printf("   - logger.format: %v\n", viper.Get("logger.format"))
+	fmt.Printf("   - elasticsearch.hosts: %v\n", viper.Get("elasticsearch.hosts"))
+	fmt.Printf("   - elasticsearch.username: %v\n", viper.Get("elasticsearch.username"))
+	fmt.Printf("   - elasticsearch.password: %v\n", viper.Get("elasticsearch.password"))
+	fmt.Printf("   - crawler.max_depth: %v\n", viper.Get("crawler.max_depth"))
+	fmt.Printf("   - crawler.rate_limit: %v\n", viper.Get("crawler.rate_limit"))
+}
+
+// bindFlags binds all command flags to viper configuration.
+func bindFlags(cmd *cobra.Command) error {
+	// Bind persistent flags
+	if err := viper.BindPFlag("app.debug", cmd.PersistentFlags().Lookup("debug")); err != nil {
+		return fmt.Errorf("failed to bind debug flag: %w", err)
+	}
+
+	if err := viper.BindPFlag("app.config_file", cmd.PersistentFlags().Lookup("config")); err != nil {
+		return fmt.Errorf("failed to bind config flag: %w", err)
+	}
+
+	// Bind command-specific flags
+	if cmd.Name() == "crawl" {
+		if err := viper.BindPFlag("crawler.max_depth", cmd.Flags().Lookup("depth")); err != nil {
+			return fmt.Errorf("failed to bind depth flag: %w", err)
+		}
+		if err := viper.BindPFlag("crawler.rate_limit", cmd.Flags().Lookup("rate-limit")); err != nil {
+			return fmt.Errorf("failed to bind rate-limit flag: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // setupConfig handles configuration file setup for all commands.
 // It ensures the config file path is absolute and configures Viper.
 func setupConfig(cmd *cobra.Command, args []string) error {
-	// Set default values first
+	// Step 1: Set default values first
 	setDefaults()
+	if Debug {
+		fmt.Println("\nStep 1: After setting defaults:")
+		printConfig()
+	}
 
-	// Enable environment variable binding
+	// Step 2: Enable environment variable binding
 	viper.AutomaticEnv()
 	if err := bindEnvVars(); err != nil {
 		return fmt.Errorf("failed to bind environment variables: %w", err)
 	}
 
-	// Get the absolute path to the config file if specified
+	// Step 3: Load .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to load .env file: %w", err)
+		}
+		// .env file not found is not an error - we'll use environment variables
+	}
+	if Debug {
+		fmt.Println("\nStep 2 & 3: After binding environment variables and loading .env:")
+		printConfig()
+	}
+
+	// Step 4: Get the absolute path to the config file if specified
 	if cfgFile != "" {
 		absPath, err := filepath.Abs(cfgFile)
 		if err != nil {
@@ -222,32 +320,104 @@ func setupConfig(cmd *cobra.Command, args []string) error {
 		viper.AddConfigPath("/etc/crawler")                  // System config directory
 	}
 
-	// Read the config file
+	// Step 5: Read the config file
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return fmt.Errorf("failed to read config file: %w", err)
 		}
 		// Config file not found is not an error - we'll use defaults
 	}
+	if Debug {
+		fmt.Println("\nStep 4 & 5: After reading config file:")
+		printConfig()
+	}
 
-	// Set debug mode from command line flag
-	viper.Set("app.debug", Debug)
+	// Step 6: Bind command flags to viper
+	if err := bindFlags(cmd); err != nil {
+		return fmt.Errorf("failed to bind flags: %w", err)
+	}
+
+	// Step 7: Validate configuration
+	if err := validateConfig(cmd); err != nil {
+		return fmt.Errorf("configuration validation failed: %w", err)
+	}
+
+	if Debug {
+		fmt.Println("\nStep 6 & 7: After binding flags and validation:")
+		printConfig()
+	}
+
+	return nil
+}
+
+// validateConfig performs configuration validation based on the current command.
+func validateConfig(cmd *cobra.Command) error {
+	// Validate app configuration
+	if !viper.IsSet("app.name") {
+		return errors.New("app.name is required")
+	}
+	if !viper.IsSet("app.environment") {
+		return errors.New("app.environment is required")
+	}
+
+	// Command-specific validation
+	switch cmd.Name() {
+	case "crawl":
+		if !viper.IsSet("crawler.base_url") {
+			return errors.New("crawler.base_url is required for crawl command")
+		}
+		if !viper.IsSet("elasticsearch.url") {
+			return errors.New("elasticsearch.url is required for crawl command")
+		}
+	case "search":
+		if !viper.IsSet("elasticsearch.url") {
+			return errors.New("elasticsearch.url is required for search command")
+		}
+	}
+
+	// Validate environment
+	env := viper.GetString("app.environment")
+	if env != "development" && env != "staging" && env != "production" {
+		return fmt.Errorf("invalid environment: %s", env)
+	}
+
+	// Validate log level
+	logLevel := viper.GetString("log.level")
+	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
+		return fmt.Errorf("invalid log level: %s", logLevel)
+	}
 
 	return nil
 }
 
 // initLogger initializes the global logger instance
 func initLogger() error {
-	// Create logger with debug level if debug flag is set
-	logConfig := &logger.Config{
-		Level:       logger.InfoLevel,
-		Development: Debug,
-		Encoding:    "console",
-		EnableColor: true,
-		OutputPaths: []string{"stdout"},
+	// Get log level from config
+	logLevel := viper.GetString("logger.level")
+	level := logger.InfoLevel
+	switch logLevel {
+	case "debug":
+		level = logger.DebugLevel
+	case "info":
+		level = logger.InfoLevel
+	case "warn":
+		level = logger.WarnLevel
+	case "error":
+		level = logger.ErrorLevel
 	}
+
+	// Override with debug flag if set
 	if Debug {
-		logConfig.Level = logger.DebugLevel
+		level = logger.DebugLevel
+	}
+
+	// Create logger with configuration
+	logConfig := &logger.Config{
+		Level:       level,
+		Development: Debug,
+		Encoding:    viper.GetString("logger.format"),
+		EnableColor: viper.GetBool("logger.enable_color"),
+		OutputPaths: []string{viper.GetString("logger.output")},
 	}
 
 	var err error
@@ -291,26 +461,10 @@ func Execute() {
 }
 
 // init initializes the root command and its subcommands.
-// It sets up:
-// - The persistent --config flag for specifying the configuration file
-// - The persistent --debug flag for enabling debug mode
-// - Adds all subcommands for managing different aspects of the crawler:
-//   - indices: For managing Elasticsearch indices
-//   - sources: For managing web content sources
-//   - crawl: For crawling web content
-//   - httpd: For running the HTTP server
-//   - job: For managing scheduled crawl jobs
-//   - search: For searching content in Elasticsearch
 func init() {
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yaml, ~/.gocrawl/config.yaml, or /etc/gocrawl/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yaml, ~/.crawler/config.yaml, or /etc/crawler/config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&Debug, "debug", false, "enable debug mode")
-
-	// Bind flags to viper immediately
-	if err := viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug")); err != nil {
-		fmt.Fprintf(os.Stderr, "Error binding debug flag: %v\n", err)
-		os.Exit(1)
-	}
 
 	// Initialize configuration on startup
 	cobra.OnInitialize(func() {
@@ -319,4 +473,7 @@ func init() {
 			os.Exit(1)
 		}
 	})
+
+	// Remove the PersistentPreRunE to avoid double loading
+	rootCmd.PersistentPreRunE = nil
 }
