@@ -42,4 +42,46 @@ const (
 
 	// DefaultFlushInterval is the default flush interval.
 	DefaultFlushInterval = 30 * time.Second
+
+	// DefaultRandomDelayFactor is used to calculate random delay for rate limiting
+	DefaultRandomDelayFactor = 2
+
+	// DefaultParallelism is the default number of parallel requests
+	DefaultParallelism = 2
+
+	// DefaultStartTimeout is the default timeout for starting the crawler
+	DefaultStartTimeout = 30 * time.Second
+
+	// DefaultStopTimeout is the default timeout for stopping the crawler
+	DefaultStopTimeout = 30 * time.Second
+
+	// DefaultPollInterval is the default interval for polling crawler status
+	DefaultPollInterval = 100 * time.Millisecond
+
+	// DefaultMaxRetries is the default number of retries for failed requests
+	DefaultMaxRetries = 3
+
+	// DefaultMaxDepth is the default maximum depth for crawling
+	DefaultMaxDepth = 2
+
+	// DefaultRateLimit is the default rate limit for requests
+	DefaultRateLimit = 2 * time.Second
+
+	// DefaultRandomDelay is the default random delay between requests
+	DefaultRandomDelay = 5 * time.Second
+
+	// DefaultBufferSize is the default size for channel buffers
+	DefaultBufferSize = 100
+
+	// DefaultMaxConcurrency is the default maximum number of concurrent requests
+	DefaultMaxConcurrency = 2
+
+	// DefaultTestSleepDuration is the default sleep duration for tests
+	DefaultTestSleepDuration = 100 * time.Millisecond
+
+	// DefaultZapFieldsCapacity is the default capacity for zap fields slice.
+	DefaultZapFieldsCapacity = 2
+
+	// CollectorStartTimeout is the timeout for collector initialization
+	CollectorStartTimeout = 5 * time.Second
 )

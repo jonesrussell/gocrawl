@@ -14,6 +14,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
@@ -70,6 +71,7 @@ type Crawler struct {
 	processors       []common.Processor
 	linkHandler      *LinkHandler
 	htmlProcessor    *HTMLProcessor
+	cfg              *crawler.Config
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -132,14 +134,18 @@ func (c *Crawler) setupCollector(source *types.Source) {
 		colly.Async(true),
 		colly.ParseHTTPErrorResponse(),
 		colly.IgnoreRobotsTxt(),
-		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"),
+		colly.UserAgent(c.cfg.UserAgent),
 		colly.AllowURLRevisit(),
-		colly.Debugger(&debug.LogDebugger{}),
 	}
 
 	// Only set allowed domains if they are configured
 	if len(source.AllowedDomains) > 0 {
 		opts = append(opts, colly.AllowedDomains(source.AllowedDomains...))
+	}
+
+	// Configure debug logging if enabled
+	if c.cfg.Debug {
+		opts = append(opts, colly.Debugger(&debug.LogDebugger{}))
 	}
 
 	c.collector = colly.NewCollector(opts...)
