@@ -39,7 +39,7 @@ var Module = fx.Module("content",
 			NewContentService,
 			fx.As(new(Interface)),
 		),
-		// Provide the content processor params
+		// Provide the content processor
 		fx.Annotate(
 			func(p struct {
 				fx.In
@@ -47,20 +47,13 @@ var Module = fx.Module("content",
 				Service   Interface
 				Storage   types.Interface
 				IndexName string `name:"contentIndexName"`
-			}) ProcessorParams {
-				return ProcessorParams{
+			}) *ContentProcessor {
+				return NewContentProcessor(ProcessorParams{
 					Logger:    p.Logger,
 					Service:   p.Service,
 					Storage:   p.Storage,
 					IndexName: p.IndexName,
-				}
-			},
-			fx.ResultTags(`name:"contentProcessorParams"`),
-		),
-		// Provide the content processor
-		fx.Annotate(
-			func(p ProcessorParams) *ContentProcessor {
-				return NewContentProcessor(p)
+				})
 			},
 			fx.ResultTags(`name:"contentProcessor"`),
 			fx.As(new(common.Processor)),
