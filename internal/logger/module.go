@@ -37,34 +37,17 @@ var Module = fx.Module("logger",
 					EncodeCaller:   zapcore.ShortCallerEncoder,
 				}
 
-				// Set color encoding based on config
-				if params.Config != nil && params.Config.EnableColor {
-					encoderConfig.EncodeLevel = func(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
-						var color string
-						switch l {
-						case zapcore.DebugLevel:
-							color = ColorDebug
-						case zapcore.InfoLevel:
-							color = ColorInfo
-						case zapcore.WarnLevel:
-							color = ColorWarn
-						case zapcore.ErrorLevel:
-							color = ColorError
-						case zapcore.DPanicLevel:
-							color = ColorError
-						case zapcore.PanicLevel:
-							color = ColorError
-						case zapcore.FatalLevel:
-							color = ColorFatal
-						case zapcore.InvalidLevel:
-							color = ColorReset
-						default:
-							color = ColorReset
-						}
-						enc.AppendString(color + l.CapitalString() + ColorReset)
-					}
+				// Check if we should enable color
+				enableColor := false
+				if params.Config != nil {
+					enableColor = params.Config.EnableColor
+				}
+				if enableColor || (params.App != nil && params.App.Debug) {
+					encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+					fmt.Fprintf(os.Stderr, "Color output enabled\n")
 				} else {
 					encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+					fmt.Fprintf(os.Stderr, "Color output disabled\n")
 				}
 
 				// Set log level based on config and debug flag
@@ -99,7 +82,7 @@ var Module = fx.Module("logger",
 				}
 
 				// Create logger with caller info enabled
-				return zap.New(core, zap.AddCaller()), nil
+				return zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel)), nil
 			},
 			fx.ResultTags(`name:"zapLogger"`),
 		),

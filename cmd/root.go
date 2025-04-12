@@ -409,6 +409,7 @@ func initLogger() error {
 	// Override with debug flag if set
 	if Debug {
 		level = logger.DebugLevel
+		fmt.Fprintf(os.Stderr, "Debug mode enabled, setting log level to DEBUG\n")
 	}
 
 	// Create logger with configuration
@@ -416,7 +417,7 @@ func initLogger() error {
 		Level:       level,
 		Development: Debug,
 		Encoding:    viper.GetString("logger.format"),
-		EnableColor: viper.GetBool("logger.enable_color"),
+		EnableColor: true, // Always enable color in debug mode
 		OutputPaths: []string{viper.GetString("logger.output")},
 	}
 

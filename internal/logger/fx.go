@@ -44,7 +44,7 @@ func (l *fxLogger) LogEvent(event fxevent.Event) {
 }
 
 func (l *fxLogger) logOnStartExecuting(e *fxevent.OnStartExecuting) {
-	l.logger.Info("OnStart hook executing",
+	l.logger.Debug("OnStart hook executing",
 		zap.String("callee", e.FunctionName),
 		zap.String("caller", e.CallerName),
 	)
@@ -58,7 +58,7 @@ func (l *fxLogger) logOnStartExecuted(e *fxevent.OnStartExecuted) {
 			zap.Error(e.Err),
 		)
 	} else {
-		l.logger.Info("OnStart hook executed",
+		l.logger.Debug("OnStart hook executed",
 			zap.String("callee", e.FunctionName),
 			zap.String("caller", e.CallerName),
 			zap.String("runtime", e.Runtime.String()),
@@ -67,7 +67,7 @@ func (l *fxLogger) logOnStartExecuted(e *fxevent.OnStartExecuted) {
 }
 
 func (l *fxLogger) logOnStopExecuting(e *fxevent.OnStopExecuting) {
-	l.logger.Info("OnStop hook executing",
+	l.logger.Debug("OnStop hook executing",
 		zap.String("callee", e.FunctionName),
 		zap.String("caller", e.CallerName),
 	)
@@ -81,7 +81,7 @@ func (l *fxLogger) logOnStopExecuted(e *fxevent.OnStopExecuted) {
 			zap.Error(e.Err),
 		)
 	} else {
-		l.logger.Info("OnStop hook executed",
+		l.logger.Debug("OnStop hook executed",
 			zap.String("callee", e.FunctionName),
 			zap.String("caller", e.CallerName),
 			zap.String("runtime", e.Runtime.String()),
@@ -96,7 +96,7 @@ func (l *fxLogger) logSupplied(e *fxevent.Supplied) {
 			zap.Error(e.Err),
 		)
 	} else {
-		l.logger.Info("Supplied",
+		l.logger.Debug("Supplied",
 			zap.String("type", e.TypeName),
 		)
 	}
@@ -104,7 +104,7 @@ func (l *fxLogger) logSupplied(e *fxevent.Supplied) {
 
 func (l *fxLogger) logProvided(e *fxevent.Provided) {
 	for _, rtype := range e.OutputTypeNames {
-		l.logger.Info("Provided",
+		l.logger.Debug("Provided",
 			zap.String("constructor", e.ConstructorName),
 			zap.String("type", rtype),
 		)
@@ -119,7 +119,7 @@ func (l *fxLogger) logProvided(e *fxevent.Provided) {
 
 func (l *fxLogger) logReplaced(e *fxevent.Replaced) {
 	for _, rtype := range e.OutputTypeNames {
-		l.logger.Info("Replaced",
+		l.logger.Debug("Replaced",
 			zap.String("type", rtype),
 		)
 	}
@@ -132,7 +132,7 @@ func (l *fxLogger) logReplaced(e *fxevent.Replaced) {
 
 func (l *fxLogger) logDecorated(e *fxevent.Decorated) {
 	for _, rtype := range e.OutputTypeNames {
-		l.logger.Info("Decorated",
+		l.logger.Debug("Decorated",
 			zap.String("decorator", e.DecoratorName),
 			zap.String("type", rtype),
 		)
@@ -152,7 +152,7 @@ func (l *fxLogger) logInvoked(e *fxevent.Invoked) {
 			zap.Error(e.Err),
 		)
 	} else {
-		l.logger.Info("Invoked",
+		l.logger.Debug("Invoked",
 			zap.String("function", e.FunctionName),
 		)
 	}
