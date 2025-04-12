@@ -27,15 +27,38 @@ func (h *LinkHandler) HandleLink(e *colly.HTMLElement) {
 		return
 	}
 
-	err := e.Request.Visit(link)
-	if err != nil &&
-		!errors.Is(err, colly.ErrAlreadyVisited) &&
-		!errors.Is(err, colly.ErrMaxDepth) &&
-		err.Error() != "Missing URL" &&
-		err.Error() != "Forbidden domain" &&
-		!strings.Contains(err.Error(), "protocol error") {
+	// Skip anchor links and javascript
+	if strings.HasPrefix(link, "#") || strings.HasPrefix(link, "javascript:") {
+		return
+	}
+
+	// Skip mailto and tel links
+	if strings.HasPrefix(link, "mailto:") || strings.HasPrefix(link, "tel:") {
+		return
+	}
+
+	// Make absolute URL if relative
+	absLink := e.Request.AbsoluteURL(link)
+	if absLink == "" {
+		h.crawler.logger.Debug("Failed to make absolute URL",
+			"url", link)
+		return
+	}
+
+	err := e.Request.Visit(absLink)
+	if err != nil {
+		if errors.Is(err, colly.ErrAlreadyVisited) ||
+			errors.Is(err, colly.ErrMaxDepth) ||
+			errors.Is(err, colly.ErrMissingURL) ||
+			errors.Is(err, colly.ErrForbiddenDomain) {
+			return
+		}
+
 		h.crawler.logger.Error("Failed to visit link",
-			"url", link,
+			"url", absLink,
 			"error", err)
+	} else {
+		h.crawler.logger.Debug("Successfully visited link",
+			"url", absLink)
 	}
 }

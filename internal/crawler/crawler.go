@@ -12,6 +12,7 @@ import (
 	"crypto/tls"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/debug"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -122,26 +123,67 @@ func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types
 
 // setupCollector configures the collector with the given source settings
 func (c *Crawler) setupCollector(source *types.Source) {
-	c.collector = colly.NewCollector(
+	c.logger.Debug("Setting up collector",
+		"max_depth", source.MaxDepth,
+		"allowed_domains", source.AllowedDomains)
+
+	opts := []colly.CollectorOption{
 		colly.MaxDepth(source.MaxDepth),
 		colly.Async(true),
-		colly.AllowedDomains(source.AllowedDomains...),
 		colly.ParseHTTPErrorResponse(),
 		colly.IgnoreRobotsTxt(),
-	)
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"),
+		colly.AllowURLRevisit(),
+		colly.Debugger(&debug.LogDebugger{}),
+	}
 
-	// Configure transport to handle HTTP/2 better
+	// Only set allowed domains if they are configured
+	if len(source.AllowedDomains) > 0 {
+		opts = append(opts, colly.AllowedDomains(source.AllowedDomains...))
+	}
+
+	c.collector = colly.NewCollector(opts...)
+
+	// Parse and set rate limit
+	rateLimit, err := time.ParseDuration(source.RateLimit)
+	if err != nil {
+		c.logger.Error("Failed to parse rate limit, using default",
+			"rate_limit", source.RateLimit,
+			"default", DefaultRateLimit,
+			"error", err)
+		rateLimit = DefaultRateLimit
+	}
+
+	err = c.collector.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Delay:       rateLimit,
+		RandomDelay: rateLimit / 2,
+		Parallelism: DefaultParallelism,
+	})
+	if err != nil {
+		c.logger.Error("Failed to set rate limit",
+			"error", err)
+	}
+
+	// Configure transport with more reasonable settings
 	c.collector.WithTransport(&http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
-			NextProtos:         []string{"http/1.1"},
 		},
-		DisableKeepAlives:     true,
-		MaxIdleConns:          0,
-		MaxIdleConnsPerHost:   0,
+		DisableKeepAlives:     false,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	})
+
+	c.logger.Debug("Collector configured",
+		"max_depth", source.MaxDepth,
+		"allowed_domains", source.AllowedDomains,
+		"rate_limit", rateLimit,
+		"parallelism", DefaultParallelism)
 }
 
 // setupCallbacks configures the collector's callbacks
@@ -177,27 +219,6 @@ func (c *Crawler) setupCallbacks(ctx context.Context) {
 	c.collector.OnHTML("a[href]", c.linkHandler.HandleLink)
 }
 
-// visitURLs visits the given URLs with error handling
-func (c *Crawler) visitURLs(ctx context.Context, urls []string) {
-	for _, url := range urls {
-		select {
-		case <-ctx.Done():
-			c.logger.Debug("Crawl cancelled while visiting URLs")
-			return
-		default:
-			if visitErr := c.collector.Visit(url); visitErr != nil {
-				if errors.Is(visitErr, colly.ErrAlreadyVisited) || errors.Is(visitErr, colly.ErrMaxDepth) {
-					continue
-				}
-				c.logger.Error("Failed to visit URL",
-					"url", url,
-					"error", visitErr)
-				c.IncrementError()
-			}
-		}
-	}
-}
-
 // Start begins the crawling process for a given source.
 func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	c.logger.Debug("Starting crawler",
@@ -212,9 +233,17 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Initialize state
 	c.state.Start(ctx, sourceName)
 
-	// Setup collector and callbacks
+	// Setup collector first
 	c.setupCollector(source)
+
+	// Then setup callbacks
 	c.setupCallbacks(ctx)
+
+	c.logger.Debug("Crawler setup complete",
+		"url", source.URL,
+		"allowed_domains", source.AllowedDomains,
+		"max_depth", source.MaxDepth,
+		"rate_limit", source.RateLimit)
 
 	// Start crawling in a goroutine
 	c.wg.Add(1)
@@ -237,32 +266,36 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 				}
 			}()
 
-			// Get start URLs from both url and start_urls fields
-			startURLs := make([]string, 0)
-			if source.URL != "" {
-				startURLs = append(startURLs, source.URL)
-			}
-			if len(source.StartURLs) > 0 {
-				startURLs = append(startURLs, source.StartURLs...)
-			}
-
-			if len(startURLs) == 0 {
-				c.logger.Warn("No start URLs configured for source",
+			if source.URL == "" {
+				c.logger.Warn("No URL configured for source",
 					"source", sourceName)
 				return
 			}
 
-			c.logger.Debug("Visiting start URLs",
+			c.logger.Debug("Visiting URL",
 				"source", sourceName,
-				"urls", startURLs)
+				"url", source.URL)
 
-			c.visitURLs(crawlCtx, startURLs)
+			select {
+			case <-crawlCtx.Done():
+				c.logger.Debug("Crawl cancelled before visiting URL")
+				return
+			default:
+				if visitErr := c.collector.Visit(source.URL); visitErr != nil {
+					c.logger.Error("Failed to visit URL",
+						"url", source.URL,
+						"error", visitErr,
+						"error_type", fmt.Sprintf("%T", visitErr))
+					c.IncrementError()
+					return
+				}
 
-			c.logger.Debug("Waiting for collector to finish")
-			c.collector.Wait()
-			c.logger.Debug("Collector finished",
-				"processed", c.state.GetProcessedCount(),
-				"errors", c.state.GetErrorCount())
+				c.logger.Debug("Waiting for collector to finish")
+				c.collector.Wait()
+				c.logger.Debug("Collector finished",
+					"processed", c.state.GetProcessedCount(),
+					"errors", c.state.GetErrorCount())
+			}
 		}()
 
 		select {
