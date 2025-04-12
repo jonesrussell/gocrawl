@@ -84,44 +84,58 @@ var Module = fx.Options(
 		),
 
 		// Sources with error handling
-		func(config config.Interface, logger logger.Interface) (*sources.Sources, error) {
-			logger.Debug("Loading sources from configuration")
+		fx.Annotate(
+			func(config config.Interface, logger logger.Interface, sourceName string) (*sources.Sources, error) {
+				logger.Debug("Loading source from configuration", "source", sourceName)
 
-			src, err := sources.LoadSources(config)
-			if err != nil {
-				logger.Error("Failed to load sources",
-					"error", err,
-				)
-				return nil, fmt.Errorf("failed to load sources: %w", err)
-			}
+				src, err := sources.LoadSources(config)
+				if err != nil {
+					logger.Error("Failed to load sources",
+						"error", err,
+					)
+					return nil, fmt.Errorf("failed to load sources: %w", err)
+				}
 
-			// Validate loaded sources
-			sourceConfigs, err := src.GetSources()
-			if err != nil {
-				logger.Error("Failed to get source configurations",
-					"error", err,
-				)
-				return nil, fmt.Errorf("failed to get source configurations: %w", err)
-			}
+				// Get all sources to find the requested one
+				sourceConfigs, err := src.GetSources()
+				if err != nil {
+					logger.Error("Failed to get source configurations",
+						"error", err,
+					)
+					return nil, fmt.Errorf("failed to get source configurations: %w", err)
+				}
 
-			if len(sourceConfigs) == 0 {
-				logger.Error("No sources configured")
-				return nil, errors.New("no sources configured in configuration file")
-			}
+				// Find the requested source
+				var requestedSource sources.Config
+				for _, cfg := range sourceConfigs {
+					if cfg.Name == sourceName {
+						requestedSource = cfg
+						break
+					}
+				}
 
-			// Log source details
-			for _, cfg := range sourceConfigs {
+				if requestedSource.Name == "" {
+					logger.Error("Source not found",
+						"source", sourceName,
+						"available_sources", sourceConfigs,
+					)
+					return nil, fmt.Errorf("source not found: %s", sourceName)
+				}
+
+				// Log source details
 				logger.Info("Loaded source configuration",
-					"name", cfg.Name,
-					"url", cfg.URL,
-					"index", cfg.Index,
-					"max_depth", cfg.MaxDepth,
-					"rate_limit", cfg.RateLimit,
+					"name", requestedSource.Name,
+					"url", requestedSource.URL,
+					"index", requestedSource.Index,
+					"max_depth", requestedSource.MaxDepth,
+					"rate_limit", requestedSource.RateLimit,
 				)
-			}
 
-			return src, nil
-		},
+				// Create a new Sources instance with just the requested source
+				return sources.NewSources(&requestedSource, logger), nil
+			},
+			fx.ParamTags(`name:"sourceName"`),
+		),
 
 		// Event bus with error handling
 		func(logger logger.Interface) (*events.EventBus, error) {

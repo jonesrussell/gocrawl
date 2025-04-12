@@ -14,6 +14,7 @@ import (
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 	"golang.org/x/net/http2"
@@ -247,5 +248,12 @@ var Module = fx.Module("storage",
 		NewStorage,
 		// Provide search manager
 		NewSearchManager,
+		// Provide index manager
+		fx.Annotate(
+			func(client *es.Client, logger logger.Interface) interfaces.IndexManager {
+				return NewElasticsearchIndexManager(client, logger)
+			},
+			fx.As(new(interfaces.IndexManager)),
+		),
 	),
 )
