@@ -10,6 +10,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -45,6 +46,19 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		return errors.New("logger not found in context or invalid type")
 	}
 
+	// Get config from context
+	configValue := cmd.Context().Value(cmdcommon.ConfigKey)
+	cfg, ok := configValue.(config.Interface)
+	if !ok {
+		return errors.New("config not found in context or invalid type")
+	}
+
+	// Create source manager
+	sourceManager, err := sources.LoadSources(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to load sources: %w", err)
+	}
+
 	var jobService common.JobService
 
 	// Create Fx app with the module
@@ -52,6 +66,7 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		Module,
 		fx.Provide(
 			func() logger.Interface { return log },
+			func() sources.Interface { return sourceManager },
 			fx.Annotate(
 				func() string { return args[0] },
 				fx.ResultTags(`name:"sourceName"`),

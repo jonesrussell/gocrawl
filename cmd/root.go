@@ -9,18 +9,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/joho/godotenv"
+	"github.com/jonesrussell/gocrawl/cmd/common"
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
 	httpdcmd "github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/indices"
 	job "github.com/jonesrussell/gocrawl/cmd/scheduler"
 	"github.com/jonesrussell/gocrawl/cmd/search"
 	"github.com/jonesrussell/gocrawl/cmd/sources"
+	"github.com/jonesrussell/gocrawl/internal/config"
 )
 
 var (
@@ -397,19 +398,28 @@ func Execute() {
 		os.Exit(1)
 	}
 
-	// Create a context with the logger
-	ctx := context.WithValue(context.Background(), common.LoggerKey, log)
+	// Initialize config
+	cfg := config.NewConfig(log)
+	if loadErr := cfg.Load(viper.GetString("config")); loadErr != nil {
+		log.Error("Failed to load config", "error", loadErr)
+		os.Exit(1)
+	}
+
+	// Create a context with dependencies
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, common.LoggerKey, log)
+	ctx = context.WithValue(ctx, common.ConfigKey, cfg)
 	rootCmd.SetContext(ctx)
 
 	// Add commands first
 	rootCmd.AddCommand(
-		job.NewJobCommand(log),         // Main job command with fx
-		job.NewJobSubCommands(log),     // Job subcommands
-		indices.Command(),              // For managing Elasticsearch indices
-		sources.NewSourcesCommand(log), // For managing web content sources
-		crawlcmd.Command(),             // For crawling web content
-		httpdcmd.Command(),             // For running the HTTP server
-		search.Command(),               // For searching content in Elasticsearch
+		job.NewJobCommand(log),                   // Main job command with fx
+		job.NewJobSubCommands(log),               // Job subcommands
+		indices.Command(),                        // For managing Elasticsearch indices
+		sources.NewSourcesCommand(cfg, log, nil), // For managing web content sources
+		crawlcmd.Command(),                       // For crawling web content
+		httpdcmd.Command(),                       // For running the HTTP server
+		search.Command(),                         // For searching content in Elasticsearch
 	)
 
 	if executeErr := rootCmd.Execute(); executeErr != nil {
