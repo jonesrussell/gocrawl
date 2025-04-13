@@ -12,7 +12,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
-	"github.com/jonesrussell/gocrawl/internal/metrics"
 	loggerMock "github.com/jonesrussell/gocrawl/testutils/mocks/logger"
 )
 
@@ -33,7 +32,7 @@ func (m *mockTimeProvider) Advance(d time.Duration) {
 func setupTestRouter(
 	t *testing.T,
 	cfg *server.Config,
-) (*gin.Engine, *middleware.SecurityMiddleware, *metrics.Metrics, *mockTimeProvider) {
+) (*gin.Engine, *middleware.SecurityMiddleware, *mockTimeProvider) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(func() { ctrl.Finish() })
 
@@ -55,8 +54,7 @@ func setupTestRouter(
 		c.Status(http.StatusOK)
 	})
 
-	metrics := security.GetMetrics()
-	return router, security, metrics, mockTime
+	return router, security, mockTime
 }
 
 func TestSecurityMiddleware_HandleCORS(t *testing.T) {
@@ -101,7 +99,7 @@ func TestSecurityMiddleware_HandleCORS(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			router, _, _, _ := setupTestRouter(t, tt.config)
+			router, _, _ := setupTestRouter(t, tt.config)
 
 			req := httptest.NewRequest(tt.method, "/test", http.NoBody)
 			if tt.origin != "" {
@@ -164,7 +162,7 @@ func TestSecurityMiddleware_APIAuth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			router, _, _, _ := setupTestRouter(t, tt.config)
+			router, _, _ := setupTestRouter(t, tt.config)
 
 			req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 			if tt.apiKey != "" {
@@ -188,7 +186,7 @@ func TestSecurityMiddleware_RateLimit(t *testing.T) {
 		APIKey:          "test-key",
 		Address:         ":8080",
 	}
-	router, security, _, mockTime := setupTestRouter(t, cfg)
+	router, security, mockTime := setupTestRouter(t, cfg)
 
 	// Set a very short window for testing
 	security.SetRateLimitWindow(100 * time.Millisecond)
@@ -196,21 +194,21 @@ func TestSecurityMiddleware_RateLimit(t *testing.T) {
 
 	// First request should succeed
 	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-Api-Key", "test-key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	// Second request should succeed
 	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-Api-Key", "test-key")
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	// Third request should be rate limited
 	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-Api-Key", "test-key")
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)
@@ -220,7 +218,7 @@ func TestSecurityMiddleware_RateLimit(t *testing.T) {
 
 	// Request should succeed again
 	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
-	req.Header.Set("X-API-Key", "test-key")
+	req.Header.Set("X-Api-Key", "test-key")
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
