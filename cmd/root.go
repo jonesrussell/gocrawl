@@ -277,7 +277,19 @@ func loadConfigFile() error {
 		if !errors.As(err, &configFileNotFoundError) {
 			return fmt.Errorf("failed to read config file: %w", err)
 		}
-		// Config file not found is not an error - we'll use defaults
+		// Config file not found - set up default configuration
+		viper.Set("app.name", "gocrawl")
+		viper.Set("app.environment", "development")
+		viper.Set("app.debug", true)
+		viper.Set("logger.level", "debug")
+		viper.Set("logger.encoding", "console")
+		viper.Set("logger.format", "text")
+		viper.Set("logger.output", "stdout")
+		viper.Set("crawler.source_file", "sources.yml")
+		viper.Set("crawler.max_depth", defaultCrawlerMaxDepth)
+		viper.Set("crawler.max_retries", defaultCrawlerMaxRetries)
+		viper.Set("storage.batch_size", defaultStorageBatchSize)
+		viper.Set("elasticsearch.max_retries", defaultElasticsearchRetries)
 	}
 
 	return nil
@@ -345,24 +357,26 @@ func setupConfig(cmd *cobra.Command) error {
 func validateConfig(cmd *cobra.Command) error {
 	// Validate app configuration
 	if !viper.IsSet("app.name") {
-		return errors.New("app.name is required")
+		viper.Set("app.name", "gocrawl")
 	}
 	if !viper.IsSet("app.environment") {
-		return errors.New("app.environment is required")
+		viper.Set("app.environment", "development")
 	}
 
 	// Command-specific validation
 	switch cmd.Name() {
 	case "crawl":
 		if !viper.IsSet("crawler.base_url") {
-			return errors.New("crawler.base_url is required for crawl command")
+			// Not required when using sources.yml
+			viper.Set("crawler.base_url", "")
 		}
 		if !viper.IsSet("elasticsearch.url") {
-			return errors.New("elasticsearch.url is required for crawl command")
+			// Not required when using sources.yml
+			viper.Set("elasticsearch.url", "http://localhost:9200")
 		}
 	case "search":
 		if !viper.IsSet("elasticsearch.url") {
-			return errors.New("elasticsearch.url is required for search command")
+			viper.Set("elasticsearch.url", "http://localhost:9200")
 		}
 	}
 
@@ -375,7 +389,7 @@ func validateConfig(cmd *cobra.Command) error {
 	// Validate log level
 	logLevel := viper.GetString("log.level")
 	if logLevel != logLevelDebug && logLevel != logLevelInfo && logLevel != logLevelWarn && logLevel != logLevelError {
-		return fmt.Errorf("invalid log level: %s", logLevel)
+		viper.Set("log.level", logLevelInfo)
 	}
 
 	return nil
@@ -401,8 +415,12 @@ func Execute() {
 	// Initialize config
 	cfg := config.NewConfig(log)
 	if loadErr := cfg.Load(viper.GetString("config")); loadErr != nil {
-		log.Error("Failed to load config", "error", loadErr)
-		os.Exit(1)
+		// If config file doesn't exist, use defaults
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if !errors.As(loadErr, &configFileNotFoundError) {
+			log.Error("Failed to load config", "error", loadErr)
+			os.Exit(1)
+		}
 	}
 
 	// Create a context with dependencies
