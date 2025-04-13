@@ -350,23 +350,61 @@ func TestLoggerDependencyRegression(t *testing.T) {
 func TestModule(t *testing.T) {
 	t.Parallel()
 
+	ctrl := gomock.NewController(t)
+	t.Cleanup(func() { ctrl.Finish() })
+
 	// Create mock dependencies
-	mockConfig := &configmocks.MockInterface{}
-	mockLogger := setupMockLogger(gomock.NewController(t))
-	mockStorage := &storagemocks.MockInterface{}
-	mockIndexManager := &apimocks.MockIndexManager{}
+	mockConfig := configmocks.NewMockInterface(ctrl)
+	mockLogger := setupMockLogger(ctrl)
+	mockStorage := storagemocks.NewMockInterface(ctrl)
+	mockIndexManager := apimocks.NewMockIndexManager(ctrl)
 
 	// Set up mock storage expectations
-	mockStorage.EXPECT().GetIndexDocCount(gomock.Any(), gomock.Any()).Return(int64(0), nil)
-	mockStorage.EXPECT().TestConnection(gomock.Any()).Return(nil)
-	mockStorage.EXPECT().Close().Return(nil)
+	mockStorage.EXPECT().GetIndexDocCount(gomock.Any(), gomock.Any()).Return(int64(0), nil).AnyTimes()
+	mockStorage.EXPECT().TestConnection(gomock.Any()).Return(nil).AnyTimes()
+	mockStorage.EXPECT().Close().Return(nil).AnyTimes()
 
 	// Set up mock index manager expectations
-	mockIndexManager.EXPECT().EnsureIndex(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-	mockIndexManager.EXPECT().DeleteIndex(gomock.Any(), gomock.Any()).Return(nil)
-	mockIndexManager.EXPECT().IndexExists(gomock.Any(), gomock.Any()).Return(true, nil)
-	mockIndexManager.EXPECT().GetMapping(gomock.Any(), gomock.Any()).Return(map[string]any{}, nil)
-	mockIndexManager.EXPECT().UpdateMapping(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	mockIndexManager.EXPECT().EnsureIndex(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockIndexManager.EXPECT().DeleteIndex(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockIndexManager.EXPECT().IndexExists(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	mockIndexManager.EXPECT().GetMapping(gomock.Any(), gomock.Any()).Return(map[string]any{}, nil).AnyTimes()
+	mockIndexManager.EXPECT().UpdateMapping(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	// Set up mock config expectations
+	mockConfig.EXPECT().GetAppConfig().Return(&app.Config{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	}).AnyTimes()
+	mockConfig.EXPECT().GetLogConfig().Return(&log.Config{
+		Level:      "debug",
+		Format:     "json",
+		Output:     "stdout",
+		MaxSize:    100,
+		MaxBackups: 3,
+		MaxAge:     28,
+		Compress:   true,
+	}).AnyTimes()
+	mockConfig.EXPECT().GetElasticsearchConfig().Return(&elasticsearch.Config{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	}).AnyTimes()
+	mockConfig.EXPECT().GetServerConfig().Return(&server.Config{
+		SecurityEnabled: true,
+		APIKey:          "test-key",
+		Address:         ":8080",
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
+	}).AnyTimes()
+	mockConfig.EXPECT().GetSources().Return([]types.Source{}).AnyTimes()
+	mockConfig.EXPECT().GetCommand().Return("test").AnyTimes()
+	mockConfig.EXPECT().GetPriorityConfig().Return(&priority.Config{
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
+	}).AnyTimes()
 
 	app := fx.New(
 		fx.Provide(

@@ -9,11 +9,14 @@ import (
 type Metrics struct {
 	mu sync.RWMutex
 
-	startTime         time.Time
-	lastProcessedTime time.Time
-	processedCount    int64
-	errorCount        int64
-	currentSource     string
+	startTime           time.Time
+	lastProcessedTime   time.Time
+	processedCount      int64
+	errorCount          int64
+	currentSource       string
+	successfulRequests  int64
+	failedRequests      int64
+	rateLimitedRequests int64
 }
 
 // NewMetrics creates a new Metrics instance.
@@ -35,6 +38,48 @@ func (m *Metrics) UpdateMetrics(success bool) {
 	m.lastProcessedTime = time.Now()
 }
 
+// IncrementSuccessfulRequests increments the count of successful requests.
+func (m *Metrics) IncrementSuccessfulRequests() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.successfulRequests++
+}
+
+// IncrementFailedRequests increments the count of failed requests.
+func (m *Metrics) IncrementFailedRequests() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failedRequests++
+}
+
+// IncrementRateLimitedRequests increments the count of rate-limited requests.
+func (m *Metrics) IncrementRateLimitedRequests() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.rateLimitedRequests++
+}
+
+// GetSuccessfulRequests returns the total number of successful requests.
+func (m *Metrics) GetSuccessfulRequests() int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.successfulRequests
+}
+
+// GetFailedRequests returns the total number of failed requests.
+func (m *Metrics) GetFailedRequests() int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.failedRequests
+}
+
+// GetRateLimitedRequests returns the total number of rate-limited requests.
+func (m *Metrics) GetRateLimitedRequests() int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.rateLimitedRequests
+}
+
 // ResetMetrics resets all metrics to their initial state.
 func (m *Metrics) ResetMetrics() {
 	m.mu.Lock()
@@ -45,6 +90,9 @@ func (m *Metrics) ResetMetrics() {
 	m.processedCount = 0
 	m.errorCount = 0
 	m.currentSource = ""
+	m.successfulRequests = 0
+	m.failedRequests = 0
+	m.rateLimitedRequests = 0
 }
 
 // GetStartTime returns the time when metrics collection started.

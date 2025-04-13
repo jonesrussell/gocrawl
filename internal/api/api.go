@@ -4,7 +4,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -93,61 +92,59 @@ func loggingMiddleware(log logger.Interface) gin.HandlerFunc {
 // handleSearch creates a handler for search requests
 func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req types.SearchRequest
+		var req SearchRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, types.APIError{
-				Code:    http.StatusBadRequest,
-				Message: "Invalid request payload",
-				Err:     err,
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    http.StatusBadRequest,
+				"message": "Invalid request payload",
 			})
 			return
 		}
 
-		// Validate request
-		if strings.TrimSpace(req.Query) == "" {
-			c.JSON(http.StatusBadRequest, types.APIError{
-				Code:    http.StatusBadRequest,
-				Message: "Query cannot be empty",
+		if req.Query == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    http.StatusBadRequest,
+				"message": "Query cannot be empty",
 			})
 			return
 		}
 
-		// Build the search query
+		// Set default size if not provided
+		if req.Size == 0 {
+			req.Size = defaultSearchSize
+		}
+
+		// Create search query
 		query := map[string]any{
 			"query": map[string]any{
 				"match": map[string]any{
 					"content": req.Query,
 				},
 			},
+			"size": req.Size,
 		}
 
-		// Get the total count first
+		// Perform search
+		results, err := searchManager.Search(c.Request.Context(), req.Index, query)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    http.StatusInternalServerError,
+				"message": "Search failed",
+			})
+			return
+		}
+
+		// Get total count
 		total, err := searchManager.Count(c.Request.Context(), req.Index, query)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, types.APIError{
-				Code:    http.StatusInternalServerError,
-				Message: "Failed to get total count",
-				Err:     err,
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    http.StatusInternalServerError,
+				"message": "Failed to get total count",
 			})
 			return
 		}
 
-		// Add size to query for search
-		searchQuery := query
-		searchQuery["size"] = defaultSearchSize
-
-		// Use the search manager to perform the search
-		results, err := searchManager.Search(c.Request.Context(), req.Index, searchQuery)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, types.APIError{
-				Code:    http.StatusInternalServerError,
-				Message: "Failed to perform search",
-				Err:     err,
-			})
-			return
-		}
-
-		// Prepare and send the response
+		// Return response
 		response := types.SearchResponse{
 			Results: results,
 			Total:   int(total),
