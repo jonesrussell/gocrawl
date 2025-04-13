@@ -158,6 +158,17 @@ var Module = fx.Module("crawl",
 			},
 			fx.ResultTags(`name:"pageService"`),
 		),
+		// Provide the sources
+		fx.Annotate(
+			func(p struct {
+				fx.In
+				Config config.Interface
+			}) (*sources.Sources, error) {
+				return sources.LoadSources(p.Config)
+			},
+			fx.ResultTags(`name:"sources"`),
+			fx.As(new(sources.Interface)),
+		),
 		// Provide the job service
 		fx.Annotate(
 			func(p struct {
@@ -197,7 +208,7 @@ var Module = fx.Module("crawl",
 				Storage        types.Interface
 				IndexName      string `name:"articleIndexName"`
 				ArticleChannel chan *models.Article
-			}) *articles.ArticleProcessor {
+			}) common.Processor {
 				return articles.NewProcessor(articles.ProcessorParams{
 					Logger:         p.Logger,
 					Service:        p.Service,
@@ -208,7 +219,6 @@ var Module = fx.Module("crawl",
 				})
 			},
 			fx.ResultTags(`name:"articleProcessor"`),
-			fx.As(new(common.Processor)),
 		),
 		// Provide the page processor
 		fx.Annotate(
@@ -218,7 +228,7 @@ var Module = fx.Module("crawl",
 				Service   page.Interface
 				Storage   types.Interface
 				IndexName string `name:"pageIndexName"`
-			}) *page.PageProcessor {
+			}) common.Processor {
 				return page.NewPageProcessor(page.ProcessorParams{
 					Logger:    p.Logger,
 					Service:   p.Service,
@@ -227,17 +237,27 @@ var Module = fx.Module("crawl",
 				})
 			},
 			fx.ResultTags(`name:"pageProcessor"`),
-			fx.As(new(common.Processor)),
 		),
-		// Provide the sources
+		// Provide the article channel
+		fx.Annotate(
+			func() chan *models.Article {
+				return make(chan *models.Article, ArticleChannelBufferSize)
+			},
+			fx.ResultTags(`name:"articleChannel"`),
+		),
+		// Provide the processors
 		fx.Annotate(
 			func(p struct {
 				fx.In
-				Config config.Interface
-			}) (*sources.Sources, error) {
-				return sources.LoadSources(p.Config)
+				ArticleProcessor common.Processor `name:"articleProcessor"`
+				PageProcessor    common.Processor `name:"pageProcessor"`
+			}) []common.Processor {
+				return []common.Processor{
+					p.ArticleProcessor,
+					p.PageProcessor,
+				}
 			},
-			fx.ResultTags(`name:"sources"`),
+			fx.ResultTags(`name:"processors"`),
 		),
 	),
 )

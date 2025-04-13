@@ -76,6 +76,7 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 			func() logger.Interface { return log },
 			func() config.Interface { return cfg },
 			func() sources.Interface { return sourceManager },
+			func() *sources.Sources { return sourceManager },
 			func() (storagetypes.Interface, error) {
 				opts := storage.Options{
 					Addresses: cfg.GetElasticsearchConfig().Addresses,
