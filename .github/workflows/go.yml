@@ -78,6 +78,11 @@ jobs:
     - name: Install Dependencies
       run: go mod tidy
 
+    - name: Generate Mocks
+      run: |
+        go install github.com/golang/mock/mockgen@latest
+        ./scripts/generate_mocks.sh
+
     - name: Build Project
       run: go build -v ./...
 
