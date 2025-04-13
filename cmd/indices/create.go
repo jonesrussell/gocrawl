@@ -84,7 +84,8 @@ func (c *Creator) Start(ctx context.Context) error {
 	}
 
 	if exists {
-		return fmt.Errorf("index %s already exists", c.index)
+		c.logger.Info("Index already exists", "index", c.index)
+		return nil
 	}
 
 	// Create the index
@@ -152,7 +153,6 @@ The index will be created with default settings unless overridden by configurati
 					if err := c.Start(cmd.Context()); err != nil {
 						return err
 					}
-					cmd.Printf("Successfully created index: %s\n", args[0])
 					return nil
 				}),
 			)
