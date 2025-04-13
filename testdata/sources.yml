@@ -1,21 +1,22 @@
 sources:
+  # Basic test source with minimal configuration
   - name: "test_source"
-    url: "https://test.example.com"
-    rate_limit: "1s"
+    url: "http://test.example.com"
+    rate_limit: "2s"
     max_depth: 2
     article_index: "test_articles"
     index: "test_content"
     selectors:
       article:
-        container: ".article-content"
-        title: "h1.article-title"
-        body: ".article-body"
-        intro: ".article-intro"
-        byline: ".article-byline"
-        published_time: "time.published"
-        time_ago: "time.timeago"
+        container: "article"
+        title: "h1"
+        body: ".content"
+        intro: ".intro"
+        byline: ".byline"
+        published_time: ".date"
+        time_ago: ".time-ago"
         json_ld: "script[type='application/ld+json']"
-        section: "meta[property='article:section']"
+        section: ".section"
         keywords: "meta[name='keywords']"
         description: "meta[name='description']"
         og_title: "meta[property='og:title']"
@@ -28,4 +29,37 @@ sources:
         category: ".category"
         tags: ".tags"
         author: ".author"
-        byline_name: ".byline-name" 
+        byline_name: ".byline-name"
+      links:
+        article: "article a"
+        next: ".next-page"
+
+  # Test source with rate limiting
+  - name: "rate_limited_source"
+    url: "http://rate-limited.example.com"
+    rate_limit: "5s"
+    max_depth: 3
+    article_index: "rate_limited_articles"
+    index: "rate_limited_content"
+    selectors:
+      article:
+        container: ".article"
+        title: "h1.title"
+        body: ".article-body"
+        published_time: "time.published"
+        author: ".author-name"
+
+  # Test source with deep crawling
+  - name: "deep_crawl_source"
+    url: "http://deep-crawl.example.com"
+    rate_limit: "1s"
+    max_depth: 5
+    article_index: "deep_crawl_articles"
+    index: "deep_crawl_content"
+    selectors:
+      article:
+        container: "#main-article"
+        title: "h1.headline"
+        body: ".article-content"
+        published_time: ".publish-date"
+        author: ".author" 

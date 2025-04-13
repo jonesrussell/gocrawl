@@ -1,3 +1,4 @@
+// Package testutils provides utilities for testing the config package.
 package testutils
 
 import (
@@ -46,7 +47,7 @@ func SetupTestEnvironment(t *testing.T, configContent, sourcesContent string) *T
 
 func (s *TestSetup) setupSourcesFile(sourcesContent string) error {
 	if sourcesContent == "" {
-		defaultSourcesPath := "testdata/sources.yml"
+		defaultSourcesPath := filepath.Join("testdata", "sources.yml")
 		content, err := os.ReadFile(defaultSourcesPath)
 		if err != nil {
 			return err
@@ -64,7 +65,7 @@ func (s *TestSetup) setupConfigFile(configContent string) error {
 }
 
 func (s *TestSetup) setupDefaultConfig() error {
-	defaultConfigPath := "testdata/config.yml"
+	defaultConfigPath := filepath.Join("testdata", "config.yml")
 	content, err := os.ReadFile(defaultConfigPath)
 	if err != nil {
 		return err

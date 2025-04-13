@@ -1,8 +1,9 @@
+// Package testutils provides utilities for testing the config package.
 package testutils
 
 import (
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,71 +14,69 @@ const (
 	MaxEnvParts = 2
 )
 
-// SetupTestEnv sets up the test environment with default values
-func SetupTestEnv(t *testing.T) func() {
-	t.Helper()
-
+// SetupConfigTestEnv sets up a test environment for config tests
+func SetupConfigTestEnv(t *testing.T) func() {
 	// Store original environment
-	originalEnv := make(map[string]string)
+	origEnv := make(map[string]string)
 	for _, env := range os.Environ() {
-		pair := strings.SplitN(env, "=", MaxEnvParts)
-		if len(pair) == MaxEnvParts {
-			originalEnv[pair[0]] = pair[1]
-		}
+		origEnv[env] = os.Getenv(env)
 	}
+
+	// Clear environment
+	os.Clearenv()
 
 	// Set test environment variables
-	for key, value := range map[string]string{
-		"GOCRAWL_APP_ENVIRONMENT":          "test",
-		"GOCRAWL_LOG_LEVEL":                "debug",
-		"GOCRAWL_CRAWLER_MAX_DEPTH":        "2",
-		"GOCRAWL_CRAWLER_PARALLELISM":      "2",
-		"GOCRAWL_SERVER_SECURITY_ENABLED":  "true",
-		"GOCRAWL_SERVER_SECURITY_API_KEY":  "id:test_api_key",
-		"GOCRAWL_ELASTICSEARCH_ADDRESSES":  "http://localhost:9200",
-		"GOCRAWL_ELASTICSEARCH_INDEX_NAME": "test-index",
-		"GOCRAWL_ELASTICSEARCH_API_KEY":    "id:test_api_key",
-		"GOCRAWL_CRAWLER_SOURCE_FILE":      "testdata/sources.yml",
-	} {
-		t.Setenv(key, value)
-	}
+	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+	t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
+	t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
+	t.Setenv("GOCRAWL_CONFIG_FILE", filepath.Join("testdata", "config.yml"))
+	t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
 
 	// Return cleanup function
 	return func() {
-		for key, value := range originalEnv {
-			t.Setenv(key, value)
+		// Restore original environment
+		os.Clearenv()
+		for k, v := range origEnv {
+			os.Setenv(k, v)
 		}
 	}
 }
 
-// SetupTestEnvWithValues sets up the test environment with custom values
-func SetupTestEnvWithValues(t *testing.T, values map[string]string) func() {
-	t.Helper()
-
+// SetupConfigTestEnvWithValues sets up a test environment with custom values
+func SetupConfigTestEnvWithValues(t *testing.T, values map[string]string) func() {
 	// Store original environment
-	originalEnv := make(map[string]string)
+	origEnv := make(map[string]string)
 	for _, env := range os.Environ() {
-		pair := strings.SplitN(env, "=", MaxEnvParts)
-		if len(pair) == MaxEnvParts {
-			originalEnv[pair[0]] = pair[1]
-		}
+		origEnv[env] = os.Getenv(env)
 	}
 
-	// Set test environment variables
-	for key, value := range values {
-		t.Setenv(key, value)
+	// Clear environment
+	os.Clearenv()
+
+	// Set default test environment variables
+	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
+	t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
+	t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
+	t.Setenv("GOCRAWL_CONFIG_FILE", filepath.Join("testdata", "config.yml"))
+	t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
+
+	// Set custom values
+	for k, v := range values {
+		t.Setenv(k, v)
 	}
 
 	// Return cleanup function
 	return func() {
-		for key, value := range originalEnv {
-			t.Setenv(key, value)
+		// Restore original environment
+		os.Clearenv()
+		for k, v := range origEnv {
+			os.Setenv(k, v)
 		}
 	}
 }
 
-// TestSetupTestEnv verifies the test environment setup and cleanup
-func TestSetupTestEnv(t *testing.T) {
+// TestSetupConfigTestEnv verifies the configuration test environment setup and cleanup
+func TestSetupConfigTestEnv(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -110,7 +109,7 @@ func TestSetupTestEnv(t *testing.T) {
 			}
 
 			// Setup test environment
-			cleanup := SetupTestEnv(t)
+			cleanup := SetupConfigTestEnv(t)
 			defer cleanup()
 
 			// Verify environment is cleared

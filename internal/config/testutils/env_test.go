@@ -1,3 +1,4 @@
+// Package testutils_test provides tests for the testutils package.
 package testutils_test
 
 import (
@@ -8,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSetupTestEnvironment(t *testing.T) {
+func TestSetupConfigTestEnvironment(t *testing.T) {
 	t.Run("basic_environment_setup_and_cleanup", func(t *testing.T) {
 		// Store original environment
 		origEnv := make(map[string]string)
@@ -20,7 +21,7 @@ func TestSetupTestEnvironment(t *testing.T) {
 		t.Setenv("TEST_VAR", "test_value")
 
 		// Setup test environment
-		cleanup := testutils.SetupTestEnv(t)
+		cleanup := testutils.SetupConfigTestEnv(t)
 		defer cleanup()
 
 		// Verify environment is cleared

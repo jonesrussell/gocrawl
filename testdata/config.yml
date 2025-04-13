@@ -15,6 +15,9 @@ elasticsearch:
   tls:
     enabled: false
     skip_verify: true
+  index:
+    articles: test_articles
+    content: test_content
 
 server:
   address: ":0"
