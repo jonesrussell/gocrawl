@@ -53,7 +53,7 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	mockLogger := testutils.NewMockLogger()
 	mockLogger.On("Error", "Index not found", []any{"index", "non_existent_index"}).Return()
 
-	s := storage.NewStorage(mockClient, mockLogger, storage.Options{
+	s := storage.NewStorage(mockClient, mockLogger, &storage.Options{
 		IndexName: "test-index",
 	})
 
@@ -102,7 +102,7 @@ func TestSearch_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	mockLogger := testutils.NewMockLogger()
-	s := storage.NewStorage(mockClient, mockLogger, storage.Options{
+	s := storage.NewStorage(mockClient, mockLogger, &storage.Options{
 		IndexName: "test-index",
 	})
 
@@ -129,7 +129,7 @@ func TestNewStorage(t *testing.T) {
 	mockClient, err := setupMockClient(transport)
 	require.NoError(t, err)
 
-	opts := storage.Options{
+	opts := &storage.Options{
 		IndexName: "test-index",
 	}
 
@@ -153,7 +153,7 @@ func TestStorage_TestConnection(t *testing.T) {
 	require.NoError(t, err)
 
 	mockLogger := testutils.NewMockLogger()
-	s := storage.NewStorage(mockClient, mockLogger, storage.Options{
+	s := storage.NewStorage(mockClient, mockLogger, &storage.Options{
 		IndexName: "test-index",
 	})
 

@@ -316,22 +316,13 @@ var Module = fx.Module("storage",
 			fx.ResultTags(`name:"indexManager"`),
 		),
 
-		// Provide the storage
+		// Provide the storage interface
 		fx.Annotate(
-			func(
-				client *elasticsearch.Client,
-				logger logger.Interface,
-				cfg config.Interface,
-			) types.Interface {
-				opts := DefaultOptions()
-				opts.Addresses = cfg.GetElasticsearchConfig().Addresses
-				opts.Username = cfg.GetElasticsearchConfig().Username
-				opts.Password = cfg.GetElasticsearchConfig().Password
-				opts.APIKey = cfg.GetElasticsearchConfig().APIKey
-				opts.IndexName = cfg.GetElasticsearchConfig().IndexName
-				return NewStorage(client, logger, opts)
+			func(client *elasticsearch.Client, logger logger.Interface) types.Interface {
+				defaultOpts := DefaultOptions()
+				return NewStorage(client, logger, &defaultOpts)
 			},
-			fx.As(new(types.Interface)),
+			fx.ParamTags(`name:"elasticsearchClient"`),
 		),
 	),
 )

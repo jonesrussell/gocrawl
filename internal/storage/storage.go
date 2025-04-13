@@ -33,11 +33,15 @@ type Storage struct {
 }
 
 // NewStorage creates a new storage instance
-func NewStorage(client *es.Client, logger logger.Interface, opts Options) types.Interface {
+func NewStorage(client *es.Client, logger logger.Interface, opts *Options) types.Interface {
+	if opts == nil {
+		defaultOpts := DefaultOptions()
+		opts = &defaultOpts
+	}
 	return &Storage{
 		client: client,
 		logger: logger,
-		opts:   opts,
+		opts:   *opts,
 	}
 }
 
