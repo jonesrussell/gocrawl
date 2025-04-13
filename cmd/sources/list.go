@@ -10,6 +10,7 @@ import (
 
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -23,17 +24,81 @@ type Params struct {
 	Logger        logger.Interface
 }
 
-// ListCommand creates and returns the list command that displays all sources.
-func ListCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List all configured content sources",
-		Long: `Display a list of all content sources configured in sources.yml.
+// ListCommand implements the list command for sources.
+type ListCommand struct {
+	logger        logger.Interface
+	sourceManager sources.Interface
+}
 
-Example:
-  gocrawl sources list`,
-		RunE: RunList,
+// NewListCommand creates a new list command.
+func NewListCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all configured sources",
+		Long:  `List all content sources configured in the system.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get dependencies from context
+			loggerValue := cmd.Context().Value(LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context")
+			}
+
+			configValue := cmd.Context().Value(ConfigKey)
+			cfg, ok := configValue.(config.Interface)
+			if !ok {
+				return errors.New("config not found in context")
+			}
+
+			// Create source manager
+			sourceManager, err := sources.LoadSources(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to load sources: %w", err)
+			}
+
+			// Create and run the command
+			listCmd := &ListCommand{
+				logger:        log,
+				sourceManager: sourceManager,
+			}
+			return listCmd.Run(cmd.Context())
+		},
 	}
+
+	return cmd
+}
+
+// Run executes the list command.
+func (c *ListCommand) Run(ctx context.Context) error {
+	c.logger.Info("Listing sources")
+
+	// Get all sources
+	sourceList, err := c.sourceManager.ListSources(ctx)
+	if err != nil {
+		c.logger.Error("Failed to list sources", "error", err)
+		return fmt.Errorf("failed to list sources: %w", err)
+	}
+
+	// Print sources
+	if len(sourceList) == 0 {
+		c.logger.Info("No sources found")
+		return nil
+	}
+
+	for _, source := range sourceList {
+		c.logger.Info("Source found",
+			"name", source.Name,
+			"url", source.URL,
+			"allowed_domains", source.AllowedDomains,
+			"start_urls", source.StartURLs,
+			"max_depth", source.MaxDepth,
+			"rate_limit", source.RateLimit,
+			"index", source.Index,
+			"article_index", source.ArticleIndex,
+		)
+	}
+
+	return nil
 }
 
 // RunList executes the list command and displays all sources.
