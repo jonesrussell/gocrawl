@@ -1,5 +1,5 @@
-// Package job provides the job command implementation.
-package job
+// Package scheduler implements the job scheduler command for managing scheduled crawling tasks.
+package scheduler
 
 import (
 	"github.com/jonesrussell/gocrawl/internal/logger"

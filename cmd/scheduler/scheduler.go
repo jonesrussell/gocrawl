@@ -1,5 +1,5 @@
-// Package job implements the job scheduler command for managing scheduled crawling tasks.
-package job
+// Package scheduler implements the job scheduler command for managing scheduled crawling tasks.
+package scheduler
 
 import (
 	"context"
