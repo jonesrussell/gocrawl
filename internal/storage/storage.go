@@ -215,8 +215,8 @@ func (s *Storage) Search(ctx context.Context, index string, query any) ([]any, e
 	}
 
 	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error decoding search response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, decodeErr
 	}
 
 	hits, ok := result["hits"].(map[string]any)
@@ -456,8 +456,8 @@ func (s *Storage) SearchDocuments(ctx context.Context, index string, query map[s
 		return fmt.Errorf("search error: %s", res.String())
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(result); err != nil {
-		return fmt.Errorf("error decoding search response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(result); decodeErr != nil {
+		return fmt.Errorf("error decoding search response: %w", decodeErr)
 	}
 
 	return nil
@@ -781,8 +781,8 @@ func (s *Storage) Aggregate(ctx context.Context, index string, aggs any) (any, e
 	}
 
 	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error decoding aggregation response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding aggregation response: %w", decodeErr)
 	}
 
 	aggregations, ok := result["aggregations"].(map[string]any)
@@ -832,8 +832,8 @@ func (s *Storage) Count(ctx context.Context, index string, query any) (int64, er
 	}
 
 	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("error decoding count response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return 0, fmt.Errorf("error decoding count response: %w", decodeErr)
 	}
 
 	count, ok := result["count"].(float64)
