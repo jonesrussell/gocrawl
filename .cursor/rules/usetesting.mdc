@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# context.Background() could be replaced by t.Context() in tests 
+
+ - ctx := t.Context()
