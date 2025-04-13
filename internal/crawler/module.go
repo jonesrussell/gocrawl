@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/transport"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
+	"github.com/jonesrussell/gocrawl/internal/content/articles"
+	"github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	content "github.com/jonesrussell/gocrawl/internal/page"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
@@ -71,8 +71,8 @@ type DefaultProcessorFactory struct {
 	logger         logger.Interface
 	config         config.Interface
 	storage        storagetypes.Interface
-	articleService article.Interface
-	pageService    content.Interface
+	articleService articles.Interface
+	pageService    page.Interface
 	indexName      string
 	articleChannel chan *models.Article
 }
@@ -83,8 +83,8 @@ type ProcessorFactoryParams struct {
 	Logger         logger.Interface
 	Config         config.Interface
 	Storage        storagetypes.Interface
-	ArticleService article.Interface
-	PageService    content.Interface
+	ArticleService articles.Interface
+	PageService    page.Interface
 	IndexName      string `name:"pageIndexName"`
 	ArticleChannel chan *models.Article
 }
@@ -107,16 +107,16 @@ func (f *DefaultProcessorFactory) CreateProcessors(
 	ctx context.Context,
 	jobService common.JobService,
 ) ([]common.Processor, error) {
-	articleProcessor := article.NewProcessor(
-		f.logger,
-		f.articleService,
-		jobService,
-		f.storage,
-		f.indexName,
-		f.articleChannel,
-	)
+	articleProcessor := articles.NewProcessor(articles.ProcessorParams{
+		Logger:         f.logger,
+		Service:        f.articleService,
+		JobService:     jobService,
+		Storage:        f.storage,
+		IndexName:      f.indexName,
+		ArticleChannel: f.articleChannel,
+	})
 
-	pageProcessor := content.NewPageProcessor(content.ProcessorParams{
+	pageProcessor := page.NewPageProcessor(page.ProcessorParams{
 		Logger:    f.logger,
 		Service:   f.pageService,
 		Storage:   f.storage,

@@ -5,17 +5,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
-	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
-	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/content/articles"
+	"github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	content "github.com/jonesrussell/gocrawl/internal/page"
-	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -32,125 +26,82 @@ const (
 	DefaultInitTimeout = 30 * time.Second
 )
 
-// Module provides the crawl command module for dependency injection
-var Module = fx.Options(
-	// Core modules
-	config.Module,
-	logger.Module,
-	storage.Module,
-	article.Module,
-	content.Module,
-
-	// Provide the context
-	fx.Provide(context.Background),
-
-	// Provide the article channel
-	fx.Provide(func() chan *models.Article {
-		return make(chan *models.Article, ArticleChannelBufferSize)
-	}),
-
-	// Provide the page index name
-	fx.Provide(fx.Annotate(
-		func() string {
-			return "page"
-		},
-		fx.ResultTags(`name:"pageIndexName"`),
-	)),
-
-	// Provide the sources
-	fx.Provide(func(logger logger.Interface, cfg config.Interface) (*sources.Sources, error) {
-		return sources.LoadSources(cfg)
-	}),
-
-	// Provide the event bus
-	fx.Provide(events.NewEventBus),
-
-	// Provide the signal handler
-	fx.Provide(func() chan struct{} {
-		return make(chan struct{})
-	}),
-
-	// Provide the processors
-	fx.Provide(func(
-		logger logger.Interface,
-		articleChannel chan *models.Article,
-	) []common.Processor {
-		return []common.Processor{
-			&common.NoopProcessor{}, // Article processor
-			&common.NoopProcessor{}, // Page processor
-		}
-	}),
-
-	// Provide the processor factory
-	fx.Provide(fx.Annotate(
-		func(
-			logger logger.Interface,
-			config config.Interface,
-			storage types.Interface,
-			articleService article.Interface,
-			pageService content.Interface,
-			indexName string,
-			articleChannel chan *models.Article,
-		) crawler.ProcessorFactory {
-			return crawler.NewProcessorFactory(crawler.ProcessorFactoryParams{
-				Logger:         logger,
-				Config:         config,
-				Storage:        storage,
-				ArticleService: articleService,
-				PageService:    pageService,
-				IndexName:      indexName,
-				ArticleChannel: articleChannel,
-			})
-		},
-		fx.ParamTags(``, ``, ``, ``, ``, `name:"pageIndexName"`, ``),
-	)),
-
-	// Provide the job service
-	fx.Provide(fx.Annotate(
-		func(
-			logger logger.Interface,
-			storage types.Interface,
-			sources *sources.Sources,
-			crawler crawler.Interface,
-			done chan struct{},
-			config config.Interface,
-			processorFactory crawler.ProcessorFactory,
-			sourceName string,
-		) common.JobService {
-			return NewJobService(JobServiceParams{
-				Logger:           logger,
-				Sources:          sources,
-				Crawler:          crawler,
-				Done:             done,
-				Config:           config,
-				Storage:          storage,
-				ProcessorFactory: processorFactory,
-				SourceName:       sourceName,
-			})
-		},
-		fx.As(new(common.JobService)),
-		fx.ParamTags(``, ``, ``, ``, ``, ``, ``, `name:"sourceName"`),
-	)),
-
-	// Provide the crawler
-	fx.Provide(func(
-		ctx context.Context,
-		logger logger.Interface,
-		sources *sources.Sources,
-		eventBus *events.EventBus,
-		processors []common.Processor,
-		cfg *crawlerconfig.Config,
-		storage types.Interface,
-	) (crawler.Interface, error) {
-		return SetupCollector(
-			ctx,
-			logger,
-			storage.GetIndexManager(),
-			sources,
-			eventBus,
-			processors[0],
-			processors[1],
-			cfg,
-		)
-	}),
+// Module provides the crawl command's dependencies.
+var Module = fx.Module("crawl",
+	fx.Provide(
+		// Provide the article service
+		fx.Annotate(
+			func(p struct {
+				fx.In
+				Logger    logger.Interface
+				Storage   types.Interface
+				IndexName string `name:"articleIndexName"`
+			}) articles.Interface {
+				return articles.NewContentService(articles.ServiceParams{
+					Logger:    p.Logger,
+					Storage:   p.Storage,
+					IndexName: p.IndexName,
+				})
+			},
+			fx.ResultTags(`name:"articleService"`),
+		),
+		// Provide the page service
+		fx.Annotate(
+			func(p struct {
+				fx.In
+				Logger    logger.Interface
+				Storage   types.Interface
+				IndexName string `name:"pageIndexName"`
+			}) page.Interface {
+				return page.NewContentService(page.ServiceParams{
+					Logger:    p.Logger,
+					Storage:   p.Storage,
+					IndexName: p.IndexName,
+				})
+			},
+			fx.ResultTags(`name:"pageService"`),
+		),
+		// Provide the article processor
+		fx.Annotate(
+			func(p struct {
+				fx.In
+				Logger         logger.Interface
+				Service        articles.Interface
+				JobService     common.JobService
+				Storage        types.Interface
+				IndexName      string `name:"articleIndexName"`
+				ArticleChannel chan *models.Article
+			}) *articles.ArticleProcessor {
+				return articles.NewProcessor(articles.ProcessorParams{
+					Logger:         p.Logger,
+					Service:        p.Service,
+					JobService:     p.JobService,
+					Storage:        p.Storage,
+					IndexName:      p.IndexName,
+					ArticleChannel: p.ArticleChannel,
+				})
+			},
+			fx.ResultTags(`name:"articleProcessor"`),
+			fx.As(new(common.Processor)),
+		),
+		// Provide the page processor
+		fx.Annotate(
+			func(p struct {
+				fx.In
+				Logger    logger.Interface
+				Service   page.Interface
+				Storage   types.Interface
+				IndexName string `name:"pageIndexName"`
+			}) *page.PageProcessor {
+				return page.NewPageProcessor(page.ProcessorParams{
+					Logger:    p.Logger,
+					Service:   p.Service,
+					Storage:   p.Storage,
+					IndexName: p.IndexName,
+				})
+			},
+			fx.ResultTags(`name:"pageProcessor"`),
+			fx.As(new(common.Processor)),
+		),
+	),
 )
