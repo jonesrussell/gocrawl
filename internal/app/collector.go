@@ -48,10 +48,16 @@ func SetupCollector(
 		return nil, errors.New("crawler configuration is required")
 	}
 
+	// Get index manager from storage
+	indexManager := storage.GetIndexManager()
+	if indexManager == nil {
+		return nil, errors.New("index manager is required")
+	}
+
 	// Create crawler using the module's provider
 	result := crawler.ProvideCrawler(
 		log,
-		storage.GetIndexManager(),
+		indexManager,
 		sources,
 		processors,
 		bus,

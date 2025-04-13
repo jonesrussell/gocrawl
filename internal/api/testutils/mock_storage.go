@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -233,3 +235,15 @@ func (m *MockIndexManager) EnsureContentIndex(ctx context.Context, name string) 
 	args := m.Called(ctx, name)
 	return args.Error(0)
 }
+
+// GetIndexManager implements storage.Interface.
+func (m *MockStorage) GetIndexManager() interfaces.IndexManager {
+	args := m.Called()
+	if val, ok := args.Get(0).(interfaces.IndexManager); ok {
+		return val
+	}
+	return nil
+}
+
+// Ensure MockStorage implements storage.Interface
+var _ storagetypes.Interface = (*MockStorage)(nil)

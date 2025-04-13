@@ -3,12 +3,8 @@ package crawl
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -130,112 +126,4 @@ type ProcessorParams struct {
 	ContentService content.Interface
 	IndexName      string `name:"contentIndexName"`
 	ArticleChannel chan *models.Article
-}
-
-// provideProcessors creates and provides the content processors.
-func provideProcessors(p ProcessorParams) ([]common.Processor, error) {
-	articleProcessor := article.NewProcessor(
-		p.Logger,
-		p.ArticleService,
-		nil, // JobService will be injected later
-		p.Storage,
-		p.IndexName,
-		p.ArticleChannel,
-	)
-
-	contentProcessor := content.NewContentProcessor(content.ProcessorParams{
-		Logger:    p.Logger,
-		Service:   p.ContentService,
-		Storage:   p.Storage,
-		IndexName: p.IndexName,
-	})
-
-	return []common.Processor{
-		articleProcessor,
-		contentProcessor,
-	}, nil
-}
-
-// provideArticleChannel provides the article channel for communication between components.
-func provideArticleChannel() chan *models.Article {
-	return make(chan *models.Article, ArticleChannelBufferSize)
-}
-
-// provideContentIndexName provides the content index name.
-func provideContentIndexName() string {
-	return "content"
-}
-
-// provideEventBus creates and provides the event bus.
-func provideEventBus(logger logger.Interface) (*events.EventBus, error) {
-	bus := events.NewEventBus(logger)
-	if bus == nil {
-		return nil, errors.New("failed to create event bus")
-	}
-	return bus, nil
-}
-
-// provideSignalHandler creates and provides the signal handler.
-func provideSignalHandler(logger logger.Interface) signal.Interface {
-	return signal.NewSignalHandler(logger)
-}
-
-// provideDoneChannel provides the done channel for graceful shutdown.
-func provideDoneChannel() chan struct{} {
-	return make(chan struct{})
-}
-
-// provideSourceConfig loads and provides the source configuration.
-func provideSourceConfig(config config.Interface, logger logger.Interface, sourceName string) (*sources.Sources, error) {
-	src, err := sources.LoadSources(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load sources: %w", err)
-	}
-
-	sourceConfigs, err := src.GetSources()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get source configurations: %w", err)
-	}
-
-	var requestedSource sources.Config
-	for _, cfg := range sourceConfigs {
-		if cfg.Name == sourceName {
-			requestedSource = cfg
-			break
-		}
-	}
-
-	if requestedSource.Name == "" {
-		return nil, fmt.Errorf("source not found: %s", sourceName)
-	}
-
-	return sources.NewSources(&requestedSource, logger), nil
-}
-
-// provideJobService creates and provides the job service.
-func provideJobService(p struct {
-	fx.In
-	Logger           logger.Interface
-	Sources          *sources.Sources
-	Crawler          crawler.Interface
-	Done             chan struct{}
-	Config           config.Interface
-	Storage          types.Interface
-	ProcessorFactory crawler.ProcessorFactory
-}) (common.JobService, error) {
-	// Get the underlying Elasticsearch client from the storage interface
-	client, ok := p.Storage.(*elasticsearch.Client)
-	if !ok {
-		return nil, fmt.Errorf("storage interface must be an Elasticsearch client")
-	}
-
-	return NewJobService(JobServiceParams{
-		Logger:           p.Logger,
-		Sources:          p.Sources,
-		Crawler:          p.Crawler,
-		Done:             p.Done,
-		Config:           p.Config,
-		Client:           client,
-		ProcessorFactory: p.ProcessorFactory,
-	}), nil
 }

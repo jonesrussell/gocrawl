@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	signalhandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
 	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -17,6 +16,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -48,8 +48,8 @@ type Params struct {
 	// ActiveJobs tracks the number of currently running jobs
 	ActiveJobs *int32 `optional:"true"`
 
-	// Client is the Elasticsearch client
-	Client *elasticsearch.Client
+	// Storage is the storage interface
+	Storage types.Interface
 }
 
 const (
@@ -74,7 +74,7 @@ func runScheduler(
 	done chan struct{},
 	cfg config.Interface,
 	activeJobs *int32,
-	client *elasticsearch.Client,
+	storage types.Interface,
 ) {
 	log.Info("Starting job scheduler")
 
@@ -83,7 +83,7 @@ func runScheduler(
 	defer ticker.Stop()
 
 	// Do initial check
-	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg, activeJobs, client)
+	checkAndRunJobs(ctx, log, sources, c, time.Now(), processors, done, cfg, activeJobs, storage)
 
 	for {
 		select {
@@ -91,7 +91,7 @@ func runScheduler(
 			log.Info("Job scheduler shutting down")
 			return
 		case t := <-ticker.C:
-			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg, activeJobs, client)
+			checkAndRunJobs(ctx, log, sources, c, t, processors, done, cfg, activeJobs, storage)
 		}
 	}
 }
@@ -106,12 +106,12 @@ func executeCrawl(
 	done chan struct{},
 	cfg config.Interface,
 	activeJobs *int32,
-	client *elasticsearch.Client,
+	storage types.Interface,
 ) {
 	atomic.AddInt32(activeJobs, 1)
 	defer atomic.AddInt32(activeJobs, -1)
 
-	collectorResult, err := app.SetupCollector(ctx, log, source, processors, done, cfg, client)
+	collectorResult, err := app.SetupCollector(ctx, log, source, processors, done, cfg, storage)
 	if err != nil {
 		log.Error("Error setting up collector",
 			"error", err,
@@ -153,7 +153,7 @@ func checkAndRunJobs(
 	done chan struct{},
 	cfg config.Interface,
 	activeJobs *int32,
-	client *elasticsearch.Client,
+	storage types.Interface,
 ) {
 	if sources == nil {
 		log.Error("Sources configuration is nil")
@@ -181,7 +181,7 @@ func checkAndRunJobs(
 				log.Info("Running scheduled crawl",
 					"source", source.Name,
 					"time", scheduledTime)
-				executeCrawl(ctx, log, c, *source, processors, done, cfg, activeJobs, client)
+				executeCrawl(ctx, log, c, *source, processors, done, cfg, activeJobs, storage)
 			}
 		}
 	}
@@ -213,7 +213,7 @@ func startJob(p Params) error {
 		p.Done,
 		p.Config,
 		p.ActiveJobs,
-		p.Client,
+		p.Storage,
 	)
 
 	return nil
