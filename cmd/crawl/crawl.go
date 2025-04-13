@@ -17,6 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -56,6 +57,11 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	// Create source manager
 	sourceManager, err := sources.LoadSources(cfg)
 	if err != nil {
+		if errors.Is(err, loader.ErrNoSources) {
+			log.Info("No sources found in configuration. Please add sources to your config file.")
+			log.Info("You can use the 'sources list' command to view configured sources.")
+			return nil
+		}
 		return fmt.Errorf("failed to load sources: %w", err)
 	}
 
