@@ -40,9 +40,12 @@ var Module = fx.Options(
 	}),
 
 	// Provide the content index name
-	fx.Provide(func() string {
-		return "content"
-	}),
+	fx.Provide(fx.Annotate(
+		func() string {
+			return "content"
+		},
+		fx.ResultTags(`name:"contentIndexName"`),
+	)),
 
 	// Provide the sources
 	fx.Provide(func(logger logger.Interface) *sources.Sources {

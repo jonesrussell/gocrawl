@@ -45,7 +45,10 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		Module,
 		fx.Provide(
 			func() logger.Interface { return log },
-			func() string { return args[0] }, // Provide source name
+			fx.Annotate(
+				func() string { return args[0] },
+				fx.ResultTags(`name:"sourceName"`),
+			),
 		),
 		fx.WithLogger(func() fxevent.Logger {
 			return logger.NewFxLogger(log)
