@@ -107,7 +107,10 @@ func bindElasticsearchEnvVars() error {
 	if err := viper.BindEnv("elasticsearch.discover_nodes", "ELASTICSEARCH_DISCOVER_NODES"); err != nil {
 		return fmt.Errorf("failed to bind elasticsearch.discover_nodes: %w", err)
 	}
-	if err := viper.BindEnv("elasticsearch.tls_insecure_skip_verify", "ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY"); err != nil {
+	if err := viper.BindEnv(
+		"elasticsearch.tls_insecure_skip_verify",
+		"ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY",
+	); err != nil {
 		return fmt.Errorf("failed to bind elasticsearch.tls_insecure_skip_verify: %w", err)
 	}
 	if err := viper.BindEnv("elasticsearch.ca_fingerprint", "ELASTICSEARCH_CA_FINGERPRINT"); err != nil {
