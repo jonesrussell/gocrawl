@@ -1,6 +1,8 @@
+// Package content_test provides tests for the content package.
 package content_test
 
 import (
+	"context"
 	"net/url"
 	"strings"
 	"testing"
@@ -15,16 +17,158 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupTest creates test dependencies and returns the content service.
-func setupTest(
-	t *testing.T,
-) content.Interface {
+// testCases defines test cases for content processing
+type testCase struct {
+	name     string
+	input    string
+	expected string
+}
+
+// htmlTestCases defines test cases for HTML content processing
+var htmlTestCases = []testCase{
+	{
+		name:     "simple text",
+		input:    `<p>Hello world</p>`,
+		expected: "Hello world",
+	},
+	{
+		name:     "nested elements",
+		input:    `<div><p>Hello</p><p>world</p></div>`,
+		expected: "Hello world",
+	},
+	{
+		name:     "multiple spaces",
+		input:    `<p>Hello    world</p>`,
+		expected: "Hello world",
+	},
+	{
+		name:     "empty elements",
+		input:    `<p></p><p>Hello world</p><p></p>`,
+		expected: "Hello world",
+	},
+	{
+		name:     "mixed content",
+		input:    `<div><p>Hello</p><span>world</span></div>`,
+		expected: "Hello world",
+	},
+	{
+		name:     "whitespace handling",
+		input:    `<p>  Hello  world  </p>`,
+		expected: "Hello world",
+	},
+}
+
+// TestService_Process tests the Process method of the Service
+func TestService_Process(t *testing.T) {
+	// Setup
+	service := createTestService(t)
+	ctx := context.Background()
+
+	// Run test cases
+	for _, tc := range htmlTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Execute
+			result := service.Process(ctx, tc.input)
+
+			// Verify
+			assert.Equal(t, tc.expected, result, "Processed content should match expected output")
+		})
+	}
+}
+
+// TestService_ProcessBatch tests the ProcessBatch method of the Service
+func TestService_ProcessBatch(t *testing.T) {
+	// Setup
+	service := createTestService(t)
+	ctx := context.Background()
+
+	// Test cases
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "empty batch",
+			input:    []string{},
+			expected: []string{},
+		},
+		{
+			name:     "single item",
+			input:    []string{`<p>Hello world</p>`},
+			expected: []string{"Hello world"},
+		},
+		{
+			name: "multiple items",
+			input: []string{
+				`<p>Hello</p>`,
+				`<p>world</p>`,
+			},
+			expected: []string{"Hello", "world"},
+		},
+	}
+
+	// Run test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Execute
+			result := service.ProcessBatch(ctx, tt.input)
+
+			// Verify
+			assert.Equal(t, tt.expected, result, "Processed batch should match expected output")
+		})
+	}
+}
+
+// TestService_ProcessWithMetadata tests the ProcessWithMetadata method of the Service
+func TestService_ProcessWithMetadata(t *testing.T) {
+	// Setup
+	service := createTestService(t)
+	ctx := context.Background()
+
+	// Test cases
+	tests := []struct {
+		name     string
+		input    string
+		metadata map[string]string
+		expected string
+	}{
+		{
+			name:     "no metadata",
+			input:    `<p>Hello world</p>`,
+			metadata: nil,
+			expected: "Hello world",
+		},
+		{
+			name:     "with metadata",
+			input:    `<p>Hello world</p>`,
+			metadata: map[string]string{"source": "test", "type": "article"},
+			expected: "Hello world",
+		},
+	}
+
+	// Run test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Execute
+			result := service.ProcessWithMetadata(ctx, tt.input, tt.metadata)
+
+			// Verify
+			assert.Equal(t, tt.expected, result, "Processed content with metadata should match expected output")
+		})
+	}
+}
+
+// createTestService creates a test service instance
+func createTestService(t *testing.T) content.Interface {
+	t.Helper()
 	ctrl := gomock.NewController(t)
-	t.Cleanup(func() { ctrl.Finish() })
+	defer ctrl.Finish()
 
 	mockLogger := logger.NewMockInterface(ctrl)
 	mockStorage := storage.NewMockInterface(ctrl)
 
+	// Set up default expectations
 	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
@@ -33,39 +177,48 @@ func setupTest(
 	return content.NewService(mockLogger, mockStorage)
 }
 
-func TestExtractContent(t *testing.T) {
-	svc := setupTest(t)
+// createTestDocument creates a test goquery Document
+func createTestDocument(t *testing.T, html string) *goquery.Document {
+	t.Helper()
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	require.NoError(t, err, "Failed to create test document")
+	return doc
+}
 
-	// Create a test HTML document
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader("<html><body><p>Test content</p></body></html>"))
-	require.NoError(t, err)
-
-	// Create a test HTML element
-	req := &colly.Request{
-		URL: &url.URL{
-			Scheme: "http",
-			Host:   "example.com",
-			Path:   "/test",
+// createTestHTMLElement creates a test colly HTMLElement
+func createTestHTMLElement(t *testing.T, html string) *colly.HTMLElement {
+	t.Helper()
+	doc := createTestDocument(t, html)
+	return &colly.HTMLElement{
+		DOM: doc.Find("body"),
+		Request: &colly.Request{
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   "example.com",
+				Path:   "/test",
+			},
 		},
-		Ctx: colly.NewContext(),
 	}
-	resp := &colly.Response{
-		Request: req,
-		Ctx:     req.Ctx,
-	}
-	e := &colly.HTMLElement{
-		Request:  req,
-		Response: resp,
-		DOM:      doc.Find("p").First(),
-	}
+}
 
+func TestExtractContent(t *testing.T) {
+	svc := createTestService(t)
+
+	// Create a test HTML element with a body element
+	html := `<body><p>Test content</p></body>`
+	e := createTestHTMLElement(t, html)
+
+	// Extract content
 	content := svc.ExtractContent(e)
+
+	// Verify content
 	assert.NotNil(t, content)
 	assert.Equal(t, "Test content", content.Body)
+	assert.Equal(t, "http://example.com/test", content.URL)
 }
 
 func TestExtractMetadata(t *testing.T) {
-	service := setupTest(t)
+	service := createTestService(t)
 
 	// Create a test HTML element
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(`
@@ -103,70 +256,14 @@ func TestExtractMetadata(t *testing.T) {
 	assert.Equal(t, "2023-04-13T12:00:00Z", metadata["article:published_time"])
 }
 
-func TestService_Process(t *testing.T) {
-	svc := setupTest(t)
-
-	testCases := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "simple text",
-			input:    "<p>Hello world</p>",
-			expected: "Hello world",
-		},
-		{
-			name:     "nested elements",
-			input:    "<div><p>Hello</p><p>world</p></div>",
-			expected: "Hello world",
-		},
-		{
-			name:     "multiple spaces",
-			input:    "<div><p>Hello  </p><p>  world</p></div>",
-			expected: "Hello world",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := svc.Process(t.Context(), tc.input)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
-}
-
-func TestService_ProcessBatch(t *testing.T) {
-	svc := setupTest(t)
-
-	input := []string{"<p>Hello</p>", "<div>World</div>"}
-	expected := []string{"Hello", "World"}
-
-	result := svc.ProcessBatch(t.Context(), input)
-	assert.Equal(t, expected, result)
-}
-
-func TestService_ProcessWithMetadata(t *testing.T) {
-	svc := setupTest(t)
-
-	input := "<p>Hello world</p>"
-	metadata := map[string]string{
-		"title": "Test Title",
-		"date":  "2023-04-13",
-	}
-
-	result := svc.ProcessWithMetadata(t.Context(), input, metadata)
-	assert.Equal(t, "Hello world", result)
-}
-
 func TestNewService(t *testing.T) {
-	service := setupTest(t)
+	service := createTestService(t)
 	assert.NotNil(t, service)
 	assert.Implements(t, (*content.Interface)(nil), service)
 }
 
 func TestService_ProcessContent(t *testing.T) {
-	svc := setupTest(t)
+	svc := createTestService(t)
 
 	input := "<p>Test content</p>"
 	result := svc.Process(t.Context(), input)

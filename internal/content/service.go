@@ -3,7 +3,7 @@ package content
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 	"time"
 
@@ -97,13 +97,6 @@ type JSONLDMetadata struct {
 	AdditionalData map[string]any `json:"additionalData,omitempty"`
 }
 
-var timeFormats = []string{
-	time.RFC3339,
-	"2006-01-02T15:04:05Z",
-	"2006-01-02T15:04:05.2030000Z",
-	"2006-01-02 15:04:05",
-}
-
 var contentTypePatterns = map[common.ContentType][]string{
 	common.ContentTypeArticle: {"/article/", "/articles/", "/post/", "/posts/"},
 	common.ContentTypePage:    {"/page/", "/pages/"},
@@ -115,9 +108,40 @@ var contentTypePatterns = map[common.ContentType][]string{
 
 // ExtractContent extracts content from an HTML element
 func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
+	// Get rules for this URL
+	rules := s.getRulesForURL(e.Request.URL.String())
+
+	// Try to find content using source-specific selectors
+	var body string
+	for _, selector := range rules.ContentSelectors {
+		if text := e.DOM.Find(selector).Text(); text != "" {
+			body = text
+			break
+		}
+	}
+
+	// If no content found with selectors, try to find content in the element
+	if body == "" {
+		// First try to find content in paragraphs and divs
+		e.DOM.Find("p, div").Each(func(_ int, sel *goquery.Selection) {
+			if text := strings.TrimSpace(sel.Text()); text != "" {
+				body = text
+				return
+			}
+		})
+
+		// If still no content, use the element's text
+		if body == "" {
+			body = e.Text
+		}
+	}
+
+	// Clean up the text
+	body = strings.TrimSpace(body)
+
 	content := &models.Content{
 		URL:  e.Request.URL.String(),
-		Body: strings.TrimSpace(e.Text),
+		Body: body,
 	}
 
 	return content
@@ -181,30 +205,30 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
 	}
 
 	// Extract OpenGraph metadata (highest precedence)
-	e.DOM.Find(`meta[property^="og:"], meta[property^="article:"]`).Each(func(_ int, s *goquery.Selection) {
-		property, exists := s.Attr("property")
-		if !exists {
+	e.DOM.Find(`meta[property^="og:"], meta[property^="article:"]`).Each(func(_ int, sel *goquery.Selection) {
+		property, propExists := sel.Attr("property")
+		if !propExists {
 			return
 		}
-		content, exists := s.Attr("content")
-		if !exists {
+		content, contentExists := sel.Attr("content")
+		if !contentExists {
 			return
 		}
 		metadata[property] = content
 	})
 
 	// Extract Twitter metadata (second precedence)
-	e.DOM.Find(`meta[name^="twitter:"]`).Each(func(_ int, s *goquery.Selection) {
-		name, exists := s.Attr("name")
-		if !exists {
+	e.DOM.Find(`meta[name^="twitter:"]`).Each(func(_ int, sel *goquery.Selection) {
+		name, nameExists := sel.Attr("name")
+		if !nameExists {
 			return
 		}
-		content, exists := s.Attr("content")
-		if !exists {
+		content, contentExists := sel.Attr("content")
+		if !contentExists {
 			return
 		}
 		key := name[8:] // Remove "twitter:" prefix
-		if _, exists := metadata[key]; !exists {
+		if _, keyExists := metadata[key]; !keyExists {
 			metadata[key] = content
 		}
 	})
@@ -216,30 +240,6 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
 	return metadata
 }
 
-// parseDate attempts to parse a date string using multiple formats
-func (s *Service) parseDate(logger logger.Interface, dateStr string) time.Time {
-	logger.Debug("Trying to parse date", "value", dateStr)
-
-	for _, format := range timeFormats {
-		t, err := time.Parse(format, dateStr)
-		if err == nil {
-			logger.Debug("Successfully parsed date",
-				"source", dateStr,
-				"format", format,
-				"result", t.String(),
-			)
-			return t
-		}
-		logger.Debug("Failed to parse date",
-			"source", dateStr,
-			"format", format,
-			"error", err.Error(),
-		)
-	}
-
-	return time.Time{}
-}
-
 // Process processes a single string content
 func (s *Service) Process(ctx context.Context, html string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
@@ -248,15 +248,23 @@ func (s *Service) Process(ctx context.Context, html string) string {
 		return ""
 	}
 
+	// Extract text from all elements except script and style
 	var text []string
-	doc.Find("p, div").Each(func(i int, sel *goquery.Selection) {
-		t := strings.TrimSpace(sel.Text())
-		if t != "" {
-			text = append(text, t)
+	doc.Find("body").Find("*:not(script):not(style)").Each(func(_ int, sel *goquery.Selection) {
+		// Only process elements that directly contain text
+		if sel.Children().Length() == 0 {
+			if t := strings.TrimSpace(sel.Text()); t != "" {
+				// Split into words and join with single space to normalize whitespace
+				words := strings.Fields(t)
+				text = append(text, strings.Join(words, " "))
+			}
 		}
 	})
 
-	return strings.Join(text, " ")
+	// Join all text segments with a single space and normalize whitespace again
+	result := strings.Join(text, " ")
+	result = strings.Join(strings.Fields(result), " ")
+	return strings.TrimSpace(result)
 }
 
 // ProcessBatch processes a batch of strings
@@ -284,10 +292,11 @@ func (s *Service) ExtractText(doc *goquery.Document) string {
 	return doc.Find("body").Text()
 }
 
+// ExtractContentFromDocument extracts content from a goquery Document
 func (s *Service) ExtractContentFromDocument(url string, doc *goquery.Document) (*models.Content, error) {
 	body := s.ExtractText(doc)
 	if body == "" {
-		return nil, fmt.Errorf("no content found in document")
+		return nil, errors.New("no content found in document")
 	}
 
 	return &models.Content{

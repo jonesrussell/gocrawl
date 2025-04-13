@@ -109,7 +109,7 @@ func (p *ContentProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement
 
 	// Get JSON-LD type if available
 	jsonLDType := ""
-	if typeVal, ok := content.Metadata["@type"].(string); ok {
+	if typeVal, typeExists := content.Metadata["@type"].(string); typeExists {
 		jsonLDType = typeVal
 	}
 
@@ -148,8 +148,8 @@ func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType commo
 		return fmt.Errorf("unsupported content type: %v", contentType)
 	}
 
-	e, ok := content.(*colly.HTMLElement)
-	if !ok {
+	e, isHTMLElement := content.(*colly.HTMLElement)
+	if !isHTMLElement {
 		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
 	}
 
@@ -166,7 +166,7 @@ func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType commo
 
 	// Get JSON-LD type if available
 	jsonLDType := ""
-	if typeVal, ok := contentData.Metadata["@type"].(string); ok {
+	if typeVal, typeExists := contentData.Metadata["@type"].(string); typeExists {
 		jsonLDType = typeVal
 	}
 
@@ -195,8 +195,8 @@ func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType commo
 
 // Process processes the content and returns the processed result
 func (p *ContentProcessor) Process(ctx context.Context, content any) error {
-	e, ok := content.(*colly.HTMLElement)
-	if !ok {
+	e, isHTMLElement := content.(*colly.HTMLElement)
+	if !isHTMLElement {
 		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
 	}
 
@@ -213,7 +213,7 @@ func (p *ContentProcessor) Process(ctx context.Context, content any) error {
 
 	// Get JSON-LD type if available
 	jsonLDType := ""
-	if typeVal, ok := contentData.Metadata["@type"].(string); ok {
+	if typeVal, typeExists := contentData.Metadata["@type"].(string); typeExists {
 		jsonLDType = typeVal
 	}
 
