@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
@@ -18,14 +18,14 @@ const (
 	HTTPStatusOK = http.StatusOK
 )
 
-// ElasticsearchIndexManager implements the types.IndexManager interface using Elasticsearch.
+// ElasticsearchIndexManager implements the interfaces.IndexManager interface using Elasticsearch.
 type ElasticsearchIndexManager struct {
 	client *elasticsearch.Client
 	logger logger.Interface
 }
 
 // NewElasticsearchIndexManager creates a new Elasticsearch index manager.
-func NewElasticsearchIndexManager(client *elasticsearch.Client, logger logger.Interface) types.IndexManager {
+func NewElasticsearchIndexManager(client *elasticsearch.Client, logger logger.Interface) interfaces.IndexManager {
 	return &ElasticsearchIndexManager{
 		client: client,
 		logger: logger,
