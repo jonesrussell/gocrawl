@@ -324,5 +324,11 @@ var Module = fx.Module("storage",
 			},
 			fx.ParamTags(`name:"elasticsearchClient"`),
 		),
+
+		// Provide the search manager
+		fx.Annotate(
+			NewSearchManager,
+			fx.ParamTags(``, ``),
+		),
 	),
 )
