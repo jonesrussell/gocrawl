@@ -172,7 +172,7 @@ type simpleEventHandler struct {
 // Handle implements the eventHandler interface for simple events.
 func (h *simpleEventHandler) Handle(log Interface, event fxevent.Event) {
 	switch event.(type) {
-	case *fxevent.Supplied, *fxevent.Invoked, *fxevent.LoggerInitialized:
+	case *fxevent.Supplied, *fxevent.Invoked, *fxevent.LoggerInitialized, *fxevent.Invoking, *fxevent.Run:
 		var err error
 		var fields []any
 
@@ -186,6 +186,10 @@ func (h *simpleEventHandler) Handle(log Interface, event fxevent.Event) {
 		case *fxevent.LoggerInitialized:
 			err = ev.Err
 			fields = []any{"function", cleanConstructorName(ev.ConstructorName)}
+		case *fxevent.Invoking:
+			fields = []any{"function", cleanConstructorName(ev.FunctionName)}
+		case *fxevent.Run:
+			fields = []any{"function", cleanConstructorName(ev.Name)}
 		}
 
 		(&fxLogger{log: log}).logSuccessOrError(h.successMsg, h.errorMsg, err, fields...)
@@ -252,6 +256,14 @@ var eventHandlers = map[reflect.Type]eventHandler{
 	reflect.TypeOf(&fxevent.LoggerInitialized{}): &simpleEventHandler{
 		successMsg: "Initialized custom fxevent.Logger",
 		errorMsg:   "Custom logger initialization failed",
+	},
+	reflect.TypeOf(&fxevent.Invoking{}): &simpleEventHandler{
+		successMsg: "Invoking",
+		errorMsg:   "Invoke failed",
+	},
+	reflect.TypeOf(&fxevent.Run{}): &simpleEventHandler{
+		successMsg: "Running",
+		errorMsg:   "Run failed",
 	},
 	reflect.TypeOf(&fxevent.Stopping{}):   &signalEventHandler{},
 	reflect.TypeOf(&fxevent.Stopped{}):    &signalEventHandler{},
