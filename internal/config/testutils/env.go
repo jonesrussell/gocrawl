@@ -29,15 +29,15 @@ func SetupConfigTestEnv(t *testing.T) func() {
 	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
 	t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
 	t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
-	t.Setenv("GOCRAWL_CONFIG_FILE", filepath.Join("testdata", "config.yml"))
-	t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
+	t.Setenv("GOCRAWL_CONFIG_FILE", filepath.Join("testdata", "config", "base.yml"))
+	t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources", "basic.yml"))
 
 	// Return cleanup function
 	return func() {
 		// Restore original environment
 		os.Clearenv()
 		for k, v := range origEnv {
-			os.Setenv(k, v)
+			t.Setenv(k, v)
 		}
 	}
 }
@@ -57,8 +57,8 @@ func SetupConfigTestEnvWithValues(t *testing.T, values map[string]string) func()
 	t.Setenv("GOCRAWL_APP_ENVIRONMENT", "test")
 	t.Setenv("GOCRAWL_APP_NAME", "gocrawl-test")
 	t.Setenv("GOCRAWL_APP_VERSION", "0.0.1")
-	t.Setenv("GOCRAWL_CONFIG_FILE", filepath.Join("testdata", "config.yml"))
-	t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources.yml"))
+	t.Setenv("GOCRAWL_CONFIG_FILE", filepath.Join("testdata", "config", "base.yml"))
+	t.Setenv("GOCRAWL_CRAWLER_SOURCE_FILE", filepath.Join("testdata", "sources", "basic.yml"))
 
 	// Set custom values
 	for k, v := range values {
@@ -70,7 +70,7 @@ func SetupConfigTestEnvWithValues(t *testing.T, values map[string]string) func()
 		// Restore original environment
 		os.Clearenv()
 		for k, v := range origEnv {
-			os.Setenv(k, v)
+			t.Setenv(k, v)
 		}
 	}
 }
