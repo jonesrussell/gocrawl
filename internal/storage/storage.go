@@ -206,45 +206,30 @@ func (s *Storage) Search(ctx context.Context, index string, query any) ([]any, e
 		s.client.Search.WithBody(bytes.NewReader(body)),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute search: %w", err)
+		return nil, fmt.Errorf("error executing search: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, fmt.Errorf("search request failed: %s", res.String())
+		return nil, fmt.Errorf("search error: %s", res.String())
 	}
 
 	var result map[string]any
-	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		return nil, fmt.Errorf("error decoding search response: %w", decodeErr)
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("error decoding search response: %w", err)
 	}
 
-	hits, hasHits := result["hits"].(map[string]any)
-	if !hasHits {
-		return nil, errors.New("invalid search response format")
+	hits, ok := result["hits"].(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid response format: hits object not found")
 	}
 
-	hitsList, hasHitsList := hits["hits"].([]any)
-	if !hasHitsList {
-		return nil, errors.New("invalid search response format")
+	hitsArray, ok := hits["hits"].([]any)
+	if !ok {
+		return nil, errors.New("invalid response format: hits array not found")
 	}
 
-	var documents []any
-	for _, hit := range hitsList {
-		hitMap, ok := hit.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		source, hasSource := hitMap["_source"]
-		if !hasSource {
-			continue
-		}
-
-		documents = append(documents, source)
-	}
-
-	return documents, nil
+	return hitsArray, nil
 }
 
 // CreateIndex creates a new index with the specified mapping
@@ -433,22 +418,28 @@ func (s *Storage) GetDocument(ctx context.Context, index, id string, document an
 	return nil
 }
 
-// SearchDocuments searches for documents in Elasticsearch
-func (s *Storage) SearchDocuments(
-	ctx context.Context,
-	index, query string,
-) ([]map[string]any, error) {
-	searchQuery := map[string]any{
-		"query": map[string]any{
-			"query_string": map[string]any{
-				"query": query,
-			},
-		},
+// SearchDocuments performs a search query and decodes the result into the provided value
+func (s *Storage) SearchDocuments(ctx context.Context, index string, query map[string]any, result any) error {
+	if s.client == nil {
+		return errors.New("elasticsearch client is not initialized")
 	}
 
-	body, err := json.Marshal(searchQuery)
+	// First check if the index exists
+	exists, err := s.IndexExists(ctx, index)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling search query: %w", err)
+		return fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		s.logger.Error("Index not found", "index", index)
+		return fmt.Errorf("%w: %s", ErrIndexNotFound, index)
+	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	body, err := marshalJSON(query)
+	if err != nil {
+		return fmt.Errorf("error marshaling search query: %w", err)
 	}
 
 	res, err := s.client.Search(
@@ -457,54 +448,19 @@ func (s *Storage) SearchDocuments(
 		s.client.Search.WithBody(bytes.NewReader(body)),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error searching documents: %w", err)
+		return fmt.Errorf("error executing search: %w", err)
 	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			s.logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
+	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, fmt.Errorf("error searching documents: %s", res.String())
+		return fmt.Errorf("search error: %s", res.String())
 	}
 
-	var result map[string]any
-	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		return nil, fmt.Errorf("error parsing search response: %w", decodeErr)
+	if err := json.NewDecoder(res.Body).Decode(result); err != nil {
+		return fmt.Errorf("error decoding search response: %w", err)
 	}
 
-	hitsObj, ok := result["hits"].(map[string]any)
-	if !ok {
-		return nil, errors.New("invalid response format: hits object not found")
-	}
-
-	hitsArray, ok := hitsObj["hits"].([]any)
-	if !ok {
-		return nil, errors.New("invalid response format: hits array not found")
-	}
-
-	documents := make([]map[string]any, 0, len(hitsArray))
-	for _, hit := range hitsArray {
-		resultMap, isValidMap := hit.(map[string]any)
-		if !isValidMap {
-			continue
-		}
-
-		source, hasSource := resultMap["_source"]
-		if !hasSource {
-			continue
-		}
-
-		sourceMap, isMap := source.(map[string]any)
-		if !isMap {
-			continue
-		}
-
-		documents = append(documents, sourceMap)
-	}
-
-	return documents, nil
+	return nil
 }
 
 // Ping implements Interface
@@ -789,45 +745,55 @@ func (s *Storage) Aggregate(ctx context.Context, index string, aggs any) (any, e
 		return nil, errors.New("elasticsearch client is not initialized")
 	}
 
-	body, err := json.Marshal(map[string]any{
+	// First check if the index exists
+	exists, err := s.IndexExists(ctx, index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		s.logger.Error("Index not found", "index", index)
+		return nil, fmt.Errorf("%w: %s", ErrIndexNotFound, index)
+	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	body, err := marshalJSON(map[string]any{
+		"size": 0,
 		"aggs": aggs,
 	})
 	if err != nil {
-		s.logger.Error("Failed to marshal aggregation query", "error", err)
 		return nil, fmt.Errorf("error marshaling aggregation query: %w", err)
 	}
 
-	res, searchErr := s.client.Search(
+	res, err := s.client.Search(
 		s.client.Search.WithContext(ctx),
 		s.client.Search.WithIndex(index),
 		s.client.Search.WithBody(bytes.NewReader(body)),
 	)
-	if searchErr != nil {
-		s.logger.Error("Failed to execute aggregation", "error", searchErr)
-		return nil, fmt.Errorf("error executing aggregation: %w", searchErr)
+	if err != nil {
+		return nil, fmt.Errorf("error executing aggregation: %w", err)
 	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			s.logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
+	defer res.Body.Close()
 
 	if res.IsError() {
-		s.logger.Error("Failed to execute aggregation", "error", res.String())
-		return nil, fmt.Errorf("error executing aggregation: %s", res.String())
+		return nil, fmt.Errorf("aggregation error: %s", res.String())
 	}
 
 	var result map[string]any
-	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		s.logger.Error("Failed to decode aggregation result", "error", decodeErr)
-		return nil, fmt.Errorf("error decoding aggregation result: %w", decodeErr)
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("error decoding aggregation response: %w", err)
 	}
 
-	s.logger.Info("Executed aggregation successfully", "index", index)
-	return result["aggregations"], nil
+	aggregations, ok := result["aggregations"].(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid response format: aggregations not found")
+	}
+
+	return aggregations, nil
 }
 
-// Count counts documents in an index
+// Count returns the number of documents matching the query
 func (s *Storage) Count(ctx context.Context, index string, query any) (int64, error) {
 	if s.client == nil {
 		return 0, errors.New("elasticsearch client is not initialized")
@@ -846,44 +812,36 @@ func (s *Storage) Count(ctx context.Context, index string, query any) (int64, er
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
 	defer cancel()
 
-	// Create the count request
-	var body bytes.Buffer
-	if query != nil {
-		if encodeErr := json.NewEncoder(&body).Encode(query); encodeErr != nil {
-			return 0, fmt.Errorf("error encoding count query: %w", encodeErr)
-		}
+	body, err := marshalJSON(query)
+	if err != nil {
+		return 0, fmt.Errorf("error marshaling count query: %w", err)
 	}
 
 	res, err := s.client.Count(
 		s.client.Count.WithContext(ctx),
 		s.client.Count.WithIndex(index),
-		s.client.Count.WithBody(&body),
+		s.client.Count.WithBody(bytes.NewReader(body)),
 	)
 	if err != nil {
-		s.logger.Error("Failed to execute count", "error", err)
-		return 0, fmt.Errorf("failed to execute count: %w", err)
+		return 0, fmt.Errorf("error executing count: %w", err)
 	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			s.logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
+	defer res.Body.Close()
 
 	if res.IsError() {
-		s.logger.Error("Failed to execute count", "error", res.String())
-		return 0, fmt.Errorf("error executing count: %s", res.String())
+		return 0, fmt.Errorf("count error: %s", res.String())
 	}
 
-	var result struct {
-		Count int64 `json:"count"`
-	}
-	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		s.logger.Error("Failed to decode count result", "error", decodeErr)
-		return 0, fmt.Errorf("error decoding count result: %w", decodeErr)
+	var result map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("error decoding count response: %w", err)
 	}
 
-	s.logger.Info("Executed count successfully", "index", index, "count", result.Count)
-	return result.Count, nil
+	count, ok := result["count"].(float64)
+	if !ok {
+		return 0, errors.New("invalid response format: count not found")
+	}
+
+	return int64(count), nil
 }
 
 // TestConnection tests the connection to the storage backend

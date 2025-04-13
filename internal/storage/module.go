@@ -1,21 +1,22 @@
-// Package storage implements the storage layer for the application.
+// Package storage provides Elasticsearch storage implementation.
 package storage
 
 import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"time"
 
 	"crypto/x509"
 
-	es "github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
+	esconfig "github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 	"golang.org/x/net/http2"
 )
@@ -33,7 +34,7 @@ const (
 )
 
 // createTLSConfig creates a TLS configuration with appropriate security settings
-func createTLSConfig(esConfig *elasticsearch.Config) (*tls.Config, error) {
+func createTLSConfig(esConfig *esconfig.Config) (*tls.Config, error) {
 	// Create basic TLS config with minimum version 1.2
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
@@ -72,7 +73,7 @@ func createTLSConfig(esConfig *elasticsearch.Config) (*tls.Config, error) {
 }
 
 // createTransport creates a configured HTTP transport for Elasticsearch
-func createTransport(esConfig *elasticsearch.Config, logger logger.Interface) (*http.Transport, error) {
+func createTransport(esConfig *esconfig.Config, logger logger.Interface) (*http.Transport, error) {
 	logger.Debug("Creating HTTP transport")
 
 	transport, ok := http.DefaultTransport.(*http.Transport)
@@ -125,7 +126,7 @@ func configureTransport(transport *http.Transport) error {
 }
 
 // createClientConfig creates an Elasticsearch client configuration
-func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transport, logger logger.Interface) es.Config {
+func createClientConfig(esConfig *esconfig.Config, transport *http.Transport, logger logger.Interface) elasticsearch.Config {
 	// Log configuration details
 	logger.Debug("Creating Elasticsearch client configuration",
 		"addresses", esConfig.Addresses,
@@ -140,7 +141,7 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 		"maxRetries", esConfig.Retry.MaxRetries)
 
 	// Create client configuration
-	cfg := es.Config{
+	cfg := elasticsearch.Config{
 		Addresses: esConfig.Addresses,
 		Username:  esConfig.Username,
 		Password:  esConfig.Password,
@@ -188,7 +189,7 @@ func createClientConfig(esConfig *elasticsearch.Config, transport *http.Transpor
 }
 
 // NewElasticsearchClient creates a new Elasticsearch client with the provided configuration
-func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.Client, error) {
+func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*elasticsearch.Client, error) {
 	esConfig := cfg.GetElasticsearchConfig()
 	if len(esConfig.Addresses) == 0 {
 		return nil, errors.New("elasticsearch addresses are required")
@@ -214,7 +215,7 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 	esCfg := createClientConfig(esConfig, transport, logger)
 
 	// Create client
-	client, err := es.NewClient(esCfg)
+	client, err := elasticsearch.NewClient(esCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
 	}
@@ -233,45 +234,89 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*es.
 	return client, nil
 }
 
-// Module provides the storage module
+// Module provides the storage module for dependency injection.
 var Module = fx.Module("storage",
 	fx.Provide(
-		// Provide Elasticsearch client
-		NewElasticsearchClient,
-		// Provide storage options
-		func(cfg config.Interface) Options {
-			return Options{
-				IndexName: cfg.GetElasticsearchConfig().IndexName,
-			}
-		},
-		// Provide storage client
-		NewStorage,
-		// Provide search manager
-		NewSearchManager,
-		// Provide index manager
+		// Provide the Elasticsearch client
 		fx.Annotate(
-			func(
-				config config.Interface,
-				logger logger.Interface,
-				client *es.Client,
-			) (interfaces.IndexManager, error) {
-				logger.Debug("Creating Elasticsearch index manager")
+			func(logger logger.Interface, cfg config.Interface) (*elasticsearch.Client, error) {
+				esConfig := cfg.GetElasticsearchConfig()
 
-				if client == nil {
-					logger.Error("Elasticsearch client not initialized")
-					return nil, errors.New("elasticsearch client not initialized")
+				// Create transport with TLS configuration
+				transport := &http.Transport{
+					MaxIdleConnsPerHost:   10,
+					ResponseHeaderTimeout: time.Second,
+					DialContext: (&net.Dialer{
+						Timeout:   30 * time.Second,
+						KeepAlive: 30 * time.Second,
+					}).DialContext,
+					MaxIdleConns:          100,
+					IdleConnTimeout:       90 * time.Second,
+					TLSHandshakeTimeout:   10 * time.Second,
+					ExpectContinueTimeout: 1 * time.Second,
 				}
 
-				manager := NewElasticsearchIndexManager(client, logger)
-				if manager == nil {
-					logger.Error("Failed to create Elasticsearch index manager")
-					return nil, errors.New("failed to create Elasticsearch index manager")
+				// Configure TLS if enabled
+				if esConfig.TLS != nil {
+					transport.TLSClientConfig = &tls.Config{
+						InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify,
+					}
 				}
 
-				return manager, nil
+				// Create Elasticsearch config
+				config := elasticsearch.Config{
+					Addresses: esConfig.Addresses,
+					Username:  esConfig.Username,
+					Password:  esConfig.Password,
+					APIKey:    esConfig.APIKey,
+					Transport: transport,
+				}
+
+				client, err := elasticsearch.NewClient(config)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
+				}
+
+				// Test the connection
+				res, err := client.Ping()
+				if err != nil {
+					return nil, fmt.Errorf("failed to ping Elasticsearch: %w", err)
+				}
+				defer res.Body.Close()
+
+				if res.IsError() {
+					return nil, fmt.Errorf("error pinging Elasticsearch: %s", res.String())
+				}
+
+				return client, nil
+			},
+			fx.ResultTags(`name:"elasticsearchClient"`),
+		),
+
+		// Provide the index manager
+		fx.Annotate(
+			func(client *elasticsearch.Client, logger logger.Interface) types.IndexManager {
+				return NewElasticsearchIndexManager(client, logger)
 			},
 			fx.ResultTags(`name:"indexManager"`),
-			fx.As(new(interfaces.IndexManager)),
+		),
+
+		// Provide the storage
+		fx.Annotate(
+			func(
+				client *elasticsearch.Client,
+				logger logger.Interface,
+				cfg config.Interface,
+			) types.Interface {
+				opts := DefaultOptions()
+				opts.Addresses = cfg.GetElasticsearchConfig().Addresses
+				opts.Username = cfg.GetElasticsearchConfig().Username
+				opts.Password = cfg.GetElasticsearchConfig().Password
+				opts.APIKey = cfg.GetElasticsearchConfig().APIKey
+				opts.IndexName = cfg.GetElasticsearchConfig().IndexName
+				return NewStorage(client, logger, opts)
+			},
+			fx.As(new(types.Interface)),
 		),
 	),
 )

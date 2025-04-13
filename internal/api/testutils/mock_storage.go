@@ -94,17 +94,28 @@ func (m *MockStorage) IndexExists(ctx context.Context, index string) (bool, erro
 	return args.Bool(0), args.Error(1)
 }
 
-// Search implements storage.Interface.
+// SearchDocuments performs a search query and decodes the result into the provided value
+func (m *MockStorage) SearchDocuments(ctx context.Context, index string, query map[string]any, result any) error {
+	args := m.Called(ctx, index, query, result)
+	return args.Error(0)
+}
+
+// Search performs a search query
 func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
-	if err := args.Error(1); err != nil {
-		return nil, err
-	}
-	result, ok := args.Get(0).([]any)
-	if !ok {
-		return nil, errors.New("invalid search result type")
-	}
-	return result, nil
+	return args.Get(0).([]any), args.Error(1)
+}
+
+// Count returns the number of documents matching the query
+func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
+	args := m.Called(ctx, index, query)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+// Aggregate performs an aggregation query
+func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
+	args := m.Called(ctx, index, aggs)
+	return args.Get(0), args.Error(1)
 }
 
 // GetIndexHealth implements storage.Interface.
@@ -143,32 +154,6 @@ func (m *MockStorage) Ping(ctx context.Context) error {
 func (m *MockStorage) TestConnection(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
-}
-
-// Aggregate implements storage.Interface.
-func (m *MockStorage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
-	args := m.Called(ctx, index, aggs)
-	if err := args.Error(1); err != nil {
-		return nil, err
-	}
-	result := args.Get(0)
-	if result == nil {
-		return nil, errors.New("nil aggregation result")
-	}
-	return result, nil
-}
-
-// Count implements storage.Interface.
-func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
-	args := m.Called(ctx, index, query)
-	if err := args.Error(1); err != nil {
-		return 0, err
-	}
-	result, ok := args.Get(0).(int64)
-	if !ok {
-		return 0, errors.New("invalid count result type")
-	}
-	return result, nil
 }
 
 // Close implements storage.Interface.
