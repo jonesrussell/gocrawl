@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 	time "time"
 
-	v2 "github.com/gocolly/colly/v2"
+	colly "github.com/gocolly/colly/v2"
 	gomock "github.com/golang/mock/gomock"
 	common "github.com/jonesrussell/gocrawl/internal/common"
 	events "github.com/jonesrussell/gocrawl/internal/crawler/events"
@@ -392,7 +392,7 @@ func (mr *MockContentProcessorMockRecorder) ContentType() *gomock.Call {
 }
 
 // ProcessHTML mocks base method.
-func (m *MockContentProcessor) ProcessHTML(ctx context.Context, element *v2.HTMLElement) error {
+func (m *MockContentProcessor) ProcessHTML(ctx context.Context, element *colly.HTMLElement) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProcessHTML", ctx, element)
 	ret0, _ := ret[0].(error)
@@ -594,7 +594,7 @@ func (mr *MockInterfaceMockRecorder) GetSource() *gomock.Call {
 }
 
 // SetCollector mocks base method.
-func (m *MockInterface) SetCollector(collector *v2.Collector) {
+func (m *MockInterface) SetCollector(collector *colly.Collector) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetCollector", collector)
 }

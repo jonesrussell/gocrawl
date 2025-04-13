@@ -6,7 +6,7 @@
 set -e
 
 # Create mock directories if they don't exist
-mkdir -p testutils/mocks/{api,config,crawler,indices,models,storage}
+mkdir -p testutils/mocks/{api,config,crawler,logger,sources,models,storage}
 
 # API mocks
 mockgen -source=internal/api/module.go -destination=testutils/mocks/api/module.go -package=api
@@ -19,9 +19,11 @@ mockgen -source=internal/config/interface.go -destination=testutils/mocks/config
 # Crawler mocks
 mockgen -source=internal/crawler/interfaces.go -destination=testutils/mocks/crawler/crawler.go -package=crawler
 
-# Indices mocks
-mockgen -source=internal/logger/logger.go -destination=testutils/mocks/indices/logger.go -package=logger
-mockgen -source=internal/sources/interface.go -destination=testutils/mocks/indices/sources.go -package=sources
+# Logger mocks
+mockgen -source=internal/logger/logger.go -destination=testutils/mocks/logger/logger.go -package=logger
+
+# Sources mocks
+mockgen -source=internal/sources/interface.go -destination=testutils/mocks/sources/sources.go -package=sources
 
 # Models mocks
 mockgen -source=internal/models/content.go -destination=testutils/mocks/models/content_processor.go -package=models
