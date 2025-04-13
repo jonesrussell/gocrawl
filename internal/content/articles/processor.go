@@ -77,10 +77,10 @@ func (p *ArticleProcessor) ContentType() common.ContentType {
 	return common.ContentTypeArticle
 }
 
-// CanProcess checks if the processor can handle the given content.
-func (p *ArticleProcessor) CanProcess(content any) bool {
-	_, ok := content.(*common.Job)
-	return ok
+// CanProcess implements the common.Processor interface.
+func (p *ArticleProcessor) CanProcess(contentType any) bool {
+	ct, ok := contentType.(common.ContentType)
+	return ok && ct == common.ContentTypeArticle
 }
 
 // ParseHTML implements the common.Processor interface.
