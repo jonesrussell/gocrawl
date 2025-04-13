@@ -21,16 +21,27 @@ import (
 	"golang.org/x/net/http2"
 )
 
-// Constants for timeouts and retries
 const (
-	DefaultMaxRetries     = 3
+	// DefaultMaxRetries is the default number of retries for index operations.
+	DefaultMaxRetries = 3
+	// DefaultScrollDuration is the default duration for scroll operations.
 	DefaultScrollDuration = 5 * time.Minute
-	// DefaultResponseHeaderTimeout is the default timeout for response headers
+	// DefaultResponseHeaderTimeout is the default timeout for response headers.
 	DefaultResponseHeaderTimeout = 10 * time.Second
-	// DefaultTLSHandshakeTimeout is the default timeout for TLS handshake
+	// DefaultTLSHandshakeTimeout is the default timeout for TLS handshake.
 	DefaultTLSHandshakeTimeout = 10 * time.Second
-	// DefaultIdleConnTimeout is the default timeout for idle connections
+	// DefaultIdleConnTimeout is the default timeout for idle connections.
 	DefaultIdleConnTimeout = 90 * time.Second
+	// DefaultMaxIdleConnsPerHost is the default maximum number of idle connections per host.
+	DefaultMaxIdleConnsPerHost = 10
+	// DefaultMaxIdleConns is the default maximum number of idle connections.
+	DefaultMaxIdleConns = 100
+	// DefaultDialTimeout is the default timeout for dial operations.
+	DefaultDialTimeout = 30 * time.Second
+	// DefaultDialKeepAlive is the default keep-alive duration for dial operations.
+	DefaultDialKeepAlive = 30 * time.Second
+	// DefaultExpectContinueTimeout is the default timeout for expect-continue.
+	DefaultExpectContinueTimeout = 1 * time.Second
 )
 
 // createTLSConfig creates a TLS configuration with appropriate security settings
@@ -125,8 +136,12 @@ func configureTransport(transport *http.Transport) error {
 	return nil
 }
 
-// createClientConfig creates an Elasticsearch client configuration
-func createClientConfig(esConfig *esconfig.Config, transport *http.Transport, logger logger.Interface) elasticsearch.Config {
+// createClientConfig creates an Elasticsearch client configuration with the provided settings.
+func createClientConfig(
+	esConfig *esconfig.Config,
+	transport *http.Transport,
+	logger logger.Interface,
+) elasticsearch.Config {
 	// Log configuration details
 	logger.Debug("Creating Elasticsearch client configuration",
 		"addresses", esConfig.Addresses,
@@ -244,22 +259,24 @@ var Module = fx.Module("storage",
 
 				// Create transport with TLS configuration
 				transport := &http.Transport{
-					MaxIdleConnsPerHost:   10,
-					ResponseHeaderTimeout: time.Second,
+					MaxIdleConnsPerHost:   DefaultMaxIdleConnsPerHost,
+					ResponseHeaderTimeout: DefaultResponseHeaderTimeout,
 					DialContext: (&net.Dialer{
-						Timeout:   30 * time.Second,
-						KeepAlive: 30 * time.Second,
+						Timeout:   DefaultDialTimeout,
+						KeepAlive: DefaultDialKeepAlive,
 					}).DialContext,
-					MaxIdleConns:          100,
-					IdleConnTimeout:       90 * time.Second,
-					TLSHandshakeTimeout:   10 * time.Second,
-					ExpectContinueTimeout: 1 * time.Second,
+					MaxIdleConns:          DefaultMaxIdleConns,
+					IdleConnTimeout:       DefaultIdleConnTimeout,
+					TLSHandshakeTimeout:   DefaultTLSHandshakeTimeout,
+					ExpectContinueTimeout: DefaultExpectContinueTimeout,
 				}
 
 				// Configure TLS if enabled
 				if esConfig.TLS != nil {
+					// InsecureSkipVerify is used for development/testing environments only
+					// and should be disabled in production. This is a security risk.
 					transport.TLSClientConfig = &tls.Config{
-						InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify,
+						InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify, // #nosec G402 - This is configurable and documented
 					}
 				}
 
@@ -295,9 +312,7 @@ var Module = fx.Module("storage",
 
 		// Provide the index manager
 		fx.Annotate(
-			func(client *elasticsearch.Client, logger logger.Interface) types.IndexManager {
-				return NewElasticsearchIndexManager(client, logger)
-			},
+			NewElasticsearchIndexManager,
 			fx.ResultTags(`name:"indexManager"`),
 		),
 

@@ -5,11 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+)
+
+const (
+	// HTTPStatusOK is the HTTP status code for successful requests.
+	HTTPStatusOK = http.StatusOK
 )
 
 // ElasticsearchIndexManager implements the types.IndexManager interface using Elasticsearch.
@@ -87,7 +93,7 @@ func (m *ElasticsearchIndexManager) IndexExists(ctx context.Context, name string
 	}
 	defer res.Body.Close()
 
-	return res.StatusCode == 200, nil
+	return res.StatusCode == HTTPStatusOK, nil
 }
 
 // UpdateMapping updates the mapping for an index.
@@ -130,8 +136,8 @@ func (m *ElasticsearchIndexManager) GetMapping(ctx context.Context, name string)
 	}
 
 	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, err
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, decodeErr
 	}
 
 	return result, nil
