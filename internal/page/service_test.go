@@ -9,7 +9,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	"github.com/golang/mock/gomock"
-	"github.com/jonesrussell/gocrawl/internal/content"
+	content "github.com/jonesrussell/gocrawl/internal/page"
 	"github.com/jonesrussell/gocrawl/testutils/mocks/logger"
 	"github.com/jonesrussell/gocrawl/testutils/mocks/storage"
 	"github.com/stretchr/testify/assert"
