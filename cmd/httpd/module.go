@@ -5,7 +5,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -35,6 +37,23 @@ var Module = fx.Options(
 		// Provide config path
 		func() string {
 			return "config.yaml"
+		},
+		// Provide the server
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			router *gin.Engine,
+			security middleware.SecurityMiddlewareInterface,
+		) (*http.Server, error) {
+			srv := &http.Server{
+				Addr:              cfg.GetServerConfig().Address,
+				Handler:           router,
+				ReadTimeout:       cfg.GetServerConfig().ReadTimeout,
+				WriteTimeout:      cfg.GetServerConfig().WriteTimeout,
+				IdleTimeout:       cfg.GetServerConfig().IdleTimeout,
+				ReadHeaderTimeout: api.ReadHeaderTimeout,
+			}
+			return srv, nil
 		},
 	),
 

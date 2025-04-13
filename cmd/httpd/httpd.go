@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	signalHandler "github.com/jonesrussell/gocrawl/cmd/common/signal"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -17,6 +19,7 @@ import (
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 const (
@@ -44,15 +47,6 @@ type Params struct {
 	Logger  logger.Interface
 	Storage storagetypes.Interface
 	Config  config.Interface
-}
-
-// serverState tracks the HTTP server's state
-type serverState struct {
-	mu       sync.Mutex
-	started  bool
-	shutdown bool
-	// serverDone is closed when the server goroutine exits
-	serverDone chan struct{}
 }
 
 // Server implements the HTTP server
@@ -143,95 +137,45 @@ var Cmd = &cobra.Command{
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		// Create a cancellable context
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
-		// Set up signal handling
-		handler := signalHandler.NewSignalHandler(logger.NewNoOp())
-		cleanup := handler.Setup(ctx)
-		defer cleanup()
-
-		// Track server state
-		state := &serverState{
-			serverDone: make(chan struct{}),
+		// Get logger from context
+		loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+		log, ok := loggerValue.(logger.Interface)
+		if !ok {
+			return errors.New("logger not found in context or invalid type")
 		}
 
-		// Initialize the Fx application
+		// Create Fx app with the module
 		fxApp := fx.New(
 			Module,
 			fx.Provide(
-				func() context.Context { return ctx },
+				func() logger.Interface { return log },
 			),
-			fx.Invoke(func(lc fx.Lifecycle, p Params) {
-				// Update the signal handler with the real logger
-				handler.SetLogger(p.Logger)
-				lc.Append(fx.Hook{
-					OnStart: func(ctx context.Context) error {
-						// Test storage connection
-						if err := p.Storage.TestConnection(ctx); err != nil {
-							return fmt.Errorf("failed to connect to storage: %w", err)
-						}
-
-						// Start HTTP server in background
-						p.Logger.Info("Starting HTTP server...", "address", p.Server.Addr)
-						state.mu.Lock()
-						state.started = true
-						state.mu.Unlock()
-
-						// Create error channel to propagate server errors
-						errChan := make(chan error, 1)
-						go func() {
-							defer close(state.serverDone)
-							if err := p.Server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-								p.Logger.Error("HTTP server failed", "error", err)
-								errChan <- fmt.Errorf("HTTP server failed: %w", err)
-							}
-						}()
-
-						// Wait for server to be healthy
-						if err := WaitForHealth(ctx, p.Server.Addr, api.HealthCheckInterval, api.HealthCheckTimeout); err != nil {
-							return err
-						}
-
-						return nil
-					},
-					OnStop: func(ctx context.Context) error {
-						state.mu.Lock()
-						if !state.started || state.shutdown {
-							state.mu.Unlock()
-							return nil
-						}
-						state.shutdown = true
-						state.mu.Unlock()
-
-						// Wait for server goroutine to exit
-						select {
-						case <-state.serverDone:
-							p.Logger.Info("HTTP server goroutine exited")
-						case <-ctx.Done():
-							p.Logger.Warn("Timeout waiting for server goroutine to exit")
-						}
-
-						return Shutdown(ctx, p.Server)
-					},
-				})
+			fx.WithLogger(func() fxevent.Logger {
+				return logger.NewFxLogger(log)
 			}),
 		)
 
-		// Set the fx app for coordinated shutdown
-		handler.SetFXApp(fxApp)
-
 		// Start the application
-		if err := fxApp.Start(ctx); err != nil {
-			return fmt.Errorf("error starting application: %w", err)
+		log.Info("Starting HTTP server")
+		startErr := fxApp.Start(cmd.Context())
+		if startErr != nil {
+			log.Error("Failed to start application", "error", startErr)
+			return fmt.Errorf("failed to start application: %w", startErr)
 		}
 
-		// Wait for shutdown signal
-		if err := handler.Wait(); err != nil {
-			return fmt.Errorf("failed to wait for handler: %w", err)
+		// Wait for interrupt signal
+		log.Info("Waiting for interrupt signal")
+		<-cmd.Context().Done()
+
+		// Stop the application
+		log.Info("Stopping application")
+		stopErr := fxApp.Stop(cmd.Context())
+		if stopErr != nil {
+			log.Error("Failed to stop application", "error", stopErr)
+			return fmt.Errorf("failed to stop application: %w", stopErr)
 		}
 
+		log.Info("Application stopped successfully")
 		return nil
 	},
 }
@@ -239,4 +183,29 @@ You can send POST requests to /search with a JSON body containing the search par
 // Command returns the httpd command for use in the root command
 func Command() *cobra.Command {
 	return Cmd
+}
+
+// Run starts the HTTP server.
+func Run() error {
+	// Create a new Fx application
+	app := fx.New(
+		Module,
+	)
+
+	// Create a context that will be cancelled on interrupt
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start the application
+	if err := app.Start(ctx); err != nil {
+		return err
+	}
+
+	// Wait for interrupt signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+
+	// Stop the application
+	return app.Stop(ctx)
 }
