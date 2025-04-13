@@ -18,6 +18,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
+	"github.com/jonesrussell/gocrawl/internal/storage"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -72,7 +74,21 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		Module,
 		fx.Provide(
 			func() logger.Interface { return log },
+			func() config.Interface { return cfg },
 			func() sources.Interface { return sourceManager },
+			func() (storagetypes.Interface, error) {
+				opts := storage.Options{
+					Addresses: cfg.GetElasticsearchConfig().Addresses,
+					Username:  cfg.GetElasticsearchConfig().Username,
+					Password:  cfg.GetElasticsearchConfig().Password,
+					APIKey:    cfg.GetElasticsearchConfig().APIKey,
+				}
+				client, err := storage.NewClient(opts)
+				if err != nil {
+					return nil, err
+				}
+				return storage.NewStorage(client.GetClient(), log, &opts), nil
+			},
 			fx.Annotate(
 				func() string { return args[0] },
 				fx.ResultTags(`name:"sourceName"`),
