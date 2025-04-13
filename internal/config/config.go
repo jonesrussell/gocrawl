@@ -123,12 +123,7 @@ func (c *Config) Validate() error {
 	}
 
 	switch c.Command {
-	case commands.IndicesList, commands.IndicesDelete:
-		if err := c.Elasticsearch.ValidateConnection(); err != nil {
-			return fmt.Errorf("elasticsearch: %w", err)
-		}
-
-	case commands.IndicesCreate:
+	case commands.IndicesList, commands.IndicesDelete, commands.IndicesCreate:
 		if err := c.Elasticsearch.Validate(); err != nil {
 			return fmt.Errorf("elasticsearch: %w", err)
 		}

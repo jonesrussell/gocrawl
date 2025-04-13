@@ -2,8 +2,8 @@
 package elasticsearch
 
 import (
-	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -101,24 +101,93 @@ type TLSConfig struct {
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify" env:"ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY"`
 }
 
-// Validate performs complete configuration validation
+// Validate validates the configuration.
 func (c *Config) Validate() error {
-	if err := c.ValidateConnection(); err != nil {
-		return err
+	if c == nil {
+		return &ConfigError{
+			Code:    ErrCodeEmptyAddresses,
+			Message: "configuration is required",
+		}
+	}
+
+	// Validate TLS configuration first
+	if c.TLS != nil {
+		if (c.TLS.CertFile != "" && c.TLS.KeyFile == "") || (c.TLS.CertFile == "" && c.TLS.KeyFile != "") {
+			return &ConfigError{
+				Code:    ErrCodeInvalidTLS,
+				Message: "both cert file and key file must be provided for TLS",
+			}
+		}
+	}
+
+	// Validate required fields
+	if len(c.Addresses) == 0 {
+		return &ConfigError{
+			Code:    ErrCodeEmptyAddresses,
+			Message: "at least one address is required",
+		}
 	}
 
 	if c.IndexName == "" {
-		return errors.New("index name is required")
+		return &ConfigError{
+			Code:    ErrCodeEmptyIndexName,
+			Message: "index name is required",
+		}
 	}
 
-	return nil
-}
-
-// ValidateConnection validates only the connection settings
-func (c *Config) ValidateConnection() error {
-	if len(c.Addresses) == 0 {
-		return errors.New("at least one Elasticsearch address is required")
+	// Validate API key presence
+	if c.APIKey == "" {
+		return &ConfigError{
+			Code:    ErrCodeMissingAPIKey,
+			Message: "API key is required",
+		}
 	}
+
+	// Validate password strength
+	if c.Password != "" && len(c.Password) < MinPasswordLength {
+		return &ConfigError{
+			Code:    ErrCodeWeakPassword,
+			Message: fmt.Sprintf("password must be at least %d characters", MinPasswordLength),
+		}
+	}
+
+	// Validate retry configuration
+	if c.Retry.Enabled {
+		if c.Retry.InitialWait < 0 || c.Retry.MaxWait < 0 || c.Retry.MaxRetries < 0 {
+			return &ConfigError{
+				Code:    ErrCodeInvalidRetry,
+				Message: "retry configuration must be non-negative",
+			}
+		}
+	}
+
+	// Validate flush interval
+	if c.FlushInterval <= 0 {
+		return &ConfigError{
+			Code:    ErrCodeInvalidFlush,
+			Message: "flush interval must be positive",
+		}
+	}
+
+	// Validate bulk size
+	if c.BulkSize <= 0 {
+		return &ConfigError{
+			Code:    ErrCodeInvalidBulkSize,
+			Message: "bulk size must be positive",
+		}
+	}
+
+	// Validate API key format last
+	if c.APIKey != "" {
+		parts := strings.Split(c.APIKey, ":")
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return &ConfigError{
+				Code:    ErrCodeInvalidFormat,
+				Message: "API key must be in the format 'id:key'",
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -140,9 +209,6 @@ func NewConfig() *Config {
 		},
 		BulkSize:      DefaultBulkSize,
 		FlushInterval: DefaultFlushInterval,
-		TLS: &TLSConfig{
-			InsecureSkipVerify: true, // Default to true for development
-		},
 	}
 }
 

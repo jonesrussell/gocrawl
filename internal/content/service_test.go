@@ -2,7 +2,6 @@
 package content_test
 
 import (
-	"context"
 	"net/url"
 	"strings"
 	"testing"
@@ -62,13 +61,12 @@ var htmlTestCases = []testCase{
 func TestService_Process(t *testing.T) {
 	// Setup
 	service := createTestService(t)
-	ctx := context.Background()
 
 	// Run test cases
 	for _, tc := range htmlTestCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Execute
-			result := service.Process(ctx, tc.input)
+			result := service.Process(t.Context(), tc.input)
 
 			// Verify
 			assert.Equal(t, tc.expected, result, "Processed content should match expected output")
@@ -80,7 +78,6 @@ func TestService_Process(t *testing.T) {
 func TestService_ProcessBatch(t *testing.T) {
 	// Setup
 	service := createTestService(t)
-	ctx := context.Background()
 
 	// Test cases
 	tests := []struct {
@@ -112,7 +109,7 @@ func TestService_ProcessBatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Execute
-			result := service.ProcessBatch(ctx, tt.input)
+			result := service.ProcessBatch(t.Context(), tt.input)
 
 			// Verify
 			assert.Equal(t, tt.expected, result, "Processed batch should match expected output")
@@ -124,7 +121,6 @@ func TestService_ProcessBatch(t *testing.T) {
 func TestService_ProcessWithMetadata(t *testing.T) {
 	// Setup
 	service := createTestService(t)
-	ctx := context.Background()
 
 	// Test cases
 	tests := []struct {
@@ -151,7 +147,7 @@ func TestService_ProcessWithMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Execute
-			result := service.ProcessWithMetadata(ctx, tt.input, tt.metadata)
+			result := service.ProcessWithMetadata(t.Context(), tt.input, tt.metadata)
 
 			// Verify
 			assert.Equal(t, tt.expected, result, "Processed content with metadata should match expected output")

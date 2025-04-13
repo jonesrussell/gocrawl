@@ -1,7 +1,10 @@
+// Package server provides server configuration types and functions.
 package server
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -9,13 +12,13 @@ import (
 const (
 	DefaultSecurityEnabled = false
 	DefaultAPIKey          = ""
-	DefaultAddress         = ":8080"
-	DefaultReadTimeout     = 15 * time.Second
-	DefaultWriteTimeout    = 15 * time.Second
-	DefaultIdleTimeout     = 60 * time.Second
-	DefaultHost            = "localhost"
-	DefaultPort            = 8080
-	DefaultMaxHeaderBytes  = 1 << 20 // 1 MB
+	DefaultAddress         = ""
+	DefaultReadTimeout     = 0
+	DefaultWriteTimeout    = 0
+	DefaultIdleTimeout     = 0
+	DefaultHost            = ""
+	DefaultPort            = 0
+	DefaultMaxHeaderBytes  = 0
 )
 
 // Config represents server-specific configuration settings.
@@ -54,6 +57,21 @@ func (c *Config) Validate() error {
 	if c.SecurityEnabled {
 		if c.APIKey == "" {
 			return errors.New("server security is enabled but no API key is provided")
+		}
+
+		// Validate API key format
+		parts := strings.Split(c.APIKey, ":")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid API key format: expected 'id:key' but got %q", c.APIKey)
+		}
+
+		// Validate API key parts
+		id, key := parts[0], parts[1]
+		if id == "" {
+			return errors.New("API key ID cannot be empty")
+		}
+		if key == "" {
+			return errors.New("API key value cannot be empty")
 		}
 	}
 

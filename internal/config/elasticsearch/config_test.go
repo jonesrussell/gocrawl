@@ -1,8 +1,6 @@
 package elasticsearch_test
 
 import (
-	"encoding/base64"
-	"errors"
 	"testing"
 	"time"
 
@@ -10,165 +8,127 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testConfig returns a valid base configuration for testing
+func testConfig() *elasticsearch.Config {
+	return &elasticsearch.Config{
+		Addresses:     []string{"http://localhost:9200"},
+		IndexName:     "test-index",
+		APIKey:        "valid_id:valid_key",
+		BulkSize:      1000,
+		FlushInterval: 30 * time.Second,
+		Retry: struct {
+			Enabled     bool          `yaml:"enabled"`
+			InitialWait time.Duration `yaml:"initial_wait"`
+			MaxWait     time.Duration `yaml:"max_wait"`
+			MaxRetries  int           `yaml:"max_retries"`
+		}{
+			Enabled:     true,
+			InitialWait: 1 * time.Second,
+			MaxWait:     5 * time.Second,
+			MaxRetries:  3,
+		},
+	}
+}
+
 func TestConfig_Validate(t *testing.T) {
 	t.Parallel()
 
-	validAPIKey := base64.StdEncoding.EncodeToString([]byte("test_key"))
-
 	tests := []struct {
-		name    string
-		config  *elasticsearch.Config
-		wantErr bool
-		errCode string
+		name        string
+		modify      func(*elasticsearch.Config)
+		wantErrCode string
 	}{
 		{
-			name: "valid configuration",
-			config: &elasticsearch.Config{
-				Addresses: []string{"http://localhost:9200"},
-				APIKey:    validAPIKey,
-				IndexName: "test",
-				Retry: struct {
-					Enabled     bool          `yaml:"enabled"`
-					InitialWait time.Duration `yaml:"initial_wait"`
-					MaxWait     time.Duration `yaml:"max_wait"`
-					MaxRetries  int           `yaml:"max_retries"`
-				}{
-					Enabled:     true,
-					InitialWait: 1 * time.Second,
-					MaxWait:     5 * time.Second,
-					MaxRetries:  3,
-				},
-				BulkSize:      1000,
-				FlushInterval: 30 * time.Second,
-			},
-			wantErr: false,
+			name:        "valid configuration",
+			modify:      func(c *elasticsearch.Config) {}, // No modification needed
+			wantErrCode: "",
 		},
 		{
 			name: "empty addresses",
-			config: &elasticsearch.Config{
-				Addresses: []string{},
-				APIKey:    validAPIKey,
-				IndexName: "test",
+			modify: func(c *elasticsearch.Config) {
+				c.Addresses = nil
 			},
-			wantErr: true,
-			errCode: elasticsearch.ErrCodeEmptyAddresses,
+			wantErrCode: elasticsearch.ErrCodeEmptyAddresses,
 		},
 		{
 			name: "empty index name",
-			config: &elasticsearch.Config{
-				Addresses: []string{"http://localhost:9200"},
-				APIKey:    validAPIKey,
-				IndexName: "",
+			modify: func(c *elasticsearch.Config) {
+				c.IndexName = ""
 			},
-			wantErr: true,
-			errCode: elasticsearch.ErrCodeEmptyIndexName,
+			wantErrCode: elasticsearch.ErrCodeEmptyIndexName,
 		},
 		{
-			name: "empty API key",
-			config: &elasticsearch.Config{
-				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "",
-				IndexName: "test",
+			name: "missing API key",
+			modify: func(c *elasticsearch.Config) {
+				c.APIKey = ""
 			},
-			wantErr: true,
-			errCode: elasticsearch.ErrCodeMissingAPIKey,
+			wantErrCode: elasticsearch.ErrCodeMissingAPIKey,
 		},
 		{
 			name: "invalid API key format",
-			config: &elasticsearch.Config{
-				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "not_base64_encoded",
-				IndexName: "test",
+			modify: func(c *elasticsearch.Config) {
+				c.APIKey = "invalid_format"
 			},
-			wantErr: true,
-			errCode: elasticsearch.ErrCodeInvalidFormat,
+			wantErrCode: elasticsearch.ErrCodeInvalidFormat,
 		},
 		{
 			name: "weak password",
-			config: &elasticsearch.Config{
-				Addresses: []string{"http://localhost:9200"},
-				APIKey:    "test_id:test_key",
-				IndexName: "test",
-				Password:  "weak",
+			modify: func(c *elasticsearch.Config) {
+				c.Password = "weak"
 			},
-			wantErr: true,
-			errCode: elasticsearch.ErrCodeWeakPassword,
+			wantErrCode: elasticsearch.ErrCodeWeakPassword,
 		},
 		{
 			name: "invalid retry configuration",
-			config: &elasticsearch.Config{
-				Addresses: []string{"http://localhost:9200"},
-				APIKey:    validAPIKey,
-				IndexName: "test",
-				Retry: struct {
-					Enabled     bool          `yaml:"enabled"`
-					InitialWait time.Duration `yaml:"initial_wait"`
-					MaxWait     time.Duration `yaml:"max_wait"`
-					MaxRetries  int           `yaml:"max_retries"`
-				}{
-					Enabled:     true,
-					InitialWait: 0,
-					MaxWait:     5 * time.Second,
-					MaxRetries:  3,
-				},
+			modify: func(c *elasticsearch.Config) {
+				c.Retry.InitialWait = -1
 			},
-			wantErr: true,
-			errCode: elasticsearch.ErrCodeInvalidRetry,
+			wantErrCode: elasticsearch.ErrCodeInvalidRetry,
 		},
 		{
 			name: "invalid bulk size",
-			config: &elasticsearch.Config{
-				Addresses: []string{"http://localhost:9200"},
-				APIKey:    validAPIKey,
-				IndexName: "test",
-				BulkSize:  0,
+			modify: func(c *elasticsearch.Config) {
+				c.BulkSize = 0
 			},
-			wantErr: true,
-			errCode: elasticsearch.ErrCodeInvalidBulkSize,
+			wantErrCode: elasticsearch.ErrCodeInvalidBulkSize,
 		},
 		{
 			name: "invalid flush interval",
-			config: &elasticsearch.Config{
-				Addresses:     []string{"http://localhost:9200"},
-				APIKey:        validAPIKey,
-				IndexName:     "test",
-				FlushInterval: 0,
+			modify: func(c *elasticsearch.Config) {
+				c.FlushInterval = 0
 			},
-			wantErr: true,
-			errCode: elasticsearch.ErrCodeInvalidFlush,
+			wantErrCode: elasticsearch.ErrCodeInvalidFlush,
 		},
 		{
 			name: "invalid TLS configuration",
-			config: &elasticsearch.Config{
-				Addresses: []string{"http://localhost:9200"},
-				APIKey:    validAPIKey,
-				IndexName: "test",
-				TLS: &elasticsearch.TLSConfig{
-					CertFile: "",
-					KeyFile:  "key.pem",
-				},
+			modify: func(c *elasticsearch.Config) {
+				c.TLS = &elasticsearch.TLSConfig{
+					CertFile: "cert.pem",
+					KeyFile:  "", // Missing key file
+				}
 			},
-			wantErr: true,
-			errCode: elasticsearch.ErrCodeInvalidTLS,
+			wantErrCode: elasticsearch.ErrCodeInvalidTLS,
 		},
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := tt.config.Validate()
-			if tt.wantErr {
-				require.Error(t, err)
-				var configErr *elasticsearch.ConfigError
-				if errors.As(err, &configErr) {
-					require.Equal(t, tt.errCode, configErr.Code)
-				} else {
-					t.Errorf("expected ConfigError, got %T", err)
-				}
-			} else {
+			cfg := testConfig()
+			tt.modify(cfg)
+
+			err := cfg.Validate()
+			if tt.wantErrCode == "" {
 				require.NoError(t, err)
+				return
 			}
+
+			require.Error(t, err)
+			var configErr *elasticsearch.ConfigError
+			require.ErrorAs(t, err, &configErr)
+			require.Equal(t, tt.wantErrCode, configErr.Code)
 		})
 	}
 }
