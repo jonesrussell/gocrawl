@@ -11,17 +11,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	apitestutils "github.com/jonesrussell/gocrawl/internal/api/testutils"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
-	configtestutils "github.com/jonesrussell/gocrawl/internal/config/testutils"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	apimocks "github.com/jonesrussell/gocrawl/testutils/mocks/api"
+	configmocks "github.com/jonesrussell/gocrawl/testutils/mocks/config"
+	indicesmocks "github.com/jonesrussell/gocrawl/testutils/mocks/indices"
+	storagemocks "github.com/jonesrussell/gocrawl/testutils/mocks/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -44,8 +46,8 @@ type testServer struct {
 }
 
 // setupMockLogger creates and configures a mock logger for testing.
-func setupMockLogger() *apitestutils.MockLogger {
-	mockLog := apitestutils.NewMockLogger()
+func setupMockLogger() logger.Interface {
+	mockLog := &indicesmocks.MockInterface{}
 	mockLog.On("Info", mock.Anything, mock.Anything).Return()
 	mockLog.On("Error", mock.Anything, mock.Anything).Return()
 	mockLog.On("Debug", mock.Anything, mock.Anything).Return()
@@ -80,7 +82,7 @@ func setupTestApp(t *testing.T) *testServer {
 	t.Helper()
 
 	// Create mock dependencies
-	mockConfig := &configtestutils.MockConfig{}
+	mockConfig := &configmocks.MockInterface{}
 	mockConfig.On("GetAppConfig").Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
@@ -114,10 +116,10 @@ func setupTestApp(t *testing.T) *testServer {
 		DefaultPriority: 1,
 		Rules:           []priority.Rule{},
 	})
-	mockLogger := apitestutils.NewMockLogger()
-	mockSearch := apitestutils.NewMockSearchManager()
-	mockStorage := apitestutils.NewMockStorage()
-	mockIndexManager := apitestutils.NewMockIndexManager()
+	mockLogger := setupMockLogger()
+	mockSearch := &apimocks.MockSearchManager{}
+	mockStorage := &storagemocks.MockInterface{}
+	mockIndexManager := &apimocks.MockIndexManager{}
 
 	// Set up mock search expectations
 	expectedQuery := map[string]any{
@@ -213,7 +215,7 @@ func TestHealthEndpoint(t *testing.T) {
 	ts := setupTestApp(t)
 
 	// Set up mock expectations for logger
-	mockLogger := ts.logger.(*apitestutils.MockLogger)
+	mockLogger := ts.logger.(*indicesmocks.MockInterface)
 	mockLogger.On("Info", "HTTP Request", mock.Anything).Return()
 
 	tests := []struct {
@@ -254,7 +256,7 @@ func TestSearchEndpoint(t *testing.T) {
 	ts := setupTestApp(t)
 
 	// Set up mock expectations for logger
-	mockLogger := ts.logger.(*apitestutils.MockLogger)
+	mockLogger := ts.logger.(*indicesmocks.MockInterface)
 	mockLogger.On("Info", "HTTP Request", mock.Anything).Return()
 
 	tests := []struct {
@@ -349,10 +351,10 @@ func TestModule(t *testing.T) {
 	t.Parallel()
 
 	// Create mock dependencies
-	mockConfig := &configtestutils.MockConfig{}
-	mockLogger := apitestutils.NewMockLogger()
-	mockStorage := apitestutils.NewMockStorage()
-	mockIndexManager := apitestutils.NewMockIndexManager()
+	mockConfig := &configmocks.MockInterface{}
+	mockLogger := setupMockLogger()
+	mockStorage := &storagemocks.MockInterface{}
+	mockIndexManager := &apimocks.MockIndexManager{}
 
 	// Set up mock storage expectations
 	mockStorage.On("GetIndexDocCount", mock.Anything, mock.Anything).Return(int64(0), nil)

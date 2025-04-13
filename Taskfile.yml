@@ -105,3 +105,24 @@ tasks:
     generates:
       - coverage/coverage.out
       - coverage/coverage.html
+
+  generate:
+    desc: Generate code (mocks, etc.)
+    cmds:
+      - ./scripts/generate_mocks.sh
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf bin/
+      - rm -rf testutils/mocks/
+
+  sources:add:
+    desc: Add a new source
+    cmds:
+      - go run main.go sources add
+
+  sources:remove:
+    desc: Remove a source
+    cmds:
+      - go run main.go sources remove
