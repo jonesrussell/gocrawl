@@ -15,7 +15,6 @@ type Params struct {
 
 // Module provides the logger module.
 var Module = fx.Module("logger",
-	fx.Provide(New),
 	fx.Provide(func(logger Interface) *zap.Logger {
 		if l, ok := logger.(*Logger); ok {
 			return l.zapLogger
