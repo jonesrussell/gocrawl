@@ -113,7 +113,7 @@ func setupTestApp(t *testing.T) *testServer {
 		WriteTimeout:    15 * time.Second,
 		IdleTimeout:     60 * time.Second,
 	}).AnyTimes()
-	mockConfig.EXPECT().GetSources().Return([]types.Source{}, nil).AnyTimes()
+	mockConfig.EXPECT().GetSources().Return([]types.Source{}).AnyTimes()
 	mockConfig.EXPECT().GetCommand().Return("test").AnyTimes()
 	mockConfig.EXPECT().GetPriorityConfig().Return(&priority.Config{
 		DefaultPriority: 1,
