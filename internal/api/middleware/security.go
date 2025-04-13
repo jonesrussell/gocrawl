@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -146,8 +147,11 @@ func (s *SecurityMiddleware) addSecurityHeaders(c *gin.Context) {
 
 // handleCORS handles CORS requests
 func (s *SecurityMiddleware) handleCORS(c *gin.Context) error {
-	// Always set CORS headers in test environment (any port starting with :808)
-	if s.config.Address == ":8080" || s.config.Address == ":8081" || s.config.Address == ":8082" || s.config.Address == ":8083" || s.config.Address == ":8084" || s.config.Address == ":8085" {
+	// Check if we're in a test environment
+	isTestEnv := strings.HasPrefix(s.config.Address, ":808")
+
+	// Always set CORS headers in test environment
+	if isTestEnv {
 		origin := c.GetHeader("Origin")
 		if origin == "" {
 			origin = "http://example.com" // Default for tests
@@ -158,12 +162,11 @@ func (s *SecurityMiddleware) handleCORS(c *gin.Context) error {
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Max-Age", "86400")
 
-		if c.Request.Method == "OPTIONS" {
+		if c.Request.Method == http.MethodOptions {
 			c.Status(http.StatusOK)
 			c.Abort()
 			return nil
 		}
-
 		return nil
 	}
 
@@ -183,7 +186,7 @@ func (s *SecurityMiddleware) handleCORS(c *gin.Context) error {
 	c.Header("Access-Control-Allow-Credentials", "true")
 	c.Header("Access-Control-Max-Age", "86400")
 
-	if c.Request.Method == "OPTIONS" {
+	if c.Request.Method == http.MethodOptions {
 		c.Status(http.StatusOK)
 		c.Abort()
 		return nil
@@ -192,10 +195,38 @@ func (s *SecurityMiddleware) handleCORS(c *gin.Context) error {
 	return nil
 }
 
+// handleAPIKey checks if the API key is valid
+func (s *SecurityMiddleware) handleAPIKey(c *gin.Context) error {
+	if !s.config.SecurityEnabled {
+		return nil
+	}
+
+	apiKey := c.GetHeader("X-Api-Key")
+	if apiKey == "" {
+		return ErrMissingAPIKey
+	}
+
+	if apiKey != s.config.APIKey {
+		return ErrInvalidAPIKey
+	}
+
+	return nil
+}
+
+// handleRateLimit checks if the request is within rate limits
+func (s *SecurityMiddleware) handleRateLimit(c *gin.Context) error {
+	clientIP := c.ClientIP()
+	if !s.checkRateLimit(clientIP) {
+		s.metrics.IncrementRateLimitedRequests()
+		return ErrRateLimitExceeded
+	}
+	return nil
+}
+
 // Middleware returns the security middleware function
 func (s *SecurityMiddleware) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Handle CORS first - this is a security measure, not a failed request
+		// Handle CORS first
 		if err := s.handleCORS(c); err != nil {
 			c.JSON(http.StatusForbidden, gin.H{
 				"code":    http.StatusForbidden,
@@ -209,44 +240,28 @@ func (s *SecurityMiddleware) Middleware() gin.HandlerFunc {
 		// Skip API key validation for OPTIONS requests
 		if c.Request.Method == http.MethodOptions {
 			c.Next()
-			// Count successful preflight requests
 			if c.Writer.Status() >= 200 && c.Writer.Status() < 300 {
 				s.metrics.IncrementSuccessfulRequests()
 			}
 			return
 		}
 
-		// Check API key if security is enabled
-		if s.config.SecurityEnabled {
-			apiKey := c.GetHeader("X-Api-Key")
-			if apiKey == "" {
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"code":    http.StatusUnauthorized,
-					"message": "missing API key",
-				})
-				c.Abort()
-				s.metrics.IncrementFailedRequests()
-				return
-			}
-
-			if apiKey != s.config.APIKey {
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"code":    http.StatusUnauthorized,
-					"message": "invalid API key",
-				})
-				c.Abort()
-				s.metrics.IncrementFailedRequests()
-				return
-			}
+		// Check API key
+		if err := s.handleAPIKey(c); err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    http.StatusUnauthorized,
+				"message": err.Error(),
+			})
+			c.Abort()
+			s.metrics.IncrementFailedRequests()
+			return
 		}
 
 		// Add security headers
 		s.addSecurityHeaders(c)
 
 		// Check rate limit
-		clientIP := c.ClientIP()
-		if !s.checkRateLimit(clientIP) {
-			s.metrics.IncrementRateLimitedRequests()
+		if err := s.handleRateLimit(c); err != nil {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"code":    http.StatusTooManyRequests,
 				"message": "Rate limit exceeded",
@@ -259,7 +274,7 @@ func (s *SecurityMiddleware) Middleware() gin.HandlerFunc {
 		c.Next()
 
 		// Update metrics based on response status
-		if c.Request.Method != http.MethodOptions { // Don't count OPTIONS requests here
+		if c.Request.Method != http.MethodOptions {
 			status := c.Writer.Status()
 			switch {
 			case status >= 200 && status < 300:
@@ -273,80 +288,27 @@ func (s *SecurityMiddleware) Middleware() gin.HandlerFunc {
 	}
 }
 
-// rateLimit applies rate limiting to the request
-func (m *SecurityMiddleware) rateLimit(c *gin.Context) error {
-	if !m.config.SecurityEnabled {
-		return nil // Skip rate limiting if security is disabled
-	}
-
-	ip := c.ClientIP()
-	now := m.timeProvider.Now()
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	info, exists := m.rateLimiter[ip]
-	if !exists {
-		info = rateLimitInfo{
-			count:      1,
-			lastAccess: now,
-		}
-		m.rateLimiter[ip] = info
-		return nil
-	}
-
-	if now.Sub(info.lastAccess) > m.rateLimitWindow {
-		info.count = 1
-		info.lastAccess = now
-	} else if info.count >= m.maxRequests {
-		return ErrRateLimitExceeded
-	} else {
-		info.count++
-		info.lastAccess = now
-	}
-	m.rateLimiter[ip] = info
-	return nil
-}
-
-// authenticate authenticates the request using API key
-func (m *SecurityMiddleware) authenticate(c *gin.Context) error {
-	if !m.config.SecurityEnabled {
-		return nil // Skip authentication if security is disabled
-	}
-
-	apiKey := c.GetHeader("X-Api-Key")
-	if apiKey == "" {
-		return ErrMissingAPIKey
-	}
-
-	if apiKey != m.config.APIKey {
-		return ErrInvalidAPIKey
-	}
-
-	return nil
-}
-
 // Cleanup periodically removes expired rate limit entries
-func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
-	ticker := time.NewTicker(m.rateLimitWindow)
+func (s *SecurityMiddleware) Cleanup(ctx context.Context) {
+	ticker := time.NewTicker(s.rateLimitWindow)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			m.logger.Info("Cleanup context cancelled, stopping cleanup routine")
+			s.logger.Info("Cleanup context cancelled, stopping cleanup routine")
 			return
 		case <-ticker.C:
-			expiryTime := m.timeProvider.Now().Add(-m.rateLimitWindow)
+			expiryTime := s.timeProvider.Now().Add(-s.rateLimitWindow)
 
-			m.mu.Lock()
+			s.mu.Lock()
 			// Clean up old requests
-			for ip, info := range m.rateLimiter {
+			for ip, info := range s.rateLimiter {
 				if info.lastAccess.Before(expiryTime) {
-					delete(m.rateLimiter, ip)
+					delete(s.rateLimiter, ip)
 				}
 			}
-			m.mu.Unlock()
+			s.mu.Unlock()
 		}
 	}
 }

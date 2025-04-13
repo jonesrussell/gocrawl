@@ -98,21 +98,28 @@ func (m *mockTimeProvider) Advance(d time.Duration) {
 // setupTestRouter creates a new test router with security middleware
 func setupTestRouter(t *testing.T, cfg *server.Config) (*gin.Engine, *middleware.SecurityMiddleware, *metrics.Metrics, *mockTimeProvider) {
 	ctrl := gomock.NewController(t)
-	mockLogger := loggerMock.NewMockInterface(ctrl)
-	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
+	t.Cleanup(func() { ctrl.Finish() })
 
-	security := middleware.NewSecurityMiddleware(cfg, mockLogger)
+	mockLog := loggerMock.NewMockInterface(ctrl)
+	mockLog.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Fatal(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().With(gomock.Any()).Return(mockLog).AnyTimes()
+
+	security := middleware.NewSecurityMiddleware(cfg, mockLog)
 	mockTime := &mockTimeProvider{}
 	security.SetTimeProvider(mockTime)
 
-	// Create router
 	router := gin.New()
 	router.Use(security.Middleware())
 	router.GET("/test", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 
-	return router, security, security.GetMetrics(), mockTime
+	metrics := security.GetMetrics()
+	return router, security, metrics, mockTime
 }
 
 func TestAPIKeyAuthentication(t *testing.T) {
@@ -121,7 +128,7 @@ func TestAPIKeyAuthentication(t *testing.T) {
 	cfg := &server.Config{
 		SecurityEnabled: true,
 		APIKey:          "test:key",
-		Address:         ":8081", // Unique port
+		Address:         ":8080",
 	}
 
 	// Setup test router
@@ -132,7 +139,7 @@ func TestAPIKeyAuthentication(t *testing.T) {
 	})
 
 	// Test missing API key
-	req, _ := http.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusUnauthorized, w.Code, "Request without API key should fail")
@@ -160,7 +167,7 @@ func TestRateLimiting(t *testing.T) {
 	cfg := &server.Config{
 		SecurityEnabled: true,
 		APIKey:          "test:key",
-		Address:         ":8082", // Unique port
+		Address:         ":8080",
 	}
 
 	// Setup test router
@@ -174,7 +181,7 @@ func TestRateLimiting(t *testing.T) {
 	m.ResetMetrics()           // Reset metrics before testing
 
 	// Create test request
-	req, _ := http.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("X-Api-Key", "test:key")
 
 	// First request should succeed
@@ -212,7 +219,7 @@ func TestCORS(t *testing.T) {
 	cfg := &server.Config{
 		SecurityEnabled: true,
 		APIKey:          "test:key",
-		Address:         ":8083",
+		Address:         ":8080",
 	}
 
 	router, security, metrics, _ := setupTestRouter(t, cfg)
@@ -222,7 +229,7 @@ func TestCORS(t *testing.T) {
 	})
 
 	// Test CORS preflight request
-	req := httptest.NewRequest(http.MethodOptions, "/test", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/test", http.NoBody)
 	req.Header.Set("Origin", "http://example.com")
 	req.Header.Set("Access-Control-Request-Method", "GET")
 	w := httptest.NewRecorder()
@@ -234,7 +241,7 @@ func TestCORS(t *testing.T) {
 	assert.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
 
 	// Test actual CORS request
-	req = httptest.NewRequest(http.MethodGet, "/test", nil)
+	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("Origin", "http://example.com")
 	req.Header.Set("X-Api-Key", "test:key")
 	w = httptest.NewRecorder()
@@ -255,7 +262,7 @@ func TestSecurityHeaders(t *testing.T) {
 	cfg := &server.Config{
 		SecurityEnabled: true,
 		APIKey:          "test:key",
-		Address:         ":8084", // Unique port
+		Address:         ":8080",
 	}
 
 	// Setup test router
@@ -266,7 +273,7 @@ func TestSecurityHeaders(t *testing.T) {
 	})
 
 	// Make request
-	req, _ := http.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("X-Api-Key", "test:key")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -290,7 +297,7 @@ func TestMetrics(t *testing.T) {
 	cfg := &server.Config{
 		SecurityEnabled: true,
 		APIKey:          "test:key",
-		Address:         ":8085", // Unique port
+		Address:         ":8080",
 		ReadTimeout:     15 * time.Second,
 		WriteTimeout:    15 * time.Second,
 		IdleTimeout:     60 * time.Second,
@@ -307,7 +314,7 @@ func TestMetrics(t *testing.T) {
 	m.ResetMetrics()           // Reset metrics before testing
 
 	// Create test request
-	req, _ := http.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("X-Api-Key", "test:key")
 
 	// Make first request (should succeed)
@@ -337,4 +344,172 @@ func TestMetrics(t *testing.T) {
 	assert.Equal(t, int64(3), m.GetSuccessfulRequests(), "Should have 3 successful requests")
 	assert.Equal(t, int64(0), m.GetFailedRequests(), "Should have no failed requests")
 	assert.Equal(t, int64(1), m.GetRateLimitedRequests(), "Should have 1 rate limited request")
+}
+
+func TestSecurityMiddleware_HandleCORS(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		config         *server.Config
+		origin         string
+		method         string
+		expectedStatus int
+	}{
+		{
+			name: "test environment allows any origin",
+			config: &server.Config{
+				Address: ":8080",
+			},
+			origin:         "http://test.com",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "production environment allows only example.com",
+			config: &server.Config{
+				Address: ":9090",
+			},
+			origin:         "https://example.com",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "production environment rejects non-example.com",
+			config: &server.Config{
+				Address: ":9090",
+			},
+			origin:         "https://other.com",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router, _, _, _ := setupTestRouter(t, tt.config)
+
+			req := httptest.NewRequest(tt.method, "/test", http.NoBody)
+			req.Header.Set("Origin", tt.origin)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+		})
+	}
+}
+
+func TestSecurityMiddleware_OptionsRequest(t *testing.T) {
+	t.Parallel()
+
+	router, _, _, _ := setupTestRouter(t, &server.Config{
+		Address: ":8080",
+	})
+
+	req := httptest.NewRequest(http.MethodOptions, "/test", http.NoBody)
+	req.Header.Set("Origin", "http://test.com")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestSecurityMiddleware_APIAuth(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		config         *server.Config
+		apiKey         string
+		expectedStatus int
+	}{
+		{
+			name: "missing API key",
+			config: &server.Config{
+				SecurityEnabled: true,
+				APIKey:          "test-key",
+			},
+			apiKey:         "",
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "invalid API key",
+			config: &server.Config{
+				SecurityEnabled: true,
+				APIKey:          "test-key",
+			},
+			apiKey:         "wrong-key",
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "valid API key",
+			config: &server.Config{
+				SecurityEnabled: true,
+				APIKey:          "test-key",
+			},
+			apiKey:         "test-key",
+			expectedStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router, _, _, _ := setupTestRouter(t, tt.config)
+
+			req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+			if tt.apiKey != "" {
+				req.Header.Set("X-Api-Key", tt.apiKey)
+			}
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+		})
+	}
+}
+
+func TestSecurityMiddleware_RateLimit(t *testing.T) {
+	t.Parallel()
+
+	router, security, metrics, mockTime := setupTestRouter(t, &server.Config{
+		Address: ":8080",
+	})
+
+	// Set a very short window for testing
+	security.SetRateLimitWindow(100 * time.Millisecond)
+	security.SetMaxRequests(2)
+
+	// First request should succeed
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Second request should succeed
+	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Third request should be rate limited
+	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+
+	// Verify metrics
+	assert.Equal(t, int64(2), metrics.GetSuccessfulRequests())
+	assert.Equal(t, int64(1), metrics.GetRateLimitedRequests())
+
+	// Wait for rate limit window to expire
+	mockTime.Advance(200 * time.Millisecond)
+
+	// Request should succeed again
+	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
 }
