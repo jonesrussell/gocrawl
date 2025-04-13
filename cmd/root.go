@@ -13,7 +13,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 
 	"github.com/joho/godotenv"
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
@@ -385,29 +384,44 @@ func validateConfig(cmd *cobra.Command) error {
 // It runs the root command and handles any errors that occur during execution.
 // If an error occurs, it prints the error message and exits with status code 1.
 func Execute() {
-	// Initialize logger first
+	// Add commands first
+	rootCmd.AddCommand(
+		job.NewJobCommand(nil),         // Main job command with fx
+		job.NewJobSubCommands(nil),     // Job subcommands
+		indices.Command(),              // For managing Elasticsearch indices
+		sources.NewSourcesCommand(nil), // For managing web content sources
+		crawlcmd.Command(),             // For crawling web content
+		httpdcmd.Command(),             // For running the HTTP server
+		search.Command(),               // For searching content in Elasticsearch
+	)
+
+	// Initialize configuration
+	if err := setupConfig(rootCmd); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize logger
 	log, err := initLogger()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Create a context with the logger and configuration
+	// Create a context with the logger
 	ctx := context.WithValue(context.Background(), common.LoggerKey, log)
-	ctx = context.WithValue(ctx, common.ConfigKey, viper.GetViper())
-
 	rootCmd.SetContext(ctx)
 
-	// Add commands
-	rootCmd.AddCommand(
-		job.NewJobCommand(log),         // Main job command with fx
-		job.NewJobSubCommands(log),     // Job subcommands
-		indices.Command(),              // For managing Elasticsearch indices
-		sources.NewSourcesCommand(log), // For managing web content sources
-		crawlcmd.Command(),             // For crawling web content
-		httpdcmd.Command(),             // For running the HTTP server
-		search.Command(),               // For searching content in Elasticsearch
-	)
+	// Update commands with logger
+	for _, cmd := range rootCmd.Commands() {
+		switch cmd.Name() {
+		case "job":
+			cmd.AddCommand(job.NewJobCommand(log))
+			cmd.AddCommand(job.NewJobSubCommands(log))
+		case "sources":
+			cmd.AddCommand(sources.NewSourcesCommand(log))
+		}
+	}
 
 	if executeErr := rootCmd.Execute(); executeErr != nil {
 		log.Error("Failed to execute command", "error", executeErr)
@@ -456,13 +470,13 @@ func initLogger() (logger.Interface, error) {
 
 	// Log the current log level
 	log.Debug("Root logger initialized",
-		zap.String("level", logLevel),
-		zap.Bool("debug", debug),
-		zap.Bool("development", logConfig.Development))
+		"level", logLevel,
+		"debug", debug,
+		"development", logConfig.Development)
 	log.Info("Root logger ready",
-		zap.String("level", logLevel),
-		zap.Bool("debug", debug),
-		zap.Bool("development", logConfig.Development))
+		"level", logLevel,
+		"debug", debug,
+		"development", logConfig.Development)
 
 	return log, nil
 }
@@ -477,15 +491,4 @@ func init() {
 		"config file (default is ./config.yaml, ~/.crawler/config.yaml, or /etc/crawler/config.yaml)",
 	)
 	rootCmd.PersistentFlags().BoolVar(&Debug, "debug", false, "enable debug mode")
-
-	// Initialize configuration on startup
-	cobra.OnInitialize(func() {
-		if err := setupConfig(rootCmd); err != nil {
-			fmt.Fprintf(os.Stderr, "Error initializing config: %v\n", err)
-			os.Exit(1)
-		}
-	})
-
-	// Remove the PersistentPreRunE to avoid double loading
-	rootCmd.PersistentPreRunE = nil
 }

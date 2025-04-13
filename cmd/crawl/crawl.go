@@ -5,12 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jonesrussell/gocrawl/cmd/common"
-	"github.com/jonesrussell/gocrawl/internal/config/app"
-	"github.com/jonesrussell/gocrawl/internal/crawler"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"go.uber.org/fx"
 )
 
@@ -24,64 +21,45 @@ Specify the source name as an argument.`,
 	RunE: runCrawl,
 }
 
-// setupCrawlerConfig creates and validates the crawler configuration
-func setupCrawlerConfig() *crawler.Config {
-	return &crawler.Config{
-		MaxDepth:    viper.GetInt("crawler.max_depth"),
-		RateLimit:   viper.GetDuration("crawler.rate_limit"),
-		Parallelism: viper.GetInt("crawler.parallelism"),
-		UserAgent:   viper.GetString("crawler.user_agent"),
-	}
-}
-
-// setupAppConfig creates the application configuration
-func setupAppConfig() *app.Config {
-	return &app.Config{
-		Name:        viper.GetString("app.name"),
-		Version:     viper.GetString("app.version"),
-		Environment: viper.GetString("app.environment"),
-		Debug:       viper.GetBool("app.debug"),
-	}
-}
-
 // runCrawl executes the crawl command
 func runCrawl(cmd *cobra.Command, args []string) error {
 	// Get logger from context
-	loggerValue := cmd.Context().Value(common.LoggerKey)
+	loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
 	log, ok := loggerValue.(logger.Interface)
 	if !ok {
 		return errors.New("logger not found in context or invalid type")
 	}
 
-	// Setup configurations
-	crawlerConfig := setupCrawlerConfig()
-	appConfig := setupAppConfig()
-
-	// Create Fx app
+	// Create Fx app with the module
 	fxApp := fx.New(
+		Module,
 		fx.Provide(
-			func() *crawler.Config { return crawlerConfig },
-			func() *app.Config { return appConfig },
 			func() logger.Interface { return log },
+			func() string { return args[0] }, // Provide source name
 		),
-		crawler.Module,
 	)
 
 	// Start the application
+	log.Info("Starting application")
 	startErr := fxApp.Start(cmd.Context())
 	if startErr != nil {
+		log.Error("Failed to start application", "error", startErr)
 		return fmt.Errorf("failed to start application: %w", startErr)
 	}
 
 	// Wait for interrupt signal
+	log.Info("Waiting for interrupt signal")
 	<-cmd.Context().Done()
 
 	// Stop the application
+	log.Info("Stopping application")
 	stopErr := fxApp.Stop(cmd.Context())
 	if stopErr != nil {
+		log.Error("Failed to stop application", "error", stopErr)
 		return fmt.Errorf("failed to stop application: %w", stopErr)
 	}
 
+	log.Info("Application stopped successfully")
 	return nil
 }
 
