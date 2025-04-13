@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/app"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -27,6 +26,7 @@ type JobService struct {
 	activeJobs       *int32
 	storage          storagetypes.Interface
 	processorFactory crawler.ProcessorFactory
+	sourceName       string
 }
 
 // JobServiceParams holds parameters for creating a new JobService.
@@ -38,6 +38,7 @@ type JobServiceParams struct {
 	Config           config.Interface
 	Storage          storagetypes.Interface
 	ProcessorFactory crawler.ProcessorFactory
+	SourceName       string `name:"sourceName"`
 }
 
 // NewJobService creates a new JobService instance.
@@ -52,69 +53,27 @@ func NewJobService(p JobServiceParams) common.JobService {
 		activeJobs:       &jobs,
 		storage:          p.Storage,
 		processorFactory: p.ProcessorFactory,
+		sourceName:       p.SourceName,
 	}
 }
 
-// Start implements the common.JobService interface.
+// Start begins the job service.
 func (s *JobService) Start(ctx context.Context) error {
-	s.logger.Info("Starting crawl job")
+	s.logger.Info("Starting job service")
+	s.logger.Info("Starting crawl for source", "source", s.sourceName)
 
-	// Get the source configuration
-	sourceConfigs, err := s.sources.GetSources()
-	if err != nil {
-		return fmt.Errorf("failed to get source configurations: %w", err)
+	// Start the crawler with the source name
+	if err := s.crawler.Start(ctx, s.sourceName); err != nil {
+		return fmt.Errorf("failed to start crawler: %w", err)
 	}
 
-	// Create processors
-	processors, err := s.processorFactory.CreateProcessors(ctx, s)
-	if err != nil {
-		return fmt.Errorf("failed to create processors: %w", err)
-	}
-
-	// Start crawling each source
-	for i := range sourceConfigs {
-		cfg := &sourceConfigs[i]
-		s.logger.Info("Starting crawl for source", "source", cfg.Name)
-
-		// Increment active jobs counter
-		atomic.AddInt32(s.activeJobs, 1)
-		defer atomic.AddInt32(s.activeJobs, -1)
-
-		// Set up the collector
-		collectorResult, err := app.SetupCollector(ctx, s.logger, *cfg, processors, s.done, s.config, s.storage)
-		if err != nil {
-			s.logger.Error("Error setting up collector",
-				"error", err,
-				"source", cfg.Name)
-			continue
+	// Wait for the crawler to complete
+	go func() {
+		if err := s.crawler.Wait(); err != nil {
+			s.logger.Error("Crawler failed", "error", err)
 		}
-
-		// Configure the crawler
-		if configErr := app.ConfigureCrawler(collectorResult, *cfg); configErr != nil {
-			s.logger.Error("Error configuring crawler",
-				"error", configErr,
-				"source", cfg.Name)
-			continue
-		}
-
-		// Start the crawler
-		if startErr := s.crawler.Start(ctx, cfg.URL); startErr != nil {
-			s.logger.Error("Error starting crawler",
-				"error", startErr,
-				"source", cfg.Name)
-			continue
-		}
-
-		// Wait for crawler to complete
-		if waitErr := s.crawler.Wait(); waitErr != nil {
-			s.logger.Error("Error waiting for crawler to complete",
-				"error", waitErr,
-				"source", cfg.Name)
-			continue
-		}
-
-		s.logger.Info("Crawl completed", "source", cfg.Name)
-	}
+		close(s.done)
+	}()
 
 	return nil
 }

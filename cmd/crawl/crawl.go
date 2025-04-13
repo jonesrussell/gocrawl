@@ -40,6 +40,8 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		return errors.New("logger not found in context or invalid type")
 	}
 
+	var jobService common.JobService
+
 	// Create Fx app with the module
 	fxApp := fx.New(
 		Module,
@@ -53,6 +55,9 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		fx.WithLogger(func() fxevent.Logger {
 			return logger.NewFxLogger(log)
 		}),
+		fx.Invoke(func(js common.JobService) {
+			jobService = js
+		}),
 	)
 
 	// Start the application
@@ -61,13 +66,6 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	if startErr != nil {
 		log.Error("Failed to start application", "error", startErr)
 		return fmt.Errorf("failed to start application: %w", startErr)
-	}
-
-	// Get the job service from the Fx app
-	var jobService common.JobService
-	if err := fx.Populate(&jobService); err != nil {
-		log.Error("Failed to get job service", "error", err)
-		return fmt.Errorf("failed to get job service: %w", err)
 	}
 
 	// Start the job service

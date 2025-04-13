@@ -16,6 +16,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -34,6 +35,18 @@ const (
 
 // Module provides the crawl command module for dependency injection
 var Module = fx.Options(
+	// Core modules
+	config.Module,
+	logger.Module,
+	storage.Module,
+	article.Module,
+	content.Module,
+
+	// Provide the context
+	fx.Provide(func() context.Context {
+		return context.Background()
+	}),
+
 	// Provide the article channel
 	fx.Provide(func() chan *models.Article {
 		return make(chan *models.Article, 100)
@@ -60,6 +73,11 @@ var Module = fx.Options(
 	// Provide the signal handler
 	fx.Provide(func() chan struct{} {
 		return make(chan struct{})
+	}),
+
+	// Provide the index manager
+	fx.Provide(func(storage types.Interface) interfaces.IndexManager {
+		return storage.GetIndexManager()
 	}),
 
 	// Provide the processors
@@ -103,7 +121,6 @@ var Module = fx.Options(
 		func(
 			logger logger.Interface,
 			storage types.Interface,
-			indexManager interfaces.IndexManager,
 			sources *sources.Sources,
 			crawler crawler.Interface,
 			done chan struct{},
