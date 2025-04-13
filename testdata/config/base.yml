@@ -1,0 +1,67 @@
+app:
+  environment: test
+  name: gocrawl-test
+  version: 0.0.1
+  debug: false
+
+log:
+  level: debug
+  debug: false
+
+crawler:
+  base_url: http://test.example.com
+  max_depth: 2
+  rate_limit: 2s
+  random_delay: 500ms
+  parallelism: 2
+  source_file: testdata/sources/basic.yml
+  tls:
+    insecure_skip_verify: true  # Allow insecure TLS for testing
+
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: test_key
+  tls:
+    enabled: false
+    skip_verify: true
+  index:
+    articles: test_articles
+    content: test_content
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 5s
+    max_retries: 3
+  bulk:
+    size: 1000
+    flush_interval: 30s
+
+server:
+  address: ":0"
+  read_timeout: 5s
+  write_timeout: 5s
+  idle_timeout: 30s
+  security:
+    enabled: true
+    api_key: test-key
+    rate_limit: 100
+    cors:
+      enabled: true
+      allowed_origins:
+        - "*"
+      allowed_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Content-Type
+        - Authorization
+        - X-API-Key
+      max_age: 300
+    tls:
+      enabled: false
+      cert_file: ""
+      key_file: "" 

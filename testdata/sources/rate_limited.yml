@@ -1,0 +1,17 @@
+sources:
+  - name: "rate_limited_source"
+    url: "http://rate-limited.example.com"
+    rate_limit: "5s"
+    max_depth: 3
+    article_index: "rate_limited_articles"
+    index: "rate_limited_content"
+    selectors:
+      article:
+        container: ".article"
+        title: "h1.title"
+        body: ".article-body"
+        published_time: "time.published"
+        author: ".author-name"
+      links:
+        article: ".article-link"
+        next: ".pagination-next" 
