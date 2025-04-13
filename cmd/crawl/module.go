@@ -61,8 +61,8 @@ var Module = fx.Options(
 	)),
 
 	// Provide the sources
-	fx.Provide(func(logger logger.Interface) *sources.Sources {
-		return sources.NewSources(&sources.Config{}, logger)
+	fx.Provide(func(logger logger.Interface, cfg config.Interface) (*sources.Sources, error) {
+		return sources.LoadSources(cfg)
 	}),
 
 	// Provide the event bus
@@ -126,6 +126,7 @@ var Module = fx.Options(
 			done chan struct{},
 			config config.Interface,
 			processorFactory crawler.ProcessorFactory,
+			sourceName string,
 		) common.JobService {
 			return NewJobService(JobServiceParams{
 				Logger:           logger,
@@ -135,9 +136,11 @@ var Module = fx.Options(
 				Config:           config,
 				Storage:          storage,
 				ProcessorFactory: processorFactory,
+				SourceName:       sourceName,
 			})
 		},
 		fx.As(new(common.JobService)),
+		fx.ParamTags(``, ``, ``, ``, ``, ``, ``, `name:"sourceName"`),
 	)),
 
 	// Provide the crawler

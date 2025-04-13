@@ -84,20 +84,18 @@ func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types
 	// Convert to types.Source
 	source := sourceutils.ConvertToConfigSource(selectedSource)
 
-	// Ensure article index exists
-	if selectedSource.ArticleIndex == "" {
-		return nil, errors.New("article index name is required")
-	}
-	if indexErr := c.indexManager.EnsureArticleIndex(ctx, selectedSource.ArticleIndex); indexErr != nil {
-		return nil, fmt.Errorf("failed to ensure article index exists: %w", indexErr)
+	// Ensure article index exists if specified
+	if selectedSource.ArticleIndex != "" {
+		if indexErr := c.indexManager.EnsureArticleIndex(ctx, selectedSource.ArticleIndex); indexErr != nil {
+			return nil, fmt.Errorf("failed to ensure article index exists: %w", indexErr)
+		}
 	}
 
-	// Ensure content index exists
-	if selectedSource.Index == "" {
-		return nil, errors.New("content index name is required")
-	}
-	if contentErr := c.indexManager.EnsureContentIndex(ctx, selectedSource.Index); contentErr != nil {
-		return nil, fmt.Errorf("failed to ensure content index exists: %w", contentErr)
+	// Ensure content index exists if specified
+	if selectedSource.Index != "" {
+		if contentErr := c.indexManager.EnsureContentIndex(ctx, selectedSource.Index); contentErr != nil {
+			return nil, fmt.Errorf("failed to ensure content index exists: %w", contentErr)
+		}
 	}
 
 	return source, nil
