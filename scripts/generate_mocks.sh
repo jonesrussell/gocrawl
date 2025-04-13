@@ -20,9 +20,8 @@ mockgen -source=internal/config/interface.go -destination=testutils/mocks/config
 mockgen -source=internal/crawler/interfaces.go -destination=testutils/mocks/crawler/crawler.go -package=crawler
 
 # Indices mocks
-mockgen -source=internal/logger/logger.go -destination=testutils/mocks/indices/logger.go -package=indices
-mockgen -source=internal/sources/interface.go -destination=testutils/mocks/indices/sources.go -package=indices
-mockgen -source=internal/storage/types/interface.go -destination=testutils/mocks/indices/storage.go -package=indices
+mockgen -source=internal/logger/logger.go -destination=testutils/mocks/indices/logger.go -package=logger
+mockgen -source=internal/sources/interface.go -destination=testutils/mocks/indices/sources.go -package=sources
 
 # Models mocks
 mockgen -source=internal/models/content.go -destination=testutils/mocks/models/content_processor.go -package=models
