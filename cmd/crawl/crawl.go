@@ -63,9 +63,28 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to start application: %w", startErr)
 	}
 
+	// Get the job service from the Fx app
+	var jobService common.JobService
+	if err := fx.Populate(&jobService); err != nil {
+		log.Error("Failed to get job service", "error", err)
+		return fmt.Errorf("failed to get job service: %w", err)
+	}
+
+	// Start the job service
+	if err := jobService.Start(cmd.Context()); err != nil {
+		log.Error("Failed to start job service", "error", err)
+		return fmt.Errorf("failed to start job service: %w", err)
+	}
+
 	// Wait for interrupt signal
 	log.Info("Waiting for interrupt signal")
 	<-cmd.Context().Done()
+
+	// Stop the job service
+	if err := jobService.Stop(cmd.Context()); err != nil {
+		log.Error("Failed to stop job service", "error", err)
+		return fmt.Errorf("failed to stop job service: %w", err)
+	}
 
 	// Stop the application
 	log.Info("Stopping application")

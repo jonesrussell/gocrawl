@@ -74,27 +74,54 @@ var Module = fx.Options(
 		}
 	}),
 
+	// Provide the processor factory
+	fx.Provide(fx.Annotate(
+		func(
+			logger logger.Interface,
+			config config.Interface,
+			storage types.Interface,
+			articleService article.Interface,
+			contentService content.Interface,
+			indexName string,
+			articleChannel chan *models.Article,
+		) crawler.ProcessorFactory {
+			return crawler.NewProcessorFactory(crawler.ProcessorFactoryParams{
+				Logger:         logger,
+				Config:         config,
+				Storage:        storage,
+				ArticleService: articleService,
+				ContentService: contentService,
+				IndexName:      indexName,
+				ArticleChannel: articleChannel,
+			})
+		},
+		fx.ParamTags(``, ``, ``, ``, ``, `name:"contentIndexName"`, ``),
+	)),
+
 	// Provide the job service
-	fx.Provide(func(
-		logger logger.Interface,
-		storage types.Interface,
-		indexManager interfaces.IndexManager,
-		sources *sources.Sources,
-		crawler crawler.Interface,
-		done chan struct{},
-		config config.Interface,
-		processorFactory crawler.ProcessorFactory,
-	) common.JobService {
-		return NewJobService(JobServiceParams{
-			Logger:           logger,
-			Sources:          sources,
-			Crawler:          crawler,
-			Done:             done,
-			Config:           config,
-			Storage:          storage,
-			ProcessorFactory: processorFactory,
-		})
-	}),
+	fx.Provide(fx.Annotate(
+		func(
+			logger logger.Interface,
+			storage types.Interface,
+			indexManager interfaces.IndexManager,
+			sources *sources.Sources,
+			crawler crawler.Interface,
+			done chan struct{},
+			config config.Interface,
+			processorFactory crawler.ProcessorFactory,
+		) common.JobService {
+			return NewJobService(JobServiceParams{
+				Logger:           logger,
+				Sources:          sources,
+				Crawler:          crawler,
+				Done:             done,
+				Config:           config,
+				Storage:          storage,
+				ProcessorFactory: processorFactory,
+			})
+		},
+		fx.As(new(common.JobService)),
+	)),
 
 	// Provide the crawler
 	fx.Provide(func(

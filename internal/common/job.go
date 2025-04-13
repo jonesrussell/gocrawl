@@ -9,6 +9,12 @@ import (
 
 // JobService defines the interface for job operations.
 type JobService interface {
+	// Start starts the job service.
+	Start(ctx context.Context) error
+	// Stop stops the job service.
+	Stop(ctx context.Context) error
+	// Status returns the current status of the job service.
+	Status(ctx context.Context) (jobtypes.JobStatus, error)
 	// GetItems returns the items for a job.
 	GetItems(ctx context.Context, jobID string) ([]*jobtypes.Item, error)
 	// UpdateItem updates an item.
