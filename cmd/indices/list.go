@@ -49,52 +49,45 @@ func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface
 	// Initialize table writer with stdout as output
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Index Name", "Health", "Docs Count", "Status"})
+	t.SetStyle(table.StyleLight)
 
-	// Process each index and gather its metadata
+	// Add table headers
+	t.AppendHeader(table.Row{"Index", "Health", "Status", "Docs", "Store Size", "Ingestion Status"})
+
+	// Process each index
 	for _, index := range indices {
-		// Get health status with error handling
-		healthStatus, healthErr := storage.GetIndexHealth(ctx, index)
-		if healthErr != nil {
-			return r.handleIndexError(
-				"get health status",
-				index,
-				healthErr,
-				"Check if the index exists and Elasticsearch is running",
-				"This could be due to network issues, index not existing, or Elasticsearch being down",
-			)
+		// Get index health
+		health, err := storage.GetIndexHealth(ctx, index)
+		if err != nil {
+			return r.handleIndexError("get health", index, err, "Skipping index", "Failed to retrieve index health")
 		}
 
-		// Get document count with fallback to 0 on error
-		docCount, docErr := storage.GetIndexDocCount(ctx, index)
-		if docErr != nil {
-			return r.handleIndexError(
-				"get document count",
-				index,
-				docErr,
-				"Check if the index exists and has documents",
-				"This could be due to index corruption, permission issues, or Elasticsearch being in a degraded state",
-			)
+		// Get document count
+		docCount, err := storage.GetIndexDocCount(ctx, index)
+		if err != nil {
+			return r.handleIndexError("get doc count", index, err, "Skipping index", "Failed to retrieve document count")
 		}
 
-		// Map health status to ingestion status
-		ingestionStatus := getIngestionStatus(healthStatus)
+		// Get ingestion status
+		ingestionStatus := getIngestionStatus(health)
 
 		// Add row to table
-		t.AppendRow([]any{
+		t.AppendRow(table.Row{
 			index,
-			healthStatus,
+			health,
+			health,
 			docCount,
+			"N/A", // Store size not available in current interface
 			ingestionStatus,
 		})
 	}
 
-	// Render the final table
+	// Render the table
 	t.Render()
 	return nil
 }
 
-// Lister implements the indices list command
+// Lister handles listing indices
 type Lister struct {
 	config   config.Interface
 	logger   logger.Interface
@@ -102,7 +95,7 @@ type Lister struct {
 	renderer *TableRenderer
 }
 
-// NewLister creates a new lister instance
+// NewLister creates a new Lister instance
 func NewLister(
 	config config.Interface,
 	logger logger.Interface,
@@ -117,56 +110,24 @@ func NewLister(
 	}
 }
 
-// Start executes the list operation
+// Start begins the list operation
 func (l *Lister) Start(ctx context.Context) error {
-	l.logger.Info("Listing indices")
-
-	// Test storage connection
-	if err := l.storage.TestConnection(ctx); err != nil {
-		return fmt.Errorf(
-			"failed to connect to storage: %w. Check Elasticsearch connection settings "+
-				"and ensure the service is running",
-			err,
-		)
-	}
-
-	// List indices
+	// Get all indices
 	indices, err := l.storage.ListIndices(ctx)
 	if err != nil {
-		l.logger.Error("Failed to list indices",
-			"error", err,
-			"action", "Check Elasticsearch permissions and cluster health",
-			"details", "This could be due to permission issues, cluster being in a degraded state, or network problems",
-		)
-		return fmt.Errorf("failed to list indices: %w. Check Elasticsearch permissions and cluster health", err)
+		return fmt.Errorf("failed to list indices: %w", err)
 	}
 
-	// Filter out internal indices (those starting with '.')
-	var filteredIndices []string
-	for _, index := range indices {
-		if !strings.HasPrefix(index, ".") {
-			filteredIndices = append(filteredIndices, index)
-		}
-	}
-
-	// Handle the case where no indices are found
-	if len(filteredIndices) == 0 {
-		l.logger.Info("No indices found",
-			"action", "Create an index using 'gocrawl indices create <index-name>'",
-			"details", "No user-created indices were found in the Elasticsearch cluster",
-		)
-		return nil
-	}
-
-	// Render the indices table using the renderer
-	return l.renderer.RenderTable(ctx, l.storage, filteredIndices)
+	// Render the table
+	return l.renderer.RenderTable(ctx, l.storage, indices)
 }
 
 // NewListCommand creates a new list command
 func NewListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all Elasticsearch indices",
+		Short: "List all indices",
+		Long:  `List all indices in the Elasticsearch cluster.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get logger from context
 			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
@@ -197,18 +158,21 @@ func NewListCommand() *cobra.Command {
 
 				// Invoke list command
 				fx.Invoke(func(l *Lister) error {
-					return l.Start(cmd.Context())
+					if err := l.Start(cmd.Context()); err != nil {
+						return err
+					}
+					return nil
 				}),
 			)
 
 			// Start application
 			if err := app.Start(context.Background()); err != nil {
-				return fmt.Errorf("failed to start application: %w", err)
+				return err
 			}
 
 			// Stop application
 			if err := app.Stop(context.Background()); err != nil {
-				return fmt.Errorf("failed to stop application: %w", err)
+				return err
 			}
 
 			return nil
@@ -221,24 +185,16 @@ func NewListCommand() *cobra.Command {
 	return cmd
 }
 
-// getIngestionStatus maps Elasticsearch health status to human-readable ingestion status.
-// This function provides a user-friendly interpretation of index health:
-// - "red" indicates a serious issue (Disconnected)
-// - "yellow" indicates a potential issue (Warning)
-// - Any other status is considered healthy (Connected)
-//
-// Parameters:
-//   - healthStatus: The Elasticsearch health status string
-//
-// Returns:
-//   - string: A human-readable ingestion status
+// getIngestionStatus determines the ingestion status based on health status
 func getIngestionStatus(healthStatus string) string {
-	switch healthStatus {
-	case "red":
-		return "Disconnected"
+	switch strings.ToLower(healthStatus) {
+	case "green":
+		return "Active"
 	case "yellow":
-		return "Warning"
+		return "Degraded"
+	case "red":
+		return "Stopped"
 	default:
-		return "Connected"
+		return "Unknown"
 	}
 }
