@@ -129,6 +129,7 @@ func convertSourceConfig(src types.Source) sourceutils.SourceConfig {
 		MaxDepth:       src.MaxDepth,
 		Time:           src.Time,
 		Index:          src.Index,
+		ArticleIndex:   src.ArticleIndex,
 		Selectors:      createSelectorConfig(src.Selectors.Article),
 		Rules:          src.Rules,
 	}
@@ -174,7 +175,6 @@ func LoadSources(cfg config.Interface) (*Sources, error) {
 			StartURLs:      []string{fmt.Sprintf("https://%s", strings.ReplaceAll(cmd, " ", ""))},
 			MaxDepth:       DefaultMaxDepth,
 			RateLimit:      DefaultRateLimit.String(),
-			Index:          "content",
 			Rules:          types.Rules{},
 		}
 

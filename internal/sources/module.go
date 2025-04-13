@@ -65,7 +65,6 @@ func NewConfig() *Config {
 		StartURLs:      []string{"http://localhost"},
 		MaxDepth:       DefaultMaxDepth,
 		RateLimit:      DefaultRateLimit,
-		Index:          "content",
 		Rules:          types.Rules{},
 	}
 }
@@ -83,7 +82,6 @@ func NewSources(cfg *Config, logger logger.Interface) *Sources {
 func DefaultConfig() *Config {
 	defaultConfig := &Config{
 		RateLimit: DefaultRateLimit,
-		Index:     "content",
 		Rules:     types.Rules{},
 	}
 	return defaultConfig

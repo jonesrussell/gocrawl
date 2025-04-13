@@ -22,6 +22,8 @@ type Source struct {
 	Time []string `yaml:"time"`
 	// Index is the name of the index for content
 	Index string `yaml:"index"`
+	// ArticleIndex is the name of the index for articles
+	ArticleIndex string `yaml:"article_index"`
 	// Selectors define CSS selectors for extracting content
 	Selectors SourceSelectors `yaml:"selectors"`
 	// Rules define crawling rules for this source
@@ -44,6 +46,9 @@ func (s *Source) Validate() error {
 	}
 	if s.RateLimit == "" {
 		return errors.New("rate_limit is required")
+	}
+	if s.ArticleIndex == "" {
+		return errors.New("article_index is required")
 	}
 	if err := s.Selectors.Validate(); err != nil {
 		return err
