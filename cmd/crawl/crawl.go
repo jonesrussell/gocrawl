@@ -89,9 +89,9 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	}
 
 	// Start the job service
-	if err := jobService.Start(cmd.Context()); err != nil {
-		log.Error("Failed to start job service", "error", err)
-		return fmt.Errorf("failed to start job service: %w", err)
+	if startJobErr := jobService.Start(cmd.Context()); startJobErr != nil {
+		log.Error("Failed to start job service", "error", startJobErr)
+		return fmt.Errorf("failed to start job service: %w", startJobErr)
 	}
 
 	// Wait for interrupt signal
@@ -99,9 +99,9 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	<-cmd.Context().Done()
 
 	// Stop the job service
-	if err := jobService.Stop(cmd.Context()); err != nil {
-		log.Error("Failed to stop job service", "error", err)
-		return fmt.Errorf("failed to stop job service: %w", err)
+	if stopJobErr := jobService.Stop(cmd.Context()); stopJobErr != nil {
+		log.Error("Failed to stop job service", "error", stopJobErr)
+		return fmt.Errorf("failed to stop job service: %w", stopJobErr)
 	}
 
 	// Stop the application
