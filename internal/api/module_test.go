@@ -230,17 +230,6 @@ func TestHealthEndpoint(t *testing.T) {
 func TestSearchEndpoint(t *testing.T) {
 	t.Parallel()
 
-	// Create test server
-	ts := setupTestApp(t)
-	defer ts.app.RequireStop()
-
-	// Set up mock expectations for logger
-	mockLogger := ts.logger.(*loggermocks.MockInterface)
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return().AnyTimes()
-
-	// Get search manager from the test server
-	mockSearch := ts.searchManager.(*apimocks.MockSearchManager)
-
 	tests := []struct {
 		name           string
 		method         string
@@ -338,6 +327,19 @@ func TestSearchEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create fresh test environment for each test
+			ts := setupTestApp(t)
+			defer ts.app.RequireStop()
+
+			// Set up mock expectations for logger
+			mockLogger := ts.logger.(*loggermocks.MockInterface)
+			mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return().AnyTimes()
+
+			// Get search manager from the test server
+			mockSearch := ts.searchManager.(*apimocks.MockSearchManager)
+
 			// Create request with body
 			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
