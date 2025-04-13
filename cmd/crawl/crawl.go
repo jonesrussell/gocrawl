@@ -21,6 +21,11 @@ import (
 	"go.uber.org/fx/fxevent"
 )
 
+const (
+	defaultParallelism = 2
+	defaultRandomDelay = 5 * time.Second
+)
+
 // Cmd represents the crawl command.
 var Cmd = &cobra.Command{
 	Use:   "crawl [source]",
@@ -120,8 +125,8 @@ func SetupCollector(
 
 	err := c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: 2,
-		RandomDelay: 5 * time.Second,
+		Parallelism: defaultParallelism,
+		RandomDelay: defaultRandomDelay,
 	})
 	if err != nil {
 		return nil, err

@@ -43,13 +43,11 @@ var Module = fx.Options(
 	content.Module,
 
 	// Provide the context
-	fx.Provide(func() context.Context {
-		return context.Background()
-	}),
+	fx.Provide(context.Background),
 
 	// Provide the article channel
 	fx.Provide(func() chan *models.Article {
-		return make(chan *models.Article, 100)
+		return make(chan *models.Article, ArticleChannelBufferSize)
 	}),
 
 	// Provide the content index name
@@ -66,9 +64,7 @@ var Module = fx.Options(
 	}),
 
 	// Provide the event bus
-	fx.Provide(func(logger logger.Interface) *events.EventBus {
-		return events.NewEventBus(logger)
-	}),
+	fx.Provide(events.NewEventBus),
 
 	// Provide the signal handler
 	fx.Provide(func() chan struct{} {

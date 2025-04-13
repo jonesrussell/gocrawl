@@ -87,7 +87,10 @@ func NewProcessorFactory(p ProcessorFactoryParams) ProcessorFactory {
 }
 
 // CreateProcessors implements ProcessorFactory.
-func (f *DefaultProcessorFactory) CreateProcessors(ctx context.Context, jobService common.JobService) ([]common.Processor, error) {
+func (f *DefaultProcessorFactory) CreateProcessors(
+	ctx context.Context,
+	jobService common.JobService,
+) ([]common.Processor, error) {
 	articleProcessor := article.NewProcessor(
 		f.logger,
 		f.articleService,
