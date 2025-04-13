@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# error-format: fmt.Errorf can be replaced with errors.New
