@@ -18,7 +18,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -37,6 +37,22 @@ const (
 	DefaultResponseHeaderTimeout = 30 * time.Second
 	// DefaultExpectContinueTimeout is the default expect continue timeout.
 	DefaultExpectContinueTimeout = 1 * time.Second
+	// DefaultMaxRetries is the default maximum number of retries for failed requests.
+	DefaultMaxRetries = 3
+	// DefaultRetryDelay is the default delay between retries.
+	DefaultRetryDelay = 1 * time.Second
+	// DefaultMaxDepth is the default maximum depth for crawling.
+	DefaultMaxDepth = 1
+	// DefaultMaxBodySize is the default maximum body size for responses.
+	DefaultMaxBodySize = 10 * 1024 * 1024 // 10 MB
+	// DefaultMaxConcurrentRequests is the default maximum number of concurrent requests.
+	DefaultMaxConcurrentRequests = 10
+	// DefaultRequestTimeout is the default timeout for requests.
+	DefaultRequestTimeout = 30 * time.Second
+	// DefaultUserAgent is the default user agent string used for HTTP requests.
+	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/91.0.4472.124 Safari/537.36"
 )
 
 // Result defines the crawler module's output.
@@ -54,7 +70,7 @@ type ProcessorFactory interface {
 type DefaultProcessorFactory struct {
 	logger         logger.Interface
 	config         config.Interface
-	storage        types.Interface
+	storage        storagetypes.Interface
 	articleService article.Interface
 	contentService content.Interface
 	indexName      string
@@ -66,7 +82,7 @@ type ProcessorFactoryParams struct {
 	fx.In
 	Logger         logger.Interface
 	Config         config.Interface
-	Storage        types.Interface
+	Storage        storagetypes.Interface
 	ArticleService article.Interface
 	ContentService content.Interface
 	IndexName      string `name:"contentIndexName"`

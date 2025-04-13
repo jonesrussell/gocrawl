@@ -5,12 +5,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
-	"os"
 	"time"
-
-	"crypto/x509"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -18,193 +14,71 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
-	"golang.org/x/net/http2"
 )
 
-const (
-	// DefaultMaxRetries is the default number of retries for index operations.
-	DefaultMaxRetries = 3
-	// DefaultScrollDuration is the default duration for scroll operations.
-	DefaultScrollDuration = 5 * time.Minute
-	// DefaultResponseHeaderTimeout is the default timeout for response headers.
-	DefaultResponseHeaderTimeout = 10 * time.Second
-	// DefaultTLSHandshakeTimeout is the default timeout for TLS handshake.
-	DefaultTLSHandshakeTimeout = 10 * time.Second
-	// DefaultIdleConnTimeout is the default timeout for idle connections.
-	DefaultIdleConnTimeout = 90 * time.Second
-	// DefaultMaxIdleConnsPerHost is the default maximum number of idle connections per host.
-	DefaultMaxIdleConnsPerHost = 10
-	// DefaultMaxIdleConns is the default maximum number of idle connections.
-	DefaultMaxIdleConns = 100
-	// DefaultDialTimeout is the default timeout for dial operations.
-	DefaultDialTimeout = 30 * time.Second
-	// DefaultDialKeepAlive is the default keep-alive duration for dial operations.
-	DefaultDialKeepAlive = 30 * time.Second
-	// DefaultExpectContinueTimeout is the default timeout for expect-continue.
-	DefaultExpectContinueTimeout = 1 * time.Second
-)
+// DefaultMaxRetries is the default maximum number of retries for failed requests.
+const DefaultMaxRetries = 3
 
-// createTLSConfig creates a TLS configuration with appropriate security settings
-func createTLSConfig(esConfig *esconfig.Config) (*tls.Config, error) {
-	// Create basic TLS config with minimum version 1.2
-	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS12,
+// DefaultRetryDelay is the default delay between retries.
+const DefaultRetryDelay = 1 * time.Second
+
+// DefaultMaxBodySize is the default maximum body size for responses.
+const DefaultMaxBodySize = 10 * 1024 * 1024 // 10 MB
+
+// DefaultRequestTimeout is the default timeout for requests.
+const DefaultRequestTimeout = 30 * time.Second
+
+// DefaultScrollDuration is the default duration for scroll operations.
+const DefaultScrollDuration = 5 * time.Minute
+
+// DefaultDialTimeout is the default timeout for dial operations.
+const DefaultDialTimeout = 30 * time.Second
+
+// DefaultDialKeepAlive is the default keep-alive duration for dial operations.
+const DefaultDialKeepAlive = 30 * time.Second
+
+// DefaultMaxIdleConnsPerHost is the default maximum number of idle connections per host.
+const DefaultMaxIdleConnsPerHost = 10
+
+// DefaultResponseHeaderTimeout is the default timeout for response headers.
+const DefaultResponseHeaderTimeout = 5 * time.Second
+
+// createTransport creates a new HTTP transport with appropriate settings
+func createTransport(esConfig *esconfig.Config) *http.Transport {
+	transport := &http.Transport{
+		MaxIdleConnsPerHost:   DefaultMaxIdleConnsPerHost,
+		ResponseHeaderTimeout: DefaultResponseHeaderTimeout,
 	}
 
-	// Handle CA certificates if provided
-	if esConfig.TLS != nil && esConfig.TLS.CAFile != "" {
-		caCert, err := os.ReadFile(esConfig.TLS.CAFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	// Configure TLS if enabled
+	if esConfig.TLS != nil {
+		// InsecureSkipVerify is used for development/testing environments only
+		// and should be disabled in production. This is a security risk.
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify, // #nosec G402 - This is configurable and documented
 		}
-
-		caCertPool := x509.NewCertPool()
-		if !caCertPool.AppendCertsFromPEM(caCert) {
-			return nil, errors.New("failed to append CA certificate")
-		}
-
-		tlsConfig.RootCAs = caCertPool
 	}
 
-	// Handle client certificates if provided
-	if esConfig.TLS != nil && esConfig.TLS.CertFile != "" && esConfig.TLS.KeyFile != "" {
-		cert, err := tls.LoadX509KeyPair(esConfig.TLS.CertFile, esConfig.TLS.KeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load client certificate: %w", err)
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
-	}
-
-	// Handle insecure skip verify if configured
-	if esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify {
-		tlsConfig.InsecureSkipVerify = true
-	}
-
-	return tlsConfig, nil
-}
-
-// createTransport creates a configured HTTP transport for Elasticsearch
-func createTransport(esConfig *esconfig.Config, logger logger.Interface) (*http.Transport, error) {
-	logger.Debug("Creating HTTP transport")
-
-	transport, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return nil, errors.New("failed to get default transport")
-	}
-
-	clonedTransport := transport.Clone()
-
-	// Create and set TLS config
-	tlsConfig, err := createTLSConfig(esConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create TLS configuration: %w", err)
-	}
-	clonedTransport.TLSClientConfig = tlsConfig
-
-	// Set timeouts
-	clonedTransport.ResponseHeaderTimeout = DefaultResponseHeaderTimeout
-	clonedTransport.ExpectContinueTimeout = 1 * time.Second
-	clonedTransport.TLSHandshakeTimeout = DefaultTLSHandshakeTimeout
-	clonedTransport.IdleConnTimeout = DefaultIdleConnTimeout
-
-	// Enable HTTP/2 support
-	if configErr := configureTransport(clonedTransport); configErr != nil {
-		logger.Warn("Failed to enable HTTP/2 support", "error", configErr)
-	}
-
-	logger.Debug("Created HTTP transport with TLS configuration",
-		"responseHeaderTimeout", clonedTransport.ResponseHeaderTimeout,
-		"expectContinueTimeout", clonedTransport.ExpectContinueTimeout,
-		"tlsHandshakeTimeout", clonedTransport.TLSHandshakeTimeout,
-		"idleConnTimeout", clonedTransport.IdleConnTimeout,
-		"tlsInsecureSkipVerify", tlsConfig.InsecureSkipVerify)
-
-	return clonedTransport, nil
-}
-
-// configureTransport configures the HTTP transport with appropriate timeouts and settings
-func configureTransport(transport *http.Transport) error {
-	transport.ResponseHeaderTimeout = DefaultResponseHeaderTimeout
-	transport.TLSHandshakeTimeout = DefaultTLSHandshakeTimeout
-	transport.IdleConnTimeout = DefaultIdleConnTimeout
-
-	// Configure HTTP/2
-	if configErr := http2.ConfigureTransport(transport); configErr != nil {
-		return fmt.Errorf("failed to configure HTTP/2 transport: %w", configErr)
-	}
-
-	return nil
+	return transport
 }
 
 // createClientConfig creates an Elasticsearch client configuration with the provided settings.
 func createClientConfig(
 	esConfig *esconfig.Config,
 	transport *http.Transport,
-	logger logger.Interface,
 ) elasticsearch.Config {
-	// Log configuration details
-	logger.Debug("Creating Elasticsearch client configuration",
-		"addresses", esConfig.Addresses,
-		"hasAPIKey", esConfig.APIKey != "",
-		"hasUsername", esConfig.Username != "",
-		"hasPassword", esConfig.Password != "",
-		"tlsInsecureSkipVerify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify,
-		"tlsHasCAFile", esConfig.TLS != nil && esConfig.TLS.CAFile != "",
-		"tlsHasCertFile", esConfig.TLS != nil && esConfig.TLS.CertFile != "",
-		"tlsHasKeyFile", esConfig.TLS != nil && esConfig.TLS.KeyFile != "",
-		"retryEnabled", esConfig.Retry.Enabled,
-		"maxRetries", esConfig.Retry.MaxRetries)
-
-	// Create client configuration
-	cfg := elasticsearch.Config{
+	return elasticsearch.Config{
 		Addresses: esConfig.Addresses,
 		Username:  esConfig.Username,
 		Password:  esConfig.Password,
 		APIKey:    esConfig.APIKey,
 		Transport: transport,
-		RetryOnStatus: []int{
-			http.StatusTooManyRequests,
-			http.StatusInternalServerError,
-			http.StatusBadGateway,
-			http.StatusServiceUnavailable,
-			http.StatusGatewayTimeout,
-		},
-		MaxRetries:            esConfig.Retry.MaxRetries,
-		DiscoverNodesOnStart:  esConfig.DiscoverNodes,
-		DiscoverNodesInterval: 0, // Disable periodic node discovery
-		CompressRequestBody:   true,
 	}
-
-	// Log final configuration (excluding sensitive fields)
-	logger.Debug("Final Elasticsearch client configuration",
-		"addresses", cfg.Addresses,
-		"hasAPIKey", cfg.APIKey != "",
-		"enableMetrics", cfg.EnableMetrics,
-		"enableDebugLogger", cfg.EnableDebugLogger,
-		"enableCompatibilityMode", cfg.EnableCompatibilityMode,
-		"compressRequestBody", cfg.CompressRequestBody,
-		"disableRetry", cfg.DisableRetry,
-		"retryOnStatus", cfg.RetryOnStatus,
-		"maxRetries", cfg.MaxRetries,
-		"discoverNodesOnStart", cfg.DiscoverNodesOnStart,
-		"discoverNodesInterval", cfg.DiscoverNodesInterval,
-		"transport", map[string]any{
-			"tlsInsecureSkipVerify": transport.TLSClientConfig != nil && transport.TLSClientConfig.InsecureSkipVerify,
-			"hasRootCAs":            transport.TLSClientConfig != nil && transport.TLSClientConfig.RootCAs != nil,
-			"hasCertificates":       transport.TLSClientConfig != nil && len(transport.TLSClientConfig.Certificates) > 0,
-			"minVersion": func() uint16 {
-				if transport.TLSClientConfig != nil {
-					return transport.TLSClientConfig.MinVersion
-				}
-				return 0
-			}(),
-		})
-
-	return cfg
 }
 
 // NewElasticsearchClient creates a new Elasticsearch client with the provided configuration
 func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*elasticsearch.Client, error) {
+	// Get Elasticsearch configuration
 	esConfig := cfg.GetElasticsearchConfig()
 	if len(esConfig.Addresses) == 0 {
 		return nil, errors.New("elasticsearch addresses are required")
@@ -221,13 +95,10 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*ela
 		"tls.has_key_file", esConfig.TLS != nil && esConfig.TLS.KeyFile != "")
 
 	// Create transport
-	transport, err := createTransport(esConfig, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transport: %w", err)
-	}
+	transport := createTransport(esConfig)
 
 	// Create client config
-	esCfg := createClientConfig(esConfig, transport, logger)
+	esCfg := createClientConfig(esConfig, transport)
 
 	// Create client
 	client, err := elasticsearch.NewClient(esCfg)
@@ -258,36 +129,10 @@ var Module = fx.Module("storage",
 				esConfig := cfg.GetElasticsearchConfig()
 
 				// Create transport with TLS configuration
-				transport := &http.Transport{
-					MaxIdleConnsPerHost:   DefaultMaxIdleConnsPerHost,
-					ResponseHeaderTimeout: DefaultResponseHeaderTimeout,
-					DialContext: (&net.Dialer{
-						Timeout:   DefaultDialTimeout,
-						KeepAlive: DefaultDialKeepAlive,
-					}).DialContext,
-					MaxIdleConns:          DefaultMaxIdleConns,
-					IdleConnTimeout:       DefaultIdleConnTimeout,
-					TLSHandshakeTimeout:   DefaultTLSHandshakeTimeout,
-					ExpectContinueTimeout: DefaultExpectContinueTimeout,
-				}
-
-				// Configure TLS if enabled
-				if esConfig.TLS != nil {
-					// InsecureSkipVerify is used for development/testing environments only
-					// and should be disabled in production. This is a security risk.
-					transport.TLSClientConfig = &tls.Config{
-						InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify, // #nosec G402 - This is configurable and documented
-					}
-				}
+				transport := createTransport(esConfig)
 
 				// Create Elasticsearch config
-				config := elasticsearch.Config{
-					Addresses: esConfig.Addresses,
-					Username:  esConfig.Username,
-					Password:  esConfig.Password,
-					APIKey:    esConfig.APIKey,
-					Transport: transport,
-				}
+				config := createClientConfig(esConfig, transport)
 
 				client, err := elasticsearch.NewClient(config)
 				if err != nil {
