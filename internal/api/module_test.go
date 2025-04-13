@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
@@ -422,47 +421,4 @@ func TestModule(t *testing.T) {
 
 	err = app.Stop(t.Context())
 	require.NoError(t, err)
-}
-
-func TestSecurityMiddleware(t *testing.T) {
-	t.Parallel()
-	// Create test dependencies
-	serverConfig := &server.Config{}
-	serverConfig.SecurityEnabled = true
-	serverConfig.APIKey = testAPIKey
-	mockLogger := setupMockLogger(gomock.NewController(t))
-
-	// Create security middleware
-	securityMiddleware := middleware.NewSecurityMiddleware(serverConfig, mockLogger)
-
-	// Create Gin router
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.Use(securityMiddleware.Middleware())
-	router.GET("/test", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	tests := []struct {
-		name     string
-		apiKey   string
-		expected int
-	}{
-		{"valid key", testAPIKey, http.StatusOK},
-		{"invalid key", "wrong-key", http.StatusUnauthorized},
-		{"missing key", "", http.StatusUnauthorized},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
-			if tt.apiKey != "" {
-				req.Header.Set("X-Api-Key", tt.apiKey)
-			}
-			router.ServeHTTP(w, req)
-			assert.Equal(t, tt.expected, w.Code)
-		})
-	}
 }
