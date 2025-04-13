@@ -11,24 +11,33 @@ import (
 // HTMLProcessor handles HTML processing for the crawler.
 type HTMLProcessor struct {
 	crawler *Crawler
+	// Track unknown content types for analysis
+	unknownTypes map[common.ContentType]int
 }
 
 // NewHTMLProcessor creates a new HTML processor.
 func NewHTMLProcessor(c *Crawler) *HTMLProcessor {
 	return &HTMLProcessor{
-		crawler: c,
+		crawler:      c,
+		unknownTypes: make(map[common.ContentType]int),
 	}
 }
 
 // ProcessHTML processes the HTML content.
 func (p *HTMLProcessor) ProcessHTML(e *colly.HTMLElement) {
-	// Detect content type and get appropriate processor
-	processor := p.selectProcessor(e)
+	// Detect content type once and reuse
+	contentType := p.detectContentType(e)
+
+	// Get processor for the content type
+	processor := p.selectProcessor(e, contentType)
 	if processor == nil {
 		p.crawler.logger.Debug("No processor found for content",
 			"url", e.Request.URL.String(),
-			"type", p.detectContentType(e))
+			"type", contentType)
 		p.crawler.state.IncrementProcessed()
+
+		// Track unknown content types
+		p.unknownTypes[contentType]++
 		return
 	}
 
@@ -38,30 +47,35 @@ func (p *HTMLProcessor) ProcessHTML(e *colly.HTMLElement) {
 		p.crawler.logger.Error("Failed to process content",
 			"error", err,
 			"url", e.Request.URL.String(),
-			"type", p.detectContentType(e))
+			"type", contentType)
 		p.crawler.state.IncrementError()
 	} else {
 		p.crawler.logger.Debug("Successfully processed content",
 			"url", e.Request.URL.String(),
-			"type", p.detectContentType(e))
+			"type", contentType,
+			"processor", processor.ContentType())
 	}
 
 	p.crawler.state.IncrementProcessed()
 }
 
-// selectProcessor selects the appropriate processor for the given HTML element
-func (p *HTMLProcessor) selectProcessor(e *colly.HTMLElement) common.Processor {
-	contentType := p.detectContentType(e)
-
-	// Try to get a processor for the specific content type
+// selectProcessor selects the appropriate processor for the given HTML element and content type
+func (p *HTMLProcessor) selectProcessor(e *colly.HTMLElement, contentType common.ContentType) common.Processor {
+	// Try to get a processor for the specific content type first
 	processor := p.getProcessorForType(contentType)
 	if processor != nil {
+		p.crawler.logger.Debug("Selected processor by content type",
+			"type", contentType,
+			"processor", processor.ContentType())
 		return processor
 	}
 
 	// Fallback: Try additional processors
 	for _, proc := range p.crawler.processors {
 		if proc.CanProcess(e) {
+			p.crawler.logger.Debug("Selected processor by CanProcess",
+				"type", contentType,
+				"processor", proc.ContentType())
 			return proc
 		}
 	}
@@ -147,4 +161,9 @@ func (p *HTMLProcessor) detectContentType(e *colly.HTMLElement) common.ContentTy
 
 	// Default to page content type
 	return common.ContentTypePage
+}
+
+// GetUnknownTypes returns a map of content types that had no processor
+func (p *HTMLProcessor) GetUnknownTypes() map[common.ContentType]int {
+	return p.unknownTypes
 }
