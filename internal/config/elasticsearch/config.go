@@ -19,7 +19,7 @@ const (
 
 // Default configuration values
 const (
-	DefaultAddresses     = "http://localhost:9200"
+	DefaultAddresses     = "https://localhost:9200"
 	DefaultIndexName     = "gocrawl"
 	DefaultRetryEnabled  = true
 	DefaultInitialWait   = 1 * time.Second
@@ -101,16 +101,8 @@ type TLSConfig struct {
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify" env:"ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY"`
 }
 
-// Validate validates the configuration.
-func (c *Config) Validate() error {
-	if c == nil {
-		return &ConfigError{
-			Code:    ErrCodeEmptyAddresses,
-			Message: "configuration is required",
-		}
-	}
-
-	// Validate TLS configuration first
+// validateTLS validates the TLS configuration
+func (c *Config) validateTLS() error {
 	if c.TLS != nil {
 		if (c.TLS.CertFile != "" && c.TLS.KeyFile == "") || (c.TLS.CertFile == "" && c.TLS.KeyFile != "") {
 			return &ConfigError{
@@ -119,8 +111,11 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
+	return nil
+}
 
-	// Validate required fields
+// validateRequiredFields validates required configuration fields
+func (c *Config) validateRequiredFields() error {
 	if len(c.Addresses) == 0 {
 		return &ConfigError{
 			Code:    ErrCodeEmptyAddresses,
@@ -135,7 +130,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Validate API key presence
 	if c.APIKey == "" {
 		return &ConfigError{
 			Code:    ErrCodeMissingAPIKey,
@@ -143,15 +137,22 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Validate password strength
+	return nil
+}
+
+// validatePassword validates the password configuration
+func (c *Config) validatePassword() error {
 	if c.Password != "" && len(c.Password) < MinPasswordLength {
 		return &ConfigError{
 			Code:    ErrCodeWeakPassword,
 			Message: fmt.Sprintf("password must be at least %d characters", MinPasswordLength),
 		}
 	}
+	return nil
+}
 
-	// Validate retry configuration
+// validateRetry validates the retry configuration
+func (c *Config) validateRetry() error {
 	if c.Retry.Enabled {
 		if c.Retry.InitialWait < 0 || c.Retry.MaxWait < 0 || c.Retry.MaxRetries < 0 {
 			return &ConfigError{
@@ -160,8 +161,11 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
+	return nil
+}
 
-	// Validate flush interval
+// validateBulkConfig validates bulk indexing configuration
+func (c *Config) validateBulkConfig() error {
 	if c.FlushInterval <= 0 {
 		return &ConfigError{
 			Code:    ErrCodeInvalidFlush,
@@ -169,7 +173,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Validate bulk size
 	if c.BulkSize <= 0 {
 		return &ConfigError{
 			Code:    ErrCodeInvalidBulkSize,
@@ -177,7 +180,11 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Validate API key format last
+	return nil
+}
+
+// validateAPIKeyFormat validates the API key format
+func (c *Config) validateAPIKeyFormat() error {
 	if c.APIKey != "" {
 		parts := strings.Split(c.APIKey, ":")
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
@@ -186,6 +193,42 @@ func (c *Config) Validate() error {
 				Message: "API key must be in the format 'id:key'",
 			}
 		}
+	}
+	return nil
+}
+
+// Validate checks if the configuration is valid
+func (c *Config) Validate() error {
+	if c == nil {
+		return &ConfigError{
+			Code:    ErrCodeEmptyAddresses,
+			Message: "configuration is required",
+		}
+	}
+
+	// Validate each component
+	if err := c.validateTLS(); err != nil {
+		return err
+	}
+
+	if err := c.validateRequiredFields(); err != nil {
+		return err
+	}
+
+	if err := c.validatePassword(); err != nil {
+		return err
+	}
+
+	if err := c.validateRetry(); err != nil {
+		return err
+	}
+
+	if err := c.validateBulkConfig(); err != nil {
+		return err
+	}
+
+	if err := c.validateAPIKeyFormat(); err != nil {
+		return err
 	}
 
 	return nil
