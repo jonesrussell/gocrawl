@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -22,10 +23,9 @@ import (
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	apimocks "github.com/jonesrussell/gocrawl/testutils/mocks/api"
 	configmocks "github.com/jonesrussell/gocrawl/testutils/mocks/config"
-	indicesmocks "github.com/jonesrussell/gocrawl/testutils/mocks/indices"
+	loggermocks "github.com/jonesrussell/gocrawl/testutils/mocks/logger"
 	storagemocks "github.com/jonesrussell/gocrawl/testutils/mocks/storage"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -46,14 +46,14 @@ type testServer struct {
 }
 
 // setupMockLogger creates and configures a mock logger for testing.
-func setupMockLogger() logger.Interface {
-	mockLog := &indicesmocks.MockInterface{}
-	mockLog.On("Info", mock.Anything, mock.Anything).Return()
-	mockLog.On("Error", mock.Anything, mock.Anything).Return()
-	mockLog.On("Debug", mock.Anything, mock.Anything).Return()
-	mockLog.On("Warn", mock.Anything, mock.Anything).Return()
-	mockLog.On("Fatal", mock.Anything, mock.Anything).Return()
-	mockLog.On("With", mock.Anything).Return(mockLog)
+func setupMockLogger(ctrl *gomock.Controller) logger.Interface {
+	mockLog := loggermocks.NewMockInterface(ctrl)
+	mockLog.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Fatal(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().With(gomock.Any()).Return(mockLog).AnyTimes()
 	return mockLog
 }
 
@@ -81,15 +81,18 @@ var TestAPIModule = fx.Module("testAPI",
 func setupTestApp(t *testing.T) *testServer {
 	t.Helper()
 
+	ctrl := gomock.NewController(t)
+	t.Cleanup(func() { ctrl.Finish() })
+
 	// Create mock dependencies
-	mockConfig := &configmocks.MockInterface{}
-	mockConfig.On("GetAppConfig").Return(&app.Config{
+	mockConfig := configmocks.NewMockInterface(ctrl)
+	mockConfig.EXPECT().GetAppConfig().Return(&app.Config{
 		Environment: "test",
 		Name:        "gocrawl",
 		Version:     "1.0.0",
 		Debug:       true,
-	})
-	mockConfig.On("GetLogConfig").Return(&log.Config{
+	}).AnyTimes()
+	mockConfig.EXPECT().GetLogConfig().Return(&log.Config{
 		Level:      "debug",
 		Format:     "json",
 		Output:     "stdout",
@@ -97,29 +100,30 @@ func setupTestApp(t *testing.T) *testServer {
 		MaxBackups: 3,
 		MaxAge:     28,
 		Compress:   true,
-	})
-	mockConfig.On("GetElasticsearchConfig").Return(&elasticsearch.Config{
+	}).AnyTimes()
+	mockConfig.EXPECT().GetElasticsearchConfig().Return(&elasticsearch.Config{
 		Addresses: []string{"http://localhost:9200"},
 		IndexName: "test-index",
-	})
-	mockConfig.On("GetServerConfig").Return(&server.Config{
+	}).AnyTimes()
+	mockConfig.EXPECT().GetServerConfig().Return(&server.Config{
 		SecurityEnabled: true,
 		APIKey:          testAPIKey,
 		Address:         ":8080",
 		ReadTimeout:     15 * time.Second,
 		WriteTimeout:    15 * time.Second,
 		IdleTimeout:     60 * time.Second,
-	})
-	mockConfig.On("GetSources").Return([]types.Source{}, nil)
-	mockConfig.On("GetCommand").Return("test")
-	mockConfig.On("GetPriorityConfig").Return(&priority.Config{
+	}).AnyTimes()
+	mockConfig.EXPECT().GetSources().Return([]types.Source{}, nil).AnyTimes()
+	mockConfig.EXPECT().GetCommand().Return("test").AnyTimes()
+	mockConfig.EXPECT().GetPriorityConfig().Return(&priority.Config{
 		DefaultPriority: 1,
 		Rules:           []priority.Rule{},
-	})
-	mockLogger := setupMockLogger()
-	mockSearch := &apimocks.MockSearchManager{}
-	mockStorage := &storagemocks.MockInterface{}
-	mockIndexManager := &apimocks.MockIndexManager{}
+	}).AnyTimes()
+
+	mockLogger := setupMockLogger(ctrl)
+	mockSearch := apimocks.NewMockSearchManager(ctrl)
+	mockStorage := storagemocks.NewMockInterface(ctrl)
+	mockIndexManager := apimocks.NewMockIndexManager(ctrl)
 
 	// Set up mock search expectations
 	expectedQuery := map[string]any{
@@ -131,14 +135,12 @@ func setupTestApp(t *testing.T) *testServer {
 		"size": 0,
 	}
 	t.Logf("Setting up mock expectations with query: %+v", expectedQuery)
-	mockSearch.On("Search", mock.Anything, "", expectedQuery).Return([]any{
+	mockSearch.EXPECT().Search(gomock.Any(), "", expectedQuery).Return([]any{
 		map[string]any{
 			"title": "Test Result",
 			"url":   "https://test.com",
 		},
-	}, nil).Run(func(args mock.Arguments) {
-		t.Logf("Search called with args: %+v", args)
-	})
+	}, nil).AnyTimes()
 
 	countQuery := map[string]any{
 		"query": map[string]any{
@@ -148,9 +150,7 @@ func setupTestApp(t *testing.T) *testServer {
 		},
 		"size": 10,
 	}
-	mockSearch.On("Count", mock.Anything, "", countQuery).Return(int64(1), nil).Run(func(args mock.Arguments) {
-		t.Logf("Count called with args: %+v", args)
-	})
+	mockSearch.EXPECT().Count(gomock.Any(), "", countQuery).Return(int64(1), nil).AnyTimes()
 
 	ts := &testServer{
 		logger: mockLogger,
@@ -215,8 +215,8 @@ func TestHealthEndpoint(t *testing.T) {
 	ts := setupTestApp(t)
 
 	// Set up mock expectations for logger
-	mockLogger := ts.logger.(*indicesmocks.MockInterface)
-	mockLogger.On("Info", "HTTP Request", mock.Anything).Return()
+	mockLogger := ts.logger.(*loggermocks.MockInterface)
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return()
 
 	tests := []struct {
 		name           string
@@ -256,8 +256,8 @@ func TestSearchEndpoint(t *testing.T) {
 	ts := setupTestApp(t)
 
 	// Set up mock expectations for logger
-	mockLogger := ts.logger.(*indicesmocks.MockInterface)
-	mockLogger.On("Info", "HTTP Request", mock.Anything).Return()
+	mockLogger := ts.logger.(*loggermocks.MockInterface)
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return()
 
 	tests := []struct {
 		name           string
@@ -352,22 +352,22 @@ func TestModule(t *testing.T) {
 
 	// Create mock dependencies
 	mockConfig := &configmocks.MockInterface{}
-	mockLogger := setupMockLogger()
+	mockLogger := setupMockLogger(gomock.NewController(t))
 	mockStorage := &storagemocks.MockInterface{}
 	mockIndexManager := &apimocks.MockIndexManager{}
 
 	// Set up mock storage expectations
-	mockStorage.On("GetIndexDocCount", mock.Anything, mock.Anything).Return(int64(0), nil)
-	mockStorage.On("Ping", mock.Anything).Return(nil)
-	mockStorage.On("TestConnection", mock.Anything).Return(nil)
-	mockStorage.On("Close").Return(nil)
+	mockStorage.EXPECT().GetIndexDocCount(gomock.Any(), gomock.Any()).Return(int64(0), nil)
+	mockStorage.EXPECT().Ping(gomock.Any()).Return(nil)
+	mockStorage.EXPECT().TestConnection(gomock.Any()).Return(nil)
+	mockStorage.EXPECT().Close().Return(nil)
 
 	// Set up mock index manager expectations
-	mockIndexManager.On("EnsureIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockIndexManager.On("DeleteIndex", mock.Anything, mock.Anything).Return(nil)
-	mockIndexManager.On("IndexExists", mock.Anything, mock.Anything).Return(true, nil)
-	mockIndexManager.On("GetMapping", mock.Anything, mock.Anything).Return(map[string]any{}, nil)
-	mockIndexManager.On("UpdateMapping", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockIndexManager.EXPECT().EnsureIndex(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	mockIndexManager.EXPECT().DeleteIndex(gomock.Any(), gomock.Any()).Return(nil)
+	mockIndexManager.EXPECT().IndexExists(gomock.Any(), gomock.Any()).Return(true, nil)
+	mockIndexManager.EXPECT().GetMapping(gomock.Any(), gomock.Any()).Return(map[string]any{}, nil)
+	mockIndexManager.EXPECT().UpdateMapping(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	app := fx.New(
 		fx.Provide(
@@ -393,7 +393,7 @@ func TestSecurityMiddleware(t *testing.T) {
 	serverConfig := &server.Config{}
 	serverConfig.SecurityEnabled = true
 	serverConfig.APIKey = testAPIKey
-	mockLogger := setupMockLogger()
+	mockLogger := setupMockLogger(gomock.NewController(t))
 
 	// Create security middleware
 	securityMiddleware := middleware.NewSecurityMiddleware(serverConfig, mockLogger)
