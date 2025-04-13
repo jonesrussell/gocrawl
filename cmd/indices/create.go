@@ -5,14 +5,17 @@ package indices
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 // DefaultMapping provides a default mapping for new indices
@@ -111,23 +114,28 @@ This command creates a new index in the Elasticsearch cluster with the specified
 The index will be created with default settings unless overridden by configuration.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get logger from context
+			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context or invalid type")
+			}
+
 			// Get config path from flags
 			configPath, _ := cmd.Flags().GetString("config")
 
 			// Create Fx application
 			app := fx.New(
+				// Include all required modules
+				Module,
+				storage.Module,
+
 				// Provide config path string
 				fx.Provide(func() string { return configPath }),
-				// Provide logger params
-				fx.Provide(func() logger.Params {
-					return logger.Params{
-						Config: &logger.Config{
-							Level:       logger.InfoLevel,
-							Development: true,
-							Encoding:    "console",
-						},
-					}
-				}),
+
+				// Provide logger
+				fx.Provide(func() logger.Interface { return log }),
+
 				// Provide create params
 				fx.Provide(func() CreateParams {
 					return CreateParams{
@@ -135,11 +143,12 @@ The index will be created with default settings unless overridden by configurati
 						IndexName:  args[0],
 					}
 				}),
-				// Include all required modules
-				config.Module,
-				storage.Module,
-				logger.Module,
-				Module,
+
+				// Use custom Fx logger
+				fx.WithLogger(func() fxevent.Logger {
+					return logger.NewFxLogger(log)
+				}),
+
 				// Invoke create command
 				fx.Invoke(func(c *Creator) error {
 					if err := c.Start(cmd.Context()); err != nil {

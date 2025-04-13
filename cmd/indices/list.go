@@ -5,17 +5,20 @@ package indices
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 // TableRenderer handles the display of index data in a table format
@@ -165,28 +168,33 @@ func NewListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "List all Elasticsearch indices",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get logger from context
+			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context or invalid type")
+			}
+
 			// Get config path from flags
 			configPath, _ := cmd.Flags().GetString("config")
 
 			// Create Fx application
 			app := fx.New(
+				// Include all required modules
+				Module,
+				storage.Module,
+
 				// Provide config path string
 				fx.Provide(func() string { return configPath }),
-				// Provide logger params
-				fx.Provide(func() logger.Params {
-					return logger.Params{
-						Config: &logger.Config{
-							Level:       logger.InfoLevel,
-							Development: true,
-							Encoding:    "console",
-						},
-					}
+
+				// Provide logger
+				fx.Provide(func() logger.Interface { return log }),
+
+				// Use custom Fx logger
+				fx.WithLogger(func() fxevent.Logger {
+					return logger.NewFxLogger(log)
 				}),
-				// Include all required modules
-				config.Module,
-				storage.Module,
-				logger.Module,
-				Module,
+
 				// Invoke list command
 				fx.Invoke(func(l *Lister) error {
 					return l.Start(cmd.Context())

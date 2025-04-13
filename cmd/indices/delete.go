@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -17,6 +18,7 @@ import (
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 var (
@@ -70,8 +72,18 @@ func (d *Deleter) Start(ctx context.Context) error {
 		if source == nil {
 			return fmt.Errorf("source not found: %s", d.sourceName)
 		}
-		d.indices = []string{source.Index}
-		d.logger.Info("Resolved source indices", "indices", d.indices)
+		if source.Index == "" && source.ArticleIndex == "" {
+			return fmt.Errorf("source %s has no indices configured", d.sourceName)
+		}
+		// Add both content and article indices if they exist
+		d.indices = make([]string, 0, 2)
+		if source.Index != "" {
+			d.indices = append(d.indices, source.Index)
+		}
+		if source.ArticleIndex != "" {
+			d.indices = append(d.indices, source.ArticleIndex)
+		}
+		d.logger.Info("Resolved source indices", "indices", d.indices, "source", d.sourceName)
 	}
 
 	// Get existing indices
@@ -168,7 +180,7 @@ func (d *Deleter) filterIndices(existingIndices []string) struct {
 // reportMissingIndices prints a list of indices that do not exist.
 func (d *Deleter) reportMissingIndices(missingIndices []string) {
 	if len(missingIndices) > 0 {
-		fmt.Fprintf(os.Stdout, "\nThe following indices do not exist (already deleted):\n")
+		fmt.Fprintf(os.Stdout, "\nThe following indices do not exist:\n")
 		for _, index := range missingIndices {
 			fmt.Fprintf(os.Stdout, "  - %s\n", index)
 		}
@@ -221,6 +233,13 @@ This command allows you to delete one or more indices from the Elasticsearch clu
 You can specify indices by name or by source name.`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get logger from context
+			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context or invalid type")
+			}
+
 			// Get flags
 			configPath, _ := cmd.Flags().GetString("config")
 			sourceName, _ := cmd.Flags().GetString("source")
@@ -233,18 +252,16 @@ You can specify indices by name or by source name.`,
 
 			// Create Fx application
 			app := fx.New(
+				// Include all required modules
+				Module,
+				storage.Module,
+
 				// Provide config path string
 				fx.Provide(func() string { return configPath }),
-				// Provide logger params
-				fx.Provide(func() logger.Params {
-					return logger.Params{
-						Config: &logger.Config{
-							Level:       logger.InfoLevel,
-							Development: true,
-							Encoding:    "console",
-						},
-					}
-				}),
+
+				// Provide logger
+				fx.Provide(func() logger.Interface { return log }),
+
 				// Provide delete params
 				fx.Provide(func() DeleteParams {
 					return DeleteParams{
@@ -254,12 +271,12 @@ You can specify indices by name or by source name.`,
 						Indices:    args,
 					}
 				}),
-				// Include all required modules
-				config.Module,
-				storage.Module,
-				logger.Module,
-				sources.Module,
-				Module,
+
+				// Use custom Fx logger
+				fx.WithLogger(func() fxevent.Logger {
+					return logger.NewFxLogger(log)
+				}),
+
 				// Invoke delete command
 				fx.Invoke(func(d *Deleter) error {
 					if err := d.Start(cmd.Context()); err != nil {
