@@ -18,7 +18,7 @@ import (
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
 	httpdcmd "github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/indices"
-	job "github.com/jonesrussell/gocrawl/cmd/scheduler"
+	"github.com/jonesrussell/gocrawl/cmd/scheduler"
 	"github.com/jonesrussell/gocrawl/cmd/search"
 	"github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -413,8 +413,7 @@ func Execute() {
 
 	// Add commands first
 	rootCmd.AddCommand(
-		job.NewJobCommand(log),                   // Main job command with fx
-		job.NewJobSubCommands(log),               // Job subcommands
+		scheduler.Command(),                      // Main scheduler command with fx
 		indices.Command(),                        // For managing Elasticsearch indices
 		sources.NewSourcesCommand(cfg, log, nil), // For managing web content sources
 		crawlcmd.Command(),                       // For crawling web content

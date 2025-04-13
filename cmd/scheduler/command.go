@@ -12,23 +12,23 @@ import (
 	"go.uber.org/fx"
 )
 
-// CommandDeps holds the dependencies for the job command.
+// CommandDeps holds the dependencies for the scheduler command.
 type CommandDeps struct {
 	fx.In
 
-	Context context.Context `name:"jobContext"`
+	Context context.Context `name:"schedulerContext"`
 	Config  config.Interface
 	Logger  logger.Interface
 	Storage storagetypes.Interface
 	Sources sources.Interface
 }
 
-// NewJobSubCommands returns the job subcommands.
-func NewJobSubCommands(log logger.Interface) *cobra.Command {
+// NewSchedulerSubCommands returns the scheduler subcommands.
+func NewSchedulerSubCommands(log logger.Interface) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "job",
-		Short: "Manage crawl jobs",
-		Long: `The job command provides functionality for managing crawl jobs.
+		Use:   "scheduler",
+		Short: "Manage crawl scheduler",
+		Long: `The scheduler command provides functionality for managing crawl schedules.
 It allows you to schedule, list, and manage web crawling tasks.`,
 	}
 
@@ -46,11 +46,11 @@ It allows you to schedule, list, and manage web crawling tasks.`,
 func newScheduleCmd(log logger.Interface) *cobra.Command {
 	return &cobra.Command{
 		Use:   "schedule",
-		Short: "Schedule a new crawl job",
-		Long: `Schedule a new crawl job with the specified parameters.
-The job will be executed according to the provided schedule.`,
+		Short: "Schedule a new crawl task",
+		Long: `Schedule a new crawl task with the specified parameters.
+The task will be executed according to the provided schedule.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Info("Scheduling new job")
+			log.Info("Scheduling new task")
 			return nil
 		},
 	}
@@ -60,11 +60,11 @@ The job will be executed according to the provided schedule.`,
 func newListCmd(log logger.Interface) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "List all crawl jobs",
-		Long: `List all scheduled and completed crawl jobs.
-This command shows the status and details of each job.`,
+		Short: "List all scheduled crawls",
+		Long: `List all scheduled and completed crawl tasks.
+This command shows the status and details of each scheduled task.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Info("Listing jobs")
+			log.Info("Listing scheduled tasks")
 			return nil
 		},
 	}
@@ -74,11 +74,11 @@ This command shows the status and details of each job.`,
 func newDeleteCmd(log logger.Interface) *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete",
-		Short: "Delete a crawl job",
-		Long: `Delete a specific crawl job by its ID.
-This command will remove the job from the scheduler.`,
+		Short: "Delete a scheduled crawl",
+		Long: `Delete a specific scheduled crawl by its ID.
+This command will remove the task from the scheduler.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Info("Deleting job")
+			log.Info("Deleting scheduled task")
 			return nil
 		},
 	}
