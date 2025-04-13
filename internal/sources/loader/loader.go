@@ -261,7 +261,12 @@ func newConfigLoader(path string) (*viper.Viper, error) {
 	v.SetConfigType("yaml")
 
 	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+		var configFileNotFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFound) {
+			return nil, fmt.Errorf("failed to read config file: %w", err)
+		}
+		// If config file is not found, create a default config
+		v.Set("sources", []map[string]any{})
 	}
 
 	return v, nil

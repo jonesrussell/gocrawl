@@ -152,6 +152,12 @@ func LoadSources(cfg config.Interface) (*Sources, error) {
 			sources.SetSources(configs)
 			return sources, nil
 		}
+	} else {
+		// Try to load sources from sources.yml directly
+		if configs, err := loadSourcesFromFile("sources.yml"); err == nil && len(configs) > 0 {
+			sources.SetSources(configs)
+			return sources, nil
+		}
 	}
 
 	// Fall back to sources from config
