@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -91,6 +92,10 @@ func (d *Deleter) confirmDeletion() error {
 
 	var response string
 	if _, err := fmt.Scanln(&response); err != nil {
+		// If we get an EOF or empty input, treat it as 'N'
+		if err == io.EOF || response == "" {
+			return ErrDeletionCancelled
+		}
 		return fmt.Errorf("failed to read user input: %w", err)
 	}
 
