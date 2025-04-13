@@ -100,16 +100,30 @@ func (m *MockStorage) SearchDocuments(ctx context.Context, index string, query m
 	return args.Error(0)
 }
 
-// Search performs a search query
+// Search performs a search query in Elasticsearch.
 func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).([]any), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return nil, err
+	}
+	val, ok := args.Get(0).([]any)
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
 }
 
-// Count returns the number of documents matching the query
+// Count counts documents matching a query.
 func (m *MockStorage) Count(ctx context.Context, index string, query any) (int64, error) {
 	args := m.Called(ctx, index, query)
-	return args.Get(0).(int64), args.Error(1)
+	if err := args.Error(1); err != nil {
+		return 0, err
+	}
+	val, ok := args.Get(0).(int64)
+	if !ok {
+		return 0, nil
+	}
+	return val, nil
 }
 
 // Aggregate performs an aggregation query
