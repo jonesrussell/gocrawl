@@ -2,6 +2,7 @@ package logger
 
 import (
 	"reflect"
+	"strings"
 	"time"
 
 	"go.uber.org/fx/fxevent"
@@ -15,6 +16,23 @@ type fxLogger struct {
 // NewFxLogger creates a new fx logger.
 func NewFxLogger(log Interface) fxevent.Logger {
 	return &fxLogger{log: log}
+}
+
+// cleanConstructorName cleans up a constructor name for logging
+func cleanConstructorName(name string) string {
+	// Remove package path
+	if idx := strings.LastIndex(name, "/"); idx != -1 {
+		name = name[idx+1:]
+	}
+	// Remove function suffix
+	if idx := strings.Index(name, "("); idx != -1 {
+		name = name[:idx]
+	}
+	// Remove fx annotations
+	if idx := strings.Index(name, "fx."); idx != -1 {
+		name = name[:idx]
+	}
+	return name
 }
 
 // logSuccessOrError is a helper method for logging success or error events.
@@ -59,15 +77,35 @@ func (h *multiTypeEventHandler) Handle(log Interface, event fxevent.Event) {
 			err = ev.Err
 		}
 
+		// Only log important dependencies
+		importantTypes := map[string]bool{
+			"*article.Manager":      true,
+			"*elasticsearch.Client": true,
+			"*sources.Sources":      true,
+			"*events.EventBus":      true,
+			"signal.Interface":      true,
+			"common.JobService":     true,
+			"config.Interface":      true,
+			"storage.Interface":     true,
+			"content.Interface":     true,
+			"crawler.Interface":     true,
+		}
+
 		for _, rtype := range outputTypes {
+			if !importantTypes[rtype] {
+				continue
+			}
+
 			fields := []any{"type", rtype}
 			if constructorName != "" {
-				fields = append(fields, "constructor", constructorName)
-			}
-			if decoratorName != "" {
+				msg := "Initialized " + cleanConstructorName(constructorName)
+				log.Debug(msg, fields...)
+			} else if decoratorName != "" {
 				fields = append(fields, "decorator", decoratorName)
+				log.Debug(h.successMsg, fields...)
+			} else {
+				log.Debug(h.successMsg, fields...)
 			}
-			log.Debug(h.successMsg, fields...)
 		}
 
 		if err != nil {
@@ -95,8 +133,8 @@ func (h *hookEventHandler) Handle(log Interface, event fxevent.Event) {
 			callerName = ev.CallerName
 		}
 		log.Debug(h.prefix+" hook executing",
-			"callee", functionName,
-			"caller", callerName,
+			"callee", cleanConstructorName(functionName),
+			"caller", cleanConstructorName(callerName),
 		)
 	case *fxevent.OnStartExecuted, *fxevent.OnStopExecuted:
 		var functionName, callerName string
@@ -118,8 +156,8 @@ func (h *hookEventHandler) Handle(log Interface, event fxevent.Event) {
 			h.prefix+" hook executed",
 			h.prefix+" hook failed",
 			err,
-			"callee", functionName,
-			"caller", callerName,
+			"callee", cleanConstructorName(functionName),
+			"caller", cleanConstructorName(callerName),
 			"runtime", runtime,
 		)
 	}
@@ -144,10 +182,10 @@ func (h *simpleEventHandler) Handle(log Interface, event fxevent.Event) {
 			fields = []any{"type", ev.TypeName}
 		case *fxevent.Invoked:
 			err = ev.Err
-			fields = []any{"function", ev.FunctionName}
+			fields = []any{"function", cleanConstructorName(ev.FunctionName)}
 		case *fxevent.LoggerInitialized:
 			err = ev.Err
-			fields = []any{"function", ev.ConstructorName}
+			fields = []any{"function", cleanConstructorName(ev.ConstructorName)}
 		}
 
 		(&fxLogger{log: log}).logSuccessOrError(h.successMsg, h.errorMsg, err, fields...)
@@ -161,9 +199,7 @@ type signalEventHandler struct{}
 func (h *signalEventHandler) Handle(log Interface, event fxevent.Event) {
 	switch e := event.(type) {
 	case *fxevent.Stopping:
-		log.Info("Received signal",
-			"signal", e.Signal,
-		)
+		log.Info("Received signal", "signal", e.Signal)
 	case *fxevent.Stopped, *fxevent.RolledBack, *fxevent.Started:
 		var err error
 		var msg string

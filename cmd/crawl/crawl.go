@@ -9,6 +9,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 // Cmd represents the crawl command.
@@ -37,6 +38,9 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 			func() logger.Interface { return log },
 			func() string { return args[0] }, // Provide source name
 		),
+		fx.WithLogger(func() fxevent.Logger {
+			return logger.NewFxLogger(log)
+		}),
 	)
 
 	// Start the application

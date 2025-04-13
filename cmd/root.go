@@ -384,17 +384,6 @@ func validateConfig(cmd *cobra.Command) error {
 // It runs the root command and handles any errors that occur during execution.
 // If an error occurs, it prints the error message and exits with status code 1.
 func Execute() {
-	// Add commands first
-	rootCmd.AddCommand(
-		job.NewJobCommand(nil),         // Main job command with fx
-		job.NewJobSubCommands(nil),     // Job subcommands
-		indices.Command(),              // For managing Elasticsearch indices
-		sources.NewSourcesCommand(nil), // For managing web content sources
-		crawlcmd.Command(),             // For crawling web content
-		httpdcmd.Command(),             // For running the HTTP server
-		search.Command(),               // For searching content in Elasticsearch
-	)
-
 	// Initialize configuration
 	if err := setupConfig(rootCmd); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -412,16 +401,16 @@ func Execute() {
 	ctx := context.WithValue(context.Background(), common.LoggerKey, log)
 	rootCmd.SetContext(ctx)
 
-	// Update commands with logger
-	for _, cmd := range rootCmd.Commands() {
-		switch cmd.Name() {
-		case "job":
-			cmd.AddCommand(job.NewJobCommand(log))
-			cmd.AddCommand(job.NewJobSubCommands(log))
-		case "sources":
-			cmd.AddCommand(sources.NewSourcesCommand(log))
-		}
-	}
+	// Add commands first
+	rootCmd.AddCommand(
+		job.NewJobCommand(log),         // Main job command with fx
+		job.NewJobSubCommands(log),     // Job subcommands
+		indices.Command(),              // For managing Elasticsearch indices
+		sources.NewSourcesCommand(log), // For managing web content sources
+		crawlcmd.Command(),             // For crawling web content
+		httpdcmd.Command(),             // For running the HTTP server
+		search.Command(),               // For searching content in Elasticsearch
+	)
 
 	if executeErr := rootCmd.Execute(); executeErr != nil {
 		log.Error("Failed to execute command", "error", executeErr)
@@ -458,9 +447,9 @@ func initLogger() (logger.Interface, error) {
 	logConfig := &logger.Config{
 		Level:       level,
 		Development: debug,
-		Encoding:    viper.GetString("logger.format"),
-		EnableColor: true, // Always enable color in debug mode
-		OutputPaths: []string{viper.GetString("logger.output")},
+		Encoding:    "console",
+		EnableColor: true,
+		OutputPaths: []string{"stdout"},
 	}
 
 	log, err := logger.New(logConfig)
