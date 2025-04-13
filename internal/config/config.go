@@ -169,6 +169,10 @@ func LoadConfig() (*Config, error) {
 	v.AddConfigPath("$HOME/.gocrawl")
 	v.AddConfigPath("/etc/gocrawl")
 
+	// Also try with .yaml extension
+	v.SetConfigName("config.yaml")
+	v.AddConfigPath(".")
+
 	// Set defaults
 	setDefaults(v)
 
@@ -186,6 +190,13 @@ func LoadConfig() (*Config, error) {
 		if !errors.As(err, &configFileNotFound) {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
+		// If config file is not found, create a default config
+		v.Set("environment", "development")
+		v.Set("logger.level", "debug")
+		v.Set("logger.encoding", "console")
+		v.Set("logger.format", "text")
+		v.Set("logger.output", "stdout")
+		v.Set("crawler.source_file", "sources.yml")
 	}
 
 	// Create a temporary logger for config loading
@@ -353,5 +364,25 @@ func (c *Config) LoadSources(logger logger.Interface) error {
 // Load loads the configuration from the given file.
 func (c *Config) Load(file string) error {
 	c.logger.Info("Loading configuration", "file", file)
+
+	// If no file is specified, try to load sources.yml directly
+	if file == "" {
+		sourcesViper := viper.New()
+		sourcesViper.SetConfigType("yaml")
+		sourcesViper.SetConfigName("sources")
+		sourcesViper.AddConfigPath(".")
+
+		if err := sourcesViper.ReadInConfig(); err != nil {
+			return fmt.Errorf("failed to read sources config: %w", err)
+		}
+
+		var sources []types.Source
+		if err := sourcesViper.UnmarshalKey("sources", &sources); err != nil {
+			return fmt.Errorf("failed to unmarshal sources: %w", err)
+		}
+
+		c.Sources = sources
+	}
+
 	return nil
 }
