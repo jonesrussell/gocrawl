@@ -95,6 +95,12 @@ func (m *MockStorage) UpdateMapping(ctx context.Context, index string, mapping m
 	return args.Error(0)
 }
 
+// SearchDocuments performs a search query and decodes the result into the provided value
+func (m *MockStorage) SearchDocuments(ctx context.Context, index string, query map[string]any, result any) error {
+	args := m.Called(ctx, index, query, result)
+	return args.Error(0)
+}
+
 // Search performs a search query in Elasticsearch.
 func (m *MockStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	args := m.Called(ctx, index, query)
