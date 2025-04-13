@@ -95,16 +95,14 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 		var req SearchRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "Invalid request payload",
+				"error": "Invalid request payload",
 			})
 			return
 		}
 
 		if req.Query == "" {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    http.StatusBadRequest,
-				"message": "Query cannot be empty",
+				"error": "Query cannot be empty",
 			})
 			return
 		}
@@ -128,8 +126,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 		results, err := searchManager.Search(c.Request.Context(), req.Index, query)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": "Search failed",
+				"error": "Search failed",
 			})
 			return
 		}
@@ -138,8 +135,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 		total, err := searchManager.Count(c.Request.Context(), req.Index, query)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    http.StatusInternalServerError,
-				"message": "Failed to get total count",
+				"error": "Failed to get total count",
 			})
 			return
 		}

@@ -213,10 +213,11 @@ func TestHealthEndpoint(t *testing.T) {
 
 	// Create test server
 	ts := setupTestApp(t)
+	defer ts.app.RequireStop()
 
 	// Set up mock expectations for logger
 	mockLogger := ts.logger.(*loggermocks.MockInterface)
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return()
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return().AnyTimes()
 
 	tests := []struct {
 		name           string
@@ -276,7 +277,7 @@ func TestSearchEndpoint(t *testing.T) {
 			body:           `{"query": "test"}`,
 			apiKey:         "",
 			expectedStatus: 401,
-			expectedBody:   `{"code":401,"message":"missing API key"}`,
+			expectedBody:   `{"error":"missing API key"}`,
 		},
 		{
 			name:           "handles invalid API key",
@@ -285,7 +286,7 @@ func TestSearchEndpoint(t *testing.T) {
 			body:           `{"query": "test"}`,
 			apiKey:         "wrong-key",
 			expectedStatus: 401,
-			expectedBody:   `{"code":401,"message":"invalid API key"}`,
+			expectedBody:   `{"error":"invalid API key"}`,
 		},
 		{
 			name:           "handles invalid JSON",
@@ -294,7 +295,7 @@ func TestSearchEndpoint(t *testing.T) {
 			body:           "invalid json",
 			apiKey:         testAPIKey,
 			expectedStatus: 400,
-			expectedBody:   `{"code":400,"message":"Invalid request payload"}`,
+			expectedBody:   `{"error":"Invalid request payload"}`,
 		},
 		{
 			name:           "handles empty query",
@@ -303,7 +304,7 @@ func TestSearchEndpoint(t *testing.T) {
 			body:           `{"query": ""}`,
 			apiKey:         testAPIKey,
 			expectedStatus: 400,
-			expectedBody:   `{"code":400,"message":"Query cannot be empty"}`,
+			expectedBody:   `{"error":"Query cannot be empty"}`,
 		},
 		{
 			name:           "returns search results with valid request",
