@@ -189,5 +189,14 @@ func (m *MockStorage) Ping(ctx context.Context) error {
 	return args.Error(0)
 }
 
+// GetIndexManager returns the index manager for this storage
+func (m *MockStorage) GetIndexManager() types.IndexManager {
+	args := m.Called()
+	if val, ok := args.Get(0).(types.IndexManager); ok {
+		return val
+	}
+	return nil
+}
+
 // Ensure MockStorage implements storage.Interface
 var _ types.Interface = (*MockStorage)(nil)

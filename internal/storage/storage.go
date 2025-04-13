@@ -10,6 +10,7 @@ import (
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -908,4 +909,9 @@ func (s *Storage) TestConnection(ctx context.Context) error {
 func (s *Storage) Close() error {
 	// No resources to close in this implementation
 	return nil
+}
+
+// GetIndexManager returns the index manager for this storage
+func (s *Storage) GetIndexManager() interfaces.IndexManager {
+	return NewElasticsearchIndexManager(s.client, s.logger)
 }

@@ -1,21 +1,24 @@
-// Package crawler provides the core crawling functionality for GoCrawl.
-// It manages the crawling process, including URL processing, rate limiting,
-// and content extraction.
+// Package crawler provides functionality for crawling web content.
 package crawler
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/article"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/transport"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -40,6 +43,71 @@ const (
 type Result struct {
 	fx.Out
 	Crawler Interface
+}
+
+// ProcessorFactory creates content processors.
+type ProcessorFactory interface {
+	CreateProcessors(ctx context.Context, jobService common.JobService) ([]common.Processor, error)
+}
+
+// DefaultProcessorFactory implements ProcessorFactory.
+type DefaultProcessorFactory struct {
+	logger         logger.Interface
+	config         config.Interface
+	storage        types.Interface
+	articleService article.Interface
+	contentService content.Interface
+	indexName      string
+	articleChannel chan *models.Article
+}
+
+// ProcessorFactoryParams holds parameters for creating a processor factory.
+type ProcessorFactoryParams struct {
+	fx.In
+	Logger         logger.Interface
+	Config         config.Interface
+	Storage        types.Interface
+	ArticleService article.Interface
+	ContentService content.Interface
+	IndexName      string `name:"contentIndexName"`
+	ArticleChannel chan *models.Article
+}
+
+// NewProcessorFactory creates a new processor factory.
+func NewProcessorFactory(p ProcessorFactoryParams) ProcessorFactory {
+	return &DefaultProcessorFactory{
+		logger:         p.Logger,
+		config:         p.Config,
+		storage:        p.Storage,
+		articleService: p.ArticleService,
+		contentService: p.ContentService,
+		indexName:      p.IndexName,
+		articleChannel: p.ArticleChannel,
+	}
+}
+
+// CreateProcessors implements ProcessorFactory.
+func (f *DefaultProcessorFactory) CreateProcessors(ctx context.Context, jobService common.JobService) ([]common.Processor, error) {
+	articleProcessor := article.NewProcessor(
+		f.logger,
+		f.articleService,
+		jobService,
+		f.storage,
+		f.indexName,
+		f.articleChannel,
+	)
+
+	contentProcessor := content.NewContentProcessor(content.ProcessorParams{
+		Logger:    f.logger,
+		Service:   f.contentService,
+		Storage:   f.storage,
+		IndexName: f.indexName,
+	})
+
+	return []common.Processor{
+		articleProcessor,
+		contentProcessor,
+	}, nil
 }
 
 // ProvideCrawler creates a new crawler instance with the given dependencies.
@@ -80,6 +148,11 @@ func ProvideCrawler(
 // Module provides the crawler module for dependency injection.
 var Module = fx.Module("crawler",
 	fx.Provide(
+		NewProcessorFactory,
+		fx.Annotate(
+			NewProcessorFactory,
+			fx.As(new(ProcessorFactory)),
+		),
 		fx.Annotate(
 			ProvideCrawler,
 			fx.ParamTags(``, `name:"indexManager"`, ``, ``, ``, ``),

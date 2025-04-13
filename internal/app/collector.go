@@ -6,14 +6,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/testutils"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // SetupCollector initializes and configures a new collector instance.
@@ -25,7 +24,7 @@ import (
 //   - processors: List of processors to apply to collected data
 //   - done: A channel that signals when crawling is complete
 //   - cfg: The application configuration
-//   - client: The Elasticsearch client
+//   - storage: The storage interface
 //
 // Returns:
 //   - crawler.Interface: The configured crawler instance
@@ -37,10 +36,9 @@ func SetupCollector(
 	processors []common.Processor,
 	done chan struct{},
 	cfg config.Interface,
-	client *elasticsearch.Client,
+	storage types.Interface,
 ) (crawler.Interface, error) {
 	// Create dependencies
-	indexManager := testutils.NewMockIndexManager()
 	bus := events.NewEventBus(log)
 	sources := sources.NewSources(&source, log)
 
@@ -53,7 +51,7 @@ func SetupCollector(
 	// Create crawler using the module's provider
 	result := crawler.ProvideCrawler(
 		log,
-		indexManager,
+		storage.GetIndexManager(),
 		sources,
 		processors,
 		bus,

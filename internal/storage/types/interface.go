@@ -2,6 +2,8 @@ package types
 
 import (
 	"context"
+
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 )
 
 // Interface defines the storage operations
@@ -41,4 +43,7 @@ type Interface interface {
 
 	// Close operation
 	Close() error
+
+	// GetIndexManager returns the index manager for this storage
+	GetIndexManager() interfaces.IndexManager
 }
