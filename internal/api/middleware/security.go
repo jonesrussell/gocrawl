@@ -60,8 +60,8 @@ func NewSecurityMiddleware(cfg *server.Config, log logger.Interface) *SecurityMi
 	rateLimit := DefaultRateLimit
 	rateLimitWindow := DefaultRateLimitWindow
 
-	// Increase rate limit for tests
-	if cfg.Address == ":8080" { // Test server address
+	// Only increase rate limit for tests if not already set
+	if cfg.Address == ":8080" && rateLimit == DefaultRateLimit { // Test server address
 		rateLimit = 100
 		rateLimitWindow = 1 * time.Second
 	}
@@ -187,32 +187,33 @@ func (s *SecurityMiddleware) handleCORS(c *gin.Context) error {
 // Middleware returns the security middleware function
 func (s *SecurityMiddleware) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Add security headers
-		s.addSecurityHeaders(c)
-
-		// Handle CORS
+		// Handle CORS first - this is a security measure, not a failed request
 		if err := s.handleCORS(c); err != nil {
-			s.metrics.IncrementFailedRequests()
 			c.JSON(http.StatusForbidden, gin.H{
 				"code":    http.StatusForbidden,
 				"message": err.Error(),
 			})
 			c.Abort()
+			// Don't count CORS errors in metrics
 			return
 		}
 
-		// Get client IP
-		clientIP := c.ClientIP()
-		if clientIP == "" {
-			clientIP = "unknown"
+		// Add security headers
+		s.addSecurityHeaders(c)
+
+		// Skip API key check for OPTIONS requests
+		if c.Request.Method == http.MethodOptions {
+			c.Next()
+			return
 		}
 
 		// Check rate limit
+		clientIP := c.ClientIP()
 		if !s.checkRateLimit(clientIP) {
 			s.metrics.IncrementRateLimitedRequests()
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"code":    http.StatusTooManyRequests,
-				"message": "rate limit exceeded",
+				"message": "Rate limit exceeded",
 			})
 			c.Abort()
 			return
@@ -221,35 +222,31 @@ func (s *SecurityMiddleware) Middleware() gin.HandlerFunc {
 		// Check API key if security is enabled
 		if s.config.SecurityEnabled {
 			apiKey := c.GetHeader("X-Api-Key")
-			if apiKey == "" {
-				s.metrics.IncrementFailedRequests()
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"code":    http.StatusUnauthorized,
-					"message": "missing API key",
-				})
-				c.Abort()
-				return
-			}
-
 			if apiKey != s.config.APIKey {
-				s.metrics.IncrementFailedRequests()
 				c.JSON(http.StatusUnauthorized, gin.H{
 					"code":    http.StatusUnauthorized,
-					"message": "invalid API key",
+					"message": "Invalid API key",
 				})
 				c.Abort()
+				s.metrics.IncrementFailedRequests()
 				return
 			}
 		}
 
-		// Process request
+		// Process the request
 		c.Next()
 
-		// Only count successful requests
-		if c.Writer.Status() < 400 {
-			s.metrics.IncrementSuccessfulRequests()
-		} else {
-			s.metrics.IncrementFailedRequests()
+		// Update metrics based on response status
+		if c.Request.Method != http.MethodOptions {
+			status := c.Writer.Status()
+			switch {
+			case status >= 200 && status < 300:
+				s.metrics.IncrementSuccessfulRequests()
+			case status == http.StatusTooManyRequests:
+				// Already counted in rate limit check
+			default:
+				s.metrics.IncrementFailedRequests()
+			}
 		}
 	}
 }
@@ -335,4 +332,11 @@ func (m *SecurityMiddleware) Cleanup(ctx context.Context) {
 // WaitCleanup waits for cleanup to complete
 func (m *SecurityMiddleware) WaitCleanup() {
 	// No cleanup needed for this implementation
+}
+
+// ResetRateLimiter clears the rate limiter map
+func (s *SecurityMiddleware) ResetRateLimiter() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rateLimiter = make(map[string]rateLimitInfo)
 }

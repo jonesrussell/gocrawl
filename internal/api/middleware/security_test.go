@@ -98,8 +98,9 @@ func setupTestRouter(t *testing.T, cfg *server.Config) (*gin.Engine, *middleware
 		currentTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 	security.SetTimeProvider(mockTime)
-	security.SetRateLimitWindow(5 * time.Second)
-	security.SetMaxRequests(2)
+
+	// Reset rate limiter for clean test state
+	security.ResetRateLimiter()
 
 	// Create router
 	gin.SetMode(gin.TestMode)
@@ -122,7 +123,8 @@ func TestAPIKeyAuthentication(t *testing.T) {
 	}
 
 	// Setup test router
-	router, _, m, _ := setupTestRouter(t, cfg)
+	router, security, m, _ := setupTestRouter(t, cfg)
+	security.ResetRateLimiter()
 
 	// Test missing API key
 	req, _ := http.NewRequest("GET", "/test", nil)
@@ -157,10 +159,10 @@ func TestRateLimiting(t *testing.T) {
 
 	// Setup test router
 	router, security, m, mockTime := setupTestRouter(t, cfg)
-
-	// Set a shorter window for testing
+	security.ResetRateLimiter()
 	security.SetRateLimitWindow(5 * time.Second)
 	security.SetMaxRequests(2) // Allow only 2 requests per window
+	m.ResetMetrics()           // Reset metrics before testing
 
 	// Create test request
 	req, _ := http.NewRequest("GET", "/test", nil)
@@ -204,7 +206,8 @@ func TestCORS(t *testing.T) {
 	}
 
 	// Setup test router
-	router, _, m, _ := setupTestRouter(t, cfg)
+	router, security, m, _ := setupTestRouter(t, cfg)
+	security.ResetRateLimiter()
 
 	// Test CORS preflight request
 	req, _ := http.NewRequest("OPTIONS", "/test", nil)
@@ -242,7 +245,8 @@ func TestSecurityHeaders(t *testing.T) {
 	}
 
 	// Setup test router
-	router, _, m, _ := setupTestRouter(t, cfg)
+	router, security, m, _ := setupTestRouter(t, cfg)
+	security.ResetRateLimiter()
 
 	// Make request
 	req, _ := http.NewRequest("GET", "/test", nil)
@@ -275,7 +279,11 @@ func TestMetrics(t *testing.T) {
 	}
 
 	// Setup test router with metrics
-	router, _, m, mockTime := setupTestRouter(t, cfg)
+	router, security, m, mockTime := setupTestRouter(t, cfg)
+	security.ResetRateLimiter()
+	security.SetRateLimitWindow(5 * time.Second)
+	security.SetMaxRequests(2) // Allow only 2 requests per window
+	m.ResetMetrics()           // Reset metrics before testing
 
 	// Create test request
 	req, _ := http.NewRequest("GET", "/test", nil)
