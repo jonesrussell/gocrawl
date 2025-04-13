@@ -149,7 +149,45 @@ To run the tests, use:
 task test
 ```
 
+To run tests with coverage reporting:
+
+```bash
+task test:cover
+```
+
+This will:
+- Generate a coverage profile in `coverage/coverage.out`
+- Create an HTML coverage report in `coverage/coverage.html`
+- Display a function-level coverage summary in the terminal
+
+Current test coverage varies across packages:
+- High coverage (80%+): metrics, config/logging, config/app, config/server, config/sources
+- Medium coverage (40-80%): api/middleware, crawler/events, api, config/elasticsearch
+- Low coverage (<40%): content, crawler, storage
+- Several packages need test files added
+
+The project uses mock interfaces for testing. To generate or update mocks, run:
+
+```bash
+task generate
+```
+
 Make sure Elasticsearch is running locally or update the test configuration to point to your Elasticsearch instance.
+
+### CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration. The workflow:
+
+1. Checks out the code
+2. Caches Go modules
+3. Sets up Go 1.24
+4. Installs dependencies
+5. Generates mocks
+6. Builds the project
+7. Runs tests
+8. Runs benchmarks
+
+The workflow runs on pull requests to the main branch and uses test-specific environment variables for configuration.
 
 ## Contributing
 

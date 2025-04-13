@@ -249,6 +249,7 @@ func TestSearchEndpoint(t *testing.T) {
 		apiKey         string
 		expectedStatus int
 		expectedBody   string
+		setupMock      func(*apimocks.MockSearchManager)
 	}{
 		{
 			name:           "requires API key",
@@ -258,6 +259,7 @@ func TestSearchEndpoint(t *testing.T) {
 			apiKey:         "",
 			expectedStatus: 401,
 			expectedBody:   `{"error":"missing API key"}`,
+			setupMock:      func(*apimocks.MockSearchManager) {},
 		},
 		{
 			name:           "handles invalid API key",
@@ -267,6 +269,7 @@ func TestSearchEndpoint(t *testing.T) {
 			apiKey:         "wrong-key",
 			expectedStatus: 401,
 			expectedBody:   `{"error":"invalid API key"}`,
+			setupMock:      func(*apimocks.MockSearchManager) {},
 		},
 		{
 			name:           "handles invalid JSON",
@@ -276,6 +279,7 @@ func TestSearchEndpoint(t *testing.T) {
 			apiKey:         testAPIKey,
 			expectedStatus: 400,
 			expectedBody:   `{"error":"Invalid request payload"}`,
+			setupMock:      func(*apimocks.MockSearchManager) {},
 		},
 		{
 			name:           "handles empty query",
@@ -285,6 +289,7 @@ func TestSearchEndpoint(t *testing.T) {
 			apiKey:         testAPIKey,
 			expectedStatus: 400,
 			expectedBody:   `{"error":"Query cannot be empty"}`,
+			setupMock:      func(*apimocks.MockSearchManager) {},
 		},
 		{
 			name:           "handles search error",
@@ -294,6 +299,9 @@ func TestSearchEndpoint(t *testing.T) {
 			apiKey:         testAPIKey,
 			expectedStatus: 500,
 			expectedBody:   `{"error":"Search failed"}`,
+			setupMock: func(m *apimocks.MockSearchManager) {
+				m.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return(nil, errors.New("search error"))
+			},
 		},
 		{
 			name:           "handles count error",
@@ -303,6 +311,10 @@ func TestSearchEndpoint(t *testing.T) {
 			apiKey:         testAPIKey,
 			expectedStatus: 500,
 			expectedBody:   `{"error":"Failed to get total count"}`,
+			setupMock: func(m *apimocks.MockSearchManager) {
+				m.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return([]any{}, nil)
+				m.EXPECT().Count(gomock.Any(), "", gomock.Any()).Return(int64(0), errors.New("count error"))
+			},
 		},
 		{
 			name:           "returns search results with valid request",
@@ -312,12 +324,20 @@ func TestSearchEndpoint(t *testing.T) {
 			apiKey:         testAPIKey,
 			expectedStatus: 200,
 			expectedBody:   `{"results":[{"title":"Test Result","url":"https://test.com"}],"total":1}`,
+			setupMock: func(m *apimocks.MockSearchManager) {
+				m.EXPECT().Search(gomock.Any(), "test-index", gomock.Any()).Return([]any{
+					map[string]any{
+						"title": "Test Result",
+						"url":   "https://test.com",
+					},
+				}, nil)
+				m.EXPECT().Count(gomock.Any(), "test-index", gomock.Any()).Return(int64(1), nil)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			// Create request with body
 			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
@@ -326,22 +346,8 @@ func TestSearchEndpoint(t *testing.T) {
 			}
 			w := httptest.NewRecorder()
 
-			// Set up mock expectations based on test case
-			switch tt.name {
-			case "handles search error":
-				mockSearch.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return(nil, errors.New("search error"))
-			case "handles count error":
-				mockSearch.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return([]any{}, nil)
-				mockSearch.EXPECT().Count(gomock.Any(), "", gomock.Any()).Return(int64(0), errors.New("count error"))
-			case "returns search results with valid request":
-				mockSearch.EXPECT().Search(gomock.Any(), "test-index", gomock.Any()).Return([]any{
-					map[string]any{
-						"title": "Test Result",
-						"url":   "https://test.com",
-					},
-				}, nil)
-				mockSearch.EXPECT().Count(gomock.Any(), "test-index", gomock.Any()).Return(int64(1), nil)
-			}
+			// Set up mock expectations
+			tt.setupMock(mockSearch)
 
 			// Send request
 			ts.server.Handler.ServeHTTP(w, req)
