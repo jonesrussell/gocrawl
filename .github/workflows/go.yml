@@ -10,6 +10,52 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      # App Configuration
+      APP_NAME: gocrawl-test
+      APP_ENV: test
+      APP_DEBUG: true
+      
+      # Server Configuration
+      SERVER_PORT: 8081
+      SERVER_READ_TIMEOUT: 10s
+      SERVER_WRITE_TIMEOUT: 30s
+      SERVER_IDLE_TIMEOUT: 60s
+      
+      # Elasticsearch Configuration
+      ELASTICSEARCH_HOSTS: http://localhost:9200
+      ELASTICSEARCH_INDEX_PREFIX: test-gocrawl
+      ELASTICSEARCH_MAX_RETRIES: 3
+      ELASTICSEARCH_RETRY_INITIAL_WAIT: 1s
+      ELASTICSEARCH_RETRY_MAX_WAIT: 30s
+      ELASTICSEARCH_API_KEY: test_api_key
+      
+      # Crawler Configuration
+      CRAWLER_MAX_DEPTH: 2
+      CRAWLER_PARALLELISM: 2
+      CRAWLER_MAX_AGE: 3600
+      CRAWLER_RATE_LIMIT: 30
+      
+      # Logging Configuration
+      LOG_LEVEL: debug
+      LOG_FORMAT: console
+      
+      # Test-specific settings
+      TEST_MOCK_ENABLED: true
+      
+      # Elasticsearch Security (using test values)
+      ELASTICSEARCH_USERNAME: test_user
+      ELASTICSEARCH_PASSWORD: test_password
+      
+      # Server Security (using test values)
+      GOCRAWL_API_KEY: test_api_key
+      
+      # TLS Configuration (disabled for tests)
+      ELASTICSEARCH_SKIP_TLS: true
+      ELASTICSEARCH_CERT_PATH: ""
+      ELASTICSEARCH_KEY_PATH: ""
+      ELASTICSEARCH_CA_PATH: ""
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
@@ -31,6 +77,11 @@ jobs:
 
     - name: Install Dependencies
       run: go mod tidy
+
+    - name: Generate Mocks
+      run: |
+        go install github.com/golang/mock/mockgen@latest
+        ./scripts/generate_mocks.sh
 
     - name: Build Project
       run: go build -v ./...

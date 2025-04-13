@@ -1,0 +1,19 @@
+elasticsearch:
+  addresses:
+    - http://localhost:9200
+  api_key: id:test_api_key
+  index_name: test-index
+  tls:
+    enabled: false
+    skip_verify: false
+    cert_file: ""
+    key_file: ""
+    ca_file: ""
+  retry:
+    enabled: true
+    initial_wait: 1s
+    max_wait: 5s
+    max_retries: 3
+  bulk:
+    size: 1000
+    flush_interval: 30s 

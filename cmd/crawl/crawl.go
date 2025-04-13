@@ -5,157 +5,168 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common/app"
+	"github.com/gocolly/colly/v2"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
-// sourceName holds the name of the source being crawled, populated from command line arguments.
-var sourceName string
-
-// Params holds the dependencies and parameters required for the crawl operation.
-type Params struct {
-	fx.In
-
-	Lifecycle  fx.Lifecycle
-	Sources    sources.Interface `name:"sourceManager"`
-	Crawler    crawler.Interface
-	Logger     logger.Interface
-	Config     config.Interface
-	Done       chan struct{}             `name:"crawlDone"`
-	Context    context.Context           `name:"crawlContext"`
-	Processors []models.ContentProcessor `group:"processors"`
-}
-
-// StartCrawl initializes and starts the crawling process.
-func StartCrawl(p Params) error {
-	source, findErr := p.Sources.FindByName(sourceName)
-	if findErr != nil {
-		return fmt.Errorf("error finding source: %w", findErr)
-	}
-
-	// Register lifecycle hooks
-	p.Lifecycle.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			collectorResult, setupErr := app.SetupCollector(ctx, p.Logger, *source, p.Processors, p.Done, p.Config)
-			if setupErr != nil {
-				return fmt.Errorf("error setting up collector: %w", setupErr)
-			}
-
-			if configErr := app.ConfigureCrawler(p.Crawler, *source, collectorResult); configErr != nil {
-				return fmt.Errorf("error configuring crawler: %w", configErr)
-			}
-
-			p.Logger.Info("Starting crawl", "source", source.Name)
-			if startErr := p.Crawler.Start(ctx, source.URL); startErr != nil {
-				return fmt.Errorf("error starting crawler: %w", startErr)
-			}
-
-			// Monitor crawl completion in a separate goroutine
-			go func() {
-				p.Crawler.Wait()
-				p.Logger.Info("Crawler finished processing all URLs")
-
-				// Signal completion through the Done channel
-				close(p.Done)
-			}()
-
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			p.Logger.Info("Stopping crawler")
-			if stopErr := p.Crawler.Stop(ctx); stopErr != nil {
-				return fmt.Errorf("error stopping crawler: %w", stopErr)
-			}
-			return nil
-		},
-	})
-
-	return nil
-}
+const (
+	defaultParallelism = 2
+	defaultRandomDelay = 5 * time.Second
+)
 
 // Cmd represents the crawl command.
 var Cmd = &cobra.Command{
 	Use:   "crawl [source]",
-	Short: "Crawl a single source defined in sources.yml",
-	Long: `Crawl a single source defined in sources.yml.
-The source argument must match a name defined in your sources.yml configuration file.
-
-Example:
-  gocrawl crawl example-blog`,
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			const errMsg = "requires exactly one source name from sources.yml\n\n" +
-				"Usage:\n  %s\n\n" +
-				"Run 'gocrawl list' to see available sources"
-			return fmt.Errorf(errMsg, cmd.UseLine())
-		}
-		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		sourceName = args[0]
-
-		// Create a cancellable context and set up signal handling
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
-		signalDone, cleanup := app.WaitForSignal(ctx, cancel)
-		defer cleanup()
-
-		// Create the crawler's completion channel
-		crawlerDone := make(chan struct{})
-
-		// Initialize the Fx application with the crawl module
-		fxApp := fx.New(
-			fx.NopLogger,
-			Module,
-			fx.Provide(
-				fx.Annotate(
-					func() context.Context { return ctx },
-					fx.ResultTags(`name:"crawlContext"`),
-				),
-				fx.Annotate(
-					func() chan struct{} { return crawlerDone },
-					fx.ResultTags(`name:"crawlDone"`),
-				),
-			),
-			fx.Invoke(StartCrawl),
-		)
-
-		// Start the application
-		if startErr := fxApp.Start(ctx); startErr != nil {
-			if errors.Is(startErr, context.Canceled) {
-				return nil
-			}
-			return fmt.Errorf("error starting application: %w", startErr)
-		}
-
-		// Wait for completion or cancellation
-		select {
-		case <-signalDone:
-			// Normal completion through signal
-		case <-crawlerDone:
-			// Crawler completed successfully
-		case <-ctx.Done():
-			// Context cancelled
-		}
-
-		// Perform graceful shutdown
-		if shutdownErr := fxApp.Stop(ctx); shutdownErr != nil {
-			return fmt.Errorf("error during shutdown: %w", shutdownErr)
-		}
-
-		return nil
-	},
+	Short: "Crawl a website for content",
+	Long: `This command crawls a website for content and stores it in the configured storage.
+Specify the source name as an argument.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runCrawl,
 }
 
-// Command returns the crawl command.
+// runCrawl executes the crawl command
+func runCrawl(cmd *cobra.Command, args []string) error {
+	// Get logger from context
+	loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+	log, ok := loggerValue.(logger.Interface)
+	if !ok {
+		return errors.New("logger not found in context or invalid type")
+	}
+
+	// Get config from context
+	configValue := cmd.Context().Value(cmdcommon.ConfigKey)
+	cfg, ok := configValue.(config.Interface)
+	if !ok {
+		return errors.New("config not found in context or invalid type")
+	}
+
+	// Create source manager
+	sourceManager, err := sources.LoadSources(cfg)
+	if err != nil {
+		if errors.Is(err, loader.ErrNoSources) {
+			log.Info("No sources found in configuration. Please add sources to your config file.")
+			log.Info("You can use the 'sources list' command to view configured sources.")
+			return nil
+		}
+		return fmt.Errorf("failed to load sources: %w", err)
+	}
+
+	var jobService common.JobService
+
+	// Create Fx app with the module
+	fxApp := fx.New(
+		Module,
+		fx.Provide(
+			func() logger.Interface { return log },
+			func() sources.Interface { return sourceManager },
+			fx.Annotate(
+				func() string { return args[0] },
+				fx.ResultTags(`name:"sourceName"`),
+			),
+		),
+		fx.WithLogger(func() fxevent.Logger {
+			return logger.NewFxLogger(log)
+		}),
+		fx.Invoke(func(js common.JobService) {
+			jobService = js
+		}),
+	)
+
+	// Start the application
+	log.Info("Starting application")
+	startErr := fxApp.Start(cmd.Context())
+	if startErr != nil {
+		log.Error("Failed to start application", "error", startErr)
+		return fmt.Errorf("failed to start application: %w", startErr)
+	}
+
+	// Start the job service
+	if startJobErr := jobService.Start(cmd.Context()); startJobErr != nil {
+		log.Error("Failed to start job service", "error", startJobErr)
+		return fmt.Errorf("failed to start job service: %w", startJobErr)
+	}
+
+	// Wait for interrupt signal
+	log.Info("Waiting for interrupt signal")
+	<-cmd.Context().Done()
+
+	// Stop the job service
+	if stopJobErr := jobService.Stop(cmd.Context()); stopJobErr != nil {
+		log.Error("Failed to stop job service", "error", stopJobErr)
+		return fmt.Errorf("failed to stop job service: %w", stopJobErr)
+	}
+
+	// Stop the application
+	log.Info("Stopping application")
+	stopErr := fxApp.Stop(cmd.Context())
+	if stopErr != nil {
+		log.Error("Failed to stop application", "error", stopErr)
+		return fmt.Errorf("failed to stop application: %w", stopErr)
+	}
+
+	log.Info("Application stopped successfully")
+	return nil
+}
+
+// Command returns the crawl command for use in the root command.
 func Command() *cobra.Command {
 	return Cmd
+}
+
+// SetupCollector creates and configures a new collector instance.
+func SetupCollector(
+	ctx context.Context,
+	logger logger.Interface,
+	indexManager interfaces.IndexManager,
+	sources sources.Interface,
+	eventBus *events.EventBus,
+	articleProcessor common.Processor,
+	contentProcessor common.Processor,
+	cfg *crawlerconfig.Config,
+) (crawler.Interface, error) {
+	// Create collector with rate limiting
+	c := colly.NewCollector(
+		colly.AllowURLRevisit(),
+		colly.Async(true),
+	)
+
+	err := c.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Parallelism: defaultParallelism,
+		RandomDelay: defaultRandomDelay,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Create crawler instance
+	crawler := crawler.NewCrawler(
+		logger,
+		eventBus,
+		indexManager,
+		sources,
+		articleProcessor,
+		contentProcessor,
+		cfg,
+	)
+
+	// Set up event handling
+	eventHandler := events.NewDefaultHandler(logger)
+	eventBus.Subscribe(eventHandler)
+
+	return crawler, nil
 }

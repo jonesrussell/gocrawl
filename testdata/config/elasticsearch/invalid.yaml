@@ -1,0 +1,18 @@
+elasticsearch:
+  addresses: []
+  api_key: invalid_key
+  index_name: ""
+  tls:
+    enabled: true
+    skip_verify: false
+    cert_file: ""
+    key_file: ""
+    ca_file: ""
+  retry:
+    enabled: true
+    initial_wait: -1s
+    max_wait: -1s
+    max_retries: -1
+  bulk:
+    size: -1
+    flush_interval: -1s 

@@ -1,102 +1,139 @@
+// Package article provides functionality for processing and managing article content
+// from web pages. It includes services for article extraction, processing, and storage,
+// with support for configurable selectors and multiple content sources.
 package article
 
 import (
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/jonesrussell/gocrawl/internal/sources"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
-// ProcessorParams contains the dependencies for creating a Processor
-type ProcessorParams struct {
-	fx.In
+const (
+	// ArticleChannelBufferSize is the size of the buffer for the article channel.
+	ArticleChannelBufferSize = 100
+)
 
-	Logger      logger.Interface
-	Storage     storage.Interface
-	IndexName   string `name:"indexName"`
-	ArticleChan chan *models.Article
-	Service     Interface
+// Manager handles article processing and management.
+type Manager struct {
+	logger  logger.Interface
+	config  config.Interface
+	sources sources.Interface
+	storage storagetypes.Interface
 }
 
-// ServiceParams contains the dependencies for creating a service
-type ServiceParams struct {
-	fx.In
-
-	Logger logger.Interface
-	Config config.Interface
-	Source string `name:"sourceName"`
-}
-
-// Module provides article-related dependencies
-var Module = fx.Module("article",
+// Module provides article-related dependencies.
+var Module = fx.Options(
 	fx.Provide(
-		NewServiceWithConfig,
+		NewArticleManager,
+		NewArticleService,
 		fx.Annotate(
-			NewProcessor,
-			fx.As(new(models.ContentProcessor)),
-			fx.ResultTags(`group:"processors"`),
+			func(
+				logger logger.Interface,
+				config config.Interface,
+				storage storagetypes.Interface,
+				jobService common.JobService,
+			) (*ArticleProcessor, error) {
+				selectors := types.ArticleSelectors{
+					Title:         "h1",
+					Description:   "meta[name=description]",
+					Author:        ".author",
+					PublishedTime: "time[datetime]",
+					Body:          "article",
+				}
+
+				service := NewService(
+					logger,
+					selectors,
+					storage,
+					"articles",
+				)
+
+				return &ArticleProcessor{
+					Logger:         logger,
+					ArticleService: service,
+					Storage:        storage,
+					IndexName:      "articles",
+					ArticleChan:    make(chan *models.Article, ArticleChannelBufferSize),
+					JobService:     jobService,
+					metrics:        &common.Metrics{},
+				}, nil
+			},
+			fx.ResultTags(`name:"articleProcessor"`),
+			fx.As(new(common.Processor)),
 		),
 	),
 )
 
-// NewServiceWithConfig creates a new article service with configuration
-func NewServiceWithConfig(p ServiceParams) Interface {
-	// Get the source configuration
-	var selectors config.ArticleSelectors
-	for _, source := range p.Config.GetSources() {
-		if source.Name == p.Source {
-			selectors = source.Selectors.Article
-			break
-		}
+// NewArticleManager creates a new article manager.
+func NewArticleManager(
+	logger logger.Interface,
+	config config.Interface,
+	sources sources.Interface,
+	storage storagetypes.Interface,
+) *Manager {
+	return &Manager{
+		logger:  logger,
+		config:  config,
+		sources: sources,
+		storage: storage,
 	}
-
-	if isEmptySelectors(selectors) {
-		p.Logger.Debug("Using default article selectors")
-		selectors = config.DefaultArticleSelectors()
-	} else {
-		p.Logger.Debug("Using article selectors",
-			"source", p.Source,
-			"selectors", selectors)
-	}
-
-	return NewService(p.Logger, selectors)
 }
 
-// isEmptySelectors checks if the article selectors are empty
-func isEmptySelectors(s config.ArticleSelectors) bool {
-	return s.Container == "" &&
-		s.Title == "" &&
-		s.Body == "" &&
-		s.Intro == "" &&
-		s.Byline == "" &&
-		s.PublishedTime == "" &&
-		s.TimeAgo == "" &&
-		s.JSONLD == "" &&
-		s.Section == "" &&
-		s.Keywords == "" &&
-		s.Description == "" &&
-		s.OGTitle == "" &&
-		s.OGDescription == "" &&
-		s.OGImage == "" &&
-		s.OgURL == "" &&
-		s.Canonical == "" &&
-		s.WordCount == "" &&
-		s.PublishDate == "" &&
-		s.Category == "" &&
-		s.Tags == "" &&
-		s.Author == "" &&
-		s.BylineName == "" &&
-		len(s.Exclude) == 0
+// NewArticleService creates a new article service.
+func NewArticleService(
+	logger logger.Interface,
+	config config.Interface,
+	storage storagetypes.Interface,
+) Interface {
+	srcs := config.GetSources()
+	if len(srcs) == 0 {
+		logger.Warn("No sources configured, using default selectors")
+		service := NewService(
+			logger,
+			(&types.ArticleSelectors{}).Default(),
+			storage,
+			"articles",
+		)
+		return service
+	}
+
+	// Create service with default selectors
+	service := NewService(
+		logger,
+		(&types.ArticleSelectors{}).Default(),
+		storage,
+		"articles",
+	)
+
+	// Add source-specific selectors
+	for i := range srcs {
+		service.AddSourceSelectors(srcs[i].Name, srcs[i].Selectors.Article)
+	}
+
+	return service
 }
 
-// NewProcessor creates a new article processor
-func NewProcessor(p ProcessorParams) *Processor {
-	return &Processor{
-		Logger:         p.Logger,
-		ArticleService: p.Service,
-		Storage:        p.Storage,
-		IndexName:      p.IndexName,
-		ArticleChan:    p.ArticleChan,
-	}
+// NewProcessor creates a new article processor.
+func NewProcessor(
+	logger logger.Interface,
+	service Interface,
+	jobService common.JobService,
+	storage storagetypes.Interface,
+	indexName string,
+	articleChan chan *models.Article,
+) *ArticleProcessor {
+	return NewArticleProcessor(ProcessorParams{
+		Logger:      logger,
+		Service:     service,
+		JobService:  jobService,
+		Storage:     storage,
+		IndexName:   indexName,
+		ArticleChan: articleChan,
+	})
 }

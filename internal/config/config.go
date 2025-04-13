@@ -6,361 +6,378 @@ package config
 import (
 	"errors"
 	"fmt"
-	"net/http"
-	"os"
-	"time"
+	"log"
+	"path/filepath"
 
+	"github.com/joho/godotenv"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/commands"
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
+	logconfig "github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
+	"github.com/jonesrussell/gocrawl/internal/config/storage"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
-// Constants for default configuration values
-const (
-	defaultRateLimit = 2 * time.Second
-)
-
-// Error definitions for configuration-related errors
-var (
-	// ErrMissingElasticURL is returned when the Elasticsearch URL is not provided
-	ErrMissingElasticURL = errors.New("elasticsearch.addresses is required")
-)
-
-// AppConfig holds application-level configuration settings.
-// It contains basic information about the application instance.
-type AppConfig struct {
-	// Environment specifies the runtime environment (development, staging, production)
-	Environment string `yaml:"environment"`
-	// Name is the application name
-	Name string `yaml:"name"`
-	// Version is the application version
-	Version string `yaml:"version"`
-	// Debug enables debug mode for additional logging
-	Debug bool `yaml:"debug"`
-}
-
-// CrawlerConfig holds crawler-specific configuration settings.
-// It defines how the crawler should behave when collecting content.
-type CrawlerConfig struct {
-	// BaseURL is the starting point for the crawler
-	BaseURL string `yaml:"base_url"`
-	// MaxDepth defines how many levels deep the crawler should traverse
-	MaxDepth int `yaml:"max_depth"`
-	// RateLimit defines the delay between requests
-	RateLimit time.Duration `yaml:"rate_limit"`
-	// RandomDelay adds randomization to the delay between requests
-	RandomDelay time.Duration `yaml:"random_delay"`
-	// IndexName is the Elasticsearch index for storing crawled content
-	IndexName string `yaml:"index_name"`
-	// ContentIndexName is the Elasticsearch index for storing parsed content
-	ContentIndexName string `yaml:"content_index_name"`
-	// SourceFile is the path to the sources configuration file
-	SourceFile string `yaml:"source_file"`
-	// Parallelism defines how many concurrent crawlers to run
-	Parallelism int `yaml:"parallelism"`
-}
-
-// SetMaxDepth sets the MaxDepth in the CrawlerConfig and updates Viper.
-// This ensures both the local config and Viper stay in sync.
-//
-// Parameters:
-//   - depth: The maximum depth for crawling
-func (c *CrawlerConfig) SetMaxDepth(depth int) {
-	c.MaxDepth = depth
-	viper.Set("crawler.max_depth", depth)
-}
-
-// SetRateLimit sets the RateLimit in the CrawlerConfig and updates Viper.
-// This ensures both the local config and Viper stay in sync.
-//
-// Parameters:
-//   - rate: The time duration between requests
-func (c *CrawlerConfig) SetRateLimit(rate time.Duration) {
-	c.RateLimit = rate
-	viper.Set("crawler.rate_limit", rate.String())
-}
-
-// SetBaseURL sets the BaseURL in the CrawlerConfig and updates Viper.
-// This ensures both the local config and Viper stay in sync.
-//
-// Parameters:
-//   - url: The base URL for crawling
-func (c *CrawlerConfig) SetBaseURL(url string) {
-	c.BaseURL = url
-	viper.Set("crawler.base_url", url)
-}
-
-// SetIndexName sets the IndexName in the CrawlerConfig and updates Viper.
-// This ensures both the local config and Viper stay in sync.
-//
-// Parameters:
-//   - index: The name of the Elasticsearch index
-func (c *CrawlerConfig) SetIndexName(index string) {
-	c.IndexName = index
-	viper.Set("elasticsearch.index_name", index)
-}
-
-// ElasticsearchConfig contains Elasticsearch connection and configuration settings.
-type ElasticsearchConfig struct {
-	// Addresses is a list of Elasticsearch node addresses
-	Addresses []string `yaml:"addresses"`
-	// Username for Elasticsearch authentication
-	Username string `yaml:"username"`
-	// Password for Elasticsearch authentication
-	Password string `yaml:"password"`
-	// APIKey for Elasticsearch authentication
-	APIKey string `yaml:"api_key"`
-	// IndexName is the default index for storing data
-	IndexName string `yaml:"index_name"`
-	// Cloud configuration for Elastic Cloud
-	Cloud struct {
-		// ID is the Elastic Cloud deployment ID
-		ID string `yaml:"id"`
-		// APIKey is the Elastic Cloud API key
-		APIKey string `yaml:"api_key"`
-	} `yaml:"cloud"`
-	// TLS configuration
-	TLS struct {
-		// Enabled indicates whether to use TLS
-		Enabled bool `yaml:"enabled"`
-		// SkipVerify indicates whether to skip TLS certificate verification
-		SkipVerify bool `yaml:"skip_verify"`
-		// Certificate is the path to the client certificate
-		Certificate string `yaml:"certificate"`
-		// Key is the path to the client key
-		Key string `yaml:"key"`
-		// CA is the path to the CA certificate
-		CA string `yaml:"ca"`
-	} `yaml:"tls"`
-	// Retry configuration
-	Retry struct {
-		// Enabled indicates whether to enable retries
-		Enabled bool `yaml:"enabled"`
-		// InitialWait is the initial wait time between retries
-		InitialWait time.Duration `yaml:"initial_wait"`
-		// MaxWait is the maximum wait time between retries
-		MaxWait time.Duration `yaml:"max_wait"`
-		// MaxRetries is the maximum number of retries
-		MaxRetries int `yaml:"max_retries"`
-	} `yaml:"retry"`
-}
-
-// LogConfig holds logging-related configuration settings.
-// It defines how the application should handle logging.
-type LogConfig struct {
-	// Level defines the minimum level of logs to output
-	Level string `yaml:"level"`
-	// Debug enables additional debug logging
-	Debug bool `yaml:"debug"`
-}
-
-// Source represents a news source configuration.
-// It defines how to crawl and process content from a specific source.
-type Source struct {
-	// Name is the unique identifier for the source
-	Name string `yaml:"name"`
-	// URL is the starting point for crawling this source
-	URL string `yaml:"url"`
-	// ArticleIndex is the Elasticsearch index for storing articles
-	ArticleIndex string `yaml:"article_index"`
-	// Index is the Elasticsearch index for storing non-article content
-	Index string `yaml:"index"`
-	// RateLimit defines the delay between requests for this source
-	RateLimit time.Duration `yaml:"rate_limit"`
-	// MaxDepth defines how deep to crawl this source
-	MaxDepth int `yaml:"max_depth"`
-	// Time defines which time-related fields to extract
-	Time []string `yaml:"time"`
-	// Selectors defines how to extract content from pages
-	Selectors SourceSelectors `yaml:"selectors"`
-}
-
-// SourceSelectors defines the selectors for a source.
-// It contains the rules for extracting content from web pages.
-type SourceSelectors struct {
-	// Article contains selectors for article-specific content
-	Article ArticleSelectors `yaml:"article"`
-}
-
-// ServerConfig holds server-specific configuration settings.
-type ServerConfig struct {
-	// Address is the address to listen on (e.g., ":8080")
-	Address string `yaml:"address"`
-	// ReadTimeout is the maximum duration for reading the entire request
-	ReadTimeout time.Duration `yaml:"read_timeout"`
-	// WriteTimeout is the maximum duration before timing out writes of the response
-	WriteTimeout time.Duration `yaml:"write_timeout"`
-	// IdleTimeout is the maximum amount of time to wait for the next request
-	IdleTimeout time.Duration `yaml:"idle_timeout"`
-	// Security contains security-related settings
-	Security struct {
-		// Enabled indicates whether security features are enabled
-		Enabled bool `yaml:"enabled"`
-		// APIKey is the API key for authentication
-		APIKey string `yaml:"api_key"`
-		// RateLimit is the maximum number of requests per minute
-		RateLimit int `yaml:"rate_limit"`
-		// CORS contains CORS configuration
-		CORS struct {
-			// Enabled indicates whether CORS is enabled
-			Enabled bool `yaml:"enabled"`
-			// AllowedOrigins is a list of allowed origins
-			AllowedOrigins []string `yaml:"allowed_origins"`
-			// AllowedMethods is a list of allowed HTTP methods
-			AllowedMethods []string `yaml:"allowed_methods"`
-			// AllowedHeaders is a list of allowed headers
-			AllowedHeaders []string `yaml:"allowed_headers"`
-			// MaxAge is the maximum age of preflight requests
-			MaxAge int `yaml:"max_age"`
-		} `yaml:"cors"`
-		// TLS contains TLS configuration
-		TLS struct {
-			// Enabled indicates whether TLS is enabled
-			Enabled bool `yaml:"enabled"`
-			// Certificate is the path to the certificate file
-			Certificate string `yaml:"certificate"`
-			// Key is the path to the private key file
-			Key string `yaml:"key"`
-		} `yaml:"tls"`
-	} `yaml:"security"`
-}
-
-// Config represents the complete application configuration.
-// It combines all configuration components into a single structure.
+// Config represents the application configuration.
 type Config struct {
-	// App contains application-specific settings
-	App AppConfig `yaml:"app"`
-	// Log contains logging configuration
-	Log LogConfig `yaml:"log"`
-	// Elasticsearch contains Elasticsearch connection settings
-	Elasticsearch ElasticsearchConfig `yaml:"elasticsearch"`
-	// Server contains HTTP server settings
-	Server ServerConfig `yaml:"server"`
-	// Crawler contains crawler-specific settings
-	Crawler CrawlerConfig `yaml:"crawler"`
-	// Sources contains the list of news sources to crawl
-	Sources []Source `yaml:"sources"`
-	// Command is the command being run (e.g., "httpd", "job")
-	Command string `yaml:"-"`
+	// Environment is the application environment (development, staging, production)
+	Environment string `yaml:"environment"`
+	// Logger holds logging-specific configuration
+	Logger *logconfig.Config `yaml:"logger"`
+	// Server holds server-specific configuration
+	Server *server.Config `yaml:"server"`
+	// Priority holds priority-specific configuration
+	Priority *priority.Config `yaml:"priority"`
+	// Storage holds storage-specific configuration
+	Storage *storage.Config `yaml:"storage"`
+	// Crawler holds crawler-specific configuration
+	Crawler *crawler.Config `yaml:"crawler"`
+	// App holds application-specific configuration
+	App *app.Config `yaml:"app"`
+	// Elasticsearch holds Elasticsearch configuration
+	Elasticsearch *elasticsearch.Config `yaml:"elasticsearch"`
+	// Sources holds the list of sources to crawl
+	Sources []types.Source `yaml:"sources"`
+	// Command is the current command being executed
+	Command string `yaml:"command"`
+	viper   *viper.Viper
+	logger  logger.Interface
 }
 
-// GetCrawlerConfig implements Interface
-func (c *Config) GetCrawlerConfig() *CrawlerConfig {
-	return &c.Crawler
+// NewConfig creates a new config instance.
+func NewConfig(logger logger.Interface) *Config {
+	return &Config{
+		viper:  viper.New(),
+		logger: logger,
+	}
 }
 
-// GetElasticsearchConfig implements Interface
-func (c *Config) GetElasticsearchConfig() *ElasticsearchConfig {
-	return &c.Elasticsearch
+// validateBasicConfig validates the basic configuration that's common to all commands
+func (c *Config) validateBasicConfig() error {
+	if c.Environment == "" {
+		return errors.New("environment is required")
+	}
+
+	// Always validate logger as it's used by all commands
+	if err := c.Logger.Validate(); err != nil {
+		return fmt.Errorf("logger: %w", err)
+	}
+
+	return nil
 }
 
-// GetLogConfig implements Interface
-func (c *Config) GetLogConfig() *LogConfig {
-	return &c.Log
+// validateCrawlConfig validates the configuration for the crawl command
+func (c *Config) validateCrawlConfig() error {
+	if err := c.Elasticsearch.Validate(); err != nil {
+		return fmt.Errorf("elasticsearch: %w", err)
+	}
+	if c.Crawler == nil {
+		return errors.New("crawler configuration is required")
+	}
+	if err := c.Crawler.Validate(); err != nil {
+		return fmt.Errorf("crawler: %w", err)
+	}
+	if len(c.Sources) == 0 {
+		return errors.New("at least one source is required")
+	}
+	for i := range c.Sources {
+		if err := c.Sources[i].Validate(); err != nil {
+			return fmt.Errorf("source[%d]: %w", i, err)
+		}
+	}
+	return nil
 }
 
-// GetAppConfig implements Interface
-func (c *Config) GetAppConfig() *AppConfig {
-	return &c.App
+// validateHTTPDConfig validates the configuration for the httpd command
+func (c *Config) validateHTTPDConfig() error {
+	if err := c.Server.Validate(); err != nil {
+		return fmt.Errorf("server: %w", err)
+	}
+	if err := c.Storage.Validate(); err != nil {
+		return fmt.Errorf("storage: %w", err)
+	}
+	return nil
 }
 
-// GetSources implements Interface
-func (c *Config) GetSources() []Source {
+// validateSearchConfig validates the configuration for the search command
+func (c *Config) validateSearchConfig() error {
+	if err := c.Elasticsearch.Validate(); err != nil {
+		return fmt.Errorf("elasticsearch: %w", err)
+	}
+	if err := c.Storage.Validate(); err != nil {
+		return fmt.Errorf("storage: %w", err)
+	}
+	return nil
+}
+
+// Validate validates the configuration based on the current command.
+func (c *Config) Validate() error {
+	if err := c.validateBasicConfig(); err != nil {
+		return err
+	}
+
+	switch c.Command {
+	case commands.IndicesList, commands.IndicesDelete, commands.IndicesCreate:
+		if err := c.Elasticsearch.Validate(); err != nil {
+			return fmt.Errorf("elasticsearch: %w", err)
+		}
+
+	case commands.Crawl:
+		if err := c.validateCrawlConfig(); err != nil {
+			return err
+		}
+
+	case commands.HTTPD:
+		if err := c.validateHTTPDConfig(); err != nil {
+			return err
+		}
+
+	case commands.Search:
+		if err := c.validateSearchConfig(); err != nil {
+			return err
+		}
+
+	case commands.Sources:
+		if err := c.Storage.Validate(); err != nil {
+			return fmt.Errorf("storage: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// LoadConfig loads the configuration from the given path.
+func LoadConfig() (*Config, error) {
+	// Use the global Viper instance
+	v := viper.GetViper()
+
+	// Set up Viper
+	v.SetConfigType("yaml")
+	v.SetConfigName("config")
+	v.AddConfigPath(".")
+	v.AddConfigPath("$HOME/.gocrawl")
+	v.AddConfigPath("/etc/gocrawl")
+
+	// Also try with .yaml extension
+	v.SetConfigName("config.yaml")
+	v.AddConfigPath(".")
+
+	// Set defaults
+	setDefaults(v)
+
+	// Load environment
+	loadEnvironment()
+
+	// Bind environment variables
+	if err := bindEnvVars(v); err != nil {
+		return nil, err
+	}
+
+	// Read the config file if it exists
+	if err := v.ReadInConfig(); err != nil {
+		var configFileNotFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFound) {
+			return nil, fmt.Errorf("failed to read config file: %w", err)
+		}
+		// If config file is not found, create a default config
+		v.Set("environment", "development")
+		v.Set("logger.level", "debug")
+		v.Set("logger.encoding", "console")
+		v.Set("logger.format", "text")
+		v.Set("logger.output", "stdout")
+		v.Set("crawler.source_file", "sources.yml")
+	}
+
+	// Create a temporary logger for config loading
+	tempLogger, err := logger.New(&logger.Config{
+		Level:       logger.InfoLevel,
+		Development: true,
+		Encoding:    "console",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary logger: %w", err)
+	}
+
+	// Unmarshal config
+	var cfg Config
+	if unmarshalErr := v.Unmarshal(&cfg, func(config *mapstructure.DecoderConfig) {
+		config.TagName = "yaml"
+		config.DecodeHook = mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+		)
+	}); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
+	}
+
+	// Load sources from sources.yml or sources.yaml if they exist
+	sourcesViper := viper.New()
+	sourcesViper.SetConfigType("yaml")
+	sourcesViper.SetConfigName("sources")
+	sourcesViper.AddConfigPath(".")
+
+	if configErr := sourcesViper.ReadInConfig(); configErr != nil {
+		return nil, fmt.Errorf("failed to read sources config: %w", configErr)
+	} else {
+		var sources []types.Source
+		if unmarshalErr := sourcesViper.UnmarshalKey("sources", &sources); unmarshalErr != nil {
+			return nil, fmt.Errorf("failed to unmarshal sources config: %w", unmarshalErr)
+		}
+		cfg.Sources = sources
+	}
+
+	// Set the logger
+	cfg.logger = tempLogger
+
+	// Validate the configuration
+	if validateErr := cfg.Validate(); validateErr != nil {
+		return nil, fmt.Errorf("invalid config: %w", validateErr)
+	}
+
+	return &cfg, nil
+}
+
+// setDefaults sets default configuration values
+func setDefaults(v *viper.Viper) {
+	v.SetDefault("environment", "development")
+	v.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
+	v.SetDefault("elasticsearch.tls.insecure_skip_verify", true)
+}
+
+// loadEnvironment loads environment variables from .env file
+func loadEnvironment() {
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: Failed to load .env file: %v", err)
+	}
+}
+
+// bindEnvVars binds environment variables to configuration keys
+func bindEnvVars(v *viper.Viper) error {
+	envVars := map[string]string{
+		"elasticsearch.tls.insecure_skip_verify": "ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY",
+		"elasticsearch.tls.cert_file":            "ELASTICSEARCH_TLS_CERT_FILE",
+		"elasticsearch.tls.key_file":             "ELASTICSEARCH_TLS_KEY_FILE",
+		"elasticsearch.tls.ca_file":              "ELASTICSEARCH_TLS_CA_FILE",
+		"elasticsearch.addresses":                "ELASTICSEARCH_HOSTS",
+		"elasticsearch.api_key":                  "ELASTICSEARCH_API_KEY",
+		"elasticsearch.username":                 "ELASTICSEARCH_USERNAME",
+		"elasticsearch.password":                 "ELASTICSEARCH_PASSWORD",
+	}
+
+	for configKey, envVar := range envVars {
+		if err := v.BindEnv(configKey, envVar); err != nil {
+			return fmt.Errorf("failed to bind environment variable %s: %w", envVar, err)
+		}
+	}
+
+	return nil
+}
+
+// GetAppConfig returns the application configuration.
+func (c *Config) GetAppConfig() *app.Config {
+	return c.App
+}
+
+// GetLogConfig returns the logging configuration.
+func (c *Config) GetLogConfig() *logconfig.Config {
+	return c.Logger
+}
+
+// GetServerConfig returns the server configuration.
+func (c *Config) GetServerConfig() *server.Config {
+	return c.Server
+}
+
+// GetSources returns the list of sources.
+func (c *Config) GetSources() []types.Source {
 	return c.Sources
 }
 
-// GetServerConfig implements Interface
-func (c *Config) GetServerConfig() *ServerConfig {
-	return &c.Server
+// GetCrawlerConfig returns the crawler configuration.
+func (c *Config) GetCrawlerConfig() *crawler.Config {
+	return c.Crawler
 }
 
-// GetCommand implements Interface
+// GetPriorityConfig returns the priority configuration.
+func (c *Config) GetPriorityConfig() *priority.Config {
+	return c.Priority
+}
+
+// GetElasticsearchConfig returns the Elasticsearch configuration.
+func (c *Config) GetElasticsearchConfig() *elasticsearch.Config {
+	return c.Elasticsearch
+}
+
+// GetCommand returns the current command.
 func (c *Config) GetCommand() string {
 	return c.Command
 }
 
-// Ensure Config implements Interface
-var _ Interface = (*Config)(nil)
-
-// parseRateLimit parses the rate limit duration from a string.
-// It converts a string duration (e.g., "1s", "500ms") into a time.Duration.
-// If the rate limit string is empty, it returns the default rate limit.
-//
-// Parameters:
-//   - rateLimitStr: The rate limit as a string
-//
-// Returns:
-//   - time.Duration: The parsed duration
-//   - error: Any error that occurred during parsing
-func parseRateLimit(rateLimitStr string) (time.Duration, error) {
-	if rateLimitStr == "" {
-		return defaultRateLimit, nil
-	}
-	return time.ParseDuration(rateLimitStr)
+// GetStorageConfig returns the storage configuration.
+func (c *Config) GetStorageConfig() *storage.Config {
+	return c.Storage
 }
 
-// NewHTTPTransport creates a new HTTP transport.
-// It returns the default HTTP transport configuration.
-//
-// Returns:
-//   - http.RoundTripper: The configured HTTP transport
-func NewHTTPTransport() http.RoundTripper {
-	return http.DefaultTransport
+// GetConfigFile returns the path to the configuration file.
+func (c *Config) GetConfigFile() string {
+	return viper.ConfigFileUsed()
 }
 
-// ParseRateLimit parses a rate limit string and returns a time.Duration.
-// If the input is invalid, it returns a default value of 1 second and an error.
-//
-// Parameters:
-//   - rateLimit: The rate limit as a string
-//
-// Returns:
-//   - time.Duration: The parsed duration or default value
-//   - error: Any error that occurred during parsing
-func ParseRateLimit(rateLimit string) (time.Duration, error) {
-	if rateLimit == "" {
-		return time.Second, errors.New("rate limit cannot be empty")
+// LoadSources loads sources from the specified file.
+func (c *Config) LoadSources(logger logger.Interface) error {
+	if c.Crawler.SourceFile == "" {
+		return errors.New("source file not specified")
 	}
-	duration, err := time.ParseDuration(rateLimit)
-	if err != nil {
-		return time.Second, errors.New("error parsing duration")
+
+	logger.Info("Loading sources from file", "file", c.Crawler.SourceFile)
+
+	// Get the absolute path to the sources file
+	sourcesPath := filepath.Join(filepath.Dir(viper.ConfigFileUsed()), c.Crawler.SourceFile)
+	sourcesViper := viper.New()
+	sourcesViper.SetConfigFile(sourcesPath)
+	sourcesViper.SetConfigType("yaml")
+
+	if err := sourcesViper.ReadInConfig(); err != nil {
+		return fmt.Errorf("failed to read sources file: %w", err)
 	}
-	return duration, nil
+
+	var sources []types.Source
+	if err := sourcesViper.UnmarshalKey("sources", &sources); err != nil {
+		return fmt.Errorf("failed to unmarshal sources: %w", err)
+	}
+
+	c.Sources = sources
+	return nil
 }
 
-// LoadConfig loads configuration from a YAML file.
-// It reads the file, parses it as YAML, and returns the configuration.
-//
-// Parameters:
-//   - path: The path to the YAML configuration file
-//
-// Returns:
-//   - *Config: The loaded configuration
-//   - error: Any error that occurred during loading
-func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("error reading config file: %w", err)
+// Load loads the configuration from the given file.
+func (c *Config) Load(file string) error {
+	c.logger.Info("Loading configuration", "file", file)
+
+	// If no file is specified, try to load sources.yml directly
+	if file == "" {
+		sourcesViper := viper.New()
+		sourcesViper.SetConfigType("yaml")
+		sourcesViper.SetConfigName("sources")
+		sourcesViper.AddConfigPath(".")
+
+		if err := sourcesViper.ReadInConfig(); err != nil {
+			return fmt.Errorf("failed to read sources config: %w", err)
+		}
+
+		var sources []types.Source
+		if err := sourcesViper.UnmarshalKey("sources", &sources); err != nil {
+			return fmt.Errorf("failed to unmarshal sources: %w", err)
+		}
+
+		c.Sources = sources
 	}
 
-	var config Config
-	if unmarshalErr := yaml.Unmarshal(data, &config); unmarshalErr != nil {
-		return nil, fmt.Errorf("error unmarshaling config: %w", unmarshalErr)
-	}
-
-	return &config, nil
-}
-
-// Validate validates the source configuration.
-// It checks that all required fields are present and have valid values.
-//
-// Returns:
-//   - error: Any validation errors that occurred
-func (s *Source) Validate() error {
-	if s.RateLimit <= 0 {
-		return errors.New("rate limit must be positive")
-	}
-	if s.MaxDepth < 0 {
-		return errors.New("max depth must be non-negative")
-	}
 	return nil
 }

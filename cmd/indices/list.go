@@ -8,153 +8,116 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
-// Constants for table formatting
-const (
-	// TableWidth defines the total width of the table output for consistent formatting.
-	// This ensures that the output remains readable across different terminal sizes.
-	TableWidth = 92
-)
-
-// listParams holds the parameters required for listing indices.
-type listParams struct {
-	ctx     context.Context
-	storage common.Storage
-	logger  common.Logger
+// TableRenderer handles the display of index data in a table format
+type TableRenderer struct {
+	logger logger.Interface
 }
 
-// listCommand creates and returns the list command that displays all indices.
-// It integrates with the Cobra command framework and sets up the command
-// structure with appropriate usage information and examples.
-//
-// Returns:
-//   - *cobra.Command: A configured Cobra command ready to be added to the root command
-func listCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List all Elasticsearch indices",
-		Long: `Display a list of all indices in the Elasticsearch cluster.
-
-Example:
-  gocrawl indices list`,
-		RunE: runList,
+// NewTableRenderer creates a new TableRenderer instance
+func NewTableRenderer(logger logger.Interface) *TableRenderer {
+	return &TableRenderer{
+		logger: logger,
 	}
 }
 
-// runList executes the list command and displays all indices.
-// It:
-// - Sets up signal handling for graceful shutdown
-// - Creates channels for error handling and completion
-// - Initializes the Fx application with required modules
-// - Handles application lifecycle and error cases
-// - Displays the indices list in a formatted table
-func runList(cmd *cobra.Command, _ []string) error {
-	// Set up signal handling for graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Create channels for error handling and completion
-	errChan := make(chan error, 1)
-	doneChan := make(chan struct{})
-
-	// Initialize the Fx application with required modules
-	app := fx.New(
-		fx.NopLogger, // Suppress Fx startup/shutdown logs
-		Module,
-		fx.Invoke(func(p struct {
-			fx.In
-			Storage common.Storage
-			Logger  common.Logger
-			LC      fx.Lifecycle
-		}) {
-			p.LC.Append(fx.Hook{
-				OnStart: func(context.Context) error {
-					params := &listParams{
-						ctx:     cmd.Context(),
-						storage: p.Storage,
-						logger:  p.Logger,
-					}
-					if err := executeList(params); err != nil {
-						p.Logger.Error("Error executing list", "error", err)
-						errChan <- err
-						return err
-					}
-					close(doneChan)
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					return nil
-				},
-			})
-		}),
+// handleIndexError handles common error cases for index operations
+func (r *TableRenderer) handleIndexError(operation, index string, err error, action, details string) error {
+	r.logger.Error(fmt.Sprintf("Failed to %s for index", operation),
+		"index", index,
+		"error", err,
+		"action", action,
+		"details", details,
 	)
-
-	// Start the application and handle any startup errors
-	if err := app.Start(cmd.Context()); err != nil {
-		return fmt.Errorf("error starting application: %w", err)
-	}
-
-	// Wait for either:
-	// - A signal interrupt (SIGINT/SIGTERM)
-	// - Context cancellation
-	// - List completion
-	// - List error
-	var listErr error
-	select {
-	case sig := <-sigChan:
-		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-	case <-cmd.Context().Done():
-		common.PrintInfof("\nContext cancelled, initiating shutdown...")
-	case listErr = <-errChan:
-		// Error already printed in executeList
-	case <-doneChan:
-		// Success message already printed in executeList
-	}
-
-	// Create a context with timeout for graceful shutdown
-	stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
-	defer stopCancel()
-
-	// Stop the application and handle any shutdown errors
-	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-		common.PrintErrorf("Error stopping application: %v", err)
-		if listErr == nil {
-			listErr = err
-		}
-	}
-
-	return listErr
+	return fmt.Errorf("failed to %s for index %s: %w. %s", operation, index, err, action)
 }
 
-// executeList retrieves and displays the list of indices.
-// This function handles the core business logic of the list command:
-// - Retrieving indices from Elasticsearch
-// - Filtering internal indices
-// - Formatting and displaying results
-//
-// Parameters:
-//   - p: listParams containing all required dependencies
-//
-// Returns:
-//   - error: Any error encountered during execution
-func executeList(p *listParams) error {
-	// Retrieve all indices from Elasticsearch
-	indices, err := p.storage.ListIndices(p.ctx)
+// RenderTable formats and displays the indices in a table format
+func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface, indices []string) error {
+	// Initialize table writer with stdout as output
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.SetStyle(table.StyleLight)
+
+	// Add table headers
+	t.AppendHeader(table.Row{"Index", "Health", "Status", "Docs", "Store Size", "Ingestion Status"})
+
+	// Process each index
+	for _, index := range indices {
+		// Get index health
+		health, err := storage.GetIndexHealth(ctx, index)
+		if err != nil {
+			return r.handleIndexError("get health", index, err, "Skipping index", "Failed to retrieve index health")
+		}
+
+		// Get document count
+		docCount, err := storage.GetIndexDocCount(ctx, index)
+		if err != nil {
+			return r.handleIndexError("get doc count", index, err, "Skipping index", "Failed to retrieve document count")
+		}
+
+		// Get ingestion status
+		ingestionStatus := getIngestionStatus(health)
+
+		// Add row to table
+		t.AppendRow(table.Row{
+			index,
+			health,
+			health,
+			docCount,
+			"N/A", // Store size not available in current interface
+			ingestionStatus,
+		})
+	}
+
+	// Render the table
+	t.Render()
+	return nil
+}
+
+// Lister handles listing indices
+type Lister struct {
+	config   config.Interface
+	logger   logger.Interface
+	storage  types.Interface
+	renderer *TableRenderer
+}
+
+// NewLister creates a new Lister instance
+func NewLister(
+	config config.Interface,
+	logger logger.Interface,
+	storage types.Interface,
+	renderer *TableRenderer,
+) *Lister {
+	return &Lister{
+		config:   config,
+		logger:   logger,
+		storage:  storage,
+		renderer: renderer,
+	}
+}
+
+// Start begins the list operation
+func (l *Lister) Start(ctx context.Context) error {
+	// Get all indices
+	indices, err := l.storage.ListIndices(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list indices: %w", err)
 	}
 
 	// Filter out internal indices (those starting with '.')
-	// This improves readability by showing only relevant indices
 	var filteredIndices []string
 	for _, index := range indices {
 		if !strings.HasPrefix(index, ".") {
@@ -162,93 +125,134 @@ func executeList(p *listParams) error {
 		}
 	}
 
-	// Handle the case where no indices are found
-	if len(filteredIndices) == 0 {
-		p.logger.Info("No indices found")
-		return nil
-	}
-
-	return printIndices(p.ctx, filteredIndices, p.storage, p.logger)
+	// Render the table
+	return l.renderer.RenderTable(ctx, l.storage, filteredIndices)
 }
 
-// printIndices formats and displays the indices in a table format.
-// This function handles the presentation layer of the list command:
-// - Creates and configures the output table
-// - Retrieves additional metadata for each index
-// - Handles errors for individual index operations
-// - Formats and displays the final output
-//
-// Parameters:
-//   - ctx: Context for managing timeouts and cancellation
-//   - indices: List of index names to display
-//   - storage: Interface for Elasticsearch operations
-//   - logger: Logger for error reporting
-//
-// Returns:
-//   - error: Any error encountered during table rendering
-func printIndices(ctx context.Context, indices []string, storage common.Storage, logger common.Logger) error {
-	// Initialize table writer with stdout as output
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Index Name", "Health", "Docs Count", "Ingestion Name", "Ingestion Status"})
+// NewListCommand creates a new list command
+func NewListCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all indices",
+		Long:  `List all indices in the Elasticsearch cluster.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get logger from context
+			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context or invalid type")
+			}
 
-	// Process each index and gather its metadata
+			// Get config path from flags
+			configPath, _ := cmd.Flags().GetString("config")
+
+			// Create Fx application
+			app := fx.New(
+				// Include all required modules
+				Module,
+
+				// Provide config path string
+				fx.Provide(func() string { return configPath }),
+
+				// Provide logger
+				fx.Provide(func() logger.Interface { return log }),
+
+				// Use custom Fx logger
+				fx.WithLogger(func() fxevent.Logger {
+					return logger.NewFxLogger(log)
+				}),
+
+				// Invoke list command
+				fx.Invoke(func(l *Lister) error {
+					if err := l.Start(cmd.Context()); err != nil {
+						return err
+					}
+					return nil
+				}),
+			)
+
+			// Start application
+			if err := app.Start(context.Background()); err != nil {
+				return err
+			}
+
+			// Stop application
+			if err := app.Stop(context.Background()); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	// Add flags
+	cmd.Flags().StringP("config", "c", "config.yaml", "Path to config file")
+
+	return cmd
+}
+
+// getIngestionStatus determines the ingestion status based on health status
+func getIngestionStatus(healthStatus string) string {
+	switch strings.ToLower(healthStatus) {
+	case "green":
+		return "Active"
+	case "yellow":
+		return "Degraded"
+	case "red":
+		return "Stopped"
+	default:
+		return "Unknown"
+	}
+}
+
+// List retrieves and returns a list of all indices.
+func (l *Lister) List(ctx context.Context) ([]*IndexInfo, error) {
+	// Get all indices
+	indices, err := l.storage.ListIndices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list indices: %w", err)
+	}
+
+	// Filter out internal indices (those starting with '.')
+	var filteredIndices []string
 	for _, index := range indices {
-		// Get health status with error handling
-		healthStatus, healthErr := storage.GetIndexHealth(ctx, index)
+		if !strings.HasPrefix(index, ".") {
+			filteredIndices = append(filteredIndices, index)
+		}
+	}
+
+	// Get health status and document count for each index
+	indexInfo := make([]*IndexInfo, len(filteredIndices))
+	for i, index := range filteredIndices {
+		// Get health status
+		health, healthErr := l.storage.GetIndexHealth(ctx, index)
 		if healthErr != nil {
-			logger.Error("Error getting health for index", "index", index, "error", healthErr)
+			l.logger.Error("Failed to get index health",
+				"index", index,
+				"error", healthErr,
+			)
 			continue
 		}
 
-		// Get document count with fallback to 0 on error
-		docCount, docErr := storage.GetIndexDocCount(ctx, index)
-		if docErr != nil {
-			docCount = 0
+		// Get document count
+		count, countErr := l.storage.GetIndexDocCount(ctx, index)
+		if countErr != nil {
+			return nil, fmt.Errorf("failed to get document count for index %s: %w", index, countErr)
 		}
 
-		// Map health status to ingestion status
-		ingestionStatus := getIngestionStatus(healthStatus)
-
-		// Add row to table
-		t.AppendRow([]any{
-			index,
-			healthStatus,
-			docCount,
-			"", // Placeholder for future ingestion name feature
-			ingestionStatus,
-		})
+		indexInfo[i] = &IndexInfo{
+			Name:   index,
+			Health: health,
+			Count:  count,
+		}
 	}
 
-	// Handle case where no indices could be processed
-	if t.Length() == 0 {
-		logger.Info("No indices found")
-		return nil
-	}
-
-	// Render the final table
-	t.Render()
-	return nil
+	return indexInfo, nil
 }
 
-// getIngestionStatus maps Elasticsearch health status to human-readable ingestion status.
-// This function provides a user-friendly interpretation of index health:
-// - "red" indicates a serious issue (Disconnected)
-// - "yellow" indicates a potential issue (Warning)
-// - Any other status is considered healthy (Connected)
-//
-// Parameters:
-//   - healthStatus: The Elasticsearch health status string
-//
-// Returns:
-//   - string: A human-readable ingestion status
-func getIngestionStatus(healthStatus string) string {
-	switch healthStatus {
-	case "red":
-		return "Disconnected"
-	case "yellow":
-		return "Warning"
-	default:
-		return "Connected"
-	}
+// IndexInfo represents information about an index
+type IndexInfo struct {
+	Name   string
+	Health string
+	Count  int64
 }

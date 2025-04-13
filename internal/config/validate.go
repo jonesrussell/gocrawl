@@ -4,90 +4,240 @@ package config
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
-	"github.com/google/uuid"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
-// ValidateConfig orchestrates the validation of the entire configuration.
-func ValidateConfig(cfg Interface) error {
-	// Check app environment first
-	appConfig := cfg.GetAppConfig()
-	if appConfig.Environment == "production" {
-		esConfig := cfg.GetElasticsearchConfig()
-		if esConfig.APIKey == "" {
-			return errors.New("API key is required in production")
+const (
+	envDevelopment = "development"
+	envStaging     = "staging"
+	envProduction  = "production"
+	envTest        = "test"
+)
+
+// ValidateConfig validates the configuration
+func ValidateConfig(cfg *Config) error {
+	if cfg == nil {
+		return errors.New("configuration is required")
+	}
+
+	// Validate environment first
+	if cfg.App.Environment == "" {
+		return &ValidationError{
+			Field:  "app.environment",
+			Value:  cfg.App.Environment,
+			Reason: "environment cannot be empty",
 		}
 	}
 
-	// Check server security based on command
-	serverConfig := cfg.GetServerConfig()
-	if serverConfig.Security.Enabled && cfg.GetCommand() == "httpd" {
-		if serverConfig.Security.APIKey == "" {
-			return errors.New("server API key is required when security is enabled for httpd command")
+	// Validate environment value
+	validEnvs := []string{envDevelopment, envStaging, envProduction, envTest}
+	isValidEnv := false
+	for _, env := range validEnvs {
+		if cfg.App.Environment == env {
+			isValidEnv = true
+			break
 		}
-		if _, err := uuid.Parse(serverConfig.Security.APIKey); err != nil {
-			return fmt.Errorf("invalid server API key format: %w", err)
+	}
+	if !isValidEnv {
+		return &ValidationError{
+			Field:  "app.environment",
+			Value:  cfg.App.Environment,
+			Reason: "invalid environment",
 		}
 	}
 
-	// Validate individual components
-	if err := validateAppConfig(appConfig); err != nil {
+	// Validate log config
+	if err := validateLogConfig(cfg.Logger); err != nil {
 		return err
 	}
-	if err := validateElasticsearchConfig(cfg.GetElasticsearchConfig()); err != nil {
+
+	// Validate crawler config
+	if err := validateCrawlerConfig(cfg.Crawler); err != nil {
 		return err
 	}
-	if err := validateLogConfig(cfg.GetLogConfig()); err != nil {
+
+	// Validate Elasticsearch config
+	if err := validateElasticsearchConfig(cfg.Elasticsearch); err != nil {
 		return err
 	}
-	if err := validateCrawlerConfig(cfg.GetCrawlerConfig()); err != nil {
+
+	// Validate app config last
+	if err := validateAppConfig(cfg.App); err != nil {
+		return &ValidationError{
+			Field:  "app",
+			Value:  cfg.App,
+			Reason: err.Error(),
+		}
+	}
+
+	// Validate sources last
+	if err := validateSources(cfg.Sources); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// ValidateEnvironment validates the environment setting.
+func ValidateEnvironment(env string) error {
+	switch env {
+	case "development", "staging", "production":
+		return nil
+	default:
+		return fmt.Errorf("invalid environment: %s", env)
+	}
+}
+
+// ValidateLogLevel validates the log level setting.
+func ValidateLogLevel(level string) error {
+	switch level {
+	case "debug", "info", "warn", "error":
+		return nil
+	default:
+		return fmt.Errorf("invalid log level: %s", level)
+	}
+}
+
+// ValidateRateLimit validates the rate limit setting.
+func ValidateRateLimit(limit time.Duration) error {
+	if limit < 0 {
+		return errors.New("rate limit must be non-negative")
 	}
 	return nil
 }
 
-// validateAppConfig validates the app-specific configuration.
-func validateAppConfig(cfg *AppConfig) error {
-	validEnvironments := map[string]bool{
-		"development": true,
-		"production":  true,
-		"test":        true,
-	}
-	if !validEnvironments[cfg.Environment] {
-		return fmt.Errorf("invalid app environment: %s", cfg.Environment)
+// ValidateMaxDepth validates the maximum depth setting.
+func ValidateMaxDepth(depth int) error {
+	if depth < 0 {
+		return errors.New("max depth must be non-negative")
 	}
 	return nil
 }
 
-// validateElasticsearchConfig validates the Elasticsearch configuration.
-func validateElasticsearchConfig(cfg *ElasticsearchConfig) error {
-	if len(cfg.Addresses) == 0 {
-		return errors.New("elasticsearch addresses are required")
+// ValidateParallelism validates the parallelism setting.
+func ValidateParallelism(parallelism int) error {
+	if parallelism < 1 {
+		return errors.New("parallelism must be positive")
 	}
 	return nil
 }
 
-// validateLogConfig validates the log-related configuration.
-func validateLogConfig(cfg *LogConfig) error {
-	if !isValidLogLevel(cfg.Level) {
-		return fmt.Errorf("invalid log level: %s", cfg.Level)
+// ValidateSource validates a source configuration.
+func ValidateSource(source *types.Source) error {
+	if source == nil {
+		return errors.New("source is required")
+	}
+	return source.Validate()
+}
+
+// ValidateSources validates a list of source configurations.
+func ValidateSources(sources []types.Source) error {
+	if len(sources) == 0 {
+		return errors.New("at least one source is required")
+	}
+	for i := range sources {
+		if err := sources[i].Validate(); err != nil {
+			return fmt.Errorf("source[%d]: %w", i, err)
+		}
 	}
 	return nil
 }
 
-// isValidLogLevel checks if the given log level is valid.
-func isValidLogLevel(level string) bool {
-	validLevels := map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
-	return validLevels[level]
+// validateAppConfig validates the application configuration
+func validateAppConfig(cfg *app.Config) error {
+	if cfg.Name == "" {
+		return &ValidationError{
+			Field:  "app.name",
+			Value:  cfg.Name,
+			Reason: "name cannot be empty",
+		}
+	}
+	if cfg.Version == "" {
+		return &ValidationError{
+			Field:  "app.version",
+			Value:  cfg.Version,
+			Reason: "version cannot be empty",
+		}
+	}
+	return nil
 }
 
-// validateCrawlerConfig validates the crawler-specific configuration.
-func validateCrawlerConfig(cfg *CrawlerConfig) error {
-	if cfg.MaxDepth < 1 {
-		return errors.New("crawler max depth must be greater than 0")
+// validateLogConfig validates the log configuration
+func validateLogConfig(cfg *log.Config) error {
+	if cfg == nil {
+		return &ValidationError{
+			Field:  "log",
+			Value:  nil,
+			Reason: "log configuration is required",
+		}
 	}
-	if cfg.Parallelism < 1 {
-		return errors.New("crawler parallelism must be greater than 0")
+
+	if cfg.Level == "" {
+		cfg.Level = "info" // Default to info if not set
+	}
+
+	validLevels := map[string]bool{
+		"debug": true,
+		"info":  true,
+		"warn":  true,
+		"error": true,
+	}
+
+	if !validLevels[strings.ToLower(cfg.Level)] {
+		return &ValidationError{
+			Field:  "log.level",
+			Value:  cfg.Level,
+			Reason: "invalid log level",
+		}
+	}
+	return nil
+}
+
+// validateCrawlerConfig validates the crawler configuration
+func validateCrawlerConfig(cfg *crawler.Config) error {
+	if cfg == nil {
+		return &ValidationError{
+			Field:  "crawler",
+			Value:  nil,
+			Reason: "crawler configuration is required",
+		}
+	}
+	return cfg.Validate()
+}
+
+// validateElasticsearchConfig validates the Elasticsearch configuration
+func validateElasticsearchConfig(cfg *elasticsearch.Config) error {
+	if cfg == nil {
+		return &ValidationError{
+			Field:  "elasticsearch",
+			Value:  nil,
+			Reason: "elasticsearch configuration is required",
+		}
+	}
+	return cfg.Validate()
+}
+
+// validateSources validates a list of source configurations
+func validateSources(sources []types.Source) error {
+	if len(sources) == 0 {
+		return &ValidationError{
+			Field:  "sources",
+			Value:  nil,
+			Reason: "at least one source is required",
+		}
+	}
+
+	for i := range sources {
+		if err := sources[i].Validate(); err != nil {
+			return fmt.Errorf("source[%d]: %w", i, err)
+		}
 	}
 	return nil
 }

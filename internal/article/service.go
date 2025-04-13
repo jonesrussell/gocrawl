@@ -1,45 +1,72 @@
-// Package article handles article-related operations
+// Package article provides functionality for processing and managing articles.
 package article
 
 import (
+	"context"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	"github.com/google/uuid"
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
 	DefaultBodySelector = "article, .article"
 )
 
-// Service defines the interface for article operations
-type Interface interface {
-	ExtractArticle(e *colly.HTMLElement) *models.Article
-	ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string
-	CleanAuthor(author string) string
-	ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time
-}
-
-// Service implements the Service interface
+// Service implements article processing operations.
 type Service struct {
-	Logger    logger.Interface
-	Selectors config.ArticleSelectors
+	// Logger for article operations
+	Logger logger.Interface
+	// SourceSelectors maps source names to their selectors
+	SourceSelectors map[string]types.ArticleSelectors
+	// DefaultSelectors is used when no source-specific selectors are found
+	DefaultSelectors types.ArticleSelectors
+	// Storage for article persistence
+	Storage storagetypes.Interface
+	// IndexName is the name of the article index
+	IndexName string
+	// metrics holds processing metrics
+	metrics *common.Metrics
 }
 
-// Ensure Service implements Interface
-var _ Interface = (*Service)(nil)
-
-// NewService creates a new Service instance
-func NewService(logger logger.Interface, selectors config.ArticleSelectors) Interface {
+// NewService creates a new article service.
+func NewService(
+	logger logger.Interface,
+	defaultSelectors types.ArticleSelectors,
+	storage storagetypes.Interface,
+	indexName string,
+) Interface {
 	return &Service{
-		Logger:    logger,
-		Selectors: selectors,
+		Logger:           logger,
+		SourceSelectors:  make(map[string]types.ArticleSelectors),
+		DefaultSelectors: defaultSelectors,
+		Storage:          storage,
+		IndexName:        indexName,
+		metrics:          &common.Metrics{},
 	}
+}
+
+// AddSourceSelectors adds selectors for a specific source
+func (s *Service) AddSourceSelectors(sourceName string, selectors types.ArticleSelectors) {
+	s.SourceSelectors[sourceName] = selectors
+}
+
+// getSelectorsForURL returns the appropriate selectors for the given URL
+func (s *Service) getSelectorsForURL(url string) types.ArticleSelectors {
+	// Try to find matching source selectors
+	for sourceName := range s.SourceSelectors {
+		if strings.Contains(url, sourceName) {
+			return s.SourceSelectors[sourceName]
+		}
+	}
+	return s.DefaultSelectors
 }
 
 type JSONLDArticle struct {
@@ -78,12 +105,15 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) *models.Article {
 		UpdatedAt: time.Now(),
 	}
 
-	// Extract metadata
-	article.Title = s.extractTitle(e)
-	article.Description = s.extractDescription(e)
-	article.PublishedDate = s.parsePublishedTime(e)
-	article.Author = s.extractAuthor(e)
-	article.Section = s.extractSection(e)
+	// Get selectors for this URL
+	selectors := s.getSelectorsForURL(e.Request.URL.String())
+
+	// Extract metadata using the appropriate selectors
+	article.Title = s.extractTitle(e, selectors)
+	article.Description = s.extractDescription(e, selectors)
+	article.PublishedDate = s.parsePublishedTime(e, selectors)
+	article.Author = s.extractAuthor(e, selectors)
+	article.Section = s.extractSection(e, selectors)
 	article.CanonicalURL = s.extractCanonicalURL(e)
 
 	return article
@@ -91,7 +121,8 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) *models.Article {
 
 // ExtractContent extracts the main content from the HTML element
 func (s *Service) ExtractContent(e *colly.HTMLElement, article *models.Article) {
-	bodyEl := s.findArticleBody(e)
+	selectors := s.getSelectorsForURL(e.Request.URL.String())
+	bodyEl := s.findArticleBody(e, selectors)
 	if bodyEl == nil {
 		s.Logger.Debug("No article body found", "url", article.Source)
 		return
@@ -108,14 +139,14 @@ func (s *Service) ExtractArticle(e *colly.HTMLElement) *models.Article {
 	return article
 }
 
-func (s *Service) extractTitle(e *colly.HTMLElement) string {
+func (s *Service) extractTitle(e *colly.HTMLElement, selectors types.ArticleSelectors) string {
 	// Try OpenGraph title first
 	if title := e.ChildAttr(`meta[property="og:title"]`, "content"); title != "" {
 		return title
 	}
 
 	// Try article title
-	if title := e.ChildText(s.Selectors.Title); title != "" {
+	if title := e.ChildText(selectors.Title); title != "" {
 		return title
 	}
 
@@ -123,46 +154,46 @@ func (s *Service) extractTitle(e *colly.HTMLElement) string {
 	return e.ChildText("title")
 }
 
-func (s *Service) extractDescription(e *colly.HTMLElement) string {
+func (s *Service) extractDescription(e *colly.HTMLElement, selectors types.ArticleSelectors) string {
 	// Try OpenGraph description
 	if desc := e.ChildAttr(`meta[property="og:description"]`, "content"); desc != "" {
 		return desc
 	}
 
 	// Try meta description
-	return e.ChildAttr(s.Selectors.Description, "content")
+	return e.ChildAttr(selectors.Description, "content")
 }
 
-func (s *Service) extractPublishedTime(e *colly.HTMLElement) string {
-	// Try article published time
-	if time := e.ChildAttr(s.Selectors.PublishedTime, "content"); time != "" {
-		return time
+func (s *Service) extractPublishedTime(e *colly.HTMLElement, selectors types.ArticleSelectors) string {
+	// Try article published publishedTime
+	if publishedTime := e.ChildAttr(selectors.PublishedTime, "content"); publishedTime != "" {
+		return publishedTime
 	}
 
-	// Try meta published time
+	// Try meta published publishedTime
 	return e.ChildAttr(`meta[property="article:published_time"]`, "content")
 }
 
-func (s *Service) extractAuthor(e *colly.HTMLElement) string {
+func (s *Service) extractAuthor(e *colly.HTMLElement, selectors types.ArticleSelectors) string {
 	// Try article author
-	if author := e.ChildText(s.Selectors.Byline + " " + s.Selectors.Author); author != "" {
+	if author := e.ChildText(selectors.Byline + " " + selectors.Author); author != "" {
 		return author
 	}
 
 	// Try meta author
-	return e.ChildAttr(s.Selectors.Author, "content")
+	return e.ChildAttr(selectors.Author, "content")
 }
 
-func (s *Service) extractSection(e *colly.HTMLElement) string {
-	return e.ChildText(s.Selectors.Section)
+func (s *Service) extractSection(e *colly.HTMLElement, selectors types.ArticleSelectors) string {
+	return e.ChildText(selectors.Section)
 }
 
 func (s *Service) extractCanonicalURL(e *colly.HTMLElement) string {
 	return e.ChildAttr("link[rel=canonical]", "href")
 }
 
-func (s *Service) findArticleBody(e *colly.HTMLElement) *goquery.Selection {
-	bodySelector := s.Selectors.Body
+func (s *Service) findArticleBody(e *colly.HTMLElement, selectors types.ArticleSelectors) *goquery.Selection {
+	bodySelector := selectors.Body
 	if bodySelector == "" {
 		bodySelector = DefaultBodySelector
 	}
@@ -175,8 +206,8 @@ func (s *Service) cleanAndExtractText(bodyEl *goquery.Selection) string {
 	return strings.TrimSpace(bodyEl.Text())
 }
 
-func (s *Service) parsePublishedTime(e *colly.HTMLElement) time.Time {
-	timeStr := s.extractPublishedTime(e)
+func (s *Service) parsePublishedTime(e *colly.HTMLElement, selectors types.ArticleSelectors) time.Time {
+	timeStr := s.extractPublishedTime(e, selectors)
 	if timeStr == "" {
 		return time.Time{}
 	}
@@ -193,7 +224,11 @@ func (s *Service) parsePublishedTime(e *colly.HTMLElement) time.Time {
 		return t
 	}
 
-	// Return zero time if parsing fails
+	// Log parsing error
+	s.Logger.Debug("Failed to parse published time",
+		"time", timeStr,
+		"error", err)
+
 	return time.Time{}
 }
 
@@ -207,43 +242,31 @@ func (s *Service) CleanAuthor(author string) string {
 	return author
 }
 
+// ExtractTags extracts tags from the HTML element and JSON-LD data
 func (s *Service) ExtractTags(e *colly.HTMLElement, jsonLD JSONLDArticle) []string {
-	tags := make([]string, 0)
+	selectors := s.getSelectorsForURL(e.Request.URL.String())
+	var tags []string
 
-	// 1. JSON-LD keywords
+	// Extract tags from meta keywords
+	if keywords := e.ChildAttr(selectors.Keywords, "content"); keywords != "" {
+		tags = append(tags, strings.Split(keywords, ",")...)
+	}
+
+	// Extract tags from JSON-LD keywords
 	if len(jsonLD.Keywords) > 0 {
-		s.Logger.Debug("Found JSON-LD keywords", "values", jsonLD.Keywords)
 		tags = append(tags, jsonLD.Keywords...)
 	}
 
-	// 2. JSON-LD section
-	if jsonLD.Section != "" {
-		s.Logger.Debug("Found JSON-LD section", "value", jsonLD.Section)
-		tags = append(tags, jsonLD.Section)
+	// Extract tags from article tags
+	if articleTags := e.ChildText(selectors.Tags); articleTags != "" {
+		tags = append(tags, strings.Split(articleTags, ",")...)
 	}
 
-	// 3. Article section from meta tag
-	if section := e.ChildAttr(s.Selectors.Section, "content"); section != "" {
-		s.Logger.Debug("Found meta section", "value", section)
-		tags = append(tags, section)
+	// Clean and deduplicate tags
+	for i := range tags {
+		tags[i] = strings.TrimSpace(tags[i])
 	}
 
-	// 4. Keywords from meta tag
-	if keywords := e.ChildAttr(s.Selectors.Keywords, "content"); keywords != "" {
-		s.Logger.Debug("Found meta keywords", "value", keywords)
-		for _, tag := range strings.Split(keywords, "|") {
-			if tag = strings.TrimSpace(tag); tag != "" {
-				tags = append(tags, tag)
-			}
-		}
-	}
-
-	// 5. Add section from URL path
-	if strings.Contains(e.Request.URL.String(), "/opp-beat/") {
-		tags = append(tags, "OPP Beat")
-	}
-
-	// Remove duplicates from tags
 	return RemoveDuplicates(tags)
 }
 
@@ -260,17 +283,27 @@ func RemoveDuplicates(tags []string) []string {
 	return uniqueTags
 }
 
+// ParsePublishedDate parses the published date from various sources
 func (s *Service) ParsePublishedDate(e *colly.HTMLElement, jsonLD JSONLDArticle) time.Time {
-	datesToTry := []string{
-		jsonLD.DatePublished,
-		jsonLD.DateModified,
-		jsonLD.DateCreated,
-		e.ChildAttr(s.Selectors.PublishedTime, "content"),
-		e.ChildAttr(s.Selectors.TimeAgo, "datetime"),
-		e.ChildText(s.Selectors.TimeAgo),
+	selectors := s.getSelectorsForURL(e.Request.URL.String())
+	var dates []string
+
+	// Try article published time
+	if publishedTime := e.ChildAttr(selectors.PublishedTime, "content"); publishedTime != "" {
+		dates = append(dates, publishedTime)
 	}
 
-	return parseDate(datesToTry, s.Logger)
+	// Try meta published time
+	if metaTime := e.ChildAttr(`meta[property="article:published_time"]`, "content"); metaTime != "" {
+		dates = append(dates, metaTime)
+	}
+
+	// Try JSON-LD published time
+	if jsonLD.DatePublished != "" {
+		dates = append(dates, jsonLD.DatePublished)
+	}
+
+	return parseDate(dates, s.Logger)
 }
 
 func parseDate(dates []string, logger logger.Interface) time.Time {
@@ -312,4 +345,75 @@ func parseDate(dates []string, logger logger.Interface) time.Time {
 	}
 
 	return publishedDate
+}
+
+// Process processes an article.
+func (s *Service) Process(article *models.Article) error {
+	if article == nil {
+		return nil
+	}
+
+	// Store the article
+	err := s.Storage.IndexDocument(context.Background(), s.IndexName, article.ID, article)
+	if err != nil {
+		s.Logger.Error("Failed to store article",
+			"error", err,
+			"articleID", article.ID,
+			"url", article.Source)
+		s.metrics.ErrorCount++
+		return err
+	}
+
+	s.metrics.ProcessedCount++
+	s.metrics.LastProcessedTime = time.Now()
+	return nil
+}
+
+// ProcessJob processes a job and its items.
+func (s *Service) ProcessJob(ctx context.Context, job *common.Job) {
+	if job == nil {
+		return
+	}
+
+	s.Logger.Info("Processing job",
+		"jobID", job.ID,
+		"url", job.URL)
+
+	start := time.Now()
+	defer func() {
+		s.metrics.ProcessingDuration += time.Since(start)
+	}()
+
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		s.Logger.Warn("Job processing cancelled",
+			"jobID", job.ID,
+			"error", ctx.Err())
+		s.metrics.ErrorCount++
+		return
+	default:
+		// Continue processing
+	}
+}
+
+// ProcessHTML processes HTML content from a source.
+func (s *Service) ProcessHTML(e *colly.HTMLElement) error {
+	if e == nil {
+		return nil
+	}
+
+	article := s.ExtractArticle(e)
+	if article == nil {
+		s.Logger.Debug("No article extracted",
+			"url", e.Request.URL.String())
+		return nil
+	}
+
+	return s.Process(article)
+}
+
+// GetMetrics returns the current processing metrics.
+func (s *Service) GetMetrics() *common.Metrics {
+	return s.metrics
 }

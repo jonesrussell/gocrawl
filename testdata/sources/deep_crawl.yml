@@ -1,0 +1,18 @@
+sources:
+  - name: "deep_crawl_source"
+    url: "http://deep-crawl.example.com"
+    rate_limit: "1s"
+    max_depth: 5
+    article_index: "deep_crawl_articles"
+    index: "deep_crawl_content"
+    selectors:
+      article:
+        container: "#main-article"
+        title: "h1.headline"
+        body: ".article-content"
+        published_time: ".publish-date"
+        author: ".author"
+      links:
+        article: "#content a.article"
+        next: ".pagination .next"
+        related: ".related-articles a" 

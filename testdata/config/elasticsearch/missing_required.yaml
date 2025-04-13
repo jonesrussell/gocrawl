@@ -1,0 +1,15 @@
+elasticsearch:
+  addresses: []
+  api_key: ""
+  index_name: ""
+  tls:
+    enabled: false
+    skip_verify: false
+    cert_file: ""
+    key_file: ""
+    ca_file: ""
+  retry:
+    enabled: false
+  bulk:
+    size: 1000
+    flush_interval: 30s 

@@ -34,6 +34,13 @@ tasks:
     cmds:
       - go run main.go --help
 
+  indices:create:
+    desc: "Create an Elasticsearch index"
+    cmds:
+      - go run main.go indices create {{.CLI_ARGS}}
+    ignore_error: true
+    interactive: true
+
   indices:list:
     desc: "List all Elasticsearch indices"
     cmds:
@@ -43,17 +50,18 @@ tasks:
   indices:delete:
     desc: "Delete one or more Elasticsearch indices"
     cmds:
-      - |
-        if [ "{{.SOURCE}}" != "" ]; then
-          go run main.go indices delete --source "{{.SOURCE}}" {{if .FORCE}}--force{{end}}
-        else
-          go run main.go indices delete {{.CLI_ARGS}}
-        fi
+      - go run main.go indices delete {{.CLI_ARGS}}
     ignore_error: true
-    interactive: true
+    interactive: false
+
+  indices:delete:source:
+    desc: "Delete indices for a specific source"
+    cmds:
+      - go run main.go indices delete --source "{{.SOURCE}}" --force
+    ignore_error: true
+    interactive: false
     vars:
-      SOURCE: '{{.SOURCE | default ""}}'
-      FORCE: '{{.FORCE | default "false"}}'
+      SOURCE: '{{.SOURCE}}'
 
   job:
     desc: "Run the job scheduler for automated crawling based on sources.yml schedules"
@@ -97,3 +105,24 @@ tasks:
     generates:
       - coverage/coverage.out
       - coverage/coverage.html
+
+  generate:
+    desc: Generate code (mocks, etc.)
+    cmds:
+      - ./scripts/generate_mocks.sh
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf bin/
+      - rm -rf testutils/mocks/
+
+  sources:add:
+    desc: Add a new source
+    cmds:
+      - go run main.go sources add
+
+  sources:remove:
+    desc: Remove a source
+    cmds:
+      - go run main.go sources remove

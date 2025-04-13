@@ -1,23 +1,28 @@
+// Package api implements the HTTP API for the search service.
 package api
 
 import (
 	"context"
-	"net/http"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
-// Constants
 const (
-	readHeaderTimeout = 10 * time.Second // Timeout for reading headers
-	defaultPort       = "8080"           // Default port if not specified in config or env
+	// HealthCheckTimeout is the maximum time to wait for the server to become healthy
+	HealthCheckTimeout = 5 * time.Second
+	// HealthCheckInterval is the time between health check attempts
+	HealthCheckInterval = 100 * time.Millisecond
+	// ReadHeaderTimeout is the timeout for reading request headers
+	ReadHeaderTimeout = 10 * time.Second
+	// ShutdownTimeout is the timeout for graceful shutdown
+	ShutdownTimeout = 5 * time.Second
 )
 
 // SearchRequest represents the structure of the search request
@@ -33,135 +38,40 @@ type SearchResponse struct {
 	Total   int   `json:"total"`
 }
 
-// SetupRouter creates and configures the Gin router with all routes
-func SetupRouter(log logger.Interface, searchManager SearchManager, cfg config.Interface) *gin.Engine {
-	router := gin.New()
-
-	// Create security middleware
-	security := middleware.NewSecurityMiddleware(cfg.GetServerConfig(), log)
-	router.Use(security.Middleware())
-
-	// Define routes
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
-
-	router.POST("/search", handleSearch(searchManager))
-
-	return router
-}
-
-// handleSearch processes search requests
-func handleSearch(searchManager SearchManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req SearchRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-			return
-		}
-
-		// Validate request
-		if strings.TrimSpace(req.Query) == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Query cannot be empty"})
-			return
-		}
-
-		// Build the search query
-		query := map[string]any{
-			"query": map[string]any{
-				"match": map[string]any{
-					"content": req.Query,
-				},
-			},
-			"size": req.Size,
-		}
-
-		// Use the search manager to perform the search
-		results, err := searchManager.Search(c.Request.Context(), req.Index, query)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		// Get the total count using a wrapped query
-		total, err := searchManager.Count(c.Request.Context(), req.Index, map[string]any{
-			"query": map[string]any{
-				"match": map[string]any{
-					"content": req.Query,
-				},
-			},
-		})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		// Prepare and send the response
-		response := SearchResponse{
-			Results: results,
-			Total:   int(total),
-		}
-
-		c.JSON(http.StatusOK, response)
-	}
-}
-
-// getServerAddress determines the server address with priority:
-// 1. GOCRAWL_PORT environment variable
-// 2. Server config from config file
-// 3. Default port
-func getServerAddress(cfg config.Interface) string {
-	var port string
-	if envPort := os.Getenv("GOCRAWL_PORT"); envPort != "" {
-		port = envPort
-	} else if serverCfg := cfg.GetServerConfig(); serverCfg != nil && serverCfg.Address != "" {
-		port = strings.TrimPrefix(serverCfg.Address, ":")
-	} else {
-		port = defaultPort
-	}
-
-	// Ensure port has colon prefix
-	return ":" + strings.TrimPrefix(port, ":")
-}
-
-// StartHTTPServer starts the HTTP server for search requests
-func StartHTTPServer(log logger.Interface, searchManager SearchManager, cfg config.Interface) (*http.Server, error) {
-	log.Info("StartHTTPServer function called")
-
-	// Setup router
-	router := SetupRouter(log, searchManager, cfg)
-
-	// Get server address
-	address := getServerAddress(cfg)
-	log.Info("Server configuration", "address", address)
-
-	// Create server
-	server := &http.Server{
-		Addr:              address,
-		Handler:           router,
-		ReadTimeout:       cfg.GetServerConfig().ReadTimeout,
-		WriteTimeout:      cfg.GetServerConfig().WriteTimeout,
-		IdleTimeout:       cfg.GetServerConfig().IdleTimeout,
-		ReadHeaderTimeout: readHeaderTimeout,
-	}
-
-	return server, nil
-}
-
-// Module provides API dependencies
+// Module provides the API dependencies.
 var Module = fx.Module("api",
 	fx.Provide(
-		StartHTTPServer,
+		// Provide the router and security middleware
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			searchManager SearchManager,
+		) (*gin.Engine, middleware.SecurityMiddlewareInterface, error) {
+			router, security := SetupRouter(log, searchManager, cfg)
+			return router, security, nil
+		},
+		NewLifecycle,
+		NewServer,
 	),
-	fx.Invoke(func(lc fx.Lifecycle, server *http.Server) {
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				// Server start is handled by the HTTPD module
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				return server.Shutdown(ctx)
-			},
-		})
-	}),
 )
+
+// Params holds the dependencies required for the API.
+type Params struct {
+	fx.In
+	Context      context.Context `name:"apiContext"`
+	Config       config.Interface
+	Logger       logger.Interface
+	Storage      types.Interface
+	IndexManager interfaces.IndexManager
+}
+
+// NewAPI creates a new API instance.
+func NewAPI(p Params) *Server {
+	return &Server{
+		Context:      p.Context,
+		Config:       p.Config,
+		Logger:       p.Logger,
+		Storage:      p.Storage,
+		IndexManager: p.IndexManager,
+	}
+}

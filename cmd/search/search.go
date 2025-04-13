@@ -6,15 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
+	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/api"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 // Constants for default values
@@ -39,23 +41,31 @@ const (
 	columnWidthContentRatio = 3 // Content column takes 2/3 of table width
 )
 
-// Params holds the parameters required for executing a search operation.
-// It uses fx.In for dependency injection of required components.
+// Error constants
+const (
+	ErrLoggerNotFound = "logger not found in context or invalid type"
+	ErrConfigNotFound = "config not found in context or invalid type"
+	ErrInvalidSize    = "invalid size value"
+	ErrStartFailed    = "failed to start application"
+	ErrStopFailed     = "failed to stop application"
+)
+
+// Params holds the search operation parameters
 type Params struct {
 	fx.In
 
 	// Logger provides logging capabilities for the search operation
-	Logger common.Logger
+	Logger logger.Interface
 	// Config holds the application configuration
-	Config common.Config
+	Config config.Interface
 	// SearchManager is the service responsible for executing searches
 	SearchManager api.SearchManager
 	// IndexName specifies which Elasticsearch index to search
-	IndexName string `name:"indexName"`
+	IndexName string `name:"searchIndex"`
 	// Query contains the search query string
-	Query string `name:"query"`
+	Query string `name:"searchQuery"`
 	// ResultSize determines how many results to return
-	ResultSize int `name:"resultSize"`
+	ResultSize int `name:"searchSize"`
 }
 
 // Result represents a search result
@@ -69,8 +79,25 @@ type Result struct {
 var Cmd = &cobra.Command{
 	Use:   "search",
 	Short: "Search content in Elasticsearch",
-	RunE:  runSearch,
+	Long: `Search command allows you to search through crawled content in Elasticsearch.
+
+Examples:
+  # Search for content containing "golang"
+  gocrawl search -q "golang"
+
+  # Search in a specific index with custom result size
+  gocrawl search -i "articles" -q "golang" -s 20
+
+Flags:
+  -i, --index string   Index to search (default "articles")
+  -q, --query string   Query string to search for (required)
+  -s, --size int      Number of results to return (default 10)
+`,
+	RunE: runSearch,
 }
+
+// searchModule provides the search command dependencies
+var searchModule = Module
 
 // Command returns the search command for use in the root command
 func Command() *cobra.Command {
@@ -81,7 +108,7 @@ func Command() *cobra.Command {
 
 	// Mark the query flag as required
 	if err := Cmd.MarkFlagRequired("query"); err != nil {
-		common.PrintErrorf("Error marking query flag as required: %v", err)
+		fmt.Fprintf(os.Stderr, "Error marking query flag as required: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -95,99 +122,68 @@ func Command() *cobra.Command {
 // - Application lifecycle management
 // - Search execution and result display
 func runSearch(cmd *cobra.Command, _ []string) error {
-	// Retrieve and validate the search query
-	queryStr, queryErr := cmd.Flags().GetString("query")
-	if queryErr != nil {
-		return fmt.Errorf("error retrieving query: %w", queryErr)
+	// Get logger from context
+	loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+	log, ok := loggerValue.(logger.Interface)
+	if !ok {
+		return errors.New(ErrLoggerNotFound)
 	}
 
-	// Get the index name and result size from flags
-	indexName := cmd.Flag("index").Value.String()
-	size, sizeErr := cmd.Flags().GetInt("size")
-	if sizeErr != nil {
-		size = DefaultSearchSize
+	// Convert size string to int
+	sizeStr := cmd.Flag("size").Value.String()
+	size, err := strconv.Atoi(sizeStr)
+	if err != nil {
+		return fmt.Errorf("%s: %w", ErrInvalidSize, err)
 	}
 
-	// Set up signal handling for graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Create channels for error handling and completion
-	errChan := make(chan error, 1)
-	doneChan := make(chan struct{})
-
-	// Initialize the Fx application with required modules and dependencies
-	app := fx.New(
-		common.Module,
-		Module,
+	// Create Fx app with the module
+	fxApp := fx.New(
+		searchModule,
 		fx.Provide(
-			// Provide search parameters with appropriate tags for dependency injection
+			func() logger.Interface { return log },
 			fx.Annotate(
-				func() string { return queryStr },
-				fx.ResultTags(`name:"query"`),
+				func() string { return cmd.Flag("index").Value.String() },
+				fx.ResultTags(`name:"searchIndex"`),
 			),
 			fx.Annotate(
-				func() string { return indexName },
-				fx.ResultTags(`name:"indexName"`),
+				func() string { return cmd.Flag("query").Value.String() },
+				fx.ResultTags(`name:"searchQuery"`),
 			),
 			fx.Annotate(
 				func() int { return size },
-				fx.ResultTags(`name:"resultSize"`),
+				fx.ResultTags(`name:"searchSize"`),
 			),
 		),
-		fx.Invoke(func(lc fx.Lifecycle, p Params) {
-			lc.Append(fx.Hook{
-				OnStart: func(context.Context) error {
-					// Execute the search and handle any errors
-					if err := executeSearch(cmd.Context(), p); err != nil {
-						p.Logger.Error("Error executing search", "error", err)
-						common.PrintErrorf("\nSearch failed: %v", err)
-						errChan <- err
-						return err
-					}
-					close(doneChan)
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					return nil
-				},
-			})
+		fx.Invoke(func(p Params) error {
+			return ExecuteSearch(cmd.Context(), p)
+		}),
+		fx.WithLogger(func() fxevent.Logger {
+			return logger.NewFxLogger(log)
 		}),
 	)
 
-	// Start the application and handle any startup errors
-	if err := app.Start(cmd.Context()); err != nil {
-		return fmt.Errorf("error starting application: %w", err)
+	// Start the application
+	log.Info("Starting search")
+	startErr := fxApp.Start(cmd.Context())
+	if startErr != nil {
+		log.Error("Failed to start application", "error", startErr)
+		return fmt.Errorf("%s: %w", ErrStartFailed, startErr)
 	}
 
-	// Wait for either:
-	// - A signal interrupt (SIGINT/SIGTERM)
-	// - Context cancellation
-	// - Search completion
-	// - Search error
-	var searchErr error
-	select {
-	case sig := <-sigChan:
-		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-	case <-cmd.Context().Done():
-		common.PrintInfof("\nContext cancelled, initiating shutdown...")
-	case searchErr = <-errChan:
-		// Error already printed in executeSearch
-	case <-doneChan:
-		// Success message already printed in executeSearch
+	// Wait for interrupt signal
+	log.Info("Waiting for interrupt signal")
+	<-cmd.Context().Done()
+
+	// Stop the application
+	log.Info("Stopping application")
+	stopErr := fxApp.Stop(cmd.Context())
+	if stopErr != nil {
+		log.Error("Failed to stop application", "error", stopErr)
+		return fmt.Errorf("%s: %w", ErrStopFailed, stopErr)
 	}
 
-	// Create a context with timeout for graceful shutdown
-	stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
-	defer stopCancel()
-
-	// Stop the application and handle any shutdown errors
-	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-		common.PrintErrorf("Error stopping application: %v", err)
-		return err
-	}
-
-	return searchErr
+	log.Info("Application stopped successfully")
+	return nil
 }
 
 // buildSearchQuery constructs the Elasticsearch query
@@ -203,18 +199,24 @@ func buildSearchQuery(size int, query string) map[string]any {
 }
 
 // processSearchResults converts raw search results to Result structs
-func processSearchResults(rawResults []any, logger common.Logger) []Result {
+func processSearchResults(rawResults []any, logger logger.Interface) []Result {
 	var results []Result
 	for _, raw := range rawResults {
 		hit, ok := raw.(map[string]any)
 		if !ok {
-			logger.Error("Failed to convert search result to map", "error", "type assertion failed")
+			logger.Error("Failed to convert search result to map",
+				"error", "type assertion failed",
+				"got_type", fmt.Sprintf("%T", raw),
+				"expected_type", "map[string]any")
 			continue
 		}
 
 		source, ok := hit["_source"].(map[string]any)
 		if !ok {
-			logger.Error("Failed to extract _source from hit", "error", "type assertion failed")
+			logger.Error("Failed to extract _source from hit",
+				"error", "type assertion failed",
+				"got_type", fmt.Sprintf("%T", hit["_source"]),
+				"expected_type", "map[string]any")
 			continue
 		}
 
@@ -271,12 +273,12 @@ func renderSearchResults(results []Result, query string) {
 
 	t.AppendFooter(table.Row{"Total", len(results), fmt.Sprintf("Query: %s", query)})
 
-	common.PrintInfof("\nSearch Results:")
+	fmt.Fprintf(os.Stdout, "\nSearch Results:\n")
 	t.Render()
 }
 
-// executeSearch performs the actual search operation using the provided parameters.
-func executeSearch(ctx context.Context, p Params) error {
+// ExecuteSearch performs the actual search operation using the provided parameters.
+func ExecuteSearch(ctx context.Context, p Params) error {
 	p.Logger.Info("Starting search...",
 		"query", p.Query,
 		"index", p.IndexName,
@@ -298,8 +300,13 @@ func executeSearch(ctx context.Context, p Params) error {
 	)
 
 	if len(results) == 0 {
-		common.PrintInfof("No results found for query: %s", p.Query)
-		return nil
+		fmt.Fprintf(os.Stdout, "No results found for query: %s\n", p.Query)
+	}
+
+	// Close the search manager
+	if closeErr := p.SearchManager.Close(); closeErr != nil {
+		p.Logger.Error("Error closing search manager", "error", closeErr)
+		return fmt.Errorf("error closing search manager: %w", closeErr)
 	}
 
 	renderSearchResults(results, p.Query)

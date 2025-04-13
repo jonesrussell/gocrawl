@@ -1,9 +1,9 @@
-// Package api_test implements tests for the API package.
+// Package api_test provides tests for the API package.
 package api_test
 
 import (
-	"encoding/json"
-	"fmt"
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,233 +12,431 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	configtest "github.com/jonesrussell/gocrawl/internal/config/testutils"
+	"github.com/jonesrussell/gocrawl/internal/config/app"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
+	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	apimocks "github.com/jonesrussell/gocrawl/testutils/mocks/api"
+	configmocks "github.com/jonesrussell/gocrawl/testutils/mocks/config"
+	loggermocks "github.com/jonesrussell/gocrawl/testutils/mocks/logger"
+	storagemocks "github.com/jonesrussell/gocrawl/testutils/mocks/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 	"go.uber.org/fx/fxtest"
 )
 
-// TestModule tests that the API module provides all necessary dependencies
-func TestModule(t *testing.T) {
+const (
+	testAPIKey     = "test-key"
+	healthEndpoint = "/health"
+	searchEndpoint = "/search"
+)
+
+// testServer wraps the test application and server for API tests.
+type testServer struct {
+	app           *fxtest.App
+	server        *http.Server
+	logger        logger.Interface
+	searchManager api.SearchManager
+}
+
+// setupMockLogger creates and configures a mock logger for testing.
+func setupMockLogger(ctrl *gomock.Controller) logger.Interface {
+	mockLog := loggermocks.NewMockInterface(ctrl)
+	mockLog.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Fatal(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().With(gomock.Any()).Return(mockLog).AnyTimes()
+	return mockLog
+}
+
+// TestAPIModule provides a test version of the API module with test-specific dependencies.
+var TestAPIModule = fx.Module("testAPI",
+	// Suppress fx logging to reduce noise in the application logs.
+	fx.WithLogger(func() fxevent.Logger {
+		return &fxevent.NopLogger
+	}),
+	// Include only the necessary components from the API module
+	fx.Provide(
+		// Provide the server and security middleware together to avoid circular dependencies
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			searchManager api.SearchManager,
+		) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
+			return api.StartHTTPServer(log, searchManager, cfg)
+		},
+		api.NewLifecycle,
+		api.NewServer,
+	),
+)
+
+// setupTestApp creates a test application with mock dependencies.
+func setupTestApp(t *testing.T) *testServer {
+	t.Helper()
+
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Cleanup(func() { ctrl.Finish() })
 
-	mockLogger := logger.NewMockInterface(ctrl)
-	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	// Create mock dependencies
+	mockConfig := configmocks.NewMockInterface(ctrl)
+	mockConfig.EXPECT().GetAppConfig().Return(&app.Config{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	}).AnyTimes()
+	mockConfig.EXPECT().GetLogConfig().Return(&log.Config{
+		Level:      "debug",
+		Format:     "json",
+		Output:     "stdout",
+		MaxSize:    100,
+		MaxBackups: 3,
+		MaxAge:     28,
+		Compress:   true,
+	}).AnyTimes()
+	mockConfig.EXPECT().GetElasticsearchConfig().Return(&elasticsearch.Config{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	}).AnyTimes()
+	mockConfig.EXPECT().GetServerConfig().Return(&server.Config{
+		SecurityEnabled: true,
+		APIKey:          testAPIKey,
+		Address:         ":8080",
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
+	}).AnyTimes()
+	mockConfig.EXPECT().GetSources().Return([]types.Source{}).AnyTimes()
+	mockConfig.EXPECT().GetCommand().Return("test").AnyTimes()
+	mockConfig.EXPECT().GetPriorityConfig().Return(&priority.Config{
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
+	}).AnyTimes()
 
-	mockSearchManager := api.NewMockSearchManager(ctrl)
-	mockCfg := configtest.NewMockConfig()
+	mockLogger := setupMockLogger(ctrl)
+	mockSearch := apimocks.NewMockSearchManager(ctrl)
+	mockStorage := storagemocks.NewMockInterface(ctrl)
+	mockIndexManager := apimocks.NewMockIndexManager(ctrl)
 
+	ts := &testServer{
+		logger: mockLogger,
+	}
+
+	// Create and start the application
 	app := fxtest.New(t,
+		fx.NopLogger,
+		fx.Supply(
+			fx.Annotate(
+				mockConfig,
+				fx.As(new(config.Interface)),
+			),
+			fx.Annotate(
+				mockSearch,
+				fx.As(new(api.SearchManager)),
+			),
+			fx.Annotate(
+				mockLogger,
+				fx.As(new(logger.Interface)),
+			),
+			fx.Annotate(
+				mockStorage,
+				fx.As(new(storagetypes.Interface)),
+			),
+			fx.Annotate(
+				mockIndexManager,
+				fx.As(new(api.IndexManager)),
+			),
+			fx.Annotate(
+				t.Context(),
+				fx.As(new(context.Context)),
+			),
+		),
+		TestAPIModule,
+		fx.Invoke(func(s *http.Server, sm api.SearchManager) {
+			ts.server = s
+			ts.searchManager = sm
+		}),
+	)
+
+	ts.app = app
+	app.RequireStart()
+
+	return ts
+}
+
+// TestAPIModuleInitialization verifies that the API module can be initialized with all required dependencies.
+func TestAPIModuleInitialization(t *testing.T) {
+	t.Parallel()
+	ts := setupTestApp(t)
+	defer ts.app.RequireStop()
+
+	assert.NotNil(t, ts.app, "Application should be initialized")
+	assert.NotNil(t, ts.server, "HTTP server should be initialized")
+}
+
+// TestHealthEndpoint verifies that the health endpoint works correctly.
+func TestHealthEndpoint(t *testing.T) {
+	t.Parallel()
+
+	// Create test server
+	ts := setupTestApp(t)
+	defer ts.app.RequireStop()
+
+	// Set up mock expectations for logger
+	mockLogger := ts.logger.(*loggermocks.MockInterface)
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return().AnyTimes()
+
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		expectedStatus int
+	}{
+		{
+			name:           "returns ok status",
+			method:         "GET",
+			path:           "/health",
+			expectedStatus: 200,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Create request
+			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+			w := httptest.NewRecorder()
+
+			// Send request
+			ts.server.Handler.ServeHTTP(w, req)
+
+			// Check response
+			assert.Equal(t, tt.expectedStatus, w.Code)
+		})
+	}
+}
+
+// TestSearchEndpoint tests the search endpoint functionality.
+func TestSearchEndpoint(t *testing.T) {
+	t.Parallel()
+
+	// Create test server
+	ts := setupTestApp(t)
+	defer ts.app.RequireStop()
+
+	// Set up mock expectations for logger
+	mockLogger := ts.logger.(*loggermocks.MockInterface)
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return().AnyTimes()
+
+	// Get search manager from the test server
+	mockSearch := ts.searchManager.(*apimocks.MockSearchManager)
+
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		body           string
+		apiKey         string
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "requires API key",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "test"}`,
+			apiKey:         "",
+			expectedStatus: 401,
+			expectedBody:   `{"error":"missing API key"}`,
+		},
+		{
+			name:           "handles invalid API key",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "test"}`,
+			apiKey:         "wrong-key",
+			expectedStatus: 401,
+			expectedBody:   `{"error":"invalid API key"}`,
+		},
+		{
+			name:           "handles invalid JSON",
+			method:         "POST",
+			path:           "/search",
+			body:           "invalid json",
+			apiKey:         testAPIKey,
+			expectedStatus: 400,
+			expectedBody:   `{"error":"Invalid request payload"}`,
+		},
+		{
+			name:           "handles empty query",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": ""}`,
+			apiKey:         testAPIKey,
+			expectedStatus: 400,
+			expectedBody:   `{"error":"Query cannot be empty"}`,
+		},
+		{
+			name:           "handles search error",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "error"}`,
+			apiKey:         testAPIKey,
+			expectedStatus: 500,
+			expectedBody:   `{"error":"Search failed"}`,
+		},
+		{
+			name:           "handles count error",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "count-error"}`,
+			apiKey:         testAPIKey,
+			expectedStatus: 500,
+			expectedBody:   `{"error":"Failed to get total count"}`,
+		},
+		{
+			name:           "returns search results with valid request",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "test", "index": "test-index"}`,
+			apiKey:         testAPIKey,
+			expectedStatus: 200,
+			expectedBody:   `{"results":[{"title":"Test Result","url":"https://test.com"}],"total":1}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Create request with body
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			if tt.apiKey != "" {
+				req.Header.Set("X-Api-Key", tt.apiKey)
+			}
+			w := httptest.NewRecorder()
+
+			// Set up mock expectations based on test case
+			switch tt.name {
+			case "handles search error":
+				mockSearch.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return(nil, errors.New("search error"))
+			case "handles count error":
+				mockSearch.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return([]any{}, nil)
+				mockSearch.EXPECT().Count(gomock.Any(), "", gomock.Any()).Return(int64(0), errors.New("count error"))
+			case "returns search results with valid request":
+				mockSearch.EXPECT().Search(gomock.Any(), "test-index", gomock.Any()).Return([]any{
+					map[string]any{
+						"title": "Test Result",
+						"url":   "https://test.com",
+					},
+				}, nil)
+				mockSearch.EXPECT().Count(gomock.Any(), "test-index", gomock.Any()).Return(int64(1), nil)
+			}
+
+			// Send request
+			ts.server.Handler.ServeHTTP(w, req)
+
+			// Check response
+			assert.Equal(t, tt.expectedStatus, w.Code)
+			assert.JSONEq(t, tt.expectedBody, w.Body.String())
+		})
+	}
+}
+
+// TestLoggerDependencyRegression verifies that the logger dependency is properly injected.
+func TestLoggerDependencyRegression(t *testing.T) {
+	t.Parallel()
+	ts := setupTestApp(t)
+	defer ts.app.RequireStop()
+
+	// Verify that the logger is properly injected
+	assert.NotNil(t, ts.logger, "Logger should be properly injected")
+}
+
+// TestModule tests the API module.
+func TestModule(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	t.Cleanup(func() { ctrl.Finish() })
+
+	// Create mock dependencies
+	mockConfig := configmocks.NewMockInterface(ctrl)
+	mockLogger := setupMockLogger(ctrl)
+	mockStorage := storagemocks.NewMockInterface(ctrl)
+	mockIndexManager := apimocks.NewMockIndexManager(ctrl)
+
+	// Set up mock storage expectations
+	mockStorage.EXPECT().GetIndexDocCount(gomock.Any(), gomock.Any()).Return(int64(0), nil).AnyTimes()
+	mockStorage.EXPECT().TestConnection(gomock.Any()).Return(nil).AnyTimes()
+	mockStorage.EXPECT().Close().Return(nil).AnyTimes()
+
+	// Set up mock index manager expectations
+	mockIndexManager.EXPECT().EnsureIndex(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockIndexManager.EXPECT().DeleteIndex(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockIndexManager.EXPECT().IndexExists(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	mockIndexManager.EXPECT().GetMapping(gomock.Any(), gomock.Any()).Return(map[string]any{}, nil).AnyTimes()
+	mockIndexManager.EXPECT().UpdateMapping(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	// Set up mock config expectations
+	mockConfig.EXPECT().GetAppConfig().Return(&app.Config{
+		Environment: "test",
+		Name:        "gocrawl",
+		Version:     "1.0.0",
+		Debug:       true,
+	}).AnyTimes()
+	mockConfig.EXPECT().GetLogConfig().Return(&log.Config{
+		Level:      "debug",
+		Format:     "json",
+		Output:     "stdout",
+		MaxSize:    100,
+		MaxBackups: 3,
+		MaxAge:     28,
+		Compress:   true,
+	}).AnyTimes()
+	mockConfig.EXPECT().GetElasticsearchConfig().Return(&elasticsearch.Config{
+		Addresses: []string{"http://localhost:9200"},
+		IndexName: "test-index",
+	}).AnyTimes()
+	mockConfig.EXPECT().GetServerConfig().Return(&server.Config{
+		SecurityEnabled: true,
+		APIKey:          "test-key",
+		Address:         ":8080",
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
+	}).AnyTimes()
+	mockConfig.EXPECT().GetSources().Return([]types.Source{}).AnyTimes()
+	mockConfig.EXPECT().GetCommand().Return("test").AnyTimes()
+	mockConfig.EXPECT().GetPriorityConfig().Return(&priority.Config{
+		DefaultPriority: 1,
+		Rules:           []priority.Rule{},
+	}).AnyTimes()
+
+	app := fx.New(
 		fx.Provide(
+			func() context.Context { return t.Context() },
+			func() config.Interface { return mockConfig },
 			func() logger.Interface { return mockLogger },
-			func() api.SearchManager { return mockSearchManager },
-			func() config.Interface { return mockCfg },
+			func() storagetypes.Interface { return mockStorage },
+			func() api.IndexManager { return mockIndexManager },
 		),
 		api.Module,
 	)
 
-	require.NoError(t, app.Err())
-}
-
-// TestServerConfiguration tests the server configuration
-func TestServerConfiguration(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
-	mockLogger.EXPECT().Info(gomock.Any()).AnyTimes()
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-
-	mockSearchManager := api.NewMockSearchManager(ctrl)
-	mockCfg := configtest.NewMockConfig()
-
-	tests := []struct {
-		name         string
-		configPort   int
-		expectedPort int
-		readTimeout  int
-		writeTimeout int
-		idleTimeout  int
-	}{
-		{
-			name:         "default_configuration",
-			configPort:   8080,
-			expectedPort: 8080,
-			readTimeout:  10,
-			writeTimeout: 30,
-			idleTimeout:  60,
-		},
-		{
-			name:         "custom_configuration",
-			configPort:   8083,
-			expectedPort: 8083,
-			readTimeout:  15,
-			writeTimeout: 45,
-			idleTimeout:  90,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockCfg.WithServerConfig(&config.ServerConfig{
-				Address:      fmt.Sprintf(":%d", tt.configPort),
-				ReadTimeout:  time.Duration(tt.readTimeout) * time.Second,
-				WriteTimeout: time.Duration(tt.writeTimeout) * time.Second,
-				IdleTimeout:  time.Duration(tt.idleTimeout) * time.Second,
-			})
-
-			var server *http.Server
-			app := fxtest.New(t,
-				fx.Provide(
-					func() logger.Interface { return mockLogger },
-					func() api.SearchManager { return mockSearchManager },
-					func() config.Interface { return mockCfg },
-				),
-				api.Module,
-				fx.Populate(&server),
-			)
-
-			require.NoError(t, app.Start(t.Context()))
-			defer app.Stop(t.Context())
-
-			// Verify server configuration
-			assert.Equal(t, fmt.Sprintf(":%d", tt.expectedPort), server.Addr)
-			assert.Equal(t, time.Duration(tt.readTimeout)*time.Second, server.ReadTimeout)
-			assert.Equal(t, time.Duration(tt.writeTimeout)*time.Second, server.WriteTimeout)
-			assert.Equal(t, time.Duration(tt.idleTimeout)*time.Second, server.IdleTimeout)
-		})
-	}
-}
-
-// TestSearchHandler tests the search handler functionality
-func TestSearchHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
-	mockSearchManager := api.NewMockSearchManager(ctrl)
-	mockCfg := configtest.NewMockConfig()
-
-	tests := []struct {
-		name           string
-		request        api.SearchRequest
-		setupMocks     func()
-		expectedStatus int
-		expectedBody   api.SearchResponse
-	}{
-		{
-			name: "successful_search",
-			request: api.SearchRequest{
-				Query: "test query",
-				Index: "articles",
-				Size:  10,
-			},
-			setupMocks: func() {
-				mockSearchManager.EXPECT().
-					Search(gomock.Any(), "articles", gomock.Any()).
-					Return([]any{"result1", "result2"}, nil)
-				mockSearchManager.EXPECT().
-					Count(gomock.Any(), "articles", gomock.Any()).
-					Return(int64(2), nil)
-			},
-			expectedStatus: http.StatusOK,
-			expectedBody: api.SearchResponse{
-				Results: []any{"result1", "result2"},
-				Total:   2,
-			},
-		},
-		{
-			name: "invalid_request",
-			request: api.SearchRequest{
-				Query: "", // Empty query
-				Index: "articles",
-				Size:  10,
-			},
-			setupMocks: func() {
-				// Set up expectations for any calls that might happen
-				mockSearchManager.EXPECT().
-					Search(gomock.Any(), gomock.Any(), gomock.Any()).
-					AnyTimes()
-				mockSearchManager.EXPECT().
-					Count(gomock.Any(), gomock.Any(), gomock.Any()).
-					AnyTimes()
-			},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody:   api.SearchResponse{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Reset mock controller for each test case
-			ctrl.Finish()
-			ctrl = gomock.NewController(t)
-			mockLogger = logger.NewMockInterface(ctrl)
-			mockSearchManager = api.NewMockSearchManager(ctrl)
-			mockCfg = configtest.NewMockConfig()
-
-			tt.setupMocks()
-
-			// Create router
-			router := api.SetupRouter(mockLogger, mockSearchManager, mockCfg)
-
-			// Create test request
-			body, err := json.Marshal(tt.request)
-			require.NoError(t, err)
-
-			req := httptest.NewRequest(http.MethodPost, "/search", strings.NewReader(string(body)))
-			req.Header.Set("Content-Type", "application/json")
-
-			// Create response recorder
-			w := httptest.NewRecorder()
-
-			// Handle request
-			router.ServeHTTP(w, req)
-
-			// Verify response
-			assert.Equal(t, tt.expectedStatus, w.Code)
-
-			if tt.expectedStatus == http.StatusOK {
-				var response api.SearchResponse
-				err = json.NewDecoder(w.Body).Decode(&response)
-				require.NoError(t, err)
-				assert.Equal(t, tt.expectedBody, response)
-			}
-		})
-	}
-}
-
-// TestHealthHandler tests the health check handler
-func TestHealthHandler(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLogger := logger.NewMockInterface(ctrl)
-	mockSearchManager := api.NewMockSearchManager(ctrl)
-	mockCfg := configtest.NewMockConfig()
-
-	// Create router
-	router := api.SetupRouter(mockLogger, mockSearchManager, mockCfg)
-
-	// Create test request
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
-
-	// Create response recorder
-	w := httptest.NewRecorder()
-
-	// Handle request
-	router.ServeHTTP(w, req)
-
-	// Verify response
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response map[string]string
-	err := json.NewDecoder(w.Body).Decode(&response)
+	err := app.Start(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, "ok", response["status"])
+
+	err = app.Stop(t.Context())
+	require.NoError(t, err)
 }

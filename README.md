@@ -47,16 +47,23 @@ A simple web crawler built in Go that fetches and processes web pages, storing r
    LOG_LEVEL: debug
    APP_DEBUG: true
 
-   ELASTIC_URL: https://localhost:9200
-   ELASTIC_USERNAME: elastic
-   ELASTIC_PASSWORD: your_password
-   ELASTIC_API_KEY: your_api_key
-   ELASTIC_INDEX_NAME: articles
-   ELASTIC_SKIP_TLS: true
+   ELASTICSEARCH_URL: https://localhost:9200
+   ELASTICSEARCH_USERNAME: elastic
+   ELASTICSEARCH_PASSWORD: your_password
+   ELASTICSEARCH_API_KEY: your_api_key
+   ELASTICSEARCH_INDEX_NAME: articles
+   ELASTICSEARCH_SKIP_TLS: true
 
    CRAWLER_BASE_URL: https://www.elliotlaketoday.com/opp-beat
    CRAWLER_MAX_DEPTH: 2
    CRAWLER_RATE_LIMIT: 2s
+
+   # Elasticsearch Configuration
+   ELASTICSEARCH_HOSTS: http://localhost:9200
+   ELASTICSEARCH_INDEX_PREFIX: gocrawl
+   ELASTICSEARCH_MAX_RETRIES: 3
+   ELASTICSEARCH_RETRY_INITIAL_WAIT: 1s
+   ELASTICSEARCH_RETRY_MAX_WAIT: 30s
    ```
 
 ## Usage

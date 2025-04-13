@@ -1,8 +1,9 @@
-// Package indices implements the command-line interface for managing Elasticsearch indices.
+// Package indices provides commands for managing Elasticsearch indices.
 package indices
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"context"
+
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -10,18 +11,22 @@ import (
 	"go.uber.org/fx"
 )
 
-// DeleteDeps holds the dependencies for the delete command
-type DeleteDeps struct {
-	Storage common.Storage
-	Sources sources.Interface
-	Logger  common.Logger
-}
-
-// Module provides the indices command dependencies
+// Module provides the indices module for dependency injection.
 var Module = fx.Module("indices",
-	// Core dependencies
+	// Core modules
 	config.Module,
-	sources.Module,
-	storage.Module,
 	logger.Module,
+	storage.Module,
+	sources.Module,
+
+	// Provide the context
+	fx.Provide(context.Background),
+
+	// Provide the indices components
+	fx.Provide(
+		NewCreator,
+		NewLister,
+		NewTableRenderer,
+		NewDeleter,
+	),
 )

@@ -1,3 +1,5 @@
+# syntax=plaintext
+
 Code Organization & Structure
 - Split large files into smaller, focused modules
 - Keep related functionality together
@@ -11,16 +13,16 @@ Code Organization & Structure
 - Use canonical import paths
 
 Dependency Injection & Interfaces
-- Use fx.In and fx.Out for dependency injection
 - Define interfaces in the package that uses them, not where they are implemented
 - For module-specific interfaces, define them in module.go
 - For interfaces used across multiple packages, define them in the consuming package
 - Avoid interface stuttering (e.g., use `Logger` instead of `CollectorLogger`)
-- Use type aliases from common package:
-  - Use common.Logger instead of logger.Interface
-  - Use common.Storage instead of storage.Interface
-  - Use common.Config instead of config.Config
 - Define New* constructors only in module.go files
+- When testing modules:
+  - Provide all required dependencies
+  - Avoid providing dependencies that are already provided
+  - Use test helpers for common dependency setup
+  - Verify dependency injection before testing functionality
 
 Error Handling
 - Prefer errors.New over fmt.Errorf for simple error messages
@@ -40,6 +42,28 @@ Testing
 - Use t.Parallel() appropriately in tests
 - Place tests in a separate _test package
 - Use testify consistently for assertions
+- Follow test naming conventions:
+  - Test[FunctionName] for function tests
+  - Test[TypeName] for type tests
+  - Test[InterfaceName] for interface tests
+- Structure tests with setup, execution, and verification phases
+- Use table-driven tests for multiple test cases
+- Mock external dependencies consistently
+- Use test helpers to reduce code duplication
+- Test both success and failure cases
+- Test edge cases and boundary conditions
+- Use meaningful test data
+- Document test setup and assumptions
+- Keep tests focused and single-purpose
+- Use subtests for related test cases
+- Test public interfaces, not implementation details
+- Use test fixtures for complex test data
+- Clean up resources in test teardown
+- Use test-specific types and interfaces
+- Avoid test interdependence
+- Use meaningful assertion messages
+- Test error conditions explicitly
+- Use test coverage tools appropriately
 
 Dependencies
 - Use go 1.24
@@ -70,3 +94,39 @@ Style & Best Practices
 - Close response bodies in HTTP clients
 - Use standard library variables where available
 - Avoid magic numbers in code
+- For HTML processing:
+  - Use goquery for HTML parsing
+  - Validate HTML before processing
+  - Handle malformed HTML gracefully
+  - Use CSS selectors for element selection
+  - Document selector requirements
+  - Handle timezone conversions explicitly
+  - Validate time formats before parsing
+  - Use constants for common time formats
+  - Handle empty or missing elements gracefully
+  - Document error conditions and recovery
+  - Use meaningful error messages
+  - Include context in error handling
+  - Clean up resources properly
+  - Handle concurrent access safely
+  - Use appropriate logging levels
+  - Document performance considerations
+  - Use appropriate metrics for monitoring
+  - Handle edge cases explicitly
+  - Use table-driven tests for validation
+  - Mock external dependencies in tests
+  - Use test fixtures for complex HTML
+  - Document test assumptions
+  - Clean up test resources
+  - Use appropriate test helpers
+  - Test error conditions thoroughly
+  - Use meaningful test data
+  - Document test setup
+  - Keep tests focused
+  - Use subtests for related cases
+  - Test public interfaces
+  - Use test-specific types
+  - Avoid test interdependence
+  - Use meaningful assertions
+  - Test error conditions
+  - Use coverage tools

@@ -3,22 +3,23 @@ package content
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
-	"github.com/google/uuid"
+	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Interface defines the interface for content operations
 type Interface interface {
 	ExtractContent(e *colly.HTMLElement) *models.Content
 	ExtractMetadata(e *colly.HTMLElement) map[string]any
-	DetermineContentType(url string, metadata map[string]any, jsonLDType string) string
+	DetermineContentType(url string, metadata map[string]any, jsonLDType string) common.ContentType
 	Process(ctx context.Context, input string) string
 	ProcessBatch(ctx context.Context, input []string) []string
 	ProcessWithMetadata(ctx context.Context, input string, metadata map[string]string) string
@@ -26,15 +27,65 @@ type Interface interface {
 
 // Service implements the Interface
 type Service struct {
-	Logger logger.Interface
+	Logger    logger.Interface
+	Storage   types.Interface
+	IndexName string
+	// SourceRules maps source names to their content processing rules
+	SourceRules map[string]ContentRules
+	// DefaultRules is used when no source-specific rules are found
+	DefaultRules ContentRules
+}
+
+// ContentRules defines the rules for processing content from a specific source
+type ContentRules struct {
+	// ContentTypePatterns maps content types to their URL patterns
+	ContentTypePatterns map[common.ContentType][]string
+	// ExcludePatterns are URL patterns to exclude from processing
+	ExcludePatterns []string
+	// MetadataSelectors defines selectors for extracting metadata
+	MetadataSelectors map[string]string
+	// ContentSelectors defines selectors for extracting content
+	ContentSelectors map[string]string
 }
 
 // Ensure Service implements Interface
 var _ Interface = (*Service)(nil)
 
 // NewService creates a new Service instance
-func NewService(logger logger.Interface) Interface {
-	return &Service{Logger: logger}
+func NewService(logger logger.Interface, storage types.Interface) Interface {
+	return &Service{
+		Logger:      logger,
+		Storage:     storage,
+		SourceRules: make(map[string]ContentRules),
+		DefaultRules: ContentRules{
+			ContentTypePatterns: contentTypePatterns,
+			MetadataSelectors: map[string]string{
+				"title":       "title",
+				"description": "meta[name=description]",
+				"keywords":    "meta[name=keywords]",
+				"author":      "meta[name=author]",
+			},
+			ContentSelectors: map[string]string{
+				"body": "article",
+			},
+		},
+	}
+}
+
+// AddSourceRules adds content processing rules for a specific source
+func (s *Service) AddSourceRules(sourceName string, rules ContentRules) {
+	s.SourceRules[sourceName] = rules
+}
+
+// getRulesForURL returns the appropriate content rules for the given URL
+func (s *Service) getRulesForURL(url string) ContentRules {
+	// Try to find matching source rules
+	for sourceName, rules := range s.SourceRules {
+		if strings.Contains(url, sourceName) {
+			return rules
+		}
+	}
+	return s.DefaultRules
 }
 
 type JSONLDMetadata struct {
@@ -46,229 +97,174 @@ type JSONLDMetadata struct {
 	AdditionalData map[string]any `json:"additionalData,omitempty"`
 }
 
-var timeFormats = []string{
-	time.RFC3339,
-	"2006-01-02T15:04:05Z",
-	"2006-01-02T15:04:05.2030000Z",
-	"2006-01-02 15:04:05",
-}
-
-var contentTypePatterns = map[string][]string{
-	"category": {"/category/", "/categories/"},
-	"tag":      {"/tag/", "/tags/"},
-	"author":   {"/author/", "/authors/"},
-	"page":     {"/page/", "/pages/"},
-	"search":   {"/search"},
-	"feed":     {"/feed"},
-	"rss":      {"/rss"},
-	"sitemap":  {"/sitemap"},
-	"system":   {"/wp-json", "/wp-admin"},
+var contentTypePatterns = map[common.ContentType][]string{
+	common.ContentTypeArticle: {"/article/", "/articles/", "/post/", "/posts/"},
+	common.ContentTypePage:    {"/page/", "/pages/"},
+	common.ContentTypeVideo:   {"/video/", "/videos/"},
+	common.ContentTypeImage:   {"/image/", "/images/", "/photo/", "/photos/", "/gallery/"},
+	common.ContentTypeHTML:    {"/html/", "/htm/"},
+	common.ContentTypeJob:     {"/job/", "/jobs/", "/career/", "/careers/"},
 }
 
 // ExtractContent extracts content from an HTML element
 func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
-	s.Logger.Debug("Extracting content", "url", e.Request.URL.String())
+	// Get rules for this URL
+	rules := s.getRulesForURL(e.Request.URL.String())
 
-	var jsonLD JSONLDMetadata
-	var parsedDate time.Time
-	var contentType string
-
-	// Extract metadata
-	metadata := s.ExtractMetadata(e)
-
-	// Parse JSON-LD if available
-	if jsonLDStr := e.DOM.Find("script[type='application/ld+json']").Text(); jsonLDStr != "" {
-		if err := json.Unmarshal([]byte(jsonLDStr), &jsonLD); err != nil {
-			s.Logger.Error("Failed to parse JSON-LD", "error", err)
-		}
-	}
-
-	// Try to parse date from various sources
-	dates := []string{
-		jsonLD.DateCreated,
-		jsonLD.DateModified,
-	}
-
-	// Add metadata dates if they exist
-	if publishedTime, ok := metadata["published_time"].(string); ok {
-		dates = append(dates, publishedTime)
-	}
-	if modifiedTime, ok := metadata["modified_time"].(string); ok {
-		dates = append(dates, modifiedTime)
-	}
-
-	for _, dateStr := range dates {
-		if dateStr == "" {
-			continue
-		}
-		parsedDate = s.parseDate(s.Logger, dateStr)
-		if !parsedDate.IsZero() {
+	// Try to find content using source-specific selectors
+	var body string
+	for _, selector := range rules.ContentSelectors {
+		if text := e.DOM.Find(selector).Text(); text != "" {
+			body = text
 			break
 		}
 	}
 
-	// Determine content type
-	contentType = s.DetermineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
+	// If no content found with selectors, try to find content in the element
+	if body == "" {
+		// First try to find content in paragraphs and divs
+		e.DOM.Find("p, div").Each(func(_ int, sel *goquery.Selection) {
+			if text := strings.TrimSpace(sel.Text()); text != "" {
+				body = text
+				return
+			}
+		})
 
-	// Create content object
-	content := &models.Content{
-		ID:        uuid.New().String(),
-		Title:     jsonLD.Name,
-		URL:       e.Request.URL.String(),
-		Type:      contentType,
-		Body:      cleanBody(e),
-		CreatedAt: parsedDate,
-		Metadata:  metadata,
+		// If still no content, use the element's text
+		if body == "" {
+			body = e.Text
+		}
 	}
 
-	s.Logger.Debug("Extracted content",
-		"id", content.ID,
-		"title", content.Title,
-		"url", content.URL,
-		"type", content.Type,
-		"created_at", content.CreatedAt,
-	)
+	// Clean up the text
+	body = strings.TrimSpace(body)
+
+	content := &models.Content{
+		URL:  e.Request.URL.String(),
+		Body: body,
+	}
 
 	return content
 }
 
 // DetermineContentType determines the content type based on URL and metadata
-func (s *Service) DetermineContentType(url string, metadata map[string]any, jsonLDType string) string {
+func (s *Service) DetermineContentType(url string, metadata map[string]any, jsonLDType string) common.ContentType {
+	// Get rules for this URL
+	rules := s.getRulesForURL(url)
+
 	// First try JSON-LD type
 	if jsonLDType != "" {
-		return strings.ToLower(jsonLDType)
+		s.Logger.Debug("Using JSON-LD type",
+			"url", url,
+			"type", jsonLDType)
+		return common.ContentType(strings.ToLower(jsonLDType))
 	}
 
 	// Then try metadata type
 	if metaType, ok := metadata["type"].(string); ok {
-		return strings.ToLower(metaType)
+		s.Logger.Debug("Using metadata type",
+			"url", url,
+			"type", metaType)
+		return common.ContentType(strings.ToLower(metaType))
 	}
 
-	// Try to detect from URL
+	// Try to detect from URL using source-specific patterns
 	urlLower := strings.ToLower(url)
-	for category, patterns := range contentTypePatterns {
+	for contentType, patterns := range rules.ContentTypePatterns {
 		for _, pattern := range patterns {
 			if strings.Contains(urlLower, pattern) {
-				return category
+				s.Logger.Debug("Using URL pattern type",
+					"url", url,
+					"pattern", pattern,
+					"type", contentType)
+				return contentType
 			}
 		}
 	}
 
 	// Default to webpage
-	return "webpage"
+	s.Logger.Debug("Using default type",
+		"url", url,
+		"type", common.ContentTypePage)
+	return common.ContentTypePage
 }
 
-// ExtractMetadata extracts metadata from various sources in the HTML
+// ExtractMetadata extracts metadata from an HTML element
 func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
+	// Get rules for this URL
+	rules := s.getRulesForURL(e.Request.URL.String())
 	metadata := make(map[string]any)
 
-	// Extract OpenGraph metadata first (highest precedence)
-	e.ForEach(`meta[property^="og:"]`, func(_ int, el *colly.HTMLElement) {
-		property := el.Attr("property")
-		content := el.Attr("content")
-		if property != "" && content != "" {
-			key := property[3:] // Remove "og:" prefix
-			if _, exists := metadata[key]; !exists {
-				metadata[key] = content
-			}
+	// Extract metadata using source-specific selectors
+	for key, selector := range rules.MetadataSelectors {
+		if value := e.DOM.Find(selector).AttrOr("content", ""); value != "" {
+			metadata[key] = value
+		} else if textValue := e.DOM.Find(selector).Text(); textValue != "" {
+			metadata[key] = textValue
 		}
+	}
+
+	// Extract OpenGraph metadata (highest precedence)
+	e.DOM.Find(`meta[property^="og:"], meta[property^="article:"]`).Each(func(_ int, sel *goquery.Selection) {
+		property, propExists := sel.Attr("property")
+		if !propExists {
+			return
+		}
+		content, contentExists := sel.Attr("content")
+		if !contentExists {
+			return
+		}
+		metadata[property] = content
 	})
 
 	// Extract Twitter metadata (second precedence)
-	e.ForEach(`meta[name^="twitter:"]`, func(_ int, el *colly.HTMLElement) {
-		name := el.Attr("name")
-		content := el.Attr("content")
-		if name != "" && content != "" {
-			key := name[8:] // Remove "twitter:" prefix
-			if _, exists := metadata[key]; !exists {
-				metadata[key] = content
-			}
+	e.DOM.Find(`meta[name^="twitter:"]`).Each(func(_ int, sel *goquery.Selection) {
+		name, nameExists := sel.Attr("name")
+		if !nameExists {
+			return
+		}
+		content, contentExists := sel.Attr("content")
+		if !contentExists {
+			return
+		}
+		key := name[8:] // Remove "twitter:" prefix
+		if _, keyExists := metadata[key]; !keyExists {
+			metadata[key] = content
 		}
 	})
 
-	// Extract other meta tags (lowest precedence)
-	e.ForEach(`meta[name]`, func(_ int, el *colly.HTMLElement) {
-		name := el.Attr("name")
-		content := el.Attr("content")
-		if name != "" && content != "" {
-			if _, exists := metadata[name]; !exists {
-				metadata[name] = content
-			}
-		}
-	})
+	s.Logger.Debug("Extracted metadata",
+		"url", e.Request.URL.String(),
+		"metadata", metadata)
 
 	return metadata
 }
 
-// parseDate attempts to parse a date string using multiple formats
-func (s *Service) parseDate(logger logger.Interface, dateStr string) time.Time {
-	logger.Debug("Trying to parse date", "value", dateStr)
-
-	for _, format := range timeFormats {
-		t, err := time.Parse(format, dateStr)
-		if err == nil {
-			logger.Debug("Successfully parsed date",
-				"source", dateStr,
-				"format", format,
-				"result", t.String(),
-			)
-			return t
-		}
-		logger.Debug("Failed to parse date",
-			"source", dateStr,
-			"format", format,
-			"error", err.Error(),
-		)
-	}
-
-	return time.Time{}
-}
-
-// cleanBody removes excluded tags and elements from the body content
-func cleanBody(e *colly.HTMLElement) string {
-	// Get a copy of the body element for manipulation
-	bodyEl := e.DOM
-
-	// Remove all style and script tags directly
-	bodyEl.Find("style,script").Remove()
-
-	// Remove other excluded elements
-	excludedSelectors := []string{
-		"header", "footer", "nav", "aside",
-		".advertisement", ".ads", ".social-share",
-		".comments", ".related-posts", ".newsletter",
-		"iframe", "noscript", "form", "button",
-		".cookie-notice", ".popup", ".modal",
-		".newsletter-signup", ".social-buttons",
-	}
-
-	for _, selector := range excludedSelectors {
-		bodyEl.Find(selector).Remove()
-	}
-
-	// Get the cleaned text
-	return bodyEl.Text()
-}
-
 // Process processes a single string content
-func (s *Service) Process(ctx context.Context, input string) string {
-	s.Logger.Debug("Processing content", "input", input)
-
-	// Create a reader from the input string
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(input))
+func (s *Service) Process(ctx context.Context, html string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		s.Logger.Error("Failed to parse HTML", "error", err)
-		return strings.TrimSpace(input)
+		s.Logger.Error("failed to parse HTML", err)
+		return ""
 	}
 
-	// Get text content without HTML tags
-	text := doc.Text()
+	// Extract text from all elements except script and style
+	var text []string
+	doc.Find("body").Find("*:not(script):not(style)").Each(func(_ int, sel *goquery.Selection) {
+		// Only process elements that directly contain text
+		if sel.Children().Length() == 0 {
+			if t := strings.TrimSpace(sel.Text()); t != "" {
+				// Split into words and join with single space to normalize whitespace
+				words := strings.Fields(t)
+				text = append(text, strings.Join(words, " "))
+			}
+		}
+	})
 
-	// Clean up whitespace
-	text = strings.Join(strings.Fields(text), " ")
-
-	s.Logger.Debug("Processed content", "result", text)
-	return text
+	// Join all text segments with a single space and normalize whitespace again
+	result := strings.Join(text, " ")
+	result = strings.Join(strings.Fields(result), " ")
+	return strings.TrimSpace(result)
 }
 
 // ProcessBatch processes a batch of strings
@@ -289,4 +285,23 @@ func (s *Service) ProcessWithMetadata(ctx context.Context, input string, metadat
 		)
 	}
 	return s.Process(ctx, input)
+}
+
+// ExtractText extracts the text content from a goquery Document.
+func (s *Service) ExtractText(doc *goquery.Document) string {
+	return doc.Find("body").Text()
+}
+
+// ExtractContentFromDocument extracts content from a goquery Document
+func (s *Service) ExtractContentFromDocument(url string, doc *goquery.Document) (*models.Content, error) {
+	body := s.ExtractText(doc)
+	if body == "" {
+		return nil, errors.New("no content found in document")
+	}
+
+	return &models.Content{
+		URL:       url,
+		Body:      body,
+		CreatedAt: time.Now(),
+	}, nil
 }

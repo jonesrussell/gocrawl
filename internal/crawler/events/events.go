@@ -12,10 +12,6 @@ type ContentType string
 const (
 	// TypeArticle represents an article content type.
 	TypeArticle ContentType = "article"
-	// TypeImage represents an image content type.
-	TypeImage ContentType = "image"
-	// TypeDocument represents a document content type.
-	TypeDocument ContentType = "document"
 )
 
 // Content represents discovered content from crawling.

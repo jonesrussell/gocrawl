@@ -9,19 +9,24 @@ import "time"
 // throughout the application. These values can be overridden through
 // configuration if needed.
 const (
-	// DefaultShutdownTimeout is the default timeout for graceful shutdown.
-	// This duration allows components to clean up resources and finish
-	// pending operations before the application exits.
-	DefaultShutdownTimeout = 10 * time.Second
-
-	// DefaultStartupTimeout is the default timeout for startup operations.
-	// This duration limits how long the application will wait for
-	// initialization tasks like connecting to databases or loading configs.
-	DefaultStartupTimeout = 30 * time.Second
-
 	// DefaultOperationTimeout is the default timeout for general operations.
 	// This duration is used for common operations like API calls,
 	// data processing tasks, or crawler shutdown that should complete
 	// in a reasonable time.
 	DefaultOperationTimeout = 30 * time.Second
+)
+
+const (
+	// DefaultTestSleepDuration is the default sleep duration for tests
+	DefaultTestSleepDuration = 100 * time.Millisecond
+	// DefaultMaxRetries is the default number of retries for failed requests
+	DefaultMaxRetries = 3
+	// DefaultMaxDepth is the default maximum depth for crawling
+	DefaultMaxDepth = 2
+	// DefaultRateLimit is the default rate limit for requests
+	DefaultRateLimit = 2 * time.Second
+	// DefaultBufferSize is the default size for channel buffers
+	DefaultBufferSize = 100
+	// DefaultMaxConcurrency is the default maximum number of concurrent requests
+	DefaultMaxConcurrency = 2
 )

@@ -7,199 +7,103 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
-// Constants for table formatting
-const (
-	// TableWidth defines the total width of the table output for consistent formatting
-	TableWidth = 160
-
-	// Column width constants
-	sourceColumnWidth   = 80
-	indexesColumnWidth  = 80
-	configColumnWidth   = 25
-	labelFormatterWidth = 8
-)
-
-// ListParams holds the parameters required for listing sources.
-type ListParams struct {
+// Params holds the dependencies required for the list operation.
+type Params struct {
 	fx.In
-
-	SourceManager sources.Interface `name:"sourceManager"`
-	Logger        common.Logger
+	SourceManager sources.Interface
+	Logger        logger.Interface
 }
 
-// ListCommand creates and returns the list command that displays all sources.
-func ListCommand() *cobra.Command {
-	return &cobra.Command{
+// ListCommand implements the list command for sources.
+type ListCommand struct {
+	logger        logger.Interface
+	sourceManager sources.Interface
+}
+
+// NewListCommand creates a new list command.
+func NewListCommand() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all configured content sources",
-		Long: `Display a list of all content sources configured in sources.yml.
+		Short: "List all configured sources",
+		Long:  `List all content sources configured in the system.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get dependencies from context
+			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context")
+			}
 
-Example:
-  gocrawl sources list`,
-		RunE: RunList,
+			configValue := cmd.Context().Value(cmdcommon.ConfigKey)
+			cfg, ok := configValue.(config.Interface)
+			if !ok {
+				return errors.New("config not found in context")
+			}
+
+			// Create source manager
+			sourceManager, err := sources.LoadSources(cfg)
+			if err != nil {
+				if errors.Is(err, loader.ErrNoSources) {
+					log.Info("No sources found in configuration. Please add sources to your config file.")
+					return nil
+				}
+				return fmt.Errorf("failed to load sources: %w", err)
+			}
+
+			// Create and run the command
+			listCmd := &ListCommand{
+				logger:        log,
+				sourceManager: sourceManager,
+			}
+			return listCmd.Run(cmd.Context())
+		},
 	}
+
+	return cmd
 }
 
-// RunList executes the list command and displays all sources.
-func RunList(cmd *cobra.Command, _ []string) error {
-	// Set up signal handling for graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+// Run executes the list command.
+func (c *ListCommand) Run(ctx context.Context) error {
+	c.logger.Info("Listing sources")
 
-	// Create channels for error handling and completion
-	errChan := make(chan error, 1)
-	doneChan := make(chan struct{})
-
-	// Initialize the Fx application with required modules
-	app := fx.New(
-		fx.NopLogger,
-		Module,
-		fx.Invoke(func(p struct {
-			fx.In
-			Sources sources.Interface `name:"sourceManager"`
-			Logger  common.Logger
-			LC      fx.Lifecycle
-		}) {
-			p.LC.Append(fx.Hook{
-				OnStart: func(context.Context) error {
-					params := &ListParams{
-						SourceManager: p.Sources,
-						Logger:        p.Logger,
-					}
-					if err := ExecuteList(*params); err != nil {
-						p.Logger.Error("Error executing list", "error", err)
-						errChan <- err
-						return err
-					}
-					close(doneChan)
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					return nil
-				},
-			})
-		}),
-	)
-
-	// Start the application and handle any startup errors
-	if err := app.Start(cmd.Context()); err != nil {
-		return fmt.Errorf("error starting application: %w", err)
+	sources, err := c.sourceManager.GetSources()
+	if err != nil {
+		return fmt.Errorf("failed to get sources: %w", err)
 	}
 
-	// Wait for either:
-	// - A signal interrupt (SIGINT/SIGTERM)
-	// - Context cancellation
-	// - List completion
-	// - List error
-	var listErr error
-	select {
-	case sig := <-sigChan:
-		common.PrintInfof("Received signal %v, initiating shutdown...", sig)
-	case <-cmd.Context().Done():
-		common.PrintInfof("Context cancelled, initiating shutdown...")
-	case listErr = <-errChan:
-		// Error already logged in ExecuteList
-	case <-doneChan:
-		// Success message already printed in ExecuteList
-	}
-
-	// Create a context with timeout for graceful shutdown
-	stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
-	defer stopCancel()
-
-	// Stop the application and handle any shutdown errors
-	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-		common.PrintErrorf("Error stopping application: %v", err)
-		if listErr == nil {
-			listErr = err
-		}
-	}
-
-	return listErr
-}
-
-// ExecuteList retrieves and displays the list of sources.
-func ExecuteList(params ListParams) error {
-	allSources := params.SourceManager.GetSources()
-	if len(allSources) == 0 {
-		params.Logger.Info("No sources found")
+	if len(sources) == 0 {
+		c.logger.Info("No sources configured")
 		return nil
 	}
 
-	return PrintSources(allSources, params.Logger)
-}
-
-// PrintSources formats and displays the sources in a table.
-func PrintSources(sources []sources.Config, logger common.Logger) error {
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-
-	// Configure table style
-	t.SetStyle(table.StyleRounded)
-	t.Style().Options.DrawBorder = true
-	t.Style().Options.SeparateColumns = true
-	t.Style().Options.SeparateRows = true
-	t.Style().Options.SeparateHeader = true
-
-	// Create transformers for consistent formatting
-	labelTransformer := text.Transformer(func(val any) string {
-		str, ok := val.(string)
-		if !ok {
-			return fmt.Sprintf("%-*s", labelFormatterWidth, "ERROR")
-		}
-		return fmt.Sprintf("%-*s", labelFormatterWidth, str)
-	})
-
-	// Set column configurations to prevent truncation and align content
-	t.SetColumnConfigs([]table.ColumnConfig{
-		{
-			Name:     "Source",
-			WidthMax: sourceColumnWidth,
-		},
-		{
-			Name:        "Indexes",
-			WidthMax:    indexesColumnWidth,
-			Align:       text.AlignLeft,
-			Transformer: labelTransformer,
-		},
-		{
-			Name:        "Crawl Config",
-			WidthMax:    configColumnWidth,
-			Align:       text.AlignLeft,
-			Transformer: labelTransformer,
-		},
-	})
-
-	t.AppendHeader(table.Row{"Source", "Indexes", "Crawl Config"})
-
-	for _, source := range sources {
-		sourceInfo := fmt.Sprintf("%s\n%s", source.Name, source.URL)
-		indexes := fmt.Sprintf("Articles: %s\nContent:  %s", source.ArticleIndex, source.Index)
-		crawlConfig := fmt.Sprintf("Rate:    %s\nDepth:    %d", source.RateLimit, source.MaxDepth)
-		t.AppendRow([]any{
-			sourceInfo,
-			indexes,
-			crawlConfig,
-		})
+	// Print sources in a formatted table
+	log := c.logger
+	log.Info("Configured Sources:")
+	log.Info("------------------")
+	for i := range sources {
+		source := &sources[i]
+		log.Info("Source details",
+			"name", source.Name,
+			"url", source.URL,
+			"allowed_domains", source.AllowedDomains,
+			"start_urls", source.StartURLs,
+			"max_depth", source.MaxDepth,
+			"rate_limit", source.RateLimit,
+			"index", source.Index,
+			"article_index", source.ArticleIndex,
+		)
+		log.Info("------------------")
 	}
 
-	if t.Length() == 0 {
-		logger.Info("No sources found")
-		return nil
-	}
-
-	t.Render()
 	return nil
 }

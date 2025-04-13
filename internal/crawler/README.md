@@ -56,7 +56,7 @@ The crawler requires several dependencies:
 - `logger.Interface`: For logging operations
 - `article.Interface`: For article processing
 - `config.Config`: For configuration management
-- `models.ContentProcessor`: For content processing
+- `collector.Processor`: For content processing
 
 ## Configuration
 

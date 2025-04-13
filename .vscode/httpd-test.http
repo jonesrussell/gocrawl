@@ -1,0 +1,60 @@
+@baseUrl = http://localhost:{{$dotenv GOCRAWL_PORT}}
+@contentType = application/json
+@apiKey = {{$dotenv ELASTICSEARCH_API_KEY}}
+
+### Health Check
+GET {{baseUrl}}/health
+Content-Type: {{contentType}}
+
+### Search
+POST {{baseUrl}}/search
+Content-Type: {{contentType}}
+X-API-Key: {{apiKey}}
+
+{
+    "query": "test",
+    "index": "articles"
+}
+
+### Search with empty query
+POST {{baseUrl}}/search
+Content-Type: {{contentType}}
+X-API-Key: {{apiKey}}
+
+{
+    "query": "",
+    "index": "articles",
+    "size": 10
+}
+
+### Search with invalid index
+POST {{baseUrl}}/search
+Content-Type: {{contentType}}
+X-API-Key: {{apiKey}}
+
+{
+    "query": "test",
+    "index": "invalid_index",
+    "size": 10
+}
+
+### Search with invalid size
+POST {{baseUrl}}/search
+Content-Type: {{contentType}}
+X-API-Key: {{apiKey}}
+
+{
+    "query": "test",
+    "index": "articles",
+    "size": -1
+}
+
+### Search without API Key (should fail)
+POST {{baseUrl}}/search
+Content-Type: {{contentType}}
+
+{
+    "query": "test",
+    "index": "articles",
+    "size": 10
+} 

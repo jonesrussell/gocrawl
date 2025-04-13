@@ -7,274 +7,334 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"os/signal"
-	"syscall"
+	"strings"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
-// deleteSourceName holds the name of the source whose indices should be deleted
-// when the --source flag is used
-var deleteSourceName string
+var (
+	// ErrDeletionCancelled is returned when the user cancels the deletion
+	ErrDeletionCancelled = errors.New("deletion cancelled by user")
+)
 
-// deleteParams holds the parameters required for deleting indices.
-type deleteParams struct {
-	ctx     context.Context
-	storage common.Storage
-	sources sources.Interface
-	logger  common.Logger
-	indices []string
-	force   bool
+const (
+	// defaultIndicesCapacity is the initial capacity for the indices slice
+	defaultIndicesCapacity = 2
+)
+
+// Deleter implements the indices delete command
+type Deleter struct {
+	config     config.Interface
+	logger     logger.Interface
+	storage    storagetypes.Interface
+	sources    sources.Interface
+	indices    []string
+	force      bool
+	sourceName string
 }
 
-// deleteCommand creates and returns the delete command that removes indices.
-// It:
-// - Sets up the command with appropriate usage and description
-// - Adds command-line flags for source and force options
-// - Configures argument validation
-// - Configures the command to use runDelete as its execution function
-func deleteCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "delete [indices...]",
-		Short: "Delete one or more Elasticsearch indices",
-		Long: `Delete one or more Elasticsearch indices from the cluster.
-If --source is specified, deletes the indices associated with that source.
+// NewDeleter creates a new deleter instance
+func NewDeleter(
+	config config.Interface,
+	logger logger.Interface,
+	storage storagetypes.Interface,
+	sources sources.Interface,
+	params DeleteParams,
+) *Deleter {
+	return &Deleter{
+		config:     config,
+		logger:     logger,
+		storage:    storage,
+		sources:    sources,
+		indices:    params.Indices,
+		force:      params.Force,
+		sourceName: params.SourceName,
+	}
+}
 
-Example:
-  gocrawl indices delete my_index
-  gocrawl indices delete index1 index2 index3
-  gocrawl indices delete --source "Elliot Lake Today"`,
-		Args: validateDeleteArgs,
-		RunE: runDelete,
+// Start executes the delete operation
+func (d *Deleter) Start(ctx context.Context) error {
+	if err := d.confirmDeletion(); err != nil {
+		return err
 	}
 
-	// Add command-line flags
-	cmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
-	cmd.Flags().StringVar(&deleteSourceName, "source", "", "Delete indices for a specific source")
+	return d.deleteIndices(ctx)
+}
+
+// confirmDeletion asks for user confirmation before deletion
+func (d *Deleter) confirmDeletion() error {
+	// Write the list of indices to be deleted
+	if _, err := os.Stdout.WriteString("The following indices will be deleted:\n"); err != nil {
+		return fmt.Errorf("failed to write to stdout: %w", err)
+	}
+	if _, err := os.Stdout.WriteString(strings.Join(d.indices, "\n") + "\n"); err != nil {
+		return fmt.Errorf("failed to write to stdout: %w", err)
+	}
+
+	// If force flag is set or stdin is not a terminal, skip confirmation
+	if d.force || !isatty.IsTerminal(os.Stdin.Fd()) {
+		return nil
+	}
+
+	if _, err := os.Stdout.WriteString("Are you sure you want to continue? (y/N): "); err != nil {
+		return fmt.Errorf("failed to write to stdout: %w", err)
+	}
+
+	var response string
+	if _, err := fmt.Scanln(&response); err != nil {
+		// If we get an EOF or empty input, treat it as 'N'
+		if errors.Is(err, io.EOF) || response == "" {
+			return ErrDeletionCancelled
+		}
+		return fmt.Errorf("failed to read user input: %w", err)
+	}
+
+	if !strings.EqualFold(response, "y") {
+		return ErrDeletionCancelled
+	}
+
+	return nil
+}
+
+// deleteIndices deletes the indices
+func (d *Deleter) deleteIndices(ctx context.Context) error {
+	d.logger.Info("Starting index deletion", "indices", d.indices, "source", d.sourceName)
+
+	// Test storage connection
+	if err := d.storage.TestConnection(ctx); err != nil {
+		d.logger.Error("Failed to connect to storage", "error", err)
+		return fmt.Errorf("failed to connect to storage: %w", err)
+	}
+
+	// Resolve indices to delete
+	if d.sourceName != "" {
+		source := d.sources.FindByName(d.sourceName)
+		if source == nil {
+			return fmt.Errorf("source not found: %s", d.sourceName)
+		}
+		if source.Index == "" && source.ArticleIndex == "" {
+			return fmt.Errorf("source %s has no indices configured", d.sourceName)
+		}
+		// Add both content and article indices if they exist
+		d.indices = make([]string, 0, defaultIndicesCapacity)
+		if source.Index != "" {
+			d.indices = append(d.indices, source.Index)
+		}
+		if source.ArticleIndex != "" {
+			d.indices = append(d.indices, source.ArticleIndex)
+		}
+		d.logger.Info("Resolved source indices", "indices", d.indices, "source", d.sourceName)
+	}
+
+	// Get existing indices
+	existingIndices, listErr := d.storage.ListIndices(ctx)
+	if listErr != nil {
+		d.logger.Error("Failed to list indices", "error", listErr)
+		return listErr
+	}
+	d.logger.Debug("Found existing indices", "indices", existingIndices)
+
+	// Check for empty indices
+	if len(d.indices) == 0 {
+		return errors.New("no indices specified")
+	}
+
+	// Filter indices
+	filtered := d.filterIndices(existingIndices)
+
+	// Report missing indices
+	d.reportMissingIndices(filtered.missing)
+
+	if len(filtered.toDelete) == 0 {
+		d.logger.Info("No indices to delete")
+		return nil
+	}
+
+	d.logger.Info("Indices to delete", "indices", filtered.toDelete)
+
+	// Delete indices
+	var deleteErr error
+	for _, index := range filtered.toDelete {
+		if err := d.storage.DeleteIndex(ctx, index); err != nil {
+			d.logger.Error("Failed to delete index",
+				"index", index,
+				"error", err,
+			)
+			deleteErr = fmt.Errorf("failed to delete index %s: %w", index, err)
+			continue
+		}
+
+		d.logger.Info("Successfully deleted index", "index", index)
+	}
+
+	if deleteErr != nil {
+		return deleteErr
+	}
+
+	if len(filtered.toDelete) == 0 {
+		d.logger.Info("No indices to delete")
+		return nil
+	}
+
+	d.logger.Info("Successfully deleted indices", "count", len(filtered.toDelete))
+	return nil
+}
+
+// filterIndices filters out non-existent indices and returns lists of indices to delete and missing indices.
+func (d *Deleter) filterIndices(existingIndices []string) struct {
+	toDelete []string
+	missing  []string
+} {
+	// Create map of existing indices
+	existingMap := make(map[string]bool)
+	for _, idx := range existingIndices {
+		existingMap[idx] = true
+	}
+
+	// Filter and report non-existent indices
+	result := struct {
+		toDelete []string
+		missing  []string
+	}{
+		toDelete: make([]string, 0, len(d.indices)),
+		missing:  make([]string, 0, len(d.indices)),
+	}
+
+	for _, index := range d.indices {
+		if !existingMap[index] {
+			result.missing = append(result.missing, index)
+		} else {
+			result.toDelete = append(result.toDelete, index)
+		}
+	}
+
+	return result
+}
+
+// reportMissingIndices prints a list of indices that do not exist.
+func (d *Deleter) reportMissingIndices(missingIndices []string) {
+	if len(missingIndices) > 0 {
+		fmt.Fprintf(os.Stdout, "\nThe following indices do not exist:\n")
+		for _, index := range missingIndices {
+			fmt.Fprintf(os.Stdout, "  - %s\n", index)
+		}
+	}
+}
+
+// DeleteParams holds the parameters for the delete command
+type DeleteParams struct {
+	ConfigPath string
+	SourceName string
+	Force      bool
+	Indices    []string
+}
+
+// NewDeleteCommand creates a new delete command
+func NewDeleteCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete [index-name...]",
+		Short: "Delete one or more Elasticsearch indices",
+		Long: `Delete one or more Elasticsearch indices.
+This command allows you to delete one or more indices from the Elasticsearch cluster.
+You can specify indices by name or by source name.`,
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get logger from context
+			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context or invalid type")
+			}
+
+			// Get flags
+			configPath, _ := cmd.Flags().GetString("config")
+			sourceName, _ := cmd.Flags().GetString("source")
+			force, _ := cmd.Flags().GetBool("force")
+
+			// Validate args
+			if err := ValidateDeleteArgs(sourceName, args); err != nil {
+				return err
+			}
+
+			// Create Fx application
+			app := fx.New(
+				// Include all required modules
+				Module,
+
+				// Provide config path string
+				fx.Provide(func() string { return configPath }),
+
+				// Provide logger
+				fx.Provide(func() logger.Interface { return log }),
+
+				// Provide delete params
+				fx.Provide(func() DeleteParams {
+					return DeleteParams{
+						ConfigPath: configPath,
+						SourceName: sourceName,
+						Force:      force,
+						Indices:    args,
+					}
+				}),
+
+				// Use custom Fx logger
+				fx.WithLogger(func() fxevent.Logger {
+					return logger.NewFxLogger(log)
+				}),
+
+				// Invoke delete command
+				fx.Invoke(func(d *Deleter) error {
+					if err := d.Start(cmd.Context()); err != nil {
+						if errors.Is(err, ErrDeletionCancelled) {
+							cmd.Println("Deletion cancelled")
+							return nil
+						}
+						return err
+					}
+					cmd.Println("Operation completed successfully")
+					return nil
+				}),
+			)
+
+			// Start application
+			if err := app.Start(context.Background()); err != nil {
+				return fmt.Errorf("failed to start application: %w", err)
+			}
+
+			// Stop application
+			if err := app.Stop(context.Background()); err != nil {
+				return fmt.Errorf("failed to stop application: %w", err)
+			}
+
+			return nil
+		},
+	}
+
+	// Add flags
+	cmd.Flags().StringP("config", "c", "config.yaml", "Path to config file")
+	cmd.Flags().StringP("source", "s", "", "Delete indices for the specified source")
+	cmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
 
 	return cmd
 }
 
-// validateDeleteArgs validates the command arguments to ensure they are valid.
-// It:
-// - Ensures either indices are specified or --source flag is used
-// - Prevents using both indices and --source flag together
-func validateDeleteArgs(_ *cobra.Command, args []string) error {
-	if deleteSourceName == "" && len(args) == 0 {
-		return errors.New("either specify indices or use --source flag")
+// ValidateDeleteArgs validates the arguments for the delete command.
+func ValidateDeleteArgs(sourceName string, args []string) error {
+	if sourceName == "" && len(args) == 0 {
+		return errors.New("either indices or a source name must be specified")
 	}
-	if deleteSourceName != "" && len(args) > 0 {
-		return errors.New("cannot specify both indices and --source flag")
-	}
-	return nil
-}
-
-// runDelete executes the delete command and removes the specified indices.
-// It:
-// - Sets up signal handling for graceful shutdown
-// - Creates channels for error handling and completion
-// - Initializes the Fx application with required modules
-// - Handles application lifecycle and error cases
-// - Manages the deletion process
-func runDelete(cmd *cobra.Command, args []string) error {
-	force, _ := cmd.Flags().GetBool("force")
-
-	// Set up signal handling for graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Create channels for error handling and completion
-	errChan := make(chan error, 1)
-	doneChan := make(chan struct{})
-
-	// Initialize the Fx application with required modules
-	app := fx.New(
-		fx.NopLogger, // Suppress Fx startup/shutdown logs
-		Module,
-		fx.Invoke(func(p struct {
-			fx.In
-			Storage common.Storage
-			Sources sources.Interface `name:"sourceManager"`
-			Logger  common.Logger
-			LC      fx.Lifecycle
-		}) {
-			p.LC.Append(fx.Hook{
-				OnStart: func(context.Context) error {
-					params := &deleteParams{
-						ctx:     cmd.Context(),
-						storage: p.Storage,
-						sources: p.Sources,
-						logger:  p.Logger,
-						indices: args,
-						force:   force,
-					}
-					if err := executeDelete(params); err != nil {
-						p.Logger.Error("Error executing delete", "error", err)
-						errChan <- err
-						return err
-					}
-					close(doneChan)
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					return nil
-				},
-			})
-		}),
-	)
-
-	// Start the application and handle any startup errors
-	if err := app.Start(cmd.Context()); err != nil {
-		return fmt.Errorf("error starting application: %w", err)
-	}
-
-	// Wait for either:
-	// - A signal interrupt (SIGINT/SIGTERM)
-	// - Context cancellation
-	// - Delete completion
-	// - Delete error
-	var deleteErr error
-	select {
-	case sig := <-sigChan:
-		common.PrintInfof("\nReceived signal %v, initiating shutdown...", sig)
-	case <-cmd.Context().Done():
-		common.PrintInfof("\nContext cancelled, initiating shutdown...")
-	case deleteErr = <-errChan:
-		// Error already printed in executeDelete
-	case <-doneChan:
-		// Success message already printed in executeDelete
-	}
-
-	// Create a context with timeout for graceful shutdown
-	stopCtx, stopCancel := context.WithTimeout(cmd.Context(), common.DefaultOperationTimeout)
-	defer stopCancel()
-
-	// Stop the application and handle any shutdown errors
-	if err := app.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
-		common.PrintErrorf("Error stopping application: %v", err)
-		if deleteErr == nil {
-			deleteErr = err
-		}
-	}
-
-	return deleteErr
-}
-
-// executeDelete performs the actual deletion of indices.
-// It:
-// - Resolves indices to delete (from args or source)
-// - Checks which indices exist
-// - Filters out non-existent indices
-// - Requests confirmation if needed
-// - Deletes the specified indices
-func executeDelete(p *deleteParams) error {
-	if err := resolveIndices(p); err != nil {
-		return err
-	}
-
-	existingMap, err := getExistingIndices(p)
-	if err != nil {
-		return err
-	}
-
-	indicesToDelete := filterExistingIndices(p, existingMap)
-	if len(indicesToDelete) == 0 {
-		return nil
-	}
-
-	if !p.force {
-		if !confirmDeletion(indicesToDelete) {
-			return nil
-		}
-	}
-
-	return deleteIndices(p, indicesToDelete)
-}
-
-// resolveIndices determines which indices to delete.
-// It:
-// - Uses command-line arguments if provided
-// - Uses source configuration if --source flag is used
-func resolveIndices(p *deleteParams) error {
-	if deleteSourceName != "" {
-		source, err := p.sources.FindByName(deleteSourceName)
-		if err != nil {
-			return err
-		}
-		// Use both content and article indices
-		p.indices = []string{source.Index, source.ArticleIndex}
-	}
-	return nil
-}
-
-// getExistingIndices retrieves a list of all existing indices.
-// It:
-// - Queries Elasticsearch for all indices
-// - Creates a map for efficient lookup
-func getExistingIndices(p *deleteParams) (map[string]bool, error) {
-	indices, err := p.storage.ListIndices(p.ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	existingMap := make(map[string]bool)
-	for _, idx := range indices {
-		existingMap[idx] = true
-	}
-	return existingMap, nil
-}
-
-// filterExistingIndices filters out non-existent indices and reports them.
-// It:
-// - Checks each requested index against existing indices
-// - Reports non-existent indices to the user
-// - Returns only the indices that exist
-func filterExistingIndices(p *deleteParams, existingMap map[string]bool) []string {
-	var missingIndices []string
-	var indicesToDelete []string
-
-	for _, index := range p.indices {
-		if !existingMap[index] {
-			missingIndices = append(missingIndices, index)
-		} else {
-			indicesToDelete = append(indicesToDelete, index)
-		}
-	}
-
-	if len(missingIndices) > 0 {
-		common.PrintInfof("\nThe following indices do not exist (already deleted):")
-		for _, index := range missingIndices {
-			common.PrintInfof("  - %s", index)
-		}
-	}
-
-	return indicesToDelete
-}
-
-// confirmDeletion prompts the user for confirmation before deleting indices.
-// It:
-// - Displays the list of indices to be deleted
-// - Requests user confirmation
-func confirmDeletion(indices []string) bool {
-	common.PrintInfof("\nAre you sure you want to delete the following indices?")
-	for _, index := range indices {
-		common.PrintInfof("  - %s", index)
-	}
-	return common.PrintConfirmation("\nContinue?")
-}
-
-// deleteIndices performs the actual deletion of the specified indices.
-// It:
-// - Deletes each index from Elasticsearch
-func deleteIndices(p *deleteParams, indices []string) error {
-	for _, index := range indices {
-		if err := p.storage.DeleteIndex(p.ctx, index); err != nil {
-			return err
-		}
+	if sourceName != "" && len(args) > 0 {
+		return errors.New("cannot specify both indices and a source name")
 	}
 	return nil
 }

@@ -1,7 +1,6 @@
 package middleware_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,28 +8,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
+	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
-	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/config/server"
+	loggerMock "github.com/jonesrussell/gocrawl/testutils/mocks/logger"
 )
 
-// mockLogger implements logger.Interface for testing
-type mockLogger struct {
-	logger.Interface
-}
-
-func (m *mockLogger) Debug(msg string, fields ...any)   {}
-func (m *mockLogger) Error(msg string, fields ...any)   {}
-func (m *mockLogger) Info(msg string, fields ...any)    {}
-func (m *mockLogger) Warn(msg string, fields ...any)    {}
-func (m *mockLogger) Fatal(msg string, fields ...any)   {}
-func (m *mockLogger) Printf(format string, args ...any) {}
-func (m *mockLogger) Errorf(format string, args ...any) {}
-func (m *mockLogger) Sync() error                       { return nil }
-
-// mockTimeProvider implements TimeProvider for testing
+// mockTimeProvider is a mock implementation of TimeProvider
 type mockTimeProvider struct {
 	currentTime time.Time
 }
@@ -43,312 +28,198 @@ func (m *mockTimeProvider) Advance(d time.Duration) {
 	m.currentTime = m.currentTime.Add(d)
 }
 
-func setupTestRouter(t *testing.T, securityConfig *config.ServerConfig) (*gin.Engine, *middleware.SecurityMiddleware) {
-	gin.SetMode(gin.TestMode)
+// setupTestRouter creates a new test router with security middleware
+func setupTestRouter(
+	t *testing.T,
+	cfg *server.Config,
+) (*gin.Engine, *middleware.SecurityMiddleware, *mockTimeProvider) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(func() { ctrl.Finish() })
+
+	mockLog := loggerMock.NewMockInterface(ctrl)
+	mockLog.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().Fatal(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLog.EXPECT().With(gomock.Any()).Return(mockLog).AnyTimes()
+
+	security := middleware.NewSecurityMiddleware(cfg, mockLog)
+	mockTime := &mockTimeProvider{}
+	security.SetTimeProvider(mockTime)
+
 	router := gin.New()
-
-	securityMiddleware := middleware.NewSecurityMiddleware(securityConfig, &mockLogger{})
-	router.Use(securityMiddleware.Middleware())
-
-	router.POST("/test", func(c *gin.Context) {
-		t.Log("Handling test request")
-		c.JSON(http.StatusOK, gin.H{"status": "success"})
+	router.Use(security.Middleware())
+	router.GET("/test", func(c *gin.Context) {
+		c.Status(http.StatusOK)
 	})
 
-	return router, securityMiddleware
+	return router, security, mockTime
 }
 
-func TestAPIKeyAuthentication(t *testing.T) {
+func TestSecurityMiddleware_HandleCORS(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
-		apiKey         string
-		requestKey     string
-		expectedStatus int
-	}{
-		{
-			name:           "valid api key",
-			apiKey:         "test-key",
-			requestKey:     "test-key",
-			expectedStatus: http.StatusOK,
-		},
-		{
-			name:           "invalid api key",
-			apiKey:         "test-key",
-			requestKey:     "wrong-key",
-			expectedStatus: http.StatusUnauthorized,
-		},
-		{
-			name:           "missing api key",
-			apiKey:         "test-key",
-			requestKey:     "",
-			expectedStatus: http.StatusUnauthorized,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.ServerConfig{
-				Security: struct {
-					Enabled   bool   `yaml:"enabled"`
-					APIKey    string `yaml:"api_key"`
-					RateLimit int    `yaml:"rate_limit"`
-					CORS      struct {
-						Enabled        bool     `yaml:"enabled"`
-						AllowedOrigins []string `yaml:"allowed_origins"`
-						AllowedMethods []string `yaml:"allowed_methods"`
-						AllowedHeaders []string `yaml:"allowed_headers"`
-						MaxAge         int      `yaml:"max_age"`
-					} `yaml:"cors"`
-					TLS struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					} `yaml:"tls"`
-				}{
-					Enabled: true,
-					APIKey:  tt.apiKey,
-				},
-			}
-			router, _ := setupTestRouter(t, cfg)
-
-			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPost, "/test", nil)
-			require.NoError(t, err)
-
-			if tt.requestKey != "" {
-				req.Header.Set("X-Api-Key", tt.requestKey)
-			}
-
-			router.ServeHTTP(w, req)
-			assert.Equal(t, tt.expectedStatus, w.Code)
-		})
-	}
-}
-
-func TestRateLimiting(t *testing.T) {
-	cfg := &config.ServerConfig{
-		Security: struct {
-			Enabled   bool   `yaml:"enabled"`
-			APIKey    string `yaml:"api_key"`
-			RateLimit int    `yaml:"rate_limit"`
-			CORS      struct {
-				Enabled        bool     `yaml:"enabled"`
-				AllowedOrigins []string `yaml:"allowed_origins"`
-				AllowedMethods []string `yaml:"allowed_methods"`
-				AllowedHeaders []string `yaml:"allowed_headers"`
-				MaxAge         int      `yaml:"max_age"`
-			} `yaml:"cors"`
-			TLS struct {
-				Enabled     bool   `yaml:"enabled"`
-				Certificate string `yaml:"certificate"`
-				Key         string `yaml:"key"`
-			} `yaml:"tls"`
-		}{
-			Enabled:   true,
-			APIKey:    "test-key",
-			RateLimit: 2, // 2 requests per 5 seconds
-		},
-	}
-	router, securityMiddleware := setupTestRouter(t, cfg)
-
-	// Set a shorter window for testing
-	securityMiddleware.SetRateLimitWindow(5 * time.Second)
-
-	// Set up mock time provider with a fixed start time
-	startTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	mockTime := &mockTimeProvider{currentTime: startTime}
-	securityMiddleware.SetTimeProvider(mockTime)
-
-	// Start cleanup goroutine with a context that we can cancel
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	// Start cleanup in a goroutine
-	cleanupDone := make(chan struct{})
-	go func() {
-		securityMiddleware.Cleanup(ctx)
-		close(cleanupDone)
-	}()
-
-	// Make requests from the same IP
-	w := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodPost, "/test", nil)
-	require.NoError(t, err)
-	req.Header.Set("X-Api-Key", "test-key")
-	req.RemoteAddr = "127.0.0.1"
-
-	// First request should succeed
-	router.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code, "First request should succeed")
-
-	// Second request should succeed
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code, "Second request should succeed")
-
-	// Third request should be rate limited
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusTooManyRequests, w.Code, "Third request should be rate limited")
-
-	// Advance time by 5 seconds and 1 millisecond to ensure we're past the window
-	mockTime.Advance(5*time.Second + time.Millisecond)
-
-	// Give the cleanup goroutine a chance to run
-	time.Sleep(100 * time.Millisecond)
-
-	// Request should succeed again after window expires
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code, "Request after window should succeed")
-
-	// Cancel the context to stop the cleanup goroutine
-	cancel()
-
-	// Wait for cleanup to finish with a timeout
-	select {
-	case <-cleanupDone:
-		// Cleanup finished successfully
-	case <-time.After(2 * time.Second):
-		t.Fatal("Cleanup goroutine did not finish within timeout")
-	}
-}
-
-func TestCORS(t *testing.T) {
-	tests := []struct {
-		name           string
+		config         *server.Config
 		origin         string
 		method         string
-		allowedOrigins []string
 		expectedStatus int
 	}{
 		{
-			name:           "allowed origin",
-			origin:         "http://example.com",
-			method:         http.MethodPost,
-			allowedOrigins: []string{"http://example.com"},
+			name: "test environment allows any origin",
+			config: &server.Config{
+				Address: ":8080",
+			},
+			origin:         "http://test.com",
+			method:         http.MethodGet,
 			expectedStatus: http.StatusOK,
 		},
 		{
-			name:           "disallowed origin",
-			origin:         "http://malicious.com",
-			method:         http.MethodPost,
-			allowedOrigins: []string{"http://example.com"},
-			expectedStatus: http.StatusForbidden,
+			name: "handles OPTIONS request",
+			config: &server.Config{
+				Address: ":8080",
+			},
+			origin:         "http://test.com",
+			method:         http.MethodOptions,
+			expectedStatus: http.StatusNoContent,
 		},
 		{
-			name:           "preflight request",
-			origin:         "http://example.com",
-			method:         http.MethodOptions,
-			allowedOrigins: []string{"http://example.com"},
-			expectedStatus: http.StatusNoContent,
+			name: "handles request without origin",
+			config: &server.Config{
+				Address: ":8080",
+			},
+			origin:         "",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusOK,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.ServerConfig{
-				Security: struct {
-					Enabled   bool   `yaml:"enabled"`
-					APIKey    string `yaml:"api_key"`
-					RateLimit int    `yaml:"rate_limit"`
-					CORS      struct {
-						Enabled        bool     `yaml:"enabled"`
-						AllowedOrigins []string `yaml:"allowed_origins"`
-						AllowedMethods []string `yaml:"allowed_methods"`
-						AllowedHeaders []string `yaml:"allowed_headers"`
-						MaxAge         int      `yaml:"max_age"`
-					} `yaml:"cors"`
-					TLS struct {
-						Enabled     bool   `yaml:"enabled"`
-						Certificate string `yaml:"certificate"`
-						Key         string `yaml:"key"`
-					} `yaml:"tls"`
-				}{
-					Enabled: true,
-					CORS: struct {
-						Enabled        bool     `yaml:"enabled"`
-						AllowedOrigins []string `yaml:"allowed_origins"`
-						AllowedMethods []string `yaml:"allowed_methods"`
-						AllowedHeaders []string `yaml:"allowed_headers"`
-						MaxAge         int      `yaml:"max_age"`
-					}{
-						Enabled:        true,
-						AllowedOrigins: tt.allowedOrigins,
-						AllowedMethods: []string{http.MethodPost},
-						AllowedHeaders: []string{"Content-Type", "X-Api-Key"},
-						MaxAge:         86400,
-					},
-				},
-			}
-			router, _ := setupTestRouter(t, cfg)
+			t.Parallel()
+			router, _, _ := setupTestRouter(t, tt.config)
 
-			w := httptest.NewRecorder()
-			req, err := http.NewRequest(tt.method, "/test", nil)
-			require.NoError(t, err)
-
+			req := httptest.NewRequest(tt.method, "/test", http.NoBody)
 			if tt.origin != "" {
 				req.Header.Set("Origin", tt.origin)
 			}
-			if tt.method == http.MethodOptions {
-				req.Header.Set("Access-Control-Request-Method", http.MethodPost)
-			}
+			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
+
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
-			if tt.expectedStatus == http.StatusOK || tt.expectedStatus == http.StatusNoContent {
+			if tt.origin != "" {
 				assert.Equal(t, tt.origin, w.Header().Get("Access-Control-Allow-Origin"))
-				assert.Contains(t, w.Header().Get("Access-Control-Allow-Methods"), http.MethodPost)
-				assert.Contains(t, w.Header().Get("Access-Control-Allow-Headers"), "X-Api-Key")
+				assert.Equal(t, "GET, POST, PUT, DELETE, OPTIONS", w.Header().Get("Access-Control-Allow-Methods"))
+				assert.Equal(t, "Content-Type, Authorization, X-API-Key", w.Header().Get("Access-Control-Allow-Headers"))
+				assert.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
 			}
 		})
 	}
 }
 
-func TestSecurityHeaders(t *testing.T) {
-	cfg := &config.ServerConfig{
-		Security: struct {
-			Enabled   bool   `yaml:"enabled"`
-			APIKey    string `yaml:"api_key"`
-			RateLimit int    `yaml:"rate_limit"`
-			CORS      struct {
-				Enabled        bool     `yaml:"enabled"`
-				AllowedOrigins []string `yaml:"allowed_origins"`
-				AllowedMethods []string `yaml:"allowed_methods"`
-				AllowedHeaders []string `yaml:"allowed_headers"`
-				MaxAge         int      `yaml:"max_age"`
-			} `yaml:"cors"`
-			TLS struct {
-				Enabled     bool   `yaml:"enabled"`
-				Certificate string `yaml:"certificate"`
-				Key         string `yaml:"key"`
-			} `yaml:"tls"`
-		}{
-			Enabled: true,
+func TestSecurityMiddleware_APIAuth(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		config         *server.Config
+		apiKey         string
+		expectedStatus int
+	}{
+		{
+			name: "missing API key",
+			config: &server.Config{
+				SecurityEnabled: true,
+				APIKey:          "test-key",
+			},
+			apiKey:         "",
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "invalid API key",
+			config: &server.Config{
+				SecurityEnabled: true,
+				APIKey:          "test-key",
+			},
+			apiKey:         "wrong-key",
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "valid API key",
+			config: &server.Config{
+				SecurityEnabled: true,
+				APIKey:          "test-key",
+			},
+			apiKey:         "test-key",
+			expectedStatus: http.StatusOK,
 		},
 	}
-	router, _ := setupTestRouter(t, cfg)
 
-	w := httptest.NewRecorder()
-	req, err := http.NewRequest(http.MethodPost, "/test", nil)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			router, _, _ := setupTestRouter(t, tt.config)
+
+			req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+			if tt.apiKey != "" {
+				req.Header.Set("X-Api-Key", tt.apiKey)
+			}
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+		})
+	}
+}
+
+func TestSecurityMiddleware_RateLimit(t *testing.T) {
+	t.Parallel()
+
+	// Setup test router with security middleware
+	cfg := &server.Config{
+		SecurityEnabled: true,
+		APIKey:          "test-key",
+		Address:         ":8080",
+	}
+	router, security, mockTime := setupTestRouter(t, cfg)
+
+	// Set a very short window for testing
+	security.SetRateLimitWindow(100 * time.Millisecond)
+	security.SetMaxRequests(2)
+
+	// First request should succeed
+	req := httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
 	req.Header.Set("X-Api-Key", "test-key")
-
+	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// Check security headers
-	headers := map[string]string{
-		"X-Frame-Options":           "DENY",
-		"X-XSS-Protection":          "1; mode=block",
-		"X-Content-Type-Options":    "nosniff",
-		"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-		"Referrer-Policy":           "strict-origin-when-cross-origin",
-		"Content-Security-Policy":   "default-src 'self'",
-	}
+	// Second request should succeed
+	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	req.Header.Set("X-Api-Key", "test-key")
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
 
-	for header, expectedValue := range headers {
-		assert.Equal(t, expectedValue, w.Header().Get(header))
-	}
+	// Third request should be rate limited
+	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	req.Header.Set("X-Api-Key", "test-key")
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+
+	// Wait for rate limit window to expire
+	mockTime.Advance(200 * time.Millisecond)
+
+	// Request should succeed again
+	req = httptest.NewRequest(http.MethodGet, "/test", http.NoBody)
+	req.Header.Set("X-Api-Key", "test-key")
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
 }

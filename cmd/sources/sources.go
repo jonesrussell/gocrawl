@@ -1,27 +1,52 @@
-// Package sources implements the command-line interface for managing content sources
-// in GoCrawl. It provides commands for listing, adding, removing, and managing
-// crawler sources defined in sources.yml.
+// Package sources provides the sources command implementation.
 package sources
 
 import (
+	"context"
+
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 )
 
-// Command creates and returns the sources command that serves as the parent
-// command for all source management operations. It:
-// - Sets up the command with appropriate usage and description
-// - Adds subcommands for specific source management operations
-// - Provides a unified interface for source configuration management
-func Command() *cobra.Command {
+// contextKey is a type for context keys to avoid collisions
+type contextKey string
+
+const (
+	// ConfigKey is the context key for the configuration
+	ConfigKey contextKey = "config"
+	// LoggerKey is the context key for the logger
+	LoggerKey contextKey = "logger"
+)
+
+// NewSourcesCommand returns the sources command.
+func NewSourcesCommand(
+	cfg config.Interface,
+	log logger.Interface,
+	_ sources.Interface, // Ignore the passed source manager
+) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sources",
-		Short: "Manage sources defined in sources.yml",
-		Long: `Manage sources defined in sources.yml.
-These commands help you list, add, remove, and manage your crawler sources.`,
+		Short: "Manage content sources",
+		Long: `The sources command provides functionality for managing content sources.
+It allows you to add, list, and configure web content sources for crawling.`,
 	}
 
-	// Add subcommands for source management operations
-	cmd.AddCommand(ListCommand())
+	// Create a context with dependencies
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, ConfigKey, cfg)
+	ctx = context.WithValue(ctx, LoggerKey, log)
+	cmd.SetContext(ctx)
+
+	// Add subcommands
+	cmd.AddCommand(
+		NewListCommand(),
+		// TODO: Implement these commands
+		// NewAddCommand(),
+		// NewRemoveCommand(),
+		// NewUpdateCommand(),
+	)
 
 	return cmd
 }
