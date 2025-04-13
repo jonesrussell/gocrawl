@@ -140,7 +140,7 @@ func (p *HTMLProcessor) detectContentType(e *colly.HTMLElement) common.ContentTy
 	}
 
 	// Check for video content - look for video players or embeds
-	hasVideoPlayer := e.DOM.Find("video, .video-player, .video-container, iframe[src*='youtube'], iframe[src*='vimeo']").Length() > 0
+	hasVideoPlayer := hasVideoPlayer(e)
 	if hasVideoPlayer {
 		return common.ContentTypeVideo
 	}
@@ -161,6 +161,18 @@ func (p *HTMLProcessor) detectContentType(e *colly.HTMLElement) common.ContentTy
 
 	// Default to page content type
 	return common.ContentTypePage
+}
+
+// hasVideoPlayer checks if the element contains a video player
+func hasVideoPlayer(e *colly.HTMLElement) bool {
+	selectors := []string{
+		"video",
+		".video-player",
+		".video-container",
+		"iframe[src*='youtube']",
+		"iframe[src*='vimeo']",
+	}
+	return e.DOM.Find(strings.Join(selectors, ", ")).Length() > 0
 }
 
 // GetUnknownTypes returns a map of content types that had no processor
