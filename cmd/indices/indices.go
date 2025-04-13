@@ -65,7 +65,7 @@ This command provides subcommands for listing, deleting, and managing indices.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get logger from context
 			loggerValue := cmd.Context().Value(LoggerKey)
-			log, ok := loggerValue.(logger.Interface)
+			loggerInterface, ok := loggerValue.(logger.Interface)
 			if !ok {
 				return errors.New("logger not found in context or invalid type")
 			}
@@ -82,11 +82,11 @@ This command provides subcommands for listing, deleting, and managing indices.`,
 				fx.Provide(func() string { return configPath }),
 
 				// Provide logger
-				fx.Provide(func() logger.Interface { return log }),
+				fx.Provide(func() logger.Interface { return loggerInterface }),
 
 				// Use custom Fx logger
 				fx.WithLogger(func() fxevent.Logger {
-					return logger.NewFxLogger(log)
+					return logger.NewFxLogger(loggerInterface)
 				}),
 
 				// Invoke indices command

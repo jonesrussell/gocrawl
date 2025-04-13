@@ -225,15 +225,19 @@ func (l *Lister) List(ctx context.Context) ([]*IndexInfo, error) {
 	indexInfo := make([]*IndexInfo, len(filteredIndices))
 	for i, index := range filteredIndices {
 		// Get health status
-		health, err := l.storage.GetIndexHealth(ctx, index)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get health for index %s: %w", index, err)
+		health, healthErr := l.storage.GetIndexHealth(ctx, index)
+		if healthErr != nil {
+			l.logger.Error("Failed to get index health",
+				"index", index,
+				"error", healthErr,
+			)
+			continue
 		}
 
 		// Get document count
-		count, err := l.storage.GetIndexDocCount(ctx, index)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get document count for index %s: %w", index, err)
+		count, countErr := l.storage.GetIndexDocCount(ctx, index)
+		if countErr != nil {
+			return nil, fmt.Errorf("failed to get document count for index %s: %w", index, countErr)
 		}
 
 		indexInfo[i] = &IndexInfo{
