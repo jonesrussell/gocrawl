@@ -5,11 +5,15 @@ package indices
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
+	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 // contextKey is a type for context keys to avoid collisions
@@ -58,21 +62,61 @@ func NewIndicesCommand(
 		Short: "Manage Elasticsearch indices",
 		Long: `Manage Elasticsearch indices.
 This command provides subcommands for listing, deleting, and managing indices.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get logger from context
+			loggerValue := cmd.Context().Value(LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context or invalid type")
+			}
+
+			// Get config path from flags
+			configPath, _ := cmd.Flags().GetString("config")
+
+			// Create Fx application
+			app := fx.New(
+				// Include all required modules
+				Module,
+
+				// Provide config path string
+				fx.Provide(func() string { return configPath }),
+
+				// Provide logger
+				fx.Provide(func() logger.Interface { return log }),
+
+				// Use custom Fx logger
+				fx.WithLogger(func() fxevent.Logger {
+					return logger.NewFxLogger(log)
+				}),
+
+				// Invoke indices command
+				fx.Invoke(func(cmd *cobra.Command) error {
+					// Add subcommands for index management operations
+					cmd.AddCommand(
+						NewListCommand(),   // Command for listing all indices
+						NewDeleteCommand(), // Command for deleting indices
+						NewCreateCommand(), // Command for creating a new index
+					)
+					return nil
+				}),
+			)
+
+			// Start application
+			if err := app.Start(context.Background()); err != nil {
+				return fmt.Errorf("failed to start application: %w", err)
+			}
+
+			// Stop application
+			if err := app.Stop(context.Background()); err != nil {
+				return fmt.Errorf("failed to stop application: %w", err)
+			}
+
+			return nil
+		},
 	}
 
-	// Create a context with dependencies
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, ConfigKey, cfg)
-	ctx = context.WithValue(ctx, LoggerKey, log)
-	ctx = context.WithValue(ctx, StorageKey, storage)
-	cmd.SetContext(ctx)
-
-	// Add subcommands for index management operations
-	cmd.AddCommand(
-		NewListCommand(),   // Command for listing all indices
-		NewDeleteCommand(), // Command for deleting indices
-		NewCreateCommand(), // Command for creating a new index
-	)
+	// Add flags
+	cmd.Flags().StringP("config", "c", "config.yaml", "Path to config file")
 
 	return cmd
 }

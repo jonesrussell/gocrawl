@@ -14,8 +14,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -63,21 +63,11 @@ func NewDeleter(
 
 // Start executes the delete operation
 func (d *Deleter) Start(ctx context.Context) error {
-	if err := d.initializeIndices(); err != nil {
-		return err
-	}
-
 	if err := d.confirmDeletion(); err != nil {
 		return err
 	}
 
 	return d.deleteIndices(ctx)
-}
-
-// initializeIndices initializes the indices slice
-func (d *Deleter) initializeIndices() error {
-	d.indices = make([]string, 0, defaultIndicesCapacity)
-	return nil
 }
 
 // confirmDeletion asks for user confirmation before deletion
@@ -89,6 +79,12 @@ func (d *Deleter) confirmDeletion() error {
 	if _, err := os.Stdout.WriteString(strings.Join(d.indices, "\n") + "\n"); err != nil {
 		return fmt.Errorf("failed to write to stdout: %w", err)
 	}
+
+	// If force flag is set or stdin is not a terminal, skip confirmation
+	if d.force || !isatty.IsTerminal(os.Stdin.Fd()) {
+		return nil
+	}
+
 	if _, err := os.Stdout.WriteString("Are you sure you want to continue? (y/N): "); err != nil {
 		return fmt.Errorf("failed to write to stdout: %w", err)
 	}
@@ -269,7 +265,6 @@ You can specify indices by name or by source name.`,
 			app := fx.New(
 				// Include all required modules
 				Module,
-				storage.Module,
 
 				// Provide config path string
 				fx.Provide(func() string { return configPath }),

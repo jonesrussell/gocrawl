@@ -14,7 +14,6 @@ import (
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -118,8 +117,16 @@ func (l *Lister) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to list indices: %w", err)
 	}
 
+	// Filter out internal indices (those starting with '.')
+	var filteredIndices []string
+	for _, index := range indices {
+		if !strings.HasPrefix(index, ".") {
+			filteredIndices = append(filteredIndices, index)
+		}
+	}
+
 	// Render the table
-	return l.renderer.RenderTable(ctx, l.storage, indices)
+	return l.renderer.RenderTable(ctx, l.storage, filteredIndices)
 }
 
 // NewListCommand creates a new list command
@@ -143,7 +150,6 @@ func NewListCommand() *cobra.Command {
 			app := fx.New(
 				// Include all required modules
 				Module,
-				storage.Module,
 
 				// Provide config path string
 				fx.Provide(func() string { return configPath }),
@@ -197,4 +203,52 @@ func getIngestionStatus(healthStatus string) string {
 	default:
 		return "Unknown"
 	}
+}
+
+// List retrieves and returns a list of all indices.
+func (l *Lister) List(ctx context.Context) ([]*IndexInfo, error) {
+	// Get all indices
+	indices, err := l.storage.ListIndices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list indices: %w", err)
+	}
+
+	// Filter out internal indices (those starting with '.')
+	var filteredIndices []string
+	for _, index := range indices {
+		if !strings.HasPrefix(index, ".") {
+			filteredIndices = append(filteredIndices, index)
+		}
+	}
+
+	// Get health status and document count for each index
+	indexInfo := make([]*IndexInfo, len(filteredIndices))
+	for i, index := range filteredIndices {
+		// Get health status
+		health, err := l.storage.GetIndexHealth(ctx, index)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get health for index %s: %w", index, err)
+		}
+
+		// Get document count
+		count, err := l.storage.GetIndexDocCount(ctx, index)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get document count for index %s: %w", index, err)
+		}
+
+		indexInfo[i] = &IndexInfo{
+			Name:   index,
+			Health: health,
+			Count:  count,
+		}
+	}
+
+	return indexInfo, nil
+}
+
+// IndexInfo represents information about an index
+type IndexInfo struct {
+	Name   string
+	Health string
+	Count  int64
 }

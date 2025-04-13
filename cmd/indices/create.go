@@ -11,7 +11,6 @@ import (
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -128,7 +127,6 @@ The index will be created with default settings unless overridden by configurati
 			app := fx.New(
 				// Include all required modules
 				Module,
-				storage.Module,
 
 				// Provide config path string
 				fx.Provide(func() string { return configPath }),
