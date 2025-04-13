@@ -3,13 +3,12 @@ package content
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
-	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -116,89 +115,10 @@ var contentTypePatterns = map[common.ContentType][]string{
 
 // ExtractContent extracts content from an HTML element
 func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
-	s.Logger.Debug("Extracting content", "url", e.Request.URL.String())
-
-	// Get rules for this URL
-	rules := s.getRulesForURL(e.Request.URL.String())
-
-	// Check if URL matches any exclude patterns
-	url := e.Request.URL.String()
-	for _, pattern := range rules.ExcludePatterns {
-		if strings.Contains(url, pattern) {
-			s.Logger.Debug("URL matches exclude pattern, skipping",
-				"url", url,
-				"pattern", pattern)
-			return nil
-		}
-	}
-
-	var jsonLD JSONLDMetadata
-	var parsedDate time.Time
-
-	// Extract metadata
-	metadata := s.ExtractMetadata(e)
-
-	// Parse JSON-LD if available
-	if jsonLDStr := e.DOM.Find("script[type='application/ld+json']").Text(); jsonLDStr != "" {
-		if err := json.Unmarshal([]byte(jsonLDStr), &jsonLD); err != nil {
-			s.Logger.Error("Failed to parse JSON-LD", "error", err)
-		}
-	}
-
-	// Try to parse date from various sources
-	dates := []string{
-		jsonLD.DateCreated,
-		jsonLD.DateModified,
-	}
-
-	// Add metadata dates if they exist
-	if publishedTime, ok := metadata["article:published_time"].(string); ok {
-		dates = append(dates, publishedTime)
-	}
-	if modifiedTime, ok := metadata["article:modified_time"].(string); ok {
-		dates = append(dates, modifiedTime)
-	}
-
-	for _, dateStr := range dates {
-		if dateStr == "" {
-			continue
-		}
-		parsedDate = s.parseDate(s.Logger, dateStr)
-		if !parsedDate.IsZero() {
-			break
-		}
-	}
-
-	// Determine content type using source-specific patterns
-	contentType := s.DetermineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
-
-	// Get the body text
-	body := e.DOM.Find("body").Text()
-	if body == "" {
-		body = e.Text
-	}
-
-	// Clean up whitespace
-	body = strings.Join(strings.Fields(body), " ")
-
-	// Create content object
 	content := &models.Content{
-		ID:        uuid.New().String(),
-		Title:     jsonLD.Name,
-		URL:       e.Request.URL.String(),
-		Type:      string(contentType),
-		Body:      body,
-		CreatedAt: parsedDate,
-		Metadata:  metadata,
+		URL:  e.Request.URL.String(),
+		Body: strings.TrimSpace(e.Text),
 	}
-
-	s.Logger.Debug("Extracted content",
-		"id", content.ID,
-		"title", content.Title,
-		"url", content.URL,
-		"type", content.Type,
-		"created_at", content.CreatedAt,
-	)
 
 	return content
 }
@@ -321,28 +241,22 @@ func (s *Service) parseDate(logger logger.Interface, dateStr string) time.Time {
 }
 
 // Process processes a single string content
-func (s *Service) Process(_ context.Context, input string) string {
-	s.Logger.Debug("Processing content", "input", input)
-
-	// Create a reader from the input string
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(input))
+func (s *Service) Process(ctx context.Context, html string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		s.Logger.Error("Failed to parse HTML", "error", err)
-		return strings.TrimSpace(input)
+		s.Logger.Error("failed to parse HTML", err)
+		return ""
 	}
 
-	// Get text content without HTML tags
-	var text strings.Builder
-	doc.Find("p, div").Each(func(_ int, s *goquery.Selection) {
-		if text.Len() > 0 {
-			text.WriteString(" ")
+	var text []string
+	doc.Find("p, div").Each(func(i int, sel *goquery.Selection) {
+		t := strings.TrimSpace(sel.Text())
+		if t != "" {
+			text = append(text, t)
 		}
-		text.WriteString(strings.TrimSpace(s.Text()))
 	})
 
-	result := text.String()
-	s.Logger.Debug("Processed content", "result", result)
-	return result
+	return strings.Join(text, " ")
 }
 
 // ProcessBatch processes a batch of strings
@@ -363,4 +277,22 @@ func (s *Service) ProcessWithMetadata(ctx context.Context, input string, metadat
 		)
 	}
 	return s.Process(ctx, input)
+}
+
+// ExtractText extracts the text content from a goquery Document.
+func (s *Service) ExtractText(doc *goquery.Document) string {
+	return doc.Find("body").Text()
+}
+
+func (s *Service) ExtractContentFromDocument(url string, doc *goquery.Document) (*models.Content, error) {
+	body := s.ExtractText(doc)
+	if body == "" {
+		return nil, fmt.Errorf("no content found in document")
+	}
+
+	return &models.Content{
+		URL:       url,
+		Body:      body,
+		CreatedAt: time.Now(),
+	}, nil
 }

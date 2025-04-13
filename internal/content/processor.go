@@ -9,10 +9,8 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/google/uuid"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -106,6 +104,25 @@ func (p *ContentProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement
 		return nil
 	}
 
+	// Extract metadata
+	content.Metadata = p.ContentService.ExtractMetadata(e)
+
+	// Get JSON-LD type if available
+	jsonLDType := ""
+	if typeVal, ok := content.Metadata["@type"].(string); ok {
+		jsonLDType = typeVal
+	}
+
+	// Determine content type
+	content.Type = string(p.ContentService.DetermineContentType(
+		e.Request.URL.String(),
+		content.Metadata,
+		jsonLDType,
+	))
+
+	// Process content
+	content.Body = p.ContentService.Process(ctx, content.Body)
+
 	// Store the content
 	if err := p.Storage.IndexDocument(ctx, p.IndexName, content.ID, content); err != nil {
 		p.Logger.Error("Failed to index content",
@@ -144,6 +161,25 @@ func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType commo
 		return nil
 	}
 
+	// Extract metadata
+	contentData.Metadata = p.ContentService.ExtractMetadata(e)
+
+	// Get JSON-LD type if available
+	jsonLDType := ""
+	if typeVal, ok := contentData.Metadata["@type"].(string); ok {
+		jsonLDType = typeVal
+	}
+
+	// Determine content type
+	contentData.Type = string(p.ContentService.DetermineContentType(
+		e.Request.URL.String(),
+		contentData.Metadata,
+		jsonLDType,
+	))
+
+	// Process content
+	contentData.Body = p.ContentService.Process(ctx, contentData.Body)
+
 	// Store the content
 	if err := p.Storage.IndexDocument(ctx, p.IndexName, contentData.ID, contentData); err != nil {
 		p.Logger.Error("Failed to index content",
@@ -164,37 +200,34 @@ func (p *ContentProcessor) Process(ctx context.Context, content any) error {
 		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
 	}
 
-	// Extract content data
-	contentData := &models.Content{
-		ID:        uuid.New().String(),
-		Title:     e.ChildText("h1"),
-		Body:      e.ChildText("article"),
-		Type:      "page",
-		URL:       e.Request.URL.String(),
-		CreatedAt: time.Now(),
-		Metadata: map[string]any{
-			"title":          e.ChildText("title"),
-			"description":    e.ChildAttr("meta[name=description]", "content"),
-			"keywords":       e.ChildAttr("meta[name=keywords]", "content"),
-			"author":         e.ChildAttr("meta[name=author]", "content"),
-			"og:title":       e.ChildAttr("meta[property=og:title]", "content"),
-			"og:description": e.ChildAttr("meta[property=og:description]", "content"),
-			"og:image":       e.ChildAttr("meta[property=og:image]", "content"),
-			"og:url":         e.ChildAttr("meta[property=og:url]", "content"),
-		},
+	// Extract content using the ContentService
+	contentData := p.ContentService.ExtractContent(e)
+	if contentData == nil {
+		p.Logger.Debug("No content extracted",
+			"url", e.Request.URL.String())
+		return nil
 	}
 
-	// Process the content using the ContentService
-	processedContent := p.ContentService.Process(ctx, contentData.ID)
-	if processedContent == "" {
-		p.Logger.Error("Failed to process content",
-			"component", "content/processor",
-			"contentID", contentData.ID)
-		p.metrics.ErrorCount++
-		return errors.New("failed to process content: empty result")
+	// Extract metadata
+	contentData.Metadata = p.ContentService.ExtractMetadata(e)
+
+	// Get JSON-LD type if available
+	jsonLDType := ""
+	if typeVal, ok := contentData.Metadata["@type"].(string); ok {
+		jsonLDType = typeVal
 	}
 
-	// Store the processed content
+	// Determine content type
+	contentData.Type = string(p.ContentService.DetermineContentType(
+		e.Request.URL.String(),
+		contentData.Metadata,
+		jsonLDType,
+	))
+
+	// Process content
+	contentData.Body = p.ContentService.Process(ctx, contentData.Body)
+
+	// Store the content
 	if err := p.Storage.IndexDocument(ctx, p.IndexName, contentData.ID, contentData); err != nil {
 		p.Logger.Error("Failed to index content",
 			"component", "content/processor",
