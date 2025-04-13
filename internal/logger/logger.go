@@ -14,6 +14,7 @@ type Interface interface {
 	Info(msg string, fields ...any)
 	Warn(msg string, fields ...any)
 	Error(msg string, fields ...any)
+	Fatal(msg string, fields ...any)
 	With(fields ...any) Interface
 }
 

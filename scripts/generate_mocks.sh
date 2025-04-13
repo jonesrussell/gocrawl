@@ -9,9 +9,10 @@ set -e
 mkdir -p testutils/mocks/{api,config,crawler,logger,sources,models,storage}
 
 # API mocks
+mockgen -source=internal/api/api.go -destination=testutils/mocks/api/api.go -package=api
 mockgen -source=internal/api/module.go -destination=testutils/mocks/api/module.go -package=api
 mockgen -source=internal/api/indexing.go -destination=testutils/mocks/api/indexing.go -package=api
-mockgen -source=internal/interfaces/search.go -destination=testutils/mocks/api/search.go -package=api
+mockgen -source=internal/interfaces/index_manager.go -destination=testutils/mocks/api/index_manager.go -package=api
 
 # Config mocks
 mockgen -source=internal/config/interface.go -destination=testutils/mocks/config/config.go -package=config

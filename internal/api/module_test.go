@@ -358,7 +358,6 @@ func TestModule(t *testing.T) {
 
 	// Set up mock storage expectations
 	mockStorage.EXPECT().GetIndexDocCount(gomock.Any(), gomock.Any()).Return(int64(0), nil)
-	mockStorage.EXPECT().Ping(gomock.Any()).Return(nil)
 	mockStorage.EXPECT().TestConnection(gomock.Any()).Return(nil)
 	mockStorage.EXPECT().Close().Return(nil)
 

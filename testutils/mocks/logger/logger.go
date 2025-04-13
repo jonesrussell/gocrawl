@@ -68,6 +68,23 @@ func (mr *MockInterfaceMockRecorder) Error(msg interface{}, fields ...interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Error", reflect.TypeOf((*MockInterface)(nil).Error), varargs...)
 }
 
+// Fatal mocks base method.
+func (m *MockInterface) Fatal(msg string, fields ...any) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{msg}
+	for _, a := range fields {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "Fatal", varargs...)
+}
+
+// Fatal indicates an expected call of Fatal.
+func (mr *MockInterfaceMockRecorder) Fatal(msg interface{}, fields ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{msg}, fields...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Fatal", reflect.TypeOf((*MockInterface)(nil).Fatal), varargs...)
+}
+
 // Info mocks base method.
 func (m *MockInterface) Info(msg string, fields ...any) {
 	m.ctrl.T.Helper()

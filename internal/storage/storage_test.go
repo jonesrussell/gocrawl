@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	es "github.com/elastic/go-elasticsearch/v8"
+	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/jonesrussell/gocrawl/internal/testutils"
+	loggermocks "github.com/jonesrussell/gocrawl/testutils/mocks/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,6 +36,9 @@ func setupMockClient(transport http.RoundTripper) (*es.Client, error) {
 }
 
 func TestSearch_IndexNotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	// Create a mock transport that returns 404 for index existence check
 	transport := &mockTransport{
 		RoundTripFn: func(req *http.Request) (*http.Response, error) {
@@ -50,8 +54,8 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	mockClient, err := setupMockClient(transport)
 	require.NoError(t, err)
 
-	mockLogger := testutils.NewMockLogger()
-	mockLogger.On("Error", "Index not found", []any{"index", "non_existent_index"}).Return()
+	mockLogger := loggermocks.NewMockInterface(ctrl)
+	mockLogger.EXPECT().Error("Index not found", "index", "non_existent_index").Return()
 
 	s := storage.NewStorage(mockClient, mockLogger, &storage.Options{
 		IndexName: "test-index",
@@ -62,12 +66,12 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, storage.ErrIndexNotFound)
 	require.Contains(t, err.Error(), "non_existent_index")
-
-	// Verify that all expected logger calls were made
-	mockLogger.AssertExpectations(t)
 }
 
 func TestSearch_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	// Create a mock transport that returns a successful search response
 	transport := &mockTransport{
 		RoundTripFn: func(req *http.Request) (*http.Response, error) {
@@ -101,7 +105,7 @@ func TestSearch_Success(t *testing.T) {
 	mockClient, err := setupMockClient(transport)
 	require.NoError(t, err)
 
-	mockLogger := testutils.NewMockLogger()
+	mockLogger := loggermocks.NewMockInterface(ctrl)
 	s := storage.NewStorage(mockClient, mockLogger, &storage.Options{
 		IndexName: "test-index",
 	})
@@ -117,7 +121,10 @@ func TestSearch_Success(t *testing.T) {
 }
 
 func TestNewStorage(t *testing.T) {
-	mockLogger := testutils.NewMockLogger()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLogger := loggermocks.NewMockInterface(ctrl)
 	transport := &mockTransport{
 		Response: &http.Response{
 			StatusCode: http.StatusOK,
@@ -139,6 +146,9 @@ func TestNewStorage(t *testing.T) {
 }
 
 func TestStorage_TestConnection(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	transport := &mockTransport{
 		RoundTripFn: func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
@@ -152,7 +162,7 @@ func TestStorage_TestConnection(t *testing.T) {
 	mockClient, err := setupMockClient(transport)
 	require.NoError(t, err)
 
-	mockLogger := testutils.NewMockLogger()
+	mockLogger := loggermocks.NewMockInterface(ctrl)
 	s := storage.NewStorage(mockClient, mockLogger, &storage.Options{
 		IndexName: "test-index",
 	})
