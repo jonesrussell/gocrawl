@@ -3,7 +3,6 @@ package api
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -50,21 +49,6 @@ var Module = fx.Module("api",
 		) (*gin.Engine, middleware.SecurityMiddlewareInterface, error) {
 			router, security := SetupRouter(log, searchManager, cfg)
 			return router, security, nil
-		},
-		// Provide the HTTP server
-		func(
-			router *gin.Engine,
-			cfg config.Interface,
-		) (*http.Server, error) {
-			srv := &http.Server{
-				Addr:              cfg.GetServerConfig().Address,
-				Handler:           router,
-				ReadTimeout:       cfg.GetServerConfig().ReadTimeout,
-				WriteTimeout:      cfg.GetServerConfig().WriteTimeout,
-				IdleTimeout:       cfg.GetServerConfig().IdleTimeout,
-				ReadHeaderTimeout: ReadHeaderTimeout,
-			}
-			return srv, nil
 		},
 		NewLifecycle,
 		NewServer,

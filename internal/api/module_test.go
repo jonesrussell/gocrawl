@@ -3,6 +3,7 @@ package api_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -40,9 +41,10 @@ const (
 
 // testServer wraps the test application and server for API tests.
 type testServer struct {
-	app    *fxtest.App
-	server *http.Server
-	logger logger.Interface
+	app           *fxtest.App
+	server        *http.Server
+	logger        logger.Interface
+	searchManager api.SearchManager
 }
 
 // setupMockLogger creates and configures a mock logger for testing.
@@ -78,6 +80,7 @@ var TestAPIModule = fx.Module("testAPI",
 	),
 )
 
+// setupTestApp creates a test application with mock dependencies.
 func setupTestApp(t *testing.T) *testServer {
 	t.Helper()
 
@@ -125,33 +128,6 @@ func setupTestApp(t *testing.T) *testServer {
 	mockStorage := storagemocks.NewMockInterface(ctrl)
 	mockIndexManager := apimocks.NewMockIndexManager(ctrl)
 
-	// Set up mock search expectations
-	expectedQuery := map[string]any{
-		"query": map[string]any{
-			"match": map[string]any{
-				"content": "test",
-			},
-		},
-		"size": 10,
-	}
-	t.Logf("Setting up mock expectations with query: %+v", expectedQuery)
-	mockSearch.EXPECT().Search(gomock.Any(), "", expectedQuery).Return([]any{
-		map[string]any{
-			"title": "Test Result",
-			"url":   "https://test.com",
-		},
-	}, nil).AnyTimes()
-
-	countQuery := map[string]any{
-		"query": map[string]any{
-			"match": map[string]any{
-				"content": "test",
-			},
-		},
-		"size": 10,
-	}
-	mockSearch.EXPECT().Count(gomock.Any(), "", countQuery).Return(int64(1), nil).AnyTimes()
-
 	ts := &testServer{
 		logger: mockLogger,
 	}
@@ -185,9 +161,10 @@ func setupTestApp(t *testing.T) *testServer {
 				fx.As(new(context.Context)),
 			),
 		),
-		api.Module,
-		fx.Invoke(func(s *http.Server) {
+		TestAPIModule,
+		fx.Invoke(func(s *http.Server, sm api.SearchManager) {
 			ts.server = s
+			ts.searchManager = sm
 		}),
 	)
 
@@ -261,6 +238,9 @@ func TestSearchEndpoint(t *testing.T) {
 	mockLogger := ts.logger.(*loggermocks.MockInterface)
 	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return().AnyTimes()
 
+	// Get search manager from the test server
+	mockSearch := ts.searchManager.(*apimocks.MockSearchManager)
+
 	tests := []struct {
 		name           string
 		method         string
@@ -307,6 +287,24 @@ func TestSearchEndpoint(t *testing.T) {
 			expectedBody:   `{"error":"Query cannot be empty"}`,
 		},
 		{
+			name:           "handles search error",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "error"}`,
+			apiKey:         testAPIKey,
+			expectedStatus: 500,
+			expectedBody:   `{"error":"Search failed"}`,
+		},
+		{
+			name:           "handles count error",
+			method:         "POST",
+			path:           "/search",
+			body:           `{"query": "count-error"}`,
+			apiKey:         testAPIKey,
+			expectedStatus: 500,
+			expectedBody:   `{"error":"Failed to get total count"}`,
+		},
+		{
 			name:           "returns search results with valid request",
 			method:         "POST",
 			path:           "/search",
@@ -327,6 +325,23 @@ func TestSearchEndpoint(t *testing.T) {
 				req.Header.Set("X-Api-Key", tt.apiKey)
 			}
 			w := httptest.NewRecorder()
+
+			// Set up mock expectations based on test case
+			switch tt.name {
+			case "handles search error":
+				mockSearch.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return(nil, errors.New("search error"))
+			case "handles count error":
+				mockSearch.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return([]any{}, nil)
+				mockSearch.EXPECT().Count(gomock.Any(), "", gomock.Any()).Return(int64(0), errors.New("count error"))
+			case "returns search results with valid request":
+				mockSearch.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return([]any{
+					map[string]any{
+						"title": "Test Result",
+						"url":   "https://test.com",
+					},
+				}, nil)
+				mockSearch.EXPECT().Count(gomock.Any(), "", gomock.Any()).Return(int64(1), nil)
+			}
 
 			// Send request
 			ts.server.Handler.ServeHTTP(w, req)
