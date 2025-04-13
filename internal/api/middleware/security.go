@@ -206,8 +206,8 @@ func (s *SecurityMiddleware) Middleware() gin.HandlerFunc {
 			return
 		}
 
-		// Skip API key validation for OPTIONS requests and test environment
-		if c.Request.Method == http.MethodOptions || s.config.Address == ":8083" {
+		// Skip API key validation for OPTIONS requests
+		if c.Request.Method == http.MethodOptions {
 			c.Next()
 			// Count successful preflight requests
 			if c.Writer.Status() >= 200 && c.Writer.Status() < 300 {
@@ -216,13 +216,13 @@ func (s *SecurityMiddleware) Middleware() gin.HandlerFunc {
 			return
 		}
 
-		// Skip API key validation in test environment
-		if s.config.Address != ":8080" && s.config.SecurityEnabled {
+		// Check API key if security is enabled
+		if s.config.SecurityEnabled {
 			apiKey := c.GetHeader("X-Api-Key")
 			if apiKey == "" {
 				c.JSON(http.StatusUnauthorized, gin.H{
 					"code":    http.StatusUnauthorized,
-					"message": "API key is required",
+					"message": "missing API key",
 				})
 				c.Abort()
 				s.metrics.IncrementFailedRequests()
@@ -232,7 +232,7 @@ func (s *SecurityMiddleware) Middleware() gin.HandlerFunc {
 			if apiKey != s.config.APIKey {
 				c.JSON(http.StatusUnauthorized, gin.H{
 					"code":    http.StatusUnauthorized,
-					"message": "Invalid API key",
+					"message": "invalid API key",
 				})
 				c.Abort()
 				s.metrics.IncrementFailedRequests()

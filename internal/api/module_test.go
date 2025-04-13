@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -131,7 +132,7 @@ func setupTestApp(t *testing.T) *testServer {
 				"content": "test",
 			},
 		},
-		"size": 0,
+		"size": 10,
 	}
 	t.Logf("Setting up mock expectations with query: %+v", expectedQuery)
 	mockSearch.EXPECT().Search(gomock.Any(), "", expectedQuery).Return([]any{
@@ -253,10 +254,11 @@ func TestSearchEndpoint(t *testing.T) {
 
 	// Create test server
 	ts := setupTestApp(t)
+	defer ts.app.RequireStop()
 
 	// Set up mock expectations for logger
 	mockLogger := ts.logger.(*loggermocks.MockInterface)
-	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return()
+	mockLogger.EXPECT().Info(gomock.Any(), gomock.Any()).Return().AnyTimes()
 
 	tests := []struct {
 		name           string
@@ -317,8 +319,8 @@ func TestSearchEndpoint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			// Create request
-			req := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+			// Create request with body
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			if tt.apiKey != "" {
 				req.Header.Set("X-Api-Key", tt.apiKey)
