@@ -3,6 +3,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -139,16 +140,17 @@ func (s *SchedulerService) UpdateJob(ctx context.Context, job *jobtypes.Job) err
 // checkAndRunJobs evaluates and executes scheduled jobs.
 func (s *SchedulerService) checkAndRunJobs(ctx context.Context, now time.Time) error {
 	if s.sources == nil {
-		return fmt.Errorf("sources configuration is nil")
+		return errors.New("sources configuration is nil")
 	}
 
 	if s.crawler == nil {
-		return fmt.Errorf("crawler instance is nil")
+		return errors.New("crawler instance is nil")
 	}
 
 	currentTime := now.Format("15:04")
 	s.logger.Info("Checking jobs", "current_time", currentTime)
 
+	// Execute crawl for each source
 	sourcesList, err := s.sources.GetSources()
 	if err != nil {
 		return fmt.Errorf("failed to get sources: %w", err)
@@ -158,13 +160,9 @@ func (s *SchedulerService) checkAndRunJobs(ctx context.Context, now time.Time) e
 		source := &sourcesList[i]
 		for _, scheduledTime := range source.Time {
 			if currentTime == scheduledTime {
-				s.logger.Info("Running scheduled crawl",
-					"source", source.Name,
-					"time", scheduledTime)
-				if err := s.executeCrawl(ctx, source); err != nil {
-					s.logger.Error("Failed to execute crawl",
-						"source", source.Name,
-						"error", err)
+				if crawlErr := s.executeCrawl(ctx, source); crawlErr != nil {
+					s.logger.Error("Failed to execute crawl", "error", crawlErr)
+					continue
 				}
 			}
 		}

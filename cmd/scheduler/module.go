@@ -24,9 +24,7 @@ var Module = fx.Options(
 	crawler.Module,
 
 	// Provide the context
-	fx.Provide(func() context.Context {
-		return context.Background()
-	}),
+	fx.Provide(context.Background),
 
 	// Provide the done channel
 	fx.Provide(func() chan struct{} {

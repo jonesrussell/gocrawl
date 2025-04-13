@@ -86,19 +86,23 @@ func (c *ListCommand) Run(ctx context.Context) error {
 		return nil
 	}
 
-	// Print sources in a table format
-	fmt.Println("Configured Sources:")
-	fmt.Println("------------------")
-	for _, source := range sources {
-		fmt.Printf("Name: %s\n", source.Name)
-		fmt.Printf("URL: %s\n", source.URL)
-		fmt.Printf("Allowed Domains: %v\n", source.AllowedDomains)
-		fmt.Printf("Start URLs: %v\n", source.StartURLs)
-		fmt.Printf("Max Depth: %d\n", source.MaxDepth)
-		fmt.Printf("Rate Limit: %d\n", source.RateLimit)
-		fmt.Printf("Index: %s\n", source.Index)
-		fmt.Printf("Article Index: %s\n", source.ArticleIndex)
-		fmt.Println("------------------")
+	// Print sources in a formatted table
+	log := c.logger
+	log.Info("Configured Sources:")
+	log.Info("------------------")
+	for i := range sources {
+		source := &sources[i]
+		log.Info("Source details",
+			"name", source.Name,
+			"url", source.URL,
+			"allowed_domains", source.AllowedDomains,
+			"start_urls", source.StartURLs,
+			"max_depth", source.MaxDepth,
+			"rate_limit", source.RateLimit,
+			"index", source.Index,
+			"article_index", source.ArticleIndex,
+		)
+		log.Info("------------------")
 	}
 
 	return nil

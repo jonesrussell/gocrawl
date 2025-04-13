@@ -12,7 +12,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -71,16 +70,10 @@ var Module = fx.Options(
 		return make(chan struct{})
 	}),
 
-	// Provide the index manager
-	fx.Provide(func(storage types.Interface) interfaces.IndexManager {
-		return storage.GetIndexManager()
-	}),
-
 	// Provide the processors
 	fx.Provide(func(
 		logger logger.Interface,
 		articleChannel chan *models.Article,
-		indexManager interfaces.IndexManager,
 	) []common.Processor {
 		return []common.Processor{
 			&common.NoopProcessor{}, // Article processor
@@ -143,16 +136,16 @@ var Module = fx.Options(
 	fx.Provide(func(
 		ctx context.Context,
 		logger logger.Interface,
-		indexManager interfaces.IndexManager,
 		sources *sources.Sources,
 		eventBus *events.EventBus,
 		processors []common.Processor,
 		cfg *crawlerconfig.Config,
+		storage types.Interface,
 	) (crawler.Interface, error) {
 		return SetupCollector(
 			ctx,
 			logger,
-			indexManager,
+			storage.GetIndexManager(),
 			sources,
 			eventBus,
 			processors[0],
