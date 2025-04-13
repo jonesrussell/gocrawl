@@ -141,8 +141,10 @@ func (d *Deleter) Start(ctx context.Context) error {
 
 	if len(filtered.toDelete) == 0 {
 		d.logger.Info("No indices to delete")
+		return nil
 	}
 
+	d.logger.Info("Successfully deleted indices", "count", len(filtered.toDelete))
 	return nil
 }
 
@@ -286,7 +288,7 @@ You can specify indices by name or by source name.`,
 						}
 						return err
 					}
-					cmd.Println("Successfully deleted indices")
+					cmd.Println("Operation completed successfully")
 					return nil
 				}),
 			)
