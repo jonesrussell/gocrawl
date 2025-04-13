@@ -3,9 +3,9 @@ package api
 
 import (
 	"context"
-	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
@@ -41,13 +41,14 @@ type SearchResponse struct {
 // Module provides the API dependencies.
 var Module = fx.Module("api",
 	fx.Provide(
-		// Provide the server and security middleware together to avoid circular dependencies
+		// Provide the router and security middleware
 		func(
 			cfg config.Interface,
 			log logger.Interface,
 			searchManager SearchManager,
-		) (*http.Server, middleware.SecurityMiddlewareInterface, error) {
-			return StartHTTPServer(log, searchManager, cfg)
+		) (*gin.Engine, middleware.SecurityMiddlewareInterface, error) {
+			router, security := SetupRouter(log, searchManager, cfg)
+			return router, security, nil
 		},
 		NewLifecycle,
 		NewServer,
