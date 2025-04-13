@@ -229,10 +229,15 @@ func setDefaults() {
 	viper.SetDefault("storage.flush_interval", "5s")
 
 	// Elasticsearch defaults
-	viper.SetDefault("elasticsearch.url", "https://localhost:9200")
-	viper.SetDefault("elasticsearch.sniff", false)
-	viper.SetDefault("elasticsearch.healthcheck", true)
-	viper.SetDefault("elasticsearch.retry_on_conflict", defaultElasticsearchRetries)
+	viper.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
+	viper.SetDefault("elasticsearch.index_name", "gocrawl")
+	viper.SetDefault("elasticsearch.retry.enabled", true)
+	viper.SetDefault("elasticsearch.retry.initial_wait", "1s")
+	viper.SetDefault("elasticsearch.retry.max_wait", "5s")
+	viper.SetDefault("elasticsearch.retry.max_retries", defaultElasticsearchRetries)
+	viper.SetDefault("elasticsearch.bulk_size", 1000)
+	viper.SetDefault("elasticsearch.flush_interval", "1s")
+	viper.SetDefault("elasticsearch.tls.insecure_skip_verify", true)
 }
 
 // loadEnvFile loads environment variables from .env file if it exists

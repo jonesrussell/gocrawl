@@ -3,18 +3,20 @@ package search
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jonesrussell/gocrawl/cmd/common/signal"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 // Constants for default values
@@ -39,6 +41,15 @@ const (
 	columnWidthContentRatio = 3 // Content column takes 2/3 of table width
 )
 
+// Error constants
+const (
+	ErrLoggerNotFound = "logger not found in context or invalid type"
+	ErrConfigNotFound = "config not found in context or invalid type"
+	ErrInvalidSize    = "invalid size value"
+	ErrStartFailed    = "failed to start application"
+	ErrStopFailed     = "failed to stop application"
+)
+
 // Params holds the search operation parameters
 type Params struct {
 	fx.In
@@ -50,11 +61,11 @@ type Params struct {
 	// SearchManager is the service responsible for executing searches
 	SearchManager api.SearchManager
 	// IndexName specifies which Elasticsearch index to search
-	IndexName string
+	IndexName string `name:"searchIndex"`
 	// Query contains the search query string
-	Query string
+	Query string `name:"searchQuery"`
 	// ResultSize determines how many results to return
-	ResultSize int
+	ResultSize int `name:"searchSize"`
 }
 
 // Result represents a search result
@@ -86,12 +97,7 @@ Flags:
 }
 
 // searchModule provides the search command dependencies
-var searchModule = fx.Module("search",
-	// Core dependencies
-	config.Module,
-	logger.Module,
-	storage.Module,
-)
+var searchModule = Module
 
 // Command returns the search command for use in the root command
 func Command() *cobra.Command {
@@ -116,68 +122,67 @@ func Command() *cobra.Command {
 // - Application lifecycle management
 // - Search execution and result display
 func runSearch(cmd *cobra.Command, _ []string) error {
-	// Retrieve and validate the search query
-	queryStr, queryErr := cmd.Flags().GetString("query")
-	if queryErr != nil {
-		return fmt.Errorf("error retrieving query: %w", queryErr)
+	// Get logger from context
+	loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
+	log, ok := loggerValue.(logger.Interface)
+	if !ok {
+		return errors.New(ErrLoggerNotFound)
 	}
 
-	// Get the index name and result size from flags
-	indexName := cmd.Flag("index").Value.String()
-	size, sizeErr := cmd.Flags().GetInt("size")
-	if sizeErr != nil {
-		size = DefaultSearchSize
+	// Convert size string to int
+	sizeStr := cmd.Flag("size").Value.String()
+	size, err := strconv.Atoi(sizeStr)
+	if err != nil {
+		return fmt.Errorf("%s: %w", ErrInvalidSize, err)
 	}
 
-	// Create a cancellable context
-	ctx, cancel := context.WithCancel(cmd.Context())
-	defer cancel()
-
-	// Set up signal handling with a no-op logger initially
-	handler := signal.NewSignalHandler(logger.NewNoOp())
-	cleanup := handler.Setup(ctx)
-	defer cleanup()
-
-	// Initialize the Fx application with required modules and dependencies
+	// Create Fx app with the module
 	fxApp := fx.New(
 		searchModule,
 		fx.Provide(
-			// Provide search parameters
-			func() string { return queryStr },  // Query
-			func() string { return indexName }, // IndexName
-			func() int { return size },         // ResultSize
+			func() logger.Interface { return log },
+			fx.Annotate(
+				func() string { return cmd.Flag("index").Value.String() },
+				fx.ResultTags(`name:"searchIndex"`),
+			),
+			fx.Annotate(
+				func() string { return cmd.Flag("query").Value.String() },
+				fx.ResultTags(`name:"searchQuery"`),
+			),
+			fx.Annotate(
+				func() int { return size },
+				fx.ResultTags(`name:"searchSize"`),
+			),
 		),
-		fx.Invoke(func(lc fx.Lifecycle, p Params) {
-			lc.Append(fx.Hook{
-				OnStart: func(context.Context) error {
-					// Execute the search and handle any errors
-					if err := ExecuteSearch(cmd.Context(), p); err != nil {
-						p.Logger.Error("Error executing search", "error", err)
-						fmt.Fprintf(os.Stderr, "\nSearch failed: %v\n", err)
-						return err
-					}
-					return nil
-				},
-				OnStop: func(context.Context) error {
-					return nil
-				},
-			})
+		fx.Invoke(func(p Params) error {
+			return ExecuteSearch(cmd.Context(), p)
+		}),
+		fx.WithLogger(func() fxevent.Logger {
+			return logger.NewFxLogger(log)
 		}),
 	)
 
-	// Set the fx app for coordinated shutdown
-	handler.SetFXApp(fxApp)
-
 	// Start the application
-	if err := fxApp.Start(ctx); err != nil {
-		return fmt.Errorf("error starting application: %w", err)
+	log.Info("Starting search")
+	startErr := fxApp.Start(cmd.Context())
+	if startErr != nil {
+		log.Error("Failed to start application", "error", startErr)
+		return fmt.Errorf("%s: %w", ErrStartFailed, startErr)
 	}
 
-	// Wait for shutdown signal
-	if err := handler.Wait(); err != nil {
-		return fmt.Errorf("failed to wait for handler: %w", err)
+	// Wait for interrupt signal
+	log.Info("Waiting for interrupt signal")
+	<-cmd.Context().Done()
+
+	// Stop the application
+	log.Info("Stopping application")
+	stopErr := fxApp.Stop(cmd.Context())
+	if stopErr != nil {
+		log.Error("Failed to stop application", "error", stopErr)
+		return fmt.Errorf("%s: %w", ErrStopFailed, stopErr)
 	}
 
+	log.Info("Application stopped successfully")
 	return nil
 }
 
@@ -199,13 +204,19 @@ func processSearchResults(rawResults []any, logger logger.Interface) []Result {
 	for _, raw := range rawResults {
 		hit, ok := raw.(map[string]any)
 		if !ok {
-			logger.Error("Failed to convert search result to map", "error", "type assertion failed")
+			logger.Error("Failed to convert search result to map",
+				"error", "type assertion failed",
+				"got_type", fmt.Sprintf("%T", raw),
+				"expected_type", "map[string]any")
 			continue
 		}
 
 		source, ok := hit["_source"].(map[string]any)
 		if !ok {
-			logger.Error("Failed to extract _source from hit", "error", "type assertion failed")
+			logger.Error("Failed to extract _source from hit",
+				"error", "type assertion failed",
+				"got_type", fmt.Sprintf("%T", hit["_source"]),
+				"expected_type", "map[string]any")
 			continue
 		}
 
