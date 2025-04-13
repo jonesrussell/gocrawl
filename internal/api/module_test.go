@@ -308,7 +308,7 @@ func TestSearchEndpoint(t *testing.T) {
 			name:           "returns search results with valid request",
 			method:         "POST",
 			path:           "/search",
-			body:           `{"query": "test"}`,
+			body:           `{"query": "test", "index": "test-index"}`,
 			apiKey:         testAPIKey,
 			expectedStatus: 200,
 			expectedBody:   `{"results":[{"title":"Test Result","url":"https://test.com"}],"total":1}`,
@@ -334,13 +334,13 @@ func TestSearchEndpoint(t *testing.T) {
 				mockSearch.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return([]any{}, nil)
 				mockSearch.EXPECT().Count(gomock.Any(), "", gomock.Any()).Return(int64(0), errors.New("count error"))
 			case "returns search results with valid request":
-				mockSearch.EXPECT().Search(gomock.Any(), "", gomock.Any()).Return([]any{
+				mockSearch.EXPECT().Search(gomock.Any(), "test-index", gomock.Any()).Return([]any{
 					map[string]any{
 						"title": "Test Result",
 						"url":   "https://test.com",
 					},
 				}, nil)
-				mockSearch.EXPECT().Count(gomock.Any(), "", gomock.Any()).Return(int64(1), nil)
+				mockSearch.EXPECT().Count(gomock.Any(), "test-index", gomock.Any()).Return(int64(1), nil)
 			}
 
 			// Send request
