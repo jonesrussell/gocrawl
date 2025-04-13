@@ -152,10 +152,10 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 	}
 
 	// Add metadata dates if they exist
-	if publishedTime, ok := metadata["published_time"].(string); ok {
+	if publishedTime, ok := metadata["article:published_time"].(string); ok {
 		dates = append(dates, publishedTime)
 	}
-	if modifiedTime, ok := metadata["modified_time"].(string); ok {
+	if modifiedTime, ok := metadata["article:modified_time"].(string); ok {
 		dates = append(dates, modifiedTime)
 	}
 
@@ -173,10 +173,13 @@ func (s *Service) ExtractContent(e *colly.HTMLElement) *models.Content {
 	contentType := s.DetermineContentType(e.Request.URL.String(), metadata, jsonLD.Type)
 
 	// Get the body text
-	body := e.ChildText("body")
+	body := e.DOM.Find("body").Text()
 	if body == "" {
 		body = e.Text
 	}
+
+	// Clean up whitespace
+	body = strings.Join(strings.Fields(body), " ")
 
 	// Create content object
 	content := &models.Content{
@@ -242,7 +245,7 @@ func (s *Service) DetermineContentType(url string, metadata map[string]any, json
 	return common.ContentTypePage
 }
 
-// ExtractMetadata extracts metadata from various sources in the HTML
+// ExtractMetadata extracts metadata from an HTML element
 func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
 	// Get rules for this URL
 	rules := s.getRulesForURL(e.Request.URL.String())
@@ -250,34 +253,39 @@ func (s *Service) ExtractMetadata(e *colly.HTMLElement) map[string]any {
 
 	// Extract metadata using source-specific selectors
 	for key, selector := range rules.MetadataSelectors {
-		if value := e.ChildAttr(selector, "content"); value != "" {
+		if value := e.DOM.Find(selector).AttrOr("content", ""); value != "" {
 			metadata[key] = value
-		} else if textValue := e.ChildText(selector); textValue != "" {
+		} else if textValue := e.DOM.Find(selector).Text(); textValue != "" {
 			metadata[key] = textValue
 		}
 	}
 
 	// Extract OpenGraph metadata (highest precedence)
-	e.ForEach(`meta[property^="og:"]`, func(_ int, el *colly.HTMLElement) {
-		property := el.Attr("property")
-		content := el.Attr("content")
-		if property != "" && content != "" {
-			key := property[3:] // Remove "og:" prefix
-			if _, exists := metadata[key]; !exists {
-				metadata[key] = content
-			}
+	e.DOM.Find(`meta[property^="og:"], meta[property^="article:"]`).Each(func(_ int, s *goquery.Selection) {
+		property, exists := s.Attr("property")
+		if !exists {
+			return
 		}
+		content, exists := s.Attr("content")
+		if !exists {
+			return
+		}
+		metadata[property] = content
 	})
 
 	// Extract Twitter metadata (second precedence)
-	e.ForEach(`meta[name^="twitter:"]`, func(_ int, el *colly.HTMLElement) {
-		name := el.Attr("name")
-		content := el.Attr("content")
-		if name != "" && content != "" {
-			key := name[8:] // Remove "twitter:" prefix
-			if _, exists := metadata[key]; !exists {
-				metadata[key] = content
-			}
+	e.DOM.Find(`meta[name^="twitter:"]`).Each(func(_ int, s *goquery.Selection) {
+		name, exists := s.Attr("name")
+		if !exists {
+			return
+		}
+		content, exists := s.Attr("content")
+		if !exists {
+			return
+		}
+		key := name[8:] // Remove "twitter:" prefix
+		if _, exists := metadata[key]; !exists {
+			metadata[key] = content
 		}
 	})
 
@@ -324,13 +332,17 @@ func (s *Service) Process(_ context.Context, input string) string {
 	}
 
 	// Get text content without HTML tags
-	text := doc.Text()
+	var text strings.Builder
+	doc.Find("p, div").Each(func(_ int, s *goquery.Selection) {
+		if text.Len() > 0 {
+			text.WriteString(" ")
+		}
+		text.WriteString(strings.TrimSpace(s.Text()))
+	})
 
-	// Clean up whitespace
-	text = strings.Join(strings.Fields(text), " ")
-
-	s.Logger.Debug("Processed content", "result", text)
-	return text
+	result := text.String()
+	s.Logger.Debug("Processed content", "result", result)
+	return result
 }
 
 // ProcessBatch processes a batch of strings

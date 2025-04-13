@@ -59,8 +59,9 @@ func TestExtractContent(t *testing.T) {
 		DOM:      doc.Find("p").First(),
 	}
 
-	contentData := svc.ExtractContent(e)
-	assert.Equal(t, "Test content", contentData)
+	content := svc.ExtractContent(e)
+	assert.NotNil(t, content)
+	assert.Equal(t, "Test content", content.Body)
 }
 
 func TestExtractMetadata(t *testing.T) {
@@ -94,12 +95,12 @@ func TestExtractMetadata(t *testing.T) {
 	e := &colly.HTMLElement{
 		Request:  req,
 		Response: resp,
-		DOM:      doc.Find("meta[property='article:published_time']").First(),
+		DOM:      doc.Selection,
 	}
 
 	metadata := service.ExtractMetadata(e)
 	assert.NotNil(t, metadata)
-	assert.Equal(t, "2023-04-13T12:00:00Z", metadata["published_time"])
+	assert.Equal(t, "2023-04-13T12:00:00Z", metadata["article:published_time"])
 }
 
 func TestService_Process(t *testing.T) {
@@ -118,6 +119,11 @@ func TestService_Process(t *testing.T) {
 		{
 			name:     "nested elements",
 			input:    "<div><p>Hello</p><p>world</p></div>",
+			expected: "Hello world",
+		},
+		{
+			name:     "multiple spaces",
+			input:    "<div><p>Hello  </p><p>  world</p></div>",
 			expected: "Hello world",
 		},
 	}
