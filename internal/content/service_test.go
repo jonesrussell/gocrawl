@@ -1,7 +1,6 @@
 package content_test
 
 import (
-	"context"
 	"net/url"
 	"strings"
 	"testing"
@@ -13,9 +12,13 @@ import (
 	"github.com/jonesrussell/gocrawl/testutils/mocks/logger"
 	"github.com/jonesrussell/gocrawl/testutils/mocks/storage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func setupTest(t *testing.T) (*logger.MockInterface, *storage.MockInterface, content.Interface) {
+// setupTest creates test dependencies and returns the content service.
+func setupTest(
+	t *testing.T,
+) content.Interface {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(func() { ctrl.Finish() })
 
@@ -27,16 +30,15 @@ func setupTest(t *testing.T) (*logger.MockInterface, *storage.MockInterface, con
 	mockLogger.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 	mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any()).AnyTimes()
 
-	svc := content.NewService(mockLogger, mockStorage)
-	return mockLogger, mockStorage, svc
+	return content.NewService(mockLogger, mockStorage)
 }
 
 func TestExtractContent(t *testing.T) {
-	_, _, svc := setupTest(t)
+	svc := setupTest(t)
 
 	// Create a test HTML document
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader("<html><body><p>Test content</p></body></html>"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a test HTML element
 	req := &colly.Request{
@@ -62,7 +64,7 @@ func TestExtractContent(t *testing.T) {
 }
 
 func TestExtractMetadata(t *testing.T) {
-	_, _, service := setupTest(t)
+	service := setupTest(t)
 
 	// Create a test HTML element
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(`
@@ -75,7 +77,7 @@ func TestExtractMetadata(t *testing.T) {
 			</body>
 		</html>
 	`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	req := &colly.Request{
 		URL: &url.URL{
@@ -101,8 +103,7 @@ func TestExtractMetadata(t *testing.T) {
 }
 
 func TestService_Process(t *testing.T) {
-	_, _, svc := setupTest(t)
-	ctx := context.Background()
+	svc := setupTest(t)
 
 	testCases := []struct {
 		name     string
@@ -123,26 +124,24 @@ func TestService_Process(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := svc.Process(ctx, tc.input)
+			result := svc.Process(t.Context(), tc.input)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
 
 func TestService_ProcessBatch(t *testing.T) {
-	_, _, svc := setupTest(t)
-	ctx := context.Background()
+	svc := setupTest(t)
 
 	input := []string{"<p>Hello</p>", "<div>World</div>"}
 	expected := []string{"Hello", "World"}
 
-	result := svc.ProcessBatch(ctx, input)
+	result := svc.ProcessBatch(t.Context(), input)
 	assert.Equal(t, expected, result)
 }
 
 func TestService_ProcessWithMetadata(t *testing.T) {
-	_, _, svc := setupTest(t)
-	ctx := context.Background()
+	svc := setupTest(t)
 
 	input := "<p>Hello world</p>"
 	metadata := map[string]string{
@@ -150,21 +149,20 @@ func TestService_ProcessWithMetadata(t *testing.T) {
 		"date":  "2023-04-13",
 	}
 
-	result := svc.ProcessWithMetadata(ctx, input, metadata)
+	result := svc.ProcessWithMetadata(t.Context(), input, metadata)
 	assert.Equal(t, "Hello world", result)
 }
 
 func TestNewService(t *testing.T) {
-	_, _, service := setupTest(t)
+	service := setupTest(t)
 	assert.NotNil(t, service)
 	assert.Implements(t, (*content.Interface)(nil), service)
 }
 
 func TestService_ProcessContent(t *testing.T) {
-	_, _, svc := setupTest(t)
-	ctx := context.Background()
+	svc := setupTest(t)
 
 	input := "<p>Test content</p>"
-	result := svc.Process(ctx, input)
+	result := svc.Process(t.Context(), input)
 	assert.Equal(t, "Test content", result)
 }
