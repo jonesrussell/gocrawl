@@ -119,7 +119,63 @@ func SetupConfigTestEnvWithValues(t *testing.T, values map[string]string) func()
 	}
 }
 
-// TestSetupConfigTestEnv verifies the configuration test environment setup and cleanup
+// setupTestEnvironment sets up the test environment with initial variables
+func setupTestEnvironment(t *testing.T, initialEnv map[string]string) error {
+	for k, v := range initialEnv {
+		if err := validateEnvVarName(k); err != nil {
+			return err
+		}
+		t.Setenv(k, v)
+	}
+	return nil
+}
+
+// verifyEnvironmentCleared checks if the environment variables are cleared
+func verifyEnvironmentCleared(t *testing.T, vars map[string]string) {
+	for k := range vars {
+		_, exists := os.LookupEnv(k)
+		require.False(t, exists, "environment should be cleared, but %s exists", k)
+	}
+}
+
+// verifyEnvironmentSet checks if the environment variables are set correctly
+func verifyEnvironmentSet(t *testing.T, expectedEnv map[string]string) {
+	for k, v := range expectedEnv {
+		actual := os.Getenv(k)
+		require.Equal(t, v, actual, "environment variable %s should be set correctly", k)
+	}
+}
+
+// verifyTestFiles checks if the test files are set up correctly
+func verifyTestFiles(t *testing.T) {
+	sourcesFile := os.Getenv("GOCRAWL_CRAWLER_SOURCE_FILE")
+	require.NotEmpty(t, sourcesFile, "GOCRAWL_CRAWLER_SOURCE_FILE should be set")
+	require.FileExists(t, sourcesFile, "sources file should exist")
+}
+
+// verifyCleanup verifies that cleanup restores the original environment
+func verifyCleanup(t *testing.T, initialEnv map[string]string, cleanup func()) {
+	// Set a new test variable
+	t.Setenv("NEW_TEST_VAR", "new_value")
+
+	// Run cleanup
+	cleanup()
+
+	// Verify original environment is restored
+	for k, v := range initialEnv {
+		actual := os.Getenv(k)
+		require.Equal(t, v, actual, "original environment variable %s should be restored", k)
+	}
+
+	// Verify new test variable is cleared
+	_, exists := os.LookupEnv("NEW_TEST_VAR")
+	require.False(t, exists, "cleanup should have cleared new environment variables")
+
+	// Verify test files are cleared
+	sourcesFile := os.Getenv("GOCRAWL_CRAWLER_SOURCE_FILE")
+	require.Empty(t, sourcesFile, "GOCRAWL_CRAWLER_SOURCE_FILE should be cleared")
+}
+
 func TestSetupConfigTestEnv(t *testing.T) {
 	t.Parallel()
 
@@ -166,18 +222,17 @@ func TestSetupConfigTestEnv(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			// Setup environment variables
-			for k, v := range tt.initialEnv {
-				if err := validateEnvVarName(k); err != nil {
-					if !tt.wantErr {
-						t.Fatalf("unexpected error: %v", err)
-					}
-					return
+			err := setupTestEnvironment(t, tt.initialEnv)
+			if err != nil {
+				if !tt.wantErr {
+					t.Fatalf("unexpected error: %v", err)
 				}
-				t.Setenv(k, v)
+				return
 			}
 
 			// Setup test environment
@@ -185,42 +240,16 @@ func TestSetupConfigTestEnv(t *testing.T) {
 			defer cleanup()
 
 			// Verify environment is cleared
-			for k := range tt.initialEnv {
-				_, exists := os.LookupEnv(k)
-				require.False(t, exists, "environment should be cleared, but %s exists", k)
-			}
+			verifyEnvironmentCleared(t, tt.initialEnv)
 
 			// Verify test environment is set correctly
-			for k, v := range tt.expectedEnv {
-				actual := os.Getenv(k)
-				require.Equal(t, v, actual, "environment variable %s should be set correctly", k)
-			}
+			verifyEnvironmentSet(t, tt.expectedEnv)
 
 			// Verify test files are set
-			sourcesFile := os.Getenv("GOCRAWL_CRAWLER_SOURCE_FILE")
-			require.NotEmpty(t, sourcesFile, "GOCRAWL_CRAWLER_SOURCE_FILE should be set")
-			require.FileExists(t, sourcesFile, "sources file should exist")
+			verifyTestFiles(t)
 
 			if tt.verifyCleanup {
-				// Set a new test variable
-				t.Setenv("NEW_TEST_VAR", "new_value")
-
-				// Run cleanup
-				cleanup()
-
-				// Verify original environment is restored
-				for k, v := range tt.initialEnv {
-					actual := os.Getenv(k)
-					require.Equal(t, v, actual, "original environment variable %s should be restored", k)
-				}
-
-				// Verify new test variable is cleared
-				_, exists := os.LookupEnv("NEW_TEST_VAR")
-				require.False(t, exists, "cleanup should have cleared new environment variables")
-
-				// Verify test files are cleared
-				sourcesFile = os.Getenv("GOCRAWL_CRAWLER_SOURCE_FILE")
-				require.Empty(t, sourcesFile, "GOCRAWL_CRAWLER_SOURCE_FILE should be cleared")
+				verifyCleanup(t, tt.initialEnv, cleanup)
 			}
 		})
 	}
