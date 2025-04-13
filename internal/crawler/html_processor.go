@@ -2,6 +2,8 @@
 package crawler
 
 import (
+	"strings"
+
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
 )
@@ -87,6 +89,30 @@ func (p *HTMLProcessor) getProcessorForType(contentType common.ContentType) comm
 
 // detectContentType detects the type of content in the HTML element
 func (p *HTMLProcessor) detectContentType(e *colly.HTMLElement) common.ContentType {
+	// First check HTTP headers
+	contentType := e.Response.Headers.Get("Content-Type")
+	if contentType != "" {
+		switch {
+		case strings.Contains(contentType, "text/html"):
+			// Continue with HTML-specific checks
+		case strings.Contains(contentType, "image/"):
+			return common.ContentTypeImage
+		case strings.Contains(contentType, "video/"):
+			return common.ContentTypeVideo
+		case strings.Contains(contentType, "application/pdf"):
+			return common.ContentTypePage
+		default:
+			// If it's not HTML, we can't process it as HTML
+			return common.ContentTypePage
+		}
+	}
+
+	// Check for special pages in URL
+	url := e.Request.URL.String()
+	if strings.Contains(url, "/login") || strings.Contains(url, "/signin") || strings.Contains(url, "/register") {
+		return common.ContentTypePage
+	}
+
 	// Check for article-specific elements and metadata
 	hasArticleTag := e.DOM.Find("article").Length() > 0
 	hasArticleClass := e.DOM.Find(".article").Length() > 0
@@ -99,19 +125,24 @@ func (p *HTMLProcessor) detectContentType(e *colly.HTMLElement) common.ContentTy
 		return common.ContentTypeArticle
 	}
 
-	// Check for video content
-	if e.DOM.Find("video").Length() > 0 || e.DOM.Find(".video").Length() > 0 {
+	// Check for video content - look for video players or embeds
+	hasVideoPlayer := e.DOM.Find("video, .video-player, .video-container, iframe[src*='youtube'], iframe[src*='vimeo']").Length() > 0
+	if hasVideoPlayer {
 		return common.ContentTypeVideo
 	}
 
-	// Check for image content
-	if e.DOM.Find("img").Length() > 0 || e.DOM.Find(".image").Length() > 0 {
-		return common.ContentTypeImage
+	// Check for job listings - look for specific job-related elements
+	hasJobElements := e.DOM.Find(".job-listing, .job-posting, .job-description, .job-title").Length() > 0
+	if hasJobElements {
+		return common.ContentTypeJob
 	}
 
-	// Check for job listings
-	if e.DOM.Find(".job-listing").Length() > 0 || e.DOM.Find(".job-posting").Length() > 0 {
-		return common.ContentTypeJob
+	// Check for image content - only if it's a dedicated image page
+	// Don't classify as image just because there are images on the page
+	hasImageGallery := e.DOM.Find(".image-gallery, .photo-gallery, .gallery-container").Length() > 0
+	hasSingleImage := e.DOM.Find("img").Length() == 1 && e.DOM.Find("article, .article").Length() == 0
+	if hasImageGallery || hasSingleImage {
+		return common.ContentTypeImage
 	}
 
 	// Default to page content type
