@@ -47,9 +47,6 @@ func (s *Source) Validate() error {
 	if s.RateLimit == "" {
 		return errors.New("rate_limit is required")
 	}
-	if s.ArticleIndex == "" {
-		return errors.New("article_index is required")
-	}
 	if err := s.Selectors.Validate(); err != nil {
 		return err
 	}

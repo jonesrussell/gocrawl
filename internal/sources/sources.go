@@ -167,6 +167,13 @@ func LoadSources(cfg config.Interface) (*Sources, error) {
 	// If we get here, we couldn't find any sources in the config
 	// Try to create a default source based on the command line argument
 	if cmd := cfg.GetCommand(); cmd != "" {
+		// Create default selectors
+		defaultSelectors := types.ArticleSelectors{
+			Container: "article",
+			Title:     "h1",
+			Body:      "article > div",
+		}
+
 		// Create a default source based on the command
 		defaultSource := &types.Source{
 			Name:           cmd,
@@ -175,7 +182,10 @@ func LoadSources(cfg config.Interface) (*Sources, error) {
 			StartURLs:      []string{fmt.Sprintf("https://%s", strings.ReplaceAll(cmd, " ", ""))},
 			MaxDepth:       DefaultMaxDepth,
 			RateLimit:      DefaultRateLimit.String(),
-			Rules:          types.Rules{},
+			Selectors: types.SourceSelectors{
+				Article: defaultSelectors,
+			},
+			Rules: types.Rules{},
 		}
 
 		// Convert to sourceutils.SourceConfig
@@ -380,8 +390,8 @@ func (s *Sources) ValidateSource(source *sourceutils.SourceConfig) error {
 	if source.URL == "" {
 		return errors.New("source URL is required")
 	}
-	if source.Index == "" {
-		return errors.New("source index is required")
+	if source.MaxDepth < 0 {
+		return errors.New("max depth must be non-negative")
 	}
 	return nil
 }

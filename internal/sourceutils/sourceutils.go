@@ -87,6 +87,7 @@ func ConvertToConfigSource(source *SourceConfig) *types.Source {
 		MaxDepth:       source.MaxDepth,
 		Time:           source.Time,
 		Index:          source.Index,
+		ArticleIndex:   source.ArticleIndex,
 		Selectors: types.SourceSelectors{
 			Article: types.ArticleSelectors{
 				Container:     source.Selectors.Article.Container,
