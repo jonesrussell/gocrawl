@@ -19,6 +19,8 @@ const (
 	DefaultHost            = ""
 	DefaultPort            = 0
 	DefaultMaxHeaderBytes  = 0
+	// APIKeyParts is the number of parts in an API key (id:key)
+	APIKeyParts = 2
 )
 
 // Config represents server-specific configuration settings.
@@ -61,7 +63,7 @@ func (c *Config) Validate() error {
 
 		// Validate API key format
 		parts := strings.Split(c.APIKey, ":")
-		if len(parts) != 2 {
+		if len(parts) != APIKeyParts {
 			return fmt.Errorf("invalid API key format: expected 'id:key' but got %q", c.APIKey)
 		}
 

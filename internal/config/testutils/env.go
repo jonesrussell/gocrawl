@@ -2,7 +2,7 @@
 package testutils
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,13 +28,13 @@ var defaultEnvVars = map[string]string{
 // validateEnvVarName checks if an environment variable name is valid
 func validateEnvVarName(name string) error {
 	if name == "" {
-		return fmt.Errorf("environment variable name cannot be empty")
+		return errors.New("environment variable name cannot be empty")
 	}
 	if strings.ContainsAny(name, " \t\n\r") {
-		return fmt.Errorf("environment variable name cannot contain whitespace")
+		return errors.New("environment variable name cannot contain whitespace")
 	}
 	if strings.Contains(name, "=") {
-		return fmt.Errorf("environment variable name cannot contain '='")
+		return errors.New("environment variable name cannot contain '='")
 	}
 	return nil
 }
@@ -43,8 +43,8 @@ func validateEnvVarName(name string) error {
 func storeEnvVars() map[string]string {
 	env := make(map[string]string)
 	for _, e := range os.Environ() {
-		parts := strings.SplitN(e, "=", 2)
-		if len(parts) == 2 {
+		parts := strings.SplitN(e, "=", MaxEnvParts)
+		if len(parts) == MaxEnvParts {
 			env[parts[0]] = parts[1]
 		}
 	}
