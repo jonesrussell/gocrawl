@@ -75,11 +75,11 @@ var Module = fx.Module("crawl",
 			func(p struct {
 				fx.In
 				Logger           logger.Interface
-				EventBus         *events.EventBus
+				EventBus         *events.EventBus `name:"eventBus"`
 				IndexManager     interfaces.IndexManager
 				Sources          *sources.Sources
-				ArticleProcessor common.Processor
-				PageProcessor    common.Processor
+				ArticleProcessor common.Processor `name:"articleProcessor"`
+				PageProcessor    common.Processor `name:"pageProcessor"`
 				Config           config.Interface
 			}) crawler.Interface {
 				cfg := crawlerconfig.New(
