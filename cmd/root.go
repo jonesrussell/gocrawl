@@ -51,6 +51,8 @@ const (
 	logLevelInfo                = "info"
 	logLevelWarn                = "warn"
 	logLevelError               = "error"
+	// DefaultBulkSize is the default number of documents to bulk index
+	DefaultBulkSize = 1000
 )
 
 // bindAppEnvVars binds app-related environment variables
@@ -235,7 +237,7 @@ func setDefaults() {
 	viper.SetDefault("elasticsearch.retry.initial_wait", "1s")
 	viper.SetDefault("elasticsearch.retry.max_wait", "5s")
 	viper.SetDefault("elasticsearch.retry.max_retries", defaultElasticsearchRetries)
-	viper.SetDefault("elasticsearch.bulk_size", 1000)
+	viper.SetDefault("elasticsearch.bulk_size", DefaultBulkSize)
 	viper.SetDefault("elasticsearch.flush_interval", "1s")
 	viper.SetDefault("elasticsearch.tls.insecure_skip_verify", true)
 }
