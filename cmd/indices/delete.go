@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
+	"strings"
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -24,6 +24,11 @@ import (
 var (
 	// ErrDeletionCancelled is returned when the user cancels the deletion
 	ErrDeletionCancelled = errors.New("deletion cancelled by user")
+)
+
+const (
+	// defaultIndicesCapacity is the initial capacity for the indices slice
+	defaultIndicesCapacity = 2
 )
 
 // Deleter implements the indices delete command
@@ -58,6 +63,50 @@ func NewDeleter(
 
 // Start executes the delete operation
 func (d *Deleter) Start(ctx context.Context) error {
+	if err := d.initializeIndices(); err != nil {
+		return err
+	}
+
+	if err := d.confirmDeletion(); err != nil {
+		return err
+	}
+
+	return d.deleteIndices(ctx)
+}
+
+// initializeIndices initializes the indices slice
+func (d *Deleter) initializeIndices() error {
+	d.indices = make([]string, 0, defaultIndicesCapacity)
+	return nil
+}
+
+// confirmDeletion asks for user confirmation before deletion
+func (d *Deleter) confirmDeletion() error {
+	// Write the list of indices to be deleted
+	if _, err := os.Stdout.WriteString("The following indices will be deleted:\n"); err != nil {
+		return fmt.Errorf("failed to write to stdout: %w", err)
+	}
+	if _, err := os.Stdout.WriteString(strings.Join(d.indices, "\n") + "\n"); err != nil {
+		return fmt.Errorf("failed to write to stdout: %w", err)
+	}
+	if _, err := os.Stdout.WriteString("Are you sure you want to continue? (y/N): "); err != nil {
+		return fmt.Errorf("failed to write to stdout: %w", err)
+	}
+
+	var response string
+	if _, err := fmt.Scanln(&response); err != nil {
+		return fmt.Errorf("failed to read user input: %w", err)
+	}
+
+	if !strings.EqualFold(response, "y") {
+		return ErrDeletionCancelled
+	}
+
+	return nil
+}
+
+// deleteIndices deletes the indices
+func (d *Deleter) deleteIndices(ctx context.Context) error {
 	d.logger.Info("Starting index deletion", "indices", d.indices, "source", d.sourceName)
 
 	// Test storage connection
@@ -76,7 +125,7 @@ func (d *Deleter) Start(ctx context.Context) error {
 			return fmt.Errorf("source %s has no indices configured", d.sourceName)
 		}
 		// Add both content and article indices if they exist
-		d.indices = make([]string, 0, 2)
+		d.indices = make([]string, 0, defaultIndicesCapacity)
 		if source.Index != "" {
 			d.indices = append(d.indices, source.Index)
 		}
@@ -111,14 +160,6 @@ func (d *Deleter) Start(ctx context.Context) error {
 	}
 
 	d.logger.Info("Indices to delete", "indices", filtered.toDelete)
-
-	// Confirm deletion if needed
-	if !d.force {
-		if err := d.confirmDeletion(filtered.toDelete); err != nil {
-			d.logger.Info("Deletion cancelled by user")
-			return err
-		}
-	}
 
 	// Delete indices
 	var deleteErr error
@@ -187,34 +228,6 @@ func (d *Deleter) reportMissingIndices(missingIndices []string) {
 			fmt.Fprintf(os.Stdout, "  - %s\n", index)
 		}
 	}
-}
-
-// confirmDeletion prompts the user to confirm deletion of indices.
-func (d *Deleter) confirmDeletion(indicesToDelete []string) error {
-	fmt.Fprintf(os.Stdout, "\nAre you sure you want to delete the following indices?\n")
-	for _, index := range indicesToDelete {
-		fmt.Fprintf(os.Stdout, "  - %s\n", index)
-	}
-	fmt.Fprintf(os.Stdout, "\nContinue? (y/N): ")
-
-	// Read a single byte to handle EOF and newline cases
-	var response [1]byte
-	n, err := os.Stdin.Read(response[:])
-	if err != nil && err != io.EOF {
-		return fmt.Errorf("failed to read user input: %w", err)
-	}
-
-	// If no input or newline, treat as 'N'
-	if n == 0 || response[0] == '\n' {
-		return ErrDeletionCancelled
-	}
-
-	// Only proceed if input is 'y' or 'Y'
-	if response[0] != 'y' && response[0] != 'Y' {
-		return ErrDeletionCancelled
-	}
-
-	return nil
 }
 
 // DeleteParams holds the parameters for the delete command
