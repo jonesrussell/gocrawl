@@ -2,11 +2,20 @@
 package crawl
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/gocolly/colly/v2"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/internal/common"
+	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -70,4 +79,48 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 // Command returns the crawl command for use in the root command.
 func Command() *cobra.Command {
 	return Cmd
+}
+
+// SetupCollector creates and configures a new collector instance.
+func SetupCollector(
+	ctx context.Context,
+	logger logger.Interface,
+	indexManager interfaces.IndexManager,
+	sources sources.Interface,
+	eventBus *events.EventBus,
+	articleProcessor common.Processor,
+	contentProcessor common.Processor,
+	cfg *crawlerconfig.Config,
+) (crawler.Interface, error) {
+	// Create collector with rate limiting
+	c := colly.NewCollector(
+		colly.AllowURLRevisit(),
+		colly.Async(true),
+	)
+
+	err := c.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Parallelism: 2,
+		RandomDelay: 5 * time.Second,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Create crawler instance
+	crawler := crawler.NewCrawler(
+		logger,
+		eventBus,
+		indexManager,
+		sources,
+		articleProcessor,
+		contentProcessor,
+		cfg,
+	)
+
+	// Set up event handling
+	eventHandler := events.NewDefaultHandler(logger)
+	eventBus.Subscribe(eventHandler)
+
+	return crawler, nil
 }
