@@ -35,7 +35,7 @@ type Crawler struct {
 	indexManager     interfaces.IndexManager
 	sources          sources.Interface
 	articleProcessor common.Processor
-	contentProcessor common.Processor
+	pageProcessor    common.Processor
 	state            *State
 	done             chan struct{}
 	wg               sync.WaitGroup
@@ -570,7 +570,7 @@ func (c *Crawler) getProcessorForType(contentType common.ContentType) common.Pro
 	case common.ContentTypeArticle:
 		return c.articleProcessor
 	case common.ContentTypePage:
-		return c.contentProcessor
+		return c.pageProcessor
 	case common.ContentTypeVideo, common.ContentTypeImage, common.ContentTypeHTML, common.ContentTypeJob:
 		// Try to find a processor for the specific content type
 		for _, p := range c.processors {
@@ -592,9 +592,9 @@ func (c *Crawler) SetArticleProcessor(processor common.Processor) {
 	c.articleProcessor = processor
 }
 
-// SetContentProcessor sets the content processor.
-func (c *Crawler) SetContentProcessor(processor common.Processor) {
-	c.contentProcessor = processor
+// SetPageProcessor sets the page processor.
+func (c *Crawler) SetPageProcessor(processor common.Processor) {
+	c.pageProcessor = processor
 }
 
 // Event Management

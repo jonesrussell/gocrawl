@@ -72,7 +72,7 @@ type DefaultProcessorFactory struct {
 	config         config.Interface
 	storage        storagetypes.Interface
 	articleService article.Interface
-	contentService content.Interface
+	pageService    content.Interface
 	indexName      string
 	articleChannel chan *models.Article
 }
@@ -84,8 +84,8 @@ type ProcessorFactoryParams struct {
 	Config         config.Interface
 	Storage        storagetypes.Interface
 	ArticleService article.Interface
-	ContentService content.Interface
-	IndexName      string `name:"contentIndexName"`
+	PageService    content.Interface
+	IndexName      string `name:"pageIndexName"`
 	ArticleChannel chan *models.Article
 }
 
@@ -96,7 +96,7 @@ func NewProcessorFactory(p ProcessorFactoryParams) ProcessorFactory {
 		config:         p.Config,
 		storage:        p.Storage,
 		articleService: p.ArticleService,
-		contentService: p.ContentService,
+		pageService:    p.PageService,
 		indexName:      p.IndexName,
 		articleChannel: p.ArticleChannel,
 	}
@@ -116,16 +116,16 @@ func (f *DefaultProcessorFactory) CreateProcessors(
 		f.articleChannel,
 	)
 
-	contentProcessor := content.NewContentProcessor(content.ProcessorParams{
+	pageProcessor := content.NewPageProcessor(content.ProcessorParams{
 		Logger:    f.logger,
-		Service:   f.contentService,
+		Service:   f.pageService,
 		Storage:   f.storage,
 		IndexName: f.indexName,
 	})
 
 	return []common.Processor{
 		articleProcessor,
-		contentProcessor,
+		pageProcessor,
 	}, nil
 }
 
@@ -138,13 +138,13 @@ func ProvideCrawler(
 	bus *events.EventBus,
 	cfg *crawler.Config,
 ) Result {
-	// Find article and content processors
-	var articleProcessor, contentProcessor common.Processor
+	// Find article and page processors
+	var articleProcessor, pageProcessor common.Processor
 	for _, p := range processors {
 		if p.ContentType() == common.ContentTypeArticle {
 			articleProcessor = p
 		} else if p.ContentType() == common.ContentTypePage {
-			contentProcessor = p
+			pageProcessor = p
 		}
 	}
 
@@ -154,7 +154,7 @@ func ProvideCrawler(
 		indexManager,
 		sources,
 		articleProcessor,
-		contentProcessor,
+		pageProcessor,
 		cfg,
 	)
 
@@ -186,7 +186,7 @@ func NewCrawler(
 	indexManager interfaces.IndexManager,
 	sources sources.Interface,
 	articleProcessor common.Processor,
-	contentProcessor common.Processor,
+	pageProcessor common.Processor,
 	cfg *crawler.Config,
 ) Interface {
 	collector := colly.NewCollector(
@@ -260,7 +260,7 @@ func NewCrawler(
 		indexManager:     indexManager,
 		sources:          sources,
 		articleProcessor: articleProcessor,
-		contentProcessor: contentProcessor,
+		pageProcessor:    pageProcessor,
 		state:            NewState(logger),
 		done:             make(chan struct{}),
 		articleChannel:   make(chan *models.Article, ArticleChannelBufferSize),

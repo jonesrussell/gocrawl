@@ -12,7 +12,7 @@ import (
 	"go.uber.org/fx"
 )
 
-// ProcessorParams defines the parameters for creating a new ContentProcessor.
+// ProcessorParams defines the parameters for creating a new PageProcessor.
 type ProcessorParams struct {
 	Logger    logger.Interface
 	Service   Interface
@@ -20,7 +20,7 @@ type ProcessorParams struct {
 	IndexName string
 }
 
-// Params defines the parameters required for creating a content service.
+// Params defines the parameters required for creating a page service.
 // It uses fx.In for dependency injection and includes:
 // - Logger: For logging operations
 type Params struct {
@@ -28,34 +28,34 @@ type Params struct {
 
 	Logger    logger.Interface
 	Storage   types.Interface
-	IndexName string `name:"contentIndexName"`
+	IndexName string `name:"pageIndexName"`
 }
 
 // Module provides the content module's dependencies.
 var Module = fx.Module("content",
 	fx.Provide(
-		// Provide the content service
+		// Provide the page service
 		fx.Annotate(
 			NewContentService,
 			fx.As(new(Interface)),
 		),
-		// Provide the content processor
+		// Provide the page processor
 		fx.Annotate(
 			func(p struct {
 				fx.In
 				Logger    logger.Interface
 				Service   Interface
 				Storage   types.Interface
-				IndexName string `name:"contentIndexName"`
-			}) *ContentProcessor {
-				return NewContentProcessor(ProcessorParams{
+				IndexName string `name:"pageIndexName"`
+			}) *PageProcessor {
+				return NewPageProcessor(ProcessorParams{
 					Logger:    p.Logger,
 					Service:   p.Service,
 					Storage:   p.Storage,
 					IndexName: p.IndexName,
 				})
 			},
-			fx.ResultTags(`name:"contentProcessor"`),
+			fx.ResultTags(`name:"pageProcessor"`),
 			fx.As(new(common.Processor)),
 		),
 	),

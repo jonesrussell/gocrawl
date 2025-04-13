@@ -89,7 +89,7 @@ func (p *HTMLProcessor) getProcessorForType(contentType common.ContentType) comm
 	case common.ContentTypeArticle:
 		return p.crawler.articleProcessor
 	case common.ContentTypePage:
-		return p.crawler.contentProcessor
+		return p.crawler.pageProcessor
 	case common.ContentTypeVideo, common.ContentTypeImage, common.ContentTypeHTML, common.ContentTypeJob:
 		// Try to find a processor for the specific content type
 		for _, proc := range p.crawler.processors {

@@ -14,47 +14,47 @@ import (
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// ContentProcessor handles content processing.
-type ContentProcessor struct {
-	// Logger for content processing operations
+// PageProcessor handles page processing.
+type PageProcessor struct {
+	// Logger for page processing operations
 	Logger logger.Interface
-	// ContentService for content operations
-	ContentService Interface
-	// Storage for content persistence
+	// PageService for page operations
+	PageService Interface
+	// Storage for page persistence
 	Storage storagetypes.Interface
-	// IndexName is the name of the content index
+	// IndexName is the name of the page index
 	IndexName string
 	// metrics holds processing metrics
 	metrics *common.Metrics
 }
 
-// NewContentProcessor creates a new content processor.
-func NewContentProcessor(p ProcessorParams) *ContentProcessor {
-	return &ContentProcessor{
-		Logger:         p.Logger,
-		ContentService: p.Service,
-		Storage:        p.Storage,
-		IndexName:      p.IndexName,
-		metrics:        &common.Metrics{},
+// NewPageProcessor creates a new page processor.
+func NewPageProcessor(p ProcessorParams) *PageProcessor {
+	return &PageProcessor{
+		Logger:      p.Logger,
+		PageService: p.Service,
+		Storage:     p.Storage,
+		IndexName:   p.IndexName,
+		metrics:     &common.Metrics{},
 	}
 }
 
 // Start implements common.Processor.Start.
-func (p *ContentProcessor) Start(ctx context.Context) error {
-	p.Logger.Info("Starting content processor",
-		"component", "content/processor")
+func (p *PageProcessor) Start(ctx context.Context) error {
+	p.Logger.Info("Starting page processor",
+		"component", "page/processor")
 	return nil
 }
 
 // Stop implements common.Processor.Stop.
-func (p *ContentProcessor) Stop(ctx context.Context) error {
-	p.Logger.Info("Stopping content processor",
-		"component", "content/processor")
+func (p *PageProcessor) Stop(ctx context.Context) error {
+	p.Logger.Info("Stopping page processor",
+		"component", "page/processor")
 	return nil
 }
 
 // ProcessJob implements common.Processor.ProcessJob
-func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) error {
+func (p *PageProcessor) ProcessJob(ctx context.Context, job *common.Job) error {
 	start := time.Now()
 	defer func() {
 		p.metrics.ProcessingDuration += time.Since(start)
@@ -88,7 +88,7 @@ func (p *ContentProcessor) ProcessJob(ctx context.Context, job *common.Job) erro
 }
 
 // ProcessHTML implements HTMLProcessor.ProcessHTML
-func (p *ContentProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
+func (p *PageProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement) error {
 	start := time.Now()
 	defer func() {
 		p.metrics.LastProcessedTime = time.Now()
@@ -96,38 +96,38 @@ func (p *ContentProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement
 		p.metrics.ProcessingDuration += time.Since(start)
 	}()
 
-	// Extract content using the ContentService
-	content := p.ContentService.ExtractContent(e)
-	if content == nil {
-		p.Logger.Debug("No content extracted",
+	// Extract page using the PageService
+	page := p.PageService.ExtractContent(e)
+	if page == nil {
+		p.Logger.Debug("No page extracted",
 			"url", e.Request.URL.String())
 		return nil
 	}
 
 	// Extract metadata
-	content.Metadata = p.ContentService.ExtractMetadata(e)
+	page.Metadata = p.PageService.ExtractMetadata(e)
 
 	// Get JSON-LD type if available
 	jsonLDType := ""
-	if typeVal, typeExists := content.Metadata["@type"].(string); typeExists {
+	if typeVal, typeExists := page.Metadata["@type"].(string); typeExists {
 		jsonLDType = typeVal
 	}
 
-	// Determine content type
-	content.Type = string(p.ContentService.DetermineContentType(
+	// Determine page type
+	page.Type = string(p.PageService.DetermineContentType(
 		e.Request.URL.String(),
-		content.Metadata,
+		page.Metadata,
 		jsonLDType,
 	))
 
-	// Process content
-	content.Body = p.ContentService.Process(ctx, content.Body)
+	// Process page
+	page.Body = p.PageService.Process(ctx, page.Body)
 
-	// Store the content
-	if err := p.Storage.IndexDocument(ctx, p.IndexName, content.ID, content); err != nil {
-		p.Logger.Error("Failed to index content",
-			"component", "content/processor",
-			"contentID", content.ID,
+	// Store the page
+	if err := p.Storage.IndexDocument(ctx, p.IndexName, page.ID, page); err != nil {
+		p.Logger.Error("Failed to index page",
+			"component", "page/processor",
+			"pageID", page.ID,
 			"error", err)
 		p.metrics.ErrorCount++
 		return err
@@ -137,12 +137,12 @@ func (p *ContentProcessor) ProcessHTML(ctx context.Context, e *colly.HTMLElement
 }
 
 // GetMetrics returns the current processing metrics.
-func (p *ContentProcessor) GetMetrics() *common.Metrics {
+func (p *PageProcessor) GetMetrics() *common.Metrics {
 	return p.metrics
 }
 
 // ProcessContent implements common.Processor.ProcessContent
-func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType common.ContentType, content any) error {
+func (p *PageProcessor) ProcessContent(ctx context.Context, contentType common.ContentType, content any) error {
 	// Handle both page and image content types
 	if contentType != common.ContentTypePage && contentType != common.ContentTypeImage {
 		return fmt.Errorf("unsupported content type: %v", contentType)
@@ -153,38 +153,38 @@ func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType commo
 		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
 	}
 
-	// Extract content using the ContentService
-	contentData := p.ContentService.ExtractContent(e)
-	if contentData == nil {
-		p.Logger.Debug("No content extracted",
+	// Extract page using the PageService
+	page := p.PageService.ExtractContent(e)
+	if page == nil {
+		p.Logger.Debug("No page extracted",
 			"url", e.Request.URL.String())
 		return nil
 	}
 
 	// Extract metadata
-	contentData.Metadata = p.ContentService.ExtractMetadata(e)
+	page.Metadata = p.PageService.ExtractMetadata(e)
 
 	// Get JSON-LD type if available
 	jsonLDType := ""
-	if typeVal, typeExists := contentData.Metadata["@type"].(string); typeExists {
+	if typeVal, typeExists := page.Metadata["@type"].(string); typeExists {
 		jsonLDType = typeVal
 	}
 
-	// Determine content type
-	contentData.Type = string(p.ContentService.DetermineContentType(
+	// Determine page type
+	page.Type = string(p.PageService.DetermineContentType(
 		e.Request.URL.String(),
-		contentData.Metadata,
+		page.Metadata,
 		jsonLDType,
 	))
 
-	// Process content
-	contentData.Body = p.ContentService.Process(ctx, contentData.Body)
+	// Process page
+	page.Body = p.PageService.Process(ctx, page.Body)
 
-	// Store the content
-	if err := p.Storage.IndexDocument(ctx, p.IndexName, contentData.ID, contentData); err != nil {
-		p.Logger.Error("Failed to index content",
-			"component", "content/processor",
-			"contentID", contentData.ID,
+	// Store the page
+	if err := p.Storage.IndexDocument(ctx, p.IndexName, page.ID, page); err != nil {
+		p.Logger.Error("Failed to index page",
+			"component", "page/processor",
+			"pageID", page.ID,
 			"error", err)
 		p.metrics.ErrorCount++
 		return err
@@ -193,45 +193,45 @@ func (p *ContentProcessor) ProcessContent(ctx context.Context, contentType commo
 	return nil
 }
 
-// Process processes the content and returns the processed result
-func (p *ContentProcessor) Process(ctx context.Context, content any) error {
+// Process processes the page and returns the processed result
+func (p *PageProcessor) Process(ctx context.Context, content any) error {
 	e, isHTMLElement := content.(*colly.HTMLElement)
 	if !isHTMLElement {
 		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
 	}
 
-	// Extract content using the ContentService
-	contentData := p.ContentService.ExtractContent(e)
-	if contentData == nil {
-		p.Logger.Debug("No content extracted",
+	// Extract page using the PageService
+	page := p.PageService.ExtractContent(e)
+	if page == nil {
+		p.Logger.Debug("No page extracted",
 			"url", e.Request.URL.String())
 		return nil
 	}
 
 	// Extract metadata
-	contentData.Metadata = p.ContentService.ExtractMetadata(e)
+	page.Metadata = p.PageService.ExtractMetadata(e)
 
 	// Get JSON-LD type if available
 	jsonLDType := ""
-	if typeVal, typeExists := contentData.Metadata["@type"].(string); typeExists {
+	if typeVal, typeExists := page.Metadata["@type"].(string); typeExists {
 		jsonLDType = typeVal
 	}
 
-	// Determine content type
-	contentData.Type = string(p.ContentService.DetermineContentType(
+	// Determine page type
+	page.Type = string(p.PageService.DetermineContentType(
 		e.Request.URL.String(),
-		contentData.Metadata,
+		page.Metadata,
 		jsonLDType,
 	))
 
-	// Process content
-	contentData.Body = p.ContentService.Process(ctx, contentData.Body)
+	// Process page
+	page.Body = p.PageService.Process(ctx, page.Body)
 
-	// Store the content
-	if err := p.Storage.IndexDocument(ctx, p.IndexName, contentData.ID, contentData); err != nil {
-		p.Logger.Error("Failed to index content",
-			"component", "content/processor",
-			"contentID", contentData.ID,
+	// Store the page
+	if err := p.Storage.IndexDocument(ctx, p.IndexName, page.ID, page); err != nil {
+		p.Logger.Error("Failed to index page",
+			"component", "page/processor",
+			"pageID", page.ID,
 			"error", err)
 		p.metrics.ErrorCount++
 		return err
@@ -243,33 +243,33 @@ func (p *ContentProcessor) Process(ctx context.Context, content any) error {
 }
 
 // CanProcess checks if this processor can handle the given content
-func (p *ContentProcessor) CanProcess(content any) bool {
+func (p *PageProcessor) CanProcess(content any) bool {
 	_, ok := content.(*colly.HTMLElement)
 	return ok
 }
 
 // ContentType implements ContentProcessor.ContentType
-func (p *ContentProcessor) ContentType() common.ContentType {
+func (p *PageProcessor) ContentType() common.ContentType {
 	return common.ContentTypePage
 }
 
 // ExtractContent implements common.Processor.ExtractContent
-func (p *ContentProcessor) ExtractContent() (string, error) {
-	// For content processing, we extract the raw content from the HTML element
+func (p *PageProcessor) ExtractContent() (string, error) {
+	// For page processing, we extract the raw content from the HTML element
 	// This is a no-op implementation since we process content directly in ProcessHTML
 	return "", nil
 }
 
 // ExtractLinks implements common.Processor.ExtractLinks
-func (p *ContentProcessor) ExtractLinks() ([]string, error) {
-	// For content processing, we don't need to extract links
+func (p *PageProcessor) ExtractLinks() ([]string, error) {
+	// For page processing, we don't need to extract links
 	// as we process the content directly
 	return nil, nil
 }
 
 // GetProcessor implements common.Processor.GetProcessor
-func (p *ContentProcessor) GetProcessor(contentType common.ContentType) (common.ContentProcessor, error) {
-	// For content processing, we handle page content
+func (p *PageProcessor) GetProcessor(contentType common.ContentType) (common.ContentProcessor, error) {
+	// For page processing, we handle page content
 	if contentType != common.ContentTypePage {
 		return nil, fmt.Errorf("unsupported content type: %v", contentType)
 	}
@@ -277,20 +277,20 @@ func (p *ContentProcessor) GetProcessor(contentType common.ContentType) (common.
 }
 
 // ParseHTML implements common.Processor.ParseHTML
-func (p *ContentProcessor) ParseHTML(r io.Reader) error {
-	// For content processing, we don't need to parse raw HTML
+func (p *PageProcessor) ParseHTML(r io.Reader) error {
+	// For page processing, we don't need to parse raw HTML
 	// as we process the content directly in ProcessHTML
 	return nil
 }
 
 // RegisterProcessor implements common.Processor.RegisterProcessor
-func (p *ContentProcessor) RegisterProcessor(processor common.ContentProcessor) {
-	// For content processing, we don't need to register additional processors
+func (p *PageProcessor) RegisterProcessor(processor common.ContentProcessor) {
+	// For page processing, we don't need to register additional processors
 	// as we handle all content types directly
 }
 
 // ValidateJob implements common.Processor.ValidateJob
-func (p *ContentProcessor) ValidateJob(job *common.Job) error {
+func (p *PageProcessor) ValidateJob(job *common.Job) error {
 	if job == nil {
 		return errors.New("job cannot be nil")
 	}
@@ -300,5 +300,5 @@ func (p *ContentProcessor) ValidateJob(job *common.Job) error {
 	return nil
 }
 
-// Ensure ContentProcessor implements common.Processor
-var _ common.Processor = (*ContentProcessor)(nil)
+// Ensure PageProcessor implements common.Processor
+var _ common.Processor = (*PageProcessor)(nil)

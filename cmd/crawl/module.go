@@ -49,12 +49,12 @@ var Module = fx.Options(
 		return make(chan *models.Article, ArticleChannelBufferSize)
 	}),
 
-	// Provide the content index name
+	// Provide the page index name
 	fx.Provide(fx.Annotate(
 		func() string {
-			return "content"
+			return "page"
 		},
-		fx.ResultTags(`name:"contentIndexName"`),
+		fx.ResultTags(`name:"pageIndexName"`),
 	)),
 
 	// Provide the sources
@@ -77,7 +77,7 @@ var Module = fx.Options(
 	) []common.Processor {
 		return []common.Processor{
 			&common.NoopProcessor{}, // Article processor
-			&common.NoopProcessor{}, // Content processor
+			&common.NoopProcessor{}, // Page processor
 		}
 	}),
 
@@ -88,7 +88,7 @@ var Module = fx.Options(
 			config config.Interface,
 			storage types.Interface,
 			articleService article.Interface,
-			contentService content.Interface,
+			pageService content.Interface,
 			indexName string,
 			articleChannel chan *models.Article,
 		) crawler.ProcessorFactory {
@@ -97,12 +97,12 @@ var Module = fx.Options(
 				Config:         config,
 				Storage:        storage,
 				ArticleService: articleService,
-				ContentService: contentService,
+				PageService:    pageService,
 				IndexName:      indexName,
 				ArticleChannel: articleChannel,
 			})
 		},
-		fx.ParamTags(``, ``, ``, ``, ``, `name:"contentIndexName"`, ``),
+		fx.ParamTags(``, ``, ``, ``, ``, `name:"pageIndexName"`, ``),
 	)),
 
 	// Provide the job service
@@ -154,15 +154,3 @@ var Module = fx.Options(
 		)
 	}),
 )
-
-// ProcessorParams holds parameters for creating processors.
-type ProcessorParams struct {
-	fx.In
-	Logger         logger.Interface
-	Config         config.Interface
-	Storage        types.Interface
-	ArticleService article.Interface
-	ContentService content.Interface
-	IndexName      string `name:"contentIndexName"`
-	ArticleChannel chan *models.Article
-}
