@@ -13,14 +13,17 @@ type MockSecurityMiddleware struct {
 	mock.Mock
 }
 
+// Cleanup mocks the cleanup method
 func (m *MockSecurityMiddleware) Cleanup(ctx context.Context) {
 	m.Called(ctx)
 }
 
+// WaitCleanup mocks the wait cleanup method
 func (m *MockSecurityMiddleware) WaitCleanup() {
 	m.Called()
 }
 
+// Middleware mocks the middleware method
 func (m *MockSecurityMiddleware) Middleware() gin.HandlerFunc {
 	args := m.Called()
 	if fn := args.Get(0); fn != nil {
@@ -31,7 +34,7 @@ func (m *MockSecurityMiddleware) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) { c.Next() }
 }
 
-// GetMiddleware returns the middleware function
+// GetMiddleware mocks the get middleware method
 func (m *MockSecurityMiddleware) GetMiddleware() gin.HandlerFunc {
 	args := m.Called()
 	if len(args) == 0 {

@@ -1,3 +1,4 @@
+// Package testutils provides shared testing utilities across the application.
 package testutils
 
 import "errors"

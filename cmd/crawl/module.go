@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
+	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -78,6 +79,20 @@ var Module = fx.Options(
 		},
 		fx.As(new(common.JobService)),
 	)),
+
+	// Provide the job processor
+	fx.Provide(fx.Annotate(
+		func(
+			logger logger.Interface,
+			config config.Interface,
+		) *DefaultJobService {
+			return &DefaultJobService{
+				logger: logger,
+				config: config,
+			}
+		},
+		fx.As(new(content.ContentProcessor)),
+	)),
 )
 
 // NewCommand creates a new crawl command.
@@ -95,7 +110,7 @@ func NewCommand(p struct {
 	return cmd
 }
 
-// DefaultJobService implements the common.Processor interface.
+// DefaultJobService implements the content.ContentProcessor interface.
 type DefaultJobService struct {
 	logger logger.Interface
 	config config.Interface
@@ -112,7 +127,7 @@ func (s *DefaultJobService) ValidateJob(job *jobtypes.Job) error {
 	return nil
 }
 
-// Process implements common.Processor.
+// Process implements content.ContentProcessor.
 func (s *DefaultJobService) Process(ctx context.Context, content any) error {
 	job, ok := content.(*jobtypes.Job)
 	if !ok {
@@ -121,50 +136,50 @@ func (s *DefaultJobService) Process(ctx context.Context, content any) error {
 	return s.ValidateJob(job)
 }
 
-// CanProcess implements common.Processor.
+// CanProcess implements content.ContentProcessor.
 func (s *DefaultJobService) CanProcess(contentType contenttype.Type) bool {
 	return contentType == contenttype.Job
 }
 
-// ContentType implements common.Processor.
+// ContentType implements content.ContentProcessor.
 func (s *DefaultJobService) ContentType() contenttype.Type {
 	return contenttype.Job
 }
 
-// ExtractContent implements common.Processor.
+// ExtractContent implements content.ContentProcessor.
 func (s *DefaultJobService) ExtractContent() (string, error) {
 	return "", errors.New("not implemented")
 }
 
-// ExtractLinks implements common.Processor.
+// ExtractLinks implements content.ContentProcessor.
 func (s *DefaultJobService) ExtractLinks() ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-// GetProcessor implements common.Processor.
-func (s *DefaultJobService) GetProcessor(contentType contenttype.Type) (common.Processor, error) {
+// GetProcessor implements content.ContentProcessor.
+func (s *DefaultJobService) GetProcessor(contentType contenttype.Type) (content.ContentProcessor, error) {
 	if contentType != contenttype.Job {
 		return nil, fmt.Errorf("unsupported content type: %s", contentType)
 	}
 	return s, nil
 }
 
-// ParseHTML implements common.Processor.
+// ParseHTML implements content.ContentProcessor.
 func (s *DefaultJobService) ParseHTML(r io.Reader) error {
 	return errors.New("not implemented")
 }
 
-// RegisterProcessor implements common.Processor.
-func (s *DefaultJobService) RegisterProcessor(processor common.Processor) {
+// RegisterProcessor implements content.ContentProcessor.
+func (s *DefaultJobService) RegisterProcessor(processor content.Processor) {
 	// No-op for now
 }
 
-// Start implements common.Processor.
+// Start implements content.ContentProcessor.
 func (s *DefaultJobService) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop implements common.Processor.
+// Stop implements content.ContentProcessor.
 func (s *DefaultJobService) Stop(ctx context.Context) error {
 	return nil
 }

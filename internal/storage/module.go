@@ -78,8 +78,16 @@ func createClientConfig(
 
 // NewElasticsearchClient creates a new Elasticsearch client with the provided configuration
 func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*elasticsearch.Client, error) {
+	if cfg == nil {
+		return nil, errors.New("config is nil")
+	}
+
 	// Get Elasticsearch configuration
 	esConfig := cfg.GetElasticsearchConfig()
+	if esConfig == nil {
+		return nil, errors.New("elasticsearch config is nil")
+	}
+
 	if len(esConfig.Addresses) == 0 {
 		return nil, errors.New("elasticsearch addresses are required")
 	}

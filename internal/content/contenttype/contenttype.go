@@ -1,4 +1,4 @@
-// Package contenttype defines content type constants and types.
+// Package contenttype provides content type definitions.
 package contenttype
 
 // Type represents the type of content being processed.

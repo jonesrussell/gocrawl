@@ -3,14 +3,12 @@ package types
 
 import (
 	"context"
-
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 )
 
 // Interface defines the interface for storage operations.
 type Interface interface {
 	// GetIndexManager returns the index manager for this storage
-	GetIndexManager() interfaces.IndexManager
+	GetIndexManager() IndexManager
 
 	// Document operations
 	IndexDocument(ctx context.Context, index string, id string, document any) error

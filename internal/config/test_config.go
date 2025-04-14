@@ -1,4 +1,5 @@
-package testutils
+// Package config provides configuration management for the application.
+package config
 
 import (
 	"path/filepath"
@@ -8,7 +9,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
@@ -34,7 +34,7 @@ func GetTestConfigPath(t *testing.T, filename string) string {
 }
 
 // LoadTestConfig loads a test configuration from the specified filename
-func LoadTestConfig(t *testing.T, filename string) *config.Config {
+func LoadTestConfig(t *testing.T, filename string) *Config {
 	t.Helper()
 	v := viper.New()
 	v.SetConfigFile(GetTestConfigPath(t, filename))
@@ -47,11 +47,11 @@ func LoadTestConfig(t *testing.T, filename string) *config.Config {
 	v.SetDefault("log.level", "debug")
 	v.SetDefault("log.debug", true)
 	v.SetDefault("crawler.base_url", "http://test.example.com")
-	v.SetDefault("crawler.max_depth", config.DefaultMaxDepth)
+	v.SetDefault("crawler.max_depth", DefaultMaxDepth)
 	v.SetDefault("crawler.rate_limit", "2s")
-	v.SetDefault("crawler.parallelism", config.DefaultParallelism)
+	v.SetDefault("crawler.parallelism", DefaultParallelism)
 
-	cfg := &config.Config{}
+	cfg := &Config{}
 	require.NoError(t, v.Unmarshal(cfg), "failed to unmarshal config")
 	return cfg
 }

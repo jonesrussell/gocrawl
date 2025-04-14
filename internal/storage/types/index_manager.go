@@ -1,5 +1,5 @@
-// Package interfaces provides shared interfaces used across the application.
-package interfaces
+// Package types defines the core types and interfaces for storage operations.
+package types
 
 import "context"
 
@@ -17,6 +17,6 @@ type IndexManager interface {
 	UpdateMapping(ctx context.Context, name string, mapping map[string]any) error
 	// EnsureArticleIndex ensures that an article index exists with the appropriate mapping.
 	EnsureArticleIndex(ctx context.Context, name string) error
-	// EnsureContentIndex ensures that a content index exists with the appropriate mapping.
-	EnsureContentIndex(ctx context.Context, name string) error
+	// EnsurePageIndex ensures that a page index exists with the appropriate mapping.
+	EnsurePageIndex(ctx context.Context, name string) error
 }

@@ -8,16 +8,15 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
 // HTMLProcessor processes HTML content and delegates to appropriate content processors.
 type HTMLProcessor struct {
 	logger       logger.Interface
-	processors   []common.Processor
+	processors   []content.Processor
 	unknownTypes map[contenttype.Type]int
 }
 
@@ -25,7 +24,7 @@ type HTMLProcessor struct {
 func NewHTMLProcessor(logger logger.Interface) *HTMLProcessor {
 	return &HTMLProcessor{
 		logger:       logger,
-		processors:   make([]common.Processor, 0, 2), // Pre-allocate for article and page processors
+		processors:   make([]content.Processor, 0, 2), // Pre-allocate for article and page processors
 		unknownTypes: make(map[contenttype.Type]int),
 	}
 }
@@ -91,7 +90,7 @@ func (p *HTMLProcessor) Stop(ctx context.Context) error {
 }
 
 // ValidateJob validates a job before processing.
-func (p *HTMLProcessor) ValidateJob(job *jobtypes.Job) error {
+func (p *HTMLProcessor) ValidateJob(job *content.Job) error {
 	if job == nil {
 		return fmt.Errorf("job cannot be nil")
 	}
@@ -99,7 +98,7 @@ func (p *HTMLProcessor) ValidateJob(job *jobtypes.Job) error {
 }
 
 // GetProcessor returns a processor for the given content type.
-func (p *HTMLProcessor) GetProcessor(contentType contenttype.Type) (common.Processor, error) {
+func (p *HTMLProcessor) GetProcessor(contentType contenttype.Type) (content.ContentProcessor, error) {
 	for _, processor := range p.processors {
 		if processor.CanProcess(contentType) {
 			return processor, nil
@@ -109,12 +108,21 @@ func (p *HTMLProcessor) GetProcessor(contentType contenttype.Type) (common.Proce
 }
 
 // RegisterProcessor registers a new processor.
-func (p *HTMLProcessor) RegisterProcessor(processor common.Processor) {
+func (p *HTMLProcessor) RegisterProcessor(processor content.Processor) {
 	p.processors = append(p.processors, processor)
 }
 
+// ProcessContent processes content using the appropriate processor.
+func (p *HTMLProcessor) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
+	processor, err := p.GetProcessor(contentType)
+	if err != nil {
+		return err
+	}
+	return processor.Process(ctx, content)
+}
+
 // selectProcessor selects a processor for the given content type.
-func (p *HTMLProcessor) selectProcessor(contentType contenttype.Type) common.Processor {
+func (p *HTMLProcessor) selectProcessor(contentType contenttype.Type) content.Processor {
 	for _, processor := range p.processors {
 		if processor.CanProcess(contentType) {
 			return processor

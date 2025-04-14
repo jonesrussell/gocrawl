@@ -1,5 +1,5 @@
-// Package testutils provides utilities for testing the config package.
-package testutils
+// Package config provides configuration management for the application.
+package config
 
 import (
 	"os"

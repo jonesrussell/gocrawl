@@ -11,13 +11,13 @@ import (
 
 	colly "github.com/gocolly/colly/v2"
 	gomock "github.com/golang/mock/gomock"
-	common "github.com/jonesrussell/gocrawl/internal/common"
 	content "github.com/jonesrussell/gocrawl/internal/content"
 	events "github.com/jonesrussell/gocrawl/internal/crawler/events"
-	interfaces "github.com/jonesrussell/gocrawl/internal/interfaces"
 	logger "github.com/jonesrussell/gocrawl/internal/logger"
+	metrics "github.com/jonesrussell/gocrawl/internal/metrics"
 	models "github.com/jonesrussell/gocrawl/internal/models"
 	sources "github.com/jonesrussell/gocrawl/internal/sources"
+	types "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // MockCrawlerInterface is a mock of CrawlerInterface interface.
@@ -44,10 +44,10 @@ func (m *MockCrawlerInterface) EXPECT() *MockCrawlerInterfaceMockRecorder {
 }
 
 // GetMetrics mocks base method.
-func (m *MockCrawlerInterface) GetMetrics() *common.Metrics {
+func (m *MockCrawlerInterface) GetMetrics() *metrics.Metrics {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMetrics")
-	ret0, _ := ret[0].(*common.Metrics)
+	ret0, _ := ret[0].(*metrics.Metrics)
 	return ret0
 }
 
@@ -525,10 +525,10 @@ func (mr *MockInterfaceMockRecorder) GetArticleChannel() *gomock.Call {
 }
 
 // GetIndexManager mocks base method.
-func (m *MockInterface) GetIndexManager() interfaces.IndexManager {
+func (m *MockInterface) GetIndexManager() types.IndexManager {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetIndexManager")
-	ret0, _ := ret[0].(interfaces.IndexManager)
+	ret0, _ := ret[0].(types.IndexManager)
 	return ret0
 }
 
@@ -553,10 +553,10 @@ func (mr *MockInterfaceMockRecorder) GetLogger() *gomock.Call {
 }
 
 // GetMetrics mocks base method.
-func (m *MockInterface) GetMetrics() *common.Metrics {
+func (m *MockInterface) GetMetrics() *metrics.Metrics {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMetrics")
-	ret0, _ := ret[0].(*common.Metrics)
+	ret0, _ := ret[0].(*metrics.Metrics)
 	return ret0
 }
 

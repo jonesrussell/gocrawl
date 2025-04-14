@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/content"
+	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -101,16 +101,41 @@ func (p *ArticleProcessor) ValidateJob(job *jobtypes.Job) error {
 }
 
 // RegisterProcessor registers a new content processor.
-func (p *ArticleProcessor) RegisterProcessor(processor common.Processor) {
+func (p *ArticleProcessor) RegisterProcessor(processor content.Processor) {
 	// Not implemented - we only handle article processing
 }
 
 // GetProcessor returns the processor for the given content type.
-func (p *ArticleProcessor) GetProcessor(contentType contenttype.Type) (common.Processor, error) {
+func (p *ArticleProcessor) GetProcessor(contentType contenttype.Type) (content.ContentProcessor, error) {
 	if contentType == contenttype.Article {
-		return p, nil
+		return &articleContentProcessor{p}, nil
 	}
 	return nil, fmt.Errorf("unsupported content type: %s", contentType)
+}
+
+// articleContentProcessor wraps ArticleProcessor to implement content.ContentProcessor
+type articleContentProcessor struct {
+	*ArticleProcessor
+}
+
+// Process implements content.ContentProcessor
+func (p *articleContentProcessor) Process(ctx context.Context, content any) error {
+	return p.ArticleProcessor.Process(ctx, content)
+}
+
+// ContentType implements content.ContentProcessor
+func (p *articleContentProcessor) ContentType() contenttype.Type {
+	return p.ArticleProcessor.ContentType()
+}
+
+// CanProcess implements content.ContentProcessor
+func (p *articleContentProcessor) CanProcess(content contenttype.Type) bool {
+	return p.ArticleProcessor.CanProcess(content)
+}
+
+// ValidateJob implements content.ContentProcessor
+func (p *articleContentProcessor) ValidateJob(job *content.Job) error {
+	return p.ArticleProcessor.ValidateJob(job)
 }
 
 // Start implements the common.Processor interface.

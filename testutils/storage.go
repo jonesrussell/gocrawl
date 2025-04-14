@@ -1,10 +1,10 @@
+// Package testutils provides shared testing utilities across the application.
 package testutils
 
 import (
 	"context"
 	"errors"
 
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/stretchr/testify/mock"
@@ -21,7 +21,7 @@ type MockStorage struct {
 	logger logger.Interface
 }
 
-// NewMockStorage creates a new mock storage.
+// NewMockStorage creates a new mock storage instance.
 func NewMockStorage(log logger.Interface) types.Interface {
 	return &MockStorage{
 		logger: log,
@@ -197,9 +197,9 @@ func (m *MockStorage) Ping(ctx context.Context) error {
 }
 
 // GetIndexManager returns the index manager for this storage
-func (m *MockStorage) GetIndexManager() interfaces.IndexManager {
+func (m *MockStorage) GetIndexManager() types.IndexManager {
 	args := m.Called()
-	if val, ok := args.Get(0).(interfaces.IndexManager); ok {
+	if val, ok := args.Get(0).(types.IndexManager); ok {
 		return val
 	}
 	return nil

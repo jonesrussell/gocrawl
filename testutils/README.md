@@ -1,6 +1,60 @@
 # Test Utilities
 
-This directory contains test utilities and mocks for the GoCrawl project.
+This directory contains shared test utilities and mock implementations used across the codebase.
+
+## Directory Structure
+
+```
+/testutils/
+├── mocks/           # Generated mock implementations
+│   ├── api/        # API-related mocks
+│   ├── config/     # Config-related mocks
+│   ├── crawler/    # Crawler-related mocks
+│   ├── logger/     # Logger-related mocks
+│   ├── sources/    # Sources-related mocks
+│   ├── models/     # Models-related mocks
+│   └── storage/    # Storage-related mocks
+├── errors.go       # Common error test utilities
+├── security.go     # Security test utilities
+└── storage.go      # Storage test utilities
+```
+
+## Usage
+
+Import test utilities using the full package path:
+
+```go
+import (
+    "github.com/jonesrussell/gocrawl/testutils"
+    "github.com/jonesrussell/gocrawl/testutils/mocks/api"
+)
+```
+
+## Package-Specific Test Helpers
+
+Package-specific test helpers should be placed in their respective packages with a `test_` prefix:
+
+```go
+// internal/config/test_config.go
+package config
+
+// TestConfig creates a test configuration
+func TestConfig() *Config {
+    // ...
+}
+```
+
+## Mock Generation
+
+Mocks are generated using the `scripts/generate_mocks.sh` script. This script:
+1. Creates the necessary mock directories
+2. Generates mocks for all interfaces
+3. Formats the generated code
+
+To generate mocks:
+```bash
+./scripts/generate_mocks.sh
+```
 
 ## Mock Structure
 

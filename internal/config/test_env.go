@@ -1,5 +1,5 @@
-// Package testutils provides utilities for testing the config package.
-package testutils
+// Package config provides configuration management for the application.
+package config
 
 import (
 	"errors"
@@ -174,82 +174,4 @@ func verifyCleanup(t *testing.T, initialEnv map[string]string, cleanup func()) {
 	// Verify test files are cleared
 	sourcesFile := os.Getenv("GOCRAWL_CRAWLER_SOURCE_FILE")
 	require.Empty(t, sourcesFile, "GOCRAWL_CRAWLER_SOURCE_FILE should be cleared")
-}
-
-func TestSetupConfigTestEnv(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name          string
-		initialEnv    map[string]string
-		expectedEnv   map[string]string
-		verifyCleanup bool
-		wantErr       bool
-	}{
-		{
-			name: "basic environment setup and cleanup",
-			initialEnv: map[string]string{
-				"TEST_VAR": "test_value",
-			},
-			expectedEnv: map[string]string{
-				"GOCRAWL_APP_ENVIRONMENT": "test",
-				"GOCRAWL_APP_NAME":        "gocrawl-test",
-				"GOCRAWL_APP_VERSION":     "0.0.1",
-			},
-			verifyCleanup: true,
-		},
-		{
-			name: "invalid environment variable name",
-			initialEnv: map[string]string{
-				"INVALID=VAR": "test_value",
-			},
-			wantErr: true,
-		},
-		{
-			name: "empty environment variable name",
-			initialEnv: map[string]string{
-				"": "test_value",
-			},
-			wantErr: true,
-		},
-		{
-			name: "whitespace in environment variable name",
-			initialEnv: map[string]string{
-				"TEST VAR": "test_value",
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			// Setup environment variables
-			err := setupTestEnvironment(t, tt.initialEnv)
-			if err != nil {
-				if !tt.wantErr {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				return
-			}
-
-			// Setup test environment
-			cleanup := SetupConfigTestEnv(t)
-			defer cleanup()
-
-			// Verify environment is cleared
-			verifyEnvironmentCleared(t, tt.initialEnv)
-
-			// Verify test environment is set correctly
-			verifyEnvironmentSet(t, tt.expectedEnv)
-
-			// Verify test files are set
-			verifyTestFiles(t)
-
-			if tt.verifyCleanup {
-				verifyCleanup(t, tt.initialEnv, cleanup)
-			}
-		})
-	}
 }

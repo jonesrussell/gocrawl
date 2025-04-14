@@ -178,35 +178,52 @@ func (m *ElasticsearchIndexManager) EnsureArticleIndex(ctx context.Context, name
 	return m.EnsureIndex(ctx, name, articleMapping)
 }
 
-// EnsureContentIndex ensures the content index exists.
-func (m *ElasticsearchIndexManager) EnsureContentIndex(ctx context.Context, name string) error {
-	contentMapping := map[string]any{
+// EnsurePageIndex ensures the page index exists.
+func (m *ElasticsearchIndexManager) EnsurePageIndex(ctx context.Context, name string) error {
+	pageMapping := map[string]any{
 		"mappings": map[string]any{
 			"properties": map[string]any{
+				"id": map[string]any{
+					"type": "keyword",
+				},
+				"url": map[string]any{
+					"type": "keyword",
+				},
 				"title": map[string]any{
 					"type": "text",
 				},
 				"content": map[string]any{
 					"type": "text",
 				},
-				"url": map[string]any{
+				"description": map[string]any{
+					"type": "text",
+				},
+				"keywords": map[string]any{
 					"type": "keyword",
 				},
-				"last_modified": map[string]any{
+				"og_title": map[string]any{
+					"type": "text",
+				},
+				"og_description": map[string]any{
+					"type": "text",
+				},
+				"og_image": map[string]any{
+					"type": "keyword",
+				},
+				"og_url": map[string]any{
+					"type": "keyword",
+				},
+				"canonical_url": map[string]any{
+					"type": "keyword",
+				},
+				"created_at": map[string]any{
 					"type": "date",
 				},
-				"source": map[string]any{
-					"type": "keyword",
-				},
-				"type": map[string]any{
-					"type": "keyword",
-				},
-				"metadata": map[string]any{
-					"type":    "object",
-					"enabled": false,
+				"updated_at": map[string]any{
+					"type": "date",
 				},
 			},
 		},
 	}
-	return m.EnsureIndex(ctx, name, contentMapping)
+	return m.EnsureIndex(ctx, name, pageMapping)
 }

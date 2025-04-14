@@ -1,20 +1,24 @@
 // Package content provides content processing types and interfaces.
 package content
 
-import (
-	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
-)
+import "github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 
-// Type aliases for commonly used interfaces and types.
-// These aliases provide a convenient way to reference core types
-// throughout the application while maintaining clear dependencies.
-type (
-	// Job is an alias for jobtypes.Job, representing a crawling job.
-	Job = jobtypes.Job
+// Type represents the type of content being processed.
+type Type string
 
-	// Item is an alias for jobtypes.Item, representing a crawled item.
-	Item = jobtypes.Item
+const (
+	// Article represents article content.
+	Article Type = "article"
+	// Page represents generic page content.
+	Page Type = "page"
+	// Video represents video content.
+	Video Type = "video"
+	// Image represents image content.
+	Image Type = "image"
+	// HTML represents HTML content.
+	HTML Type = "html"
+	// Job represents job content.
+	JobType Type = "job"
 )
 
 // These types are defined as any to avoid import cycles.
@@ -32,16 +36,3 @@ type JobValidator interface {
 	// ValidateJob validates a job before processing.
 	ValidateJob(job *jobtypes.Job) error
 }
-
-// ContentType is an alias for contenttype.Type.
-type ContentType = contenttype.Type
-
-// Content type constants.
-const (
-	ContentTypeArticle = contenttype.Article
-	ContentTypePage    = contenttype.Page
-	ContentTypeVideo   = contenttype.Video
-	ContentTypeImage   = contenttype.Image
-	ContentTypeHTML    = contenttype.HTML
-	ContentTypeJob     = contenttype.Job
-)

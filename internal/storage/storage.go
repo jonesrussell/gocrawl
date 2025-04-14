@@ -10,7 +10,6 @@ import (
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -27,9 +26,10 @@ const (
 
 // Storage implements the storage interface
 type Storage struct {
-	client *es.Client
-	logger logger.Interface
-	opts   Options
+	client       *es.Client
+	logger       logger.Interface
+	opts         Options
+	indexManager types.IndexManager
 }
 
 // NewStorage creates a new storage instance
@@ -38,11 +38,13 @@ func NewStorage(client *es.Client, logger logger.Interface, opts *Options) types
 		defaultOpts := DefaultOptions()
 		opts = &defaultOpts
 	}
-	return &Storage{
+	s := &Storage{
 		client: client,
 		logger: logger,
 		opts:   *opts,
 	}
+	s.indexManager = NewElasticsearchIndexManager(client, logger)
+	return s
 }
 
 // Ensure Storage implements types.Interface
@@ -874,6 +876,6 @@ func (s *Storage) Close() error {
 }
 
 // GetIndexManager returns the index manager for this storage
-func (s *Storage) GetIndexManager() interfaces.IndexManager {
-	return NewElasticsearchIndexManager(s.client, s.logger)
+func (s *Storage) GetIndexManager() types.IndexManager {
+	return s.indexManager
 }

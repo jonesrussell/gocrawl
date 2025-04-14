@@ -13,8 +13,8 @@ import (
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/processor"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -146,11 +146,11 @@ func Command() *cobra.Command {
 func SetupCollector(
 	ctx context.Context,
 	logger logger.Interface,
-	indexManager interfaces.IndexManager,
+	indexManager storagetypes.IndexManager,
 	sources sources.Interface,
 	eventBus *events.EventBus,
-	articleProcessor common.Processor,
-	contentProcessor common.Processor,
+	articleProcessor processor.Processor,
+	contentProcessor processor.Processor,
 	cfg *crawlerconfig.Config,
 ) (crawler.Interface, error) {
 	// Create crawler instance

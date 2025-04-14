@@ -9,22 +9,22 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/content"
+	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// PageProcessor implements the common.Processor interface for pages.
+// PageProcessor implements the content.Processor interface for pages.
 type PageProcessor struct {
 	logger      logger.Interface
-	service     Interface
-	validator   jobtypes.JobValidator
+	service     PageService
+	validator   content.JobValidator
 	storage     types.Interface
 	indexName   string
 	pageChannel chan *models.Page
+	registry    []content.ContentProcessor
 }
 
 // NewPageProcessor creates a new page processor.
@@ -36,10 +36,11 @@ func NewPageProcessor(p ProcessorParams) *PageProcessor {
 		storage:     p.Storage,
 		indexName:   p.IndexName,
 		pageChannel: p.PageChannel,
+		registry:    make([]content.ContentProcessor, 0),
 	}
 }
 
-// Process implements the common.Processor interface.
+// Process implements the content.Processor interface.
 func (p *PageProcessor) Process(ctx context.Context, content any) error {
 	e, ok := content.(*colly.HTMLElement)
 	if !ok {
@@ -64,22 +65,22 @@ func (p *PageProcessor) Process(ctx context.Context, content any) error {
 	return nil
 }
 
-// ContentType implements the common.Processor interface.
+// ContentType implements the content.Processor interface.
 func (p *PageProcessor) ContentType() contenttype.Type {
 	return contenttype.Page
 }
 
-// CanProcess implements the common.Processor interface.
-func (p *PageProcessor) CanProcess(contentType contenttype.Type) bool {
-	return contentType == contenttype.Page
+// CanProcess implements the content.Processor interface.
+func (p *PageProcessor) CanProcess(content contenttype.Type) bool {
+	return content == contenttype.Page
 }
 
-// Start implements the common.Processor interface.
+// Start implements the content.Processor interface.
 func (p *PageProcessor) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop implements the common.Processor interface.
+// Stop implements the content.Processor interface.
 func (p *PageProcessor) Stop(ctx context.Context) error {
 	if p.pageChannel != nil {
 		close(p.pageChannel)
@@ -87,8 +88,8 @@ func (p *PageProcessor) Stop(ctx context.Context) error {
 	return nil
 }
 
-// ValidateJob implements the common.Processor interface.
-func (p *PageProcessor) ValidateJob(job *jobtypes.Job) error {
+// ValidateJob implements the content.Processor interface.
+func (p *PageProcessor) ValidateJob(job *content.Job) error {
 	if p.validator == nil {
 		return nil
 	}
@@ -96,11 +97,17 @@ func (p *PageProcessor) ValidateJob(job *jobtypes.Job) error {
 }
 
 // GetProcessor returns a processor for the given content type.
-func (p *PageProcessor) GetProcessor(contentType contenttype.Type) (common.Processor, error) {
-	if contentType != contenttype.Page {
-		return nil, fmt.Errorf("unsupported content type: %s", contentType)
+func (p *PageProcessor) GetProcessor(contentType contenttype.Type) (content.ContentProcessor, error) {
+	if contentType == contenttype.Page {
+		return &pageContentProcessor{p}, nil
 	}
-	return p, nil
+
+	for _, processor := range p.registry {
+		if processor.CanProcess(contentType) {
+			return processor, nil
+		}
+	}
+	return nil, fmt.Errorf("unsupported content type: %s", contentType)
 }
 
 // ParseHTML parses HTML content.
@@ -119,6 +126,40 @@ func (p *PageProcessor) ExtractContent() (string, error) {
 }
 
 // RegisterProcessor registers a new processor.
-func (p *PageProcessor) RegisterProcessor(processor common.Processor) {
-	// No-op for now
+func (p *PageProcessor) RegisterProcessor(processor content.ContentProcessor) {
+	p.registry = append(p.registry, processor)
+}
+
+// ProcessContent processes content using the appropriate processor.
+func (p *PageProcessor) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
+	processor, err := p.GetProcessor(contentType)
+	if err != nil {
+		return err
+	}
+	return processor.Process(ctx, content)
+}
+
+// pageContentProcessor wraps PageProcessor to implement content.ContentProcessor
+type pageContentProcessor struct {
+	*PageProcessor
+}
+
+// Process implements content.ContentProcessor
+func (p *pageContentProcessor) Process(ctx context.Context, content any) error {
+	return p.PageProcessor.Process(ctx, content)
+}
+
+// ContentType implements content.ContentProcessor
+func (p *pageContentProcessor) ContentType() contenttype.Type {
+	return p.PageProcessor.ContentType()
+}
+
+// CanProcess implements content.ContentProcessor
+func (p *pageContentProcessor) CanProcess(content contenttype.Type) bool {
+	return p.PageProcessor.CanProcess(content)
+}
+
+// ValidateJob implements content.ContentProcessor
+func (p *pageContentProcessor) ValidateJob(job *content.Job) error {
+	return p.PageProcessor.ValidateJob(job)
 }

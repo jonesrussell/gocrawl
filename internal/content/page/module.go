@@ -4,8 +4,7 @@
 package page
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -26,7 +25,7 @@ var Module = fx.Module("page",
 				fx.In
 				Logger      logger.Interface
 				Service     Interface
-				Validator   jobtypes.JobValidator
+				Validator   content.JobValidator
 				Storage     types.Interface
 				IndexName   string `name:"pageIndexName"`
 				PageChannel chan *models.Page
@@ -41,7 +40,7 @@ var Module = fx.Module("page",
 				})
 			},
 			fx.ResultTags(`name:"pageProcessor"`),
-			fx.As(new(common.Processor)),
+			fx.As(new(content.Processor)),
 		),
 	),
 )

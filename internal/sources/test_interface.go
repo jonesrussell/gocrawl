@@ -1,16 +1,16 @@
-package testutils
+// Package sources provides source management functionality.
+package sources
 
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/stretchr/testify/mock"
 )
 
 // TestInterface defines the interface for testing source operations.
 type TestInterface interface {
-	sources.Interface
+	Interface
 }
 
 // TestSources implements the TestInterface interface.
@@ -95,6 +95,7 @@ func (s *TestSources) GetSources() ([]sourceutils.SourceConfig, error) {
 	return s.sources, nil
 }
 
+// MockSources is a mock implementation of the sources interface.
 type MockSources struct {
 	mock.Mock
 }
