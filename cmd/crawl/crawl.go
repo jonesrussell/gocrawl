@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gocolly/colly/v2"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -154,23 +153,8 @@ func SetupCollector(
 	contentProcessor common.Processor,
 	cfg *crawlerconfig.Config,
 ) (crawler.Interface, error) {
-	// Create collector with rate limiting
-	c := colly.NewCollector(
-		colly.AllowURLRevisit(),
-		colly.Async(true),
-	)
-
-	err := c.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		Parallelism: defaultParallelism,
-		RandomDelay: defaultRandomDelay,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	// Create crawler instance
-	crawler := crawler.NewCrawler(
+	return crawler.NewCrawler(
 		logger,
 		eventBus,
 		indexManager,
@@ -178,11 +162,5 @@ func SetupCollector(
 		articleProcessor,
 		contentProcessor,
 		cfg,
-	)
-
-	// Set up event handling
-	eventHandler := events.NewDefaultHandler(logger)
-	eventBus.Subscribe(eventHandler)
-
-	return crawler, nil
+	), nil
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -19,10 +18,9 @@ import (
 // JobService implements the common.JobService interface for the crawl module.
 type JobService struct {
 	logger           logger.Interface
-	sources          *sources.Sources
+	sources          sources.Interface
 	crawler          crawler.Interface
 	done             chan struct{}
-	config           config.Interface
 	activeJobs       *int32
 	storage          storagetypes.Interface
 	processorFactory crawler.ProcessorFactory
@@ -32,10 +30,9 @@ type JobService struct {
 // JobServiceParams holds parameters for creating a new JobService.
 type JobServiceParams struct {
 	Logger           logger.Interface
-	Sources          *sources.Sources
+	Sources          sources.Interface
 	Crawler          crawler.Interface
 	Done             chan struct{}
-	Config           config.Interface
 	Storage          storagetypes.Interface
 	ProcessorFactory crawler.ProcessorFactory
 	SourceName       string `name:"sourceName"`
@@ -49,7 +46,6 @@ func NewJobService(p JobServiceParams) common.JobService {
 		sources:          p.Sources,
 		crawler:          p.Crawler,
 		done:             p.Done,
-		config:           p.Config,
 		activeJobs:       &jobs,
 		storage:          p.Storage,
 		processorFactory: p.ProcessorFactory,

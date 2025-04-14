@@ -3,23 +3,29 @@ package crawl
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
+	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
-	"github.com/jonesrussell/gocrawl/internal/content/articles"
-	"github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
-	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
+)
+
+// Common errors
+var (
+	ErrInvalidJob    = errors.New("invalid job")
+	ErrInvalidJobURL = errors.New("invalid job URL")
 )
 
 // Processor defines the interface for content processors.
@@ -34,237 +40,180 @@ const (
 	DefaultInitTimeout = 30 * time.Second
 )
 
-// Module provides the crawl command's dependencies.
-var Module = fx.Module("crawl",
-	fx.Provide(
-		// Provide the done channel
-		fx.Annotate(
-			func() chan struct{} {
-				return make(chan struct{})
-			},
-			fx.ResultTags(`name:"done"`),
-		),
-		// Provide the event bus
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger logger.Interface
-			}) *events.EventBus {
-				return events.NewEventBus(p.Logger)
-			},
-			fx.ResultTags(`name:"eventBus"`),
-		),
-		// Provide the index manager
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger logger.Interface
-				Config config.Interface
-			}) interfaces.IndexManager {
-				client, err := storage.NewElasticsearchClient(p.Config, p.Logger)
-				if err != nil {
-					p.Logger.Error("Failed to create Elasticsearch client", "error", err)
-					return nil
-				}
-				return storage.NewElasticsearchIndexManager(client, p.Logger)
-			},
-			fx.As(new(interfaces.IndexManager)),
-		),
-		// Provide the crawler
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger       logger.Interface
-				EventBus     *events.EventBus `name:"eventBus"`
-				IndexManager interfaces.IndexManager
-				Sources      *sources.Sources
-				Processors   []common.Processor `name:"processors"`
-				Config       config.Interface
-			}) crawler.Interface {
-				cfg := crawlerconfig.New(
-					crawlerconfig.WithMaxDepth(3),
-					crawlerconfig.WithMaxConcurrency(2),
-					crawlerconfig.WithRequestTimeout(30*time.Second),
-					crawlerconfig.WithUserAgent("gocrawl/1.0"),
-					crawlerconfig.WithRespectRobotsTxt(true),
-					crawlerconfig.WithAllowedDomains([]string{"*"}),
-					crawlerconfig.WithDelay(2*time.Second),
-					crawlerconfig.WithRandomDelay(500*time.Millisecond),
-				)
-				var articleProcessor, pageProcessor common.Processor
-				for _, p := range p.Processors {
-					if p.ContentType() == common.ContentTypeArticle {
-						articleProcessor = p
-					} else if p.ContentType() == common.ContentTypePage {
-						pageProcessor = p
-					}
-				}
-				return crawler.NewCrawler(
-					p.Logger,
-					p.EventBus,
-					p.IndexManager,
-					p.Sources,
-					articleProcessor,
-					pageProcessor,
-					cfg,
-				)
-			},
-			fx.As(new(crawler.Interface)),
-		),
-		// Provide the processor factory
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger         logger.Interface
-				Config         config.Interface
-				Storage        types.Interface
-				ArticleService articles.Interface
-				PageService    page.Interface
-				IndexName      string `name:"pageIndexName"`
-			}) crawler.ProcessorFactory {
-				return crawler.NewProcessorFactory(crawler.ProcessorFactoryParams{
-					Logger:         p.Logger,
-					Config:         p.Config,
-					Storage:        p.Storage,
-					ArticleService: p.ArticleService,
-					PageService:    p.PageService,
-					IndexName:      p.IndexName,
-				})
-			},
-			fx.As(new(crawler.ProcessorFactory)),
-		),
-		// Provide the article service
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger    logger.Interface
-				Storage   types.Interface
-				IndexName string `name:"articleIndexName"`
-			}) articles.Interface {
-				return articles.NewContentService(articles.ServiceParams{
-					Logger:    p.Logger,
-					Storage:   p.Storage,
-					IndexName: p.IndexName,
-				})
-			},
-			fx.ResultTags(`name:"articleService"`),
-		),
-		// Provide the page service
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger    logger.Interface
-				Storage   types.Interface
-				IndexName string `name:"pageIndexName"`
-			}) page.Interface {
-				return page.NewContentService(page.ServiceParams{
-					Logger:    p.Logger,
-					Storage:   p.Storage,
-					IndexName: p.IndexName,
-				})
-			},
-			fx.ResultTags(`name:"pageService"`),
-		),
-		// Provide the sources
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Config config.Interface
-			}) (*sources.Sources, error) {
-				return sources.LoadSources(p.Config)
-			},
-			fx.ResultTags(`name:"sources"`),
-			fx.As(new(sources.Interface)),
-		),
-		// Provide the job service
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger           logger.Interface
-				Sources          *sources.Sources
-				Crawler          crawler.Interface
-				Done             chan struct{} `name:"done"`
-				Config           config.Interface
-				Storage          types.Interface
-				ProcessorFactory crawler.ProcessorFactory
-				SourceName       string `name:"sourceName"`
-			}) (common.JobService, error) {
-				if p.Sources == nil {
-					return nil, fmt.Errorf("sources is nil")
-				}
-				return NewJobService(JobServiceParams{
-					Logger:           p.Logger,
-					Sources:          p.Sources,
-					Crawler:          p.Crawler,
-					Done:             p.Done,
-					Config:           p.Config,
-					Storage:          p.Storage,
-					ProcessorFactory: p.ProcessorFactory,
-					SourceName:       p.SourceName,
-				}), nil
-			},
-			fx.As(new(common.JobService)),
-		),
-		// Provide the article processor
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger         logger.Interface
-				Service        articles.Interface
-				JobService     common.JobService
-				Storage        types.Interface
-				IndexName      string `name:"articleIndexName"`
-				ArticleChannel chan *models.Article
-			}) common.Processor {
-				return articles.NewProcessor(articles.ProcessorParams{
-					Logger:         p.Logger,
-					Service:        p.Service,
-					JobService:     p.JobService,
-					Storage:        p.Storage,
-					IndexName:      p.IndexName,
-					ArticleChannel: p.ArticleChannel,
-				})
-			},
-			fx.ResultTags(`name:"articleProcessor"`),
-		),
-		// Provide the page processor
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger    logger.Interface
-				Service   page.Interface
-				Storage   types.Interface
-				IndexName string `name:"pageIndexName"`
-			}) common.Processor {
-				return page.NewPageProcessor(page.ProcessorParams{
-					Logger:    p.Logger,
-					Service:   p.Service,
-					Storage:   p.Storage,
-					IndexName: p.IndexName,
-				})
-			},
-			fx.ResultTags(`name:"pageProcessor"`),
-		),
-		// Provide the article channel
-		fx.Annotate(
-			func() chan *models.Article {
-				return make(chan *models.Article, ArticleChannelBufferSize)
-			},
-			fx.ResultTags(`name:"articleChannel"`),
-		),
-		// Provide the processors
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				ArticleProcessor common.Processor `name:"articleProcessor"`
-				PageProcessor    common.Processor `name:"pageProcessor"`
-			}) []common.Processor {
-				return []common.Processor{
-					p.ArticleProcessor,
-					p.PageProcessor,
-				}
-			},
-			fx.ResultTags(`name:"processors"`),
-		),
-	),
+// Module provides the crawl command module for dependency injection
+var Module = fx.Options(
+	// Core modules
+	config.Module,
+	logger.Module,
+	storage.Module,
+	sources.Module,
+	crawler.Module,
+
+	// Provide the context
+	fx.Provide(context.Background),
+
+	// Provide the done channel
+	fx.Provide(func() chan struct{} {
+		return make(chan struct{})
+	}),
+
+	// Provide the job service
+	fx.Provide(fx.Annotate(
+		func(
+			logger logger.Interface,
+			storage types.Interface,
+			sources sources.Interface,
+			crawler crawler.Interface,
+			done chan struct{},
+			processorFactory crawler.ProcessorFactory,
+		) common.JobService {
+			return NewJobService(JobServiceParams{
+				Logger:           logger,
+				Sources:          sources,
+				Crawler:          crawler,
+				Done:             done,
+				Storage:          storage,
+				ProcessorFactory: processorFactory,
+			})
+		},
+		fx.As(new(common.JobService)),
+	)),
 )
+
+// NewCommand creates a new crawl command.
+func NewCommand(p struct {
+	fx.In
+	Crawler crawler.Interface
+}) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "crawl",
+		Short: "Crawl a website",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return p.Crawler.Start(context.Background(), "default")
+		},
+	}
+	return cmd
+}
+
+// DefaultJobService implements the common.Processor interface.
+type DefaultJobService struct {
+	logger logger.Interface
+	config config.Interface
+}
+
+// ValidateJob validates a job before processing.
+func (s *DefaultJobService) ValidateJob(job *jobtypes.Job) error {
+	if job == nil {
+		return ErrInvalidJob
+	}
+	if job.URL == "" {
+		return ErrInvalidJobURL
+	}
+	return nil
+}
+
+// Process implements common.Processor.
+func (s *DefaultJobService) Process(ctx context.Context, content any) error {
+	job, ok := content.(*jobtypes.Job)
+	if !ok {
+		return fmt.Errorf("invalid content type: expected *jobtypes.Job, got %T", content)
+	}
+	return s.ValidateJob(job)
+}
+
+// CanProcess implements common.Processor.
+func (s *DefaultJobService) CanProcess(contentType contenttype.Type) bool {
+	return contentType == contenttype.Job
+}
+
+// ContentType implements common.Processor.
+func (s *DefaultJobService) ContentType() contenttype.Type {
+	return contenttype.Job
+}
+
+// ExtractContent implements common.Processor.
+func (s *DefaultJobService) ExtractContent() (string, error) {
+	return "", errors.New("not implemented")
+}
+
+// ExtractLinks implements common.Processor.
+func (s *DefaultJobService) ExtractLinks() ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+// GetProcessor implements common.Processor.
+func (s *DefaultJobService) GetProcessor(contentType contenttype.Type) (common.Processor, error) {
+	if contentType != contenttype.Job {
+		return nil, fmt.Errorf("unsupported content type: %s", contentType)
+	}
+	return s, nil
+}
+
+// ParseHTML implements common.Processor.
+func (s *DefaultJobService) ParseHTML(r io.Reader) error {
+	return errors.New("not implemented")
+}
+
+// RegisterProcessor implements common.Processor.
+func (s *DefaultJobService) RegisterProcessor(processor common.Processor) {
+	// No-op for now
+}
+
+// Start implements common.Processor.
+func (s *DefaultJobService) Start(ctx context.Context) error {
+	return nil
+}
+
+// Stop implements common.Processor.
+func (s *DefaultJobService) Stop(ctx context.Context) error {
+	return nil
+}
+
+// ZapWrapper wraps a zap.Logger to implement logger.Interface.
+type ZapWrapper struct {
+	*zap.Logger
+}
+
+// Debug implements logger.Interface.
+func (l *ZapWrapper) Debug(msg string, fields ...any) {
+	l.Logger.Debug(msg, toZapFields(fields)...)
+}
+
+// Info implements logger.Interface.
+func (l *ZapWrapper) Info(msg string, fields ...any) {
+	l.Logger.Info(msg, toZapFields(fields)...)
+}
+
+// Error implements logger.Interface.
+func (l *ZapWrapper) Error(msg string, fields ...any) {
+	l.Logger.Error(msg, toZapFields(fields)...)
+}
+
+// Warn implements logger.Interface.
+func (l *ZapWrapper) Warn(msg string, fields ...any) {
+	l.Logger.Warn(msg, toZapFields(fields)...)
+}
+
+// Fatal implements logger.Interface.
+func (l *ZapWrapper) Fatal(msg string, fields ...any) {
+	l.Logger.Fatal(msg, toZapFields(fields)...)
+}
+
+// toZapFields converts the fields to zap fields.
+func toZapFields(fields []any) []zap.Field {
+	if len(fields) == 0 {
+		return nil
+	}
+	zapFields := make([]zap.Field, 0, len(fields)/2)
+	for i := 0; i < len(fields); i += 2 {
+		if i+1 >= len(fields) {
+			break
+		}
+		key, ok := fields[i].(string)
+		if !ok {
+			continue
+		}
+		zapFields = append(zapFields, zap.Any(key, fields[i+1]))
+	}
+	return zapFields
+}
