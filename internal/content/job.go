@@ -46,6 +46,8 @@ type Item struct {
 	Type Type
 	// Status is the current status of the item.
 	Status JobStatus
+	// Source is the source of the item.
+	Source string
 	// CreatedAt is when the item was created.
 	CreatedAt time.Time
 	// UpdatedAt is when the item was last updated.
