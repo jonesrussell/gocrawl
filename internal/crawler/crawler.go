@@ -5,15 +5,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/common/transport"
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -91,10 +94,10 @@ func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types
 		}
 	}
 
-	// Ensure content index exists if specified
+	// Ensure page index exists if specified
 	if selectedSource.Index != "" {
-		if contentErr := c.indexManager.EnsureContentIndex(ctx, selectedSource.Index); contentErr != nil {
-			return nil, fmt.Errorf("failed to ensure content index exists: %w", contentErr)
+		if pageErr := c.indexManager.EnsurePageIndex(ctx, selectedSource.Index); pageErr != nil {
+			return nil, fmt.Errorf("failed to ensure page index exists: %w", pageErr)
 		}
 	}
 
@@ -201,7 +204,9 @@ func (c *Crawler) setupCallbacks(ctx context.Context) {
 	})
 
 	// Set up HTML processing
-	c.collector.OnHTML("html", c.htmlProcessor.ProcessHTML)
+	c.collector.OnHTML("html", func(e *colly.HTMLElement) {
+		c.ProcessHTML(e)
+	})
 
 	// Set up error handling
 	c.collector.OnError(func(r *colly.Response, visitErr error) {
@@ -531,7 +536,7 @@ func (c *Crawler) selectProcessor(e *colly.HTMLElement) common.Processor {
 
 	// Fallback: Try additional processors
 	for _, p := range c.processors {
-		if p.CanProcess(e) {
+		if p.CanProcess(contentType) {
 			return p
 		}
 	}
@@ -540,16 +545,16 @@ func (c *Crawler) selectProcessor(e *colly.HTMLElement) common.Processor {
 }
 
 // getProcessorForType returns a processor for the given content type
-func (c *Crawler) getProcessorForType(contentType common.ContentType) common.Processor {
+func (c *Crawler) getProcessorForType(contentType contenttype.Type) common.Processor {
 	switch contentType {
-	case common.ContentTypeArticle:
+	case contenttype.Article:
 		return c.articleProcessor
-	case common.ContentTypePage:
+	case contenttype.Page:
 		return c.pageProcessor
-	case common.ContentTypeVideo, common.ContentTypeImage, common.ContentTypeHTML, common.ContentTypeJob:
+	case contenttype.Video, contenttype.Image, contenttype.HTML, contenttype.Job:
 		// Try to find a processor for the specific content type
 		for _, p := range c.processors {
-			if p.ContentType() == contentType {
+			if p.CanProcess(contentType) {
 				return p
 			}
 		}
@@ -572,6 +577,89 @@ func (c *Crawler) SetPageProcessor(processor common.Processor) {
 	c.pageProcessor = processor
 }
 
+// GetProcessors returns the processors.
+func (c *Crawler) GetProcessors() []content.Processor {
+	processors := make([]content.Processor, 0, len(c.processors))
+	for _, p := range c.processors {
+		wrapper := &processorWrapper{
+			processor: p,
+			registry:  make([]content.ContentProcessor, 0),
+		}
+		processors = append(processors, wrapper)
+	}
+	return processors
+}
+
+// processorWrapper wraps a common.Processor to implement content.Processor
+type processorWrapper struct {
+	processor common.Processor
+	registry  []content.ContentProcessor
+}
+
+// ContentType implements content.ContentProcessor
+func (p *processorWrapper) ContentType() contenttype.Type {
+	return p.processor.ContentType()
+}
+
+// CanProcess implements content.ContentProcessor
+func (p *processorWrapper) CanProcess(content contenttype.Type) bool {
+	return p.processor.CanProcess(content)
+}
+
+// Process implements content.ContentProcessor
+func (p *processorWrapper) Process(ctx context.Context, content any) error {
+	return p.processor.Process(ctx, content)
+}
+
+// ParseHTML implements content.HTMLProcessor
+func (p *processorWrapper) ParseHTML(r io.Reader) error {
+	return p.processor.ParseHTML(r)
+}
+
+// ExtractLinks implements content.HTMLProcessor
+func (p *processorWrapper) ExtractLinks() ([]string, error) {
+	return p.processor.ExtractLinks()
+}
+
+// ExtractContent implements content.HTMLProcessor
+func (p *processorWrapper) ExtractContent() (string, error) {
+	return p.processor.ExtractContent()
+}
+
+// RegisterProcessor implements content.ProcessorRegistry
+func (p *processorWrapper) RegisterProcessor(processor content.ContentProcessor) {
+	p.registry = append(p.registry, processor)
+}
+
+// GetProcessor implements content.ProcessorRegistry
+func (p *processorWrapper) GetProcessor(contentType contenttype.Type) (content.ContentProcessor, error) {
+	for _, processor := range p.registry {
+		if processor.CanProcess(contentType) {
+			return processor, nil
+		}
+	}
+	return nil, fmt.Errorf("no processor found for content type: %s", contentType)
+}
+
+// ProcessContent implements content.ProcessorRegistry
+func (p *processorWrapper) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
+	processor, err := p.GetProcessor(contentType)
+	if err != nil {
+		return err
+	}
+	return processor.Process(ctx, content)
+}
+
+// Start implements content.Processor
+func (p *processorWrapper) Start(ctx context.Context) error {
+	return p.processor.Start(ctx)
+}
+
+// Stop implements content.Processor
+func (p *processorWrapper) Stop(ctx context.Context) error {
+	return p.processor.Stop(ctx)
+}
+
 // Event Management
 // ---------------
 
@@ -591,11 +679,6 @@ func (c *Crawler) GetLogger() logger.Interface {
 // GetSource returns the source.
 func (c *Crawler) GetSource() sources.Interface {
 	return c.sources
-}
-
-// GetProcessors returns the processors.
-func (c *Crawler) GetProcessors() []common.Processor {
-	return c.processors
 }
 
 // GetArticleChannel returns the article channel.
@@ -635,4 +718,23 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	}
 
 	c.state.IncrementProcessed()
+}
+
+// GetProcessor returns a processor for the given content type.
+func (c *Crawler) GetProcessor(contentType contenttype.Type) (common.Processor, error) {
+	for _, p := range c.processors {
+		if p.CanProcess(contentType) {
+			return p, nil
+		}
+	}
+
+	if contentType == contenttype.Article {
+		return c.articleProcessor, nil
+	}
+
+	if contentType == contenttype.Page {
+		return c.pageProcessor, nil
+	}
+
+	return nil, fmt.Errorf("no processor found for content type: %s", contentType)
 }

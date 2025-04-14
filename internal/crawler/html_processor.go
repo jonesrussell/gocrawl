@@ -2,180 +2,155 @@
 package crawler
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"strings"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
+	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
-// HTMLProcessor handles HTML processing for the crawler.
+// HTMLProcessor processes HTML content and delegates to appropriate content processors.
 type HTMLProcessor struct {
-	crawler *Crawler
-	// Track unknown content types for analysis
-	unknownTypes map[common.ContentType]int
+	logger       logger.Interface
+	processors   []common.Processor
+	unknownTypes map[contenttype.Type]int
 }
 
-// NewHTMLProcessor creates a new HTML processor.
-func NewHTMLProcessor(c *Crawler) *HTMLProcessor {
+// NewHTMLProcessor creates a new HTMLProcessor.
+func NewHTMLProcessor(logger logger.Interface) *HTMLProcessor {
 	return &HTMLProcessor{
-		crawler:      c,
-		unknownTypes: make(map[common.ContentType]int),
+		logger:       logger,
+		processors:   make([]common.Processor, 0, 2), // Pre-allocate for article and page processors
+		unknownTypes: make(map[contenttype.Type]int),
 	}
 }
 
-// ProcessHTML processes the HTML content.
-func (p *HTMLProcessor) ProcessHTML(e *colly.HTMLElement) {
-	// Detect content type once and reuse
+// Process processes an HTML element.
+func (p *HTMLProcessor) Process(ctx context.Context, content any) error {
+	e, ok := content.(*colly.HTMLElement)
+	if !ok {
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
+	}
+
+	// Detect content type
 	contentType := p.detectContentType(e)
 
-	// Get processor for the content type
-	processor := p.selectProcessor(e, contentType)
+	// Select appropriate processor
+	processor := p.selectProcessor(contentType)
 	if processor == nil {
-		p.crawler.logger.Debug("No processor found for content",
-			"url", e.Request.URL.String(),
-			"type", contentType)
-		p.crawler.state.IncrementProcessed()
-
-		// Track unknown content types
 		p.unknownTypes[contentType]++
-		return
+		return fmt.Errorf("no processor found for content type: %s", contentType)
 	}
 
 	// Process the content
-	err := processor.Process(p.crawler.state.Context(), e)
-	if err != nil {
-		p.crawler.logger.Error("Failed to process content",
-			"error", err,
-			"url", e.Request.URL.String(),
-			"type", contentType)
-		p.crawler.state.IncrementError()
-	} else {
-		p.crawler.logger.Debug("Successfully processed content",
-			"url", e.Request.URL.String(),
-			"type", contentType,
-			"processor", processor.ContentType())
-	}
-
-	p.crawler.state.IncrementProcessed()
-}
-
-// selectProcessor selects the appropriate processor for the given HTML element and content type
-func (p *HTMLProcessor) selectProcessor(e *colly.HTMLElement, contentType common.ContentType) common.Processor {
-	// Try to get a processor for the specific content type first
-	processor := p.getProcessorForType(contentType)
-	if processor != nil {
-		p.crawler.logger.Debug("Selected processor by content type",
-			"type", contentType,
-			"processor", processor.ContentType())
-		return processor
-	}
-
-	// Fallback: Try additional processors
-	for _, proc := range p.crawler.processors {
-		if proc.CanProcess(e) {
-			p.crawler.logger.Debug("Selected processor by CanProcess",
-				"type", contentType,
-				"processor", proc.ContentType())
-			return proc
-		}
+	if err := processor.Process(ctx, e); err != nil {
+		return fmt.Errorf("failed to process content: %w", err)
 	}
 
 	return nil
 }
 
-// getProcessorForType returns a processor for the given content type
-func (p *HTMLProcessor) getProcessorForType(contentType common.ContentType) common.Processor {
-	switch contentType {
-	case common.ContentTypeArticle:
-		return p.crawler.articleProcessor
-	case common.ContentTypePage:
-		return p.crawler.pageProcessor
-	case common.ContentTypeVideo, common.ContentTypeImage, common.ContentTypeHTML, common.ContentTypeJob:
-		// Try to find a processor for the specific content type
-		for _, proc := range p.crawler.processors {
-			if proc.ContentType() == contentType {
-				return proc
-			}
+// ParseHTML parses HTML content.
+func (p *HTMLProcessor) ParseHTML(r io.Reader) error {
+	return fmt.Errorf("not implemented")
+}
+
+// ExtractLinks extracts links from the content.
+func (p *HTMLProcessor) ExtractLinks() ([]string, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// ExtractContent extracts the main content.
+func (p *HTMLProcessor) ExtractContent() (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+// CanProcess returns whether the processor can handle the given content type.
+func (p *HTMLProcessor) CanProcess(contentType contenttype.Type) bool {
+	return contentType == contenttype.HTML
+}
+
+// ContentType returns the content type this processor handles.
+func (p *HTMLProcessor) ContentType() contenttype.Type {
+	return contenttype.HTML
+}
+
+// Start initializes the processor.
+func (p *HTMLProcessor) Start(ctx context.Context) error {
+	return nil
+}
+
+// Stop stops the processor.
+func (p *HTMLProcessor) Stop(ctx context.Context) error {
+	return nil
+}
+
+// ValidateJob validates a job before processing.
+func (p *HTMLProcessor) ValidateJob(job *jobtypes.Job) error {
+	if job == nil {
+		return fmt.Errorf("job cannot be nil")
+	}
+	return nil
+}
+
+// GetProcessor returns a processor for the given content type.
+func (p *HTMLProcessor) GetProcessor(contentType contenttype.Type) (common.Processor, error) {
+	for _, processor := range p.processors {
+		if processor.CanProcess(contentType) {
+			return processor, nil
+		}
+	}
+	return nil, fmt.Errorf("no processor found for content type: %s", contentType)
+}
+
+// RegisterProcessor registers a new processor.
+func (p *HTMLProcessor) RegisterProcessor(processor common.Processor) {
+	p.processors = append(p.processors, processor)
+}
+
+// selectProcessor selects a processor for the given content type.
+func (p *HTMLProcessor) selectProcessor(contentType contenttype.Type) common.Processor {
+	for _, processor := range p.processors {
+		if processor.CanProcess(contentType) {
+			return processor
 		}
 	}
 	return nil
 }
 
-// detectContentType detects the type of content in the HTML element
-func (p *HTMLProcessor) detectContentType(e *colly.HTMLElement) common.ContentType {
-	// First check HTTP headers
-	contentType := e.Response.Headers.Get("Content-Type")
-	if contentType != "" {
-		switch {
-		case strings.Contains(contentType, "text/html"):
-			// Continue with HTML-specific checks
-		case strings.Contains(contentType, "image/"):
-			return common.ContentTypeImage
-		case strings.Contains(contentType, "video/"):
-			return common.ContentTypeVideo
-		case strings.Contains(contentType, "application/pdf"):
-			return common.ContentTypePage
-		default:
-			// If it's not HTML, we can't process it as HTML
-			return common.ContentTypePage
-		}
-	}
-
-	// Check for special pages in URL
+// detectContentType detects the content type of the given HTML element.
+func (p *HTMLProcessor) detectContentType(e *colly.HTMLElement) contenttype.Type {
 	url := e.Request.URL.String()
-	if strings.Contains(url, "/login") || strings.Contains(url, "/signin") || strings.Contains(url, "/register") {
-		return common.ContentTypePage
+
+	// Check for article patterns
+	if strings.Contains(url, "/article/") || strings.Contains(url, "/articles/") ||
+		strings.Contains(url, "/blog/") || strings.Contains(url, "/news/") {
+		return contenttype.Article
 	}
 
-	// Check for article-specific elements and metadata
-	hasArticleTag := e.DOM.Find("article").Length() > 0
-	hasArticleClass := e.DOM.Find(".article").Length() > 0
-	hasArticleMeta := e.DOM.Find("meta[property='og:type'][content='article']").Length() > 0
-	hasPublicationDate := e.DOM.Find("time[datetime], .published-date, .post-date").Length() > 0
-	hasAuthor := e.DOM.Find(".author, .byline, meta[name='author']").Length() > 0
-
-	// If it has multiple article indicators, it's likely an article
-	if (hasArticleTag || hasArticleClass) && (hasPublicationDate || hasAuthor || hasArticleMeta) {
-		return common.ContentTypeArticle
+	// Check for job listings
+	if strings.Contains(url, "/job/") || strings.Contains(url, "/jobs/") ||
+		strings.Contains(url, "/career/") || strings.Contains(url, "/careers/") {
+		return contenttype.Job
 	}
 
-	// Check for video content - look for video players or embeds
-	hasVideoPlayer := hasVideoPlayer(e)
-	if hasVideoPlayer {
-		return common.ContentTypeVideo
+	// Check for image galleries
+	if strings.Contains(url, "/image/") || strings.Contains(url, "/images/") ||
+		strings.Contains(url, "/photo/") || strings.Contains(url, "/photos/") ||
+		strings.Contains(url, "/gallery/") {
+		return contenttype.Image
 	}
 
-	// Check for job listings - look for specific job-related elements
-	hasJobElements := e.DOM.Find(".job-listing, .job-posting, .job-description, .job-title").Length() > 0
-	if hasJobElements {
-		return common.ContentTypeJob
-	}
-
-	// Check for image content - only if it's a dedicated image page
-	// Don't classify as image just because there are images on the page
-	hasImageGallery := e.DOM.Find(".image-gallery, .photo-gallery, .gallery-container").Length() > 0
-	hasSingleImage := e.DOM.Find("img").Length() == 1 && e.DOM.Find("article, .article").Length() == 0
-	if hasImageGallery || hasSingleImage {
-		return common.ContentTypeImage
-	}
-
-	// Default to page content type
-	return common.ContentTypePage
+	// Default to page
+	return contenttype.Page
 }
 
-// hasVideoPlayer checks if the element contains a video player
-func hasVideoPlayer(e *colly.HTMLElement) bool {
-	selectors := []string{
-		"video",
-		".video-player",
-		".video-container",
-		"iframe[src*='youtube']",
-		"iframe[src*='vimeo']",
-	}
-	return e.DOM.Find(strings.Join(selectors, ", ")).Length() > 0
-}
-
-// GetUnknownTypes returns a map of content types that had no processor
-func (p *HTMLProcessor) GetUnknownTypes() map[common.ContentType]int {
+// GetUnknownTypes returns a map of content types that have no registered processor.
+func (p *HTMLProcessor) GetUnknownTypes() map[contenttype.Type]int {
 	return p.unknownTypes
 }
