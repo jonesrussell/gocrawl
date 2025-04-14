@@ -130,7 +130,7 @@ func (p *PageProcessor) RegisterProcessor(processor content.ContentProcessor) {
 	p.registry = append(p.registry, processor)
 }
 
-// ProcessContent processes content using the appropriate processor.
+// ProcessContent implements content.ProcessorRegistry
 func (p *PageProcessor) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
 	processor, err := p.GetProcessor(contentType)
 	if err != nil {

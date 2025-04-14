@@ -11,10 +11,10 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/processor"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/jonesrussell/gocrawl/internal/storage"
@@ -149,8 +149,8 @@ func SetupCollector(
 	indexManager storagetypes.IndexManager,
 	sources sources.Interface,
 	eventBus *events.EventBus,
-	articleProcessor processor.Processor,
-	contentProcessor processor.Processor,
+	articleProcessor content.Processor,
+	contentProcessor content.Processor,
 	cfg *crawlerconfig.Config,
 ) (crawler.Interface, error) {
 	// Create crawler instance
