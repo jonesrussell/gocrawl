@@ -128,11 +128,11 @@ func (s *DefaultJobService) ValidateJob(job *content.Job) error {
 
 // Process implements content.ContentProcessor.
 func (s *DefaultJobService) Process(ctx context.Context, content any) error {
-	job, ok := content.(*content.Job)
-	if !ok {
-		return fmt.Errorf("invalid content type: expected *content.Job, got %T", content)
+	if content == nil {
+		return ErrInvalidJob
 	}
-	return s.ValidateJob(job)
+	// TODO: Implement job processing
+	return nil
 }
 
 // CanProcess implements content.ContentProcessor.

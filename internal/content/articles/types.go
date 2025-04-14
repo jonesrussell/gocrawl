@@ -2,9 +2,10 @@
 package articles
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/processor"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -31,8 +32,10 @@ type ModuleParams struct {
 type ProcessorParams struct {
 	Logger         logger.Interface
 	Service        Interface
-	Validator      jobtypes.JobValidator
+	Validator      content.JobValidator
 	Storage        types.Interface
 	IndexName      string
 	ArticleChannel chan *models.Article
+	ArticleIndexer processor.Processor
+	PageIndexer    processor.Processor
 }

@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/processor"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -21,10 +21,12 @@ import (
 type ArticleProcessor struct {
 	logger         logger.Interface
 	service        Interface
-	validator      jobtypes.JobValidator
+	validator      content.JobValidator
 	storage        types.Interface
 	indexName      string
 	articleChannel chan *models.Article
+	articleIndexer processor.Processor
+	pageIndexer    processor.Processor
 }
 
 // NewProcessor creates a new article processor.
@@ -36,6 +38,8 @@ func NewProcessor(p ProcessorParams) *ArticleProcessor {
 		storage:        p.Storage,
 		indexName:      p.IndexName,
 		articleChannel: p.ArticleChannel,
+		articleIndexer: p.ArticleIndexer,
+		pageIndexer:    p.PageIndexer,
 	}
 }
 
@@ -90,12 +94,17 @@ func (p *ArticleProcessor) ExtractContent() (string, error) {
 }
 
 // ValidateJob implements the common.Processor interface.
-func (p *ArticleProcessor) ValidateJob(job *jobtypes.Job) error {
+func (p *ArticleProcessor) ValidateJob(job *content.Job) error {
 	if job == nil {
 		return errors.New("job cannot be nil")
 	}
-	if job.Type != contenttype.Article {
-		return fmt.Errorf("invalid job type: expected %s, got %s", contenttype.Article, job.Type)
+	if len(job.Items) == 0 {
+		return errors.New("job must have at least one item")
+	}
+	for _, item := range job.Items {
+		if item.Type != content.Article {
+			return fmt.Errorf("invalid item type: expected %s, got %s", content.Article, item.Type)
+		}
 	}
 	return nil
 }

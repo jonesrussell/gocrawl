@@ -2,10 +2,9 @@
 package articles
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/processor"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
@@ -24,10 +23,11 @@ var Module = fx.Module("articles",
 				fx.In
 				Logger         logger.Interface
 				Service        Interface
-				Validator      jobtypes.JobValidator
+				Validator      content.JobValidator
 				Storage        types.Interface
 				IndexName      string `name:"articleIndexName"`
-				ArticleChannel chan *models.Article
+				ArticleIndexer processor.Processor
+				PageIndexer    processor.Processor
 			}) *ArticleProcessor {
 				return NewProcessor(ProcessorParams{
 					Logger:         p.Logger,
@@ -35,11 +35,12 @@ var Module = fx.Module("articles",
 					Validator:      p.Validator,
 					Storage:        p.Storage,
 					IndexName:      p.IndexName,
-					ArticleChannel: p.ArticleChannel,
+					ArticleIndexer: p.ArticleIndexer,
+					PageIndexer:    p.PageIndexer,
 				})
 			},
 			fx.ResultTags(`name:"articleProcessor"`),
-			fx.As(new(common.Processor)),
+			fx.As(new(content.Processor)),
 		),
 	),
 )
