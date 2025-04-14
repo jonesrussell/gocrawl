@@ -7,17 +7,17 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/common/transport"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/articles"
+	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -61,7 +61,7 @@ type CrawlerParams struct {
 	fx.In
 	Logger       logger.Interface
 	Bus          *events.EventBus
-	IndexManager interfaces.IndexManager
+	IndexManager types.IndexManager
 	Sources      sources.Interface
 	Config       *crawler.Config
 }
@@ -74,7 +74,7 @@ type Result struct {
 
 // ProcessorFactory creates processors for the crawler.
 type ProcessorFactory interface {
-	CreateProcessors(validator common.Processor) ([]common.Processor, error)
+	CreateProcessors(validator content.JobValidator) ([]content.Processor, error)
 }
 
 // DefaultProcessorFactory implements ProcessorFactory.
@@ -90,8 +90,8 @@ func NewProcessorFactory(logger logger.Interface) *DefaultProcessorFactory {
 }
 
 // CreateProcessors creates processors for the crawler.
-func (f *DefaultProcessorFactory) CreateProcessors(validator common.Processor) ([]common.Processor, error) {
-	processors := make([]common.Processor, 0, 2) // Pre-allocate for 2 processors
+func (f *DefaultProcessorFactory) CreateProcessors(validator content.JobValidator) ([]content.Processor, error) {
+	processors := make([]content.Processor, 0, 2) // Pre-allocate for 2 processors
 
 	// Create article processor
 	articleProcessor := articles.NewProcessor(articles.ProcessorParams{
@@ -113,15 +113,15 @@ func (f *DefaultProcessorFactory) CreateProcessors(validator common.Processor) (
 // ProvideCrawler provides a crawler instance.
 func ProvideCrawler(
 	params CrawlerParams,
-	processors []common.Processor,
+	processors []content.Processor,
 ) (Interface, error) {
-	var articleProcessor, pageProcessor common.Processor
+	var articleProcessor, pageProcessor content.Processor
 
 	// Find article and page processors
 	for _, p := range processors {
-		if p.ContentType() == content.ContentTypeArticle {
+		if p.ContentType() == contenttype.Article {
 			articleProcessor = p
-		} else if p.ContentType() == content.ContentTypePage {
+		} else if p.ContentType() == contenttype.Page {
 			pageProcessor = p
 		}
 	}
@@ -156,10 +156,10 @@ var Module = fx.Module("crawler",
 func NewCrawler(
 	logger logger.Interface,
 	bus *events.EventBus,
-	indexManager interfaces.IndexManager,
+	indexManager types.IndexManager,
 	sources sources.Interface,
-	articleProcessor common.Processor,
-	pageProcessor common.Processor,
+	articleProcessor content.Processor,
+	pageProcessor content.Processor,
 	cfg *crawler.Config,
 ) Interface {
 	collector := colly.NewCollector(
@@ -237,7 +237,7 @@ func NewCrawler(
 		state:            NewState(logger),
 		done:             make(chan struct{}),
 		articleChannel:   make(chan *models.Article, ArticleChannelBufferSize),
-		processors:       make([]common.Processor, 0),
+		processors:       make([]content.Processor, 0),
 		htmlProcessor:    NewHTMLProcessor(logger),
 		cfg:              cfg,
 		abortChan:        make(chan struct{}),

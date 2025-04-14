@@ -100,12 +100,12 @@ func (p *ArticleProcessor) ValidateJob(job *jobtypes.Job) error {
 	return nil
 }
 
-// RegisterProcessor registers a new content processor.
-func (p *ArticleProcessor) RegisterProcessor(processor content.Processor) {
+// RegisterProcessor implements content.ProcessorRegistry
+func (p *ArticleProcessor) RegisterProcessor(processor content.ContentProcessor) {
 	// Not implemented - we only handle article processing
 }
 
-// GetProcessor returns the processor for the given content type.
+// GetProcessor implements content.ProcessorRegistry
 func (p *ArticleProcessor) GetProcessor(contentType contenttype.Type) (content.ContentProcessor, error) {
 	if contentType == contenttype.Article {
 		return &articleContentProcessor{p}, nil
@@ -138,14 +138,14 @@ func (p *articleContentProcessor) ValidateJob(job *content.Job) error {
 	return p.ArticleProcessor.ValidateJob(job)
 }
 
-// Start implements the common.Processor interface.
+// Start implements content.Processor
 func (p *ArticleProcessor) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop implements the common.Processor interface.
+// Stop implements content.Processor
 func (p *ArticleProcessor) Stop(ctx context.Context) error {
-	return nil
+	return p.Close()
 }
 
 // Close cleans up resources used by the processor.
@@ -154,4 +154,13 @@ func (p *ArticleProcessor) Close() error {
 		close(p.articleChannel)
 	}
 	return nil
+}
+
+// ProcessContent implements content.ProcessorRegistry
+func (p *ArticleProcessor) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
+	processor, err := p.GetProcessor(contentType)
+	if err != nil {
+		return err
+	}
+	return processor.Process(ctx, content)
 }
