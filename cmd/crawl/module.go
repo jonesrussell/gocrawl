@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
@@ -117,7 +116,7 @@ type DefaultJobService struct {
 }
 
 // ValidateJob validates a job before processing.
-func (s *DefaultJobService) ValidateJob(job *jobtypes.Job) error {
+func (s *DefaultJobService) ValidateJob(job *content.Job) error {
 	if job == nil {
 		return ErrInvalidJob
 	}
@@ -129,9 +128,9 @@ func (s *DefaultJobService) ValidateJob(job *jobtypes.Job) error {
 
 // Process implements content.ContentProcessor.
 func (s *DefaultJobService) Process(ctx context.Context, content any) error {
-	job, ok := content.(*jobtypes.Job)
+	job, ok := content.(*content.Job)
 	if !ok {
-		return fmt.Errorf("invalid content type: expected *jobtypes.Job, got %T", content)
+		return fmt.Errorf("invalid content type: expected *content.Job, got %T", content)
 	}
 	return s.ValidateJob(job)
 }

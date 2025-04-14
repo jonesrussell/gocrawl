@@ -8,9 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -61,8 +60,8 @@ type Params struct {
 	Context      context.Context `name:"apiContext"`
 	Config       config.Interface
 	Logger       logger.Interface
-	Storage      types.Interface
-	IndexManager interfaces.IndexManager
+	Storage      storagetypes.Interface
+	IndexManager storagetypes.IndexManager
 }
 
 // NewAPI creates a new API instance.

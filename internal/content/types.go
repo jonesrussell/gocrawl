@@ -1,8 +1,6 @@
 // Package content provides content processing types and interfaces.
 package content
 
-import "github.com/jonesrussell/gocrawl/internal/common/jobtypes"
-
 // Type represents the type of content being processed.
 type Type string
 
@@ -30,9 +28,3 @@ type (
 	// Storage represents the storage interface.
 	Storage any
 )
-
-// JobValidator validates jobs before processing.
-type JobValidator interface {
-	// ValidateJob validates a job before processing.
-	ValidateJob(job *jobtypes.Job) error
-}
