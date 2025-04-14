@@ -25,7 +25,7 @@ var Module = fx.Module("page",
 				fx.In
 				Logger      logger.Interface
 				Service     Interface
-				JobService  common.JobService
+				Validator   common.JobValidator
 				Storage     types.Interface
 				IndexName   string `name:"pageIndexName"`
 				PageChannel chan *models.Page
@@ -33,7 +33,7 @@ var Module = fx.Module("page",
 				return NewPageProcessor(ProcessorParams{
 					Logger:      p.Logger,
 					Service:     p.Service,
-					JobService:  p.JobService,
+					Validator:   p.Validator,
 					Storage:     p.Storage,
 					IndexName:   p.IndexName,
 					PageChannel: p.PageChannel,

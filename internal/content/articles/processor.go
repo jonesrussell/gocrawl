@@ -20,7 +20,7 @@ import (
 type ArticleProcessor struct {
 	logger         logger.Interface
 	service        Interface
-	jobService     common.JobService
+	validator      common.JobValidator
 	storage        types.Interface
 	indexName      string
 	articleChannel chan *models.Article
@@ -31,7 +31,7 @@ func NewProcessor(p ProcessorParams) *ArticleProcessor {
 	return &ArticleProcessor{
 		logger:         p.Logger,
 		service:        p.Service,
-		jobService:     p.JobService,
+		validator:      p.Validator,
 		storage:        p.Storage,
 		indexName:      p.IndexName,
 		articleChannel: p.ArticleChannel,
@@ -105,13 +105,7 @@ func (p *ArticleProcessor) ProcessJob(ctx context.Context, job *common.Job) erro
 
 // ValidateJob implements the common.Processor interface.
 func (p *ArticleProcessor) ValidateJob(job *jobtypes.Job) error {
-	if job == nil {
-		return errors.New("job is nil")
-	}
-	if job.URL == "" {
-		return errors.New("job URL is empty")
-	}
-	return nil
+	return p.validator.ValidateJob(job)
 }
 
 // RegisterProcessor registers a new content processor.

@@ -20,7 +20,7 @@ import (
 type PageProcessor struct {
 	logger      logger.Interface
 	service     Interface
-	jobService  common.JobService
+	validator   common.JobValidator
 	storage     types.Interface
 	indexName   string
 	pageChannel chan *models.Page
@@ -31,7 +31,7 @@ func NewPageProcessor(p ProcessorParams) *PageProcessor {
 	return &PageProcessor{
 		logger:      p.Logger,
 		service:     p.Service,
-		jobService:  p.JobService,
+		validator:   p.Validator,
 		storage:     p.Storage,
 		indexName:   p.IndexName,
 		pageChannel: p.PageChannel,
@@ -144,11 +144,5 @@ func (p *PageProcessor) Stop(ctx context.Context) error {
 
 // ValidateJob implements the common.Processor interface.
 func (p *PageProcessor) ValidateJob(job *jobtypes.Job) error {
-	if job == nil {
-		return errors.New("job is nil")
-	}
-	if job.URL == "" {
-		return errors.New("job URL is empty")
-	}
-	return nil
+	return p.validator.ValidateJob(job)
 }

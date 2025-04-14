@@ -31,7 +31,7 @@ type ModuleParams struct {
 type ProcessorParams struct {
 	Logger         logger.Interface
 	Service        Interface
-	JobService     common.JobService
+	Validator      common.JobValidator
 	Storage        types.Interface
 	IndexName      string
 	ArticleChannel chan *models.Article

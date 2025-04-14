@@ -23,7 +23,7 @@ var Module = fx.Module("articles",
 				fx.In
 				Logger         logger.Interface
 				Service        Interface
-				JobService     common.JobService
+				Validator      common.JobValidator
 				Storage        types.Interface
 				IndexName      string `name:"articleIndexName"`
 				ArticleChannel chan *models.Article
@@ -31,7 +31,7 @@ var Module = fx.Module("articles",
 				return NewProcessor(ProcessorParams{
 					Logger:         p.Logger,
 					Service:        p.Service,
-					JobService:     p.JobService,
+					Validator:      p.Validator,
 					Storage:        p.Storage,
 					IndexName:      p.IndexName,
 					ArticleChannel: p.ArticleChannel,
