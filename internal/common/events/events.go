@@ -3,7 +3,7 @@ package events
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/content"
 )
 
 // EventType represents the type of event.
@@ -25,7 +25,7 @@ type Event struct {
 	// Type is the type of event.
 	Type EventType `json:"type"`
 	// Job is the job associated with the event.
-	Job *jobtypes.Job `json:"job"`
+	Job *content.Job `json:"job"`
 	// Error is the error message if the event is job_failed.
 	Error string `json:"error,omitempty"`
 	// Progress is the job progress (0-100) if the event is job_progress.

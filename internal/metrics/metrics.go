@@ -14,3 +14,13 @@ type Metrics struct {
 	// ProcessingDuration is the total time spent processing.
 	ProcessingDuration time.Duration
 }
+
+// NewMetrics creates a new Metrics instance with default values.
+func NewMetrics() *Metrics {
+	return &Metrics{
+		ProcessedCount:     0,
+		ErrorCount:         0,
+		LastProcessedTime:  time.Time{},
+		ProcessingDuration: 0,
+	}
+}

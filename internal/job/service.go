@@ -5,11 +5,11 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
-	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
@@ -22,8 +22,8 @@ type Service struct {
 	storage    types.Interface
 	done       chan struct{}
 	activeJobs *int32
-	metrics    *jobtypes.Metrics
-	validator  jobtypes.JobValidator
+	metrics    *metrics.Metrics
+	validator  content.JobValidator
 }
 
 // ServiceParams holds parameters for creating a new Service.
@@ -33,7 +33,7 @@ type ServiceParams struct {
 	Crawler   crawler.Interface
 	Storage   types.Interface
 	Done      chan struct{}
-	Validator jobtypes.JobValidator
+	Validator content.JobValidator
 }
 
 // NewService creates a new base job service.
@@ -46,7 +46,7 @@ func NewService(p ServiceParams) *Service {
 		storage:    p.Storage,
 		done:       p.Done,
 		activeJobs: &jobs,
-		metrics:    &jobtypes.Metrics{},
+		metrics:    metrics.NewMetrics(),
 		validator:  p.Validator,
 	}
 }
@@ -65,38 +65,35 @@ func (s *Service) Stop(ctx context.Context) error {
 }
 
 // Status returns the current status of the job service.
-func (s *Service) Status(ctx context.Context) (jobtypes.JobStatus, error) {
+func (s *Service) Status(ctx context.Context) (content.JobStatus, error) {
 	activeJobs := atomic.LoadInt32(s.activeJobs)
-	state := jobtypes.JobStateRunning
+	state := content.JobStatusProcessing
 	if activeJobs == 0 {
-		state = jobtypes.JobStateCompleted
+		state = content.JobStatusCompleted
 	}
-	return jobtypes.JobStatus{
-		State:     state,
-		StartTime: time.Now(),
-	}, nil
+	return state, nil
 }
 
 // GetItems returns the items for a job.
-func (s *Service) GetItems(ctx context.Context, jobID string) ([]*jobtypes.Item, error) {
+func (s *Service) GetItems(ctx context.Context, jobID string) ([]*content.Item, error) {
 	s.logger.Info("Getting items for job", "jobID", jobID)
 	return nil, fmt.Errorf("not implemented")
 }
 
 // UpdateItem updates an item.
-func (s *Service) UpdateItem(ctx context.Context, item *jobtypes.Item) error {
+func (s *Service) UpdateItem(ctx context.Context, item *content.Item) error {
 	s.logger.Info("Updating item", "itemID", item.ID)
 	return fmt.Errorf("not implemented")
 }
 
 // UpdateJob updates a job.
-func (s *Service) UpdateJob(ctx context.Context, job *jobtypes.Job) error {
+func (s *Service) UpdateJob(ctx context.Context, job *content.Job) error {
 	s.logger.Info("Updating job", "jobID", job.ID)
 	return fmt.Errorf("not implemented")
 }
 
 // ValidateJob validates a job.
-func (s *Service) ValidateJob(job *jobtypes.Job) error {
+func (s *Service) ValidateJob(job *content.Job) error {
 	if s.validator == nil {
 		return fmt.Errorf("no validator configured")
 	}
@@ -114,14 +111,13 @@ func (s *Service) DecrementActiveJobs() {
 }
 
 // GetMetrics returns the current metrics.
-func (s *Service) GetMetrics() *jobtypes.Metrics {
+func (s *Service) GetMetrics() *metrics.Metrics {
 	return s.metrics
 }
 
 // UpdateMetrics updates the metrics.
-func (s *Service) UpdateMetrics(fn func(*jobtypes.Metrics)) {
+func (s *Service) UpdateMetrics(fn func(*metrics.Metrics)) {
 	fn(s.metrics)
-	s.metrics.LastUpdated = time.Now()
 }
 
 // GetLogger returns the logger.
