@@ -1,6 +1,10 @@
 package jobtypes
 
-import "time"
+import (
+	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
+)
 
 // JobState represents the state of a job.
 type JobState string
@@ -32,13 +36,20 @@ type JobStatus struct {
 	Progress int `json:"progress"`
 }
 
-// Job represents a crawling job.
+// JobValidator validates jobs before processing.
+type JobValidator interface {
+	// ValidateJob validates a job before processing.
+	ValidateJob(job *Job) error
+}
+
+// Job represents a job to be processed.
 type Job struct {
-	ID        string    `json:"id"`
-	URL       string    `json:"url"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string
+	URL       string
+	Type      contenttype.Type
+	Status    JobStatus
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // Item represents a crawled item from a job.
