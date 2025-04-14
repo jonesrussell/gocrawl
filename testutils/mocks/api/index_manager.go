@@ -62,20 +62,6 @@ func (mr *MockIndexManagerMockRecorder) EnsureArticleIndex(ctx, name interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureArticleIndex", reflect.TypeOf((*MockIndexManager)(nil).EnsureArticleIndex), ctx, name)
 }
 
-// EnsureContentIndex mocks base method.
-func (m *MockIndexManager) EnsureContentIndex(ctx context.Context, name string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureContentIndex", ctx, name)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// EnsureContentIndex indicates an expected call of EnsureContentIndex.
-func (mr *MockIndexManagerMockRecorder) EnsureContentIndex(ctx, name interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureContentIndex", reflect.TypeOf((*MockIndexManager)(nil).EnsureContentIndex), ctx, name)
-}
-
 // EnsureIndex mocks base method.
 func (m *MockIndexManager) EnsureIndex(ctx context.Context, name string, mapping any) error {
 	m.ctrl.T.Helper()
@@ -88,6 +74,20 @@ func (m *MockIndexManager) EnsureIndex(ctx context.Context, name string, mapping
 func (mr *MockIndexManagerMockRecorder) EnsureIndex(ctx, name, mapping interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureIndex", reflect.TypeOf((*MockIndexManager)(nil).EnsureIndex), ctx, name, mapping)
+}
+
+// EnsurePageIndex mocks base method.
+func (m *MockIndexManager) EnsurePageIndex(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsurePageIndex", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnsurePageIndex indicates an expected call of EnsurePageIndex.
+func (mr *MockIndexManagerMockRecorder) EnsurePageIndex(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsurePageIndex", reflect.TypeOf((*MockIndexManager)(nil).EnsurePageIndex), ctx, name)
 }
 
 // GetMapping mocks base method.

@@ -12,6 +12,7 @@ import (
 	colly "github.com/gocolly/colly/v2"
 	gomock "github.com/golang/mock/gomock"
 	common "github.com/jonesrussell/gocrawl/internal/common"
+	content "github.com/jonesrussell/gocrawl/internal/content"
 	events "github.com/jonesrussell/gocrawl/internal/crawler/events"
 	interfaces "github.com/jonesrussell/gocrawl/internal/interfaces"
 	logger "github.com/jonesrussell/gocrawl/internal/logger"
@@ -566,10 +567,10 @@ func (mr *MockInterfaceMockRecorder) GetMetrics() *gomock.Call {
 }
 
 // GetProcessors mocks base method.
-func (m *MockInterface) GetProcessors() []common.Processor {
+func (m *MockInterface) GetProcessors() []content.Processor {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetProcessors")
-	ret0, _ := ret[0].([]common.Processor)
+	ret0, _ := ret[0].([]content.Processor)
 	return ret0
 }
 
