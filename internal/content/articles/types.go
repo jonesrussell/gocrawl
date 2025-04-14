@@ -2,7 +2,7 @@
 package articles
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -31,7 +31,7 @@ type ModuleParams struct {
 type ProcessorParams struct {
 	Logger         logger.Interface
 	Service        Interface
-	Validator      common.JobValidator
+	Validator      jobtypes.JobValidator
 	Storage        types.Interface
 	IndexName      string
 	ArticleChannel chan *models.Article

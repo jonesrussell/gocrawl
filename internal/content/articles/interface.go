@@ -8,5 +8,5 @@ import "github.com/gocolly/colly/v2"
 type Interface interface {
 	// Process handles the processing of article content.
 	// It takes a colly.HTMLElement and processes the article found within it.
-	Process(e *colly.HTMLElement)
+	Process(e *colly.HTMLElement) error
 }

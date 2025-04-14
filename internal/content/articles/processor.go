@@ -10,6 +10,7 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/common/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -20,7 +21,7 @@ import (
 type ArticleProcessor struct {
 	logger         logger.Interface
 	service        Interface
-	validator      common.JobValidator
+	validator      jobtypes.JobValidator
 	storage        types.Interface
 	indexName      string
 	articleChannel chan *models.Article
@@ -40,29 +41,20 @@ func NewProcessor(p ProcessorParams) *ArticleProcessor {
 
 // Process implements the common.Processor interface.
 func (p *ArticleProcessor) Process(ctx context.Context, content any) error {
-	// Check if content is a job
-	job, ok := content.(*jobtypes.Job)
+	e, ok := content.(*colly.HTMLElement)
 	if !ok {
-		return fmt.Errorf("invalid content type: expected *jobtypes.Job, got %T", content)
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
 	}
 
-	// Create a new collector for this job
-	c := colly.NewCollector()
-
-	// Configure the collector
-	c.OnHTML("article", func(e *colly.HTMLElement) {
-		p.service.Process(e)
-	})
-
-	// Visit the URL
-	if err := c.Visit(job.URL); err != nil {
-		return fmt.Errorf("failed to visit URL: %w", err)
+	// Process the article
+	if err := p.service.Process(e); err != nil {
+		return fmt.Errorf("failed to process article: %w", err)
 	}
 
 	// Send the processed article to the channel
 	if p.articleChannel != nil {
 		article := &models.Article{
-			Source:    job.URL,
+			Source:    e.Request.URL.String(),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
@@ -72,15 +64,14 @@ func (p *ArticleProcessor) Process(ctx context.Context, content any) error {
 	return nil
 }
 
-// ContentType returns the type of content this processor handles.
-func (p *ArticleProcessor) ContentType() common.ContentType {
-	return common.ContentTypeArticle
+// ContentType implements the common.Processor interface.
+func (p *ArticleProcessor) ContentType() contenttype.Type {
+	return contenttype.Article
 }
 
 // CanProcess implements the common.Processor interface.
-func (p *ArticleProcessor) CanProcess(contentType any) bool {
-	ct, ok := contentType.(common.ContentType)
-	return ok && ct == common.ContentTypeArticle
+func (p *ArticleProcessor) CanProcess(contentType contenttype.Type) bool {
+	return contentType == contenttype.Article
 }
 
 // ParseHTML implements the common.Processor interface.
@@ -98,52 +89,41 @@ func (p *ArticleProcessor) ExtractContent() (string, error) {
 	return "", errors.New("not implemented")
 }
 
-// ProcessJob processes a job and its items.
-func (p *ArticleProcessor) ProcessJob(ctx context.Context, job *common.Job) error {
-	return p.Process(ctx, job)
-}
-
 // ValidateJob implements the common.Processor interface.
 func (p *ArticleProcessor) ValidateJob(job *jobtypes.Job) error {
-	return p.validator.ValidateJob(job)
+	if job == nil {
+		return errors.New("job cannot be nil")
+	}
+	if job.Type != contenttype.Article {
+		return fmt.Errorf("invalid job type: expected %s, got %s", contenttype.Article, job.Type)
+	}
+	return nil
 }
 
 // RegisterProcessor registers a new content processor.
-func (p *ArticleProcessor) RegisterProcessor(processor common.ContentProcessor) {
+func (p *ArticleProcessor) RegisterProcessor(processor common.Processor) {
 	// Not implemented - we only handle article processing
 }
 
-// GetProcessor returns a processor for the given content type.
-func (p *ArticleProcessor) GetProcessor(contentType common.ContentType) (common.ContentProcessor, error) {
-	if contentType == common.ContentTypeArticle {
+// GetProcessor returns the processor for the given content type.
+func (p *ArticleProcessor) GetProcessor(contentType contenttype.Type) (common.Processor, error) {
+	if contentType == contenttype.Article {
 		return p, nil
 	}
 	return nil, fmt.Errorf("unsupported content type: %s", contentType)
 }
 
-// ProcessContent implements the common.Processor interface.
-func (p *ArticleProcessor) ProcessContent(ctx context.Context, contentType common.ContentType, content any) error {
-	if contentType != common.ContentTypeArticle {
-		return fmt.Errorf("unsupported content type: %s", contentType)
-	}
-	job, ok := content.(common.Job)
-	if !ok {
-		return errors.New("invalid content type: expected common.Job")
-	}
-	return p.Process(ctx, job)
-}
-
-// Start initializes the processor.
+// Start implements the common.Processor interface.
 func (p *ArticleProcessor) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop cleans up the processor.
+// Stop implements the common.Processor interface.
 func (p *ArticleProcessor) Stop(ctx context.Context) error {
-	return p.Close()
+	return nil
 }
 
-// Close implements the common.Processor interface.
+// Close cleans up resources used by the processor.
 func (p *ArticleProcessor) Close() error {
 	if p.articleChannel != nil {
 		close(p.articleChannel)

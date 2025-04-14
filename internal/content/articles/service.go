@@ -2,6 +2,8 @@
 package articles
 
 import (
+	"errors"
+
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -24,10 +26,9 @@ func NewContentService(p ServiceParams) Interface {
 }
 
 // Process implements the Interface.
-func (s *ContentService) Process(e *colly.HTMLElement) {
+func (s *ContentService) Process(e *colly.HTMLElement) error {
 	if e == nil {
-		s.logger.Debug("Received nil HTML element")
-		return
+		return errors.New("nil HTML element")
 	}
 
 	s.logger.Debug("Processing article",
@@ -37,4 +38,6 @@ func (s *ContentService) Process(e *colly.HTMLElement) {
 	// This is a placeholder - implement actual extraction logic
 	s.logger.Debug("Article processed",
 		"url", e.Request.URL.String())
+
+	return nil
 }

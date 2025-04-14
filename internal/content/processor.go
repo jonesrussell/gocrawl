@@ -16,7 +16,7 @@ type ContentProcessor interface {
 	ContentType() contenttype.Type
 
 	// CanProcess checks if the processor can handle the given content.
-	CanProcess(content any) bool
+	CanProcess(content contenttype.Type) bool
 
 	// Process handles the content processing.
 	Process(ctx context.Context, content any) error
@@ -139,7 +139,7 @@ func (p *NoopProcessor) ContentType() contenttype.Type {
 }
 
 // CanProcess implements ContentProcessor.CanProcess.
-func (p *NoopProcessor) CanProcess(content any) bool {
+func (p *NoopProcessor) CanProcess(content contenttype.Type) bool {
 	return true
 }
 
