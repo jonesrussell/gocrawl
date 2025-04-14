@@ -68,45 +68,48 @@ type ProcessorFactory interface {
 
 // DefaultProcessorFactory implements ProcessorFactory.
 type DefaultProcessorFactory struct {
-	logger         logger.Interface
 	config         config.Interface
 	storage        storagetypes.Interface
 	articleService articles.Interface
 	pageService    page.Interface
 	indexName      string
 	articleChannel chan *models.Article
+	logger         logger.Interface
 }
 
-// ProcessorFactoryParams holds parameters for creating a processor factory.
+// ProcessorFactoryParams defines the parameters for creating a processor factory.
 type ProcessorFactoryParams struct {
 	fx.In
-	Logger         logger.Interface
 	Config         config.Interface
 	Storage        storagetypes.Interface
 	ArticleService articles.Interface
 	PageService    page.Interface
 	IndexName      string `name:"pageIndexName"`
 	ArticleChannel chan *models.Article
+	Logger         logger.Interface
 }
 
 // NewProcessorFactory creates a new processor factory.
 func NewProcessorFactory(p ProcessorFactoryParams) ProcessorFactory {
 	return &DefaultProcessorFactory{
-		logger:         p.Logger,
 		config:         p.Config,
 		storage:        p.Storage,
 		articleService: p.ArticleService,
 		pageService:    p.PageService,
 		indexName:      p.IndexName,
 		articleChannel: p.ArticleChannel,
+		logger:         p.Logger,
 	}
 }
 
-// CreateProcessors implements ProcessorFactory.
+// CreateProcessors creates the processors for the crawler.
 func (f *DefaultProcessorFactory) CreateProcessors(
 	ctx context.Context,
 	jobService common.JobService,
 ) ([]common.Processor, error) {
+	processors := make([]common.Processor, 0)
+
+	// Create article processor
 	articleProcessor := articles.NewProcessor(articles.ProcessorParams{
 		Logger:         f.logger,
 		Service:        f.articleService,
@@ -115,21 +118,21 @@ func (f *DefaultProcessorFactory) CreateProcessors(
 		IndexName:      f.indexName,
 		ArticleChannel: f.articleChannel,
 	})
+	processors = append(processors, articleProcessor)
 
+	// Create page processor
 	pageProcessor := page.NewPageProcessor(page.ProcessorParams{
 		Logger:    f.logger,
 		Service:   f.pageService,
 		Storage:   f.storage,
 		IndexName: f.indexName,
 	})
+	processors = append(processors, pageProcessor)
 
-	return []common.Processor{
-		articleProcessor,
-		pageProcessor,
-	}, nil
+	return processors, nil
 }
 
-// ProvideCrawler creates a new crawler instance with the given dependencies.
+// ProvideCrawler provides a crawler instance.
 func ProvideCrawler(
 	logger logger.Interface,
 	indexManager interfaces.IndexManager,
@@ -158,7 +161,6 @@ func ProvideCrawler(
 		cfg,
 	)
 
-	logger.Info("Created crawler instance")
 	return Result{
 		Crawler: crawler,
 	}

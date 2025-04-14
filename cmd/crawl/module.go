@@ -74,13 +74,12 @@ var Module = fx.Module("crawl",
 		fx.Annotate(
 			func(p struct {
 				fx.In
-				Logger           logger.Interface
-				EventBus         *events.EventBus `name:"eventBus"`
-				IndexManager     interfaces.IndexManager
-				Sources          *sources.Sources
-				ArticleProcessor common.Processor `name:"articleProcessor"`
-				PageProcessor    common.Processor `name:"pageProcessor"`
-				Config           config.Interface
+				Logger       logger.Interface
+				EventBus     *events.EventBus `name:"eventBus"`
+				IndexManager interfaces.IndexManager
+				Sources      *sources.Sources
+				Processors   []common.Processor `name:"processors"`
+				Config       config.Interface
 			}) crawler.Interface {
 				cfg := crawlerconfig.New(
 					crawlerconfig.WithMaxDepth(3),
@@ -92,13 +91,21 @@ var Module = fx.Module("crawl",
 					crawlerconfig.WithDelay(2*time.Second),
 					crawlerconfig.WithRandomDelay(500*time.Millisecond),
 				)
+				var articleProcessor, pageProcessor common.Processor
+				for _, p := range p.Processors {
+					if p.ContentType() == common.ContentTypeArticle {
+						articleProcessor = p
+					} else if p.ContentType() == common.ContentTypePage {
+						pageProcessor = p
+					}
+				}
 				return crawler.NewCrawler(
 					p.Logger,
 					p.EventBus,
 					p.IndexManager,
 					p.Sources,
-					p.ArticleProcessor,
-					p.PageProcessor,
+					articleProcessor,
+					pageProcessor,
 					cfg,
 				)
 			},

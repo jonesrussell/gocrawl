@@ -438,12 +438,12 @@ func Execute() {
 
 	// Add commands first
 	rootCmd.AddCommand(
-		scheduler.Command(),                      // Main scheduler command with fx
-		indices.Command(),                        // For managing Elasticsearch indices
-		sources.NewSourcesCommand(cfg, log, nil), // For managing web content sources
-		crawlcmd.Command(),                       // For crawling web content
-		httpdcmd.Command(),                       // For running the HTTP server
-		search.Command(),                         // For searching content in Elasticsearch
+		scheduler.Command(),         // Main scheduler command with fx
+		indices.Command(),           // For managing Elasticsearch indices
+		sources.NewSourcesCommand(), // For managing web content sources
+		crawlcmd.Command(),          // For crawling web content
+		httpdcmd.Command(),          // For running the HTTP server
+		search.Command(),            // For searching content in Elasticsearch
 	)
 
 	if executeErr := rootCmd.Execute(); executeErr != nil {

@@ -3,33 +3,33 @@ package common
 
 import (
 	"context"
+	"errors"
 
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
-// contextKey is a type for context keys to avoid collisions
+// contextKey is a custom type for context keys to avoid collisions
 type contextKey string
 
-const (
-	// LoggerKey is the key used to store the logger in the context
-	LoggerKey contextKey = "logger"
-	// ConfigKey is the context key for the configuration
-	ConfigKey contextKey = "config"
-)
+// LoggerKey is the key used to store the logger in the context
+var LoggerKey contextKey = "logger"
 
-// GetLoggerFromContext returns the logger from the context
-func GetLoggerFromContext(ctx context.Context) logger.Interface {
-	if logger, ok := ctx.Value(LoggerKey).(logger.Interface); ok {
-		return logger
+// ConfigKey is the context key for the configuration
+var ConfigKey contextKey = "config"
+
+// GetLoggerFromContext retrieves the logger from the context
+func GetLoggerFromContext(ctx context.Context) (*zap.Logger, error) {
+	if logger, ok := ctx.Value(LoggerKey).(*zap.Logger); ok {
+		return logger, nil
 	}
-	return nil
+	return nil, errors.New("logger not found in context or invalid type")
 }
 
-// GetConfigFromContext returns the configuration from the context
-func GetConfigFromContext(ctx context.Context) *viper.Viper {
+// GetConfigFromContext retrieves the config from the context
+func GetConfigFromContext(ctx context.Context) (*viper.Viper, error) {
 	if config, ok := ctx.Value(ConfigKey).(*viper.Viper); ok {
-		return config
+		return config, nil
 	}
-	return nil
+	return nil, errors.New("config not found in context or invalid type")
 }

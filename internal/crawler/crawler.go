@@ -246,105 +246,84 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	// Initialize abort channel
 	c.abortChan = make(chan struct{})
-	c.logger.Debug("Initialized abort channel",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
+	defer close(c.abortChan) // Ensure channel is closed when done
+
+	// Start cleanup goroutine
+	cleanupDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(c.cfg.CleanupInterval)
+		defer ticker.Stop()
+		defer close(cleanupDone)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-c.abortChan:
+				return
+			case <-ticker.C:
+				c.cleanupResources()
+			}
+		}
+	}()
 
 	// Validate source
-	c.logger.Debug("Validating source",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	source, err := c.validateSource(ctx, sourceName)
 	if err != nil {
-		c.logger.Error("Failed to validate source",
-			"error", err,
-			"source", sourceName,
-			"debug_enabled", c.cfg.Debug,
-		)
 		return fmt.Errorf("failed to validate source: %w", err)
 	}
-	c.logger.Debug("Source validated successfully",
-		"url", source.URL,
-		"allowed_domains", source.AllowedDomains,
-		"debug_enabled", c.cfg.Debug,
-	)
 
 	// Set up collector
-	c.logger.Debug("Setting up collector",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	err = c.setupCollector(source)
 	if err != nil {
-		c.logger.Error("Failed to setup collector",
-			"error", err,
-			"source", sourceName,
-			"debug_enabled", c.cfg.Debug,
-		)
 		return fmt.Errorf("failed to setup collector: %w", err)
 	}
-	c.logger.Debug("Collector setup completed",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 
 	// Set up callbacks
-	c.logger.Debug("Setting up callbacks",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	c.setupCallbacks(ctx)
-	c.logger.Debug("Callbacks setup completed",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 
 	// Start the crawler state
-	c.logger.Debug("Starting crawler state",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	c.state.Start(ctx, sourceName)
-	c.logger.Debug("Crawler state started",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 
 	// Visit the source URL
-	c.logger.Debug("Attempting to visit URL",
-		"url", source.URL,
-		"allowed_domains", source.AllowedDomains,
-		"debug_enabled", c.cfg.Debug,
-	)
-
 	if visitErr := c.collector.Visit(source.URL); visitErr != nil {
-		c.logger.Error("Failed to visit source URL",
-			"error", visitErr,
-			"url", source.URL,
-			"debug_enabled", c.cfg.Debug,
-		)
 		return fmt.Errorf("failed to visit source URL: %w", visitErr)
 	}
 
-	c.logger.Debug("Successfully initiated visit",
-		"url", source.URL,
-		"debug_enabled", c.cfg.Debug,
-	)
-
 	// Wait for the crawler to finish
-	c.logger.Debug("Waiting for collector to finish",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	c.collector.Wait()
-	c.logger.Debug("Collector finished",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
+
+	// Wait for cleanup goroutine
+	select {
+	case <-cleanupDone:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
 	return nil
+}
+
+// cleanupResources performs periodic cleanup of crawler resources
+func (c *Crawler) cleanupResources() {
+	c.logger.Debug("Cleaning up crawler resources")
+
+	// Clean up article channel
+	select {
+	case <-c.articleChannel: // Try to read one item
+	default: // Channel is empty
+	}
+
+	// Clean up processors
+	for _, p := range c.processors {
+		if cleaner, ok := p.(interface{ Cleanup() }); ok {
+			cleaner.Cleanup()
+		}
+	}
+
+	// Clean up state
+	c.state.Reset()
+
+	c.logger.Debug("Finished cleaning up crawler resources")
 }
 
 // Stop stops the crawler.
@@ -357,14 +336,11 @@ func (c *Crawler) Stop(ctx context.Context) error {
 
 	// Cancel the context
 	c.state.Cancel()
-	c.logger.Debug("Context cancelled")
 
 	// Signal abort to all goroutines
 	close(c.abortChan)
-	c.logger.Debug("Abort signal sent")
 
 	// Wait for the collector to finish
-	c.logger.Debug("Waiting for collector to finish")
 	c.collector.Wait()
 
 	// Create a done channel for the wait group
@@ -372,9 +348,7 @@ func (c *Crawler) Stop(ctx context.Context) error {
 
 	// Start a goroutine to wait for the wait group
 	go func() {
-		c.logger.Debug("Waiting for wait group")
 		c.wg.Wait()
-		c.logger.Debug("Wait group finished")
 		close(waitDone)
 	}()
 
@@ -382,6 +356,7 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	select {
 	case <-waitDone:
 		c.state.Stop()
+		c.cleanupResources() // Final cleanup
 		c.logger.Debug("Crawler stopped successfully")
 		return nil
 	case <-ctx.Done():
