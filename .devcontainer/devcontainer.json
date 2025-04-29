@@ -14,5 +14,8 @@
 	},
 	"features": {
 		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
-	}
+	},
+	"mounts": [
+        "type=bind,source=/home/${localEnv:USER}/.ssh,target=/home/vscode/.ssh"
+    ]
 }
