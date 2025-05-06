@@ -282,11 +282,9 @@ func (s *Storage) DeleteIndex(ctx context.Context, index string) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
 	defer cancel()
 
-	// Convert single index string to slice of strings
-	index := []string{index}
-
+	// Call API with []string{index} but keep index as string
 	res, err := s.client.Indices.Delete(
-		index,
+		[]string{index},
 		s.client.Indices.Delete.WithContext(ctx),
 	)
 	if err != nil {

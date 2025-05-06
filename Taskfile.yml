@@ -1,5 +1,15 @@
 version: '3'
 
+output:
+  group:
+    error_only: false
+  colorize: true
+  prefix:
+    info: "🔍"
+    success: "✅"
+    warning: "⚠️"
+    error: "❌"
+
 tasks:
   api:
     desc: "Run the HTTP API server"
