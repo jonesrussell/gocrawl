@@ -8,11 +8,24 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"ms-azuretools.vscode-docker"
+				"ms-azuretools.vscode-docker",
+				"humao.rest-client"
 			]
 		}
 	},
 	"features": {
-		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
-	}
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+			"moby": true,
+			"installDockerBuildx": true,
+			"installDockerComposeSwitch": true,
+			"version": "latest",
+			"dockerDashComposeVersion": "v2"
+		},
+		"ghcr.io/devcontainers-extra/features/go-task:1": {
+			"version": "latest"
+		}
+	},
+	"mounts": [
+        "type=bind,source=/home/${localEnv:USER}/.ssh,target=/home/vscode/.ssh"
+    ]
 }
