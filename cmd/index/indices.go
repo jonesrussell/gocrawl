@@ -1,7 +1,7 @@
-// Package indices implements the command-line interface for managing Elasticsearch
-// indices in GoCrawl. It provides commands for listing, deleting, and managing
-// indices in the Elasticsearch cluster.
-package indices
+// Package index implements the command-line interface for managing Elasticsearch
+// index in GoCrawl. It provides commands for listing, deleting, and managing
+// index in the Elasticsearch cluster.
+package index
 
 import (
 	"context"
@@ -28,40 +28,40 @@ const (
 	StorageKey contextKey = "storage"
 )
 
-// Command creates and returns the indices command that serves as the parent
+// Command creates and returns the index command that serves as the parent
 // command for all index management operations. It:
 // - Sets up the command with appropriate usage and description
 // - Adds subcommands for specific index management operations
 // - Provides a unified interface for index management
 func Command() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "indices",
-		Short: "Manage Elasticsearch indices",
-		Long: `Manage Elasticsearch indices.
-This command provides subcommands for listing, deleting, and managing indices.`,
+		Use:   "index",
+		Short: "Manage Elasticsearch index",
+		Long: `Manage Elasticsearch index.
+This command provides subcommands for listing, deleting, and managing index.`,
 	}
 
 	// Add subcommands for index management operations
 	cmd.AddCommand(
-		NewListCommand(),   // Command for listing all indices
-		NewDeleteCommand(), // Command for deleting indices
+		NewListCommand(),   // Command for listing all index
+		NewDeleteCommand(), // Command for deleting index
 		NewCreateCommand(), // Command for creating a new index
 	)
 
 	return cmd
 }
 
-// NewIndicesCommand creates a new indices command with dependencies.
+// NewIndicesCommand creates a new index command with dependencies.
 func NewIndicesCommand(
 	cfg config.Interface,
 	log logger.Interface,
 	storage types.Interface,
 ) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "indices",
-		Short: "Manage Elasticsearch indices",
-		Long: `Manage Elasticsearch indices.
-This command provides subcommands for listing, deleting, and managing indices.`,
+		Use:   "index",
+		Short: "Manage Elasticsearch index",
+		Long: `Manage Elasticsearch index.
+This command provides subcommands for listing, deleting, and managing index.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get logger from context
 			loggerValue := cmd.Context().Value(LoggerKey)
@@ -89,12 +89,12 @@ This command provides subcommands for listing, deleting, and managing indices.`,
 					return logger.NewFxLogger(loggerInterface)
 				}),
 
-				// Invoke indices command
+				// Invoke index command
 				fx.Invoke(func(cmd *cobra.Command) error {
 					// Add subcommands for index management operations
 					cmd.AddCommand(
-						NewListCommand(),   // Command for listing all indices
-						NewDeleteCommand(), // Command for deleting indices
+						NewListCommand(),   // Command for listing all index
+						NewDeleteCommand(), // Command for deleting index
 						NewCreateCommand(), // Command for creating a new index
 					)
 					return nil

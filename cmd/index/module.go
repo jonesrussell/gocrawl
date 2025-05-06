@@ -1,5 +1,5 @@
-// Package indices provides commands for managing Elasticsearch indices.
-package indices
+// Package index provides commands for managing Elasticsearch index.
+package index
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"go.uber.org/fx"
 )
 
-// Module provides the indices module for dependency injection.
-var Module = fx.Module("indices",
+// Module provides the index module for dependency injection.
+var Module = fx.Module("index",
 	// Core modules
 	config.Module,
 	logger.Module,
@@ -22,7 +22,7 @@ var Module = fx.Module("indices",
 	// Provide the context
 	fx.Provide(context.Background),
 
-	// Provide the indices components
+	// Provide the index components
 	fx.Provide(
 		NewCreator,
 		NewLister,

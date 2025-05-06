@@ -3,7 +3,7 @@ package types
 
 import "context"
 
-// IndexManager defines the interface for managing Elasticsearch indices.
+// IndexManager defines the interface for managing Elasticsearch index.
 type IndexManager interface {
 	// EnsureIndex ensures that an index exists with the specified mapping.
 	EnsureIndex(ctx context.Context, name string, mapping any) error

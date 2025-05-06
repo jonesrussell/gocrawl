@@ -18,9 +18,9 @@ tasks:
     desc: "Run the web crawler for a single source defined in sources.yml"
     cmds:
       - echo '' > app.log
-      - go run main.go indices delete --source {{.CLI_ARGS | trim}} --force || true
+      - go run main.go index delete --source {{.CLI_ARGS | trim}} --force || true
       - go run main.go crawl {{.CLI_ARGS | trim}}
-      - go run main.go indices list
+      - go run main.go index list
     interactive: true
 
   deadcode:
@@ -34,30 +34,30 @@ tasks:
     cmds:
       - go run main.go --help
 
-  indices:create:
+  index:create:
     desc: "Create an Elasticsearch index"
     cmds:
-      - go run main.go indices create {{.CLI_ARGS}}
+      - go run main.go index create {{.CLI_ARGS}}
     ignore_error: true
     interactive: true
 
-  indices:list:
-    desc: "List all Elasticsearch indices"
+  index:list:
+    desc: "List all Elasticsearch index"
     cmds:
-      - go run main.go indices list
+      - go run main.go index list
     ignore_error: true
 
-  indices:delete:
-    desc: "Delete one or more Elasticsearch indices"
+  index:delete:
+    desc: "Delete one or more Elasticsearch index"
     cmds:
-      - go run main.go indices delete {{.CLI_ARGS}}
+      - go run main.go index delete {{.CLI_ARGS}}
     ignore_error: true
     interactive: false
 
-  indices:delete:source:
-    desc: "Delete indices for a specific source"
+  index:delete:source:
+    desc: "Delete index for a specific source"
     cmds:
-      - go run main.go indices delete --source "{{.SOURCE}}" --force
+      - go run main.go index delete --source "{{.SOURCE}}" --force
     ignore_error: true
     interactive: false
     vars:

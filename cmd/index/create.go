@@ -1,7 +1,7 @@
-// Package indices implements the command-line interface for managing Elasticsearch
-// indices in GoCrawl. It provides commands for listing, deleting, and managing
-// indices in the Elasticsearch cluster.
-package indices
+// Package index implements the command-line interface for managing Elasticsearch
+// index in GoCrawl. It provides commands for listing, deleting, and managing
+// index in the Elasticsearch cluster.
+package index
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"go.uber.org/fx/fxevent"
 )
 
-// DefaultMapping provides a default mapping for new indices
+// DefaultMapping provides a default mapping for new index
 var DefaultMapping = map[string]any{
 	"mappings": map[string]any{
 		"properties": map[string]any{
@@ -43,7 +43,7 @@ var DefaultMapping = map[string]any{
 	},
 }
 
-// Creator implements the indices create command
+// Creator implements the index create command
 type Creator struct {
 	config  config.Interface
 	logger  logger.Interface

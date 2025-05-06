@@ -1,7 +1,7 @@
-// Package indices implements the command-line interface for managing Elasticsearch
-// indices in GoCrawl. This file contains the implementation of the delete command
-// that allows users to delete one or more indices from the Elasticsearch cluster.
-package indices
+// Package index implements the command-line interface for managing Elasticsearch
+// index in GoCrawl. This file contains the implementation of the delete command
+// that allows users to delete one or more index from the Elasticsearch cluster.
+package index
 
 import (
 	"context"
@@ -28,17 +28,17 @@ var (
 )
 
 const (
-	// defaultIndicesCapacity is the initial capacity for the indices slice
+	// defaultIndicesCapacity is the initial capacity for the index slice
 	defaultIndicesCapacity = 2
 )
 
-// Deleter implements the indices delete command
+// Deleter implements the index delete command
 type Deleter struct {
 	config     config.Interface
 	logger     logger.Interface
 	storage    storagetypes.Interface
 	sources    sources.Interface
-	indices    []string
+	index      []string
 	force      bool
 	sourceName string
 }
@@ -56,7 +56,7 @@ func NewDeleter(
 		logger:     logger,
 		storage:    storage,
 		sources:    sources,
-		indices:    params.Indices,
+		index:      params.Indices,
 		force:      params.Force,
 		sourceName: params.SourceName,
 	}
@@ -73,11 +73,11 @@ func (d *Deleter) Start(ctx context.Context) error {
 
 // confirmDeletion asks for user confirmation before deletion
 func (d *Deleter) confirmDeletion() error {
-	// Write the list of indices to be deleted
-	if _, err := os.Stdout.WriteString("The following indices will be deleted:\n"); err != nil {
+	// Write the list of index to be deleted
+	if _, err := os.Stdout.WriteString("The following index will be deleted:\n"); err != nil {
 		return fmt.Errorf("failed to write to stdout: %w", err)
 	}
-	if _, err := os.Stdout.WriteString(strings.Join(d.indices, "\n") + "\n"); err != nil {
+	if _, err := os.Stdout.WriteString(strings.Join(d.index, "\n") + "\n"); err != nil {
 		return fmt.Errorf("failed to write to stdout: %w", err)
 	}
 
@@ -106,9 +106,9 @@ func (d *Deleter) confirmDeletion() error {
 	return nil
 }
 
-// deleteIndices deletes the indices
+// deleteIndices deletes the index
 func (d *Deleter) deleteIndices(ctx context.Context) error {
-	d.logger.Info("Starting index deletion", "indices", d.indices, "source", d.sourceName)
+	d.logger.Info("Starting index deletion", "index", d.index, "source", d.sourceName)
 
 	// Test storage connection
 	if err := d.storage.TestConnection(ctx); err != nil {
@@ -116,53 +116,53 @@ func (d *Deleter) deleteIndices(ctx context.Context) error {
 		return fmt.Errorf("failed to connect to storage: %w", err)
 	}
 
-	// Resolve indices to delete
+	// Resolve index to delete
 	if d.sourceName != "" {
 		source := d.sources.FindByName(d.sourceName)
 		if source == nil {
 			return fmt.Errorf("source not found: %s", d.sourceName)
 		}
 		if source.Index == "" && source.ArticleIndex == "" {
-			return fmt.Errorf("source %s has no indices configured", d.sourceName)
+			return fmt.Errorf("source %s has no index configured", d.sourceName)
 		}
-		// Add both content and article indices if they exist
-		d.indices = make([]string, 0, defaultIndicesCapacity)
+		// Add both content and article index if they exist
+		d.index = make([]string, 0, defaultIndicesCapacity)
 		if source.Index != "" {
-			d.indices = append(d.indices, source.Index)
+			d.index = append(d.index, source.Index)
 		}
 		if source.ArticleIndex != "" {
-			d.indices = append(d.indices, source.ArticleIndex)
+			d.index = append(d.index, source.ArticleIndex)
 		}
-		d.logger.Info("Resolved source indices", "indices", d.indices, "source", d.sourceName)
+		d.logger.Info("Resolved source index", "index", d.index, "source", d.sourceName)
 	}
 
-	// Get existing indices
+	// Get existing index
 	existingIndices, listErr := d.storage.ListIndices(ctx)
 	if listErr != nil {
-		d.logger.Error("Failed to list indices", "error", listErr)
+		d.logger.Error("Failed to list index", "error", listErr)
 		return listErr
 	}
-	d.logger.Debug("Found existing indices", "indices", existingIndices)
+	d.logger.Debug("Found existing index", "index", existingIndices)
 
-	// Check for empty indices
-	if len(d.indices) == 0 {
-		return errors.New("no indices specified")
+	// Check for empty index
+	if len(d.index) == 0 {
+		return errors.New("no index specified")
 	}
 
-	// Filter indices
+	// Filter index
 	filtered := d.filterIndices(existingIndices)
 
-	// Report missing indices
+	// Report missing index
 	d.reportMissingIndices(filtered.missing)
 
 	if len(filtered.toDelete) == 0 {
-		d.logger.Info("No indices to delete")
+		d.logger.Info("No index to delete")
 		return nil
 	}
 
-	d.logger.Info("Indices to delete", "indices", filtered.toDelete)
+	d.logger.Info("Indices to delete", "index", filtered.toDelete)
 
-	// Delete indices
+	// Delete index
 	var deleteErr error
 	for _, index := range filtered.toDelete {
 		if err := d.storage.DeleteIndex(ctx, index); err != nil {
@@ -182,35 +182,35 @@ func (d *Deleter) deleteIndices(ctx context.Context) error {
 	}
 
 	if len(filtered.toDelete) == 0 {
-		d.logger.Info("No indices to delete")
+		d.logger.Info("No index to delete")
 		return nil
 	}
 
-	d.logger.Info("Successfully deleted indices", "count", len(filtered.toDelete))
+	d.logger.Info("Successfully deleted index", "count", len(filtered.toDelete))
 	return nil
 }
 
-// filterIndices filters out non-existent indices and returns lists of indices to delete and missing indices.
+// filterIndices filters out non-existent index and returns lists of index to delete and missing index.
 func (d *Deleter) filterIndices(existingIndices []string) struct {
 	toDelete []string
 	missing  []string
 } {
-	// Create map of existing indices
+	// Create map of existing index
 	existingMap := make(map[string]bool)
 	for _, idx := range existingIndices {
 		existingMap[idx] = true
 	}
 
-	// Filter and report non-existent indices
+	// Filter and report non-existent index
 	result := struct {
 		toDelete []string
 		missing  []string
 	}{
-		toDelete: make([]string, 0, len(d.indices)),
-		missing:  make([]string, 0, len(d.indices)),
+		toDelete: make([]string, 0, len(d.index)),
+		missing:  make([]string, 0, len(d.index)),
 	}
 
-	for _, index := range d.indices {
+	for _, index := range d.index {
 		if !existingMap[index] {
 			result.missing = append(result.missing, index)
 		} else {
@@ -221,10 +221,10 @@ func (d *Deleter) filterIndices(existingIndices []string) struct {
 	return result
 }
 
-// reportMissingIndices prints a list of indices that do not exist.
+// reportMissingIndices prints a list of index that do not exist.
 func (d *Deleter) reportMissingIndices(missingIndices []string) {
 	if len(missingIndices) > 0 {
-		fmt.Fprintf(os.Stdout, "\nThe following indices do not exist:\n")
+		fmt.Fprintf(os.Stdout, "\nThe following index do not exist:\n")
 		for _, index := range missingIndices {
 			fmt.Fprintf(os.Stdout, "  - %s\n", index)
 		}
@@ -243,10 +243,10 @@ type DeleteParams struct {
 func NewDeleteCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete [index-name...]",
-		Short: "Delete one or more Elasticsearch indices",
-		Long: `Delete one or more Elasticsearch indices.
-This command allows you to delete one or more indices from the Elasticsearch cluster.
-You can specify indices by name or by source name.`,
+		Short: "Delete one or more Elasticsearch index",
+		Long: `Delete one or more Elasticsearch index.
+This command allows you to delete one or more index from the Elasticsearch cluster.
+You can specify index by name or by source name.`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get logger from context
@@ -322,7 +322,7 @@ You can specify indices by name or by source name.`,
 
 	// Add flags
 	cmd.Flags().StringP("config", "c", "config.yaml", "Path to config file")
-	cmd.Flags().StringP("source", "s", "", "Delete indices for the specified source")
+	cmd.Flags().StringP("source", "s", "", "Delete index for the specified source")
 	cmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
 
 	return cmd
@@ -331,10 +331,10 @@ You can specify indices by name or by source name.`,
 // ValidateDeleteArgs validates the arguments for the delete command.
 func ValidateDeleteArgs(sourceName string, args []string) error {
 	if sourceName == "" && len(args) == 0 {
-		return errors.New("either indices or a source name must be specified")
+		return errors.New("either index or a source name must be specified")
 	}
 	if sourceName != "" && len(args) > 0 {
-		return errors.New("cannot specify both indices and a source name")
+		return errors.New("cannot specify both index and a source name")
 	}
 	return nil
 }

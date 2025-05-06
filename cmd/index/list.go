@@ -1,7 +1,7 @@
-// Package indices implements the command-line interface for managing Elasticsearch
-// indices in GoCrawl. This file contains the implementation of the list command
-// that displays all indices in a formatted table with their health status and metrics.
-package indices
+// Package index implements the command-line interface for managing Elasticsearch
+// index in GoCrawl. This file contains the implementation of the list command
+// that displays all index in a formatted table with their health status and metrics.
+package index
 
 import (
 	"context"
@@ -43,8 +43,8 @@ func (r *TableRenderer) handleIndexError(operation, index string, err error, act
 	return fmt.Errorf("failed to %s for index %s: %w. %s", operation, index, err, action)
 }
 
-// RenderTable formats and displays the indices in a table format
-func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface, indices []string) error {
+// RenderTable formats and displays the index in a table format
+func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface, index []string) error {
 	// Initialize table writer with stdout as output
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -54,7 +54,7 @@ func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface
 	t.AppendHeader(table.Row{"Index", "Health", "Status", "Docs", "Store Size", "Ingestion Status"})
 
 	// Process each index
-	for _, index := range indices {
+	for _, index := range index {
 		// Get index health
 		health, err := storage.GetIndexHealth(ctx, index)
 		if err != nil {
@@ -86,7 +86,7 @@ func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface
 	return nil
 }
 
-// Lister handles listing indices
+// Lister handles listing index
 type Lister struct {
 	config   config.Interface
 	logger   logger.Interface
@@ -111,15 +111,15 @@ func NewLister(
 
 // Start begins the list operation
 func (l *Lister) Start(ctx context.Context) error {
-	// Get all indices
-	indices, err := l.storage.ListIndices(ctx)
+	// Get all index
+	index, err := l.storage.ListIndices(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list indices: %w", err)
+		return fmt.Errorf("failed to list index: %w", err)
 	}
 
-	// Filter out internal indices (those starting with '.')
+	// Filter out internal index (those starting with '.')
 	var filteredIndices []string
-	for _, index := range indices {
+	for _, index := range index {
 		if !strings.HasPrefix(index, ".") {
 			filteredIndices = append(filteredIndices, index)
 		}
@@ -133,8 +133,8 @@ func (l *Lister) Start(ctx context.Context) error {
 func NewListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all indices",
-		Long:  `List all indices in the Elasticsearch cluster.`,
+		Short: "List all index",
+		Long:  `List all index in the Elasticsearch cluster.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get logger from context
 			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
@@ -205,17 +205,17 @@ func getIngestionStatus(healthStatus string) string {
 	}
 }
 
-// List retrieves and returns a list of all indices.
+// List retrieves and returns a list of all index.
 func (l *Lister) List(ctx context.Context) ([]*IndexInfo, error) {
-	// Get all indices
-	indices, err := l.storage.ListIndices(ctx)
+	// Get all index
+	index, err := l.storage.ListIndices(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list indices: %w", err)
+		return nil, fmt.Errorf("failed to list index: %w", err)
 	}
 
-	// Filter out internal indices (those starting with '.')
+	// Filter out internal index (those starting with '.')
 	var filteredIndices []string
-	for _, index := range indices {
+	for _, index := range index {
 		if !strings.HasPrefix(index, ".") {
 			filteredIndices = append(filteredIndices, index)
 		}

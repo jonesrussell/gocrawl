@@ -66,7 +66,7 @@ Mocks are organized by package to make them easy to find and maintain:
   │   ├── api/           # API-related mocks
   │   ├── config/        # Configuration mocks
   │   ├── crawler/       # Crawler mocks
-  │   ├── indices/       # Index-related mocks
+  │   ├── index/       # Index-related mocks
   │   ├── models/        # Model mocks
   │   └── storage/       # Storage mocks
   └── README.md

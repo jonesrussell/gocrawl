@@ -177,7 +177,7 @@ func (m *MockStorage) GetIndexHealth(ctx context.Context, index string) (string,
 	return args.String(0), args.Error(1)
 }
 
-// ListIndices lists all indices in Elasticsearch.
+// ListIndices lists all index in Elasticsearch.
 func (m *MockStorage) ListIndices(ctx context.Context) ([]string, error) {
 	args := m.Called(ctx)
 	if err := args.Error(1); err != nil {

@@ -283,10 +283,10 @@ func (s *Storage) DeleteIndex(ctx context.Context, index string) error {
 	defer cancel()
 
 	// Convert single index string to slice of strings
-	indices := []string{index}
+	index := []string{index}
 
 	res, err := s.client.Indices.Delete(
-		indices,
+		index,
 		s.client.Indices.Delete.WithContext(ctx),
 	)
 	if err != nil {
@@ -492,15 +492,15 @@ func (s *Storage) Ping(ctx context.Context) error {
 	return nil
 }
 
-// ListIndices lists all indices in the cluster
+// ListIndices lists all index in the cluster
 func (s *Storage) ListIndices(ctx context.Context) ([]string, error) {
 	res, err := s.client.Cat.Indices(
 		s.client.Cat.Indices.WithContext(ctx),
 		s.client.Cat.Indices.WithFormat("json"),
 	)
 	if err != nil {
-		s.logger.Error("Failed to list indices", "error", err)
-		return nil, fmt.Errorf("failed to list indices: %w", err)
+		s.logger.Error("Failed to list index", "error", err)
+		return nil, fmt.Errorf("failed to list index: %w", err)
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
@@ -509,24 +509,24 @@ func (s *Storage) ListIndices(ctx context.Context) ([]string, error) {
 	}()
 
 	if res.IsError() {
-		s.logger.Error("Failed to list indices", "error", res.String())
-		return nil, fmt.Errorf("error listing indices: %s", res.String())
+		s.logger.Error("Failed to list index", "error", res.String())
+		return nil, fmt.Errorf("error listing index: %s", res.String())
 	}
 
-	var indices []struct {
+	var index []struct {
 		Index string `json:"index"`
 	}
-	if decodeErr := json.NewDecoder(res.Body).Decode(&indices); decodeErr != nil {
-		s.logger.Error("Failed to list indices", "error", decodeErr)
-		return nil, fmt.Errorf("error decoding indices: %w", decodeErr)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&index); decodeErr != nil {
+		s.logger.Error("Failed to list index", "error", decodeErr)
+		return nil, fmt.Errorf("error decoding index: %w", decodeErr)
 	}
 
-	result := make([]string, len(indices))
-	for i, idx := range indices {
+	result := make([]string, len(index))
+	for i, idx := range index {
 		result[i] = idx.Index
 	}
 
-	s.logger.Info("Retrieved indices list")
+	s.logger.Info("Retrieved index list")
 	return result, nil
 }
 

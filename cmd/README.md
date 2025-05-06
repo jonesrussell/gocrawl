@@ -42,17 +42,17 @@ Commands:
 - `add`: Add a new scheduled job
 - `remove`: Remove a scheduled job
 
-### `indices`
-Manages Elasticsearch indices.
+### `index`
+Manages Elasticsearch index.
 
 ```bash
-gocrawl indices [command]
+gocrawl index [command]
 ```
 
 Commands:
-- `create`: Create new indices
-- `delete`: Delete existing indices
-- `list`: List all indices
+- `create`: Create new index
+- `delete`: Delete existing index
+- `list`: List all index
 - `mapping`: Show index mappings
 
 ### `sources`
@@ -100,9 +100,9 @@ gocrawl search "breaking news" --size 20
 gocrawl sources list
 ```
 
-4. Create new indices:
+4. Create new index:
 ```bash
-gocrawl indices create --source "Example Blog"
+gocrawl index create --source "Example Blog"
 ```
 
 ## Error Handling
