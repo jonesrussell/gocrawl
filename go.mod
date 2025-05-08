@@ -239,7 +239,4 @@ require (
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 )
 
-tool (
-	github.com/golangci/golangci-lint/cmd/golangci-lint
-	github.com/jonesrussell/gocrawl
-)
+tool github.com/golangci/golangci-lint/cmd/golangci-lint
