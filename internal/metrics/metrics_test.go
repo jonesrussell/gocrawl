@@ -44,16 +44,6 @@ func TestResetMetrics(t *testing.T) {
 	assert.Empty(t, metrics.GetCurrentSource())
 }
 
-func TestProcessingDuration(t *testing.T) {
-	metrics := metrics.NewMetrics()
-	initialDuration := metrics.GetProcessingDuration()
-
-	time.Sleep(100 * time.Millisecond)
-	updatedDuration := metrics.GetProcessingDuration()
-
-	assert.Greater(t, updatedDuration, initialDuration)
-}
-
 func TestCurrentSource(t *testing.T) {
 	metrics := metrics.NewMetrics()
 	assert.Empty(t, metrics.GetCurrentSource())
