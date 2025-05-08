@@ -4,11 +4,11 @@ package api
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// IndexManager is an alias for interfaces.IndexManager
-type IndexManager = interfaces.IndexManager
+// IndexManager is an alias for types.IndexManager
+type IndexManager = types.IndexManager
 
 // DocumentManager defines the interface for document management
 type DocumentManager interface {

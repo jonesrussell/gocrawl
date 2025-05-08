@@ -1,5 +1,52 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
+# Style & Best Practices
+
+- Use named returns sparingly and document when used.
+- Ensure exhaustive switch statements and map initializations.
+- Include context in HTTP requests.
+- Close response bodies in HTTP clients.
+- Use standard library variables where available.
+- Avoid magic numbers in code.
+
+## HTML Processing
+- Use goquery for HTML parsing.
+- Validate HTML before processing.
+- Handle malformed HTML gracefully.
+- Use CSS selectors for element selection.
+- Document selector requirements.
+- Handle timezone conversions explicitly.
+- Validate time formats before parsing.
+- Use constants for common time formats.
+- Handle empty or missing elements gracefully.
+- Document error conditions and recovery.
+- Use meaningful error messages.
+- Include context in error handling.
+- Clean up resources properly.
+- Handle concurrent access safely.
+- Use appropriate logging levels.
+- Document performance considerations.
+- Use appropriate metrics for monitoring.
+- Handle edge cases explicitly.
+- Use table-driven tests for validation.
+- Mock external dependencies in tests.
+- Use test fixtures for complex HTML.
+- Document test assumptions.
+- Clean up test resources.
+- Use appropriate test helpers.
+- Test error conditions thoroughly.
+- Use meaningful test data.
+- Document test setup.
+- Keep tests focused.
+- Use subtests for related cases.
+- Test public interfaces.
+- Use test-specific types.
+- Avoid test interdependence.
+- Use meaningful assertions.
+- Test error conditions.
+- Use coverage tools.
+
+See [style and best practices](mdc:style-best-practices.mdc) for more details.

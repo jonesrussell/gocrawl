@@ -3,7 +3,9 @@ package crawler
 
 import (
 	"errors"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gocolly/colly/v2"
 )
@@ -45,8 +47,27 @@ func (h *LinkHandler) HandleLink(e *colly.HTMLElement) {
 		return
 	}
 
-	err := e.Request.Visit(absLink)
-	if err != nil {
+	// Validate URL if configured
+	if h.crawler.cfg.ValidateURLs {
+		if _, err := url.Parse(absLink); err != nil {
+			h.crawler.logger.Debug("Invalid URL",
+				"url", absLink,
+				"error", err)
+			return
+		}
+	}
+
+	// Try to visit the URL with retries
+	var lastErr error
+	for i := 0; i < h.crawler.cfg.MaxRetries; i++ {
+		err := e.Request.Visit(absLink)
+		if err == nil {
+			h.crawler.logger.Debug("Successfully visited link",
+				"url", absLink)
+			return
+		}
+
+		// Check if error is non-retryable
 		if errors.Is(err, colly.ErrAlreadyVisited) ||
 			errors.Is(err, colly.ErrMaxDepth) ||
 			errors.Is(err, colly.ErrMissingURL) ||
@@ -54,11 +75,20 @@ func (h *LinkHandler) HandleLink(e *colly.HTMLElement) {
 			return
 		}
 
-		h.crawler.logger.Error("Failed to visit link",
+		lastErr = err
+		h.crawler.logger.Debug("Failed to visit link, retrying",
 			"url", absLink,
-			"error", err)
-	} else {
-		h.crawler.logger.Debug("Successfully visited link",
-			"url", absLink)
+			"error", err,
+			"attempt", i+1,
+			"max_retries", h.crawler.cfg.MaxRetries)
+
+		// Wait before retrying
+		time.Sleep(h.crawler.cfg.RetryDelay)
 	}
+
+	// If we get here, all retries failed
+	h.crawler.logger.Error("Failed to visit link after retries",
+		"url", absLink,
+		"error", lastErr,
+		"max_retries", h.crawler.cfg.MaxRetries)
 }

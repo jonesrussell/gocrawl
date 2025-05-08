@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -27,7 +27,7 @@ type SchedulerService struct {
 	activeJobs       *int32
 	storage          types.Interface
 	processorFactory crawler.ProcessorFactory
-	items            map[string][]*jobtypes.Item
+	items            map[string][]*content.Item
 }
 
 // SchedulerServiceParams holds parameters for creating a new SchedulerService.
@@ -53,7 +53,7 @@ func NewSchedulerService(p SchedulerServiceParams) common.JobService {
 		activeJobs:       &jobs,
 		storage:          p.Storage,
 		processorFactory: p.ProcessorFactory,
-		items:            make(map[string][]*jobtypes.Item),
+		items:            make(map[string][]*content.Item),
 	}
 }
 
@@ -94,7 +94,7 @@ func (s *SchedulerService) Stop(ctx context.Context) error {
 }
 
 // GetItems returns the items collected by the scheduler service for a specific source.
-func (s *SchedulerService) GetItems(ctx context.Context, sourceName string) ([]*jobtypes.Item, error) {
+func (s *SchedulerService) GetItems(ctx context.Context, sourceName string) ([]*content.Item, error) {
 	items, ok := s.items[sourceName]
 	if !ok {
 		return nil, fmt.Errorf("no items found for source %s", sourceName)
@@ -103,10 +103,10 @@ func (s *SchedulerService) GetItems(ctx context.Context, sourceName string) ([]*
 }
 
 // UpdateItem updates an item in the scheduler service.
-func (s *SchedulerService) UpdateItem(ctx context.Context, item *jobtypes.Item) error {
-	items, ok := s.items[item.JobID]
+func (s *SchedulerService) UpdateItem(ctx context.Context, item *content.Item) error {
+	items, ok := s.items[item.Source]
 	if !ok {
-		return fmt.Errorf("no items found for job %s", item.JobID)
+		return fmt.Errorf("no items found for source %s", item.Source)
 	}
 	for i, existingItem := range items {
 		if existingItem.ID == item.ID {
@@ -118,20 +118,16 @@ func (s *SchedulerService) UpdateItem(ctx context.Context, item *jobtypes.Item) 
 }
 
 // Status returns the current status of the scheduler service.
-func (s *SchedulerService) Status(ctx context.Context) (jobtypes.JobStatus, error) {
-	state := jobtypes.JobStateRunning
+func (s *SchedulerService) Status(ctx context.Context) (content.JobStatus, error) {
+	state := content.JobStatusProcessing
 	if atomic.LoadInt32(s.activeJobs) == 0 {
-		state = jobtypes.JobStateCompleted
+		state = content.JobStatusCompleted
 	}
-	return jobtypes.JobStatus{
-		State:     state,
-		StartTime: time.Now(),
-		Progress:  0,
-	}, nil
+	return state, nil
 }
 
 // UpdateJob updates a job in the scheduler service.
-func (s *SchedulerService) UpdateJob(ctx context.Context, job *jobtypes.Job) error {
+func (s *SchedulerService) UpdateJob(ctx context.Context, job *content.Job) error {
 	s.logger.Info("Updating job", "jobID", job.ID)
 	// TODO: Implement job update in storage
 	return nil

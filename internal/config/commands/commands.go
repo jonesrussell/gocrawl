@@ -4,7 +4,7 @@ package commands
 // Command names
 const (
 	// Root commands
-	Indices = "indices"
+	Indices = "index"
 	Job     = "job"
 	Crawl   = "crawl"
 	HTTPD   = "httpd"
@@ -12,9 +12,9 @@ const (
 	Sources = "sources"
 
 	// Indices subcommands
-	IndicesList   = "indices list"
-	IndicesDelete = "indices delete"
-	IndicesCreate = "indices create"
+	IndicesList   = "index list"
+	IndicesDelete = "index delete"
+	IndicesCreate = "index create"
 )
 
 // ConfigRequirements represents which configuration sections are required for a command
@@ -55,7 +55,7 @@ func GetConfigRequirements(command string) ConfigRequirements {
 }
 
 // RequiresCrawlerConfig returns true if the given command requires crawler configuration.
-// Some commands like indices list don't need crawler config to function.
+// Some commands like index list don't need crawler config to function.
 func RequiresCrawlerConfig(command string) bool {
 	return GetConfigRequirements(command).RequiresCrawler
 }

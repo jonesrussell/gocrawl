@@ -10,7 +10,6 @@ import (
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -27,9 +26,10 @@ const (
 
 // Storage implements the storage interface
 type Storage struct {
-	client *es.Client
-	logger logger.Interface
-	opts   Options
+	client       *es.Client
+	logger       logger.Interface
+	opts         Options
+	indexManager types.IndexManager
 }
 
 // NewStorage creates a new storage instance
@@ -38,11 +38,13 @@ func NewStorage(client *es.Client, logger logger.Interface, opts *Options) types
 		defaultOpts := DefaultOptions()
 		opts = &defaultOpts
 	}
-	return &Storage{
+	s := &Storage{
 		client: client,
 		logger: logger,
 		opts:   *opts,
 	}
+	s.indexManager = NewElasticsearchIndexManager(client, logger)
+	return s
 }
 
 // Ensure Storage implements types.Interface
@@ -280,11 +282,9 @@ func (s *Storage) DeleteIndex(ctx context.Context, index string) error {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
 	defer cancel()
 
-	// Convert single index string to slice of strings
-	indices := []string{index}
-
+	// Call API with []string{index} but keep index as string
 	res, err := s.client.Indices.Delete(
-		indices,
+		[]string{index},
 		s.client.Indices.Delete.WithContext(ctx),
 	)
 	if err != nil {
@@ -490,15 +490,15 @@ func (s *Storage) Ping(ctx context.Context) error {
 	return nil
 }
 
-// ListIndices lists all indices in the cluster
+// ListIndices lists all index in the cluster
 func (s *Storage) ListIndices(ctx context.Context) ([]string, error) {
 	res, err := s.client.Cat.Indices(
 		s.client.Cat.Indices.WithContext(ctx),
 		s.client.Cat.Indices.WithFormat("json"),
 	)
 	if err != nil {
-		s.logger.Error("Failed to list indices", "error", err)
-		return nil, fmt.Errorf("failed to list indices: %w", err)
+		s.logger.Error("Failed to list index", "error", err)
+		return nil, fmt.Errorf("failed to list index: %w", err)
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
@@ -507,24 +507,24 @@ func (s *Storage) ListIndices(ctx context.Context) ([]string, error) {
 	}()
 
 	if res.IsError() {
-		s.logger.Error("Failed to list indices", "error", res.String())
-		return nil, fmt.Errorf("error listing indices: %s", res.String())
+		s.logger.Error("Failed to list index", "error", res.String())
+		return nil, fmt.Errorf("error listing index: %s", res.String())
 	}
 
-	var indices []struct {
+	var index []struct {
 		Index string `json:"index"`
 	}
-	if decodeErr := json.NewDecoder(res.Body).Decode(&indices); decodeErr != nil {
-		s.logger.Error("Failed to list indices", "error", decodeErr)
-		return nil, fmt.Errorf("error decoding indices: %w", decodeErr)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&index); decodeErr != nil {
+		s.logger.Error("Failed to list index", "error", decodeErr)
+		return nil, fmt.Errorf("error decoding index: %w", decodeErr)
 	}
 
-	result := make([]string, len(indices))
-	for i, idx := range indices {
+	result := make([]string, len(index))
+	for i, idx := range index {
 		result[i] = idx.Index
 	}
 
-	s.logger.Info("Retrieved indices list")
+	s.logger.Info("Retrieved index list")
 	return result, nil
 }
 
@@ -874,6 +874,6 @@ func (s *Storage) Close() error {
 }
 
 // GetIndexManager returns the index manager for this storage
-func (s *Storage) GetIndexManager() interfaces.IndexManager {
-	return NewElasticsearchIndexManager(s.client, s.logger)
+func (s *Storage) GetIndexManager() types.IndexManager {
+	return s.indexManager
 }

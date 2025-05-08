@@ -3,12 +3,10 @@ module github.com/jonesrussell/gocrawl
 go 1.24
 
 require (
-	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/gin-gonic/gin v1.10.0
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/golang/mock v1.4.4
-	github.com/google/uuid v1.6.0
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-isatty v0.0.20
@@ -35,6 +33,7 @@ require (
 	github.com/GaijinEntertainment/go-exhaustruct/v3 v3.3.0 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.0 // indirect
+	github.com/PuerkitoBio/goquery v1.10.2 // indirect
 	github.com/alecthomas/go-check-sumtype v0.3.1 // indirect
 	github.com/alexkohler/nakedret/v2 v2.0.5 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect

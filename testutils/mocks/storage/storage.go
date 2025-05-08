@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	interfaces "github.com/jonesrussell/gocrawl/internal/interfaces"
+	types "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // MockInterface is a mock of Interface interface.
@@ -166,10 +166,10 @@ func (mr *MockInterfaceMockRecorder) GetIndexHealth(ctx, index interface{}) *gom
 }
 
 // GetIndexManager mocks base method.
-func (m *MockInterface) GetIndexManager() interfaces.IndexManager {
+func (m *MockInterface) GetIndexManager() types.IndexManager {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetIndexManager")
-	ret0, _ := ret[0].(interfaces.IndexManager)
+	ret0, _ := ret[0].(types.IndexManager)
 	return ret0
 }
 

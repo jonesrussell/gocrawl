@@ -3,3 +3,19 @@ description:
 globs:
 alwaysApply: false
 ---
+# Dependencies
+
+- Use go 1.24.
+- Required packages:
+  - github.com/elastic/go-elasticsearch/v8
+  - github.com/gocolly/colly/v2
+  - github.com/joho/godotenv
+  - github.com/spf13/cobra
+  - go.uber.org/fx
+  - go.uber.org/zap
+- Avoid deprecated packages:
+  - Use google.golang.org/protobuf instead of github.com/golang/protobuf
+  - Use github.com/google/uuid instead of github.com/satori/go.uuid
+  - Use github.com/gofrs/uuid/v5+ instead of github.com/gofrs/uuid
+
+See [dependency guidelines](mdc:dependencies.mdc) for more details.

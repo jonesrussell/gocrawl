@@ -17,7 +17,6 @@
   "rest-client.defaultHeaders": {
     "User-Agent": "GoCrawl-REST-Client"
   },
-  "rest-client.timeoutInMilliseconds": 5000,
   "rest-client.followredirect": true,
   "rest-client.previewResponsePanelTakeFocus": false,
   "rest-client.showResponseInDifferentTab": true,

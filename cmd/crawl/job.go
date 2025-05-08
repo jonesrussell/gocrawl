@@ -5,11 +5,9 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
-	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
-	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -19,10 +17,9 @@ import (
 // JobService implements the common.JobService interface for the crawl module.
 type JobService struct {
 	logger           logger.Interface
-	sources          *sources.Sources
+	sources          sources.Interface
 	crawler          crawler.Interface
 	done             chan struct{}
-	config           config.Interface
 	activeJobs       *int32
 	storage          storagetypes.Interface
 	processorFactory crawler.ProcessorFactory
@@ -32,10 +29,9 @@ type JobService struct {
 // JobServiceParams holds parameters for creating a new JobService.
 type JobServiceParams struct {
 	Logger           logger.Interface
-	Sources          *sources.Sources
+	Sources          sources.Interface
 	Crawler          crawler.Interface
 	Done             chan struct{}
-	Config           config.Interface
 	Storage          storagetypes.Interface
 	ProcessorFactory crawler.ProcessorFactory
 	SourceName       string `name:"sourceName"`
@@ -49,7 +45,6 @@ func NewJobService(p JobServiceParams) common.JobService {
 		sources:          p.Sources,
 		crawler:          p.Crawler,
 		done:             p.Done,
-		config:           p.Config,
 		activeJobs:       &jobs,
 		storage:          p.Storage,
 		processorFactory: p.ProcessorFactory,
@@ -87,34 +82,31 @@ func (s *JobService) Stop(ctx context.Context) error {
 }
 
 // Status implements the common.JobService interface.
-func (s *JobService) Status(ctx context.Context) (jobtypes.JobStatus, error) {
+func (s *JobService) Status(ctx context.Context) (content.JobStatus, error) {
 	activeJobs := atomic.LoadInt32(s.activeJobs)
-	state := jobtypes.JobStateRunning
+	state := content.JobStatusProcessing
 	if activeJobs == 0 {
-		state = jobtypes.JobStateCompleted
+		state = content.JobStatusCompleted
 	}
-	return jobtypes.JobStatus{
-		State:     state,
-		StartTime: time.Now(),
-	}, nil
+	return state, nil
 }
 
 // GetItems implements the common.JobService interface.
-func (s *JobService) GetItems(ctx context.Context, jobID string) ([]*jobtypes.Item, error) {
+func (s *JobService) GetItems(ctx context.Context, jobID string) ([]*content.Item, error) {
 	s.logger.Info("Getting items for job", "jobID", jobID)
 	// TODO: Implement item retrieval from storage
 	return nil, nil
 }
 
 // UpdateItem implements the common.JobService interface.
-func (s *JobService) UpdateItem(ctx context.Context, item *jobtypes.Item) error {
+func (s *JobService) UpdateItem(ctx context.Context, item *content.Item) error {
 	s.logger.Info("Updating item", "itemID", item.ID)
 	// TODO: Implement item update in storage
 	return nil
 }
 
 // UpdateJob implements the common.JobService interface.
-func (s *JobService) UpdateJob(ctx context.Context, job *jobtypes.Job) error {
+func (s *JobService) UpdateJob(ctx context.Context, job *content.Job) error {
 	s.logger.Info("Updating job", "jobID", job.ID)
 	// TODO: Implement job update in storage
 	return nil

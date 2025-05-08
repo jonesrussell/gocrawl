@@ -114,8 +114,10 @@
 ## High Priority
 
 ### 1. Code Cleanup and Reorganization
-- [ ] Standardize Package Structure
-  - [ ] Move all tests to `_test` packages
+- [x] Standardize Package Structure
+  - [x] Move content type definitions to dedicated package
+  - [x] Update processor interfaces to use contenttype package
+  - [x] Remove duplicate type definitions
   - [ ] Add proper package documentation
   - [ ] Add proper function documentation
   - [ ] Add proper type documentation
@@ -263,6 +265,76 @@
   - [ ] Add configuration fixtures
   - [ ] Add job fixtures
   - [ ] Add article fixtures
+
+### 7. Linting and Code Quality
+- [ ] Fix Linting Issues
+  - [ ] Replace fmt.Println with proper logging in cmd/sources/sources.go
+  - [ ] Fix variable shadowing in cmd/crawl/crawl.go
+  - [ ] Update for loop to use integer range in internal/crawler/link_handler.go
+  - [ ] Replace magic numbers with constants in:
+    - cmd/crawl/module.go
+    - internal/config/crawler/config.go
+    - internal/crawler/module.go
+  - [ ] Replace fmt.Errorf with errors.New in cmd/crawl/module.go
+- [ ] Add Linting Rules
+  - [ ] Add forbidigo rule for fmt.Print*
+  - [ ] Add govet rule for shadowing
+  - [ ] Add intrange rule for Go 1.22+
+  - [ ] Add mnd rule for magic numbers
+  - [ ] Add perfsprint rule for error formatting
+
+### 8. Dependency Injection
+- [ ] Fix Missing Dependencies
+  - [ ] Add articles.Interface provider
+  - [ ] Add articleIndexName provider
+  - [ ] Add proper error handling for missing dependencies
+  - [ ] Add dependency validation
+  - [ ] Add dependency documentation
+- [ ] Improve Error Messages
+  - [ ] Add more descriptive error messages
+  - [ ] Add error context
+  - [ ] Add error recovery suggestions
+  - [ ] Add error logging improvements
+
+### 9. Common Package Reorganization
+- [ ] Move content-specific types to content package
+  - [ ] Move processor.go to internal/content/processor.go
+  - [ ] Move job.go to internal/content/job.go
+  - [ ] Update all imports to use new locations
+  - [ ] Add proper documentation
+  - [ ] Add proper examples
+- [ ] Create dedicated packages for distinct concerns
+  - [ ] Create internal/metrics/ for metrics types
+  - [ ] Create internal/output/ for output types
+  - [ ] Create internal/events/ for event types
+  - [ ] Create internal/transport/ for transport types
+  - [ ] Create internal/sources/ for source types
+  - [ ] Add proper documentation
+  - [ ] Add proper examples
+- [ ] Review and reorganize constants
+  - [ ] Move content-specific constants to content package
+  - [ ] Move metrics-specific constants to metrics package
+  - [ ] Move output-specific constants to output package
+  - [ ] Keep only truly common constants in common package
+  - [ ] Add proper documentation
+  - [ ] Add proper examples
+- [ ] Update imports across codebase
+  - [ ] Update all references to use new package locations
+  - [ ] Ensure no circular dependencies
+  - [ ] Add proper documentation
+  - [ ] Add proper examples
+- [ ] Testing
+  - [ ] Add tests for moved types
+  - [ ] Add tests for new packages
+  - [ ] Add tests for constant usage
+  - [ ] Add tests for import paths
+  - [ ] Add tests for circular dependencies
+- [ ] Documentation
+  - [ ] Add package overviews
+  - [ ] Add type documentation
+  - [ ] Add interface documentation
+  - [ ] Add usage examples
+  - [ ] Add migration guide
 
 ## Medium Priority
 

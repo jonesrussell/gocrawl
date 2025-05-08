@@ -3,3 +3,17 @@ description:
 globs:
 alwaysApply: false
 ---
+# Dependency Injection & Interfaces
+
+- Define interfaces in the package that uses them, not where they are implemented.
+- For module-specific interfaces, define them in module.go.
+- For interfaces used across multiple packages, define them in the consuming package.
+- Avoid interface stuttering (e.g., use `Logger` instead of `CollectorLogger`).
+- Define New* constructors only in module.go files.
+- When testing modules:
+  - Provide all required dependencies.
+  - Avoid providing dependencies that are already provided.
+  - Use test helpers for common dependency setup.
+  - Verify dependency injection before testing functionality.
+
+See [dependency injection guidelines](mdc:dependency-injection.mdc) for more details.

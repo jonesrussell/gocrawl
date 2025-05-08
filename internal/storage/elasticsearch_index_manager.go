@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
@@ -18,14 +18,14 @@ const (
 	HTTPStatusOK = http.StatusOK
 )
 
-// ElasticsearchIndexManager implements the interfaces.IndexManager interface using Elasticsearch.
+// ElasticsearchIndexManager implements the types.IndexManager interface using Elasticsearch.
 type ElasticsearchIndexManager struct {
 	client *elasticsearch.Client
 	logger logger.Interface
 }
 
 // NewElasticsearchIndexManager creates a new Elasticsearch index manager.
-func NewElasticsearchIndexManager(client *elasticsearch.Client, logger logger.Interface) interfaces.IndexManager {
+func NewElasticsearchIndexManager(client *elasticsearch.Client, logger logger.Interface) types.IndexManager {
 	return &ElasticsearchIndexManager{
 		client: client,
 		logger: logger,
@@ -178,35 +178,52 @@ func (m *ElasticsearchIndexManager) EnsureArticleIndex(ctx context.Context, name
 	return m.EnsureIndex(ctx, name, articleMapping)
 }
 
-// EnsureContentIndex ensures the content index exists.
-func (m *ElasticsearchIndexManager) EnsureContentIndex(ctx context.Context, name string) error {
-	contentMapping := map[string]any{
+// EnsurePageIndex ensures the page index exists.
+func (m *ElasticsearchIndexManager) EnsurePageIndex(ctx context.Context, name string) error {
+	pageMapping := map[string]any{
 		"mappings": map[string]any{
 			"properties": map[string]any{
+				"id": map[string]any{
+					"type": "keyword",
+				},
+				"url": map[string]any{
+					"type": "keyword",
+				},
 				"title": map[string]any{
 					"type": "text",
 				},
 				"content": map[string]any{
 					"type": "text",
 				},
-				"url": map[string]any{
+				"description": map[string]any{
+					"type": "text",
+				},
+				"keywords": map[string]any{
 					"type": "keyword",
 				},
-				"last_modified": map[string]any{
+				"og_title": map[string]any{
+					"type": "text",
+				},
+				"og_description": map[string]any{
+					"type": "text",
+				},
+				"og_image": map[string]any{
+					"type": "keyword",
+				},
+				"og_url": map[string]any{
+					"type": "keyword",
+				},
+				"canonical_url": map[string]any{
+					"type": "keyword",
+				},
+				"created_at": map[string]any{
 					"type": "date",
 				},
-				"source": map[string]any{
-					"type": "keyword",
-				},
-				"type": map[string]any{
-					"type": "keyword",
-				},
-				"metadata": map[string]any{
-					"type":    "object",
-					"enabled": false,
+				"updated_at": map[string]any{
+					"type": "date",
 				},
 			},
 		},
 	}
-	return m.EnsureIndex(ctx, name, contentMapping)
+	return m.EnsureIndex(ctx, name, pageMapping)
 }

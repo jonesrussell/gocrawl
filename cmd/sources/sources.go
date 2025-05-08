@@ -2,10 +2,9 @@
 package sources
 
 import (
-	"context"
+	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 )
@@ -20,33 +19,44 @@ const (
 	LoggerKey contextKey = "logger"
 )
 
-// NewSourcesCommand returns the sources command.
-func NewSourcesCommand(
-	cfg config.Interface,
-	log logger.Interface,
-	_ sources.Interface, // Ignore the passed source manager
-) *cobra.Command {
+// NewSourcesCommand creates a new sources command
+func NewSourcesCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sources",
 		Short: "Manage content sources",
-		Long: `The sources command provides functionality for managing content sources.
-It allows you to add, list, and configure web content sources for crawling.`,
+		Long:  `Manage content sources for crawling`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			sourceManager, err := sources.LoadSources(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to load sources: %w", err)
+			}
+
+			// List all sources
+			srcs, err := sourceManager.ListSources(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to list sources: %w", err)
+			}
+
+			if len(srcs) == 0 {
+				fmt.Println("No sources configured")
+				return nil
+			}
+
+			fmt.Println("Configured sources:")
+			for _, src := range srcs {
+				fmt.Printf("- %s\n", src.Name)
+			}
+
+			return nil
+		},
 	}
-
-	// Create a context with dependencies
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, ConfigKey, cfg)
-	ctx = context.WithValue(ctx, LoggerKey, log)
-	cmd.SetContext(ctx)
-
-	// Add subcommands
-	cmd.AddCommand(
-		NewListCommand(),
-		// TODO: Implement these commands
-		// NewAddCommand(),
-		// NewRemoveCommand(),
-		// NewUpdateCommand(),
-	)
 
 	return cmd
 }

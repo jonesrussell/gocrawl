@@ -82,3 +82,8 @@ func NewClient(opts Options) (*Client, error) {
 		opts:   opts,
 	}, nil
 }
+
+// GetClient returns the Elasticsearch client
+func (c *Client) GetClient() *es.Client {
+	return c.client
+}

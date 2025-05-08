@@ -9,13 +9,15 @@ import (
 
 // Default configuration values
 const (
-	DefaultMaxDepth    = 3
-	DefaultRateLimit   = 2 * time.Second
-	DefaultParallelism = 2
+	DefaultMaxDepth    = 5
+	DefaultRateLimit   = 1 * time.Second
+	DefaultParallelism = 5
 	DefaultUserAgent   = "gocrawl/1.0"
 	DefaultTimeout     = 30 * time.Second
 	DefaultMaxBodySize = 10 * 1024 * 1024 // 10MB
 	DefaultRandomDelay = 500 * time.Millisecond
+	DefaultMaxRetries  = 3
+	DefaultRetryDelay  = 1 * time.Second
 )
 
 // Config represents the crawler configuration.
@@ -44,6 +46,18 @@ type Config struct {
 	Debug bool `yaml:"debug"`
 	// TLS contains TLS configuration
 	TLS TLSConfig `yaml:"tls"`
+	// MaxRetries is the maximum number of retries for failed requests
+	MaxRetries int `yaml:"max_retries"`
+	// RetryDelay is the delay between retries
+	RetryDelay time.Duration `yaml:"retry_delay"`
+	// FollowRedirects indicates whether to follow redirects
+	FollowRedirects bool `yaml:"follow_redirects"`
+	// MaxRedirects is the maximum number of redirects to follow
+	MaxRedirects int `yaml:"max_redirects"`
+	// ValidateURLs indicates whether to validate URLs before visiting
+	ValidateURLs bool `yaml:"validate_urls"`
+	// CleanupInterval is the interval for cleaning up resources
+	CleanupInterval time.Duration `yaml:"cleanup_interval"`
 }
 
 // Validate validates the crawler configuration.
@@ -86,6 +100,12 @@ func New(opts ...Option) *Config {
 			MaxVersion:               0, // Use highest supported version
 			PreferServerCipherSuites: true,
 		},
+		MaxRetries:      DefaultMaxRetries,
+		RetryDelay:      DefaultRetryDelay,
+		FollowRedirects: true,
+		MaxRedirects:    5,
+		ValidateURLs:    true,
+		CleanupInterval: 24 * time.Hour,
 	}
 
 	for _, opt := range opts {

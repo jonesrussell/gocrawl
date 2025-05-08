@@ -3,3 +3,37 @@ description:
 globs:
 alwaysApply: false
 ---
+# Testing Guidelines
+
+- Use require for error assertions.
+- Avoid allocations with (*os.File).WriteString.
+- Avoid shadow declarations.
+- Test each module independently.
+- Write testable examples with expected output.
+- Use t.Parallel() appropriately in tests.
+- Place tests in a separate _test package.
+- Use testify consistently for assertions.
+- Follow test naming conventions:
+  - Test[FunctionName] for function tests
+  - Test[TypeName] for type tests
+  - Test[InterfaceName] for interface tests
+- Structure tests with setup, execution, and verification phases.
+- Use table-driven tests for multiple test cases.
+- Mock external dependencies consistently.
+- Use test helpers to reduce code duplication.
+- Test both success and failure cases.
+- Test edge cases and boundary conditions.
+- Use meaningful test data.
+- Document test setup and assumptions.
+- Keep tests focused and single-purpose.
+- Use subtests for related test cases.
+- Test public interfaces, not implementation details.
+- Use test fixtures for complex test data.
+- Clean up resources in test teardown.
+- Use test-specific types and interfaces.
+- Avoid test interdependence.
+- Use meaningful assertion messages.
+- Test error conditions explicitly.
+- Use test coverage tools appropriately.
+
+See [testing guidelines](mdc:testing.mdc) for more details.

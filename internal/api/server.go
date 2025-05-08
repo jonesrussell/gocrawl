@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
@@ -16,7 +15,7 @@ type Server struct {
 	Config       config.Interface
 	Logger       logger.Interface
 	Storage      types.Interface
-	IndexManager interfaces.IndexManager
+	IndexManager types.IndexManager
 }
 
 // NewServer creates a new API server instance.

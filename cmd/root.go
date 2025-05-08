@@ -17,7 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/common"
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
 	httpdcmd "github.com/jonesrussell/gocrawl/cmd/httpd"
-	"github.com/jonesrussell/gocrawl/cmd/indices"
+	"github.com/jonesrussell/gocrawl/cmd/index"
 	"github.com/jonesrussell/gocrawl/cmd/scheduler"
 	"github.com/jonesrussell/gocrawl/cmd/search"
 	"github.com/jonesrussell/gocrawl/cmd/sources"
@@ -438,12 +438,12 @@ func Execute() {
 
 	// Add commands first
 	rootCmd.AddCommand(
-		scheduler.Command(),                      // Main scheduler command with fx
-		indices.Command(),                        // For managing Elasticsearch indices
-		sources.NewSourcesCommand(cfg, log, nil), // For managing web content sources
-		crawlcmd.Command(),                       // For crawling web content
-		httpdcmd.Command(),                       // For running the HTTP server
-		search.Command(),                         // For searching content in Elasticsearch
+		scheduler.Command(),         // Main scheduler command with fx
+		index.Command(),             // For managing Elasticsearch index
+		sources.NewSourcesCommand(), // For managing web content sources
+		crawlcmd.Command(),          // For crawling web content
+		httpdcmd.Command(),          // For running the HTTP server
+		search.Command(),            // For searching content in Elasticsearch
 	)
 
 	if executeErr := rootCmd.Execute(); executeErr != nil {

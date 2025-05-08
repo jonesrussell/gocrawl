@@ -7,17 +7,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gocolly/colly/v2"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
+	"github.com/jonesrussell/gocrawl/internal/storage"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -72,7 +73,21 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		Module,
 		fx.Provide(
 			func() logger.Interface { return log },
+			func() config.Interface { return cfg },
 			func() sources.Interface { return sourceManager },
+			func() (storagetypes.Interface, error) {
+				opts := storage.Options{
+					Addresses: cfg.GetElasticsearchConfig().Addresses,
+					Username:  cfg.GetElasticsearchConfig().Username,
+					Password:  cfg.GetElasticsearchConfig().Password,
+					APIKey:    cfg.GetElasticsearchConfig().APIKey,
+				}
+				client, err := storage.NewClient(opts)
+				if err != nil {
+					return nil, err
+				}
+				return storage.NewStorage(client.GetClient(), log, &opts), nil
+			},
 			fx.Annotate(
 				func() string { return args[0] },
 				fx.ResultTags(`name:"sourceName"`),
@@ -131,30 +146,15 @@ func Command() *cobra.Command {
 func SetupCollector(
 	ctx context.Context,
 	logger logger.Interface,
-	indexManager interfaces.IndexManager,
+	indexManager storagetypes.IndexManager,
 	sources sources.Interface,
 	eventBus *events.EventBus,
-	articleProcessor common.Processor,
-	contentProcessor common.Processor,
+	articleProcessor content.Processor,
+	contentProcessor content.Processor,
 	cfg *crawlerconfig.Config,
 ) (crawler.Interface, error) {
-	// Create collector with rate limiting
-	c := colly.NewCollector(
-		colly.AllowURLRevisit(),
-		colly.Async(true),
-	)
-
-	err := c.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		Parallelism: defaultParallelism,
-		RandomDelay: defaultRandomDelay,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	// Create crawler instance
-	crawler := crawler.NewCrawler(
+	return crawler.NewCrawler(
 		logger,
 		eventBus,
 		indexManager,
@@ -162,11 +162,5 @@ func SetupCollector(
 		articleProcessor,
 		contentProcessor,
 		cfg,
-	)
-
-	// Set up event handling
-	eventHandler := events.NewDefaultHandler(logger)
-	eventBus.Subscribe(eventHandler)
-
-	return crawler, nil
+	), nil
 }

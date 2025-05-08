@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Core Interfaces
@@ -25,7 +26,7 @@ type CrawlerInterface interface {
 	// Subscribe adds a handler for crawler events.
 	Subscribe(handler events.EventHandler)
 	// GetMetrics returns the current crawler metrics.
-	GetMetrics() *common.Metrics
+	GetMetrics() *metrics.Metrics
 }
 
 // Config defines the configuration for a crawler.
@@ -102,8 +103,7 @@ type ArticleStorage interface {
 
 // Extended Interface
 
-// Interface extends CrawlerInterface with additional methods specific to our implementation.
-// It provides access to configuration, metrics, and internal components.
+// Interface defines the complete crawler interface.
 type Interface interface {
 	// Embed the core crawler interface
 	CrawlerInterface
@@ -115,7 +115,7 @@ type Interface interface {
 	// SetCollector sets the collector for the crawler
 	SetCollector(collector *colly.Collector)
 	// GetIndexManager returns the index manager
-	GetIndexManager() interfaces.IndexManager
+	GetIndexManager() types.IndexManager
 	// Wait waits for the crawler to complete
 	Wait() error
 	// GetLogger returns the logger
@@ -123,7 +123,7 @@ type Interface interface {
 	// GetSource returns the source
 	GetSource() sources.Interface
 	// GetProcessors returns the processors
-	GetProcessors() []common.Processor
+	GetProcessors() []content.Processor
 	// GetArticleChannel returns the article channel
 	GetArticleChannel() chan *models.Article
 	// Done returns a channel that's closed when the crawler is done

@@ -4,7 +4,7 @@ package common
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/common/jobtypes"
+	"github.com/jonesrussell/gocrawl/internal/content"
 )
 
 // JobService defines the interface for job operations.
@@ -14,11 +14,11 @@ type JobService interface {
 	// Stop stops the job service.
 	Stop(ctx context.Context) error
 	// Status returns the current status of the job service.
-	Status(ctx context.Context) (jobtypes.JobStatus, error)
+	Status(ctx context.Context) (content.JobStatus, error)
 	// GetItems returns the items for a job.
-	GetItems(ctx context.Context, jobID string) ([]*jobtypes.Item, error)
+	GetItems(ctx context.Context, jobID string) ([]*content.Item, error)
 	// UpdateItem updates an item.
-	UpdateItem(ctx context.Context, item *jobtypes.Item) error
+	UpdateItem(ctx context.Context, item *content.Item) error
 	// UpdateJob updates a job.
-	UpdateJob(ctx context.Context, job *jobtypes.Job) error
+	UpdateJob(ctx context.Context, job *content.Job) error
 }

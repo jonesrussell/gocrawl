@@ -5,21 +5,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/gocolly/colly/v2"
-	"github.com/jonesrussell/gocrawl/internal/common"
+	colly "github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common/transport"
-	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
-	"github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
+	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/content"
+	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/interfaces"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 const (
@@ -32,18 +35,18 @@ type Crawler struct {
 	logger           logger.Interface
 	collector        *colly.Collector
 	bus              *events.EventBus
-	indexManager     interfaces.IndexManager
+	indexManager     storagetypes.IndexManager
 	sources          sources.Interface
-	articleProcessor common.Processor
-	contentProcessor common.Processor
+	articleProcessor content.Processor
+	pageProcessor    content.Processor
 	state            *State
 	done             chan struct{}
 	wg               sync.WaitGroup
 	articleChannel   chan *models.Article
-	processors       []common.Processor
+	processors       []content.Processor
 	linkHandler      *LinkHandler
 	htmlProcessor    *HTMLProcessor
-	cfg              *crawlerconfig.Config
+	cfg              *crawler.Config
 	abortChan        chan struct{} // Channel to signal abort
 }
 
@@ -55,7 +58,7 @@ var _ CrawlerMetrics = (*Crawler)(nil)
 // -------------------
 
 // ValidateSource validates a source configuration.
-func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types.Source, error) {
+func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*configtypes.Source, error) {
 	// Get all sources
 	sourceConfigs, err := c.sources.GetSources()
 	if err != nil {
@@ -91,10 +94,10 @@ func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types
 		}
 	}
 
-	// Ensure content index exists if specified
+	// Ensure page index exists if specified
 	if selectedSource.Index != "" {
-		if contentErr := c.indexManager.EnsureContentIndex(ctx, selectedSource.Index); contentErr != nil {
-			return nil, fmt.Errorf("failed to ensure content index exists: %w", contentErr)
+		if pageErr := c.indexManager.EnsurePageIndex(ctx, selectedSource.Index); pageErr != nil {
+			return nil, fmt.Errorf("failed to ensure page index exists: %w", pageErr)
 		}
 	}
 
@@ -102,7 +105,7 @@ func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*types
 }
 
 // setupCollector configures the collector with the given source settings
-func (c *Crawler) setupCollector(source *types.Source) error {
+func (c *Crawler) setupCollector(source *configtypes.Source) error {
 	c.logger.Debug("Setting up collector",
 		"max_depth", source.MaxDepth,
 		"allowed_domains", source.AllowedDomains)
@@ -128,16 +131,16 @@ func (c *Crawler) setupCollector(source *types.Source) error {
 	if err != nil {
 		c.logger.Error("Failed to parse rate limit, using default",
 			"rate_limit", source.RateLimit,
-			"default", crawlerconfig.DefaultRateLimit,
+			"default", crawler.DefaultRateLimit,
 			"error", err)
-		rateLimit = crawlerconfig.DefaultRateLimit
+		rateLimit = crawler.DefaultRateLimit
 	}
 
 	err = c.collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Delay:       rateLimit,
 		RandomDelay: rateLimit / RandomDelayDivisor,
-		Parallelism: crawlerconfig.DefaultParallelism,
+		Parallelism: crawler.DefaultParallelism,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to set rate limit: %w", err)
@@ -170,7 +173,7 @@ func (c *Crawler) setupCollector(source *types.Source) error {
 		"max_depth", source.MaxDepth,
 		"allowed_domains", source.AllowedDomains,
 		"rate_limit", rateLimit,
-		"parallelism", crawlerconfig.DefaultParallelism)
+		"parallelism", crawler.DefaultParallelism)
 
 	return nil
 }
@@ -201,7 +204,9 @@ func (c *Crawler) setupCallbacks(ctx context.Context) {
 	})
 
 	// Set up HTML processing
-	c.collector.OnHTML("html", c.htmlProcessor.ProcessHTML)
+	c.collector.OnHTML("html", func(e *colly.HTMLElement) {
+		c.ProcessHTML(e)
+	})
 
 	// Set up error handling
 	c.collector.OnError(func(r *colly.Response, visitErr error) {
@@ -246,105 +251,84 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	// Initialize abort channel
 	c.abortChan = make(chan struct{})
-	c.logger.Debug("Initialized abort channel",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
+	defer close(c.abortChan) // Ensure channel is closed when done
+
+	// Start cleanup goroutine
+	cleanupDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(c.cfg.CleanupInterval)
+		defer ticker.Stop()
+		defer close(cleanupDone)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-c.abortChan:
+				return
+			case <-ticker.C:
+				c.cleanupResources()
+			}
+		}
+	}()
 
 	// Validate source
-	c.logger.Debug("Validating source",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	source, err := c.validateSource(ctx, sourceName)
 	if err != nil {
-		c.logger.Error("Failed to validate source",
-			"error", err,
-			"source", sourceName,
-			"debug_enabled", c.cfg.Debug,
-		)
 		return fmt.Errorf("failed to validate source: %w", err)
 	}
-	c.logger.Debug("Source validated successfully",
-		"url", source.URL,
-		"allowed_domains", source.AllowedDomains,
-		"debug_enabled", c.cfg.Debug,
-	)
 
 	// Set up collector
-	c.logger.Debug("Setting up collector",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	err = c.setupCollector(source)
 	if err != nil {
-		c.logger.Error("Failed to setup collector",
-			"error", err,
-			"source", sourceName,
-			"debug_enabled", c.cfg.Debug,
-		)
 		return fmt.Errorf("failed to setup collector: %w", err)
 	}
-	c.logger.Debug("Collector setup completed",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 
 	// Set up callbacks
-	c.logger.Debug("Setting up callbacks",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	c.setupCallbacks(ctx)
-	c.logger.Debug("Callbacks setup completed",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 
 	// Start the crawler state
-	c.logger.Debug("Starting crawler state",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	c.state.Start(ctx, sourceName)
-	c.logger.Debug("Crawler state started",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 
 	// Visit the source URL
-	c.logger.Debug("Attempting to visit URL",
-		"url", source.URL,
-		"allowed_domains", source.AllowedDomains,
-		"debug_enabled", c.cfg.Debug,
-	)
-
 	if visitErr := c.collector.Visit(source.URL); visitErr != nil {
-		c.logger.Error("Failed to visit source URL",
-			"error", visitErr,
-			"url", source.URL,
-			"debug_enabled", c.cfg.Debug,
-		)
 		return fmt.Errorf("failed to visit source URL: %w", visitErr)
 	}
 
-	c.logger.Debug("Successfully initiated visit",
-		"url", source.URL,
-		"debug_enabled", c.cfg.Debug,
-	)
-
 	// Wait for the crawler to finish
-	c.logger.Debug("Waiting for collector to finish",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
 	c.collector.Wait()
-	c.logger.Debug("Collector finished",
-		"source", sourceName,
-		"debug_enabled", c.cfg.Debug,
-	)
+
+	// Wait for cleanup goroutine
+	select {
+	case <-cleanupDone:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
 	return nil
+}
+
+// cleanupResources performs periodic cleanup of crawler resources
+func (c *Crawler) cleanupResources() {
+	c.logger.Debug("Cleaning up crawler resources")
+
+	// Clean up article channel
+	select {
+	case <-c.articleChannel: // Try to read one item
+	default: // Channel is empty
+	}
+
+	// Clean up processors
+	for _, p := range c.processors {
+		if cleaner, ok := p.(interface{ Cleanup() }); ok {
+			cleaner.Cleanup()
+		}
+	}
+
+	// Clean up state
+	c.state.Reset()
+
+	c.logger.Debug("Finished cleaning up crawler resources")
 }
 
 // Stop stops the crawler.
@@ -357,14 +341,11 @@ func (c *Crawler) Stop(ctx context.Context) error {
 
 	// Cancel the context
 	c.state.Cancel()
-	c.logger.Debug("Context cancelled")
 
 	// Signal abort to all goroutines
 	close(c.abortChan)
-	c.logger.Debug("Abort signal sent")
 
 	// Wait for the collector to finish
-	c.logger.Debug("Waiting for collector to finish")
 	c.collector.Wait()
 
 	// Create a done channel for the wait group
@@ -372,9 +353,7 @@ func (c *Crawler) Stop(ctx context.Context) error {
 
 	// Start a goroutine to wait for the wait group
 	go func() {
-		c.logger.Debug("Waiting for wait group")
 		c.wg.Wait()
-		c.logger.Debug("Wait group finished")
 		close(waitDone)
 	}()
 
@@ -382,6 +361,7 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	select {
 	case <-waitDone:
 		c.state.Stop()
+		c.cleanupResources() // Final cleanup
 		c.logger.Debug("Crawler stopped successfully")
 		return nil
 	case <-ctx.Done():
@@ -434,8 +414,8 @@ func (c *Crawler) CurrentSource() string {
 // -----------------
 
 // GetMetrics returns the crawler metrics.
-func (c *Crawler) GetMetrics() *common.Metrics {
-	return &common.Metrics{
+func (c *Crawler) GetMetrics() *metrics.Metrics {
+	return &metrics.Metrics{
 		ProcessedCount:     c.state.GetProcessedCount(),
 		ErrorCount:         c.state.GetErrorCount(),
 		LastProcessedTime:  c.state.GetLastProcessedTime(),
@@ -545,7 +525,7 @@ func (c *Crawler) SetCollector(collector *colly.Collector) {
 // ------------------
 
 // selectProcessor selects the appropriate processor for the given HTML element
-func (c *Crawler) selectProcessor(e *colly.HTMLElement) common.Processor {
+func (c *Crawler) selectProcessor(e *colly.HTMLElement) content.Processor {
 	contentType := c.htmlProcessor.detectContentType(e)
 
 	// Try to get a processor for the specific content type
@@ -556,7 +536,7 @@ func (c *Crawler) selectProcessor(e *colly.HTMLElement) common.Processor {
 
 	// Fallback: Try additional processors
 	for _, p := range c.processors {
-		if p.CanProcess(e) {
+		if p.CanProcess(contentType) {
 			return p
 		}
 	}
@@ -565,16 +545,16 @@ func (c *Crawler) selectProcessor(e *colly.HTMLElement) common.Processor {
 }
 
 // getProcessorForType returns a processor for the given content type
-func (c *Crawler) getProcessorForType(contentType common.ContentType) common.Processor {
+func (c *Crawler) getProcessorForType(contentType contenttype.Type) content.Processor {
 	switch contentType {
-	case common.ContentTypeArticle:
+	case contenttype.Article:
 		return c.articleProcessor
-	case common.ContentTypePage:
-		return c.contentProcessor
-	case common.ContentTypeVideo, common.ContentTypeImage, common.ContentTypeHTML, common.ContentTypeJob:
+	case contenttype.Page:
+		return c.pageProcessor
+	case contenttype.Video, contenttype.Image, contenttype.HTML, contenttype.Job:
 		// Try to find a processor for the specific content type
 		for _, p := range c.processors {
-			if p.ContentType() == contentType {
+			if p.CanProcess(contentType) {
 				return p
 			}
 		}
@@ -583,18 +563,101 @@ func (c *Crawler) getProcessorForType(contentType common.ContentType) common.Pro
 }
 
 // AddProcessor adds a new processor to the crawler.
-func (c *Crawler) AddProcessor(processor common.Processor) {
+func (c *Crawler) AddProcessor(processor content.Processor) {
 	c.processors = append(c.processors, processor)
 }
 
 // SetArticleProcessor sets the article processor.
-func (c *Crawler) SetArticleProcessor(processor common.Processor) {
+func (c *Crawler) SetArticleProcessor(processor content.Processor) {
 	c.articleProcessor = processor
 }
 
-// SetContentProcessor sets the content processor.
-func (c *Crawler) SetContentProcessor(processor common.Processor) {
-	c.contentProcessor = processor
+// SetPageProcessor sets the page processor.
+func (c *Crawler) SetPageProcessor(processor content.Processor) {
+	c.pageProcessor = processor
+}
+
+// GetProcessors returns the processors.
+func (c *Crawler) GetProcessors() []content.Processor {
+	processors := make([]content.Processor, 0, len(c.processors))
+	for _, p := range c.processors {
+		wrapper := &processorWrapper{
+			processor: p,
+			registry:  make([]content.ContentProcessor, 0),
+		}
+		processors = append(processors, wrapper)
+	}
+	return processors
+}
+
+// processorWrapper wraps a content.Processor to implement content.Processor
+type processorWrapper struct {
+	processor content.Processor
+	registry  []content.ContentProcessor
+}
+
+// ContentType implements content.ContentProcessor
+func (p *processorWrapper) ContentType() contenttype.Type {
+	return p.processor.ContentType()
+}
+
+// CanProcess implements content.ContentProcessor
+func (p *processorWrapper) CanProcess(content contenttype.Type) bool {
+	return p.processor.CanProcess(content)
+}
+
+// Process implements content.ContentProcessor
+func (p *processorWrapper) Process(ctx context.Context, content any) error {
+	return p.processor.Process(ctx, content)
+}
+
+// ParseHTML implements content.HTMLProcessor
+func (p *processorWrapper) ParseHTML(r io.Reader) error {
+	return p.processor.ParseHTML(r)
+}
+
+// ExtractLinks implements content.HTMLProcessor
+func (p *processorWrapper) ExtractLinks() ([]string, error) {
+	return p.processor.ExtractLinks()
+}
+
+// ExtractContent implements content.HTMLProcessor
+func (p *processorWrapper) ExtractContent() (string, error) {
+	return p.processor.ExtractContent()
+}
+
+// RegisterProcessor implements content.ProcessorRegistry
+func (p *processorWrapper) RegisterProcessor(processor content.ContentProcessor) {
+	p.registry = append(p.registry, processor)
+}
+
+// GetProcessor implements content.ProcessorRegistry
+func (p *processorWrapper) GetProcessor(contentType contenttype.Type) (content.ContentProcessor, error) {
+	for _, processor := range p.registry {
+		if processor.CanProcess(contentType) {
+			return processor, nil
+		}
+	}
+	return nil, fmt.Errorf("no processor found for content type: %s", contentType)
+}
+
+// ProcessContent implements content.ProcessorRegistry
+func (p *processorWrapper) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
+	processor, err := p.GetProcessor(contentType)
+	if err != nil {
+		return err
+	}
+	return processor.Process(ctx, content)
+}
+
+// Start implements content.Processor
+func (p *processorWrapper) Start(ctx context.Context) error {
+	return p.processor.Start(ctx)
+}
+
+// Stop implements content.Processor
+func (p *processorWrapper) Stop(ctx context.Context) error {
+	return p.processor.Stop(ctx)
 }
 
 // Event Management
@@ -618,18 +681,13 @@ func (c *Crawler) GetSource() sources.Interface {
 	return c.sources
 }
 
-// GetProcessors returns the processors.
-func (c *Crawler) GetProcessors() []common.Processor {
-	return c.processors
-}
-
 // GetArticleChannel returns the article channel.
 func (c *Crawler) GetArticleChannel() chan *models.Article {
 	return c.articleChannel
 }
 
 // GetIndexManager returns the index manager.
-func (c *Crawler) GetIndexManager() interfaces.IndexManager {
+func (c *Crawler) GetIndexManager() storagetypes.IndexManager {
 	return c.indexManager
 }
 
@@ -660,4 +718,23 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	}
 
 	c.state.IncrementProcessed()
+}
+
+// GetProcessor returns a processor for the given content type.
+func (c *Crawler) GetProcessor(contentType contenttype.Type) (content.Processor, error) {
+	for _, p := range c.processors {
+		if p.CanProcess(contentType) {
+			return p, nil
+		}
+	}
+
+	if contentType == contenttype.Article {
+		return c.articleProcessor, nil
+	}
+
+	if contentType == contenttype.Page {
+		return c.pageProcessor, nil
+	}
+
+	return nil, fmt.Errorf("no processor found for content type: %s", contentType)
 }

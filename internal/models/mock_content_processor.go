@@ -5,12 +5,12 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockContentProcessor is a mock implementation of ContentProcessor
-type MockContentProcessor struct {
+// MockPageProcessor is a mock implementation of PageProcessor
+type MockPageProcessor struct {
 	mock.Mock
 }
 
-// Process implements ContentProcessor
-func (m *MockContentProcessor) Process(e *colly.HTMLElement) {
+// Process implements PageProcessor
+func (m *MockPageProcessor) Process(e *colly.HTMLElement) {
 	m.Called(e)
 }
