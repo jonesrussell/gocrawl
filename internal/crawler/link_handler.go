@@ -59,7 +59,7 @@ func (h *LinkHandler) HandleLink(e *colly.HTMLElement) {
 
 	// Try to visit the URL with retries
 	var lastErr error
-	for i := 0; i < h.crawler.cfg.MaxRetries; i++ {
+	for i := range h.crawler.cfg.MaxRetries {
 		err := e.Request.Visit(absLink)
 		if err == nil {
 			h.crawler.logger.Debug("Successfully visited link",

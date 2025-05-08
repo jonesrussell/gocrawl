@@ -2,9 +2,11 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 )
@@ -45,13 +47,21 @@ func NewSourcesCommand() *cobra.Command {
 			}
 
 			if len(srcs) == 0 {
-				fmt.Println("No sources configured")
+				loggerValue, ok := ctx.Value(LoggerKey).(logger.Interface)
+				if !ok {
+					return errors.New("logger not found in context or invalid type")
+				}
+				loggerValue.Info("No sources configured")
 				return nil
 			}
 
-			fmt.Println("Configured sources:")
+			loggerValue, ok := ctx.Value(LoggerKey).(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context or invalid type")
+			}
+			loggerValue.Info("Configured sources:")
 			for _, src := range srcs {
-				fmt.Printf("- %s\n", src.Name)
+				loggerValue.Info("- " + src.Name)
 			}
 
 			return nil

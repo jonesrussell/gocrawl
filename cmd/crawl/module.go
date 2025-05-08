@@ -38,6 +38,8 @@ const (
 	ArticleChannelBufferSize = 100
 	// DefaultInitTimeout is the default timeout for module initialization.
 	DefaultInitTimeout = 30 * time.Second
+	// DefaultZapFieldsCapacity is the default capacity for zap fields slice
+	DefaultZapFieldsCapacity = 2
 )
 
 // Module provides the crawl command module for dependency injection
@@ -218,7 +220,7 @@ func toZapFields(fields []any) []zap.Field {
 	if len(fields) == 0 {
 		return nil
 	}
-	zapFields := make([]zap.Field, 0, len(fields)/2)
+	zapFields := make([]zap.Field, 0, len(fields)/DefaultZapFieldsCapacity)
 	for i := 0; i < len(fields); i += 2 {
 		if i+1 >= len(fields) {
 			break

@@ -18,6 +18,10 @@ const (
 	DefaultRandomDelay = 500 * time.Millisecond
 	DefaultMaxRetries  = 3
 	DefaultRetryDelay  = 1 * time.Second
+	// DefaultMaxRedirects is the default maximum number of redirects to follow
+	DefaultMaxRedirects = 5
+	// DefaultCleanupInterval is the default interval for cleanup operations
+	DefaultCleanupInterval = 24 * time.Hour
 )
 
 // Config represents the crawler configuration.
@@ -103,9 +107,9 @@ func New(opts ...Option) *Config {
 		MaxRetries:      DefaultMaxRetries,
 		RetryDelay:      DefaultRetryDelay,
 		FollowRedirects: true,
-		MaxRedirects:    5,
+		MaxRedirects:    DefaultMaxRedirects,
 		ValidateURLs:    true,
-		CleanupInterval: 24 * time.Hour,
+		CleanupInterval: DefaultCleanupInterval,
 	}
 
 	for _, opt := range opts {

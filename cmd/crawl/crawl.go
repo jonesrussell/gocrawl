@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -22,11 +21,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
-)
-
-const (
-	defaultParallelism = 2
-	defaultRandomDelay = 5 * time.Second
 )
 
 // Cmd represents the crawl command.
@@ -82,11 +76,11 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 					Password:  cfg.GetElasticsearchConfig().Password,
 					APIKey:    cfg.GetElasticsearchConfig().APIKey,
 				}
-				client, err := storage.NewClient(opts)
-				if err != nil {
-					return nil, err
+				storageClient, clientErr := storage.NewClient(opts)
+				if clientErr != nil {
+					return nil, clientErr
 				}
-				return storage.NewStorage(client.GetClient(), log, &opts), nil
+				return storage.NewStorage(storageClient.GetClient(), log, &opts), nil
 			},
 			fx.Annotate(
 				func() string { return args[0] },

@@ -19,7 +19,7 @@ import (
 // PageProcessor implements the content.Processor interface for pages.
 type PageProcessor struct {
 	logger      logger.Interface
-	service     PageService
+	service     Interface
 	validator   content.JobValidator
 	storage     types.Interface
 	indexName   string

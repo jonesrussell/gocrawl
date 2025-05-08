@@ -8,12 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// TestInterface defines the interface for testing source operations.
-type TestInterface interface {
-	Interface
-}
-
-// TestSources implements the TestInterface interface.
+// TestSources implements the Interface interface.
 type TestSources struct {
 	mock.Mock
 	sources []sourceutils.SourceConfig

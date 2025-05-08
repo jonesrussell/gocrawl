@@ -21,4 +21,7 @@ const (
 
 	// CrawlerCollectorStartTimeout is the timeout for collector initialization
 	CrawlerCollectorStartTimeout = 5 * time.Second
+
+	// DefaultProcessorsCapacity is the default capacity for processor slices.
+	DefaultProcessorsCapacity = 2
 )
