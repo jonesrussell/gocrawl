@@ -147,7 +147,13 @@ func LoadConfig() (*Config, error) {
 
 	// Load .env file if it exists
 	v.SetConfigFile(".env")
-	v.MergeInConfig()
+	if err := v.MergeInConfig(); err != nil {
+		var configFileNotFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFound) {
+			return nil, fmt.Errorf("failed to load .env file: %w", err)
+		}
+		// .env file doesn't exist, which is fine
+	}
 
 	// Set defaults
 	setDefaults(v)

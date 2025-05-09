@@ -248,7 +248,7 @@ func NewConfig() *Config {
 		}{
 			Enabled:     true,
 			InitialWait: time.Second,
-			MaxWait:     DefaultMaxWait * time.Second,
+			MaxWait:     DefaultMaxWait,
 			MaxRetries:  DefaultMaxRetries,
 		},
 		BulkSize:      DefaultBulkSize,
