@@ -2,6 +2,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 
 	es "github.com/elastic/go-elasticsearch/v8"
@@ -15,7 +16,7 @@ var ClientModule = fx.Module("elasticsearch",
 		func(cfg config.Interface) (*es.Client, error) {
 			esConfig := cfg.GetElasticsearchConfig()
 			if esConfig == nil {
-				return nil, fmt.Errorf("elasticsearch configuration is required")
+				return nil, errors.New("elasticsearch configuration is required")
 			}
 
 			transport := CreateTransport(esConfig)

@@ -208,6 +208,21 @@ func initConfig() error {
 	return nil
 }
 
+const (
+	// DefaultMaxRetries is the default number of retries for Elasticsearch operations
+	DefaultMaxRetries = 3
+	// DefaultBulkSize is the default size for bulk operations
+	DefaultBulkSize = 1000
+	// DefaultMaxDepth is the default maximum depth for crawling
+	DefaultMaxDepth = 3
+	// DefaultMaxConcurrency is the default maximum number of concurrent operations
+	DefaultMaxConcurrency = 2
+	// DefaultParallelism is the default number of parallel operations
+	DefaultParallelism = 2
+	// DefaultMaxRedirects is the default maximum number of redirects to follow
+	DefaultMaxRedirects = 5
+)
+
 // setDefaults sets default configuration values
 func setDefaults() {
 	// App defaults - production safe
@@ -253,9 +268,9 @@ func setDefaults() {
 			"enabled":      true,
 			"initial_wait": "1s",
 			"max_wait":     "30s",
-			"max_retries":  3,
+			"max_retries":  DefaultMaxRetries,
 		},
-		"bulk_size":      1000,
+		"bulk_size":      DefaultBulkSize,
 		"flush_interval": "1s",
 		"index_prefix":   "gocrawl",
 		"discover_nodes": false,
@@ -263,8 +278,8 @@ func setDefaults() {
 
 	// Crawler defaults - production safe
 	viper.SetDefault("crawler", map[string]any{
-		"max_depth":          3,
-		"max_concurrency":    2,
+		"max_depth":          DefaultMaxDepth,
+		"max_concurrency":    DefaultMaxConcurrency,
 		"request_timeout":    "30s",
 		"user_agent":         "gocrawl/1.0",
 		"respect_robots_txt": true,
@@ -278,13 +293,13 @@ func setDefaults() {
 			"output":  "stdout",
 		},
 		"rate_limit":  "2s",
-		"parallelism": 2,
+		"parallelism": DefaultParallelism,
 		"tls": map[string]any{
 			"insecure_skip_verify": false,
 		},
 		"retry_delay":      "5s",
 		"follow_redirects": true,
-		"max_redirects":    5,
+		"max_redirects":    DefaultMaxRedirects,
 		"validate_urls":    true,
 		"cleanup_interval": "1h",
 	})

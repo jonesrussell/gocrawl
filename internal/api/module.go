@@ -97,19 +97,23 @@ type documentManager struct {
 	logger  logger.Interface
 }
 
-func (m *documentManager) Index(ctx context.Context, index string, id string, doc any) error {
+// Index indexes a document
+func (m *documentManager) Index(ctx context.Context, index, id string, doc any) error {
 	return m.storage.IndexDocument(ctx, index, id, doc)
 }
 
-func (m *documentManager) Update(ctx context.Context, index string, id string, doc any) error {
+// Update updates a document
+func (m *documentManager) Update(ctx context.Context, index, id string, doc any) error {
 	return m.storage.IndexDocument(ctx, index, id, doc)
 }
 
-func (m *documentManager) Delete(ctx context.Context, index string, id string) error {
+// Delete deletes a document
+func (m *documentManager) Delete(ctx context.Context, index, id string) error {
 	return m.storage.DeleteDocument(ctx, index, id)
 }
 
-func (m *documentManager) Get(ctx context.Context, index string, id string) (any, error) {
+// Get gets a document
+func (m *documentManager) Get(ctx context.Context, index, id string) (any, error) {
 	var doc any
 	err := m.storage.GetDocument(ctx, index, id, &doc)
 	return doc, err

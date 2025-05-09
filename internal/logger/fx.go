@@ -4,152 +4,115 @@ import (
 	"strings"
 
 	"go.uber.org/fx/fxevent"
+	"go.uber.org/zap"
 )
 
-// fxLogger is a logger that implements fxevent.Logger.
+// fxLogger implements fxevent.Logger
 type fxLogger struct {
 	log Interface
 }
 
-// NewFxLogger creates a new fx logger.
+// NewFxLogger creates a new Fx logger
 func NewFxLogger(log Interface) fxevent.Logger {
-	return &fxLogger{
-		log: log,
+	return &fxLogger{log: log}
+}
+
+// isImportantDependency checks if a dependency is important enough to log
+func isImportantDependency(name string) bool {
+	importantTypes := map[string]bool{
+		"*article.Manager":      true,
+		"*elasticsearch.Client": true,
+		"*sources.Sources":      true,
+		"*events.EventBus":      true,
+		"signal.Interface":      true,
+		"common.JobService":     true,
+		"config.Interface":      true,
+		"storage.Interface":     true,
+		"content.Interface":     true,
+		"crawler.Interface":     true,
 	}
+	return importantTypes[name]
 }
 
 // cleanConstructorName cleans up a constructor name for logging
 func cleanConstructorName(name string) string {
-	// Remove package path
-	if idx := strings.LastIndex(name, "/"); idx != -1 {
-		name = name[idx+1:]
-	}
-	// Remove function suffix
-	if idx := strings.Index(name, "("); idx != -1 {
-		name = name[:idx]
-	}
-	// Remove fx annotations
-	if idx := strings.Index(name, "fx."); idx != -1 {
-		name = name[:idx]
-	}
-	return name
+	parts := strings.Split(name, ".")
+	return parts[len(parts)-1]
 }
 
-// LogEvent logs an fx event.
+// logProvidedEvent logs a Provided event
+func (l *fxLogger) logProvidedEvent(event *fxevent.Provided) {
+	// Filter out internal dependencies
+	if !isImportantDependency(event.ConstructorName) {
+		return
+	}
+
+	// Clean up constructor name for logging
+	constructorName := cleanConstructorName(event.ConstructorName)
+
+	// Log the event
+	l.log.Info("provided",
+		zap.String("constructor", constructorName),
+		zap.Strings("outputs", event.OutputTypeNames),
+		zap.String("module", event.ModuleName),
+	)
+}
+
+// logInvokedEvent logs an Invoked event
+func (l *fxLogger) logInvokedEvent(event *fxevent.Invoked) {
+	// Clean up function name for logging
+	functionName := cleanConstructorName(event.FunctionName)
+
+	// Log the event
+	l.log.Info("invoked",
+		zap.String("function", functionName),
+		zap.String("module", event.ModuleName),
+	)
+}
+
+// logRunEvent logs a Run event
+func (l *fxLogger) logRunEvent(event *fxevent.Run) {
+	// Clean up function name for logging
+	functionName := cleanConstructorName(event.Name)
+
+	// Log the event
+	l.log.Info("run",
+		zap.String("function", functionName),
+		zap.String("module", event.ModuleName),
+	)
+}
+
+// logStartEvent logs a Start event
+func (l *fxLogger) logStartEvent() {
+	l.log.Info("started")
+}
+
+// logStopEvent logs a Stop event
+func (l *fxLogger) logStopEvent() {
+	l.log.Info("stopped")
+}
+
+// logRollbackEvent logs a Rollback event
+func (l *fxLogger) logRollbackEvent(event *fxevent.RolledBack) {
+	l.log.Error("rolled back",
+		zap.Error(event.Err),
+	)
+}
+
+// LogEvent logs an Fx event
 func (l *fxLogger) LogEvent(event fxevent.Event) {
 	switch e := event.(type) {
 	case *fxevent.Provided:
-		// Only log important dependencies
-		importantTypes := map[string]bool{
-			"*article.Manager":      true,
-			"*elasticsearch.Client": true,
-			"*sources.Sources":      true,
-			"*events.EventBus":      true,
-			"signal.Interface":      true,
-			"common.JobService":     true,
-			"config.Interface":      true,
-			"storage.Interface":     true,
-			"content.Interface":     true,
-			"crawler.Interface":     true,
-		}
-
-		for _, rtype := range e.OutputTypeNames {
-			if !importantTypes[rtype] {
-				continue
-			}
-
-			fields := []any{"type", rtype}
-			if e.ConstructorName != "" {
-				msg := "Initialized " + cleanConstructorName(e.ConstructorName)
-				l.log.Debug(msg, fields...)
-			} else {
-				l.log.Debug("Provided", fields...)
-			}
-		}
-
-		if e.Err != nil {
-			l.log.Error("Error encountered while applying options", "error", e.Err)
-		}
-
+		l.logProvidedEvent(e)
 	case *fxevent.Invoked:
-		l.log.Debug("Invoked",
-			"function", cleanConstructorName(e.FunctionName),
-		)
-		if e.Err != nil {
-			l.log.Error("Invoke failed", "error", e.Err)
-		}
-
+		l.logInvokedEvent(e)
 	case *fxevent.Run:
-		l.log.Debug("Running",
-			"function", cleanConstructorName(e.Name),
-			"duration", e.Runtime,
-		)
-		if e.Err != nil {
-			l.log.Error("Run failed", "error", e.Err)
-		}
-
-	case *fxevent.OnStartExecuting:
-		l.log.Debug("Starting",
-			"function", cleanConstructorName(e.FunctionName),
-			"caller", cleanConstructorName(e.CallerName),
-		)
-
-	case *fxevent.OnStartExecuted:
-		if e.Err != nil {
-			l.log.Error("Start failed",
-				"function", cleanConstructorName(e.FunctionName),
-				"caller", cleanConstructorName(e.CallerName),
-				"duration", e.Runtime,
-				"error", e.Err,
-			)
-		} else {
-			l.log.Debug("Started",
-				"function", cleanConstructorName(e.FunctionName),
-				"caller", cleanConstructorName(e.CallerName),
-				"duration", e.Runtime,
-			)
-		}
-
-	case *fxevent.OnStopExecuting:
-		l.log.Debug("Stopping",
-			"function", cleanConstructorName(e.FunctionName),
-			"caller", cleanConstructorName(e.CallerName),
-		)
-
-	case *fxevent.OnStopExecuted:
-		if e.Err != nil {
-			l.log.Error("Stop failed",
-				"function", cleanConstructorName(e.FunctionName),
-				"caller", cleanConstructorName(e.CallerName),
-				"duration", e.Runtime,
-				"error", e.Err,
-			)
-		} else {
-			l.log.Debug("Stopped",
-				"function", cleanConstructorName(e.FunctionName),
-				"caller", cleanConstructorName(e.CallerName),
-				"duration", e.Runtime,
-			)
-		}
-
+		l.logRunEvent(e)
 	case *fxevent.Started:
-		if e.Err != nil {
-			l.log.Error("Application start failed", "error", e.Err)
-		} else {
-			l.log.Info("Application started")
-		}
-
-	case *fxevent.Stopping:
-		l.log.Info("Application stopping", "signal", e.Signal)
-
+		l.logStartEvent()
 	case *fxevent.Stopped:
-		if e.Err != nil {
-			l.log.Error("Application stop failed", "error", e.Err)
-		} else {
-			l.log.Info("Application stopped")
-		}
-
+		l.logStopEvent()
 	case *fxevent.RolledBack:
-		l.log.Error("Application start failed, rolling back", "error", e.Err)
+		l.logRollbackEvent(e)
 	}
 }
