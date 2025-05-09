@@ -120,25 +120,16 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*ela
 var Module = fx.Module("storage",
 	fx.Provide(
 		// Provide the Elasticsearch client
-		fx.Annotate(
-			NewElasticsearchClient,
-			fx.ResultTags(`name:"elasticsearchClient"`),
-		),
+		NewElasticsearchClient,
 
 		// Provide the index manager
-		fx.Annotate(
-			NewElasticsearchIndexManager,
-			fx.ResultTags(`name:"indexManager"`),
-		),
+		NewElasticsearchIndexManager,
 
 		// Provide the storage interface
-		fx.Annotate(
-			func(client *elasticsearch.Client, logger logger.Interface) types.Interface {
-				defaultOpts := DefaultOptions()
-				return NewStorage(client, logger, &defaultOpts)
-			},
-			fx.ParamTags(`name:"elasticsearchClient"`),
-		),
+		func(client *elasticsearch.Client, logger logger.Interface) types.Interface {
+			defaultOpts := DefaultOptions()
+			return NewStorage(client, logger, &defaultOpts)
+		},
 
 		// Provide the search manager
 		NewSearchManager,

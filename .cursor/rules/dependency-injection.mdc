@@ -1,7 +1,7 @@
 ---
-description:
-globs:
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
 # Dependency Injection & Interfaces
 
@@ -10,6 +10,10 @@ alwaysApply: false
 - For interfaces used across multiple packages, define them in the consuming package.
 - Avoid interface stuttering (e.g., use `Logger` instead of `CollectorLogger`).
 - Define New* constructors only in module.go files.
+- Use unnamed dependencies in constructors (e.g., `NewServer(logger.Interface, config.Interface)` instead of `NewServer(Params)`).
+- Use function types for simple interfaces (e.g., `JobValidatorFunc` for `JobValidator`).
+- Use `fx.Module` consistently across all modules.
+- Keep module.go files focused on DI setup and avoid business logic.
 - When testing modules:
   - Provide all required dependencies.
   - Avoid providing dependencies that are already provided.

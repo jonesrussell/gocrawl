@@ -109,7 +109,8 @@ func (c *SourcesCommand) Run(ctx context.Context) error {
 	log := c.logger
 	log.Info("Configured Sources:")
 	log.Info("------------------")
-	for _, src := range sources {
+	for i := range sources {
+		src := &sources[i]
 		log.Info("Source details",
 			"name", src.Name,
 			"url", src.URL,

@@ -30,29 +30,26 @@ type SchedulerService struct {
 	items            map[string][]*content.Item
 }
 
-// SchedulerServiceParams holds parameters for creating a new SchedulerService.
-type SchedulerServiceParams struct {
-	Logger           logger.Interface
-	Sources          sources.Interface
-	Crawler          crawler.Interface
-	Done             chan struct{}
-	Config           config.Interface
-	Storage          types.Interface
-	ProcessorFactory crawler.ProcessorFactory
-}
-
 // NewSchedulerService creates a new SchedulerService instance.
-func NewSchedulerService(p SchedulerServiceParams) common.JobService {
+func NewSchedulerService(
+	logger logger.Interface,
+	sources sources.Interface,
+	crawler crawler.Interface,
+	done chan struct{},
+	config config.Interface,
+	storage types.Interface,
+	processorFactory crawler.ProcessorFactory,
+) common.JobService {
 	var jobs int32
 	return &SchedulerService{
-		logger:           p.Logger,
-		sources:          p.Sources,
-		crawler:          p.Crawler,
-		done:             p.Done,
-		config:           p.Config,
+		logger:           logger,
+		sources:          sources,
+		crawler:          crawler,
+		done:             done,
+		config:           config,
 		activeJobs:       &jobs,
-		storage:          p.Storage,
-		processorFactory: p.ProcessorFactory,
+		storage:          storage,
+		processorFactory: processorFactory,
 		items:            make(map[string][]*content.Item),
 	}
 }

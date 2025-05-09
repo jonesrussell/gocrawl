@@ -43,23 +43,19 @@ var Module = fx.Module("api",
 	),
 )
 
-// Params holds the dependencies required for the API.
-type Params struct {
-	fx.In
-	Context      context.Context `name:"apiContext"`
-	Config       config.Interface
-	Logger       logger.Interface
-	Storage      storagetypes.Interface
-	IndexManager storagetypes.IndexManager
-}
-
 // NewAPI creates a new API instance.
-func NewAPI(p Params) *Server {
+func NewAPI(
+	ctx context.Context,
+	cfg config.Interface,
+	log logger.Interface,
+	storage storagetypes.Interface,
+	indexManager storagetypes.IndexManager,
+) *Server {
 	return &Server{
-		Context:      p.Context,
-		Config:       p.Config,
-		Logger:       p.Logger,
-		Storage:      p.Storage,
-		IndexManager: p.IndexManager,
+		Context:      ctx,
+		Config:       cfg,
+		Logger:       log,
+		Storage:      storage,
+		IndexManager: indexManager,
 	}
 }

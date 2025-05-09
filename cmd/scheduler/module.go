@@ -10,12 +10,11 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
 // Module provides the scheduler command module for dependency injection
-var Module = fx.Options(
+var Module = fx.Module("scheduler",
 	// Core modules
 	config.Module,
 	logger.Module,
@@ -26,38 +25,23 @@ var Module = fx.Options(
 	// Provide the context
 	fx.Provide(context.Background),
 
-	// Provide the done channel
-	fx.Provide(func() chan struct{} {
-		return make(chan struct{})
-	}),
-
-	// Provide the active jobs counter
-	fx.Provide(func() *int32 {
-		var jobs int32
-		return &jobs
-	}),
-
 	// Provide the scheduler service
-	fx.Provide(fx.Annotate(
-		func(
-			logger logger.Interface,
-			storage types.Interface,
-			sources sources.Interface,
-			crawler crawler.Interface,
-			done chan struct{},
-			config config.Interface,
-			processorFactory crawler.ProcessorFactory,
-		) common.JobService {
-			return NewSchedulerService(SchedulerServiceParams{
-				Logger:           logger,
-				Sources:          sources,
-				Crawler:          crawler,
-				Done:             done,
-				Config:           config,
-				Storage:          storage,
-				ProcessorFactory: processorFactory,
-			})
+	fx.Provide(
+		// Provide the done channel
+		func() chan struct{} {
+			return make(chan struct{})
 		},
-		fx.As(new(common.JobService)),
-	)),
+
+		// Provide the active jobs counter
+		func() *int32 {
+			var jobs int32
+			return &jobs
+		},
+
+		// Provide the scheduler service
+		fx.Annotate(
+			NewSchedulerService,
+			fx.As(new(common.JobService)),
+		),
+	),
 )

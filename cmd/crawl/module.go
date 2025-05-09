@@ -4,19 +4,16 @@ package crawl
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"time"
 
+	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/content"
-	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
+	crawlerpkg "github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 // Common errors
@@ -35,19 +32,43 @@ const (
 	ArticleChannelBufferSize = 100
 	// DefaultInitTimeout is the default timeout for module initialization.
 	DefaultInitTimeout = 30 * time.Second
-	// DefaultZapFieldsCapacity is the default capacity for zap fields slice
-	DefaultZapFieldsCapacity = 2
 )
 
-// Module provides the crawl module for dependency injection.
+// Module provides the crawl command module for dependency injection.
 var Module = fx.Module("crawl",
-	// Include core modules
+	// Include required modules
 	storage.Module,
-	sources.Module,
-	// Provide the crawl components
+	crawlerpkg.Module,
+
 	fx.Provide(
-		NewCrawler,
-		SetupCollector,
+		// Provide the crawl command
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			crawler crawlerpkg.Interface,
+			bus *events.EventBus,
+		) *cobra.Command {
+			return &cobra.Command{
+				Use:   "crawl",
+				Short: "Start the crawler",
+				RunE: func(cmd *cobra.Command, args []string) error {
+					// Create context with dependencies
+					ctx := context.Background()
+					ctx = context.WithValue(ctx, common.ConfigKey, cfg)
+					ctx = context.WithValue(ctx, common.LoggerKey, log)
+
+					// Start crawler
+					if err := crawler.Start(ctx, "default"); err != nil {
+						return err
+					}
+
+					// Wait for crawler to finish
+					<-ctx.Done()
+
+					return nil
+				},
+			}
+		},
 	),
 )
 
@@ -67,127 +88,4 @@ Specify the source name as an argument.`,
 		},
 	}
 	return cmd
-}
-
-// DefaultJobService implements the content.ContentProcessor interface.
-type DefaultJobService struct {
-	logger logger.Interface
-	config config.Interface
-}
-
-// ValidateJob validates a job before processing.
-func (s *DefaultJobService) ValidateJob(job *content.Job) error {
-	if job == nil {
-		return ErrInvalidJob
-	}
-	if job.URL == "" {
-		return ErrInvalidJobURL
-	}
-	return nil
-}
-
-// Process implements content.ContentProcessor.
-func (s *DefaultJobService) Process(ctx context.Context, content any) error {
-	if content == nil {
-		return ErrInvalidJob
-	}
-	// TODO: Implement job processing
-	return nil
-}
-
-// CanProcess implements content.ContentProcessor.
-func (s *DefaultJobService) CanProcess(contentType contenttype.Type) bool {
-	return contentType == contenttype.Job
-}
-
-// ContentType implements content.ContentProcessor.
-func (s *DefaultJobService) ContentType() contenttype.Type {
-	return contenttype.Job
-}
-
-// ExtractContent implements content.ContentProcessor.
-func (s *DefaultJobService) ExtractContent() (string, error) {
-	return "", errors.New("not implemented")
-}
-
-// ExtractLinks implements content.ContentProcessor.
-func (s *DefaultJobService) ExtractLinks() ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-// GetProcessor implements content.ContentProcessor.
-func (s *DefaultJobService) GetProcessor(contentType contenttype.Type) (content.ContentProcessor, error) {
-	if contentType != contenttype.Job {
-		return nil, fmt.Errorf("unsupported content type: %s", contentType)
-	}
-	return s, nil
-}
-
-// ParseHTML implements content.ContentProcessor.
-func (s *DefaultJobService) ParseHTML(r io.Reader) error {
-	return errors.New("not implemented")
-}
-
-// RegisterProcessor implements content.ContentProcessor.
-func (s *DefaultJobService) RegisterProcessor(processor content.Processor) {
-	// No-op for now
-}
-
-// Start implements content.ContentProcessor.
-func (s *DefaultJobService) Start(ctx context.Context) error {
-	return nil
-}
-
-// Stop implements content.ContentProcessor.
-func (s *DefaultJobService) Stop(ctx context.Context) error {
-	return nil
-}
-
-// ZapWrapper wraps a zap.Logger to implement logger.Interface.
-type ZapWrapper struct {
-	*zap.Logger
-}
-
-// Debug implements logger.Interface.
-func (l *ZapWrapper) Debug(msg string, fields ...any) {
-	l.Logger.Debug(msg, toZapFields(fields)...)
-}
-
-// Info implements logger.Interface.
-func (l *ZapWrapper) Info(msg string, fields ...any) {
-	l.Logger.Info(msg, toZapFields(fields)...)
-}
-
-// Error implements logger.Interface.
-func (l *ZapWrapper) Error(msg string, fields ...any) {
-	l.Logger.Error(msg, toZapFields(fields)...)
-}
-
-// Warn implements logger.Interface.
-func (l *ZapWrapper) Warn(msg string, fields ...any) {
-	l.Logger.Warn(msg, toZapFields(fields)...)
-}
-
-// Fatal implements logger.Interface.
-func (l *ZapWrapper) Fatal(msg string, fields ...any) {
-	l.Logger.Fatal(msg, toZapFields(fields)...)
-}
-
-// toZapFields converts the fields to zap fields.
-func toZapFields(fields []any) []zap.Field {
-	if len(fields) == 0 {
-		return nil
-	}
-	zapFields := make([]zap.Field, 0, len(fields)/DefaultZapFieldsCapacity)
-	for i := 0; i < len(fields); i += 2 {
-		if i+1 >= len(fields) {
-			break
-		}
-		key, ok := fields[i].(string)
-		if !ok {
-			continue
-		}
-		zapFields = append(zapFields, zap.Any(key, fields[i+1]))
-	}
-	return zapFields
 }

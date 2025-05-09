@@ -2,6 +2,7 @@
 package crawler
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -57,22 +58,6 @@ const (
 	DefaultChannelBufferSize = 100
 )
 
-// CrawlerParams defines the parameters for creating a crawler.
-type CrawlerParams struct {
-	fx.In
-	Logger       logger.Interface
-	Bus          *events.EventBus
-	IndexManager types.IndexManager
-	Sources      sources.Interface
-	Config       *crawler.Config
-}
-
-// Result defines the crawler module's output.
-type Result struct {
-	fx.Out
-	Crawler Interface
-}
-
 // ProcessorFactory creates processors for the crawler.
 type ProcessorFactory interface {
 	CreateProcessors(validator content.JobValidator) ([]content.Processor, error)
@@ -92,7 +77,7 @@ func NewProcessorFactory(logger logger.Interface) *DefaultProcessorFactory {
 
 // CreateProcessors creates processors for the crawler.
 func (f *DefaultProcessorFactory) CreateProcessors(validator content.JobValidator) ([]content.Processor, error) {
-	processors := make([]content.Processor, 0, DefaultProcessorsCapacity) // Pre-allocate for 2 processors
+	processors := make([]content.Processor, 0, DefaultProcessorsCapacity)
 
 	// Create article processor
 	articleProcessor := articles.NewProcessor(articles.ProcessorParams{
@@ -113,12 +98,34 @@ func (f *DefaultProcessorFactory) CreateProcessors(validator content.JobValidato
 
 // ProvideCrawler provides a crawler instance.
 func ProvideCrawler(
-	params CrawlerParams,
-	processors []content.Processor,
+	logger logger.Interface,
+	bus *events.EventBus,
+	indexManager types.IndexManager,
+	sources sources.Interface,
+	cfg *crawler.Config,
+	processorFactory ProcessorFactory,
 ) (Interface, error) {
-	var articleProcessor, pageProcessor content.Processor
+	// Create a simple job validator
+	validator := &struct {
+		content.JobValidator
+	}{
+		JobValidator: content.JobValidatorFunc(func(job *content.Job) error {
+			if job == nil {
+				return errors.New("job cannot be nil")
+			}
+			if job.URL == "" {
+				return errors.New("job URL cannot be empty")
+			}
+			return nil
+		}),
+	}
 
-	// Find article and page processors
+	processors, err := processorFactory.CreateProcessors(validator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create processors: %w", err)
+	}
+
+	var articleProcessor, pageProcessor content.Processor
 	for _, p := range processors {
 		if p.ContentType() == contenttype.Article {
 			articleProcessor = p
@@ -132,13 +139,13 @@ func ProvideCrawler(
 	}
 
 	return NewCrawler(
-		params.Logger,
-		params.Bus,
-		params.IndexManager,
-		params.Sources,
+		logger,
+		bus,
+		indexManager,
+		sources,
 		articleProcessor,
 		pageProcessor,
-		params.Config,
+		cfg,
 	), nil
 }
 
@@ -148,9 +155,6 @@ var Module = fx.Module("crawler",
 		NewProcessorFactory,
 		ProvideCrawler,
 	),
-	fx.Invoke(func(c Interface) {
-		// Initialize the crawler
-	}),
 )
 
 // NewCrawler creates a new crawler instance.
