@@ -166,19 +166,7 @@ func LoadConfig() (*Config, error) {
 		if !errors.As(err, &configFileNotFound) {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
-		// If config file is not found, create a default config
-		v.Set("app.name", "gocrawl")
-		v.Set("app.environment", "development")
-		v.Set("app.debug", true)
-		v.Set("logger.level", "debug")
-		v.Set("logger.encoding", "console")
-		v.Set("logger.format", "text")
-		v.Set("logger.output", "stdout")
-		v.Set("crawler.source_file", "sources.yml")
-		v.Set("crawler.max_depth", DefaultMaxDepth)
-		v.Set("crawler.max_retries", DefaultMaxRetries)
-		v.Set("storage.batch_size", DefaultStorageBatchSize)
-		v.Set("elasticsearch.max_retries", DefaultElasticsearchRetries)
+		// If config file is not found, we'll use the defaults set by setDefaults
 	}
 
 	// Create a temporary logger for config loading
@@ -211,39 +199,55 @@ func LoadConfig() (*Config, error) {
 // setDefaults sets default configuration values
 func setDefaults(v *viper.Viper) {
 	// App defaults
-	v.SetDefault("app.name", "gocrawl")
-	v.SetDefault("app.version", "1.0.0")
-	v.SetDefault("app.environment", "development")
-	v.SetDefault("app.debug", false)
+	v.SetDefault("app", map[string]any{
+		"name":        "gocrawl",
+		"version":     "1.0.0",
+		"environment": "development",
+		"debug":       true,
+	})
 
 	// Logger defaults
-	v.SetDefault("logger.level", "debug")
-	v.SetDefault("logger.format", "console")
-	v.SetDefault("logger.output", "stdout")
-	v.SetDefault("logger.enable_color", true)
+	v.SetDefault("logger", map[string]any{
+		"level":        "debug",
+		"format":       "console",
+		"output":       "stdout",
+		"encoding":     "console",
+		"enable_color": true,
+	})
 
 	// Crawler defaults
-	v.SetDefault("crawler.max_depth", DefaultMaxDepth)
-	v.SetDefault("crawler.max_retries", DefaultMaxRetries)
-	v.SetDefault("crawler.rate_limit", "1s")
-	v.SetDefault("crawler.timeout", "30s")
-	v.SetDefault("crawler.user_agent", "GoCrawl/1.0")
+	v.SetDefault("crawler", map[string]any{
+		"max_depth":   DefaultMaxDepth,
+		"max_retries": DefaultMaxRetries,
+		"rate_limit":  "1s",
+		"timeout":     "30s",
+		"user_agent":  "GoCrawl/1.0",
+		"source_file": "sources.yml",
+	})
 
 	// Storage defaults
-	v.SetDefault("storage.type", "elasticsearch")
-	v.SetDefault("storage.batch_size", DefaultStorageBatchSize)
-	v.SetDefault("storage.flush_interval", "5s")
+	v.SetDefault("storage", map[string]any{
+		"type":           "elasticsearch",
+		"batch_size":     DefaultStorageBatchSize,
+		"flush_interval": "5s",
+	})
 
 	// Elasticsearch defaults
-	v.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
-	v.SetDefault("elasticsearch.index_name", "gocrawl")
-	v.SetDefault("elasticsearch.retry.enabled", true)
-	v.SetDefault("elasticsearch.retry.initial_wait", "1s")
-	v.SetDefault("elasticsearch.retry.max_wait", "5s")
-	v.SetDefault("elasticsearch.retry.max_retries", DefaultElasticsearchRetries)
-	v.SetDefault("elasticsearch.bulk_size", DefaultBulkSize)
-	v.SetDefault("elasticsearch.flush_interval", "1s")
-	v.SetDefault("elasticsearch.tls.insecure_skip_verify", true)
+	v.SetDefault("elasticsearch", map[string]any{
+		"addresses":  []string{"https://localhost:9200"},
+		"index_name": "gocrawl",
+		"retry": map[string]any{
+			"enabled":      true,
+			"initial_wait": "1s",
+			"max_wait":     "5s",
+			"max_retries":  DefaultElasticsearchRetries,
+		},
+		"bulk_size":      DefaultBulkSize,
+		"flush_interval": "1s",
+		"tls": map[string]any{
+			"insecure_skip_verify": true,
+		},
+	})
 }
 
 // GetAppConfig returns the application configuration.
