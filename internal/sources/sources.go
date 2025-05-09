@@ -137,8 +137,7 @@ func convertSourceConfig(src types.Source) sourceutils.SourceConfig {
 
 // LoadSources creates a new Sources instance by loading sources from either:
 // 1. A YAML file specified in the crawler config
-// 2. The configuration object itself
-// 3. A default source based on the command line argument
+// 2. A default source based on the command line argument
 // Returns an error if no sources are found in any location
 func LoadSources(cfg config.Interface) (*Sources, error) {
 	sources := &Sources{
@@ -147,30 +146,18 @@ func LoadSources(cfg config.Interface) (*Sources, error) {
 
 	// Try to load sources from file first
 	crawlerCfg := cfg.GetCrawlerConfig()
+	sourceFile := "sources.yml"
 	if crawlerCfg != nil && crawlerCfg.SourceFile != "" {
-		if configs, err := loadSourcesFromFile(crawlerCfg.SourceFile); err == nil && len(configs) > 0 {
-			sources.SetSources(configs)
-			return sources, nil
-		}
-	} else {
-		// Try to load sources from sources.yml directly
-		if configs, err := loadSourcesFromFile("sources.yml"); err == nil && len(configs) > 0 {
-			sources.SetSources(configs)
-			return sources, nil
-		}
+		sourceFile = crawlerCfg.SourceFile
 	}
 
-	// Fall back to sources from config
-	if srcs := cfg.GetSources(); len(srcs) > 0 {
-		configs := make([]sourceutils.SourceConfig, 0, len(srcs))
-		for i := range srcs {
-			configs = append(configs, convertSourceConfig(srcs[i]))
-		}
+	// Try to load sources from file
+	if configs, err := loadSourcesFromFile(sourceFile); err == nil && len(configs) > 0 {
 		sources.SetSources(configs)
 		return sources, nil
 	}
 
-	// If we get here, we couldn't find any sources in the config
+	// If we get here, we couldn't find any sources in the file
 	// Try to create a default source based on the command line argument
 	if cmd := cfg.GetCommand(); cmd != "" {
 		// Create default selectors

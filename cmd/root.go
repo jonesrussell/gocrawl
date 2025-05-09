@@ -420,14 +420,10 @@ func Execute() {
 	}
 
 	// Initialize config
-	cfg := config.NewConfig(log)
-	if loadErr := cfg.Load(viper.GetString("config")); loadErr != nil {
-		// If config file doesn't exist, use defaults
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if !errors.As(loadErr, &configFileNotFoundError) {
-			log.Error("Failed to load config", "error", loadErr)
-			os.Exit(1)
-		}
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Error("Failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	// Create a context with dependencies
@@ -493,10 +489,6 @@ func initLogger() (logger.Interface, error) {
 
 	// Log the current log level
 	log.Debug("Root logger initialized",
-		"level", logLevel,
-		"debug", debug,
-		"development", logConfig.Development)
-	log.Info("Root logger ready",
 		"level", logLevel,
 		"debug", debug,
 		"development", logConfig.Development)

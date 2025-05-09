@@ -9,7 +9,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/storage"
-	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 // Interface defines the interface for configuration management.
@@ -20,8 +19,6 @@ type Interface interface {
 	GetLogConfig() *logconfig.Config
 	// GetServerConfig returns the server configuration.
 	GetServerConfig() *server.Config
-	// GetSources returns the list of sources.
-	GetSources() []types.Source
 	// GetCrawlerConfig returns the crawler configuration.
 	GetCrawlerConfig() *crawler.Config
 	// GetPriorityConfig returns the priority configuration.

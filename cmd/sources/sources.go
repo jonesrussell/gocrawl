@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -47,7 +48,7 @@ func NewSourcesCommand() *cobra.Command {
 			}
 
 			if len(srcs) == 0 {
-				loggerValue, ok := ctx.Value(LoggerKey).(logger.Interface)
+				loggerValue, ok := ctx.Value(common.LoggerKey).(logger.Interface)
 				if !ok {
 					return errors.New("logger not found in context or invalid type")
 				}
@@ -55,7 +56,7 @@ func NewSourcesCommand() *cobra.Command {
 				return nil
 			}
 
-			loggerValue, ok := ctx.Value(LoggerKey).(logger.Interface)
+			loggerValue, ok := ctx.Value(common.LoggerKey).(logger.Interface)
 			if !ok {
 				return errors.New("logger not found in context or invalid type")
 			}

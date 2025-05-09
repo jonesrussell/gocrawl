@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"path/filepath"
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
@@ -18,7 +17,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/priority"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/storage"
-	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/viper"
 )
@@ -41,8 +39,6 @@ type Config struct {
 	App *app.Config `yaml:"app"`
 	// Elasticsearch holds Elasticsearch configuration
 	Elasticsearch *elasticsearch.Config `yaml:"elasticsearch"`
-	// Sources holds the list of sources to crawl
-	Sources []types.Source `yaml:"sources"`
 	// Command is the current command being executed
 	Command string `yaml:"command"`
 	viper   *viper.Viper
@@ -81,14 +77,6 @@ func (c *Config) validateCrawlConfig() error {
 	}
 	if err := c.Crawler.Validate(); err != nil {
 		return fmt.Errorf("crawler: %w", err)
-	}
-	if len(c.Sources) == 0 {
-		return errors.New("at least one source is required")
-	}
-	for i := range c.Sources {
-		if err := c.Sources[i].Validate(); err != nil {
-			return fmt.Errorf("source[%d]: %w", i, err)
-		}
 	}
 	return nil
 }
@@ -190,7 +178,6 @@ func LoadConfig() (*Config, error) {
 		v.Set("logger.encoding", "console")
 		v.Set("logger.format", "text")
 		v.Set("logger.output", "stdout")
-		v.Set("crawler.source_file", "sources.yml")
 	}
 
 	// Create a temporary logger for config loading
@@ -208,22 +195,6 @@ func LoadConfig() (*Config, error) {
 	v.SetConfigType("yaml")
 	if unmarshalErr := v.Unmarshal(&cfg); unmarshalErr != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
-	}
-
-	// Load sources from sources.yml or sources.yaml if they exist
-	sourcesViper := viper.New()
-	sourcesViper.SetConfigType("yaml")
-	sourcesViper.SetConfigName("sources")
-	sourcesViper.AddConfigPath(".")
-
-	if configErr := sourcesViper.ReadInConfig(); configErr != nil {
-		return nil, fmt.Errorf("failed to read sources config: %w", configErr)
-	} else {
-		var sources []types.Source
-		if unmarshalErr := sourcesViper.UnmarshalKey("sources", &sources); unmarshalErr != nil {
-			return nil, fmt.Errorf("failed to unmarshal sources config: %w", unmarshalErr)
-		}
-		cfg.Sources = sources
 	}
 
 	// Set the logger
@@ -288,11 +259,6 @@ func (c *Config) GetServerConfig() *server.Config {
 	return c.Server
 }
 
-// GetSources returns the list of sources.
-func (c *Config) GetSources() []types.Source {
-	return c.Sources
-}
-
 // GetCrawlerConfig returns the crawler configuration.
 func (c *Config) GetCrawlerConfig() *crawler.Config {
 	return c.Crawler
@@ -321,57 +287,4 @@ func (c *Config) GetStorageConfig() *storage.Config {
 // GetConfigFile returns the path to the configuration file.
 func (c *Config) GetConfigFile() string {
 	return viper.ConfigFileUsed()
-}
-
-// LoadSources loads sources from the specified file.
-func (c *Config) LoadSources(logger logger.Interface) error {
-	if c.Crawler.SourceFile == "" {
-		return errors.New("source file not specified")
-	}
-
-	logger.Info("Loading sources from file", "file", c.Crawler.SourceFile)
-
-	// Get the absolute path to the sources file
-	sourcesPath := filepath.Join(filepath.Dir(viper.ConfigFileUsed()), c.Crawler.SourceFile)
-	sourcesViper := viper.New()
-	sourcesViper.SetConfigFile(sourcesPath)
-	sourcesViper.SetConfigType("yaml")
-
-	if err := sourcesViper.ReadInConfig(); err != nil {
-		return fmt.Errorf("failed to read sources file: %w", err)
-	}
-
-	var sources []types.Source
-	if err := sourcesViper.UnmarshalKey("sources", &sources); err != nil {
-		return fmt.Errorf("failed to unmarshal sources: %w", err)
-	}
-
-	c.Sources = sources
-	return nil
-}
-
-// Load loads the configuration from the given file.
-func (c *Config) Load(file string) error {
-	c.logger.Info("Loading configuration", "file", file)
-
-	// If no file is specified, try to load sources.yml directly
-	if file == "" {
-		sourcesViper := viper.New()
-		sourcesViper.SetConfigType("yaml")
-		sourcesViper.SetConfigName("sources")
-		sourcesViper.AddConfigPath(".")
-
-		if err := sourcesViper.ReadInConfig(); err != nil {
-			return fmt.Errorf("failed to read sources config: %w", err)
-		}
-
-		var sources []types.Source
-		if err := sourcesViper.UnmarshalKey("sources", &sources); err != nil {
-			return fmt.Errorf("failed to unmarshal sources: %w", err)
-		}
-
-		c.Sources = sources
-	}
-
-	return nil
 }
