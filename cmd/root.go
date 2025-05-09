@@ -44,59 +44,66 @@ var (
 // Module provides the root command and its dependencies
 var Module = fx.Module("root",
 	common.Module,
-	fx.Provide(
-		func() (config.Interface, error) {
-			return config.LoadConfig()
-		},
-		func() *logger.Config {
-			return &logger.Config{
-				Level:       logger.Level(viper.GetString("logger.level")),
-				Development: viper.GetBool("logger.development"),
-				Encoding:    viper.GetString("logger.encoding"),
-				OutputPaths: viper.GetStringSlice("logger.output_paths"),
-				EnableColor: viper.GetBool("logger.enable_color"),
-			}
-		},
-		logger.New,
-	),
+	storage.Module,
+	index.Module,
+	search.Module,
+	httpd.Module,
 	fx.WithLogger(logger.NewFxLogger),
 )
 
 // Execute runs the root command
 func Execute() error {
-	// Initialize configuration
 	if err := initConfig(); err != nil {
 		return fmt.Errorf("failed to initialize configuration: %w", err)
 	}
 
-	// Bind flags
 	if err := bindFlags(rootCmd); err != nil {
 		return fmt.Errorf("failed to bind flags: %w", err)
 	}
 
-	// Create the application
+	// Load config and create logger
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	logCfg := &logger.Config{
+		Level:       logger.Level(viper.GetString("logger.level")),
+		Development: viper.GetBool("logger.development"),
+		Encoding:    viper.GetString("logger.encoding"),
+		OutputPaths: viper.GetStringSlice("logger.output_paths"),
+		EnableColor: viper.GetBool("logger.enable_color"),
+	}
+
+	log, err := logger.New(logCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// Create a context with dependencies
+	ctx := context.WithValue(context.Background(), common.ConfigKey, cfg)
+	ctx = context.WithValue(ctx, common.LoggerKey, log)
+
+	// Initialize the application with the root module
 	app := fx.New(
-		fx.NopLogger, // Disable default Fx logger
 		Module,
-		storage.ClientModule,
-		index.Module,
-		search.Module,
-		httpd.Module,
+		fx.Provide(
+			func() config.Interface { return cfg },
+			func() logger.Interface { return log },
+		),
+		fx.WithLogger(logger.NewFxLogger),
 	)
 
-	// Start the application
-	if err := app.Start(context.Background()); err != nil {
-		return fmt.Errorf("failed to start application: %w", err)
+	if startErr := app.Start(ctx); startErr != nil {
+		return startErr
 	}
-	defer func() {
-		if err := app.Stop(context.Background()); err != nil {
-			fmt.Fprintf(os.Stderr, "Error stopping application: %v\n", err)
-		}
-	}()
 
-	// Execute the root command
-	if err := rootCmd.Execute(); err != nil {
-		return fmt.Errorf("failed to execute command: %w", err)
+	if stopErr := app.Stop(ctx); stopErr != nil {
+		return stopErr
+	}
+
+	if execErr := rootCmd.Execute(); execErr != nil {
+		return execErr
 	}
 
 	return nil
@@ -146,8 +153,10 @@ func init() {
 		},
 	})
 
-	// Add index command
+	// Add subcommands
 	rootCmd.AddCommand(index.Command)
+	rootCmd.AddCommand(search.Command())
+	rootCmd.AddCommand(httpd.Command())
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -195,15 +204,19 @@ func initConfig() error {
 		fmt.Fprintf(os.Stderr, "Warning: .env file not found: %v\n", err)
 	}
 
-	// Set development logging settings based on environment
-	isDev := viper.GetString("app.environment") == "development" && viper.GetBool("app.debug")
+	// Set development logging settings based on environment and debug flag
+	isDev := viper.GetString("app.environment") == "development" || viper.GetBool("app.debug")
 	if isDev {
 		viper.Set("logger.development", true)
 		viper.Set("logger.enable_color", true)
 		viper.Set("logger.caller", true)
 		viper.Set("logger.stacktrace", true)
 		viper.Set("logger.encoding", "console")
+		viper.Set("logger.level", "debug")
 	}
+
+	// Synchronize global Debug variable with Viper's value
+	Debug = viper.GetBool("app.debug")
 
 	return nil
 }

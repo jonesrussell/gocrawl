@@ -1,3 +1,4 @@
+// Package logger provides logging functionality for the application.
 package logger
 
 import (
@@ -51,7 +52,7 @@ func (l *fxLogger) logProvidedEvent(event *fxevent.Provided) {
 	constructorName := cleanConstructorName(event.ConstructorName)
 
 	// Log the event
-	l.log.Info("provided",
+	l.log.Debug("provided",
 		zap.String("constructor", constructorName),
 		zap.Strings("outputs", event.OutputTypeNames),
 		zap.String("module", event.ModuleName),
@@ -64,7 +65,7 @@ func (l *fxLogger) logInvokedEvent(event *fxevent.Invoked) {
 	functionName := cleanConstructorName(event.FunctionName)
 
 	// Log the event
-	l.log.Info("invoked",
+	l.log.Debug("invoked",
 		zap.String("function", functionName),
 		zap.String("module", event.ModuleName),
 	)
@@ -76,7 +77,7 @@ func (l *fxLogger) logRunEvent(event *fxevent.Run) {
 	functionName := cleanConstructorName(event.Name)
 
 	// Log the event
-	l.log.Info("run",
+	l.log.Debug("run",
 		zap.String("function", functionName),
 		zap.String("module", event.ModuleName),
 	)
@@ -84,12 +85,12 @@ func (l *fxLogger) logRunEvent(event *fxevent.Run) {
 
 // logStartEvent logs a Start event
 func (l *fxLogger) logStartEvent() {
-	l.log.Info("started")
+	l.log.Debug("started")
 }
 
 // logStopEvent logs a Stop event
 func (l *fxLogger) logStopEvent() {
-	l.log.Info("stopped")
+	l.log.Debug("stopped")
 }
 
 // logRollbackEvent logs a Rollback event

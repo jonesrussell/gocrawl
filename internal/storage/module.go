@@ -3,10 +3,13 @@ package storage
 
 import (
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	esconfig "github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -71,19 +74,79 @@ func CreateClientConfig(
 	}
 }
 
-// Module provides storage dependencies
+// ClientParams contains dependencies for creating an Elasticsearch client
+type ClientParams struct {
+	fx.In
+
+	Config config.Interface
+}
+
+// ClientResult contains the Elasticsearch client
+type ClientResult struct {
+	fx.Out
+
+	Client *es.Client
+}
+
+// NewClient creates a new Elasticsearch client
+func NewClient(p ClientParams) (ClientResult, error) {
+	esConfig := p.Config.GetElasticsearchConfig()
+	if esConfig == nil {
+		return ClientResult{}, errors.New("elasticsearch configuration is required")
+	}
+
+	transport := CreateTransport(esConfig)
+	clientConfig := CreateClientConfig(esConfig, transport)
+
+	client, err := es.NewClient(clientConfig)
+	if err != nil {
+		return ClientResult{}, fmt.Errorf("failed to create Elasticsearch client: %w", err)
+	}
+
+	res, err := client.Ping()
+	if err != nil {
+		return ClientResult{}, fmt.Errorf("failed to ping Elasticsearch: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return ClientResult{}, fmt.Errorf("error pinging Elasticsearch: %s", res.String())
+	}
+
+	return ClientResult{Client: client}, nil
+}
+
+// StorageParams contains dependencies for creating a storage implementation
+type StorageParams struct {
+	fx.In
+
+	Client *es.Client
+	Logger logger.Interface
+}
+
+// StorageResult contains the storage implementation
+type StorageResult struct {
+	fx.Out
+
+	Storage types.Interface
+}
+
+// NewStorage creates a new storage implementation
+func NewStorage(p StorageParams) StorageResult {
+	opts := DefaultOptions()
+	storage := &Storage{
+		client: p.Client,
+		logger: p.Logger,
+		opts:   opts,
+	}
+	storage.indexManager = NewElasticsearchIndexManager(p.Client, p.Logger)
+	return StorageResult{Storage: storage}
+}
+
+// Module provides all storage-related dependencies
 var Module = fx.Module("storage",
 	fx.Provide(
-		// Provide the storage implementation
-		func(client *es.Client, log logger.Interface) types.Interface {
-			opts := DefaultOptions()
-			storage := &Storage{
-				client: client,
-				logger: log,
-				opts:   opts,
-			}
-			storage.indexManager = NewElasticsearchIndexManager(client, log)
-			return storage
-		},
+		NewClient,
+		NewStorage,
 	),
 )

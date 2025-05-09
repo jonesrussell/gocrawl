@@ -285,9 +285,9 @@ func (s *ElasticsearchStorage) IndexExists(ctx context.Context, index string) (b
 
 // ListIndices lists all indices
 func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error) {
-	res, err := s.client.Cat.Indices(
-		s.client.Cat.Indices.WithContext(ctx),
-		s.client.Cat.Indices.WithFormat("json"),
+	res, err := s.client.Indices.Get(
+		[]string{"_all"},
+		s.client.Indices.Get.WithContext(ctx),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list indices: %w", err)
@@ -298,18 +298,14 @@ func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error
 		return nil, fmt.Errorf("error listing indices: %s", res.String())
 	}
 
-	var indices []map[string]any
+	var indices map[string]any
 	if decodeErr := json.NewDecoder(res.Body).Decode(&indices); decodeErr != nil {
 		return nil, fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
 	var result []string
-	for _, index := range indices {
-		name, ok := index["index"].(string)
-		if !ok {
-			continue
-		}
-		result = append(result, name)
+	for index := range indices {
+		result = append(result, index)
 	}
 
 	return result, nil

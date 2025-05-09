@@ -2,12 +2,20 @@
 package index
 
 import (
+	"errors"
+
 	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
+)
+
+var (
+	forceDelete bool
 )
 
 // Command is the index command
@@ -15,53 +23,151 @@ var Command = &cobra.Command{
 	Use:   "index",
 	Short: "Manage Elasticsearch indices",
 	Long:  `Manage Elasticsearch indices for storing crawled content`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cmd.Help()
+	},
 }
 
 // Module provides the index module for dependency injection.
 var Module = fx.Module("index",
 	common.Module,
+	storage.Module,
+	sources.Module,
 	fx.Provide(
-		// Provide the table renderer
 		NewTableRenderer,
-
-		// Provide the lister
 		NewLister,
 
-		// Provide the command
+		// Provide the creator
 		func(
 			cfg config.Interface,
 			log logger.Interface,
 			storage types.Interface,
-			lister *Lister,
-		) *cobra.Command {
-			// Add subcommands
-			Command.AddCommand(
-				&cobra.Command{
-					Use:   "list",
-					Short: "List all indices",
-					RunE: func(cmd *cobra.Command, args []string) error {
-						return lister.Start(cmd.Context())
-					},
-				},
-				&cobra.Command{
-					Use:   "create",
-					Short: "Create an index",
-					RunE: func(cmd *cobra.Command, args []string) error {
-						// TODO: Implement create functionality
-						return nil
-					},
-				},
-				&cobra.Command{
-					Use:   "delete",
-					Short: "Delete an index",
-					RunE: func(cmd *cobra.Command, args []string) error {
-						// TODO: Implement delete functionality
-						return nil
-					},
-				},
-			)
+		) *Creator {
+			return NewCreator(cfg, log, storage, CreateParams{})
+		},
 
-			return Command
+		// Provide the deleter
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			storage types.Interface,
+			srcs sources.Interface,
+		) *Deleter {
+			return NewDeleter(cfg, log, storage, srcs, DeleteParams{
+				Force: forceDelete,
+			})
 		},
 	),
 )
+
+// init initializes the index command and its subcommands
+func init() {
+	// Create the list command
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all indices",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get logger from context
+			loggerValue := cmd.Context().Value(common.LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context")
+			}
+
+			// Get config from context
+			configValue := cmd.Context().Value(common.ConfigKey)
+			cfg, ok := configValue.(config.Interface)
+			if !ok {
+				return errors.New("config not found in context")
+			}
+
+			app := fx.New(
+				Module,
+				fx.Provide(
+					func() config.Interface { return cfg },
+					func() logger.Interface { return log },
+				),
+				fx.Invoke(func(lister *Lister) error {
+					return lister.Start(cmd.Context())
+				}),
+			)
+			return app.Start(cmd.Context())
+		},
+	}
+
+	// Create the create command
+	createCmd := &cobra.Command{
+		Use:   "create [index-name]",
+		Short: "Create an index",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get logger from context
+			loggerValue := cmd.Context().Value(common.LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context")
+			}
+
+			// Get config from context
+			configValue := cmd.Context().Value(common.ConfigKey)
+			cfg, ok := configValue.(config.Interface)
+			if !ok {
+				return errors.New("config not found in context")
+			}
+
+			app := fx.New(
+				Module,
+				fx.Provide(
+					func() config.Interface { return cfg },
+					func() logger.Interface { return log },
+				),
+				fx.Invoke(func(creator *Creator) error {
+					creator.index = args[0]
+					return creator.Start(cmd.Context())
+				}),
+			)
+			return app.Start(cmd.Context())
+		},
+	}
+
+	// Create the delete command
+	deleteCmd := &cobra.Command{
+		Use:   "delete [index-name]",
+		Short: "Delete an index",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get logger from context
+			loggerValue := cmd.Context().Value(common.LoggerKey)
+			log, ok := loggerValue.(logger.Interface)
+			if !ok {
+				return errors.New("logger not found in context")
+			}
+
+			// Get config from context
+			configValue := cmd.Context().Value(common.ConfigKey)
+			cfg, ok := configValue.(config.Interface)
+			if !ok {
+				return errors.New("config not found in context")
+			}
+
+			app := fx.New(
+				Module,
+				fx.Provide(
+					func() config.Interface { return cfg },
+					func() logger.Interface { return log },
+				),
+				fx.Invoke(func(deleter *Deleter) error {
+					deleter.index = args
+					return deleter.Start(cmd.Context())
+				}),
+			)
+			return app.Start(cmd.Context())
+		},
+	}
+
+	// Add force flag to delete command
+	deleteCmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Force deletion without confirmation")
+
+	// Add subcommands to the global Command
+	Command.AddCommand(listCmd, createCmd, deleteCmd)
+}

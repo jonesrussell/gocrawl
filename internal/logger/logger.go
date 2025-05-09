@@ -2,6 +2,7 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -114,11 +115,14 @@ func New(config *Config) (Interface, error) {
 		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
 
+	// Get log level
+	level := getLogLevel(string(config.Level))
+
 	// Create core
 	core := zapcore.NewCore(
 		encoder,
 		zapcore.AddSync(os.Stdout),
-		getLogLevel(string(config.Level)),
+		level,
 	)
 
 	// Create logger with options
@@ -221,24 +225,41 @@ func (l *Logger) WithEnvironment(env string) Interface {
 	return l.With(fieldKeys.Environment, env)
 }
 
-// fieldPairSize represents the number of elements in a key-value pair.
-const fieldPairSize = 2
-
 // toZapFields converts a list of any fields to zap.Field.
 func toZapFields(fields []any) []zap.Field {
-	if len(fields)%fieldPairSize != 0 {
-		return []zap.Field{zap.Error(ErrInvalidFields)}
+	if len(fields) == 0 {
+		return nil
 	}
 
-	zapFields := make([]zap.Field, 0, len(fields)/fieldPairSize)
-	for i := 0; i < len(fields); i += fieldPairSize {
-		key, ok := fields[i].(string)
-		if !ok {
-			return []zap.Field{zap.Error(ErrInvalidFields)}
+	zapFields := make([]zap.Field, 0, len(fields))
+	for i := 0; i < len(fields); i++ {
+		switch field := fields[i].(type) {
+		case zap.Field:
+			// If it's already a zap.Field, use it directly
+			zapFields = append(zapFields, field)
+		case string:
+			// If it's a string, it should be a key
+			if i+1 >= len(fields) {
+				if defaultLogger != nil {
+					defaultLogger.Warn("Missing value for field key",
+						"key", field,
+						"error", ErrInvalidFields,
+					)
+				}
+				continue
+			}
+			zapFields = append(zapFields, zap.Any(field, fields[i+1]))
+			i++ // Skip the value in the next iteration
+		default:
+			// If it's neither, log a warning and skip
+			if defaultLogger != nil {
+				defaultLogger.Warn("Invalid field type",
+					"expected_type", "string or zap.Field",
+					"actual_type", fmt.Sprintf("%T", field),
+					"error", ErrInvalidFields,
+				)
+			}
 		}
-
-		value := fields[i+1]
-		zapFields = append(zapFields, zap.Any(key, value))
 	}
 
 	return zapFields
