@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
-	"go.uber.org/zap"
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/cmd/common"
@@ -50,25 +49,21 @@ var Module = fx.Module("root",
 		func() (config.Interface, error) {
 			return config.LoadConfig()
 		},
-		func(cfg config.Interface) (*zap.Logger, logger.Interface, error) {
-			logConfig := &logger.Config{
+		func() *logger.Config {
+			return &logger.Config{
 				Level:       logger.Level(viper.GetString("logger.level")),
 				Development: viper.GetBool("logger.development"),
 				Encoding:    viper.GetString("logger.encoding"),
 				OutputPaths: viper.GetStringSlice("logger.output_paths"),
 				EnableColor: viper.GetBool("logger.enable_color"),
 			}
-
-			logInterface, zapLogger, err := logger.NewWithZap(logConfig)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			return zapLogger, logInterface, nil
+		},
+		func(logConfig *logger.Config) (logger.Interface, error) {
+			return logger.New(logConfig)
 		},
 	),
-	fx.WithLogger(func(log *zap.Logger) fxevent.Logger {
-		return &fxevent.ZapLogger{Logger: log}
+	fx.WithLogger(func(log logger.Interface) fxevent.Logger {
+		return logger.NewFxLogger(log)
 	}),
 )
 
@@ -86,6 +81,7 @@ func Execute() error {
 
 	// Create the application
 	app := fx.New(
+		fx.NopLogger, // Disable default Fx logger
 		Module,
 		storage.ClientModule,
 		index.Module,
@@ -174,8 +170,6 @@ func initConfig() error {
 	if err := viper.ReadInConfig(); err != nil {
 		// Config file not found, that's ok - we'll use defaults
 		fmt.Fprintf(os.Stderr, "Warning: Config file not found: %v\n", err)
-	} else {
-		fmt.Fprintf(os.Stderr, "Using config file: %s\n", viper.ConfigFileUsed())
 	}
 
 	// Bind environment variables
@@ -187,29 +181,22 @@ func initConfig() error {
 	viper.BindEnv("app.debug", "APP_DEBUG")
 	viper.BindEnv("logger.level", "LOG_LEVEL")
 	viper.BindEnv("logger.encoding", "LOG_FORMAT")
-	viper.BindEnv("logger.development", "APP_DEBUG")  // Development mode follows debug mode
-	viper.BindEnv("logger.enable_color", "APP_DEBUG") // Color output follows debug mode
-	viper.BindEnv("logger.caller", "APP_DEBUG")       // Caller info follows debug mode
-	viper.BindEnv("logger.stacktrace", "APP_DEBUG")   // Stacktrace follows debug mode
 
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		// .env file not found, that's ok - we'll use environment variables
 		fmt.Fprintf(os.Stderr, "Warning: .env file not found: %v\n", err)
-	} else {
-		fmt.Fprintf(os.Stderr, "Loaded .env file\n")
 	}
 
-	// Debug: Print all configuration values
-	fmt.Fprintf(os.Stderr, "Configuration values:\n")
-	fmt.Fprintf(os.Stderr, "  APP_ENV: %s\n", viper.GetString("app.environment"))
-	fmt.Fprintf(os.Stderr, "  APP_DEBUG: %v\n", viper.GetBool("app.debug"))
-	fmt.Fprintf(os.Stderr, "  LOG_LEVEL: %s\n", viper.GetString("logger.level"))
-	fmt.Fprintf(os.Stderr, "  LOG_FORMAT: %s\n", viper.GetString("logger.encoding"))
-	fmt.Fprintf(os.Stderr, "  LOG_DEVELOPMENT: %v\n", viper.GetBool("logger.development"))
-	fmt.Fprintf(os.Stderr, "  LOG_ENABLE_COLOR: %v\n", viper.GetBool("logger.enable_color"))
-	fmt.Fprintf(os.Stderr, "  LOG_CALLER: %v\n", viper.GetBool("logger.caller"))
-	fmt.Fprintf(os.Stderr, "  LOG_STACKTRACE: %v\n", viper.GetBool("logger.stacktrace"))
+	// Set development logging settings based on environment
+	isDev := viper.GetString("app.environment") == "development" && viper.GetBool("app.debug")
+	if isDev {
+		viper.Set("logger.development", true)
+		viper.Set("logger.enable_color", true)
+		viper.Set("logger.caller", true)
+		viper.Set("logger.stacktrace", true)
+		viper.Set("logger.encoding", "console")
+	}
 
 	return nil
 }
@@ -228,7 +215,7 @@ func setDefaults() {
 	viper.SetDefault("logger", map[string]any{
 		"level":        "info",
 		"development":  false,
-		"encoding":     "console",
+		"encoding":     "json",
 		"output_paths": []string{"stdout"},
 		"enable_color": false,
 		"caller":       false,

@@ -1,9 +1,7 @@
 package logger
 
 import (
-	"reflect"
 	"strings"
-	"time"
 
 	"go.uber.org/fx/fxevent"
 )
@@ -15,7 +13,9 @@ type fxLogger struct {
 
 // NewFxLogger creates a new fx logger.
 func NewFxLogger(log Interface) fxevent.Logger {
-	return &fxLogger{log: log}
+	return &fxLogger{
+		log: log,
+	}
 }
 
 // cleanConstructorName cleans up a constructor name for logging
@@ -35,48 +35,10 @@ func cleanConstructorName(name string) string {
 	return name
 }
 
-// logSuccessOrError is a helper method for logging success or error events.
-func (l *fxLogger) logSuccessOrError(successMsg, errorMsg string, err error, fields ...any) {
-	if err != nil {
-		l.log.Error(errorMsg, append(fields, "error", err)...)
-	} else {
-		l.log.Debug(successMsg, fields...)
-	}
-}
-
-// eventHandler defines the interface for handling fx events.
-type eventHandler interface {
-	Handle(log Interface, event fxevent.Event)
-}
-
-// multiTypeEventHandler handles events with multiple types.
-type multiTypeEventHandler struct {
-	successMsg string
-	errorMsg   string
-}
-
-// Handle implements the eventHandler interface for multi-type events.
-func (h *multiTypeEventHandler) Handle(log Interface, event fxevent.Event) {
-	switch event.(type) {
-	case *fxevent.Provided, *fxevent.Replaced, *fxevent.Decorated:
-		var outputTypes []string
-		var constructorName, decoratorName string
-		var err error
-
-		switch ev := event.(type) {
-		case *fxevent.Provided:
-			outputTypes = ev.OutputTypeNames
-			constructorName = ev.ConstructorName
-			err = ev.Err
-		case *fxevent.Replaced:
-			outputTypes = ev.OutputTypeNames
-			err = ev.Err
-		case *fxevent.Decorated:
-			outputTypes = ev.OutputTypeNames
-			decoratorName = ev.DecoratorName
-			err = ev.Err
-		}
-
+// LogEvent logs an fx event.
+func (l *fxLogger) LogEvent(event fxevent.Event) {
+	switch e := event.(type) {
+	case *fxevent.Provided:
 		// Only log important dependencies
 		importantTypes := map[string]bool{
 			"*article.Manager":      true,
@@ -91,194 +53,103 @@ func (h *multiTypeEventHandler) Handle(log Interface, event fxevent.Event) {
 			"crawler.Interface":     true,
 		}
 
-		for _, rtype := range outputTypes {
+		for _, rtype := range e.OutputTypeNames {
 			if !importantTypes[rtype] {
 				continue
 			}
 
 			fields := []any{"type", rtype}
-			if constructorName != "" {
-				msg := "Initialized " + cleanConstructorName(constructorName)
-				log.Debug(msg, fields...)
-			} else if decoratorName != "" {
-				fields = append(fields, "decorator", decoratorName)
-				log.Debug(h.successMsg, fields...)
+			if e.ConstructorName != "" {
+				msg := "Initialized " + cleanConstructorName(e.ConstructorName)
+				l.log.Debug(msg, fields...)
 			} else {
-				log.Debug(h.successMsg, fields...)
+				l.log.Debug("Provided", fields...)
 			}
 		}
 
-		if err != nil {
-			log.Error(h.errorMsg, "error", err)
+		if e.Err != nil {
+			l.log.Error("Error encountered while applying options", "error", e.Err)
 		}
-	}
-}
 
-// hookEventHandler handles hook events (OnStart/OnStop).
-type hookEventHandler struct {
-	prefix string
-}
-
-// Handle implements the eventHandler interface for hook events.
-func (h *hookEventHandler) Handle(log Interface, event fxevent.Event) {
-	switch event.(type) {
-	case *fxevent.OnStartExecuting, *fxevent.OnStopExecuting:
-		var functionName, callerName string
-		switch ev := event.(type) {
-		case *fxevent.OnStartExecuting:
-			functionName = ev.FunctionName
-			callerName = ev.CallerName
-		case *fxevent.OnStopExecuting:
-			functionName = ev.FunctionName
-			callerName = ev.CallerName
-		}
-		log.Debug(h.prefix+" hook executing",
-			"callee", cleanConstructorName(functionName),
-			"caller", cleanConstructorName(callerName),
+	case *fxevent.Invoked:
+		l.log.Debug("Invoked",
+			"function", cleanConstructorName(e.FunctionName),
 		)
-	case *fxevent.OnStartExecuted, *fxevent.OnStopExecuted:
-		var functionName, callerName string
-		var err error
-		var runtime time.Duration
-		switch ev := event.(type) {
-		case *fxevent.OnStartExecuted:
-			functionName = ev.FunctionName
-			callerName = ev.CallerName
-			err = ev.Err
-			runtime = ev.Runtime
-		case *fxevent.OnStopExecuted:
-			functionName = ev.FunctionName
-			callerName = ev.CallerName
-			err = ev.Err
-			runtime = ev.Runtime
+		if e.Err != nil {
+			l.log.Error("Invoke failed", "error", e.Err)
 		}
-		(&fxLogger{log: log}).logSuccessOrError(
-			h.prefix+" hook executed",
-			h.prefix+" hook failed",
-			err,
-			"callee", cleanConstructorName(functionName),
-			"caller", cleanConstructorName(callerName),
-			"runtime", runtime,
+
+	case *fxevent.Run:
+		l.log.Debug("Running",
+			"function", cleanConstructorName(e.Name),
+			"duration", e.Runtime,
 		)
-	}
-}
-
-// simpleEventHandler handles simple success/error events.
-type simpleEventHandler struct {
-	successMsg string
-	errorMsg   string
-}
-
-// Handle implements the eventHandler interface for simple events.
-func (h *simpleEventHandler) Handle(log Interface, event fxevent.Event) {
-	switch event.(type) {
-	case *fxevent.Supplied, *fxevent.Invoked, *fxevent.LoggerInitialized, *fxevent.Invoking, *fxevent.Run:
-		var err error
-		var fields []any
-
-		switch ev := event.(type) {
-		case *fxevent.Supplied:
-			err = ev.Err
-			fields = []any{"type", ev.TypeName}
-		case *fxevent.Invoked:
-			err = ev.Err
-			fields = []any{"function", cleanConstructorName(ev.FunctionName)}
-		case *fxevent.LoggerInitialized:
-			err = ev.Err
-			fields = []any{"function", cleanConstructorName(ev.ConstructorName)}
-		case *fxevent.Invoking:
-			fields = []any{"function", cleanConstructorName(ev.FunctionName)}
-		case *fxevent.Run:
-			fields = []any{"function", cleanConstructorName(ev.Name)}
+		if e.Err != nil {
+			l.log.Error("Run failed", "error", e.Err)
 		}
 
-		(&fxLogger{log: log}).logSuccessOrError(h.successMsg, h.errorMsg, err, fields...)
-	}
-}
+	case *fxevent.OnStartExecuting:
+		l.log.Debug("Starting",
+			"function", cleanConstructorName(e.FunctionName),
+			"caller", cleanConstructorName(e.CallerName),
+		)
 
-// signalEventHandler handles signal-related events.
-type signalEventHandler struct{}
+	case *fxevent.OnStartExecuted:
+		if e.Err != nil {
+			l.log.Error("Start failed",
+				"function", cleanConstructorName(e.FunctionName),
+				"caller", cleanConstructorName(e.CallerName),
+				"duration", e.Runtime,
+				"error", e.Err,
+			)
+		} else {
+			l.log.Debug("Started",
+				"function", cleanConstructorName(e.FunctionName),
+				"caller", cleanConstructorName(e.CallerName),
+				"duration", e.Runtime,
+			)
+		}
 
-// Handle implements the eventHandler interface for signal events.
-func (h *signalEventHandler) Handle(log Interface, event fxevent.Event) {
-	switch e := event.(type) {
+	case *fxevent.OnStopExecuting:
+		l.log.Debug("Stopping",
+			"function", cleanConstructorName(e.FunctionName),
+			"caller", cleanConstructorName(e.CallerName),
+		)
+
+	case *fxevent.OnStopExecuted:
+		if e.Err != nil {
+			l.log.Error("Stop failed",
+				"function", cleanConstructorName(e.FunctionName),
+				"caller", cleanConstructorName(e.CallerName),
+				"duration", e.Runtime,
+				"error", e.Err,
+			)
+		} else {
+			l.log.Debug("Stopped",
+				"function", cleanConstructorName(e.FunctionName),
+				"caller", cleanConstructorName(e.CallerName),
+				"duration", e.Runtime,
+			)
+		}
+
+	case *fxevent.Started:
+		if e.Err != nil {
+			l.log.Error("Application start failed", "error", e.Err)
+		} else {
+			l.log.Info("Application started")
+		}
+
 	case *fxevent.Stopping:
-		log.Info("Received signal", "signal", e.Signal)
-	case *fxevent.Stopped, *fxevent.RolledBack, *fxevent.Started:
-		var err error
-		var msg string
-		switch ev := event.(type) {
-		case *fxevent.Stopped:
-			err = ev.Err
-			msg = "Stop failed"
-		case *fxevent.RolledBack:
-			err = ev.Err
-			msg = "Start failed, rolling back"
-		case *fxevent.Started:
-			err = ev.Err
-			msg = "Start failed"
+		l.log.Info("Application stopping", "signal", e.Signal)
+
+	case *fxevent.Stopped:
+		if e.Err != nil {
+			l.log.Error("Application stop failed", "error", e.Err)
+		} else {
+			l.log.Info("Application stopped")
 		}
 
-		if err != nil {
-			log.Error(msg, "error", err)
-		} else if _, ok := event.(*fxevent.Started); ok {
-			log.Info("Started")
-		}
+	case *fxevent.RolledBack:
+		l.log.Error("Application start failed, rolling back", "error", e.Err)
 	}
-}
-
-// eventHandlers maps event types to their handlers.
-var eventHandlers = map[reflect.Type]eventHandler{
-	reflect.TypeOf(&fxevent.Provided{}): &multiTypeEventHandler{
-		successMsg: "Provided",
-		errorMsg:   "Error encountered while applying options",
-	},
-	reflect.TypeOf(&fxevent.Replaced{}): &multiTypeEventHandler{
-		successMsg: "Replaced",
-		errorMsg:   "Error encountered while replacing",
-	},
-	reflect.TypeOf(&fxevent.Decorated{}): &multiTypeEventHandler{
-		successMsg: "Decorated",
-		errorMsg:   "Error encountered while applying options",
-	},
-	reflect.TypeOf(&fxevent.OnStartExecuting{}): &hookEventHandler{prefix: "OnStart"},
-	reflect.TypeOf(&fxevent.OnStartExecuted{}):  &hookEventHandler{prefix: "OnStart"},
-	reflect.TypeOf(&fxevent.OnStopExecuting{}):  &hookEventHandler{prefix: "OnStop"},
-	reflect.TypeOf(&fxevent.OnStopExecuted{}):   &hookEventHandler{prefix: "OnStop"},
-	reflect.TypeOf(&fxevent.Supplied{}): &simpleEventHandler{
-		successMsg: "Supplied",
-		errorMsg:   "Error encountered while applying options",
-	},
-	reflect.TypeOf(&fxevent.Invoked{}): &simpleEventHandler{
-		successMsg: "Invoked",
-		errorMsg:   "Invoke failed",
-	},
-	reflect.TypeOf(&fxevent.LoggerInitialized{}): &simpleEventHandler{
-		successMsg: "Initialized custom fxevent.Logger",
-		errorMsg:   "Custom logger initialization failed",
-	},
-	reflect.TypeOf(&fxevent.Invoking{}): &simpleEventHandler{
-		successMsg: "Invoking",
-		errorMsg:   "Invoke failed",
-	},
-	reflect.TypeOf(&fxevent.Run{}): &simpleEventHandler{
-		successMsg: "Running",
-		errorMsg:   "Run failed",
-	},
-	reflect.TypeOf(&fxevent.Stopping{}):   &signalEventHandler{},
-	reflect.TypeOf(&fxevent.Stopped{}):    &signalEventHandler{},
-	reflect.TypeOf(&fxevent.RolledBack{}): &signalEventHandler{},
-	reflect.TypeOf(&fxevent.Started{}):    &signalEventHandler{},
-}
-
-// LogEvent logs an fx event.
-func (l *fxLogger) LogEvent(event fxevent.Event) {
-	handler, ok := eventHandlers[reflect.TypeOf(event)]
-	if !ok {
-		l.log.Error("Unknown event type",
-			"type", reflect.TypeOf(event),
-		)
-		return
-	}
-	handler.Handle(l.log, event)
 }

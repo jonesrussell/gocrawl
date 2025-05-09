@@ -2,10 +2,10 @@
 package logger
 
 import (
-	"fmt"
 	"os"
+	"strings"
+	"time"
 
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -47,90 +47,68 @@ func New(config *Config) (Interface, error) {
 		config.OutputPaths = []string{"stdout"}
 	}
 
-	// Create development encoder config
-	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "T",
-		LevelKey:       "L",
-		NameKey:        "N",
-		CallerKey:      "C",
-		FunctionKey:    zapcore.OmitKey,
-		MessageKey:     "M",
-		StacktraceKey:  "S",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.CapitalLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
-		EncodeDuration: zapcore.StringDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
-	}
-
-	// Set output
-	output := zapcore.AddSync(os.Stdout)
-
-	// Create level enabler
-	var level zapcore.Level
-	switch config.Level {
-	case "debug":
-		level = zapcore.DebugLevel
-	case "info":
-		level = zapcore.InfoLevel
-	case "warn":
-		level = zapcore.WarnLevel
-	case "error":
-		level = zapcore.ErrorLevel
-	default:
-		level = zapcore.InfoLevel
-	}
-
-	// Create encoder based on encoding setting
-	var encoder zapcore.Encoder
-	if config.Encoding == "console" {
-		if config.EnableColor {
-			encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	// Create encoder config
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
+	if config.Development {
+		encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		encoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+			enc.AppendString(t.Format("2006-01-02 15:04:05.000"))
 		}
-		encoder = zapcore.NewConsoleEncoder(encoderConfig)
+		encoderConfig.EncodeDuration = zapcore.StringDurationEncoder
+		encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+		encoderConfig.ConsoleSeparator = " | "
 	} else {
+		encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+		encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+		encoderConfig.EncodeDuration = zapcore.StringDurationEncoder
+		encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+	}
+
+	// Create encoder
+	var encoder zapcore.Encoder
+	if config.Encoding == "json" {
 		encoder = zapcore.NewJSONEncoder(encoderConfig)
+	} else {
+		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
 
 	// Create core
 	core := zapcore.NewCore(
 		encoder,
-		output,
-		level,
+		zapcore.AddSync(os.Stdout),
+		getLogLevel(string(config.Level)),
 	)
 
 	// Create logger with options
 	opts := []zap.Option{
 		zap.AddCaller(),
+		zap.AddStacktrace(zapcore.ErrorLevel),
 	}
-
-	// Add development mode options
 	if config.Development {
-		opts = append(opts,
-			zap.Development(),
-			zap.AddStacktrace(zapcore.WarnLevel),
-		)
-	} else {
-		opts = append(opts,
-			zap.AddStacktrace(zapcore.ErrorLevel),
-		)
+		opts = append(opts, zap.Development())
 	}
-
-	// Create logger
 	zapLogger := zap.New(core, opts...)
+
 	defaultLogger = &Logger{zapLogger: zapLogger}
-
-	// Log configuration details
-	defaultLogger.Debug("Logger configuration",
-		"level", config.Level,
-		"development", config.Development,
-		"encoding", config.Encoding,
-		"output_paths", config.OutputPaths,
-		"enable_color", config.EnableColor,
-		"zap_level", level.String(),
-		"zap_options", fmt.Sprintf("%+v", opts))
-
 	return defaultLogger, nil
+}
+
+// getLogLevel converts a string level to zapcore.Level
+func getLogLevel(level string) zapcore.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	case "fatal":
+		return zapcore.FatalLevel
+	default:
+		return zapcore.InfoLevel
+	}
 }
 
 // Debug logs a debug message.
@@ -186,56 +164,4 @@ func toZapFields(fields []any) []zap.Field {
 	}
 
 	return zapFields
-}
-
-// NewFromConfig creates a new logger instance from Viper configuration
-func NewFromConfig(v *viper.Viper) (Interface, error) {
-	// Get logger configuration from Viper
-	logConfig := &Config{
-		Level:       Level(v.GetString("logger.level")),
-		Development: v.GetBool("logger.development"),
-		Encoding:    v.GetString("logger.encoding"),
-		OutputPaths: v.GetStringSlice("logger.output_paths"),
-		EnableColor: v.GetBool("logger.enable_color"),
-	}
-
-	// If no output paths specified, default to stdout
-	if len(logConfig.OutputPaths) == 0 {
-		logConfig.OutputPaths = DefaultOutputPaths
-	}
-
-	// Create logger with configuration
-	log, err := New(logConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
-
-	// Log the current log level
-	log.Debug("Logger initialized",
-		"level", logConfig.Level,
-		"development", logConfig.Development,
-		"encoding", logConfig.Encoding,
-		"output_paths", logConfig.OutputPaths,
-		"enable_color", logConfig.EnableColor)
-
-	return log, nil
-}
-
-// GetZapLogger returns the underlying zap logger
-func (l *Logger) GetZapLogger() *zap.Logger {
-	return l.zapLogger
-}
-
-// NewWithZap creates a new logger instance and returns both Interface and *zap.Logger
-func NewWithZap(config *Config) (Interface, *zap.Logger, error) {
-	logger, err := New(config)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if l, ok := logger.(*Logger); ok {
-		return logger, l.zapLogger, nil
-	}
-
-	return logger, nil, fmt.Errorf("failed to get underlying zap logger")
 }
