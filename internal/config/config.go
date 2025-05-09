@@ -58,20 +58,6 @@ func NewConfig(logger logger.Interface) *Config {
 	}
 }
 
-// validateBasicConfig validates the basic configuration that's common to all commands
-func (c *Config) validateBasicConfig() error {
-	if c.Environment == "" {
-		return errors.New("environment is required")
-	}
-
-	// Always validate logger as it's used by all commands
-	if err := c.Logger.Validate(); err != nil {
-		return fmt.Errorf("logger: %w", err)
-	}
-
-	return nil
-}
-
 // validateCrawlConfig validates the configuration for the crawl command
 func (c *Config) validateCrawlConfig() error {
 	if err := c.Elasticsearch.Validate(); err != nil {
@@ -110,10 +96,6 @@ func (c *Config) validateSearchConfig() error {
 
 // Validate validates the configuration based on the current command.
 func (c *Config) Validate() error {
-	if err := c.validateBasicConfig(); err != nil {
-		return err
-	}
-
 	switch c.Command {
 	case commands.IndicesList, commands.IndicesDelete, commands.IndicesCreate:
 		if err := c.Elasticsearch.Validate(); err != nil {

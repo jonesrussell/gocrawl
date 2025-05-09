@@ -3,6 +3,8 @@ package config
 
 import (
 	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 )
 
 // ValidLogLevels defines the valid logging levels
@@ -76,7 +78,7 @@ const (
 	DefaultElasticsearchRetries = 3
 
 	// DefaultBulkSize is the default number of documents to bulk index
-	DefaultBulkSize = 1000
+	DefaultBulkSize = elasticsearch.DefaultBulkSize
 
 	// DefaultHTTPPort is the default HTTP server port
 	DefaultHTTPPort = 8080

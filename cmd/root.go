@@ -36,32 +36,29 @@ var (
 		Short: "A web crawler for collecting and processing content",
 		Long: `gocrawl is a web crawler that helps you collect and process content from various sources.
 It provides a flexible and extensible framework for building custom crawlers.`,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Load configuration
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Initialize logger
+			log, err := logger.NewFromConfig(viper.GetViper())
+			if err != nil {
+				return fmt.Errorf("failed to initialize logger: %w", err)
+			}
+
+			// Create a context with dependencies
+			ctx := context.Background()
+			ctx = context.WithValue(ctx, common.LoggerKey, log)
+			ctx = context.WithValue(ctx, common.ConfigKey, cfg)
+			cmd.SetContext(ctx)
+
+			return nil
+		},
 	}
 )
-
-const (
-	// DefaultBulkSize is the default number of documents to bulk index
-	DefaultBulkSize = 1000
-)
-
-// setupConfig handles configuration file setup for all commands
-func setupConfig(cmd *cobra.Command) error {
-	// Load configuration
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Bind flags to configuration
-	if bindErr := bindFlags(cmd); bindErr != nil {
-		return fmt.Errorf("failed to bind flags: %w", bindErr)
-	}
-
-	// Store config in command context
-	cmd.SetContext(context.WithValue(cmd.Context(), common.ConfigKey, cfg))
-
-	return nil
-}
 
 // bindFlags binds all command flags to viper configuration.
 func bindFlags(cmd *cobra.Command) error {
@@ -91,32 +88,6 @@ func bindFlags(cmd *cobra.Command) error {
 // It runs the root command and handles any errors that occur during execution.
 // If an error occurs, it prints the error message and exits with status code 1.
 func Execute() {
-	// Initialize configuration
-	if err := setupConfig(rootCmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Initialize logger
-	log, err := logger.NewFromConfig(viper.GetViper())
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Initialize config
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		log.Error("Failed to load config", "error", err)
-		os.Exit(1)
-	}
-
-	// Create a context with dependencies
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, common.LoggerKey, log)
-	ctx = context.WithValue(ctx, common.ConfigKey, cfg)
-	rootCmd.SetContext(ctx)
-
 	// Add commands first
 	rootCmd.AddCommand(
 		scheduler.Command(),         // Main scheduler command with fx
@@ -128,13 +99,15 @@ func Execute() {
 	)
 
 	if executeErr := rootCmd.Execute(); executeErr != nil {
-		log.Error("Failed to execute command", "error", executeErr)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", executeErr)
 		os.Exit(1)
 	}
 }
 
 // init initializes the root command and its subcommands.
 func init() {
+	cobra.OnInitialize(initConfig)
+
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(
 		&cfgFile,
@@ -143,4 +116,27 @@ func init() {
 		"config file (default is ./config.yaml, ~/.crawler/config.yaml, or /etc/crawler/config.yaml)",
 	)
 	rootCmd.PersistentFlags().BoolVar(&Debug, "debug", false, "enable debug mode")
+
+	// Bind flags
+	if err := bindFlags(rootCmd); err != nil {
+		fmt.Fprintf(os.Stderr, "Error binding flags: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// initConfig reads in config file and ENV variables if set.
+func initConfig() {
+	if cfgFile != "" {
+		// Use config file from the flag
+		viper.SetConfigFile(cfgFile)
+	} else {
+		// Search for config in default locations
+		viper.AddConfigPath(".")              // Current directory
+		viper.AddConfigPath("$HOME/.gocrawl") // User config directory
+		viper.AddConfigPath("/etc/gocrawl")   // System config directory
+		viper.SetConfigName("config")
+	}
+
+	// Read in environment variables that match
+	viper.AutomaticEnv()
 }
