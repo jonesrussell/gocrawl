@@ -11,6 +11,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/mitchellh/mapstructure"
 )
 
 // ElasticsearchStorage implements the storage interface using Elasticsearch
@@ -39,7 +40,7 @@ func (s *ElasticsearchStorage) GetIndexManager() types.IndexManager {
 }
 
 // IndexDocument indexes a document
-func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, id string, document any) error {
+func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index, id string, document any) error {
 	res, err := s.client.Index(
 		index,
 		bytes.NewReader(mustJSON(document)),
@@ -58,9 +59,13 @@ func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, 
 	return nil
 }
 
-// GetDocument retrieves a document
-func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index, id string, document any) error {
-	res, err := s.client.Get(index, id)
+// GetDocument retrieves a document by ID
+func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index, id string, result any) error {
+	res, err := s.client.Get(
+		index,
+		id,
+		s.client.Get.WithContext(ctx),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to get document: %w", err)
 	}
@@ -70,26 +75,26 @@ func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index, id string
 		return fmt.Errorf("error getting document: %s", res.String())
 	}
 
-	var result struct {
-		Source json.RawMessage `json:"_source"`
+	var doc struct {
+		Source any `json:"_source"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if result.Source == nil {
-		return errors.New("invalid document source")
+	if decodeErr := json.NewDecoder(res.Body).Decode(&doc); decodeErr != nil {
+		return fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
-	if err := json.Unmarshal(result.Source, document); err != nil {
-		return fmt.Errorf("failed to unmarshal document: %w", err)
+	if doc.Source == nil {
+		return errors.New("document not found")
+	}
+
+	if unmarshalErr := mapstructure.Decode(doc.Source, result); unmarshalErr != nil {
+		return fmt.Errorf("error unmarshaling document: %w", unmarshalErr)
 	}
 
 	return nil
 }
 
 // DeleteDocument deletes a document
-func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string, id string) error {
+func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index, id string) error {
 	res, err := s.client.Delete(
 		index,
 		id,
@@ -108,7 +113,12 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 }
 
 // SearchDocuments performs a search query
-func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string, query map[string]any, result any) error {
+func (s *ElasticsearchStorage) SearchDocuments(
+	ctx context.Context,
+	index string,
+	query map[string]any,
+	result any,
+) error {
 	queryBytes := mustJSON(query)
 	res, err := s.client.Search(
 		s.client.Search.WithContext(ctx),
@@ -116,41 +126,32 @@ func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string
 		s.client.Search.WithBody(bytes.NewReader(queryBytes)),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to search documents: %w", err)
+		return fmt.Errorf("failed to search: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return fmt.Errorf("error searching documents: %s", res.String())
+		return fmt.Errorf("error searching: %s", res.String())
 	}
 
 	var searchResult struct {
 		Hits struct {
 			Hits []struct {
-				Source map[string]any `json:"_source"`
+				Source any `json:"_source"`
 			} `json:"hits"`
 		} `json:"hits"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&searchResult); err != nil {
-		return fmt.Errorf("failed to decode search response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&searchResult); decodeErr != nil {
+		return fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
-	if searchResult.Hits.Hits == nil {
-		return errors.New("invalid search result")
-	}
-
-	hits := make([]map[string]any, 0, len(searchResult.Hits.Hits))
+	hits := make([]any, 0, len(searchResult.Hits.Hits))
 	for _, hit := range searchResult.Hits.Hits {
 		hits = append(hits, hit.Source)
 	}
 
-	bytes, err := json.Marshal(hits)
-	if err != nil {
-		return fmt.Errorf("failed to marshal hits: %w", err)
-	}
-
-	if err := json.Unmarshal(bytes, result); err != nil {
-		return fmt.Errorf("failed to unmarshal result: %w", err)
+	if unmarshalErr := mapstructure.Decode(hits, result); unmarshalErr != nil {
+		return fmt.Errorf("error unmarshaling hits: %w", unmarshalErr)
 	}
 
 	return nil
@@ -159,8 +160,12 @@ func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string
 // Search performs a search query
 func (s *ElasticsearchStorage) Search(ctx context.Context, index string, query any) ([]any, error) {
 	var result []any
-	if err := s.SearchDocuments(ctx, index, query.(map[string]any), &result); err != nil {
-		return nil, err
+	queryMap, ok := query.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid query type: expected map[string]any, got %T", query)
+	}
+	if err := s.SearchDocuments(ctx, index, queryMap, &result); err != nil {
+		return nil, fmt.Errorf("failed to search documents: %w", err)
 	}
 	return result, nil
 }
@@ -181,14 +186,14 @@ func (s *ElasticsearchStorage) Count(ctx context.Context, index string, query an
 		return 0, fmt.Errorf("error counting documents: %s", res.String())
 	}
 
-	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("error decoding response: %w", err)
+	var countResult map[string]any
+	if decodeErr := json.NewDecoder(res.Body).Decode(&countResult); decodeErr != nil {
+		return 0, fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
-	count, ok := result["count"].(float64)
+	count, ok := countResult["count"].(float64)
 	if !ok {
-		return 0, fmt.Errorf("invalid count result")
+		return 0, errors.New("invalid count result")
 	}
 
 	return int64(count), nil
@@ -213,14 +218,14 @@ func (s *ElasticsearchStorage) Aggregate(ctx context.Context, index string, aggs
 		return nil, fmt.Errorf("error aggregating: %s", res.String())
 	}
 
-	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
+	var aggResult map[string]any
+	if decodeErr := json.NewDecoder(res.Body).Decode(&aggResult); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
-	aggregations, ok := result["aggregations"].(map[string]any)
+	aggregations, ok := aggResult["aggregations"].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("invalid aggregations result")
+		return nil, errors.New("invalid aggregations result")
 	}
 
 	return aggregations, nil
@@ -274,7 +279,8 @@ func (s *ElasticsearchStorage) IndexExists(ctx context.Context, index string) (b
 	}
 	defer res.Body.Close()
 
-	return res.StatusCode == 200, nil
+	const successStatusCode = 200
+	return res.StatusCode == successStatusCode, nil
 }
 
 // ListIndices lists all indices
@@ -293,8 +299,8 @@ func (s *ElasticsearchStorage) ListIndices(ctx context.Context) ([]string, error
 	}
 
 	var indices []map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&indices); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
+	if decodeErr := json.NewDecoder(res.Body).Decode(&indices); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
 	var result []string
@@ -324,19 +330,19 @@ func (s *ElasticsearchStorage) GetMapping(ctx context.Context, index string) (ma
 		return nil, fmt.Errorf("error getting mapping: %s", res.String())
 	}
 
-	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
+	var mappingResult map[string]any
+	if decodeErr := json.NewDecoder(res.Body).Decode(&mappingResult); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
-	indexMapping, ok := result[index].(map[string]any)
+	indexMapping, ok := mappingResult[index].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("invalid index mapping")
+		return nil, errors.New("invalid index mapping")
 	}
 
 	mappings, ok := indexMapping["mappings"].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("invalid mappings")
+		return nil, errors.New("invalid mappings")
 	}
 
 	return mappings, nil
@@ -376,14 +382,14 @@ func (s *ElasticsearchStorage) GetIndexHealth(ctx context.Context, index string)
 		return "", fmt.Errorf("error getting index health: %s", res.String())
 	}
 
-	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("error decoding response: %w", err)
+	var healthResult map[string]any
+	if decodeErr := json.NewDecoder(res.Body).Decode(&healthResult); decodeErr != nil {
+		return "", fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
-	status, ok := result["status"].(string)
+	status, ok := healthResult["status"].(string)
 	if !ok {
-		return "", fmt.Errorf("invalid status")
+		return "", errors.New("invalid status")
 	}
 
 	return status, nil
@@ -404,14 +410,14 @@ func (s *ElasticsearchStorage) GetIndexDocCount(ctx context.Context, index strin
 		return 0, fmt.Errorf("error getting document count: %s", res.String())
 	}
 
-	var result map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("error decoding response: %w", err)
+	var countResult map[string]any
+	if decodeErr := json.NewDecoder(res.Body).Decode(&countResult); decodeErr != nil {
+		return 0, fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
-	count, ok := result["count"].(float64)
+	count, ok := countResult["count"].(float64)
 	if !ok {
-		return 0, fmt.Errorf("invalid count result")
+		return 0, errors.New("invalid count result")
 	}
 
 	return int64(count), nil
