@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/cmd/common"
 	crawlcmd "github.com/jonesrussell/gocrawl/cmd/crawl"
 	httpdcmd "github.com/jonesrussell/gocrawl/cmd/httpd"
@@ -128,41 +128,30 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	// Set config file
 	if cfgFile != "" {
-		// Use config file from the flag
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Search for config in default locations
-		viper.AddConfigPath(".")              // Current directory
-		viper.AddConfigPath("$HOME/.gocrawl") // User config directory
-		viper.AddConfigPath("/etc/gocrawl")   // System config directory
 		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath(".")
+		viper.AddConfigPath("./config")
 	}
 
-	// Set up environment variable binding
+	// Set defaults first
+	setDefaults()
+
+	// Read config file
+	if err := viper.ReadInConfig(); err != nil {
+		// Config file not found, that's ok
+	}
+
+	// Bind environment variables
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Load .env file if it exists
-	viper.SetConfigFile(".env")
-	if err := viper.MergeInConfig(); err != nil {
-		var configFileNotFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFound) {
-			fmt.Fprintf(os.Stderr, "Warning: failed to load .env file: %v\n", err)
-		}
-	}
-
-	// Set defaults
-	setDefaults()
-
-	// Read the config file
-	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFound) {
-			fmt.Fprintf(os.Stderr, "Warning: failed to read config file: %v\n", err)
-		}
-		// If config file is not found, we'll use the defaults set by setDefaults
-	}
+	godotenv.Load()
 }
 
 // setDefaults sets default configuration values
@@ -213,13 +202,17 @@ func setDefaults() {
 		"retry": map[string]any{
 			"enabled":      true,
 			"initial_wait": "1s",
-			"max_wait":     "5s",
+			"max_wait":     "30s",
 			"max_retries":  config.DefaultElasticsearchRetries,
 		},
 		"bulk_size":      config.DefaultBulkSize,
 		"flush_interval": "1s",
 		"tls": map[string]any{
-			"insecure_skip_verify": true,
+			"enabled":                     true,
+			"insecure_skip_verify":        false,
+			"min_version":                 771, // TLS 1.2
+			"max_version":                 772, // TLS 1.3
+			"prefer_server_cipher_suites": true,
 		},
 	})
 }
