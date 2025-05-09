@@ -114,7 +114,8 @@ func (l *Lister) Start(ctx context.Context) error {
 	// Get all index
 	index, err := l.storage.ListIndices(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list index: %w", err)
+		l.logger.Error("failed to list index", err)
+		return err
 	}
 
 	// Filter out internal index (those starting with '.')
