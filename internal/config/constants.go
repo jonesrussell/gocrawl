@@ -237,11 +237,3 @@ const (
 	StorageTypeFile          = "file"
 	StorageTypeMemory        = "memory"
 )
-
-// Default Elasticsearch settings
-const (
-	DefaultElasticsearchHost     = "http://localhost:9200"
-	DefaultElasticsearchIndex    = "gocrawl"
-	DefaultElasticsearchUsername = "elastic"
-	DefaultElasticsearchPassword = "changeme"
-)

@@ -29,6 +29,8 @@ const (
 	DefaultFlushInterval = 30 * time.Second
 	MinPasswordLength    = 8
 	DefaultDiscoverNodes = false // Default to false to prevent node discovery
+	DefaultUsername      = "elastic"
+	DefaultPassword      = "changeme"
 
 	// Retry configuration constants
 	HAInitialWait = 2 * time.Second
