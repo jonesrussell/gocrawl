@@ -69,6 +69,15 @@ const (
 	// DefaultStorageType is the default storage backend type
 	DefaultStorageType = "elasticsearch"
 
+	// DefaultStorageBatchSize is the default number of items to batch for storage operations
+	DefaultStorageBatchSize = 100
+
+	// DefaultElasticsearchRetries is the default number of retries for Elasticsearch operations
+	DefaultElasticsearchRetries = 3
+
+	// DefaultBulkSize is the default number of documents to bulk index
+	DefaultBulkSize = 1000
+
 	// DefaultHTTPPort is the default HTTP server port
 	DefaultHTTPPort = 8080
 
@@ -125,9 +134,6 @@ const (
 
 	// DefaultAppEnv is the default application environment
 	DefaultAppEnv = "development"
-
-	// DefaultBulkSize is the default bulk size for Elasticsearch operations
-	DefaultBulkSize = 1000
 
 	// DefaultFlushInterval is the default flush interval for Elasticsearch operations
 	DefaultFlushInterval = 30 * time.Second

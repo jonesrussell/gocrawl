@@ -21,7 +21,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -56,53 +55,6 @@ var _ CrawlerMetrics = (*Crawler)(nil)
 
 // Core Crawler Methods
 // -------------------
-
-// ValidateSource validates a source configuration.
-func (c *Crawler) validateSource(ctx context.Context, sourceName string) (*configtypes.Source, error) {
-	// Get all sources
-	sourceConfigs, err := c.sources.GetSources()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sources: %w", err)
-	}
-
-	// If no sources are configured, return an error
-	if len(sourceConfigs) == 0 {
-		return nil, errors.New("no sources configured")
-	}
-
-	// Find the requested source
-	var selectedSource *sourceutils.SourceConfig
-	for i := range sourceConfigs {
-		if sourceConfigs[i].Name == sourceName {
-			selectedSource = &sourceConfigs[i]
-			break
-		}
-	}
-
-	// If source not found, return an error
-	if selectedSource == nil {
-		return nil, fmt.Errorf("source not found: %s", sourceName)
-	}
-
-	// Convert to types.Source
-	source := sourceutils.ConvertToConfigSource(selectedSource)
-
-	// Ensure article index exists if specified
-	if selectedSource.ArticleIndex != "" {
-		if indexErr := c.indexManager.EnsureArticleIndex(ctx, selectedSource.ArticleIndex); indexErr != nil {
-			return nil, fmt.Errorf("failed to ensure article index exists: %w", indexErr)
-		}
-	}
-
-	// Ensure page index exists if specified
-	if selectedSource.Index != "" {
-		if pageErr := c.indexManager.EnsurePageIndex(ctx, selectedSource.Index); pageErr != nil {
-			return nil, fmt.Errorf("failed to ensure page index exists: %w", pageErr)
-		}
-	}
-
-	return source, nil
-}
 
 // setupCollector configures the collector with the given source settings
 func (c *Crawler) setupCollector(source *configtypes.Source) error {
@@ -273,7 +225,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	}()
 
 	// Validate source
-	source, err := c.validateSource(ctx, sourceName)
+	source, err := c.sources.ValidateSource(ctx, sourceName, c.indexManager)
 	if err != nil {
 		return fmt.Errorf("failed to validate source: %w", err)
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/log"
-	"github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 const (
@@ -77,18 +76,13 @@ func ValidateConfig(cfg *Config) error {
 		}
 	}
 
-	// Validate sources last
-	if err := validateSources(cfg.Sources); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 // ValidateEnvironment validates the environment setting.
 func ValidateEnvironment(env string) error {
 	switch env {
-	case "development", "staging", "production":
+	case "development", "staging", "production", "testing":
 		return nil
 	default:
 		return fmt.Errorf("invalid environment: %s", env)
@@ -125,27 +119,6 @@ func ValidateMaxDepth(depth int) error {
 func ValidateParallelism(parallelism int) error {
 	if parallelism < 1 {
 		return errors.New("parallelism must be positive")
-	}
-	return nil
-}
-
-// ValidateSource validates a source configuration.
-func ValidateSource(source *types.Source) error {
-	if source == nil {
-		return errors.New("source is required")
-	}
-	return source.Validate()
-}
-
-// ValidateSources validates a list of source configurations.
-func ValidateSources(sources []types.Source) error {
-	if len(sources) == 0 {
-		return errors.New("at least one source is required")
-	}
-	for i := range sources {
-		if err := sources[i].Validate(); err != nil {
-			return fmt.Errorf("source[%d]: %w", i, err)
-		}
 	}
 	return nil
 }
@@ -222,22 +195,4 @@ func validateElasticsearchConfig(cfg *elasticsearch.Config) error {
 		}
 	}
 	return cfg.Validate()
-}
-
-// validateSources validates a list of source configurations
-func validateSources(sources []types.Source) error {
-	if len(sources) == 0 {
-		return &ValidationError{
-			Field:  "sources",
-			Value:  nil,
-			Reason: "at least one source is required",
-		}
-	}
-
-	for i := range sources {
-		if err := sources[i].Validate(); err != nil {
-			return fmt.Errorf("source[%d]: %w", i, err)
-		}
-	}
-	return nil
 }

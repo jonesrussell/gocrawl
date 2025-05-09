@@ -6,9 +6,8 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
+	"strings"
 
-	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/jonesrussell/gocrawl/internal/config/commands"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
@@ -139,45 +138,47 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// LoadConfig loads the configuration from the given path.
+// LoadConfig loads the configuration from the specified file or default locations.
 func LoadConfig() (*Config, error) {
-	// Use the global Viper instance
-	v := viper.GetViper()
+	// Create a new Viper instance
+	v := viper.New()
 
 	// Set up Viper
 	v.SetConfigType("yaml")
 	v.SetConfigName("config")
-	v.AddConfigPath(".")
-	v.AddConfigPath("$HOME/.gocrawl")
-	v.AddConfigPath("/etc/gocrawl")
 
-	// Also try with .yaml extension
-	v.SetConfigName("config.yaml")
-	v.AddConfigPath(".")
+	// Add config paths in order of priority
+	v.AddConfigPath(".")              // Current directory
+	v.AddConfigPath("$HOME/.gocrawl") // User config directory
+	v.AddConfigPath("/etc/gocrawl")   // System config directory
+
+	// Set up environment variable binding
+	v.AutomaticEnv()
+	v.SetEnvPrefix("GOCRAWL")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Set defaults
 	setDefaults(v)
 
-	// Load environment
-	loadEnvironment()
-
-	// Bind environment variables
-	if err := bindEnvVars(v); err != nil {
-		return nil, err
-	}
-
-	// Read the config file if it exists
+	// Read the config file
 	if err := v.ReadInConfig(); err != nil {
 		var configFileNotFound viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFound) {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
 		// If config file is not found, create a default config
-		v.Set("environment", "development")
+		v.Set("app.name", "gocrawl")
+		v.Set("app.environment", "development")
+		v.Set("app.debug", true)
 		v.Set("logger.level", "debug")
 		v.Set("logger.encoding", "console")
 		v.Set("logger.format", "text")
 		v.Set("logger.output", "stdout")
+		v.Set("crawler.source_file", "sources.yml")
+		v.Set("crawler.max_depth", DefaultMaxDepth)
+		v.Set("crawler.max_retries", DefaultMaxRetries)
+		v.Set("storage.batch_size", DefaultStorageBatchSize)
+		v.Set("elasticsearch.max_retries", DefaultElasticsearchRetries)
 	}
 
 	// Create a temporary logger for config loading
@@ -192,17 +193,16 @@ func LoadConfig() (*Config, error) {
 
 	// Unmarshal config
 	var cfg Config
-	v.SetConfigType("yaml")
-	if unmarshalErr := v.Unmarshal(&cfg); unmarshalErr != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
+	if err := v.Unmarshal(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	// Set the logger
 	cfg.logger = tempLogger
 
 	// Validate the configuration
-	if validateErr := cfg.Validate(); validateErr != nil {
-		return nil, fmt.Errorf("invalid config: %w", validateErr)
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
 	return &cfg, nil
@@ -210,38 +210,40 @@ func LoadConfig() (*Config, error) {
 
 // setDefaults sets default configuration values
 func setDefaults(v *viper.Viper) {
-	v.SetDefault("environment", "development")
+	// App defaults
+	v.SetDefault("app.name", "gocrawl")
+	v.SetDefault("app.version", "1.0.0")
+	v.SetDefault("app.environment", "development")
+	v.SetDefault("app.debug", false)
+
+	// Logger defaults
+	v.SetDefault("logger.level", "debug")
+	v.SetDefault("logger.format", "console")
+	v.SetDefault("logger.output", "stdout")
+	v.SetDefault("logger.enable_color", true)
+
+	// Crawler defaults
+	v.SetDefault("crawler.max_depth", DefaultMaxDepth)
+	v.SetDefault("crawler.max_retries", DefaultMaxRetries)
+	v.SetDefault("crawler.rate_limit", "1s")
+	v.SetDefault("crawler.timeout", "30s")
+	v.SetDefault("crawler.user_agent", "GoCrawl/1.0")
+
+	// Storage defaults
+	v.SetDefault("storage.type", "elasticsearch")
+	v.SetDefault("storage.batch_size", DefaultStorageBatchSize)
+	v.SetDefault("storage.flush_interval", "5s")
+
+	// Elasticsearch defaults
 	v.SetDefault("elasticsearch.addresses", []string{"https://localhost:9200"})
+	v.SetDefault("elasticsearch.index_name", "gocrawl")
+	v.SetDefault("elasticsearch.retry.enabled", true)
+	v.SetDefault("elasticsearch.retry.initial_wait", "1s")
+	v.SetDefault("elasticsearch.retry.max_wait", "5s")
+	v.SetDefault("elasticsearch.retry.max_retries", DefaultElasticsearchRetries)
+	v.SetDefault("elasticsearch.bulk_size", DefaultBulkSize)
+	v.SetDefault("elasticsearch.flush_interval", "1s")
 	v.SetDefault("elasticsearch.tls.insecure_skip_verify", true)
-}
-
-// loadEnvironment loads environment variables from .env file
-func loadEnvironment() {
-	if err := godotenv.Load(); err != nil {
-		log.Printf("Warning: Failed to load .env file: %v", err)
-	}
-}
-
-// bindEnvVars binds environment variables to configuration keys
-func bindEnvVars(v *viper.Viper) error {
-	envVars := map[string]string{
-		"elasticsearch.tls.insecure_skip_verify": "ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY",
-		"elasticsearch.tls.cert_file":            "ELASTICSEARCH_TLS_CERT_FILE",
-		"elasticsearch.tls.key_file":             "ELASTICSEARCH_TLS_KEY_FILE",
-		"elasticsearch.tls.ca_file":              "ELASTICSEARCH_TLS_CA_FILE",
-		"elasticsearch.addresses":                "ELASTICSEARCH_HOSTS",
-		"elasticsearch.api_key":                  "ELASTICSEARCH_API_KEY",
-		"elasticsearch.username":                 "ELASTICSEARCH_USERNAME",
-		"elasticsearch.password":                 "ELASTICSEARCH_PASSWORD",
-	}
-
-	for configKey, envVar := range envVars {
-		if err := v.BindEnv(configKey, envVar); err != nil {
-			return fmt.Errorf("failed to bind environment variable %s: %w", envVar, err)
-		}
-	}
-
-	return nil
 }
 
 // GetAppConfig returns the application configuration.

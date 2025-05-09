@@ -2,8 +2,10 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -145,4 +147,52 @@ func toZapFields(fields []any) []zap.Field {
 	}
 
 	return zapFields
+}
+
+// NewFromConfig creates a new logger instance from Viper configuration
+func NewFromConfig(v *viper.Viper) (Interface, error) {
+	// Get log level from config
+	logLevel := v.GetString("logger.level")
+	level := InfoLevel
+
+	// Check debug flag from Viper first
+	debug := v.GetBool("app.debug")
+	if debug {
+		level = DebugLevel
+		logLevel = "debug"
+	} else {
+		// Fall back to log level from config
+		switch logLevel {
+		case "debug":
+			level = DebugLevel
+		case "info":
+			level = InfoLevel
+		case "warn":
+			level = WarnLevel
+		case "error":
+			level = ErrorLevel
+		}
+	}
+
+	// Create logger with configuration
+	logConfig := &Config{
+		Level:       level,
+		Development: debug,
+		Encoding:    "console",
+		EnableColor: true,
+		OutputPaths: []string{"stdout"},
+	}
+
+	log, err := New(logConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// Log the current log level
+	log.Debug("Logger initialized",
+		"level", logLevel,
+		"debug", debug,
+		"development", logConfig.Development)
+
+	return log, nil
 }

@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/config/types"
+
+	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Config represents a source configuration.
@@ -36,9 +38,9 @@ type Sources struct {
 // Ensure Sources implements Interface
 var _ Interface = (*Sources)(nil)
 
-// ConvertSourceConfig converts a sources.Config to a types.Source.
-// It handles the conversion of fields between the two types.
-func ConvertSourceConfig(source *Config) *types.Source {
+// ConvertSourceConfig converts a sources.Config to a configtypes.Source.
+// It handles the conversion of fields between the two configtypes.
+func ConvertSourceConfig(source *Config) *configtypes.Source {
 	if source == nil {
 		return nil
 	}
@@ -51,7 +53,7 @@ func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
 	var articleSelectors sourceutils.ArticleSelectors
 
 	switch s := selectors.(type) {
-	case types.ArticleSelectors:
+	case configtypes.ArticleSelectors:
 		articleSelectors = sourceutils.ArticleSelectors{
 			Container:     s.Container,
 			Title:         s.Title,
@@ -111,8 +113,8 @@ func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
 	}
 }
 
-// convertSourceConfig converts a types.Source to a sourceutils.SourceConfig
-func convertSourceConfig(src types.Source) sourceutils.SourceConfig {
+// convertSourceConfig converts a configtypes.Source to a sourceutils.SourceConfig
+func convertSourceConfig(src configtypes.Source) sourceutils.SourceConfig {
 	// Parse the rate limit duration
 	rateLimit, err := time.ParseDuration(src.RateLimit)
 	if err != nil {
@@ -161,24 +163,24 @@ func LoadSources(cfg config.Interface) (*Sources, error) {
 	// Try to create a default source based on the command line argument
 	if cmd := cfg.GetCommand(); cmd != "" {
 		// Create default selectors
-		defaultSelectors := types.ArticleSelectors{
+		defaultSelectors := configtypes.ArticleSelectors{
 			Container: "article",
 			Title:     "h1",
 			Body:      "article > div",
 		}
 
 		// Create a default source based on the command
-		defaultSource := &types.Source{
+		defaultSource := &configtypes.Source{
 			Name:           cmd,
 			URL:            fmt.Sprintf("https://%s", strings.ReplaceAll(cmd, " ", "")),
 			AllowedDomains: []string{strings.ReplaceAll(cmd, " ", "")},
 			StartURLs:      []string{fmt.Sprintf("https://%s", strings.ReplaceAll(cmd, " ", ""))},
 			MaxDepth:       DefaultMaxDepth,
 			RateLimit:      DefaultRateLimit.String(),
-			Selectors: types.SourceSelectors{
+			Selectors: configtypes.SourceSelectors{
 				Article: defaultSelectors,
 			},
-			Rules: types.Rules{},
+			Rules: configtypes.Rules{},
 		}
 
 		// Convert to sourceutils.SourceConfig
@@ -265,7 +267,7 @@ func convertLoaderConfig(cfg loader.Config) sourceutils.SourceConfig {
 			Index:          cfg.Index,
 			ArticleIndex:   cfg.ArticleIndex,
 			Selectors:      createSelectorConfig(cfg.Selectors.Article),
-			Rules:          types.Rules{},
+			Rules:          configtypes.Rules{},
 		}
 	}
 
@@ -286,7 +288,7 @@ func convertLoaderConfig(cfg loader.Config) sourceutils.SourceConfig {
 		Index:          cfg.Index,
 		ArticleIndex:   cfg.ArticleIndex,
 		Selectors:      createSelectorConfig(cfg.Selectors.Article),
-		Rules:          types.Rules{},
+		Rules:          configtypes.Rules{},
 	}
 }
 
@@ -335,9 +337,16 @@ func (s *Sources) ListSources(ctx context.Context) ([]*sourceutils.SourceConfig,
 
 // AddSource adds a new source.
 func (s *Sources) AddSource(ctx context.Context, source *sourceutils.SourceConfig) error {
-	if err := s.ValidateSource(source); err != nil {
-		return err
+	// Validate the source configuration
+	if source == nil {
+		return ErrInvalidSource
 	}
+
+	// Check if source already exists
+	if s.FindByName(source.Name) != nil {
+		return ErrSourceExists
+	}
+
 	s.sources = append(s.sources, *source)
 	s.metrics.SourceCount = int64(len(s.sources))
 	s.metrics.LastUpdated = time.Now()
@@ -346,9 +355,16 @@ func (s *Sources) AddSource(ctx context.Context, source *sourceutils.SourceConfi
 
 // UpdateSource updates an existing source.
 func (s *Sources) UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error {
-	if err := s.ValidateSource(source); err != nil {
-		return err
+	// Validate the source configuration
+	if source == nil {
+		return ErrInvalidSource
 	}
+
+	// Check if source exists
+	if s.FindByName(source.Name) == nil {
+		return ErrSourceNotFound
+	}
+
 	for i := range s.sources {
 		if s.sources[i].Name == source.Name {
 			s.sources[i] = *source
@@ -356,7 +372,7 @@ func (s *Sources) UpdateSource(ctx context.Context, source *sourceutils.SourceCo
 			return nil
 		}
 	}
-	return fmt.Errorf("source not found: %s", source.Name)
+	return ErrSourceNotFound
 }
 
 // DeleteSource deletes a source by name.
@@ -372,21 +388,51 @@ func (s *Sources) DeleteSource(ctx context.Context, name string) error {
 	return fmt.Errorf("source not found: %s", name)
 }
 
-// ValidateSource validates a source configuration.
-func (s *Sources) ValidateSource(source *sourceutils.SourceConfig) error {
-	if source == nil {
-		return errors.New("source is nil")
+// ValidateSource validates a source configuration and ensures required indices exist.
+func (s *Sources) ValidateSource(ctx context.Context, sourceName string, indexManager storagetypes.IndexManager) (*configtypes.Source, error) {
+	// Get all sources
+	sourceConfigs, err := s.GetSources()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sources: %w", err)
 	}
-	if source.Name == "" {
-		return errors.New("source name is required")
+
+	// If no sources are configured, return an error
+	if len(sourceConfigs) == 0 {
+		return nil, errors.New("no sources configured")
 	}
-	if source.URL == "" {
-		return errors.New("source URL is required")
+
+	// Find the requested source
+	var selectedSource *sourceutils.SourceConfig
+	for i := range sourceConfigs {
+		if sourceConfigs[i].Name == sourceName {
+			selectedSource = &sourceConfigs[i]
+			break
+		}
 	}
-	if source.MaxDepth < 0 {
-		return errors.New("max depth must be non-negative")
+
+	// If source not found, return an error
+	if selectedSource == nil {
+		return nil, fmt.Errorf("source not found: %s", sourceName)
 	}
-	return nil
+
+	// Convert to configtypes.Source
+	source := sourceutils.ConvertToConfigSource(selectedSource)
+
+	// Ensure article index exists if specified
+	if selectedSource.ArticleIndex != "" {
+		if indexErr := indexManager.EnsureArticleIndex(ctx, selectedSource.ArticleIndex); indexErr != nil {
+			return nil, fmt.Errorf("failed to ensure article index exists: %w", indexErr)
+		}
+	}
+
+	// Ensure page index exists if specified
+	if selectedSource.Index != "" {
+		if pageErr := indexManager.EnsurePageIndex(ctx, selectedSource.Index); pageErr != nil {
+			return nil, fmt.Errorf("failed to ensure page index exists: %w", pageErr)
+		}
+	}
+
+	return source, nil
 }
 
 // GetMetrics returns the current metrics.
@@ -491,8 +537,8 @@ func extractArticleSelectorsFromLoader(selectors loader.ArticleSelectors) articl
 	}
 }
 
-// extractArticleSelectorsFromConfig converts types.ArticleSelectors to articleSelector.
-func extractArticleSelectorsFromConfig(selectors types.ArticleSelectors) articleSelector {
+// extractArticleSelectorsFromConfig converts configtypes.ArticleSelectors to articleSelector.
+func extractArticleSelectorsFromConfig(selectors configtypes.ArticleSelectors) articleSelector {
 	return articleSelector{
 		Container:     selectors.Container,
 		Title:         selectors.Title,
@@ -526,8 +572,8 @@ func NewSelectorConfigFromLoader(src loader.Config) SelectorConfig {
 	}
 }
 
-// NewSelectorConfigFromSource creates a new SelectorConfig from a types.Source.
-func NewSelectorConfigFromSource(src types.Source) SelectorConfig {
+// NewSelectorConfigFromSource creates a new SelectorConfig from a configtypes.Source.
+func NewSelectorConfigFromSource(src configtypes.Source) SelectorConfig {
 	return SelectorConfig{
 		Article: getArticleSelectorsFromSelector(extractArticleSelectorsFromConfig(src.Selectors.Article)),
 	}
