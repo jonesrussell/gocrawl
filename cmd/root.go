@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/cmd/common"
@@ -58,13 +57,9 @@ var Module = fx.Module("root",
 				EnableColor: viper.GetBool("logger.enable_color"),
 			}
 		},
-		func(logConfig *logger.Config) (logger.Interface, error) {
-			return logger.New(logConfig)
-		},
+		logger.New,
 	),
-	fx.WithLogger(func(log logger.Interface) fxevent.Logger {
-		return logger.NewFxLogger(log)
-	}),
+	fx.WithLogger(logger.NewFxLogger),
 )
 
 // Execute runs the root command
@@ -93,7 +88,11 @@ func Execute() error {
 	if err := app.Start(context.Background()); err != nil {
 		return fmt.Errorf("failed to start application: %w", err)
 	}
-	defer app.Stop(context.Background())
+	defer func() {
+		if err := app.Stop(context.Background()); err != nil {
+			fmt.Fprintf(os.Stderr, "Error stopping application: %v\n", err)
+		}
+	}()
 
 	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {
@@ -177,10 +176,18 @@ func initConfig() error {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Map environment variables to config keys
-	viper.BindEnv("app.environment", "APP_ENV")
-	viper.BindEnv("app.debug", "APP_DEBUG")
-	viper.BindEnv("logger.level", "LOG_LEVEL")
-	viper.BindEnv("logger.encoding", "LOG_FORMAT")
+	if err := viper.BindEnv("app.environment", "APP_ENV"); err != nil {
+		return fmt.Errorf("failed to bind APP_ENV: %w", err)
+	}
+	if err := viper.BindEnv("app.debug", "APP_DEBUG"); err != nil {
+		return fmt.Errorf("failed to bind APP_DEBUG: %w", err)
+	}
+	if err := viper.BindEnv("logger.level", "LOG_LEVEL"); err != nil {
+		return fmt.Errorf("failed to bind LOG_LEVEL: %w", err)
+	}
+	if err := viper.BindEnv("logger.encoding", "LOG_FORMAT"); err != nil {
+		return fmt.Errorf("failed to bind LOG_FORMAT: %w", err)
+	}
 
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {

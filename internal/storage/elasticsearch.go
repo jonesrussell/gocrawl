@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	es "github.com/elastic/go-elasticsearch/v8"
@@ -20,7 +21,11 @@ type ElasticsearchStorage struct {
 }
 
 // NewElasticsearchStorage creates a new Elasticsearch storage instance
-func NewElasticsearchStorage(client *es.Client, config *elasticsearch.Config, logger logger.Interface) *ElasticsearchStorage {
+func NewElasticsearchStorage(
+	client *es.Client,
+	config *elasticsearch.Config,
+	logger logger.Interface,
+) *ElasticsearchStorage {
 	return &ElasticsearchStorage{
 		client: client,
 		config: config,
@@ -54,12 +59,8 @@ func (s *ElasticsearchStorage) IndexDocument(ctx context.Context, index string, 
 }
 
 // GetDocument retrieves a document
-func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id string, document any) error {
-	res, err := s.client.Get(
-		index,
-		id,
-		s.client.Get.WithContext(ctx),
-	)
+func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index, id string, document any) error {
+	res, err := s.client.Get(index, id)
 	if err != nil {
 		return fmt.Errorf("failed to get document: %w", err)
 	}
@@ -69,23 +70,19 @@ func (s *ElasticsearchStorage) GetDocument(ctx context.Context, index string, id
 		return fmt.Errorf("error getting document: %s", res.String())
 	}
 
-	var result map[string]any
+	var result struct {
+		Source json.RawMessage `json:"_source"`
+	}
 	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return fmt.Errorf("error decoding response: %w", err)
+		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	source, ok := result["_source"].(map[string]any)
-	if !ok {
-		return fmt.Errorf("invalid document source")
+	if result.Source == nil {
+		return errors.New("invalid document source")
 	}
 
-	bytes, err := json.Marshal(source)
-	if err != nil {
-		return fmt.Errorf("error marshaling source: %w", err)
-	}
-
-	if err := json.Unmarshal(bytes, document); err != nil {
-		return fmt.Errorf("error unmarshaling document: %w", err)
+	if err := json.Unmarshal(result.Source, document); err != nil {
+		return fmt.Errorf("failed to unmarshal document: %w", err)
 	}
 
 	return nil
@@ -112,10 +109,11 @@ func (s *ElasticsearchStorage) DeleteDocument(ctx context.Context, index string,
 
 // SearchDocuments performs a search query
 func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string, query map[string]any, result any) error {
+	queryBytes := mustJSON(query)
 	res, err := s.client.Search(
 		s.client.Search.WithContext(ctx),
 		s.client.Search.WithIndex(index),
-		s.client.Search.WithBody(bytes.NewReader(mustJSON(query))),
+		s.client.Search.WithBody(bytes.NewReader(queryBytes)),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to search documents: %w", err)
@@ -126,41 +124,33 @@ func (s *ElasticsearchStorage) SearchDocuments(ctx context.Context, index string
 		return fmt.Errorf("error searching documents: %s", res.String())
 	}
 
-	var searchResult map[string]any
+	var searchResult struct {
+		Hits struct {
+			Hits []struct {
+				Source map[string]any `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
 	if err := json.NewDecoder(res.Body).Decode(&searchResult); err != nil {
-		return fmt.Errorf("error decoding response: %w", err)
+		return fmt.Errorf("failed to decode search response: %w", err)
 	}
 
-	hits, ok := searchResult["hits"].(map[string]any)
-	if !ok {
-		return fmt.Errorf("invalid search result")
+	if searchResult.Hits.Hits == nil {
+		return errors.New("invalid search result")
 	}
 
-	sources, ok := hits["hits"].([]any)
-	if !ok {
-		return fmt.Errorf("invalid hits array")
+	hits := make([]map[string]any, 0, len(searchResult.Hits.Hits))
+	for _, hit := range searchResult.Hits.Hits {
+		hits = append(hits, hit.Source)
 	}
 
-	var documents []map[string]any
-	for _, hit := range sources {
-		hitMap, ok := hit.(map[string]any)
-		if !ok {
-			continue
-		}
-		source, ok := hitMap["_source"].(map[string]any)
-		if !ok {
-			continue
-		}
-		documents = append(documents, source)
-	}
-
-	bytes, err := json.Marshal(documents)
+	bytes, err := json.Marshal(hits)
 	if err != nil {
-		return fmt.Errorf("error marshaling documents: %w", err)
+		return fmt.Errorf("failed to marshal hits: %w", err)
 	}
 
 	if err := json.Unmarshal(bytes, result); err != nil {
-		return fmt.Errorf("error unmarshaling result: %w", err)
+		return fmt.Errorf("failed to unmarshal result: %w", err)
 	}
 
 	return nil
