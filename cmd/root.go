@@ -191,11 +191,4 @@ func setDefaults() {
 		"user_agent":  "GoCrawl/1.0",
 		"source_file": "sources.yml",
 	})
-
-	// Storage defaults
-	viper.SetDefault("storage", map[string]any{
-		"type":           "elasticsearch",
-		"batch_size":     config.DefaultStorageBatchSize,
-		"flush_interval": "5s",
-	})
 }
