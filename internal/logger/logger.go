@@ -18,6 +18,16 @@ type Interface interface {
 	Error(msg string, fields ...any)
 	Fatal(msg string, fields ...any)
 	With(fields ...any) Interface
+	// Structured logging helpers
+	WithUser(userID string) Interface
+	WithRequestID(requestID string) Interface
+	WithTraceID(traceID string) Interface
+	WithSpanID(spanID string) Interface
+	WithDuration(duration time.Duration) Interface
+	WithError(err error) Interface
+	WithComponent(component string) Interface
+	WithVersion(version string) Interface
+	WithEnvironment(env string) Interface
 }
 
 // Logger implements the Interface.
@@ -28,6 +38,38 @@ type Logger struct {
 var (
 	// defaultLogger is the singleton logger instance
 	defaultLogger *Logger
+
+	// logLevels maps string levels to zapcore.Level
+	logLevels = map[string]zapcore.Level{
+		"debug": zapcore.DebugLevel,
+		"info":  zapcore.InfoLevel,
+		"warn":  zapcore.WarnLevel,
+		"error": zapcore.ErrorLevel,
+		"fatal": zapcore.FatalLevel,
+	}
+
+	// Common field keys
+	fieldKeys = struct {
+		UserID      string
+		RequestID   string
+		TraceID     string
+		SpanID      string
+		Duration    string
+		Error       string
+		Component   string
+		Version     string
+		Environment string
+	}{
+		UserID:      "user_id",
+		RequestID:   "request_id",
+		TraceID:     "trace_id",
+		SpanID:      "span_id",
+		Duration:    "duration",
+		Error:       "error",
+		Component:   "component",
+		Version:     "version",
+		Environment: "environment",
+	}
 )
 
 // New creates a new logger instance.
@@ -95,20 +137,11 @@ func New(config *Config) (Interface, error) {
 
 // getLogLevel converts a string level to zapcore.Level
 func getLogLevel(level string) zapcore.Level {
-	switch strings.ToLower(level) {
-	case "debug":
-		return zapcore.DebugLevel
-	case "info":
-		return zapcore.InfoLevel
-	case "warn":
-		return zapcore.WarnLevel
-	case "error":
-		return zapcore.ErrorLevel
-	case "fatal":
-		return zapcore.FatalLevel
-	default:
+	lvl, exists := logLevels[strings.ToLower(level)]
+	if !exists {
 		return zapcore.InfoLevel
 	}
+	return lvl
 }
 
 // Debug logs a debug message.
@@ -141,6 +174,51 @@ func (l *Logger) With(fields ...any) Interface {
 	return &Logger{
 		zapLogger: l.zapLogger.With(toZapFields(fields)...),
 	}
+}
+
+// WithUser adds a user ID to the logger.
+func (l *Logger) WithUser(userID string) Interface {
+	return l.With(fieldKeys.UserID, userID)
+}
+
+// WithRequestID adds a request ID to the logger.
+func (l *Logger) WithRequestID(requestID string) Interface {
+	return l.With(fieldKeys.RequestID, requestID)
+}
+
+// WithTraceID adds a trace ID to the logger.
+func (l *Logger) WithTraceID(traceID string) Interface {
+	return l.With(fieldKeys.TraceID, traceID)
+}
+
+// WithSpanID adds a span ID to the logger.
+func (l *Logger) WithSpanID(spanID string) Interface {
+	return l.With(fieldKeys.SpanID, spanID)
+}
+
+// WithDuration adds a duration to the logger.
+func (l *Logger) WithDuration(duration time.Duration) Interface {
+	return l.With(fieldKeys.Duration, duration)
+}
+
+// WithError adds an error to the logger.
+func (l *Logger) WithError(err error) Interface {
+	return l.With(fieldKeys.Error, err)
+}
+
+// WithComponent adds a component name to the logger.
+func (l *Logger) WithComponent(component string) Interface {
+	return l.With(fieldKeys.Component, component)
+}
+
+// WithVersion adds a version to the logger.
+func (l *Logger) WithVersion(version string) Interface {
+	return l.With(fieldKeys.Version, version)
+}
+
+// WithEnvironment adds an environment to the logger.
+func (l *Logger) WithEnvironment(env string) Interface {
+	return l.With(fieldKeys.Environment, env)
 }
 
 // fieldPairSize represents the number of elements in a key-value pair.

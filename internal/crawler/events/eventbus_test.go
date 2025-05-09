@@ -20,43 +20,94 @@ type MockLogger struct {
 	mock.Mock
 }
 
-// NewMockLogger creates a new mock logger instance
-func NewMockLogger() *MockLogger {
-	return &MockLogger{}
-}
-
-// Debug implements logger.Interface
+// Debug logs a debug message.
 func (m *MockLogger) Debug(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Info implements logger.Interface
+// Info logs an info message.
 func (m *MockLogger) Info(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Warn implements logger.Interface
+// Warn logs a warning message.
 func (m *MockLogger) Warn(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Error implements logger.Interface
+// Error logs an error message.
 func (m *MockLogger) Error(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// Fatal implements logger.Interface
+// Fatal logs a fatal message and exits.
 func (m *MockLogger) Fatal(msg string, fields ...any) {
 	m.Called(msg, fields)
 }
 
-// With implements logger.Interface
+// With creates a new logger with the given fields.
 func (m *MockLogger) With(fields ...any) logger.Interface {
-	args := m.Called(fields)
-	if result, ok := args.Get(0).(logger.Interface); ok {
-		return result
-	}
+	m.Called(fields)
 	return m
+}
+
+// WithUser adds a user ID to the logger.
+func (m *MockLogger) WithUser(userID string) logger.Interface {
+	m.Called(userID)
+	return m
+}
+
+// WithRequestID adds a request ID to the logger.
+func (m *MockLogger) WithRequestID(requestID string) logger.Interface {
+	m.Called(requestID)
+	return m
+}
+
+// WithTraceID adds a trace ID to the logger.
+func (m *MockLogger) WithTraceID(traceID string) logger.Interface {
+	m.Called(traceID)
+	return m
+}
+
+// WithSpanID adds a span ID to the logger.
+func (m *MockLogger) WithSpanID(spanID string) logger.Interface {
+	m.Called(spanID)
+	return m
+}
+
+// WithDuration adds a duration to the logger.
+func (m *MockLogger) WithDuration(duration time.Duration) logger.Interface {
+	m.Called(duration)
+	return m
+}
+
+// WithError adds an error to the logger.
+func (m *MockLogger) WithError(err error) logger.Interface {
+	m.Called(err)
+	return m
+}
+
+// WithComponent adds a component name to the logger.
+func (m *MockLogger) WithComponent(component string) logger.Interface {
+	m.Called(component)
+	return m
+}
+
+// WithVersion adds a version to the logger.
+func (m *MockLogger) WithVersion(version string) logger.Interface {
+	m.Called(version)
+	return m
+}
+
+// WithEnvironment adds an environment to the logger.
+func (m *MockLogger) WithEnvironment(env string) logger.Interface {
+	m.Called(env)
+	return m
+}
+
+// NewMockLogger creates a new mock logger instance
+func NewMockLogger() *MockLogger {
+	return &MockLogger{}
 }
 
 // NewFxLogger implements logger.Interface
