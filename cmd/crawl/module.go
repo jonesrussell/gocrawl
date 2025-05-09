@@ -8,15 +8,12 @@ import (
 	"io"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
-	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -42,70 +39,31 @@ const (
 	DefaultZapFieldsCapacity = 2
 )
 
-// Module provides the crawl command module for dependency injection
-var Module = fx.Options(
-	// Core modules
-	config.Module,
-	logger.Module,
+// Module provides the crawl module for dependency injection.
+var Module = fx.Module("crawl",
+	// Include core modules
 	storage.Module,
 	sources.Module,
-	crawler.Module,
-
-	// Provide the context
-	fx.Provide(context.Background),
-
-	// Provide the done channel
-	fx.Provide(func() chan struct{} {
-		return make(chan struct{})
-	}),
-
-	// Provide the job service
-	fx.Provide(fx.Annotate(
-		func(
-			logger logger.Interface,
-			storage types.Interface,
-			sources sources.Interface,
-			crawler crawler.Interface,
-			done chan struct{},
-			processorFactory crawler.ProcessorFactory,
-		) common.JobService {
-			return NewJobService(JobServiceParams{
-				Logger:           logger,
-				Sources:          sources,
-				Crawler:          crawler,
-				Done:             done,
-				Storage:          storage,
-				ProcessorFactory: processorFactory,
-			})
-		},
-		fx.As(new(common.JobService)),
-	)),
-
-	// Provide the job processor
-	fx.Provide(fx.Annotate(
-		func(
-			logger logger.Interface,
-			config config.Interface,
-		) *DefaultJobService {
-			return &DefaultJobService{
-				logger: logger,
-				config: config,
-			}
-		},
-		fx.As(new(content.ContentProcessor)),
-	)),
+	// Provide the crawl components
+	fx.Provide(
+		NewCrawler,
+		SetupCollector,
+	),
 )
 
 // NewCommand creates a new crawl command.
 func NewCommand(p struct {
 	fx.In
-	Crawler crawler.Interface
+	Crawler *Crawler
 }) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "crawl",
+		Use:   "crawl [source]",
 		Short: "Crawl a website",
+		Long: `This command crawls a website for content and stores it in the configured storage.
+Specify the source name as an argument.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return p.Crawler.Start(context.Background(), "default")
+			return p.Crawler.Start(cmd.Context())
 		},
 	}
 	return cmd
