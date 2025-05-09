@@ -11,6 +11,8 @@ import (
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -121,25 +123,30 @@ The index will be created with default settings unless overridden by configurati
 				return errors.New("logger not found in context or invalid type")
 			}
 
-			// Get config path from flags
-			configPath, _ := cmd.Flags().GetString("config")
+			// Get config from context
+			cfgValue := cmd.Context().Value(cmdcommon.ConfigKey)
+			cfg, ok := cfgValue.(config.Interface)
+			if !ok {
+				return errors.New("config not found in context or invalid type")
+			}
 
 			// Create Fx application
 			app := fx.New(
 				// Include all required modules
 				Module,
+				storage.Module,
+				sources.Module,
 
-				// Provide config path string
-				fx.Provide(func() string { return configPath }),
+				// Provide existing config
+				fx.Provide(func() config.Interface { return cfg }),
 
-				// Provide logger
+				// Provide existing logger
 				fx.Provide(func() logger.Interface { return log }),
 
 				// Provide create params
 				fx.Provide(func() CreateParams {
 					return CreateParams{
-						ConfigPath: configPath,
-						IndexName:  args[0],
+						IndexName: args[0],
 					}
 				}),
 

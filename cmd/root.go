@@ -143,7 +143,8 @@ func initConfig() {
 
 	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
-		// Config file not found, that's ok
+		// Config file not found, that's ok - we'll use defaults
+		fmt.Fprintf(os.Stderr, "Warning: Config file not found: %v\n", err)
 	}
 
 	// Bind environment variables
@@ -151,7 +152,10 @@ func initConfig() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Load .env file if it exists
-	godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		// .env file not found, that's ok - we'll use environment variables
+		fmt.Fprintf(os.Stderr, "Warning: .env file not found: %v\n", err)
+	}
 }
 
 // setDefaults sets default configuration values

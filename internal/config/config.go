@@ -13,7 +13,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/logging"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
-	"github.com/jonesrussell/gocrawl/internal/config/storage"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/viper"
 )
@@ -35,8 +34,6 @@ type Config struct {
 	Logger *logging.Config `yaml:"logger"`
 	// Server holds server-specific configuration
 	Server *server.Config `yaml:"server"`
-	// Storage holds storage-specific configuration
-	Storage *storage.Config `yaml:"storage"`
 	// Crawler holds crawler-specific configuration
 	Crawler *crawler.Config `yaml:"crawler"`
 	// App holds application-specific configuration
@@ -75,8 +72,8 @@ func (c *Config) validateHTTPDConfig() error {
 	if err := c.Server.Validate(); err != nil {
 		return fmt.Errorf("server: %w", err)
 	}
-	if err := c.Storage.Validate(); err != nil {
-		return fmt.Errorf("storage: %w", err)
+	if err := c.Elasticsearch.Validate(); err != nil {
+		return fmt.Errorf("elasticsearch: %w", err)
 	}
 	return nil
 }
@@ -85,9 +82,6 @@ func (c *Config) validateHTTPDConfig() error {
 func (c *Config) validateSearchConfig() error {
 	if err := c.Elasticsearch.Validate(); err != nil {
 		return fmt.Errorf("elasticsearch: %w", err)
-	}
-	if err := c.Storage.Validate(); err != nil {
-		return fmt.Errorf("storage: %w", err)
 	}
 	return nil
 }
@@ -116,16 +110,16 @@ func (c *Config) Validate() error {
 		}
 
 	case commands.Sources:
-		if err := c.Storage.Validate(); err != nil {
-			return fmt.Errorf("storage: %w", err)
+		if err := c.Elasticsearch.Validate(); err != nil {
+			return fmt.Errorf("elasticsearch: %w", err)
 		}
 	}
 
 	return nil
 }
 
-// LoadConfig loads the configuration from Viper into a Config struct.
-func LoadConfig() (*Config, error) {
+// LoadConfig loads the configuration from Viper
+func LoadConfig() (Interface, error) {
 	// Create a temporary logger for config loading
 	tempLogger, err := logger.New(&logger.Config{
 		Level:       logger.InfoLevel,
@@ -136,10 +130,14 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to create temporary logger: %w", err)
 	}
 
-	// Unmarshal config
-	var cfg Config
-	if unmarshalErr := viper.Unmarshal(&cfg); unmarshalErr != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
+	// Create config with defaults
+	cfg := &Config{
+		Environment: viper.GetString("environment"),
+		Logger: &logging.Config{
+			Level:    viper.GetString("logger.level"),
+			Encoding: viper.GetString("logger.encoding"),
+		},
+		Elasticsearch: elasticsearch.LoadFromViper(viper.GetViper()),
 	}
 
 	// Set the logger
@@ -150,7 +148,12 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("invalid config: %w", validateErr)
 	}
 
-	return &cfg, nil
+	return cfg, nil
+}
+
+// LoadElasticsearchConfig loads Elasticsearch configuration from Viper
+func LoadElasticsearchConfig() *elasticsearch.Config {
+	return elasticsearch.LoadFromViper(viper.GetViper())
 }
 
 // GetAppConfig returns the application configuration.
@@ -181,11 +184,6 @@ func (c *Config) GetElasticsearchConfig() *elasticsearch.Config {
 // GetCommand returns the current command.
 func (c *Config) GetCommand() string {
 	return c.Command
-}
-
-// GetStorageConfig returns the storage configuration.
-func (c *Config) GetStorageConfig() *storage.Config {
-	return c.Storage
 }
 
 // GetConfigFile returns the path to the configuration file.

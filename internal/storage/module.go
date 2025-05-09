@@ -51,9 +51,7 @@ func createTransport(esConfig *esconfig.Config) *http.Transport {
 	}
 
 	// Configure TLS if enabled
-	if esConfig.TLS != nil {
-		// InsecureSkipVerify is used for development/testing environments only
-		// and should be disabled in production. This is a security risk.
+	if esConfig.TLS != nil && esConfig.TLS.Enabled {
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: esConfig.TLS.InsecureSkipVerify, // #nosec G402 - This is configurable and documented
 		}
@@ -92,18 +90,7 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*ela
 		return nil, errors.New("elasticsearch addresses are required")
 	}
 
-	// Log detailed configuration information
-	logger.Debug("Elasticsearch configuration",
-		"addresses", esConfig.Addresses,
-		"hasAPIKey", esConfig.APIKey != "",
-		"apiKey", esConfig.APIKey, // Log the actual API key value
-		"hasBasicAuth", esConfig.Username != "" && esConfig.Password != "",
-		"tls.insecure_skip_verify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify,
-		"tls.has_ca_file", esConfig.TLS != nil && esConfig.TLS.CAFile != "",
-		"tls.has_cert_file", esConfig.TLS != nil && esConfig.TLS.CertFile != "",
-		"tls.has_key_file", esConfig.TLS != nil && esConfig.TLS.KeyFile != "")
-
-	// Create transport
+	// Create transport with TLS configuration
 	transport := createTransport(esConfig)
 
 	// Create client config
@@ -134,33 +121,7 @@ var Module = fx.Module("storage",
 	fx.Provide(
 		// Provide the Elasticsearch client
 		fx.Annotate(
-			func(logger logger.Interface, cfg config.Interface) (*elasticsearch.Client, error) {
-				esConfig := cfg.GetElasticsearchConfig()
-
-				// Create transport with TLS configuration
-				transport := createTransport(esConfig)
-
-				// Create Elasticsearch config
-				config := createClientConfig(esConfig, transport)
-
-				client, err := elasticsearch.NewClient(config)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
-				}
-
-				// Test the connection
-				res, err := client.Ping()
-				if err != nil {
-					return nil, fmt.Errorf("failed to ping Elasticsearch: %w", err)
-				}
-				defer res.Body.Close()
-
-				if res.IsError() {
-					return nil, fmt.Errorf("error pinging Elasticsearch: %s", res.String())
-				}
-
-				return client, nil
-			},
+			NewElasticsearchClient,
 			fx.ResultTags(`name:"elasticsearchClient"`),
 		),
 
@@ -182,7 +143,7 @@ var Module = fx.Module("storage",
 		// Provide the search manager
 		fx.Annotate(
 			NewSearchManager,
-			fx.ParamTags(``, ``),
+			fx.ResultTags(`name:"searchManager"`),
 		),
 	),
 )

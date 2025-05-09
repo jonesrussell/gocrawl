@@ -13,7 +13,6 @@ import (
 	elasticsearch "github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	logging "github.com/jonesrussell/gocrawl/internal/config/logging"
 	server "github.com/jonesrussell/gocrawl/internal/config/server"
-	storage "github.com/jonesrussell/gocrawl/internal/config/storage"
 )
 
 // MockInterface is a mock of Interface interface.
@@ -135,20 +134,6 @@ func (m *MockInterface) GetServerConfig() *server.Config {
 func (mr *MockInterfaceMockRecorder) GetServerConfig() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerConfig", reflect.TypeOf((*MockInterface)(nil).GetServerConfig))
-}
-
-// GetStorageConfig mocks base method.
-func (m *MockInterface) GetStorageConfig() *storage.Config {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStorageConfig")
-	ret0, _ := ret[0].(*storage.Config)
-	return ret0
-}
-
-// GetStorageConfig indicates an expected call of GetStorageConfig.
-func (mr *MockInterfaceMockRecorder) GetStorageConfig() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStorageConfig", reflect.TypeOf((*MockInterface)(nil).GetStorageConfig))
 }
 
 // Validate mocks base method.

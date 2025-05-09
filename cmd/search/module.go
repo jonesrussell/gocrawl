@@ -24,17 +24,6 @@ var Module = fx.Module("search",
 		if esConfig == nil {
 			return errors.New("elasticsearch configuration is required")
 		}
-
-		// Log Elasticsearch configuration
-		log.Debug("Elasticsearch configuration",
-			"addresses", esConfig.Addresses,
-			"hasAPIKey", esConfig.APIKey != "",
-			"hasBasicAuth", esConfig.Username != "" && esConfig.Password != "",
-			"tls.insecure_skip_verify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify,
-			"tls.has_ca_file", esConfig.TLS != nil && esConfig.TLS.CAFile != "",
-			"tls.has_cert_file", esConfig.TLS != nil && esConfig.TLS.CertFile != "",
-			"tls.has_key_file", esConfig.TLS != nil && esConfig.TLS.KeyFile != "")
-
 		return nil
 	}),
 )

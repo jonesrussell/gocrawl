@@ -7,7 +7,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/logging"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
-	"github.com/jonesrussell/gocrawl/internal/config/storage"
 )
 
 // Interface defines the interface for configuration management.
@@ -22,8 +21,6 @@ type Interface interface {
 	GetCrawlerConfig() *crawler.Config
 	// GetElasticsearchConfig returns the Elasticsearch configuration.
 	GetElasticsearchConfig() *elasticsearch.Config
-	// GetStorageConfig returns the storage configuration.
-	GetStorageConfig() *storage.Config
 	// GetCommand returns the current command.
 	GetCommand() string
 	// GetConfigFile returns the path to the configuration file.

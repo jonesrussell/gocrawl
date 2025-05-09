@@ -33,6 +33,8 @@ const (
 	DefaultDiscoverNodes = false // Default to false to prevent node discovery
 	DefaultUsername      = "elastic"
 	DefaultPassword      = "changeme"
+	DefaultMaxSize       = 1024 * 1024 * 1024 // 1 GB
+	DefaultMaxItems      = 10000
 
 	// Retry configuration constants
 	HAInitialWait = 2 * time.Second
@@ -95,6 +97,12 @@ type Config struct {
 	FlushInterval time.Duration `yaml:"flush_interval"`
 	// DiscoverNodes enables/disables node discovery
 	DiscoverNodes bool `yaml:"discover_nodes" env:"ELASTICSEARCH_DISCOVER_NODES"`
+	// MaxSize is the maximum size of the storage in bytes
+	MaxSize int64 `yaml:"max_size"`
+	// MaxItems is the maximum number of items to store
+	MaxItems int `yaml:"max_items"`
+	// Compression is whether to compress stored data
+	Compression bool `yaml:"compression"`
 }
 
 // TLSConfig represents TLS configuration settings.
@@ -242,15 +250,15 @@ func (c *Config) Validate() error {
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
 	return &Config{
-		Addresses: []string{"https://localhost:9200"},
+		Addresses: []string{DefaultAddresses},
 		Retry: struct {
 			Enabled     bool          `yaml:"enabled" env:"ELASTICSEARCH_RETRY_ENABLED"`
 			InitialWait time.Duration `yaml:"initial_wait" env:"ELASTICSEARCH_RETRY_INITIAL_WAIT"`
 			MaxWait     time.Duration `yaml:"max_wait" env:"ELASTICSEARCH_RETRY_MAX_WAIT"`
 			MaxRetries  int           `yaml:"max_retries" env:"ELASTICSEARCH_MAX_RETRIES"`
 		}{
-			Enabled:     true,
-			InitialWait: time.Second,
+			Enabled:     DefaultRetryEnabled,
+			InitialWait: DefaultInitialWait,
 			MaxWait:     DefaultMaxWait,
 			MaxRetries:  DefaultMaxRetries,
 		},
@@ -260,6 +268,9 @@ func NewConfig() *Config {
 			Enabled:            true,
 			InsecureSkipVerify: false,
 		},
+		MaxSize:     DefaultMaxSize,
+		MaxItems:    DefaultMaxItems,
+		Compression: true,
 	}
 }
 
@@ -371,11 +382,6 @@ func WithTLSInsecureSkipVerify(skip bool) Option {
 
 // LoadFromViper loads Elasticsearch configuration from Viper
 func LoadFromViper(v *viper.Viper) *Config {
-	fmt.Printf("Debug: Loading Elasticsearch config from Viper\n")
-	fmt.Printf("Debug: Viper TLS settings - Enabled: %v, SkipVerify: %v\n",
-		v.GetBool("elasticsearch.tls.enabled"),
-		v.GetBool("elasticsearch.tls.insecure_skip_verify"))
-
 	cfg := &Config{
 		Addresses: v.GetStringSlice("elasticsearch.addresses"),
 		Username:  v.GetString("elasticsearch.username"),
@@ -389,8 +395,5 @@ func LoadFromViper(v *viper.Viper) *Config {
 			KeyFile:            v.GetString("elasticsearch.tls.key_file"),
 		},
 	}
-
-	fmt.Printf("Debug: Loaded Elasticsearch config: %+v\n", cfg)
-	fmt.Printf("Debug: Loaded TLS config: %+v\n", cfg.TLS)
 	return cfg
 }
