@@ -4,8 +4,10 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/cobra"
@@ -137,6 +139,87 @@ func initConfig() {
 		viper.SetConfigName("config")
 	}
 
-	// Read in environment variables that match
+	// Set up environment variable binding
 	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Load .env file if it exists
+	viper.SetConfigFile(".env")
+	if err := viper.MergeInConfig(); err != nil {
+		var configFileNotFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFound) {
+			fmt.Fprintf(os.Stderr, "Warning: failed to load .env file: %v\n", err)
+		}
+	}
+
+	// Set defaults
+	setDefaults()
+
+	// Read the config file
+	if err := viper.ReadInConfig(); err != nil {
+		var configFileNotFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFound) {
+			fmt.Fprintf(os.Stderr, "Warning: failed to read config file: %v\n", err)
+		}
+		// If config file is not found, we'll use the defaults set by setDefaults
+	}
+}
+
+// setDefaults sets default configuration values
+func setDefaults() {
+	// App defaults
+	viper.SetDefault("app", map[string]any{
+		"name":        "gocrawl",
+		"version":     "1.0.0",
+		"environment": "development",
+		"debug":       true,
+	})
+
+	// Logger defaults
+	viper.SetDefault("logger", map[string]any{
+		"level":       "debug",
+		"encoding":    "console",
+		"output":      "stdout",
+		"debug":       true,
+		"caller":      false,
+		"stacktrace":  false,
+		"max_size":    config.DefaultMaxLogSize,
+		"max_backups": config.DefaultMaxLogBackups,
+		"max_age":     config.DefaultMaxLogAge,
+		"compress":    true,
+	})
+
+	// Crawler defaults
+	viper.SetDefault("crawler", map[string]any{
+		"max_depth":   config.DefaultMaxDepth,
+		"max_retries": config.DefaultMaxRetries,
+		"rate_limit":  "1s",
+		"timeout":     "30s",
+		"user_agent":  "GoCrawl/1.0",
+		"source_file": "sources.yml",
+	})
+
+	// Storage defaults
+	viper.SetDefault("storage", map[string]any{
+		"type":           "elasticsearch",
+		"batch_size":     config.DefaultStorageBatchSize,
+		"flush_interval": "5s",
+	})
+
+	// Elasticsearch defaults
+	viper.SetDefault("elasticsearch", map[string]any{
+		"addresses":  []string{"https://localhost:9200"},
+		"index_name": "gocrawl",
+		"retry": map[string]any{
+			"enabled":      true,
+			"initial_wait": "1s",
+			"max_wait":     "5s",
+			"max_retries":  config.DefaultElasticsearchRetries,
+		},
+		"bulk_size":      config.DefaultBulkSize,
+		"flush_interval": "1s",
+		"tls": map[string]any{
+			"insecure_skip_verify": true,
+		},
+	})
 }

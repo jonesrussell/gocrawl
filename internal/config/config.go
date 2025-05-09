@@ -6,7 +6,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/jonesrussell/gocrawl/internal/config/commands"
@@ -46,14 +45,13 @@ type Config struct {
 	Elasticsearch *elasticsearch.Config `yaml:"elasticsearch"`
 	// Command is the current command being executed
 	Command string `yaml:"command"`
-	viper   *viper.Viper
-	logger  logger.Interface
+	// logger is the application logger
+	logger logger.Interface
 }
 
 // NewConfig creates a new config instance.
 func NewConfig(logger logger.Interface) *Config {
 	return &Config{
-		viper:  viper.New(),
 		logger: logger,
 	}
 }
@@ -126,47 +124,8 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// LoadConfig loads the configuration from the specified file or default locations.
+// LoadConfig loads the configuration from Viper into a Config struct.
 func LoadConfig() (*Config, error) {
-	// Create a new Viper instance
-	v := viper.New()
-
-	// Set up Viper
-	v.SetConfigType("yaml")
-	v.SetConfigName("config")
-
-	// Add config paths in order of priority
-	v.AddConfigPath(".")              // Current directory
-	v.AddConfigPath("$HOME/.gocrawl") // User config directory
-	v.AddConfigPath("/etc/gocrawl")   // System config directory
-
-	// Set up environment variable binding
-	v.AutomaticEnv()
-	v.SetEnvPrefix("GOCRAWL")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// Load .env file if it exists
-	v.SetConfigFile(".env")
-	if err := v.MergeInConfig(); err != nil {
-		var configFileNotFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFound) {
-			return nil, fmt.Errorf("failed to load .env file: %w", err)
-		}
-		// .env file doesn't exist, which is fine
-	}
-
-	// Set defaults
-	setDefaults(v)
-
-	// Read the config file
-	if err := v.ReadInConfig(); err != nil {
-		var configFileNotFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFound) {
-			return nil, fmt.Errorf("failed to read config file: %w", err)
-		}
-		// If config file is not found, we'll use the defaults set by setDefaults
-	}
-
 	// Create a temporary logger for config loading
 	tempLogger, err := logger.New(&logger.Config{
 		Level:       logger.InfoLevel,
@@ -179,7 +138,7 @@ func LoadConfig() (*Config, error) {
 
 	// Unmarshal config
 	var cfg Config
-	if unmarshalErr := v.Unmarshal(&cfg); unmarshalErr != nil {
+	if unmarshalErr := viper.Unmarshal(&cfg); unmarshalErr != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
 	}
 
@@ -192,65 +151,6 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &cfg, nil
-}
-
-// setDefaults sets default configuration values
-func setDefaults(v *viper.Viper) {
-	// App defaults
-	v.SetDefault("app", map[string]any{
-		"name":        "gocrawl",
-		"version":     "1.0.0",
-		"environment": "development",
-		"debug":       true,
-	})
-
-	// Logger defaults
-	v.SetDefault("logger", map[string]any{
-		"level":       "debug",
-		"encoding":    "console",
-		"output":      "stdout",
-		"debug":       true,
-		"caller":      false,
-		"stacktrace":  false,
-		"max_size":    DefaultMaxLogSize,
-		"max_backups": DefaultMaxLogBackups,
-		"max_age":     DefaultMaxLogAge,
-		"compress":    true,
-	})
-
-	// Crawler defaults
-	v.SetDefault("crawler", map[string]any{
-		"max_depth":   DefaultMaxDepth,
-		"max_retries": DefaultMaxRetries,
-		"rate_limit":  "1s",
-		"timeout":     "30s",
-		"user_agent":  "GoCrawl/1.0",
-		"source_file": "sources.yml",
-	})
-
-	// Storage defaults
-	v.SetDefault("storage", map[string]any{
-		"type":           "elasticsearch",
-		"batch_size":     DefaultStorageBatchSize,
-		"flush_interval": "5s",
-	})
-
-	// Elasticsearch defaults
-	v.SetDefault("elasticsearch", map[string]any{
-		"addresses":  []string{"https://localhost:9200"},
-		"index_name": "gocrawl",
-		"retry": map[string]any{
-			"enabled":      true,
-			"initial_wait": "1s",
-			"max_wait":     "5s",
-			"max_retries":  DefaultElasticsearchRetries,
-		},
-		"bulk_size":      DefaultBulkSize,
-		"flush_interval": "1s",
-		"tls": map[string]any{
-			"insecure_skip_verify": true,
-		},
-	})
 }
 
 // GetAppConfig returns the application configuration.
