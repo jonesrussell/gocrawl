@@ -96,6 +96,7 @@ func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*ela
 	logger.Debug("Elasticsearch configuration",
 		"addresses", esConfig.Addresses,
 		"hasAPIKey", esConfig.APIKey != "",
+		"apiKey", esConfig.APIKey, // Log the actual API key value
 		"hasBasicAuth", esConfig.Username != "" && esConfig.Password != "",
 		"tls.insecure_skip_verify", esConfig.TLS != nil && esConfig.TLS.InsecureSkipVerify,
 		"tls.has_ca_file", esConfig.TLS != nil && esConfig.TLS.CAFile != "",

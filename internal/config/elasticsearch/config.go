@@ -64,15 +64,15 @@ func (e *ConfigError) Error() string {
 // Config represents Elasticsearch configuration settings.
 type Config struct {
 	// Addresses is a list of Elasticsearch node addresses
-	Addresses []string `yaml:"addresses"`
+	Addresses []string `yaml:"addresses" env:"ELASTICSEARCH_HOSTS"`
 	// APIKey is the base64 encoded API key for authentication
-	APIKey string `yaml:"api_key"`
+	APIKey string `yaml:"api_key" env:"ELASTICSEARCH_API_KEY"`
 	// Username is the username for authentication
-	Username string `yaml:"username"`
+	Username string `yaml:"username" env:"ELASTICSEARCH_USERNAME"`
 	// Password is the password for authentication (minimum 8 characters)
-	Password string `yaml:"password"`
+	Password string `yaml:"password" env:"ELASTICSEARCH_PASSWORD"`
 	// IndexName is the name of the index
-	IndexName string `yaml:"index_name"`
+	IndexName string `yaml:"index_name" env:"ELASTICSEARCH_INDEX_PREFIX"`
 	// Cloud contains cloud-specific configuration
 	Cloud struct {
 		ID     string `yaml:"id"`
@@ -82,17 +82,17 @@ type Config struct {
 	TLS *TLSConfig `yaml:"tls"`
 	// Retry contains retry configuration
 	Retry struct {
-		Enabled     bool          `yaml:"enabled"`
-		InitialWait time.Duration `yaml:"initial_wait"`
-		MaxWait     time.Duration `yaml:"max_wait"`
-		MaxRetries  int           `yaml:"max_retries"`
+		Enabled     bool          `yaml:"enabled" env:"ELASTICSEARCH_RETRY_ENABLED"`
+		InitialWait time.Duration `yaml:"initial_wait" env:"ELASTICSEARCH_RETRY_INITIAL_WAIT"`
+		MaxWait     time.Duration `yaml:"max_wait" env:"ELASTICSEARCH_RETRY_MAX_WAIT"`
+		MaxRetries  int           `yaml:"max_retries" env:"ELASTICSEARCH_MAX_RETRIES"`
 	} `yaml:"retry"`
 	// BulkSize is the number of documents to bulk index
 	BulkSize int `yaml:"bulk_size"`
 	// FlushInterval is the interval at which to flush the bulk indexer
 	FlushInterval time.Duration `yaml:"flush_interval"`
 	// DiscoverNodes enables/disables node discovery
-	DiscoverNodes bool `yaml:"discover_nodes"`
+	DiscoverNodes bool `yaml:"discover_nodes" env:"ELASTICSEARCH_DISCOVER_NODES"`
 }
 
 // TLSConfig represents TLS configuration settings.
@@ -239,94 +239,28 @@ func (c *Config) Validate() error {
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
 	return &Config{
-		Addresses: []string{DefaultAddresses},
-		IndexName: DefaultIndexName,
+		Addresses: []string{"https://localhost:9200"},
 		Retry: struct {
-			Enabled     bool          `yaml:"enabled"`
-			InitialWait time.Duration `yaml:"initial_wait"`
-			MaxWait     time.Duration `yaml:"max_wait"`
-			MaxRetries  int           `yaml:"max_retries"`
+			Enabled     bool          `yaml:"enabled" env:"ELASTICSEARCH_RETRY_ENABLED"`
+			InitialWait time.Duration `yaml:"initial_wait" env:"ELASTICSEARCH_RETRY_INITIAL_WAIT"`
+			MaxWait     time.Duration `yaml:"max_wait" env:"ELASTICSEARCH_RETRY_MAX_WAIT"`
+			MaxRetries  int           `yaml:"max_retries" env:"ELASTICSEARCH_MAX_RETRIES"`
 		}{
-			Enabled:     DefaultRetryEnabled,
-			InitialWait: DefaultInitialWait,
-			MaxWait:     DefaultMaxWait,
+			Enabled:     true,
+			InitialWait: time.Second,
+			MaxWait:     DefaultMaxWait * time.Second,
 			MaxRetries:  DefaultMaxRetries,
 		},
 		BulkSize:      DefaultBulkSize,
 		FlushInterval: DefaultFlushInterval,
+		TLS: &TLSConfig{
+			InsecureSkipVerify: true,
+		},
 	}
-}
-
-// ExampleConfig demonstrates common configuration patterns.
-func ExampleConfig() {
-	// Basic configuration
-	basicCfg := NewConfig()
-	WithAddresses([]string{"http://localhost:9200"})(basicCfg)
-	WithAPIKey("my_id:my_key")(basicCfg)
-	WithIndexName("my_index")(basicCfg)
-
-	// Cloud configuration
-	cloudCfg := NewConfig()
-	WithCloudID("my-cloud-id")(cloudCfg)
-	WithCloudAPIKey("my-cloud-key")(cloudCfg)
-
-	// TLS configuration
-	tlsCfg := NewConfig()
-	WithTLSCertFile("cert.pem")(tlsCfg)
-	WithTLSKeyFile("key.pem")(tlsCfg)
-	WithTLSCAFile("ca.pem")(tlsCfg)
-
-	// High availability configuration
-	haCfg := NewConfig()
-	WithAddresses([]string{
-		"http://node1:9200",
-		"http://node2:9200",
-		"http://node3:9200",
-	})(haCfg)
-	WithAPIKey("ha_id:ha_key")(haCfg)
-	WithIndexName("ha_index")(haCfg)
-	WithRetryEnabled(true)(haCfg)
-	WithInitialWait(HAInitialWait)(haCfg)
-	WithMaxWait(HAMaxWait)(haCfg)
-	WithMaxRetries(HAMaxRetries)(haCfg)
-
-	// Validate configurations
-	_ = basicCfg.Validate()
-	_ = cloudCfg.Validate()
-	_ = tlsCfg.Validate()
-	_ = haCfg.Validate()
 }
 
 // Option is a function that configures an Elasticsearch configuration.
 type Option func(*Config)
-
-// WithAddresses sets the Elasticsearch addresses.
-func WithAddresses(addresses []string) Option {
-	return func(c *Config) {
-		c.Addresses = addresses
-	}
-}
-
-// WithAPIKey sets the Elasticsearch API key.
-func WithAPIKey(key string) Option {
-	return func(c *Config) {
-		c.APIKey = key
-	}
-}
-
-// WithUsername sets the Elasticsearch username.
-func WithUsername(username string) Option {
-	return func(c *Config) {
-		c.Username = username
-	}
-}
-
-// WithPassword sets the Elasticsearch password.
-func WithPassword(password string) Option {
-	return func(c *Config) {
-		c.Password = password
-	}
-}
 
 // WithIndexName sets the Elasticsearch index name.
 func WithIndexName(name string) Option {

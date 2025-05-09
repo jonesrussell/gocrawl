@@ -145,6 +145,10 @@ func LoadConfig() (*Config, error) {
 	v.SetEnvPrefix("GOCRAWL")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
+	// Load .env file if it exists
+	v.SetConfigFile(".env")
+	v.MergeInConfig()
+
 	// Set defaults
 	setDefaults(v)
 
