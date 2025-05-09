@@ -62,7 +62,7 @@ tasks:
     cmds:
       - go run main.go index delete {{.CLI_ARGS}}
     ignore_error: true
-    interactive: false
+    interactive: true
 
   index:delete:source:
     desc: "Delete index for a specific source"
