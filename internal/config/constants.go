@@ -173,6 +173,10 @@ const (
 
 	// DefaultMaxRateLimitCount is the default maximum rate limit count
 	DefaultMaxRateLimitCount = 100
+
+	// Source-specific defaults
+	DefaultSourceMaxDepth  = 2
+	DefaultSourceRateLimit = 5 * time.Second
 )
 
 // ValidHTTPMethods defines the valid HTTP methods

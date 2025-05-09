@@ -150,12 +150,7 @@ func ProvideCrawler(
 }
 
 // Module provides the crawler module for dependency injection.
-var Module = fx.Module("crawler",
-	fx.Provide(
-		NewProcessorFactory,
-		ProvideCrawler,
-	),
-)
+var Module = fx.Module("crawler")
 
 // NewCrawler creates a new crawler instance.
 func NewCrawler(

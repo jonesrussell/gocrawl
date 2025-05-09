@@ -6,12 +6,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	crawlerpkg "github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -37,55 +35,49 @@ const (
 // Module provides the crawl command module for dependency injection.
 var Module = fx.Module("crawl",
 	// Include required modules
-	storage.Module,
 	crawlerpkg.Module,
 
 	fx.Provide(
-		// Provide the crawl command
-		func(
-			cfg config.Interface,
-			log logger.Interface,
-			crawler crawlerpkg.Interface,
-			bus *events.EventBus,
-		) *cobra.Command {
-			return &cobra.Command{
-				Use:   "crawl",
-				Short: "Start the crawler",
-				RunE: func(cmd *cobra.Command, args []string) error {
-					// Create context with dependencies
-					ctx := context.Background()
-					ctx = context.WithValue(ctx, common.ConfigKey, cfg)
-					ctx = context.WithValue(ctx, common.LoggerKey, log)
-
-					// Start crawler
-					if err := crawler.Start(ctx, "default"); err != nil {
-						return err
+		fx.Annotated{
+			Group: "commands",
+			Target: func(
+				cfg config.Interface,
+				log logger.Interface,
+				crawler crawlerpkg.Interface,
+				bus *events.EventBus,
+			) func(parent *cobra.Command) {
+				return func(parent *cobra.Command) {
+					cmd := &cobra.Command{
+						Use:   "crawl [source]",
+						Short: "Start the crawler",
+						Long: `This command crawls a website for content and stores it in the configured storage.
+Specify the source name as an argument.`,
+						Args: cobra.ExactArgs(1),
+						RunE: func(cmd *cobra.Command, args []string) error {
+							// Start crawler
+							if err := crawler.Start(cmd.Context(), args[0]); err != nil {
+								return err
+							}
+							return nil
+						},
 					}
 
-					// Wait for crawler to finish
-					<-ctx.Done()
+					// Add lifecycle hooks
+					fx.Invoke(func(lc fx.Lifecycle) {
+						lc.Append(fx.Hook{
+							OnStart: func(ctx context.Context) error {
+								return nil
+							},
+							OnStop: func(ctx context.Context) error {
+								// Stop crawler
+								return crawler.Stop(ctx)
+							},
+						})
+					})
 
-					return nil
-				},
-			}
+					parent.AddCommand(cmd)
+				}
+			},
 		},
 	),
 )
-
-// NewCommand creates a new crawl command.
-func NewCommand(p struct {
-	fx.In
-	Crawler *Crawler
-}) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "crawl [source]",
-		Short: "Crawl a website",
-		Long: `This command crawls a website for content and stores it in the configured storage.
-Specify the source name as an argument.`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return p.Crawler.Start(cmd.Context())
-		},
-	}
-	return cmd
-}

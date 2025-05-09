@@ -45,7 +45,6 @@ func NewSourcesCommand() *cobra.Command {
 			// Create Fx application
 			app := fx.New(
 				// Include required modules
-				sources.Module,
 				Module,
 
 				// Provide existing config
