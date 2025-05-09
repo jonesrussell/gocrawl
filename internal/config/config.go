@@ -12,12 +12,20 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/commands"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
-	logconfig "github.com/jonesrussell/gocrawl/internal/config/log"
-	"github.com/jonesrussell/gocrawl/internal/config/priority"
+	"github.com/jonesrussell/gocrawl/internal/config/logging"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	"github.com/jonesrussell/gocrawl/internal/config/storage"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/spf13/viper"
+)
+
+const (
+	// DefaultMaxLogSize is the default maximum size of a log file in MB
+	DefaultMaxLogSize = 100
+	// DefaultMaxLogBackups is the default number of log file backups to keep
+	DefaultMaxLogBackups = 3
+	// DefaultMaxLogAge is the default maximum age of a log file in days
+	DefaultMaxLogAge = 30
 )
 
 // Config represents the application configuration.
@@ -25,11 +33,9 @@ type Config struct {
 	// Environment is the application environment (development, staging, production)
 	Environment string `yaml:"environment"`
 	// Logger holds logging-specific configuration
-	Logger *logconfig.Config `yaml:"logger"`
+	Logger *logging.Config `yaml:"logger"`
 	// Server holds server-specific configuration
 	Server *server.Config `yaml:"server"`
-	// Priority holds priority-specific configuration
-	Priority *priority.Config `yaml:"priority"`
 	// Storage holds storage-specific configuration
 	Storage *storage.Config `yaml:"storage"`
 	// Crawler holds crawler-specific configuration
@@ -181,16 +187,16 @@ func LoadConfig() (*Config, error) {
 
 	// Unmarshal config
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	if unmarshalErr := v.Unmarshal(&cfg); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
 	}
 
 	// Set the logger
 	cfg.logger = tempLogger
 
 	// Validate the configuration
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+	if validateErr := cfg.Validate(); validateErr != nil {
+		return nil, fmt.Errorf("invalid config: %w", validateErr)
 	}
 
 	return &cfg, nil
@@ -208,11 +214,16 @@ func setDefaults(v *viper.Viper) {
 
 	// Logger defaults
 	v.SetDefault("logger", map[string]any{
-		"level":        "debug",
-		"format":       "console",
-		"output":       "stdout",
-		"encoding":     "console",
-		"enable_color": true,
+		"level":       "debug",
+		"encoding":    "console",
+		"output":      "stdout",
+		"debug":       true,
+		"caller":      false,
+		"stacktrace":  false,
+		"max_size":    DefaultMaxLogSize,
+		"max_backups": DefaultMaxLogBackups,
+		"max_age":     DefaultMaxLogAge,
+		"compress":    true,
 	})
 
 	// Crawler defaults
@@ -256,7 +267,7 @@ func (c *Config) GetAppConfig() *app.Config {
 }
 
 // GetLogConfig returns the logging configuration.
-func (c *Config) GetLogConfig() *logconfig.Config {
+func (c *Config) GetLogConfig() *logging.Config {
 	return c.Logger
 }
 
@@ -268,11 +279,6 @@ func (c *Config) GetServerConfig() *server.Config {
 // GetCrawlerConfig returns the crawler configuration.
 func (c *Config) GetCrawlerConfig() *crawler.Config {
 	return c.Crawler
-}
-
-// GetPriorityConfig returns the priority configuration.
-func (c *Config) GetPriorityConfig() *priority.Config {
-	return c.Priority
 }
 
 // GetElasticsearchConfig returns the Elasticsearch configuration.

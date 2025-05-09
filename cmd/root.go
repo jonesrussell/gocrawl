@@ -40,33 +40,25 @@ It provides a flexible and extensible framework for building custom crawlers.`,
 )
 
 const (
-	defaultCrawlerMaxDepth      = 10
-	defaultCrawlerMaxRetries    = 3
-	defaultStorageBatchSize     = 100
-	defaultElasticsearchRetries = 3
-	logLevelDebug               = "debug"
-	logLevelInfo                = "info"
-	logLevelWarn                = "warn"
-	logLevelError               = "error"
 	// DefaultBulkSize is the default number of documents to bulk index
 	DefaultBulkSize = 1000
 )
 
 // setupConfig handles configuration file setup for all commands
 func setupConfig(cmd *cobra.Command) error {
-	// Step 1: Load configuration
+	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
+	// Bind flags to configuration
+	if bindErr := bindFlags(cmd); bindErr != nil {
+		return fmt.Errorf("failed to bind flags: %w", bindErr)
+	}
+
 	// Store config in command context
 	cmd.SetContext(context.WithValue(cmd.Context(), common.ConfigKey, cfg))
-
-	// Step 2: Bind command flags to viper
-	if err := bindFlags(cmd); err != nil {
-		return fmt.Errorf("failed to bind flags: %w", err)
-	}
 
 	return nil
 }

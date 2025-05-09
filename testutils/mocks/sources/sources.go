@@ -9,7 +9,9 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	types "github.com/jonesrussell/gocrawl/internal/config/types"
 	sourceutils "github.com/jonesrussell/gocrawl/internal/sourceutils"
+	types0 "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // MockInterface is a mock of Interface interface.
@@ -136,15 +138,16 @@ func (mr *MockInterfaceMockRecorder) UpdateSource(ctx, source interface{}) *gomo
 }
 
 // ValidateSource mocks base method.
-func (m *MockInterface) ValidateSource(source *sourceutils.SourceConfig) error {
+func (m *MockInterface) ValidateSource(ctx context.Context, sourceName string, indexManager types0.IndexManager) (*types.Source, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ValidateSource", source)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "ValidateSource", ctx, sourceName, indexManager)
+	ret0, _ := ret[0].(*types.Source)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // ValidateSource indicates an expected call of ValidateSource.
-func (mr *MockInterfaceMockRecorder) ValidateSource(source interface{}) *gomock.Call {
+func (mr *MockInterfaceMockRecorder) ValidateSource(ctx, sourceName, indexManager interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateSource", reflect.TypeOf((*MockInterface)(nil).ValidateSource), source)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateSource", reflect.TypeOf((*MockInterface)(nil).ValidateSource), ctx, sourceName, indexManager)
 }

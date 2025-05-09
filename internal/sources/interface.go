@@ -22,7 +22,11 @@ type Interface interface {
 	// DeleteSource deletes a source by name.
 	DeleteSource(ctx context.Context, name string) error
 	// ValidateSource validates a source configuration and ensures required indices exist.
-	ValidateSource(ctx context.Context, sourceName string, indexManager storagetypes.IndexManager) (*configtypes.Source, error)
+	ValidateSource(
+		ctx context.Context,
+		sourceName string,
+		indexManager storagetypes.IndexManager,
+	) (*configtypes.Source, error)
 	// GetMetrics returns the current metrics.
 	GetMetrics() sourceutils.SourcesMetrics
 	// FindByName finds a source by name. Returns nil if not found.

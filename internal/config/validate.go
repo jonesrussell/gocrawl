@@ -10,7 +10,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
-	"github.com/jonesrussell/gocrawl/internal/config/log"
+	"github.com/jonesrussell/gocrawl/internal/config/logging"
 )
 
 const (
@@ -143,7 +143,7 @@ func validateAppConfig(cfg *app.Config) error {
 }
 
 // validateLogConfig validates the log configuration
-func validateLogConfig(cfg *log.Config) error {
+func validateLogConfig(cfg *logging.Config) error {
 	if cfg == nil {
 		return &ValidationError{
 			Field:  "log",

@@ -388,8 +388,13 @@ func (s *Sources) DeleteSource(ctx context.Context, name string) error {
 	return fmt.Errorf("source not found: %s", name)
 }
 
-// ValidateSource validates a source configuration and ensures required indices exist.
-func (s *Sources) ValidateSource(ctx context.Context, sourceName string, indexManager storagetypes.IndexManager) (*configtypes.Source, error) {
+// ValidateSource validates a source configuration and returns the validated source.
+// It checks if the source exists and is properly configured.
+func (s *Sources) ValidateSource(
+	ctx context.Context,
+	sourceName string,
+	indexManager storagetypes.IndexManager,
+) (*configtypes.Source, error) {
 	// Get all sources
 	sourceConfigs, err := s.GetSources()
 	if err != nil {
