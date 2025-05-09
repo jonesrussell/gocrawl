@@ -5,8 +5,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -40,15 +38,6 @@ type SearchResponse struct {
 // Module provides the API dependencies.
 var Module = fx.Module("api",
 	fx.Provide(
-		// Provide the router and security middleware
-		func(
-			cfg config.Interface,
-			log logger.Interface,
-			searchManager SearchManager,
-		) (*gin.Engine, middleware.SecurityMiddlewareInterface, error) {
-			router, security := SetupRouter(log, searchManager, cfg)
-			return router, security, nil
-		},
 		NewLifecycle,
 		NewServer,
 	),

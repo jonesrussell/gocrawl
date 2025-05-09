@@ -8,20 +8,8 @@ import (
 	"time"
 )
 
-// Default configuration values
-const (
-	DefaultSecurityEnabled = false
-	DefaultAPIKey          = ""
-	DefaultAddress         = ""
-	DefaultReadTimeout     = 0
-	DefaultWriteTimeout    = 0
-	DefaultIdleTimeout     = 0
-	DefaultHost            = ""
-	DefaultPort            = 0
-	DefaultMaxHeaderBytes  = 0
-	// APIKeyParts is the number of parts in an API key (id:key)
-	APIKeyParts = 2
-)
+// APIKeyParts is the number of parts in an API key (id:key)
+const APIKeyParts = 2
 
 // Config represents server-specific configuration settings.
 type Config struct {
@@ -82,14 +70,7 @@ func (c *Config) Validate() error {
 
 // New creates a new server configuration with the given options.
 func New(opts ...Option) *Config {
-	cfg := &Config{
-		SecurityEnabled: DefaultSecurityEnabled,
-		APIKey:          DefaultAPIKey,
-		Address:         DefaultAddress,
-		ReadTimeout:     DefaultReadTimeout,
-		WriteTimeout:    DefaultWriteTimeout,
-		IdleTimeout:     DefaultIdleTimeout,
-	}
+	cfg := &Config{}
 
 	for _, opt := range opts {
 		opt(cfg)
@@ -118,12 +99,6 @@ func WithAPIKey(key string) Option {
 // NewConfig creates a new Config instance with default values.
 func NewConfig() *Config {
 	return &Config{
-		Host:           DefaultHost,
-		Port:           DefaultPort,
-		ReadTimeout:    DefaultReadTimeout,
-		WriteTimeout:   DefaultWriteTimeout,
-		IdleTimeout:    DefaultIdleTimeout,
-		MaxHeaderBytes: DefaultMaxHeaderBytes,
 		TLS: struct {
 			Enabled  bool   `yaml:"enabled"`
 			CertFile string `yaml:"cert_file"`

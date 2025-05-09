@@ -149,6 +149,13 @@ You can send POST requests to /search with a JSON body containing the search par
 			Module,
 			fx.Provide(
 				func() logger.Interface { return log },
+				func() config.Interface {
+					cfgValue := cmd.Context().Value(cmdcommon.ConfigKey)
+					if cfg, ok := cfgValue.(config.Interface); ok {
+						return cfg
+					}
+					return nil
+				},
 			),
 			fx.WithLogger(func() fxevent.Logger {
 				return logger.NewFxLogger(log)

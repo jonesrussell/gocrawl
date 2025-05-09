@@ -17,26 +17,20 @@ import (
 // Module provides the HTTP server dependencies.
 var Module = fx.Options(
 	// Core modules
-	config.Module,
 	logger.Module,
 	storage.Module,
 	api.Module,
 
 	// Providers
 	fx.Provide(
-		// Provide logger params
-		func() logger.Params {
-			return logger.Params{
-				Config: &logger.Config{
-					Level:       logger.InfoLevel,
-					Development: false,
-					Encoding:    "json",
-				},
-			}
-		},
-		// Provide config path
-		func() string {
-			return "config.yaml"
+		// Provide the router and security middleware
+		func(
+			cfg config.Interface,
+			log logger.Interface,
+			searchManager api.SearchManager,
+		) (*gin.Engine, middleware.SecurityMiddlewareInterface, error) {
+			router, security := api.SetupRouter(log, searchManager, cfg)
+			return router, security, nil
 		},
 		// Provide the server
 		func(

@@ -141,9 +141,6 @@ var Module = fx.Module("storage",
 		),
 
 		// Provide the search manager
-		fx.Annotate(
-			NewSearchManager,
-			fx.ResultTags(`name:"searchManager"`),
-		),
+		NewSearchManager,
 	),
 )

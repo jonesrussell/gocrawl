@@ -6,6 +6,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/jonesrussell/gocrawl/internal/config/commands"
@@ -17,6 +18,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Default configuration values
 const (
 	// DefaultMaxLogSize is the default maximum size of a log file in MB
 	DefaultMaxLogSize = 100
@@ -24,6 +26,12 @@ const (
 	DefaultMaxLogBackups = 3
 	// DefaultMaxLogAge is the default maximum age of a log file in days
 	DefaultMaxLogAge = 30
+
+	// Server defaults
+	DefaultServerAddress      = ":8080"
+	DefaultServerReadTimeout  = 30 * time.Second
+	DefaultServerWriteTimeout = 30 * time.Second
+	DefaultServerIdleTimeout  = 60 * time.Second
 )
 
 // Config represents the application configuration.
@@ -137,8 +145,33 @@ func LoadConfig() (Interface, error) {
 			Level:    viper.GetString("logger.level"),
 			Encoding: viper.GetString("logger.encoding"),
 		},
+		Server:        server.NewConfig(),
 		Elasticsearch: elasticsearch.LoadFromViper(viper.GetViper()),
 	}
+
+	// Set server config from Viper with defaults
+	cfg.Server.Address = viper.GetString("server.address")
+	if cfg.Server.Address == "" {
+		cfg.Server.Address = DefaultServerAddress
+	}
+
+	cfg.Server.ReadTimeout = viper.GetDuration("server.readTimeout")
+	if cfg.Server.ReadTimeout == 0 {
+		cfg.Server.ReadTimeout = DefaultServerReadTimeout
+	}
+
+	cfg.Server.WriteTimeout = viper.GetDuration("server.writeTimeout")
+	if cfg.Server.WriteTimeout == 0 {
+		cfg.Server.WriteTimeout = DefaultServerWriteTimeout
+	}
+
+	cfg.Server.IdleTimeout = viper.GetDuration("server.idleTimeout")
+	if cfg.Server.IdleTimeout == 0 {
+		cfg.Server.IdleTimeout = DefaultServerIdleTimeout
+	}
+
+	cfg.Server.SecurityEnabled = viper.GetBool("server.security.enabled")
+	cfg.Server.APIKey = viper.GetString("server.security.apiKey")
 
 	// Set the logger
 	cfg.logger = tempLogger

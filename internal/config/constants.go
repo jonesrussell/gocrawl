@@ -41,9 +41,6 @@ const (
 	// DefaultIdleTimeout is the default HTTP server idle timeout
 	DefaultIdleTimeout = 120 * time.Second
 
-	// DefaultServerAddress is the default HTTP server address
-	DefaultServerAddress = ":8080"
-
 	// DefaultLogLevel is the default logging level
 	DefaultLogLevel = "info"
 
