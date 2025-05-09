@@ -215,7 +215,7 @@ func (c *Crawler) setupCallbacks(ctx context.Context) {
 			"status", r.StatusCode,
 			"error", visitErr)
 
-		if errors.Is(visitErr, colly.ErrAlreadyVisited) || errors.Is(visitErr, colly.ErrMaxDepth) {
+		if errors.Is(visitErr, ErrAlreadyVisited) || errors.Is(visitErr, ErrMaxDepth) {
 			return
 		}
 

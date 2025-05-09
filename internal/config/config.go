@@ -20,7 +20,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/storage"
 	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 )
 
@@ -206,13 +205,8 @@ func LoadConfig() (*Config, error) {
 
 	// Unmarshal config
 	var cfg Config
-	if unmarshalErr := v.Unmarshal(&cfg, func(config *mapstructure.DecoderConfig) {
-		config.TagName = "yaml"
-		config.DecodeHook = mapstructure.ComposeDecodeHookFunc(
-			mapstructure.StringToTimeDurationHookFunc(),
-			mapstructure.StringToSliceHookFunc(","),
-		)
-	}); unmarshalErr != nil {
+	v.SetConfigType("yaml")
+	if unmarshalErr := v.Unmarshal(&cfg); unmarshalErr != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
 	}
 
