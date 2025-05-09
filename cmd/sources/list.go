@@ -60,27 +60,59 @@ func (r *TableRenderer) RenderTable(sources []*sourceutils.SourceConfig) error {
 	return nil
 }
 
-// ListCommand implements the list command for sources.
-type ListCommand struct {
+// Lister handles listing sources
+type Lister struct {
 	sourceManager sources.Interface
 	logger        logger.Interface
 	renderer      *TableRenderer
 }
 
-// NewListCommand creates a new list command.
+// NewLister creates a new Lister instance
+func NewLister(
+	sourceManager sources.Interface,
+	logger logger.Interface,
+	renderer *TableRenderer,
+) *Lister {
+	return &Lister{
+		sourceManager: sourceManager,
+		logger:        logger,
+		renderer:      renderer,
+	}
+}
+
+// Start begins the list operation
+func (l *Lister) Start(ctx context.Context) error {
+	l.logger.Info("Listing sources")
+
+	sources, err := l.sourceManager.ListSources(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get sources: %w", err)
+	}
+
+	if len(sources) == 0 {
+		l.logger.Info("No sources configured")
+		return nil
+	}
+
+	// Render the table
+	return l.renderer.RenderTable(sources)
+}
+
+// NewListCommand creates a new list command
 func NewListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all configured sources",
 		Long:  `List all content sources configured in the system.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get dependencies from context
+			// Get logger from context
 			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
 			log, ok := loggerValue.(logger.Interface)
 			if !ok {
 				return errors.New("logger not found in context")
 			}
 
+			// Get config from context
 			configValue := cmd.Context().Value(cmdcommon.ConfigKey)
 			cfg, ok := configValue.(config.Interface)
 			if !ok {
@@ -90,7 +122,7 @@ func NewListCommand() *cobra.Command {
 			// Create Fx app with the module
 			fxApp := fx.New(
 				// Include required modules
-				sources.Module,
+				Module,
 
 				// Provide existing config
 				fx.Provide(func() config.Interface { return cfg }),
@@ -104,30 +136,19 @@ func NewListCommand() *cobra.Command {
 				}),
 
 				// Invoke list command
-				fx.Invoke(func(sourceManager sources.Interface, logger logger.Interface) error {
-					listCmd := &ListCommand{
-						sourceManager: sourceManager,
-						logger:        logger,
-						renderer:      NewTableRenderer(logger),
-					}
-					return listCmd.Run(cmd.Context())
+				fx.Invoke(func(l *Lister) error {
+					return l.Start(cmd.Context())
 				}),
 			)
 
-			// Start the application
-			log.Info("Starting application")
-			startErr := fxApp.Start(cmd.Context())
-			if startErr != nil {
-				log.Error("Failed to start application", "error", startErr)
-				return fmt.Errorf("failed to start application: %w", startErr)
+			// Start application
+			if err := fxApp.Start(cmd.Context()); err != nil {
+				return err
 			}
 
-			// Stop the application
-			log.Info("Stopping application")
-			stopErr := fxApp.Stop(cmd.Context())
-			if stopErr != nil {
-				log.Error("Failed to stop application", "error", stopErr)
-				return fmt.Errorf("failed to stop application: %w", stopErr)
+			// Stop application
+			if err := fxApp.Stop(cmd.Context()); err != nil {
+				return err
 			}
 
 			return nil
@@ -135,22 +156,4 @@ func NewListCommand() *cobra.Command {
 	}
 
 	return cmd
-}
-
-// Run executes the list command.
-func (c *ListCommand) Run(ctx context.Context) error {
-	c.logger.Info("Listing sources")
-
-	sources, err := c.sourceManager.ListSources(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get sources: %w", err)
-	}
-
-	if len(sources) == 0 {
-		c.logger.Info("No sources configured")
-		return nil
-	}
-
-	// Render the table
-	return c.renderer.RenderTable(sources)
 }

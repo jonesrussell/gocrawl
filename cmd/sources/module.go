@@ -6,8 +6,13 @@ import (
 	"go.uber.org/fx"
 )
 
-// Module provides the sources command functionality.
+// Module provides the sources module for dependency injection.
 var Module = fx.Module("sources",
 	// Include core modules
 	sources.Module,
+	// Provide the source components
+	fx.Provide(
+		NewTableRenderer,
+		NewLister,
+	),
 )

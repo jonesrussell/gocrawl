@@ -42,10 +42,11 @@ func NewSourcesCommand() *cobra.Command {
 				return errors.New("config not found in context or invalid type")
 			}
 
-			// Create Fx app with the module
-			fxApp := fx.New(
+			// Create Fx application
+			app := fx.New(
 				// Include required modules
 				sources.Module,
+				Module,
 
 				// Provide existing config
 				fx.Provide(func() config.Interface { return cfg }),
@@ -68,20 +69,14 @@ func NewSourcesCommand() *cobra.Command {
 				}),
 			)
 
-			// Start the application
-			log.Info("Starting application")
-			startErr := fxApp.Start(cmd.Context())
-			if startErr != nil {
-				log.Error("Failed to start application", "error", startErr)
-				return fmt.Errorf("failed to start application: %w", startErr)
+			// Start application
+			if err := app.Start(context.Background()); err != nil {
+				return err
 			}
 
-			// Stop the application
-			log.Info("Stopping application")
-			stopErr := fxApp.Stop(cmd.Context())
-			if stopErr != nil {
-				log.Error("Failed to stop application", "error", stopErr)
-				return fmt.Errorf("failed to stop application: %w", stopErr)
+			// Stop application
+			if err := app.Stop(context.Background()); err != nil {
+				return err
 			}
 
 			return nil
@@ -122,6 +117,8 @@ func (c *SourcesCommand) Run(ctx context.Context) error {
 			"start_urls", src.StartURLs,
 			"max_depth", src.MaxDepth,
 			"rate_limit", src.RateLimit,
+			"index", src.Index,
+			"article_index", src.ArticleIndex,
 		)
 		log.Info("------------------")
 	}
