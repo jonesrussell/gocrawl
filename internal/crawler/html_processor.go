@@ -3,6 +3,7 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -24,7 +25,7 @@ type HTMLProcessor struct {
 func NewHTMLProcessor(logger logger.Interface) *HTMLProcessor {
 	return &HTMLProcessor{
 		logger:       logger,
-		processors:   make([]content.Processor, 0, 2), // Pre-allocate for article and page processors
+		processors:   make([]content.Processor, 0, DefaultProcessorsCapacity), // Pre-allocate for article and page processors
 		unknownTypes: make(map[contenttype.Type]int),
 	}
 }
@@ -56,17 +57,17 @@ func (p *HTMLProcessor) Process(ctx context.Context, content any) error {
 
 // ParseHTML parses HTML content.
 func (p *HTMLProcessor) ParseHTML(r io.Reader) error {
-	return fmt.Errorf("not implemented")
+	return errors.New("not implemented")
 }
 
 // ExtractLinks extracts links from the content.
 func (p *HTMLProcessor) ExtractLinks() ([]string, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 // ExtractContent extracts the main content.
 func (p *HTMLProcessor) ExtractContent() (string, error) {
-	return "", fmt.Errorf("not implemented")
+	return "", errors.New("not implemented")
 }
 
 // CanProcess returns whether the processor can handle the given content type.
@@ -92,7 +93,7 @@ func (p *HTMLProcessor) Stop(ctx context.Context) error {
 // ValidateJob validates a job before processing.
 func (p *HTMLProcessor) ValidateJob(job *content.Job) error {
 	if job == nil {
-		return fmt.Errorf("job cannot be nil")
+		return errors.New("job cannot be nil")
 	}
 	return nil
 }

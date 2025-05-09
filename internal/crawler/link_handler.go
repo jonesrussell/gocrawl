@@ -59,7 +59,7 @@ func (h *LinkHandler) HandleLink(e *colly.HTMLElement) {
 
 	// Try to visit the URL with retries
 	var lastErr error
-	for i := 0; i < h.crawler.cfg.MaxRetries; i++ {
+	for i := range h.crawler.cfg.MaxRetries {
 		err := e.Request.Visit(absLink)
 		if err == nil {
 			h.crawler.logger.Debug("Successfully visited link",
@@ -68,10 +68,10 @@ func (h *LinkHandler) HandleLink(e *colly.HTMLElement) {
 		}
 
 		// Check if error is non-retryable
-		if errors.Is(err, colly.ErrAlreadyVisited) ||
-			errors.Is(err, colly.ErrMaxDepth) ||
-			errors.Is(err, colly.ErrMissingURL) ||
-			errors.Is(err, colly.ErrForbiddenDomain) {
+		if errors.Is(err, ErrAlreadyVisited) ||
+			errors.Is(err, ErrMaxDepth) ||
+			errors.Is(err, ErrMissingURL) ||
+			errors.Is(err, ErrForbiddenDomain) {
 			return
 		}
 

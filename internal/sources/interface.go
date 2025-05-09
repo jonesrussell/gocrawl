@@ -5,11 +5,13 @@ import (
 	"context"
 	"errors"
 
+	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// Interface defines the interface for source management operations.
+// Interface defines the interface for managing sources.
 type Interface interface {
 	// ListSources retrieves all sources.
 	ListSources(ctx context.Context) ([]*sourceutils.SourceConfig, error)
@@ -19,8 +21,12 @@ type Interface interface {
 	UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error
 	// DeleteSource deletes a source by name.
 	DeleteSource(ctx context.Context, name string) error
-	// ValidateSource validates a source configuration.
-	ValidateSource(source *sourceutils.SourceConfig) error
+	// ValidateSource validates a source configuration and ensures required indices exist.
+	ValidateSource(
+		ctx context.Context,
+		sourceName string,
+		indexManager storagetypes.IndexManager,
+	) (*configtypes.Source, error)
 	// GetMetrics returns the current metrics.
 	GetMetrics() sourceutils.SourcesMetrics
 	// FindByName finds a source by name. Returns nil if not found.

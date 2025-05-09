@@ -3,6 +3,8 @@ package config
 
 import (
 	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 )
 
 // ValidLogLevels defines the valid logging levels
@@ -69,6 +71,15 @@ const (
 	// DefaultStorageType is the default storage backend type
 	DefaultStorageType = "elasticsearch"
 
+	// DefaultStorageBatchSize is the default number of items to batch for storage operations
+	DefaultStorageBatchSize = 100
+
+	// DefaultElasticsearchRetries is the default number of retries for Elasticsearch operations
+	DefaultElasticsearchRetries = 3
+
+	// DefaultBulkSize is the default number of documents to bulk index
+	DefaultBulkSize = elasticsearch.DefaultBulkSize
+
 	// DefaultHTTPPort is the default HTTP server port
 	DefaultHTTPPort = 8080
 
@@ -125,9 +136,6 @@ const (
 
 	// DefaultAppEnv is the default application environment
 	DefaultAppEnv = "development"
-
-	// DefaultBulkSize is the default bulk size for Elasticsearch operations
-	DefaultBulkSize = 1000
 
 	// DefaultFlushInterval is the default flush interval for Elasticsearch operations
 	DefaultFlushInterval = 30 * time.Second
@@ -230,12 +238,4 @@ const (
 	StorageTypeElasticsearch = "elasticsearch"
 	StorageTypeFile          = "file"
 	StorageTypeMemory        = "memory"
-)
-
-// Default Elasticsearch settings
-const (
-	DefaultElasticsearchHost     = "http://localhost:9200"
-	DefaultElasticsearchIndex    = "gocrawl"
-	DefaultElasticsearchUsername = "elastic"
-	DefaultElasticsearchPassword = "changeme"
 )

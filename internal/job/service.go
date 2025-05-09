@@ -3,7 +3,7 @@ package job
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync/atomic"
 
 	"github.com/jonesrussell/gocrawl/internal/content"
@@ -77,25 +77,25 @@ func (s *Service) Status(ctx context.Context) (content.JobStatus, error) {
 // GetItems returns the items for a job.
 func (s *Service) GetItems(ctx context.Context, jobID string) ([]*content.Item, error) {
 	s.logger.Info("Getting items for job", "jobID", jobID)
-	return nil, fmt.Errorf("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 // UpdateItem updates an item.
 func (s *Service) UpdateItem(ctx context.Context, item *content.Item) error {
 	s.logger.Info("Updating item", "itemID", item.ID)
-	return fmt.Errorf("not implemented")
+	return errors.New("not implemented")
 }
 
 // UpdateJob updates a job.
 func (s *Service) UpdateJob(ctx context.Context, job *content.Job) error {
 	s.logger.Info("Updating job", "jobID", job.ID)
-	return fmt.Errorf("not implemented")
+	return errors.New("not implemented")
 }
 
 // ValidateJob validates a job.
 func (s *Service) ValidateJob(job *content.Job) error {
 	if s.validator == nil {
-		return fmt.Errorf("no validator configured")
+		return errors.New("no validator configured")
 	}
 	return s.validator.ValidateJob(job)
 }

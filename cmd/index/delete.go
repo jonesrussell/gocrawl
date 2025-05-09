@@ -15,6 +15,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -256,8 +257,14 @@ You can specify index by name or by source name.`,
 				return errors.New("logger not found in context or invalid type")
 			}
 
+			// Get config from context
+			cfgValue := cmd.Context().Value(cmdcommon.ConfigKey)
+			cfg, ok := cfgValue.(config.Interface)
+			if !ok {
+				return errors.New("config not found in context or invalid type")
+			}
+
 			// Get flags
-			configPath, _ := cmd.Flags().GetString("config")
 			sourceName, _ := cmd.Flags().GetString("source")
 			force, _ := cmd.Flags().GetBool("force")
 
@@ -270,17 +277,18 @@ You can specify index by name or by source name.`,
 			app := fx.New(
 				// Include all required modules
 				Module,
+				storage.Module,
+				sources.Module,
 
-				// Provide config path string
-				fx.Provide(func() string { return configPath }),
+				// Provide existing config
+				fx.Provide(func() config.Interface { return cfg }),
 
-				// Provide logger
+				// Provide existing logger
 				fx.Provide(func() logger.Interface { return log }),
 
 				// Provide delete params
 				fx.Provide(func() DeleteParams {
 					return DeleteParams{
-						ConfigPath: configPath,
 						SourceName: sourceName,
 						Force:      force,
 						Indices:    args,
@@ -321,7 +329,6 @@ You can specify index by name or by source name.`,
 	}
 
 	// Add flags
-	cmd.Flags().StringP("config", "c", "config.yaml", "Path to config file")
 	cmd.Flags().StringP("source", "s", "", "Delete index for the specified source")
 	cmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
 

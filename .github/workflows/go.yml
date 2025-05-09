@@ -48,7 +48,7 @@ jobs:
       ELASTICSEARCH_PASSWORD: test_password
       
       # Server Security (using test values)
-      GOCRAWL_API_KEY: test_api_key
+      API_KEY: test_api_key
       
       # TLS Configuration (disabled for tests)
       ELASTICSEARCH_SKIP_TLS: true

@@ -1,4 +1,4 @@
-@baseUrl = http://localhost:{{$dotenv GOCRAWL_PORT}}
+@baseUrl = http://localhost:{{$dotenv SERVER_PORT}}
 @contentType = application/json
 @apiKey = {{$dotenv ELASTICSEARCH_API_KEY}}
 

@@ -11,11 +11,8 @@ import (
 	app "github.com/jonesrussell/gocrawl/internal/config/app"
 	crawler "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	elasticsearch "github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
-	log "github.com/jonesrussell/gocrawl/internal/config/log"
-	priority "github.com/jonesrussell/gocrawl/internal/config/priority"
+	logging "github.com/jonesrussell/gocrawl/internal/config/logging"
 	server "github.com/jonesrussell/gocrawl/internal/config/server"
-	storage "github.com/jonesrussell/gocrawl/internal/config/storage"
-	types "github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 // MockInterface is a mock of Interface interface.
@@ -112,10 +109,10 @@ func (mr *MockInterfaceMockRecorder) GetElasticsearchConfig() *gomock.Call {
 }
 
 // GetLogConfig mocks base method.
-func (m *MockInterface) GetLogConfig() *log.Config {
+func (m *MockInterface) GetLogConfig() *logging.Config {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLogConfig")
-	ret0, _ := ret[0].(*log.Config)
+	ret0, _ := ret[0].(*logging.Config)
 	return ret0
 }
 
@@ -123,20 +120,6 @@ func (m *MockInterface) GetLogConfig() *log.Config {
 func (mr *MockInterfaceMockRecorder) GetLogConfig() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogConfig", reflect.TypeOf((*MockInterface)(nil).GetLogConfig))
-}
-
-// GetPriorityConfig mocks base method.
-func (m *MockInterface) GetPriorityConfig() *priority.Config {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPriorityConfig")
-	ret0, _ := ret[0].(*priority.Config)
-	return ret0
-}
-
-// GetPriorityConfig indicates an expected call of GetPriorityConfig.
-func (mr *MockInterfaceMockRecorder) GetPriorityConfig() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPriorityConfig", reflect.TypeOf((*MockInterface)(nil).GetPriorityConfig))
 }
 
 // GetServerConfig mocks base method.
@@ -151,34 +134,6 @@ func (m *MockInterface) GetServerConfig() *server.Config {
 func (mr *MockInterfaceMockRecorder) GetServerConfig() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerConfig", reflect.TypeOf((*MockInterface)(nil).GetServerConfig))
-}
-
-// GetSources mocks base method.
-func (m *MockInterface) GetSources() []types.Source {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSources")
-	ret0, _ := ret[0].([]types.Source)
-	return ret0
-}
-
-// GetSources indicates an expected call of GetSources.
-func (mr *MockInterfaceMockRecorder) GetSources() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSources", reflect.TypeOf((*MockInterface)(nil).GetSources))
-}
-
-// GetStorageConfig mocks base method.
-func (m *MockInterface) GetStorageConfig() *storage.Config {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStorageConfig")
-	ret0, _ := ret[0].(*storage.Config)
-	return ret0
-}
-
-// GetStorageConfig indicates an expected call of GetStorageConfig.
-func (mr *MockInterfaceMockRecorder) GetStorageConfig() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStorageConfig", reflect.TypeOf((*MockInterface)(nil).GetStorageConfig))
 }
 
 // Validate mocks base method.

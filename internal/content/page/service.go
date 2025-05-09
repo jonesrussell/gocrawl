@@ -9,6 +9,11 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
+// Interface defines the contract for page processing services.
+type Interface interface {
+	Process(e *colly.HTMLElement) error
+}
+
 // ContentService implements the Interface for page processing.
 type ContentService struct {
 	logger    logger.Interface

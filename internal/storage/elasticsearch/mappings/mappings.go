@@ -2,6 +2,7 @@ package mappings
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -30,16 +31,16 @@ func DefaultSettings() BaseSettings {
 // ValidateSettings validates the index settings
 func ValidateSettings(settings BaseSettings) error {
 	if settings.NumberOfShards < 1 {
-		return fmt.Errorf("number_of_shards must be greater than 0")
+		return errors.New("number_of_shards must be greater than 0")
 	}
 	if settings.NumberOfReplicas < 0 {
-		return fmt.Errorf("number_of_replicas must be greater than or equal to 0")
+		return errors.New("number_of_replicas must be greater than or equal to 0")
 	}
 	return nil
 }
 
 // ToJSON converts any mapping to a JSON string with proper indentation
-func ToJSON(mapping interface{}) (string, error) {
+func ToJSON(mapping any) (string, error) {
 	data, err := json.MarshalIndent(mapping, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal mapping to JSON: %w", err)

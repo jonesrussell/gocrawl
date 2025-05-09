@@ -2,9 +2,10 @@
 package crawler
 
 import (
-	"fmt"
 	"net/http"
 	"time"
+
+	"errors"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common/transport"
@@ -91,7 +92,7 @@ func NewProcessorFactory(logger logger.Interface) *DefaultProcessorFactory {
 
 // CreateProcessors creates processors for the crawler.
 func (f *DefaultProcessorFactory) CreateProcessors(validator content.JobValidator) ([]content.Processor, error) {
-	processors := make([]content.Processor, 0, 2) // Pre-allocate for 2 processors
+	processors := make([]content.Processor, 0, DefaultProcessorsCapacity) // Pre-allocate for 2 processors
 
 	// Create article processor
 	articleProcessor := articles.NewProcessor(articles.ProcessorParams{
@@ -127,7 +128,7 @@ func ProvideCrawler(
 	}
 
 	if articleProcessor == nil || pageProcessor == nil {
-		return nil, fmt.Errorf("missing required processors")
+		return nil, errors.New("missing required processors")
 	}
 
 	return NewCrawler(

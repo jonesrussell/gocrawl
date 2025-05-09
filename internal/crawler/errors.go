@@ -34,6 +34,15 @@ var (
 
 	// ErrArticleProcessingFailed is returned when article processing fails.
 	ErrArticleProcessingFailed = errors.New("article processing failed")
+
+	// ErrAlreadyVisited is returned when a URL has already been visited
+	ErrAlreadyVisited = errors.New("URL already visited")
+
+	// ErrMaxDepth is returned when the maximum crawl depth has been reached
+	ErrMaxDepth = errors.New("maximum crawl depth reached")
+
+	// ErrMissingURL is returned when a URL is missing or invalid
+	ErrMissingURL = errors.New("missing or invalid URL")
 )
 
 // WrapperError wraps an error with additional context.
