@@ -160,8 +160,8 @@ func setDefaults() {
 	viper.SetDefault("app", map[string]any{
 		"name":        "gocrawl",
 		"version":     "1.0.0",
-		"environment": "development",
-		"debug":       true,
+		"environment": "production",
+		"debug":       false,
 	})
 
 	// Logger defaults
@@ -193,26 +193,5 @@ func setDefaults() {
 		"type":           "elasticsearch",
 		"batch_size":     config.DefaultStorageBatchSize,
 		"flush_interval": "5s",
-	})
-
-	// Elasticsearch defaults
-	viper.SetDefault("elasticsearch", map[string]any{
-		"addresses":  []string{"https://localhost:9200"},
-		"index_name": "gocrawl",
-		"retry": map[string]any{
-			"enabled":      true,
-			"initial_wait": "1s",
-			"max_wait":     "30s",
-			"max_retries":  config.DefaultElasticsearchRetries,
-		},
-		"bulk_size":      config.DefaultBulkSize,
-		"flush_interval": "1s",
-		"tls": map[string]any{
-			"enabled":                     true,
-			"insecure_skip_verify":        false,
-			"min_version":                 771, // TLS 1.2
-			"max_version":                 772, // TLS 1.3
-			"prefer_server_cipher_suites": true,
-		},
 	})
 }

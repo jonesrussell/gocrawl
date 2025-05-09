@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 // ValidationLevel represents the level of configuration validation required
@@ -101,6 +103,7 @@ type TLSConfig struct {
 	KeyFile            string `yaml:"key_file" env:"ELASTICSEARCH_TLS_KEY_FILE"`
 	CAFile             string `yaml:"ca_file" env:"ELASTICSEARCH_TLS_CA_FILE"`
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify" env:"ELASTICSEARCH_TLS_INSECURE_SKIP_VERIFY"`
+	Enabled            bool   `yaml:"enabled" env:"ELASTICSEARCH_TLS_ENABLED"`
 }
 
 // validateTLS validates the TLS configuration
@@ -254,7 +257,8 @@ func NewConfig() *Config {
 		BulkSize:      DefaultBulkSize,
 		FlushInterval: DefaultFlushInterval,
 		TLS: &TLSConfig{
-			InsecureSkipVerify: true,
+			Enabled:            true,
+			InsecureSkipVerify: false,
 		},
 	}
 }
@@ -363,4 +367,30 @@ func WithTLSInsecureSkipVerify(skip bool) Option {
 		}
 		c.TLS.InsecureSkipVerify = skip
 	}
+}
+
+// LoadFromViper loads Elasticsearch configuration from Viper
+func LoadFromViper(v *viper.Viper) *Config {
+	fmt.Printf("Debug: Loading Elasticsearch config from Viper\n")
+	fmt.Printf("Debug: Viper TLS settings - Enabled: %v, SkipVerify: %v\n",
+		v.GetBool("elasticsearch.tls.enabled"),
+		v.GetBool("elasticsearch.tls.insecure_skip_verify"))
+
+	cfg := &Config{
+		Addresses: v.GetStringSlice("elasticsearch.addresses"),
+		Username:  v.GetString("elasticsearch.username"),
+		Password:  v.GetString("elasticsearch.password"),
+		APIKey:    v.GetString("elasticsearch.api_key"),
+		TLS: &TLSConfig{
+			Enabled:            v.GetBool("elasticsearch.tls.enabled"),
+			InsecureSkipVerify: v.GetBool("elasticsearch.tls.insecure_skip_verify"),
+			CAFile:             v.GetString("elasticsearch.tls.ca_file"),
+			CertFile:           v.GetString("elasticsearch.tls.cert_file"),
+			KeyFile:            v.GetString("elasticsearch.tls.key_file"),
+		},
+	}
+
+	fmt.Printf("Debug: Loaded Elasticsearch config: %+v\n", cfg)
+	fmt.Printf("Debug: Loaded TLS config: %+v\n", cfg.TLS)
+	return cfg
 }
