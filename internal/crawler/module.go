@@ -13,7 +13,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/articles"
-	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -58,53 +57,25 @@ const (
 	DefaultChannelBufferSize = 100
 )
 
-// ProcessorFactory creates processors for the crawler.
-type ProcessorFactory interface {
-	CreateProcessors(validator content.JobValidator) ([]content.Processor, error)
-}
+// ProvideCrawler creates a new crawler instance with all its components
+func ProvideCrawler(p struct {
+	fx.In
 
-// DefaultProcessorFactory implements ProcessorFactory.
-type DefaultProcessorFactory struct {
-	logger logger.Interface
-}
+	Logger         logger.Interface
+	Bus            *events.EventBus
+	IndexManager   types.IndexManager
+	Sources        sources.Interface
+	Config         *crawler.Config
+	ArticleService articles.Interface
+	PageService    page.Interface
+	Storage        types.Interface
+}) (struct {
+	fx.Out
 
-// NewProcessorFactory creates a new processor factory.
-func NewProcessorFactory(logger logger.Interface) *DefaultProcessorFactory {
-	return &DefaultProcessorFactory{
-		logger: logger,
-	}
-}
-
-// CreateProcessors creates processors for the crawler.
-func (f *DefaultProcessorFactory) CreateProcessors(validator content.JobValidator) ([]content.Processor, error) {
-	processors := make([]content.Processor, 0, DefaultProcessorsCapacity)
-
-	// Create article processor
-	articleProcessor := articles.NewProcessor(articles.ProcessorParams{
-		Logger:    f.logger,
-		Validator: validator,
-	})
-	processors = append(processors, articleProcessor)
-
-	// Create page processor
-	pageProcessor := page.NewPageProcessor(page.ProcessorParams{
-		Logger:    f.logger,
-		Validator: validator,
-	})
-	processors = append(processors, pageProcessor)
-
-	return processors, nil
-}
-
-// ProvideCrawler provides a crawler instance.
-func ProvideCrawler(
-	logger logger.Interface,
-	bus *events.EventBus,
-	indexManager types.IndexManager,
-	sources sources.Interface,
-	cfg *crawler.Config,
-	processorFactory ProcessorFactory,
-) (Interface, error) {
+	Crawler        Interface
+	ArticleChannel chan *models.Article
+	PageChannel    chan *models.Page
+}, error) {
 	// Create a simple job validator
 	validator := &struct {
 		content.JobValidator
@@ -120,78 +91,63 @@ func ProvideCrawler(
 		}),
 	}
 
-	processors, err := processorFactory.CreateProcessors(validator)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create processors: %w", err)
-	}
+	// Create article processor
+	articleProcessor := articles.NewProcessor(
+		p.Logger,
+		p.ArticleService,
+		validator,
+		p.Storage,
+		"articles",
+		make(chan *models.Article, ArticleChannelBufferSize),
+		nil,
+		nil,
+	)
 
-	var articleProcessor, pageProcessor content.Processor
-	for _, p := range processors {
-		if p.ContentType() == contenttype.Article {
-			articleProcessor = p
-		} else if p.ContentType() == contenttype.Page {
-			pageProcessor = p
-		}
-	}
+	// Create page processor
+	pageProcessor := page.NewPageProcessor(
+		p.Logger,
+		p.PageService,
+		validator,
+		p.Storage,
+		"pages",
+		make(chan *models.Page, DefaultChannelBufferSize),
+	)
 
-	if articleProcessor == nil || pageProcessor == nil {
-		return nil, errors.New("missing required processors")
-	}
-
-	return NewCrawler(
-		logger,
-		bus,
-		indexManager,
-		sources,
-		articleProcessor,
-		pageProcessor,
-		cfg,
-	), nil
-}
-
-// Module provides the crawler module for dependency injection.
-var Module = fx.Module("crawler")
-
-// NewCrawler creates a new crawler instance.
-func NewCrawler(
-	logger logger.Interface,
-	bus *events.EventBus,
-	indexManager types.IndexManager,
-	sources sources.Interface,
-	articleProcessor content.Processor,
-	pageProcessor content.Processor,
-	cfg *crawler.Config,
-) Interface {
+	// Create collector
 	collector := colly.NewCollector(
-		colly.MaxDepth(cfg.MaxDepth),
+		colly.MaxDepth(p.Config.MaxDepth),
 		colly.Async(true),
-		colly.AllowedDomains(cfg.AllowedDomains...),
+		colly.AllowedDomains(p.Config.AllowedDomains...),
 		colly.ParseHTTPErrorResponse(),
 		colly.IgnoreRobotsTxt(),
-		colly.UserAgent(cfg.UserAgent),
+		colly.UserAgent(p.Config.UserAgent),
 		colly.AllowURLRevisit(),
 	)
 
 	// Configure rate limiting
 	if err := collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Delay:       cfg.Delay,
-		RandomDelay: cfg.RandomDelay,
-		Parallelism: cfg.MaxConcurrency,
+		Delay:       p.Config.Delay,
+		RandomDelay: p.Config.RandomDelay,
+		Parallelism: p.Config.MaxConcurrency,
 	}); err != nil {
-		logger.Error("Failed to set rate limit",
-			"error", err,
-			"delay", cfg.Delay,
-			"randomDelay", cfg.RandomDelay,
-			"parallelism", cfg.MaxConcurrency)
+		return struct {
+			fx.Out
+			Crawler        Interface
+			ArticleChannel chan *models.Article
+			PageChannel    chan *models.Page
+		}{}, fmt.Errorf("failed to set rate limit: %w", err)
 	}
 
-	// Configure transport with more reasonable settings
-	tlsConfig, err := transport.NewTLSConfig(cfg)
+	// Configure transport
+	tlsConfig, err := transport.NewTLSConfig(p.Config)
 	if err != nil {
-		logger.Error("Failed to create TLS configuration",
-			"error", err)
-		return nil
+		return struct {
+			fx.Out
+			Crawler        Interface
+			ArticleChannel chan *models.Article
+			PageChannel    chan *models.Page
+		}{}, fmt.Errorf("failed to create TLS configuration: %w", err)
 	}
 
 	collector.WithTransport(&http.Transport{
@@ -204,46 +160,67 @@ func NewCrawler(
 		ExpectContinueTimeout: DefaultExpectContinueTimeout,
 	})
 
-	if cfg.TLS.InsecureSkipVerify {
-		logger.Warn("TLS certificate verification is disabled. This is not recommended for production use.",
+	if p.Config.TLS.InsecureSkipVerify {
+		p.Logger.Warn("TLS certificate verification is disabled. This is not recommended for production use.",
 			"component", "crawler",
 			"warning", "This makes HTTPS connections vulnerable to man-in-the-middle attacks")
 	}
 
 	// Set up callbacks
 	collector.OnRequest(func(r *colly.Request) {
-		logger.Info("Visiting", "url", r.URL.String())
+		p.Logger.Info("Visiting", "url", r.URL.String())
 	})
 
 	collector.OnResponse(func(r *colly.Response) {
-		logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
+		p.Logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
 	})
 
 	collector.OnError(func(r *colly.Response, err error) {
-		logger.Error("Error while crawling",
+		p.Logger.Error("Error while crawling",
 			"url", r.Request.URL.String(),
 			"status", r.StatusCode,
 			"error", err)
 	})
 
+	// Create channels
+	articleChannel := make(chan *models.Article, ArticleChannelBufferSize)
+	pageChannel := make(chan *models.Page, DefaultChannelBufferSize)
+
+	// Create crawler
 	c := &Crawler{
-		logger:           logger,
+		logger:           p.Logger,
 		collector:        collector,
-		bus:              bus,
-		indexManager:     indexManager,
-		sources:          sources,
+		bus:              p.Bus,
+		indexManager:     p.IndexManager,
+		sources:          p.Sources,
 		articleProcessor: articleProcessor,
 		pageProcessor:    pageProcessor,
-		state:            NewState(logger),
+		state:            NewState(p.Logger),
 		done:             make(chan struct{}),
-		articleChannel:   make(chan *models.Article, ArticleChannelBufferSize),
-		processors:       make([]content.Processor, 0),
-		htmlProcessor:    NewHTMLProcessor(logger),
-		cfg:              cfg,
+		articleChannel:   articleChannel,
+		processors:       []content.Processor{articleProcessor, pageProcessor},
+		htmlProcessor:    NewHTMLProcessor(p.Logger),
+		cfg:              p.Config,
 		abortChan:        make(chan struct{}),
 	}
 
 	c.linkHandler = NewLinkHandler(c)
 
-	return c
+	return struct {
+		fx.Out
+		Crawler        Interface
+		ArticleChannel chan *models.Article
+		PageChannel    chan *models.Page
+	}{
+		Crawler:        c,
+		ArticleChannel: articleChannel,
+		PageChannel:    pageChannel,
+	}, nil
 }
+
+// Module provides the crawler module for dependency injection.
+var Module = fx.Module("crawler",
+	fx.Provide(
+		ProvideCrawler,
+	),
+)

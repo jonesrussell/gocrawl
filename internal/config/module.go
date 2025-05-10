@@ -2,34 +2,41 @@
 package config
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/config/app"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"go.uber.org/fx"
 )
+
+// ConfigParams contains dependencies for creating configuration
+type ConfigParams struct {
+	fx.In
+
+	Logger logger.Interface
+}
+
+// ConfigResult contains all configuration components
+type ConfigResult struct {
+	fx.Out
+
+	CrawlerConfig       *crawler.Config
+	ElasticsearchConfig *elasticsearch.Config
+	ServerConfig        *server.Config
+}
+
+// ProvideConfig creates all configuration components
+func ProvideConfig(p ConfigParams) ConfigResult {
+	return ConfigResult{
+		CrawlerConfig:       crawler.New(),
+		ElasticsearchConfig: elasticsearch.NewConfig(),
+		ServerConfig:        server.NewConfig(),
+	}
+}
 
 // Module provides the configuration module for dependency injection.
 var Module = fx.Module("config",
 	fx.Provide(
-		// Provide the concrete config type
-		LoadConfig,
-		// Provide the interface
-		func(cfg *Config) Interface {
-			return cfg
-		},
-		// Provide specific configs
-		func(cfg *Config) *crawler.Config {
-			return cfg.GetCrawlerConfig()
-		},
-		func(cfg *Config) *elasticsearch.Config {
-			return cfg.GetElasticsearchConfig()
-		},
-		func(cfg *Config) *server.Config {
-			return cfg.GetServerConfig()
-		},
-		func(cfg *Config) *app.Config {
-			return cfg.GetAppConfig()
-		},
+		ProvideConfig,
 	),
 )

@@ -28,14 +28,21 @@ type PageProcessor struct {
 }
 
 // NewPageProcessor creates a new page processor.
-func NewPageProcessor(p ProcessorParams) *PageProcessor {
+func NewPageProcessor(
+	logger logger.Interface,
+	service Interface,
+	validator content.JobValidator,
+	storage types.Interface,
+	indexName string,
+	pageChannel chan *models.Page,
+) *PageProcessor {
 	return &PageProcessor{
-		logger:      p.Logger,
-		service:     p.Service,
-		validator:   p.Validator,
-		storage:     p.Storage,
-		indexName:   p.IndexName,
-		pageChannel: p.PageChannel,
+		logger:      logger,
+		service:     service,
+		validator:   validator,
+		storage:     storage,
+		indexName:   indexName,
+		pageChannel: pageChannel,
 		registry:    make([]content.ContentProcessor, 0),
 	}
 }

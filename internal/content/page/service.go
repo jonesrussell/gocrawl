@@ -22,11 +22,11 @@ type ContentService struct {
 }
 
 // NewContentService creates a new page content service.
-func NewContentService(p ServiceParams) Interface {
+func NewContentService(logger logger.Interface, storage types.Interface, indexName string) Interface {
 	return &ContentService{
-		logger:    p.Logger,
-		storage:   p.Storage,
-		indexName: p.IndexName,
+		logger:    logger,
+		storage:   storage,
+		indexName: indexName,
 	}
 }
 

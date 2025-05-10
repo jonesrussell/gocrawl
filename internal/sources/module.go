@@ -1,19 +1,48 @@
-// Package sources manages the configuration and lifecycle of web content sources for GoCrawl.
-// It handles source configuration loading and validation through a YAML-based configuration system.
+// Package sources provides the sources module for dependency injection.
 package sources
 
 import (
 	"fmt"
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"go.uber.org/fx"
 )
 
+// SourcesParams contains dependencies for creating sources
+type SourcesParams struct {
+	fx.In
+
+	Logger logger.Interface
+	Config config.Interface
+}
+
+// SourcesResult contains the sources and its components
+type SourcesResult struct {
+	fx.Out
+
+	Sources Interface
+}
+
+// NewSourcesProvider creates a new Sources instance
+func NewSourcesProvider(p SourcesParams) (SourcesResult, error) {
+	sources, err := LoadSources(p.Config)
+	if err != nil {
+		return SourcesResult{}, err
+	}
+
+	return SourcesResult{
+		Sources: sources,
+	}, nil
+}
+
 // Module provides the sources module for dependency injection.
 var Module = fx.Module("sources",
-	// Include required modules
-	cmdcommon.Module,
+	fx.Provide(
+		NewSourcesProvider,
+	),
 )
 
 // ModuleParams defines the parameters for creating a new Sources instance.

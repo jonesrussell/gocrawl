@@ -44,6 +44,7 @@ var (
 // Module provides the root command and its dependencies
 var Module = fx.Module("root",
 	common.Module,
+	storage.ClientModule,
 	storage.Module,
 	index.Module,
 	search.Module,

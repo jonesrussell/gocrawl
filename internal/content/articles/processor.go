@@ -30,16 +30,25 @@ type ArticleProcessor struct {
 }
 
 // NewProcessor creates a new article processor.
-func NewProcessor(p ProcessorParams) *ArticleProcessor {
+func NewProcessor(
+	logger logger.Interface,
+	service Interface,
+	validator content.JobValidator,
+	storage types.Interface,
+	indexName string,
+	articleChannel chan *models.Article,
+	articleIndexer processor.Processor,
+	pageIndexer processor.Processor,
+) *ArticleProcessor {
 	return &ArticleProcessor{
-		logger:         p.Logger,
-		service:        p.Service,
-		validator:      p.Validator,
-		storage:        p.Storage,
-		indexName:      p.IndexName,
-		articleChannel: p.ArticleChannel,
-		articleIndexer: p.ArticleIndexer,
-		pageIndexer:    p.PageIndexer,
+		logger:         logger,
+		service:        service,
+		validator:      validator,
+		storage:        storage,
+		indexName:      indexName,
+		articleChannel: articleChannel,
+		articleIndexer: articleIndexer,
+		pageIndexer:    pageIndexer,
 	}
 }
 

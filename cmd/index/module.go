@@ -28,6 +28,17 @@ var Command = &cobra.Command{
 	},
 }
 
+// IndexParams contains dependencies for index commands
+type IndexParams struct {
+	fx.In
+
+	Config       config.Interface
+	Logger       logger.Interface
+	Storage      types.Interface
+	IndexManager types.IndexManager
+	Sources      sources.Interface
+}
+
 // Module provides the index module for dependency injection.
 var Module = fx.Module("index",
 	common.Module,
@@ -38,22 +49,13 @@ var Module = fx.Module("index",
 		NewLister,
 
 		// Provide the creator
-		func(
-			cfg config.Interface,
-			log logger.Interface,
-			storage types.Interface,
-		) *Creator {
-			return NewCreator(cfg, log, storage, CreateParams{})
+		func(p IndexParams) *Creator {
+			return NewCreator(p.Config, p.Logger, p.Storage, CreateParams{})
 		},
 
 		// Provide the deleter
-		func(
-			cfg config.Interface,
-			log logger.Interface,
-			storage types.Interface,
-			srcs sources.Interface,
-		) *Deleter {
-			return NewDeleter(cfg, log, storage, srcs, DeleteParams{
+		func(p IndexParams) *Deleter {
+			return NewDeleter(p.Config, p.Logger, p.Storage, p.Sources, DeleteParams{
 				Force: forceDelete,
 			})
 		},
