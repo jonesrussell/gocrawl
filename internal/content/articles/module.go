@@ -2,80 +2,40 @@
 package articles
 
 import (
-	"github.com/jonesrussell/gocrawl/internal/content"
-	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
-	"github.com/jonesrussell/gocrawl/internal/processor"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
-// ProcessorParams contains dependencies for creating a processor
-type ProcessorParams struct {
-	Logger         logger.Interface
-	Service        Interface
-	Validator      content.JobValidator
-	Storage        types.Interface
-	IndexName      string
-	ArticleIndexer processor.Processor
-	PageIndexer    processor.Processor
-}
+const (
+	// ArticleChannelBufferSize is the buffer size for the article channel.
+	ArticleChannelBufferSize = 100
+)
 
 // ProvideArticleService creates a new article service
-func ProvideArticleService(p struct {
-	fx.In
-
-	Logger    logger.Interface
-	Storage   types.Interface
-	IndexName string `name:"articleIndexName"`
-}) (struct {
-	fx.Out
-
-	Service Interface `group:"services"`
-}, error) {
+func ProvideArticleService(p ContentServiceParams) ContentServiceResult {
 	service := NewContentService(p.Logger, p.Storage, p.IndexName)
 
-	return struct {
-		fx.Out
-		Service Interface `group:"services"`
-	}{
+	return ContentServiceResult{
 		Service: service,
-	}, nil
+	}
 }
 
 // ProvideArticleProcessor creates a new article processor
-func ProvideArticleProcessor(p struct {
-	fx.In
-
-	Logger         logger.Interface
-	Service        Interface
-	Validator      content.JobValidator
-	Storage        types.Interface
-	IndexName      string `name:"articleIndexName"`
-	ArticleIndexer processor.Processor
-	PageIndexer    processor.Processor
-}) (struct {
-	fx.Out
-
-	Processor content.Processor `name:"articleProcessor"`
-}, error) {
+func ProvideArticleProcessor(p ProcessorParams) ProcessorResult {
 	processor := NewProcessor(
 		p.Logger,
 		p.Service,
 		p.Validator,
 		p.Storage,
 		p.IndexName,
-		make(chan *models.Article, 100),
+		make(chan *models.Article, ArticleChannelBufferSize),
 		p.ArticleIndexer,
 		p.PageIndexer,
 	)
 
-	return struct {
-		fx.Out
-		Processor content.Processor `name:"articleProcessor"`
-	}{
+	return ProcessorResult{
 		Processor: processor,
-	}, nil
+	}
 }
 
 // Module provides the articles module's dependencies.

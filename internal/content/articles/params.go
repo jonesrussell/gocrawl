@@ -11,13 +11,6 @@ import (
 
 // ContentServiceParams contains dependencies for creating the article service
 type ContentServiceParams struct {
-	Logger    logger.Interface
-	Storage   types.Interface
-	IndexName string
-}
-
-// ArticleServiceParams contains dependencies for creating the article service
-type ArticleServiceParams struct {
 	fx.In
 
 	Logger    logger.Interface
@@ -25,15 +18,15 @@ type ArticleServiceParams struct {
 	IndexName string `name:"articleIndexName"`
 }
 
-// ArticleServiceResult contains the article service
-type ArticleServiceResult struct {
+// ContentServiceResult contains the article service
+type ContentServiceResult struct {
 	fx.Out
 
 	Service Interface `group:"services"`
 }
 
-// ArticleProcessorParams contains dependencies for creating the article processor
-type ArticleProcessorParams struct {
+// ProcessorParams contains dependencies for creating the article processor
+type ProcessorParams struct {
 	fx.In
 
 	Logger         logger.Interface
@@ -45,20 +38,9 @@ type ArticleProcessorParams struct {
 	PageIndexer    processor.Processor
 }
 
-// ArticleProcessorResult contains the article processor
-type ArticleProcessorResult struct {
+// ProcessorResult contains the article processor
+type ProcessorResult struct {
 	fx.Out
 
 	Processor content.Processor `name:"articleProcessor"`
-}
-
-// ProcessorParams contains dependencies for creating a processor
-type ProcessorParams struct {
-	Logger         logger.Interface
-	Service        Interface
-	Validator      content.JobValidator
-	Storage        types.Interface
-	IndexName      string
-	ArticleIndexer processor.Processor
-	PageIndexer    processor.Processor
 }

@@ -10,13 +10,14 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
-	"github.com/jonesrussell/gocrawl/internal/content"
+	"github.com/jonesrussell/gocrawl/internal/content/articles"
+	"github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
+	loggerpkg "github.com/jonesrussell/gocrawl/internal/logger"
+	sourcespkg "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -25,18 +26,18 @@ import (
 // Crawler handles the crawl operation
 type Crawler struct {
 	config        config.Interface
-	logger        logger.Interface
+	logger        loggerpkg.Interface
 	jobService    common.JobService
-	sourceManager sources.Interface
+	sourceManager sourcespkg.Interface
 	crawler       crawler.Interface
 }
 
 // NewCrawler creates a new crawler instance
 func NewCrawler(
 	config config.Interface,
-	logger logger.Interface,
+	logger loggerpkg.Interface,
 	jobService common.JobService,
-	sourceManager sources.Interface,
+	sourceManager sourcespkg.Interface,
 	crawler crawler.Interface,
 ) *Crawler {
 	return &Crawler{
@@ -51,7 +52,7 @@ func NewCrawler(
 // Start begins the crawl operation
 func (c *Crawler) Start(ctx context.Context) error {
 	// Check if sources exist
-	if _, err := sources.LoadSources(c.config); err != nil {
+	if _, err := sourcespkg.LoadSources(c.config); err != nil {
 		if errors.Is(err, loader.ErrNoSources) {
 			c.logger.Info("No sources found in configuration. Please add sources to your config file.")
 			c.logger.Info("You can use the 'sources list' command to view configured sources.")
@@ -90,7 +91,7 @@ Specify the source name as an argument.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get logger from context
 			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
-			log, ok := loggerValue.(logger.Interface)
+			log, ok := loggerValue.(loggerpkg.Interface)
 			if !ok {
 				return errors.New("logger not found in context or invalid type")
 			}
@@ -111,7 +112,7 @@ Specify the source name as an argument.`,
 				fx.Provide(func() config.Interface { return cfg }),
 
 				// Provide existing logger
-				fx.Provide(func() logger.Interface { return log }),
+				fx.Provide(func() loggerpkg.Interface { return log }),
 
 				// Provide source name
 				fx.Provide(fx.Annotate(
@@ -121,7 +122,7 @@ Specify the source name as an argument.`,
 
 				// Use custom Fx logger
 				fx.WithLogger(func() fxevent.Logger {
-					return logger.NewFxLogger(log)
+					return loggerpkg.NewFxLogger(log)
 				}),
 
 				// Invoke crawler
@@ -150,22 +151,43 @@ Specify the source name as an argument.`,
 // SetupCollector creates and configures a new collector instance.
 func SetupCollector(
 	ctx context.Context,
-	logger logger.Interface,
-	indexManager storagetypes.IndexManager,
-	sources sources.Interface,
+	logger loggerpkg.Interface,
+	indexManager types.IndexManager,
+	sources sourcespkg.Interface,
 	eventBus *events.EventBus,
-	articleProcessor content.Processor,
-	contentProcessor content.Processor,
+	articleService articles.Interface,
+	pageService page.Interface,
 	cfg *crawlerconfig.Config,
 ) (crawler.Interface, error) {
-	// Create crawler instance
-	return crawler.NewCrawler(
-		logger,
-		eventBus,
-		indexManager,
-		sources,
-		articleProcessor,
-		contentProcessor,
-		cfg,
-	), nil
+	// Create crawler instance using ProvideCrawler
+	storage, ok := indexManager.(types.Interface)
+	if !ok {
+		return nil, errors.New("index manager does not implement types.Interface")
+	}
+
+	result, err := crawler.ProvideCrawler(struct {
+		fx.In
+		Logger         loggerpkg.Interface
+		Bus            *events.EventBus
+		IndexManager   types.IndexManager
+		Sources        sourcespkg.Interface
+		Config         *crawlerconfig.Config
+		ArticleService articles.Interface
+		PageService    page.Interface
+		Storage        types.Interface
+	}{
+		Logger:         logger,
+		Bus:            eventBus,
+		IndexManager:   indexManager,
+		Sources:        sources,
+		Config:         cfg,
+		ArticleService: articleService,
+		PageService:    pageService,
+		Storage:        storage,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create crawler: %w", err)
+	}
+
+	return result.Crawler, nil
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common/transport"
+	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/articles"
@@ -57,6 +58,103 @@ const (
 	DefaultChannelBufferSize = 100
 )
 
+// ModuleParams contains dependencies for creating the crawler module.
+type ModuleParams struct {
+	fx.In
+
+	Config  config.Interface
+	Logger  logger.Interface
+	Storage types.Interface
+}
+
+// Module provides the crawler module's dependencies.
+var Module = fx.Module("crawler",
+	fx.Provide(
+		ProvideCrawler,
+		ProvideProcessorFactory,
+	),
+)
+
+// createJobValidator creates a simple job validator
+func createJobValidator() content.JobValidator {
+	return &struct {
+		content.JobValidator
+	}{
+		JobValidator: content.JobValidatorFunc(func(job *content.Job) error {
+			if job == nil {
+				return errors.New("job cannot be nil")
+			}
+			if job.URL == "" {
+				return errors.New("job URL cannot be empty")
+			}
+			return nil
+		}),
+	}
+}
+
+// createCollector creates and configures a new colly collector
+func createCollector(cfg *crawler.Config, logger logger.Interface) (*colly.Collector, error) {
+	collector := colly.NewCollector(
+		colly.MaxDepth(cfg.MaxDepth),
+		colly.Async(true),
+		colly.AllowedDomains(cfg.AllowedDomains...),
+		colly.ParseHTTPErrorResponse(),
+		colly.IgnoreRobotsTxt(),
+		colly.UserAgent(cfg.UserAgent),
+		colly.AllowURLRevisit(),
+	)
+
+	// Configure rate limiting
+	if err := collector.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Delay:       cfg.Delay,
+		RandomDelay: cfg.RandomDelay,
+		Parallelism: cfg.MaxConcurrency,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to set rate limit: %w", err)
+	}
+
+	// Configure transport
+	tlsConfig, err := transport.NewTLSConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create TLS configuration: %w", err)
+	}
+
+	collector.WithTransport(&http.Transport{
+		TLSClientConfig:       tlsConfig,
+		DisableKeepAlives:     false,
+		MaxIdleConns:          DefaultMaxIdleConns,
+		MaxIdleConnsPerHost:   DefaultMaxIdleConnsPerHost,
+		IdleConnTimeout:       DefaultIdleConnTimeout,
+		ResponseHeaderTimeout: DefaultResponseHeaderTimeout,
+		ExpectContinueTimeout: DefaultExpectContinueTimeout,
+	})
+
+	if cfg.TLS.InsecureSkipVerify {
+		logger.Warn("TLS certificate verification is disabled. This is not recommended for production use.",
+			"component", "crawler",
+			"warning", "This makes HTTPS connections vulnerable to man-in-the-middle attacks")
+	}
+
+	// Set up callbacks
+	collector.OnRequest(func(r *colly.Request) {
+		logger.Info("Visiting", "url", r.URL.String())
+	})
+
+	collector.OnResponse(func(r *colly.Response) {
+		logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
+	})
+
+	collector.OnError(func(r *colly.Response, err error) {
+		logger.Error("Error while crawling",
+			"url", r.Request.URL.String(),
+			"status", r.StatusCode,
+			"error", err)
+	})
+
+	return collector, nil
+}
+
 // ProvideCrawler creates a new crawler instance with all its components
 func ProvideCrawler(p struct {
 	fx.In
@@ -76,22 +174,9 @@ func ProvideCrawler(p struct {
 	ArticleChannel chan *models.Article
 	PageChannel    chan *models.Page
 }, error) {
-	// Create a simple job validator
-	validator := &struct {
-		content.JobValidator
-	}{
-		JobValidator: content.JobValidatorFunc(func(job *content.Job) error {
-			if job == nil {
-				return errors.New("job cannot be nil")
-			}
-			if job.URL == "" {
-				return errors.New("job URL cannot be empty")
-			}
-			return nil
-		}),
-	}
+	validator := createJobValidator()
 
-	// Create article processor
+	// Create processors
 	articleProcessor := articles.NewProcessor(
 		p.Logger,
 		p.ArticleService,
@@ -103,7 +188,6 @@ func ProvideCrawler(p struct {
 		nil,
 	)
 
-	// Create page processor
 	pageProcessor := page.NewPageProcessor(
 		p.Logger,
 		p.PageService,
@@ -114,73 +198,15 @@ func ProvideCrawler(p struct {
 	)
 
 	// Create collector
-	collector := colly.NewCollector(
-		colly.MaxDepth(p.Config.MaxDepth),
-		colly.Async(true),
-		colly.AllowedDomains(p.Config.AllowedDomains...),
-		colly.ParseHTTPErrorResponse(),
-		colly.IgnoreRobotsTxt(),
-		colly.UserAgent(p.Config.UserAgent),
-		colly.AllowURLRevisit(),
-	)
-
-	// Configure rate limiting
-	if err := collector.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		Delay:       p.Config.Delay,
-		RandomDelay: p.Config.RandomDelay,
-		Parallelism: p.Config.MaxConcurrency,
-	}); err != nil {
-		return struct {
-			fx.Out
-			Crawler        Interface
-			ArticleChannel chan *models.Article
-			PageChannel    chan *models.Page
-		}{}, fmt.Errorf("failed to set rate limit: %w", err)
-	}
-
-	// Configure transport
-	tlsConfig, err := transport.NewTLSConfig(p.Config)
+	collector, err := createCollector(p.Config, p.Logger)
 	if err != nil {
 		return struct {
 			fx.Out
 			Crawler        Interface
 			ArticleChannel chan *models.Article
 			PageChannel    chan *models.Page
-		}{}, fmt.Errorf("failed to create TLS configuration: %w", err)
+		}{}, err
 	}
-
-	collector.WithTransport(&http.Transport{
-		TLSClientConfig:       tlsConfig,
-		DisableKeepAlives:     false,
-		MaxIdleConns:          DefaultMaxIdleConns,
-		MaxIdleConnsPerHost:   DefaultMaxIdleConnsPerHost,
-		IdleConnTimeout:       DefaultIdleConnTimeout,
-		ResponseHeaderTimeout: DefaultResponseHeaderTimeout,
-		ExpectContinueTimeout: DefaultExpectContinueTimeout,
-	})
-
-	if p.Config.TLS.InsecureSkipVerify {
-		p.Logger.Warn("TLS certificate verification is disabled. This is not recommended for production use.",
-			"component", "crawler",
-			"warning", "This makes HTTPS connections vulnerable to man-in-the-middle attacks")
-	}
-
-	// Set up callbacks
-	collector.OnRequest(func(r *colly.Request) {
-		p.Logger.Info("Visiting", "url", r.URL.String())
-	})
-
-	collector.OnResponse(func(r *colly.Response) {
-		p.Logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
-	})
-
-	collector.OnError(func(r *colly.Response, err error) {
-		p.Logger.Error("Error while crawling",
-			"url", r.Request.URL.String(),
-			"status", r.StatusCode,
-			"error", err)
-	})
 
 	// Create channels
 	articleChannel := make(chan *models.Article, ArticleChannelBufferSize)
@@ -218,9 +244,7 @@ func ProvideCrawler(p struct {
 	}, nil
 }
 
-// Module provides the crawler module for dependency injection.
-var Module = fx.Module("crawler",
-	fx.Provide(
-		ProvideCrawler,
-	),
-)
+// ProvideProcessorFactory creates a new processor factory.
+func ProvideProcessorFactory(p ModuleParams) ProcessorFactory {
+	return NewProcessorFactory(p.Logger, p.Storage, "content")
+}

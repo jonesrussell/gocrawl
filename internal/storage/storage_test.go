@@ -57,10 +57,11 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	mockLogger := loggermocks.NewMockInterface(ctrl)
 	mockLogger.EXPECT().Error("Index not found", "index", "non_existent_index").Return()
 
-	result := storage.NewStorage(storage.StorageParams{
+	result, err := storage.NewStorage(storage.StorageParams{
 		Client: mockClient,
 		Logger: mockLogger,
 	})
+	require.NoError(t, err)
 	s := result.Storage
 
 	// Test searching a non-existent index
@@ -108,10 +109,11 @@ func TestSearch_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	mockLogger := loggermocks.NewMockInterface(ctrl)
-	result := storage.NewStorage(storage.StorageParams{
+	result, err := storage.NewStorage(storage.StorageParams{
 		Client: mockClient,
 		Logger: mockLogger,
 	})
+	require.NoError(t, err)
 	s := result.Storage
 
 	results, err := s.Search(t.Context(), "test-index", map[string]any{
@@ -140,10 +142,11 @@ func TestNewStorage(t *testing.T) {
 	mockClient, err := setupMockClient(transport)
 	require.NoError(t, err)
 
-	result := storage.NewStorage(storage.StorageParams{
+	result, err := storage.NewStorage(storage.StorageParams{
 		Client: mockClient,
 		Logger: mockLogger,
 	})
+	require.NoError(t, err)
 	store := result.Storage
 	assert.NotNil(t, store)
 	assert.Implements(t, (*types.Interface)(nil), store)
@@ -167,10 +170,11 @@ func TestStorage_TestConnection(t *testing.T) {
 	require.NoError(t, err)
 
 	mockLogger := loggermocks.NewMockInterface(ctrl)
-	result := storage.NewStorage(storage.StorageParams{
+	result, err := storage.NewStorage(storage.StorageParams{
 		Client: mockClient,
 		Logger: mockLogger,
 	})
+	require.NoError(t, err)
 	s := result.Storage
 
 	err = s.TestConnection(t.Context())

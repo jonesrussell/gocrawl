@@ -18,13 +18,13 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/index"
 	"github.com/jonesrussell/gocrawl/cmd/search"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
 var (
 	// cfgFile holds the path to the configuration file.
-	// It can be set via the --config flag or defaults to config.yaml.
 	cfgFile string
 
 	// Debug enables debug mode for all commands
@@ -35,6 +35,12 @@ var (
 		Use:   "gocrawl",
 		Short: "A web crawler and search engine",
 		Long:  `A web crawler and search engine built with Go.`,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := initConfig(); err != nil {
+				return fmt.Errorf("failed to initialize configuration: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -54,14 +60,6 @@ var Module = fx.Module("root",
 
 // Execute runs the root command
 func Execute() error {
-	if err := initConfig(); err != nil {
-		return fmt.Errorf("failed to initialize configuration: %w", err)
-	}
-
-	if err := bindFlags(rootCmd); err != nil {
-		return fmt.Errorf("failed to bind flags: %w", err)
-	}
-
 	// Load config and create logger
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -103,35 +101,7 @@ func Execute() error {
 		return stopErr
 	}
 
-	if execErr := rootCmd.Execute(); execErr != nil {
-		return execErr
-	}
-
-	return nil
-}
-
-// bindFlags binds all command flags to viper configuration.
-func bindFlags(cmd *cobra.Command) error {
-	// Bind persistent flags
-	if err := viper.BindPFlag("app.debug", cmd.PersistentFlags().Lookup("debug")); err != nil {
-		return fmt.Errorf("failed to bind debug flag: %w", err)
-	}
-
-	if err := viper.BindPFlag("app.config_file", cmd.PersistentFlags().Lookup("config")); err != nil {
-		return fmt.Errorf("failed to bind config flag: %w", err)
-	}
-
-	// Bind command-specific flags
-	if cmd.Name() == "crawl" {
-		if err := viper.BindPFlag("crawler.max_depth", cmd.Flags().Lookup("depth")); err != nil {
-			return fmt.Errorf("failed to bind depth flag: %w", err)
-		}
-		if err := viper.BindPFlag("crawler.rate_limit", cmd.Flags().Lookup("rate-limit")); err != nil {
-			return fmt.Errorf("failed to bind rate-limit flag: %w", err)
-		}
-	}
-
-	return nil
+	return rootCmd.Execute()
 }
 
 // init initializes the root command and its subcommands.
@@ -222,21 +192,6 @@ func initConfig() error {
 	return nil
 }
 
-const (
-	// DefaultMaxRetries is the default number of retries for Elasticsearch operations
-	DefaultMaxRetries = 3
-	// DefaultBulkSize is the default size for bulk operations
-	DefaultBulkSize = 1000
-	// DefaultMaxDepth is the default maximum depth for crawling
-	DefaultMaxDepth = 3
-	// DefaultMaxConcurrency is the default maximum number of concurrent operations
-	DefaultMaxConcurrency = 2
-	// DefaultParallelism is the default number of parallel operations
-	DefaultParallelism = 2
-	// DefaultMaxRedirects is the default maximum number of redirects to follow
-	DefaultMaxRedirects = 5
-)
-
 // setDefaults sets default configuration values
 func setDefaults() {
 	// App defaults - production safe
@@ -282,9 +237,9 @@ func setDefaults() {
 			"enabled":      true,
 			"initial_wait": "1s",
 			"max_wait":     "30s",
-			"max_retries":  DefaultMaxRetries,
+			"max_retries":  crawler.DefaultMaxRetries,
 		},
-		"bulk_size":      DefaultBulkSize,
+		"bulk_size":      config.DefaultBulkSize,
 		"flush_interval": "1s",
 		"index_prefix":   "gocrawl",
 		"discover_nodes": false,
@@ -292,10 +247,10 @@ func setDefaults() {
 
 	// Crawler defaults - production safe
 	viper.SetDefault("crawler", map[string]any{
-		"max_depth":          DefaultMaxDepth,
-		"max_concurrency":    DefaultMaxConcurrency,
+		"max_depth":          crawler.DefaultMaxDepth,
+		"max_concurrency":    crawler.DefaultParallelism,
 		"request_timeout":    "30s",
-		"user_agent":         "gocrawl/1.0",
+		"user_agent":         crawler.DefaultUserAgent,
 		"respect_robots_txt": true,
 		"delay":              "1s",
 		"random_delay":       "0s",
@@ -307,13 +262,13 @@ func setDefaults() {
 			"output":  "stdout",
 		},
 		"rate_limit":  "2s",
-		"parallelism": DefaultParallelism,
+		"parallelism": crawler.DefaultParallelism,
 		"tls": map[string]any{
 			"insecure_skip_verify": false,
 		},
 		"retry_delay":      "5s",
 		"follow_redirects": true,
-		"max_redirects":    DefaultMaxRedirects,
+		"max_redirects":    crawler.DefaultMaxRedirects,
 		"validate_urls":    true,
 		"cleanup_interval": "1h",
 	})
