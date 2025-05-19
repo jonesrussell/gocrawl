@@ -2,7 +2,9 @@
 package index
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -69,18 +71,10 @@ func init() {
 		Use:   "list",
 		Short: "List all indices",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get logger from context
-			loggerValue := cmd.Context().Value(common.LoggerKey)
-			log, ok := loggerValue.(logger.Interface)
-			if !ok {
-				return errors.New("logger not found in context")
-			}
-
-			// Get config from context
-			configValue := cmd.Context().Value(common.ConfigKey)
-			cfg, ok := configValue.(config.Interface)
-			if !ok {
-				return errors.New("config not found in context")
+			ctx := cmd.Context()
+			log, cfg, err := getDependencies(ctx)
+			if err != nil {
+				return err
 			}
 
 			app := fx.New(
@@ -90,10 +84,20 @@ func init() {
 					func() logger.Interface { return log },
 				),
 				fx.Invoke(func(lister *Lister) error {
-					return lister.Start(cmd.Context())
+					return lister.Start(ctx)
 				}),
 			)
-			return app.Start(cmd.Context())
+
+			if err := app.Start(ctx); err != nil {
+				return fmt.Errorf("failed to start application: %w", err)
+			}
+			defer func() {
+				if err := app.Stop(ctx); err != nil {
+					log.Error("failed to stop application", "error", err)
+				}
+			}()
+
+			return nil
 		},
 	}
 
@@ -103,18 +107,10 @@ func init() {
 		Short: "Create an index",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get logger from context
-			loggerValue := cmd.Context().Value(common.LoggerKey)
-			log, ok := loggerValue.(logger.Interface)
-			if !ok {
-				return errors.New("logger not found in context")
-			}
-
-			// Get config from context
-			configValue := cmd.Context().Value(common.ConfigKey)
-			cfg, ok := configValue.(config.Interface)
-			if !ok {
-				return errors.New("config not found in context")
+			ctx := cmd.Context()
+			log, cfg, err := getDependencies(ctx)
+			if err != nil {
+				return err
 			}
 
 			app := fx.New(
@@ -125,10 +121,20 @@ func init() {
 				),
 				fx.Invoke(func(creator *Creator) error {
 					creator.index = args[0]
-					return creator.Start(cmd.Context())
+					return creator.Start(ctx)
 				}),
 			)
-			return app.Start(cmd.Context())
+
+			if err := app.Start(ctx); err != nil {
+				return fmt.Errorf("failed to start application: %w", err)
+			}
+			defer func() {
+				if err := app.Stop(ctx); err != nil {
+					log.Error("failed to stop application", "error", err)
+				}
+			}()
+
+			return nil
 		},
 	}
 
@@ -138,18 +144,10 @@ func init() {
 		Short: "Delete an index",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get logger from context
-			loggerValue := cmd.Context().Value(common.LoggerKey)
-			log, ok := loggerValue.(logger.Interface)
-			if !ok {
-				return errors.New("logger not found in context")
-			}
-
-			// Get config from context
-			configValue := cmd.Context().Value(common.ConfigKey)
-			cfg, ok := configValue.(config.Interface)
-			if !ok {
-				return errors.New("config not found in context")
+			ctx := cmd.Context()
+			log, cfg, err := getDependencies(ctx)
+			if err != nil {
+				return err
 			}
 
 			app := fx.New(
@@ -160,10 +158,20 @@ func init() {
 				),
 				fx.Invoke(func(deleter *Deleter) error {
 					deleter.index = args
-					return deleter.Start(cmd.Context())
+					return deleter.Start(ctx)
 				}),
 			)
-			return app.Start(cmd.Context())
+
+			if err := app.Start(ctx); err != nil {
+				return fmt.Errorf("failed to start application: %w", err)
+			}
+			defer func() {
+				if err := app.Stop(ctx); err != nil {
+					log.Error("failed to stop application", "error", err)
+				}
+			}()
+
+			return nil
 		},
 	}
 
@@ -172,4 +180,23 @@ func init() {
 
 	// Add subcommands to the global Command
 	Command.AddCommand(listCmd, createCmd, deleteCmd)
+}
+
+// getDependencies retrieves logger and config from context
+func getDependencies(ctx context.Context) (logger.Interface, config.Interface, error) {
+	// Get logger from context
+	loggerValue := ctx.Value(common.LoggerKey)
+	log, ok := loggerValue.(logger.Interface)
+	if !ok {
+		return nil, nil, errors.New("logger not found in context")
+	}
+
+	// Get config from context
+	configValue := ctx.Value(common.ConfigKey)
+	cfg, ok := configValue.(config.Interface)
+	if !ok {
+		return nil, nil, errors.New("config not found in context")
+	}
+
+	return log, cfg, nil
 }

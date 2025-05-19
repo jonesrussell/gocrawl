@@ -93,15 +93,18 @@ func Execute() error {
 		fx.WithLogger(logger.NewFxLogger),
 	)
 
-	if startErr := app.Start(ctx); startErr != nil {
-		return startErr
+	// Start the application
+	if err := app.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start application: %w", err)
 	}
+	defer func() {
+		if err := app.Stop(ctx); err != nil {
+			log.Error("failed to stop application", "error", err)
+		}
+	}()
 
-	if stopErr := app.Stop(ctx); stopErr != nil {
-		return stopErr
-	}
-
-	return rootCmd.Execute()
+	// Execute the root command
+	return rootCmd.ExecuteContext(ctx)
 }
 
 // init initializes the root command and its subcommands.
