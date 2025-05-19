@@ -8,8 +8,11 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"ms-azuretools.vscode-docker",
-				"humao.rest-client"
+				"humao.rest-client",
+				"docker.docker",
+				"dbaeumer.vscode-eslint",
+				"golang.go",
+				"ms-edgedevtools.vscode-edge-devtools"
 			]
 		}
 	},
