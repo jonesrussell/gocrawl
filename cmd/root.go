@@ -94,12 +94,12 @@ func Execute() error {
 	)
 
 	// Start the application
-	if err := app.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start application: %w", err)
+	if startErr := app.Start(ctx); startErr != nil {
+		return fmt.Errorf("failed to start application: %w", startErr)
 	}
 	defer func() {
-		if err := app.Stop(ctx); err != nil {
-			log.Error("failed to stop application", "error", err)
+		if stopErr := app.Stop(ctx); stopErr != nil {
+			log.Error("failed to stop application", "error", stopErr)
 		}
 	}()
 
