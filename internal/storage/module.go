@@ -3,12 +3,10 @@ package storage
 
 import (
 	"crypto/tls"
-	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	esconfig "github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -43,8 +41,8 @@ const DefaultMaxIdleConnsPerHost = 10
 // DefaultResponseHeaderTimeout is the default timeout for response headers.
 const DefaultResponseHeaderTimeout = 5 * time.Second
 
-// createTransport creates a new HTTP transport with appropriate settings
-func createTransport(esConfig *esconfig.Config) *http.Transport {
+// CreateTransport creates a new HTTP transport with appropriate settings
+func CreateTransport(esConfig *esconfig.Config) *http.Transport {
 	transport := &http.Transport{
 		MaxIdleConnsPerHost:   DefaultMaxIdleConnsPerHost,
 		ResponseHeaderTimeout: DefaultResponseHeaderTimeout,
@@ -60,12 +58,12 @@ func createTransport(esConfig *esconfig.Config) *http.Transport {
 	return transport
 }
 
-// createClientConfig creates an Elasticsearch client configuration with the provided settings.
-func createClientConfig(
+// CreateClientConfig creates an Elasticsearch client configuration with the provided settings.
+func CreateClientConfig(
 	esConfig *esconfig.Config,
 	transport *http.Transport,
-) elasticsearch.Config {
-	return elasticsearch.Config{
+) es.Config {
+	return es.Config{
 		Addresses: esConfig.Addresses,
 		Username:  esConfig.Username,
 		Password:  esConfig.Password,
@@ -74,73 +72,46 @@ func createClientConfig(
 	}
 }
 
-// NewElasticsearchClient creates a new Elasticsearch client with the provided configuration
-func NewElasticsearchClient(cfg config.Interface, logger logger.Interface) (*elasticsearch.Client, error) {
-	if cfg == nil {
-		return nil, errors.New("config is nil")
-	}
+// StorageParams contains all dependencies for creating storage components
+type StorageParams struct {
+	fx.In
 
-	// Get Elasticsearch configuration
-	esConfig := cfg.GetElasticsearchConfig()
-	if esConfig == nil {
-		return nil, errors.New("elasticsearch config is nil")
-	}
-
-	if len(esConfig.Addresses) == 0 {
-		return nil, errors.New("elasticsearch addresses are required")
-	}
-
-	// Create transport with TLS configuration
-	transport := createTransport(esConfig)
-
-	// Create client config
-	esCfg := createClientConfig(esConfig, transport)
-
-	// Create client
-	client, err := elasticsearch.NewClient(esCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Elasticsearch client: %w", err)
-	}
-
-	// Test connection
-	res, err := client.Ping()
-	if err != nil {
-		return nil, fmt.Errorf("failed to ping Elasticsearch: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return nil, fmt.Errorf("error pinging Elasticsearch: %s", res.String())
-	}
-
-	return client, nil
+	Config config.Interface
+	Logger logger.Interface
+	Client *es.Client
 }
 
-// Module provides the storage module for dependency injection.
+// StorageResult contains all storage-related components
+type StorageResult struct {
+	fx.Out
+
+	Storage      types.Interface
+	IndexManager types.IndexManager
+}
+
+// NewStorage creates all storage-related components
+func NewStorage(p StorageParams) (StorageResult, error) {
+	// Create storage with default options
+	opts := DefaultOptions()
+	storage := &Storage{
+		client: p.Client,
+		logger: p.Logger,
+		opts:   opts,
+	}
+
+	// Create index manager
+	indexManager := NewElasticsearchIndexManager(p.Client, p.Logger)
+	storage.indexManager = indexManager
+
+	return StorageResult{
+		Storage:      storage,
+		IndexManager: indexManager,
+	}, nil
+}
+
+// Module provides all storage-related dependencies
 var Module = fx.Module("storage",
 	fx.Provide(
-		// Provide the Elasticsearch client
-		fx.Annotate(
-			NewElasticsearchClient,
-			fx.ResultTags(`name:"elasticsearchClient"`),
-		),
-
-		// Provide the index manager
-		fx.Annotate(
-			NewElasticsearchIndexManager,
-			fx.ResultTags(`name:"indexManager"`),
-		),
-
-		// Provide the storage interface
-		fx.Annotate(
-			func(client *elasticsearch.Client, logger logger.Interface) types.Interface {
-				defaultOpts := DefaultOptions()
-				return NewStorage(client, logger, &defaultOpts)
-			},
-			fx.ParamTags(`name:"elasticsearchClient"`),
-		),
-
-		// Provide the search manager
-		NewSearchManager,
+		NewStorage,
 	),
 )

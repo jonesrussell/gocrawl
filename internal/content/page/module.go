@@ -11,36 +11,64 @@ import (
 	"go.uber.org/fx"
 )
 
+// ProvidePageService creates a new page service
+func ProvidePageService(p struct {
+	fx.In
+
+	Logger    logger.Interface
+	Storage   types.Interface
+	IndexName string `name:"pageIndexName"`
+}) (struct {
+	fx.Out
+
+	Service Interface `group:"services"`
+}, error) {
+	service := NewContentService(p.Logger, p.Storage, p.IndexName)
+
+	return struct {
+		fx.Out
+		Service Interface `group:"services"`
+	}{
+		Service: service,
+	}, nil
+}
+
+// ProvidePageProcessor creates a new page processor
+func ProvidePageProcessor(p struct {
+	fx.In
+
+	Logger      logger.Interface
+	Service     Interface
+	Validator   content.JobValidator
+	Storage     types.Interface
+	IndexName   string `name:"pageIndexName"`
+	PageChannel chan *models.Page
+}) (struct {
+	fx.Out
+
+	Processor content.Processor `name:"pageProcessor"`
+}, error) {
+	processor := NewPageProcessor(
+		p.Logger,
+		p.Service,
+		p.Validator,
+		p.Storage,
+		p.IndexName,
+		p.PageChannel,
+	)
+
+	return struct {
+		fx.Out
+		Processor content.Processor `name:"pageProcessor"`
+	}{
+		Processor: processor,
+	}, nil
+}
+
 // Module provides the page module's dependencies.
 var Module = fx.Module("page",
 	fx.Provide(
-		// Provide the page service
-		fx.Annotate(
-			NewContentService,
-			fx.As(new(Interface)),
-		),
-		// Provide the page processor
-		fx.Annotate(
-			func(p struct {
-				fx.In
-				Logger      logger.Interface
-				Service     Interface
-				Validator   content.JobValidator
-				Storage     types.Interface
-				IndexName   string `name:"pageIndexName"`
-				PageChannel chan *models.Page
-			}) *PageProcessor {
-				return NewPageProcessor(ProcessorParams{
-					Logger:      p.Logger,
-					Service:     p.Service,
-					Validator:   p.Validator,
-					Storage:     p.Storage,
-					IndexName:   p.IndexName,
-					PageChannel: p.PageChannel,
-				})
-			},
-			fx.ResultTags(`name:"pageProcessor"`),
-			fx.As(new(content.Processor)),
-		),
+		ProvidePageService,
+		ProvidePageProcessor,
 	),
 )

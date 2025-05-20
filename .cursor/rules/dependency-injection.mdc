@@ -1,7 +1,7 @@
 ---
-description:
-globs:
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
 # Dependency Injection & Interfaces
 
@@ -10,10 +10,42 @@ alwaysApply: false
 - For interfaces used across multiple packages, define them in the consuming package.
 - Avoid interface stuttering (e.g., use `Logger` instead of `CollectorLogger`).
 - Define New* constructors only in module.go files.
+- Use unnamed dependencies in constructors (e.g., `NewServer(logger.Interface, config.Interface)` instead of `NewServer(Params)`).
+- Use function types for simple interfaces (e.g., `JobValidatorFunc` for `JobValidator`).
+- Use `fx.Module` consistently across all modules.
+- Keep module.go files focused on DI setup and avoid business logic.
 - When testing modules:
   - Provide all required dependencies.
   - Avoid providing dependencies that are already provided.
   - Use test helpers for common dependency setup.
   - Verify dependency injection before testing functionality.
+
+## Interface Organization
+- Keep related interfaces in the same package.
+- Use clear, descriptive names for interfaces.
+- Document interface methods with clear comments.
+- Consider splitting large interfaces into smaller, focused ones.
+- Use interface composition to build complex interfaces.
+
+## Dependency Management
+- Use `fx.In` and `fx.Out` structs for complex dependencies.
+- Group related dependencies in parameter structs.
+- Use named dependencies when needed (e.g., `name:"articleIndexName"`).
+- Provide dependencies in the correct order (e.g., client before service).
+- Use `fx.WithLogger` for custom logging.
+
+## Module Structure
+- Keep modules small and focused.
+- Use consistent naming across modules.
+- Document module dependencies clearly.
+- Handle errors in module constructors.
+- Use `fx.Options` for complex module configuration.
+
+## Testing
+- Mock dependencies using interfaces.
+- Use test fixtures for common setup.
+- Verify dependency injection in tests.
+- Test error cases and edge conditions.
+- Use table-driven tests for multiple scenarios.
 
 See [dependency injection guidelines](mdc:dependency-injection.mdc) for more details.

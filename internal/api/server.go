@@ -18,6 +18,15 @@ type Server struct {
 	IndexManager types.IndexManager
 }
 
+// Params holds the parameters for creating a new API server.
+type Params struct {
+	Context      context.Context
+	Config       config.Interface
+	Logger       logger.Interface
+	Storage      types.Interface
+	IndexManager types.IndexManager
+}
+
 // NewServer creates a new API server instance.
 func NewServer(p Params) *Server {
 	return &Server{

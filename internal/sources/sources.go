@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -28,25 +27,15 @@ type SelectorConfig = sourceutils.SelectorConfig
 // ArticleSelectors defines the CSS selectors used for article content extraction.
 type ArticleSelectors = sourceutils.ArticleSelectors
 
-// Sources manages a collection of source configurations.
+// Sources manages a collection of web content sources.
 type Sources struct {
-	sources []sourceutils.SourceConfig
+	sources []Config
 	logger  logger.Interface
 	metrics *sourceutils.SourcesMetrics
 }
 
 // Ensure Sources implements Interface
 var _ Interface = (*Sources)(nil)
-
-// ConvertSourceConfig converts a sources.Config to a configtypes.Source.
-// It handles the conversion of fields between the two configtypes.
-func ConvertSourceConfig(source *Config) *configtypes.Source {
-	if source == nil {
-		return nil
-	}
-
-	return sourceutils.ConvertToConfigSource(source)
-}
 
 // createSelectorConfig creates a new SelectorConfig from the given selectors
 func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
@@ -113,88 +102,29 @@ func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
 	}
 }
 
-// convertSourceConfig converts a configtypes.Source to a sourceutils.SourceConfig
-func convertSourceConfig(src configtypes.Source) sourceutils.SourceConfig {
-	// Parse the rate limit duration
-	rateLimit, err := time.ParseDuration(src.RateLimit)
-	if err != nil {
-		// If parsing fails, use a default value
-		rateLimit = time.Second
-	}
-
-	return sourceutils.SourceConfig{
-		Name:           src.Name,
-		URL:            src.URL,
-		AllowedDomains: src.AllowedDomains,
-		StartURLs:      src.StartURLs,
-		RateLimit:      rateLimit,
-		MaxDepth:       src.MaxDepth,
-		Time:           src.Time,
-		Index:          src.Index,
-		ArticleIndex:   src.ArticleIndex,
-		Selectors:      createSelectorConfig(src.Selectors.Article),
-		Rules:          src.Rules,
-	}
-}
-
 // LoadSources creates a new Sources instance by loading sources from either:
 // 1. A YAML file specified in the crawler config
-// 2. A default source based on the command line argument
-// Returns an error if no sources are found in any location
+// Returns an error if no sources are found
 func LoadSources(cfg config.Interface) (*Sources, error) {
-	sources := &Sources{
+	// Load sources from config file
+	sources, err := loadSourcesFromFile(cfg.GetCrawlerConfig().SourceFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load sources from file: %w", err)
+	}
+
+	// If no sources found, return an error
+	if len(sources) == 0 {
+		return nil, errors.New("no sources found in file")
+	}
+
+	return &Sources{
+		sources: sources,
 		metrics: sourceutils.NewSourcesMetrics(),
-	}
-
-	// Try to load sources from file first
-	crawlerCfg := cfg.GetCrawlerConfig()
-	sourceFile := "sources.yml"
-	if crawlerCfg != nil && crawlerCfg.SourceFile != "" {
-		sourceFile = crawlerCfg.SourceFile
-	}
-
-	// Try to load sources from file
-	if configs, err := loadSourcesFromFile(sourceFile); err == nil && len(configs) > 0 {
-		sources.SetSources(configs)
-		return sources, nil
-	}
-
-	// If we get here, we couldn't find any sources in the file
-	// Try to create a default source based on the command line argument
-	if cmd := cfg.GetCommand(); cmd != "" {
-		// Create default selectors
-		defaultSelectors := configtypes.ArticleSelectors{
-			Container: "article",
-			Title:     "h1",
-			Body:      "article > div",
-		}
-
-		// Create a default source based on the command
-		defaultSource := &configtypes.Source{
-			Name:           cmd,
-			URL:            fmt.Sprintf("https://%s", strings.ReplaceAll(cmd, " ", "")),
-			AllowedDomains: []string{strings.ReplaceAll(cmd, " ", "")},
-			StartURLs:      []string{fmt.Sprintf("https://%s", strings.ReplaceAll(cmd, " ", ""))},
-			MaxDepth:       DefaultMaxDepth,
-			RateLimit:      DefaultRateLimit.String(),
-			Selectors: configtypes.SourceSelectors{
-				Article: defaultSelectors,
-			},
-			Rules: configtypes.Rules{},
-		}
-
-		// Convert to sourceutils.SourceConfig
-		sourceConfig := convertSourceConfig(*defaultSource)
-		sources.SetSources([]sourceutils.SourceConfig{sourceConfig})
-		return sources, nil
-	}
-
-	// No sources found
-	return nil, errors.New("no sources found in configuration")
+	}, nil
 }
 
 // loadSourcesFromFile attempts to load sources from a file
-func loadSourcesFromFile(path string) ([]sourceutils.SourceConfig, error) {
+func loadSourcesFromFile(path string) ([]Config, error) {
 	sourceLoader, err := loader.NewLoader(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create source loader: %w", err)
@@ -210,7 +140,7 @@ func loadSourcesFromFile(path string) ([]sourceutils.SourceConfig, error) {
 	}
 
 	// Convert loaded configs to our source type
-	sourceConfigs := make([]sourceutils.SourceConfig, 0, len(configs))
+	sourceConfigs := make([]Config, 0, len(configs))
 	for i := range configs {
 		sourceConfigs = append(sourceConfigs, convertLoaderConfig(configs[i]))
 	}
@@ -219,7 +149,7 @@ func loadSourcesFromFile(path string) ([]sourceutils.SourceConfig, error) {
 }
 
 // convertLoaderConfig converts a loader.Config to a sourceutils.SourceConfig
-func convertLoaderConfig(cfg loader.Config) sourceutils.SourceConfig {
+func convertLoaderConfig(cfg loader.Config) Config {
 	// Parse rate limit duration
 	var rateLimit time.Duration
 	if cfg.RateLimit != nil {
@@ -256,7 +186,7 @@ func convertLoaderConfig(cfg loader.Config) sourceutils.SourceConfig {
 	u, err := url.Parse(cfg.URL)
 	if err != nil {
 		// If URL parsing fails, use the URL as is
-		return sourceutils.SourceConfig{
+		return Config{
 			Name:           cfg.Name,
 			URL:            cfg.URL,
 			AllowedDomains: []string{cfg.URL},
@@ -277,7 +207,7 @@ func convertLoaderConfig(cfg loader.Config) sourceutils.SourceConfig {
 		domain = cfg.URL
 	}
 
-	return sourceutils.SourceConfig{
+	return Config{
 		Name:           cfg.Name,
 		URL:            cfg.URL,
 		AllowedDomains: []string{domain},
@@ -310,25 +240,25 @@ func LoadFromFile(path string, logger logger.Interface) (*Sources, error) {
 	}
 
 	// Convert loaded configs to our source type
-	sourceConfigs := make([]sourceutils.SourceConfig, 0, len(configs))
+	sourceConfigs := make([]Config, 0, len(configs))
 	for i := range configs {
 		sourceConfigs = append(sourceConfigs, convertLoaderConfig(configs[i]))
 	}
 
-	sources.SetSources(sourceConfigs)
+	sources.sources = sourceConfigs
 	return sources, nil
 }
 
 // SetSources sets the sources.
-func (s *Sources) SetSources(configs []sourceutils.SourceConfig) {
+func (s *Sources) SetSources(configs []Config) {
 	s.sources = configs
 	s.metrics.SourceCount = int64(len(configs))
 	s.metrics.LastUpdated = time.Now()
 }
 
 // ListSources retrieves all sources.
-func (s *Sources) ListSources(ctx context.Context) ([]*sourceutils.SourceConfig, error) {
-	result := make([]*sourceutils.SourceConfig, 0, len(s.sources))
+func (s *Sources) ListSources(ctx context.Context) ([]*Config, error) {
+	result := make([]*Config, 0, len(s.sources))
 	for i := range s.sources {
 		result = append(result, &s.sources[i])
 	}
@@ -336,7 +266,7 @@ func (s *Sources) ListSources(ctx context.Context) ([]*sourceutils.SourceConfig,
 }
 
 // AddSource adds a new source.
-func (s *Sources) AddSource(ctx context.Context, source *sourceutils.SourceConfig) error {
+func (s *Sources) AddSource(ctx context.Context, source *Config) error {
 	// Validate the source configuration
 	if source == nil {
 		return ErrInvalidSource
@@ -354,7 +284,7 @@ func (s *Sources) AddSource(ctx context.Context, source *sourceutils.SourceConfi
 }
 
 // UpdateSource updates an existing source.
-func (s *Sources) UpdateSource(ctx context.Context, source *sourceutils.SourceConfig) error {
+func (s *Sources) UpdateSource(ctx context.Context, source *Config) error {
 	// Validate the source configuration
 	if source == nil {
 		return ErrInvalidSource
@@ -407,7 +337,7 @@ func (s *Sources) ValidateSource(
 	}
 
 	// Find the requested source
-	var selectedSource *sourceutils.SourceConfig
+	var selectedSource *Config
 	for i := range sourceConfigs {
 		if sourceConfigs[i].Name == sourceName {
 			selectedSource = &sourceConfigs[i]
@@ -446,12 +376,12 @@ func (s *Sources) GetMetrics() sourceutils.SourcesMetrics {
 }
 
 // GetSources returns all sources.
-func (s *Sources) GetSources() ([]sourceutils.SourceConfig, error) {
+func (s *Sources) GetSources() ([]Config, error) {
 	return s.sources, nil
 }
 
 // FindByName finds a source by name.
-func (s *Sources) FindByName(name string) *sourceutils.SourceConfig {
+func (s *Sources) FindByName(name string) *Config {
 	for i := range s.sources {
 		if s.sources[i].Name == name {
 			return &s.sources[i]

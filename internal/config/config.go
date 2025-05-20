@@ -127,7 +127,7 @@ func (c *Config) Validate() error {
 }
 
 // LoadConfig loads the configuration from Viper
-func LoadConfig() (Interface, error) {
+func LoadConfig() (*Config, error) {
 	// Create a temporary logger for config loading
 	tempLogger, err := logger.New(&logger.Config{
 		Level:       logger.InfoLevel,
@@ -147,6 +147,23 @@ func LoadConfig() (Interface, error) {
 		},
 		Server:        server.NewConfig(),
 		Elasticsearch: elasticsearch.LoadFromViper(viper.GetViper()),
+		App: &app.Config{
+			Name:        viper.GetString("app.name"),
+			Version:     viper.GetString("app.version"),
+			Environment: viper.GetString("app.environment"),
+			Debug:       viper.GetBool("app.debug"),
+		},
+	}
+
+	// Set default app values if not set
+	if cfg.App.Name == "" {
+		cfg.App.Name = "gocrawl"
+	}
+	if cfg.App.Version == "" {
+		cfg.App.Version = "1.0.0"
+	}
+	if cfg.App.Environment == "" {
+		cfg.App.Environment = "development"
 	}
 
 	// Set server config from Viper with defaults

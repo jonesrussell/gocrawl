@@ -4,8 +4,9 @@ package logger
 import (
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -18,6 +19,16 @@ type Interface interface {
 	Error(msg string, fields ...any)
 	Fatal(msg string, fields ...any)
 	With(fields ...any) Interface
+	// Structured logging helpers
+	WithUser(userID string) Interface
+	WithRequestID(requestID string) Interface
+	WithTraceID(traceID string) Interface
+	WithSpanID(spanID string) Interface
+	WithDuration(duration time.Duration) Interface
+	WithError(err error) Interface
+	WithComponent(component string) Interface
+	WithVersion(version string) Interface
+	WithEnvironment(env string) Interface
 }
 
 // Logger implements the Interface.
@@ -28,6 +39,38 @@ type Logger struct {
 var (
 	// defaultLogger is the singleton logger instance
 	defaultLogger *Logger
+
+	// logLevels maps string levels to zapcore.Level
+	logLevels = map[string]zapcore.Level{
+		"debug": zapcore.DebugLevel,
+		"info":  zapcore.InfoLevel,
+		"warn":  zapcore.WarnLevel,
+		"error": zapcore.ErrorLevel,
+		"fatal": zapcore.FatalLevel,
+	}
+
+	// Common field keys
+	fieldKeys = struct {
+		UserID      string
+		RequestID   string
+		TraceID     string
+		SpanID      string
+		Duration    string
+		Error       string
+		Component   string
+		Version     string
+		Environment string
+	}{
+		UserID:      "user_id",
+		RequestID:   "request_id",
+		TraceID:     "trace_id",
+		SpanID:      "span_id",
+		Duration:    "duration",
+		Error:       "error",
+		Component:   "component",
+		Version:     "version",
+		Environment: "environment",
+	}
 )
 
 // New creates a new logger instance.
@@ -48,50 +91,61 @@ func New(config *Config) (Interface, error) {
 	}
 
 	// Create encoder config
-	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "ts",
-		LevelKey:       "level",
-		NameKey:        "logger",
-		CallerKey:      "caller",
-		FunctionKey:    zapcore.OmitKey,
-		MessageKey:     "msg",
-		StacktraceKey:  "stacktrace",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.CapitalColorLevelEncoder,
-		EncodeTime:     zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05"),
-		EncodeDuration: zapcore.StringDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
-	}
-
-	// Set output
-	output := zapcore.AddSync(os.Stdout)
-
-	// Create level enabler
-	level := zapcore.InfoLevel
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
 	if config.Development {
-		level = zapcore.DebugLevel
+		encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		encoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+			enc.AppendString(t.Format("2006-01-02 15:04:05.000"))
+		}
+		encoderConfig.EncodeDuration = zapcore.StringDurationEncoder
+		encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+		encoderConfig.ConsoleSeparator = " | "
+	} else {
+		encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+		encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+		encoderConfig.EncodeDuration = zapcore.StringDurationEncoder
+		encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
 	}
 
-	// Create encoder based on encoding setting
+	// Create encoder
 	var encoder zapcore.Encoder
-	if config.Encoding == "console" {
-		encoder = zapcore.NewConsoleEncoder(encoderConfig)
-	} else {
+	if config.Encoding == "json" {
 		encoder = zapcore.NewJSONEncoder(encoderConfig)
+	} else {
+		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
+
+	// Get log level
+	level := getLogLevel(string(config.Level))
 
 	// Create core
 	core := zapcore.NewCore(
 		encoder,
-		output,
+		zapcore.AddSync(os.Stdout),
 		level,
 	)
 
-	// Create logger
-	zapLogger := zap.New(core)
-	defaultLogger = &Logger{zapLogger: zapLogger}
+	// Create logger with options
+	opts := []zap.Option{
+		zap.AddCaller(),
+		zap.AddStacktrace(zapcore.ErrorLevel),
+	}
+	if config.Development {
+		opts = append(opts, zap.Development())
+	}
+	zapLogger := zap.New(core, opts...)
 
+	defaultLogger = &Logger{zapLogger: zapLogger}
 	return defaultLogger, nil
+}
+
+// getLogLevel converts a string level to zapcore.Level
+func getLogLevel(level string) zapcore.Level {
+	lvl, exists := logLevels[strings.ToLower(level)]
+	if !exists {
+		return zapcore.InfoLevel
+	}
+	return lvl
 }
 
 // Debug logs a debug message.
@@ -126,73 +180,87 @@ func (l *Logger) With(fields ...any) Interface {
 	}
 }
 
-// fieldPairSize represents the number of elements in a key-value pair.
-const fieldPairSize = 2
+// WithUser adds a user ID to the logger.
+func (l *Logger) WithUser(userID string) Interface {
+	return l.With(fieldKeys.UserID, userID)
+}
+
+// WithRequestID adds a request ID to the logger.
+func (l *Logger) WithRequestID(requestID string) Interface {
+	return l.With(fieldKeys.RequestID, requestID)
+}
+
+// WithTraceID adds a trace ID to the logger.
+func (l *Logger) WithTraceID(traceID string) Interface {
+	return l.With(fieldKeys.TraceID, traceID)
+}
+
+// WithSpanID adds a span ID to the logger.
+func (l *Logger) WithSpanID(spanID string) Interface {
+	return l.With(fieldKeys.SpanID, spanID)
+}
+
+// WithDuration adds a duration to the logger.
+func (l *Logger) WithDuration(duration time.Duration) Interface {
+	return l.With(fieldKeys.Duration, duration)
+}
+
+// WithError adds an error to the logger.
+func (l *Logger) WithError(err error) Interface {
+	return l.With(fieldKeys.Error, err)
+}
+
+// WithComponent adds a component name to the logger.
+func (l *Logger) WithComponent(component string) Interface {
+	return l.With(fieldKeys.Component, component)
+}
+
+// WithVersion adds a version to the logger.
+func (l *Logger) WithVersion(version string) Interface {
+	return l.With(fieldKeys.Version, version)
+}
+
+// WithEnvironment adds an environment to the logger.
+func (l *Logger) WithEnvironment(env string) Interface {
+	return l.With(fieldKeys.Environment, env)
+}
 
 // toZapFields converts a list of any fields to zap.Field.
 func toZapFields(fields []any) []zap.Field {
-	if len(fields)%fieldPairSize != 0 {
-		return []zap.Field{zap.Error(ErrInvalidFields)}
+	if len(fields) == 0 {
+		return nil
 	}
 
-	zapFields := make([]zap.Field, 0, len(fields)/fieldPairSize)
-	for i := 0; i < len(fields); i += fieldPairSize {
-		key, ok := fields[i].(string)
-		if !ok {
-			return []zap.Field{zap.Error(ErrInvalidFields)}
+	zapFields := make([]zap.Field, 0, len(fields))
+	for i := 0; i < len(fields); i++ {
+		switch field := fields[i].(type) {
+		case zap.Field:
+			// If it's already a zap.Field, use it directly
+			zapFields = append(zapFields, field)
+		case string:
+			// If it's a string, it should be a key
+			if i+1 >= len(fields) {
+				if defaultLogger != nil {
+					defaultLogger.Warn("Missing value for field key",
+						"key", field,
+						"error", ErrInvalidFields,
+					)
+				}
+				continue
+			}
+			zapFields = append(zapFields, zap.Any(field, fields[i+1]))
+			i++ // Skip the value in the next iteration
+		default:
+			// If it's neither, log a warning and skip
+			if defaultLogger != nil {
+				defaultLogger.Warn("Invalid field type",
+					"expected_type", "string or zap.Field",
+					"actual_type", fmt.Sprintf("%T", field),
+					"error", ErrInvalidFields,
+				)
+			}
 		}
-
-		value := fields[i+1]
-		zapFields = append(zapFields, zap.Any(key, value))
 	}
 
 	return zapFields
-}
-
-// NewFromConfig creates a new logger instance from Viper configuration
-func NewFromConfig(v *viper.Viper) (Interface, error) {
-	// Get log level from config
-	logLevel := v.GetString("logger.level")
-	level := InfoLevel
-
-	// Check debug flag from Viper first
-	debug := v.GetBool("app.debug")
-	if debug {
-		level = DebugLevel
-		logLevel = "debug"
-	} else {
-		// Fall back to log level from config
-		switch logLevel {
-		case "debug":
-			level = DebugLevel
-		case "info":
-			level = InfoLevel
-		case "warn":
-			level = WarnLevel
-		case "error":
-			level = ErrorLevel
-		}
-	}
-
-	// Create logger with configuration
-	logConfig := &Config{
-		Level:       level,
-		Development: debug,
-		Encoding:    "console",
-		EnableColor: true,
-		OutputPaths: []string{"stdout"},
-	}
-
-	log, err := New(logConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
-
-	// Log the current log level
-	log.Debug("Logger initialized",
-		"level", logLevel,
-		"debug", debug,
-		"development", logConfig.Development)
-
-	return log, nil
 }

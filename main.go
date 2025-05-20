@@ -1,10 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/jonesrussell/gocrawl/cmd"
 )
 
 func main() {
-	// Call the Execute function from the cmd package
-	cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }

@@ -60,6 +60,14 @@ type JobValidator interface {
 	ValidateJob(job *Job) error
 }
 
+// JobValidatorFunc is a function type that implements JobValidator.
+type JobValidatorFunc func(job *Job) error
+
+// ValidateJob implements JobValidator.
+func (f JobValidatorFunc) ValidateJob(job *Job) error {
+	return f(job)
+}
+
 // JobService defines the interface for job operations.
 type JobService interface {
 	// Start starts the job service.

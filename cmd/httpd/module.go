@@ -6,19 +6,19 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
+	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
 // Module provides the HTTP server dependencies.
-var Module = fx.Options(
+var Module = fx.Module("httpd",
 	// Core modules
-	logger.Module,
-	storage.Module,
+	common.Module,
 	api.Module,
 
 	// Providers
@@ -27,9 +27,8 @@ var Module = fx.Options(
 		func(
 			cfg config.Interface,
 			log logger.Interface,
-			searchManager api.SearchManager,
 		) (*gin.Engine, middleware.SecurityMiddlewareInterface, error) {
-			router, security := api.SetupRouter(log, searchManager, cfg)
+			router, security := api.SetupRouter(log, nil, cfg)
 			return router, security, nil
 		},
 		// Provide the server
@@ -48,6 +47,32 @@ var Module = fx.Options(
 				ReadHeaderTimeout: api.ReadHeaderTimeout,
 			}
 			return srv, nil
+		},
+		// Provide the command registrar
+		fx.Annotated{
+			Group: "commands",
+			Target: func(
+				cfg config.Interface,
+				log logger.Interface,
+				srv *http.Server,
+			) common.CommandRegistrar {
+				return func(parent *cobra.Command) {
+					cmd := &cobra.Command{
+						Use:   "serve",
+						Short: "Start the HTTP server",
+						Long:  `Start the HTTP server for the search API`,
+						RunE: func(cmd *cobra.Command, args []string) error {
+							// Start the server
+							if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+								return err
+							}
+							return nil
+						},
+					}
+
+					parent.AddCommand(cmd)
+				}
+			},
 		},
 	),
 

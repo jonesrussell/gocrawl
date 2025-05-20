@@ -1,7 +1,7 @@
 ---
-description:
-globs:
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
 # Dependencies
 
@@ -11,11 +11,16 @@ alwaysApply: false
   - github.com/gocolly/colly/v2
   - github.com/joho/godotenv
   - github.com/spf13/cobra
+  - github.com/spf13/viper
   - go.uber.org/fx
   - go.uber.org/zap
 - Avoid deprecated packages:
   - Use google.golang.org/protobuf instead of github.com/golang/protobuf
   - Use github.com/google/uuid instead of github.com/satori/go.uuid
   - Use github.com/gofrs/uuid/v5+ instead of github.com/gofrs/uuid
+- Package organization:
+  - Keep internal packages in the internal directory
+  - Use consistent package naming (e.g., logger, config, storage)
+  - Group related functionality in subpackages (e.g., content/articles, content/page)
 
 See [dependency guidelines](mdc:dependencies.mdc) for more details.

@@ -4,23 +4,13 @@ package articles
 import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/processor"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
-// ServiceParams contains the parameters for creating a new content service.
-type ServiceParams struct {
-	Logger    logger.Interface
-	Storage   types.Interface
-	IndexName string
-}
-
-// ModuleParams defines the parameters required for creating an article service.
-// It uses fx.In for dependency injection and includes:
-// - Logger: For logging operations
-type ModuleParams struct {
+// ContentServiceParams contains dependencies for creating the article service
+type ContentServiceParams struct {
 	fx.In
 
 	Logger    logger.Interface
@@ -28,14 +18,29 @@ type ModuleParams struct {
 	IndexName string `name:"articleIndexName"`
 }
 
-// ProcessorParams contains the parameters for creating a new processor.
+// ContentServiceResult contains the article service
+type ContentServiceResult struct {
+	fx.Out
+
+	Service Interface `group:"services"`
+}
+
+// ProcessorParams contains dependencies for creating the article processor
 type ProcessorParams struct {
+	fx.In
+
 	Logger         logger.Interface
 	Service        Interface
 	Validator      content.JobValidator
 	Storage        types.Interface
-	IndexName      string
-	ArticleChannel chan *models.Article
+	IndexName      string `name:"articleIndexName"`
 	ArticleIndexer processor.Processor
 	PageIndexer    processor.Processor
+}
+
+// ProcessorResult contains the article processor
+type ProcessorResult struct {
+	fx.Out
+
+	Processor content.Processor `name:"articleProcessor"`
 }

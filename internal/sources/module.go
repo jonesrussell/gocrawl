@@ -1,33 +1,47 @@
-// Package sources manages the configuration and lifecycle of web content sources for GoCrawl.
-// It handles source configuration loading and validation through a YAML-based configuration system.
+// Package sources provides the sources module for dependency injection.
 package sources
 
 import (
 	"fmt"
-	"time"
 
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	"github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"go.uber.org/fx"
 )
 
-const (
-	// DefaultMaxDepth is the default maximum depth for crawling.
-	DefaultMaxDepth = 2
+// SourcesParams contains dependencies for creating sources
+type SourcesParams struct {
+	fx.In
 
-	// DefaultRateLimit is the default rate limit for sources
-	DefaultRateLimit = 5 * time.Second
-)
+	Logger logger.Interface
+	Config config.Interface
+}
+
+// SourcesResult contains the sources and its components
+type SourcesResult struct {
+	fx.Out
+
+	Sources Interface
+}
+
+// NewSourcesProvider creates a new Sources instance
+func NewSourcesProvider(p SourcesParams) (SourcesResult, error) {
+	sources, err := LoadSources(p.Config)
+	if err != nil {
+		return SourcesResult{}, err
+	}
+
+	return SourcesResult{
+		Sources: sources,
+	}, nil
+}
 
 // Module provides the sources module for dependency injection.
 var Module = fx.Module("sources",
 	fx.Provide(
-		fx.Annotate(
-			ProvideSources,
-			fx.As(new(Interface)),
-		),
+		NewSourcesProvider,
 	),
 )
 
@@ -35,8 +49,7 @@ var Module = fx.Module("sources",
 type ModuleParams struct {
 	fx.In
 
-	Config config.Interface
-	Logger logger.Interface
+	Deps cmdcommon.CommandDeps
 }
 
 // Result defines the output of the sources module.
@@ -48,7 +61,7 @@ type Result struct {
 
 // ProvideSources creates a new Sources instance from the given configuration.
 func ProvideSources(params ModuleParams) (Interface, error) {
-	sources, err := LoadSources(params.Config)
+	sources, err := LoadSources(params.Deps.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sources: %w", err)
 	}
@@ -56,33 +69,11 @@ func ProvideSources(params ModuleParams) (Interface, error) {
 	return sources, nil
 }
 
-// NewConfig creates a new source configuration.
-func NewConfig() *Config {
-	return &Config{
-		Name:           "default",
-		URL:            "http://localhost",
-		AllowedDomains: []string{"localhost"},
-		StartURLs:      []string{"http://localhost"},
-		MaxDepth:       DefaultMaxDepth,
-		RateLimit:      DefaultRateLimit,
-		Rules:          types.Rules{},
-	}
-}
-
 // NewSources creates a new sources instance.
-func NewSources(cfg *Config, logger logger.Interface) *Sources {
+func NewSources(cfg *Config, deps cmdcommon.CommandDeps) *Sources {
 	return &Sources{
 		sources: []Config{*cfg},
-		logger:  logger,
+		logger:  deps.Logger,
 		metrics: sourceutils.NewSourcesMetrics(),
 	}
-}
-
-// DefaultConfig returns the default source configuration.
-func DefaultConfig() *Config {
-	defaultConfig := &Config{
-		RateLimit: DefaultRateLimit,
-		Rules:     types.Rules{},
-	}
-	return defaultConfig
 }

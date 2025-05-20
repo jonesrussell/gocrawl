@@ -6,6 +6,7 @@ package logger
 
 import (
 	reflect "reflect"
+	time "time"
 
 	gomock "github.com/golang/mock/gomock"
 	logger "github.com/jonesrussell/gocrawl/internal/logger"
@@ -135,4 +136,130 @@ func (m *MockInterface) With(fields ...any) logger.Interface {
 func (mr *MockInterfaceMockRecorder) With(fields ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "With", reflect.TypeOf((*MockInterface)(nil).With), fields...)
+}
+
+// WithComponent mocks base method.
+func (m *MockInterface) WithComponent(component string) logger.Interface {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithComponent", component)
+	ret0, _ := ret[0].(logger.Interface)
+	return ret0
+}
+
+// WithComponent indicates an expected call of WithComponent.
+func (mr *MockInterfaceMockRecorder) WithComponent(component interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithComponent", reflect.TypeOf((*MockInterface)(nil).WithComponent), component)
+}
+
+// WithDuration mocks base method.
+func (m *MockInterface) WithDuration(duration time.Duration) logger.Interface {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithDuration", duration)
+	ret0, _ := ret[0].(logger.Interface)
+	return ret0
+}
+
+// WithDuration indicates an expected call of WithDuration.
+func (mr *MockInterfaceMockRecorder) WithDuration(duration interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithDuration", reflect.TypeOf((*MockInterface)(nil).WithDuration), duration)
+}
+
+// WithEnvironment mocks base method.
+func (m *MockInterface) WithEnvironment(env string) logger.Interface {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithEnvironment", env)
+	ret0, _ := ret[0].(logger.Interface)
+	return ret0
+}
+
+// WithEnvironment indicates an expected call of WithEnvironment.
+func (mr *MockInterfaceMockRecorder) WithEnvironment(env interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithEnvironment", reflect.TypeOf((*MockInterface)(nil).WithEnvironment), env)
+}
+
+// WithError mocks base method.
+func (m *MockInterface) WithError(err error) logger.Interface {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithError", err)
+	ret0, _ := ret[0].(logger.Interface)
+	return ret0
+}
+
+// WithError indicates an expected call of WithError.
+func (mr *MockInterfaceMockRecorder) WithError(err interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithError", reflect.TypeOf((*MockInterface)(nil).WithError), err)
+}
+
+// WithRequestID mocks base method.
+func (m *MockInterface) WithRequestID(requestID string) logger.Interface {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithRequestID", requestID)
+	ret0, _ := ret[0].(logger.Interface)
+	return ret0
+}
+
+// WithRequestID indicates an expected call of WithRequestID.
+func (mr *MockInterfaceMockRecorder) WithRequestID(requestID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithRequestID", reflect.TypeOf((*MockInterface)(nil).WithRequestID), requestID)
+}
+
+// WithSpanID mocks base method.
+func (m *MockInterface) WithSpanID(spanID string) logger.Interface {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithSpanID", spanID)
+	ret0, _ := ret[0].(logger.Interface)
+	return ret0
+}
+
+// WithSpanID indicates an expected call of WithSpanID.
+func (mr *MockInterfaceMockRecorder) WithSpanID(spanID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithSpanID", reflect.TypeOf((*MockInterface)(nil).WithSpanID), spanID)
+}
+
+// WithTraceID mocks base method.
+func (m *MockInterface) WithTraceID(traceID string) logger.Interface {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithTraceID", traceID)
+	ret0, _ := ret[0].(logger.Interface)
+	return ret0
+}
+
+// WithTraceID indicates an expected call of WithTraceID.
+func (mr *MockInterfaceMockRecorder) WithTraceID(traceID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithTraceID", reflect.TypeOf((*MockInterface)(nil).WithTraceID), traceID)
+}
+
+// WithUser mocks base method.
+func (m *MockInterface) WithUser(userID string) logger.Interface {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithUser", userID)
+	ret0, _ := ret[0].(logger.Interface)
+	return ret0
+}
+
+// WithUser indicates an expected call of WithUser.
+func (mr *MockInterfaceMockRecorder) WithUser(userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithUser", reflect.TypeOf((*MockInterface)(nil).WithUser), userID)
+}
+
+// WithVersion mocks base method.
+func (m *MockInterface) WithVersion(version string) logger.Interface {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithVersion", version)
+	ret0, _ := ret[0].(logger.Interface)
+	return ret0
+}
+
+// WithVersion indicates an expected call of WithVersion.
+func (mr *MockInterfaceMockRecorder) WithVersion(version interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithVersion", reflect.TypeOf((*MockInterface)(nil).WithVersion), version)
 }
