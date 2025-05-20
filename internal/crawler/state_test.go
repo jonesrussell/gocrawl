@@ -1,6 +1,7 @@
 package crawler_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ func TestState(t *testing.T) {
 	t.Run("StartStop", func(t *testing.T) {
 		t.Parallel()
 		s := crawler.NewState(testLogger)
-		ctx := t.Context()
+		ctx := context.Background()
 
 		// Test Start
 		s.Start(ctx, "test-source")
@@ -44,7 +45,7 @@ func TestState(t *testing.T) {
 	t.Run("ContextCancellation", func(t *testing.T) {
 		t.Parallel()
 		s := crawler.NewState(testLogger)
-		ctx := t.Context()
+		ctx := context.Background()
 
 		s.Start(ctx, "test-source")
 		require.NotNil(t, s.Context())
@@ -86,7 +87,7 @@ func TestState(t *testing.T) {
 	t.Run("StateTransitions", func(t *testing.T) {
 		t.Parallel()
 		s := crawler.NewState(testLogger)
-		ctx := t.Context()
+		ctx := context.Background()
 
 		// Test multiple start/stop cycles
 		for range 5 {
@@ -104,7 +105,7 @@ func TestState(t *testing.T) {
 
 func TestState_Start(t *testing.T) {
 	s := crawler.NewState(nil)
-	s.Start(t.Context(), "test")
+	s.Start(context.Background(), "test")
 	assert.True(t, s.IsRunning())
 	assert.Equal(t, "test", s.CurrentSource())
 	assert.NotZero(t, s.GetStartTime())

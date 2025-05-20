@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -65,7 +66,7 @@ func TestSearch_IndexNotFound(t *testing.T) {
 	s := result.Storage
 
 	// Test searching a non-existent index
-	_, err = s.Search(t.Context(), "non_existent_index", nil)
+	_, err = s.Search(context.Background(), "non_existent_index", nil)
 	require.Error(t, err)
 	require.ErrorIs(t, err, storage.ErrIndexNotFound)
 	require.Contains(t, err.Error(), "non_existent_index")
@@ -116,7 +117,7 @@ func TestSearch_Success(t *testing.T) {
 	require.NoError(t, err)
 	s := result.Storage
 
-	results, err := s.Search(t.Context(), "test-index", map[string]any{
+	results, err := s.Search(context.Background(), "test-index", map[string]any{
 		"query": map[string]any{
 			"match_all": map[string]any{},
 		},
@@ -177,6 +178,6 @@ func TestStorage_TestConnection(t *testing.T) {
 	require.NoError(t, err)
 	s := result.Storage
 
-	err = s.TestConnection(t.Context())
+	err = s.TestConnection(context.Background())
 	require.NoError(t, err)
 }

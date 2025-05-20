@@ -163,7 +163,7 @@ func TestEventBus(t *testing.T) {
 		handler := &MockEventHandler{}
 		bus.Subscribe(handler)
 		article := &models.Article{Title: "Test Article"}
-		bus.PublishArticle(t.Context(), article)
+		bus.PublishArticle(context.Background(), article)
 		require.Eventually(t, func() bool {
 			return handler.article != nil
 		}, time.Second, time.Millisecond*100)
@@ -175,7 +175,7 @@ func TestEventBus(t *testing.T) {
 		handler := &MockEventHandler{}
 		bus.Subscribe(handler)
 		err := errors.New("test error")
-		bus.PublishError(t.Context(), err)
+		bus.PublishError(context.Background(), err)
 		require.Eventually(t, func() bool {
 			return handler.err != nil
 		}, time.Second, time.Millisecond*100)
@@ -186,7 +186,7 @@ func TestEventBus(t *testing.T) {
 		t.Parallel()
 		handler := &MockEventHandler{}
 		bus.Subscribe(handler)
-		bus.PublishStart(t.Context())
+		bus.PublishStart(context.Background())
 		require.Eventually(t, func() bool {
 			return handler.started
 		}, time.Second, time.Millisecond*100)
@@ -196,7 +196,7 @@ func TestEventBus(t *testing.T) {
 		t.Parallel()
 		handler := &MockEventHandler{}
 		bus.Subscribe(handler)
-		bus.PublishStop(t.Context())
+		bus.PublishStop(context.Background())
 		require.Eventually(t, func() bool {
 			return handler.stopped
 		}, time.Second, time.Millisecond*100)
