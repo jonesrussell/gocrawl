@@ -31,7 +31,7 @@ func TestBus_Subscribe(t *testing.T) {
 		return nil
 	})
 
-	err := bus.Publish(t.Context(), content)
+	err := bus.Publish(context.Background(), content)
 	require.NoError(t, err)
 
 	select {
@@ -67,7 +67,7 @@ func TestBus_Publish(t *testing.T) {
 		return nil
 	})
 
-	err := bus.Publish(t.Context(), content)
+	err := bus.Publish(context.Background(), content)
 	require.NoError(t, err)
 
 	select {
@@ -98,7 +98,7 @@ func TestBus_Publish_Error(t *testing.T) {
 		return testErr
 	})
 
-	err := bus.Publish(t.Context(), content)
+	err := bus.Publish(context.Background(), content)
 	require.Error(t, err)
 	require.Equal(t, testErr, err)
 }
@@ -125,7 +125,7 @@ func TestBus_Publish_MultipleHandlers(t *testing.T) {
 		return nil
 	})
 
-	err := bus.Publish(t.Context(), content)
+	err := bus.Publish(context.Background(), content)
 	require.NoError(t, err)
 
 	select {
@@ -163,7 +163,7 @@ func TestBus_Publish_Concurrent(t *testing.T) {
 			URL:  "http://test.com",
 			Type: events.TypeArticle,
 		}
-		err := bus.Publish(t.Context(), content)
+		err := bus.Publish(context.Background(), content)
 		require.NoError(t, err)
 	}
 
@@ -194,7 +194,7 @@ func TestBus_Publish_ContextCancellation(t *testing.T) {
 		return ctx.Err()
 	})
 
-	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
 	err := bus.Publish(ctx, content)

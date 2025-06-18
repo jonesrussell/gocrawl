@@ -35,5 +35,8 @@ alwaysApply: false
 - Use meaningful assertion messages.
 - Test error conditions explicitly.
 - Use test coverage tools appropriately.
+- Ensure test code is compatible with the project's minimum Go version.
+- Use context.Background() instead of t.Context() for Go versions < 1.24.
+- Document any version-specific test requirements.
 
 See [testing guidelines](mdc:testing.mdc) for more details.
