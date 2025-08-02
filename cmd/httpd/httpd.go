@@ -151,7 +151,7 @@ You can send POST requests to /search with a JSON body containing the search par
 				func() logger.Interface { return log },
 				func() config.Interface {
 					cfgValue := cmd.Context().Value(cmdcommon.ConfigKey)
-					if cfg, ok := cfgValue.(config.Interface); ok {
+					if cfg, isConfig := cfgValue.(config.Interface); isConfig {
 						return cfg
 					}
 					return nil

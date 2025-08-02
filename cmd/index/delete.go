@@ -11,16 +11,11 @@ import (
 	"os"
 	"strings"
 
-	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/mattn/go-isatty"
-	"github.com/spf13/cobra"
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 )
 
 var (
@@ -32,6 +27,14 @@ const (
 	// defaultIndicesCapacity is the initial capacity for the index slice
 	defaultIndicesCapacity = 2
 )
+
+// DeleteParams holds the parameters for the delete command
+type DeleteParams struct {
+	ConfigPath string
+	SourceName string
+	Force      bool
+	Indices    []string
+}
 
 // Deleter implements the index delete command
 type Deleter struct {
@@ -230,118 +233,4 @@ func (d *Deleter) reportMissingIndices(missingIndices []string) {
 			fmt.Fprintf(os.Stdout, "  - %s\n", index)
 		}
 	}
-}
-
-// DeleteParams holds the parameters for the delete command
-type DeleteParams struct {
-	ConfigPath string
-	SourceName string
-	Force      bool
-	Indices    []string
-}
-
-// NewDeleteCommand creates a new delete command
-func NewDeleteCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "delete [index-name...]",
-		Short: "Delete one or more Elasticsearch index",
-		Long: `Delete one or more Elasticsearch index.
-This command allows you to delete one or more index from the Elasticsearch cluster.
-You can specify index by name or by source name.`,
-		Args: cobra.ArbitraryArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get logger from context
-			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
-			log, ok := loggerValue.(logger.Interface)
-			if !ok {
-				return errors.New("logger not found in context or invalid type")
-			}
-
-			// Get config from context
-			cfgValue := cmd.Context().Value(cmdcommon.ConfigKey)
-			cfg, ok := cfgValue.(config.Interface)
-			if !ok {
-				return errors.New("config not found in context or invalid type")
-			}
-
-			// Get flags
-			sourceName, _ := cmd.Flags().GetString("source")
-			force, _ := cmd.Flags().GetBool("force")
-
-			// Validate args
-			if err := ValidateDeleteArgs(sourceName, args); err != nil {
-				return err
-			}
-
-			// Create Fx application
-			app := fx.New(
-				// Include all required modules
-				Module,
-				storage.Module,
-				sources.Module,
-
-				// Provide existing config
-				fx.Provide(func() config.Interface { return cfg }),
-
-				// Provide existing logger
-				fx.Provide(func() logger.Interface { return log }),
-
-				// Provide delete params
-				fx.Provide(func() DeleteParams {
-					return DeleteParams{
-						SourceName: sourceName,
-						Force:      force,
-						Indices:    args,
-					}
-				}),
-
-				// Use custom Fx logger
-				fx.WithLogger(func() fxevent.Logger {
-					return logger.NewFxLogger(log)
-				}),
-
-				// Invoke delete command
-				fx.Invoke(func(d *Deleter) error {
-					if err := d.Start(cmd.Context()); err != nil {
-						if errors.Is(err, ErrDeletionCancelled) {
-							cmd.Println("Deletion cancelled")
-							return nil
-						}
-						return err
-					}
-					cmd.Println("Operation completed successfully")
-					return nil
-				}),
-			)
-
-			// Start application
-			if err := app.Start(context.Background()); err != nil {
-				return fmt.Errorf("failed to start application: %w", err)
-			}
-
-			// Stop application
-			if err := app.Stop(context.Background()); err != nil {
-				return fmt.Errorf("failed to stop application: %w", err)
-			}
-
-			return nil
-		},
-	}
-
-	// Add flags
-	cmd.Flags().StringP("source", "s", "", "Delete index for the specified source")
-	cmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
-
-	return cmd
-}
-
-// ValidateDeleteArgs validates the arguments for the delete command.
-func ValidateDeleteArgs(sourceName string, args []string) error {
-	if sourceName == "" && len(args) == 0 {
-		return errors.New("either index or a source name must be specified")
-	}
-	if sourceName != "" && len(args) > 0 {
-		return errors.New("cannot specify both index and a source name")
-	}
-	return nil
 }

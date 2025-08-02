@@ -4,11 +4,8 @@ package articles
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
-	"time"
 
-	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -30,42 +27,32 @@ type ArticleProcessor struct {
 }
 
 // NewProcessor creates a new article processor.
-func NewProcessor(p ProcessorParams) *ArticleProcessor {
+func NewProcessor(
+	logger logger.Interface,
+	service Interface,
+	validator content.JobValidator,
+	storage types.Interface,
+	indexName string,
+	articleChannel chan *models.Article,
+	articleIndexer processor.Processor,
+	pageIndexer processor.Processor,
+) *ArticleProcessor {
 	return &ArticleProcessor{
-		logger:         p.Logger,
-		service:        p.Service,
-		validator:      p.Validator,
-		storage:        p.Storage,
-		indexName:      p.IndexName,
-		articleChannel: p.ArticleChannel,
-		articleIndexer: p.ArticleIndexer,
-		pageIndexer:    p.PageIndexer,
+		logger:         logger,
+		service:        service,
+		validator:      validator,
+		storage:        storage,
+		indexName:      indexName,
+		articleChannel: articleChannel,
+		articleIndexer: articleIndexer,
+		pageIndexer:    pageIndexer,
 	}
 }
 
 // Process implements the common.Processor interface.
 func (p *ArticleProcessor) Process(ctx context.Context, content any) error {
-	e, ok := content.(*colly.HTMLElement)
-	if !ok {
-		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
-	}
-
-	// Process the article
-	if err := p.service.Process(e); err != nil {
-		return fmt.Errorf("failed to process article: %w", err)
-	}
-
-	// Send the processed article to the channel
-	if p.articleChannel != nil {
-		article := &models.Article{
-			Source:    e.Request.URL.String(),
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		}
-		p.articleChannel <- article
-	}
-
-	return nil
+	// TODO: Implement article processing
+	return errors.New("not implemented")
 }
 
 // ContentType implements the common.Processor interface.
@@ -103,7 +90,7 @@ func (p *ArticleProcessor) ValidateJob(job *content.Job) error {
 	}
 	for _, item := range job.Items {
 		if item.Type != content.Article {
-			return fmt.Errorf("invalid item type: expected %s, got %s", content.Article, item.Type)
+			return errors.New("invalid item type: expected article")
 		}
 	}
 	return nil
@@ -119,7 +106,7 @@ func (p *ArticleProcessor) GetProcessor(contentType contenttype.Type) (content.C
 	if contentType == contenttype.Article {
 		return &articleContentProcessor{p}, nil
 	}
-	return nil, fmt.Errorf("unsupported content type: %s", contentType)
+	return nil, errors.New("unsupported content type")
 }
 
 // articleContentProcessor wraps ArticleProcessor to implement content.ContentProcessor
@@ -172,4 +159,27 @@ func (p *ArticleProcessor) ProcessContent(ctx context.Context, contentType conte
 		return err
 	}
 	return processor.Process(ctx, content)
+}
+
+// Get retrieves an article by its ID
+func (p *ArticleProcessor) Get(ctx context.Context, id string) (*models.Article, error) {
+	// TODO: Implement article retrieval
+	return nil, errors.New("not implemented")
+}
+
+// GetByURL retrieves an article by its URL
+func (p *ArticleProcessor) GetByURL(ctx context.Context, url string) (string, error) {
+	// TODO: Implement article retrieval by URL
+	return "", errors.New("not implemented")
+}
+
+// Validate validates a job
+func (p *ArticleProcessor) Validate(job *content.Job) error {
+	if job == nil {
+		return errors.New("job cannot be nil")
+	}
+	if len(job.Items) == 0 {
+		return errors.New("job must have at least one item")
+	}
+	return nil
 }

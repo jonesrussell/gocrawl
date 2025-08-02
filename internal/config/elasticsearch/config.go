@@ -143,10 +143,11 @@ func (c *Config) validateRequiredFields() error {
 		}
 	}
 
-	if c.APIKey == "" {
+	// Allow either API key or username/password authentication
+	if c.APIKey == "" && (c.Username == "" || c.Password == "") {
 		return &ConfigError{
 			Code:    ErrCodeMissingAPIKey,
-			Message: "API key is required",
+			Message: "either API key or username/password is required",
 		}
 	}
 

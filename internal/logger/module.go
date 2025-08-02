@@ -7,18 +7,27 @@ import (
 	"go.uber.org/zap"
 )
 
-// Params holds the parameters for creating a new logger.
-type Params struct {
-	Config *Config
-	App    *app.Config
-}
-
 // Module provides the logger module.
 var Module = fx.Module("logger",
-	fx.Provide(func(logger Interface) *zap.Logger {
-		if l, ok := logger.(*Logger); ok {
-			return l.zapLogger
-		}
-		return zap.NewNop()
-	}),
+	fx.Provide(
+		// Provide the logger interface
+		func(cfg *app.Config) (Interface, error) {
+			// Create logger config with sensible defaults
+			logConfig := &Config{
+				Level:       InfoLevel, // Default to info level
+				Development: cfg.Environment != "production",
+				Encoding:    "console",
+				EnableColor: true,
+				OutputPaths: []string{"stdout"},
+			}
+			return New(logConfig)
+		},
+		// Provide the underlying zap logger for components that need it directly
+		func(logger Interface) *zap.Logger {
+			if l, ok := logger.(*Logger); ok {
+				return l.zapLogger
+			}
+			return zap.NewNop()
+		},
+	),
 )

@@ -32,21 +32,6 @@ type Storage struct {
 	indexManager types.IndexManager
 }
 
-// NewStorage creates a new storage instance
-func NewStorage(client *es.Client, logger logger.Interface, opts *Options) types.Interface {
-	if opts == nil {
-		defaultOpts := DefaultOptions()
-		opts = &defaultOpts
-	}
-	s := &Storage{
-		client: client,
-		logger: logger,
-		opts:   *opts,
-	}
-	s.indexManager = NewElasticsearchIndexManager(client, logger)
-	return s
-}
-
 // Ensure Storage implements types.Interface
 var _ types.Interface = (*Storage)(nil)
 

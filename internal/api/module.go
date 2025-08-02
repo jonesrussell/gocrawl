@@ -1,4 +1,4 @@
-// Package api implements the HTTP API for the search service.
+// Package api provides the API layer for the application.
 package api
 
 import (
@@ -7,7 +7,7 @@ import (
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"go.uber.org/fx"
 )
 
@@ -35,31 +35,99 @@ type SearchResponse struct {
 	Total   int   `json:"total"`
 }
 
-// Module provides the API dependencies.
-var Module = fx.Module("api",
-	fx.Provide(
-		NewLifecycle,
-		NewServer,
-	),
-)
-
-// Params holds the dependencies required for the API.
-type Params struct {
-	fx.In
-	Context      context.Context `name:"apiContext"`
-	Config       config.Interface
-	Logger       logger.Interface
-	Storage      storagetypes.Interface
-	IndexManager storagetypes.IndexManager
+// searchManager implements the Search interface
+type searchManager struct {
+	storage types.Interface
+	logger  logger.Interface
 }
 
-// NewAPI creates a new API instance.
-func NewAPI(p Params) *Server {
-	return &Server{
-		Context:      p.Context,
+func (m *searchManager) Search(ctx context.Context, query string) ([]any, error) {
+	return m.storage.Search(ctx, "articles", map[string]any{"query": query})
+}
+
+// documentManager implements the DocumentManager interface
+type documentManager struct {
+	storage types.Interface
+	logger  logger.Interface
+}
+
+// Index indexes a document
+func (m *documentManager) Index(ctx context.Context, index, id string, doc any) error {
+	return m.storage.IndexDocument(ctx, index, id, doc)
+}
+
+// Update updates a document
+func (m *documentManager) Update(ctx context.Context, index, id string, doc any) error {
+	return m.storage.IndexDocument(ctx, index, id, doc)
+}
+
+// Delete deletes a document
+func (m *documentManager) Delete(ctx context.Context, index, id string) error {
+	return m.storage.DeleteDocument(ctx, index, id)
+}
+
+// Get gets a document
+func (m *documentManager) Get(ctx context.Context, index, id string) (any, error) {
+	var doc any
+	err := m.storage.GetDocument(ctx, index, id, &doc)
+	return doc, err
+}
+
+// ProvideAPI creates all API components
+func ProvideAPI(p struct {
+	fx.In
+
+	Config       config.Interface
+	Logger       logger.Interface
+	Storage      types.Interface
+	IndexManager types.IndexManager
+}) (struct {
+	fx.Out
+
+	Search          Search
+	IndexManager    IndexManager
+	DocumentManager DocumentManager
+	Server          *Server
+}, error) {
+	// Create search manager
+	search := &searchManager{
+		storage: p.Storage,
+		logger:  p.Logger,
+	}
+
+	// Create document manager
+	docManager := &documentManager{
+		storage: p.Storage,
+		logger:  p.Logger,
+	}
+
+	// Create server
+	server := &Server{
+		Context:      context.Background(),
 		Config:       p.Config,
 		Logger:       p.Logger,
 		Storage:      p.Storage,
 		IndexManager: p.IndexManager,
 	}
+
+	return struct {
+		fx.Out
+
+		Search          Search
+		IndexManager    IndexManager
+		DocumentManager DocumentManager
+		Server          *Server
+	}{
+		Search:          search,
+		IndexManager:    p.IndexManager,
+		DocumentManager: docManager,
+		Server:          server,
+	}, nil
 }
+
+// Module provides the API module for dependency injection.
+var Module = fx.Module("api",
+	fx.Provide(
+		ProvideAPI,
+	),
+)
