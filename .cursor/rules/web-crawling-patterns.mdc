@@ -1,0 +1,41 @@
+# Web Crawling Patterns
+
+## Crawler Architecture
+- Use Colly framework for web scraping
+- Implement proper rate limiting and politeness
+- Handle robots.txt and respect website policies
+- Use appropriate user agents and headers
+
+## Content Extraction
+- Extract structured data when possible
+- Handle different content types (HTML, JSON, XML)
+- Implement content cleaning and normalization
+- Store raw content alongside processed content
+
+## Error Handling
+- Handle network timeouts gracefully
+- Implement retry logic with exponential backoff
+- Log crawling errors for debugging
+- Continue crawling even if individual pages fail
+
+## Storage
+- Use Elasticsearch for content indexing
+- Implement proper document mapping
+- Handle bulk operations efficiently
+- Use appropriate analyzers for search
+
+## Configuration
+- Support multiple source configurations
+- Allow custom crawling rules per source
+- Implement scheduling for automated crawling
+- Support incremental crawling
+
+## Monitoring
+- Track crawling metrics and performance
+- Monitor storage usage and indexing speed
+- Log crawling statistics and progress
+- Implement health checks for crawler services
+description:
+globs:
+alwaysApply: true
+---

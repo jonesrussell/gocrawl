@@ -1,0 +1,41 @@
+# API Development Patterns
+
+## HTTP Framework
+- Use Gin framework for REST API endpoints
+- Follow RESTful design principles
+- Implement proper HTTP status codes
+- Use middleware for cross-cutting concerns
+
+## Request/Response Handling
+- Validate input data using struct tags
+- Return consistent JSON response formats
+- Handle errors gracefully with proper HTTP status codes
+- Implement request logging and monitoring
+
+## Authentication & Security
+- Implement proper authentication mechanisms
+- Use HTTPS in production
+- Validate and sanitize all inputs
+- Implement rate limiting for API endpoints
+
+## Error Handling
+- Return structured error responses
+- Log errors with appropriate context
+- Use consistent error message formats
+- Implement proper error codes
+
+## Documentation
+- Document API endpoints with comments
+- Use OpenAPI/Swagger when possible
+- Provide example requests and responses
+- Keep API documentation up to date
+
+## Testing
+- Write integration tests for API endpoints
+- Mock external dependencies
+- Test error scenarios and edge cases
+- Use test utilities for common operations
+description:
+globs:
+alwaysApply: true
+---

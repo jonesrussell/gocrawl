@@ -1,0 +1,48 @@
+# GoCrawl Project Structure
+
+This is a Go web crawler and search engine project with the following architecture:
+
+## Main Entry Points
+- [main.go](mdc:main.go) - Application entry point that executes the root command
+- [cmd/root.go](mdc:cmd/root.go) - Root command structure using Cobra CLI framework
+
+## Command Structure (cmd/)
+- `crawl/` - Web crawling functionality
+- `httpd/` - HTTP server and API endpoints
+- `index/` - Content indexing operations
+- `scheduler/` - Job scheduling for automated crawling
+- `search/` - Search functionality
+- `sources/` - Source management
+- `common/` - Shared command utilities
+
+## Core Components (internal/)
+- `crawler/` - Web crawling engine using Colly
+- `storage/` - Elasticsearch storage layer
+- `sources/` - Source configuration and management
+- `processor/` - Content processing and extraction
+- `content/` - Content handling and models
+- `api/` - REST API implementation using Gin
+- `config/` - Configuration management using Viper
+- `logger/` - Logging using Zap
+- `metrics/` - Application metrics and monitoring
+- `job/` - Job management and scheduling
+- `types/` - Common type definitions
+- `models/` - Data models and structures
+
+## Configuration
+- [config.example.yaml](mdc:config.example.yaml) - Main configuration template
+- [sources.example.yml](mdc:sources.example.yml) - Source configuration template
+- [.env.example](mdc:.env.example) - Environment variables template
+
+## Dependencies
+- Web crawling: `github.com/gocolly/colly/v2`
+- HTTP framework: `github.com/gin-gonic/gin`
+- Search engine: `github.com/elastic/go-elasticsearch/v8`
+- CLI framework: `github.com/spf13/cobra`
+- Configuration: `github.com/spf13/viper`
+- Logging: `go.uber.org/zap`
+- Dependency injection: `go.uber.org/fx`
+description:
+globs:
+alwaysApply: true
+---

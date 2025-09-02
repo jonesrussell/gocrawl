@@ -1,0 +1,41 @@
+# Development Workflow
+
+## Getting Started
+1. Ensure Go 1.23+ is installed
+2. Clone and navigate to project directory
+3. Run `go mod download` to install dependencies
+4. Copy configuration examples and customize
+
+## Common Commands
+- `go build -o bin/gocrawl` - Build the application
+- `go test ./...` - Run all tests
+- `go mod tidy` - Clean up dependencies
+- `task lint` - Run linter (golangci-lint)
+
+## Configuration
+- Copy `config.example.yaml` to `config.yaml`
+- Copy `sources.example.yml` to `sources.yml`
+- Set up Elasticsearch connection details
+- Configure logging and monitoring settings
+
+## Testing
+- Write unit tests for new functionality
+- Use `testify` for assertions and mocking
+- Run integration tests before committing
+- Ensure test coverage for critical paths
+
+## Code Quality
+- Run `go fmt` before committing
+- Use `golangci-lint` for static analysis
+- Follow Go coding standards
+- Write clear commit messages
+
+## Deployment
+- Build for target platform
+- Configure production settings
+- Set up monitoring and logging
+- Test in staging environment first
+description:
+globs:
+alwaysApply: true
+---

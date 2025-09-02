@@ -1,0 +1,47 @@
+# Go Coding Standards
+
+## Code Style
+- Follow Go standard formatting (use `go fmt` or `gofmt`)
+- Use meaningful variable and function names
+- Keep functions focused and single-purpose
+- Use proper Go idioms and patterns
+
+## Error Handling
+- Always check and handle errors explicitly
+- Use `if err != nil` pattern consistently
+- Return errors up the call stack when appropriate
+- Use `fmt.Errorf` with context for error wrapping
+
+## Package Organization
+- Keep packages focused and cohesive
+- Use `internal/` for private packages
+- Follow Go module conventions
+- Use meaningful package names
+
+## Testing
+- Write tests for all public functions
+- Use `testify` for assertions and mocking
+- Follow Go testing conventions
+- Use table-driven tests when appropriate
+
+## Logging
+- Use structured logging with Zap
+- Include relevant context in log messages
+- Use appropriate log levels (debug, info, warn, error)
+- Avoid logging sensitive information
+
+## Configuration
+- Use Viper for configuration management
+- Support environment variables and config files
+- Validate configuration on startup
+- Use sensible defaults
+
+## Dependencies
+- Use Go modules for dependency management
+- Keep dependencies up to date
+- Avoid unnecessary external dependencies
+- Use `go mod tidy` to clean up dependencies
+description:
+globs:
+alwaysApply: true
+---

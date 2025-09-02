@@ -1,0 +1,41 @@
+# Elasticsearch Integration
+
+## Client Usage
+- Use official Go Elasticsearch client (`go-elasticsearch/v8`)
+- Implement proper connection pooling
+- Handle connection failures gracefully
+- Use context for request timeouts
+
+## Index Management
+- Create indices with proper mappings
+- Use index aliases for zero-downtime updates
+- Implement index lifecycle management
+- Handle index versioning properly
+
+## Document Operations
+- Use bulk operations for multiple documents
+- Implement proper error handling for failed operations
+- Use appropriate refresh settings
+- Handle document conflicts gracefully
+
+## Search Implementation
+- Use query DSL for complex searches
+- Implement proper pagination
+- Use aggregations for analytics
+- Optimize search performance
+
+## Data Modeling
+- Design mappings for efficient searching
+- Use appropriate field types
+- Implement proper analyzers
+- Consider search requirements when modeling
+
+## Monitoring & Maintenance
+- Monitor cluster health and performance
+- Implement proper logging for operations
+- Handle index maintenance tasks
+- Monitor storage usage and growth
+description:
+globs:
+alwaysApply: true
+---
