@@ -3,16 +3,14 @@ package sources
 
 import (
 	"github.com/jonesrussell/gocrawl/cmd/common"
-	intsources "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
 // Module provides the sources module for dependency injection.
-var Module = fx.Module("sources",
+var Module = fx.Module("cmd_sources",
 	// Include required modules
 	common.Module,
-	intsources.Module,
 
 	// Provide the command registrar
 	fx.Provide(

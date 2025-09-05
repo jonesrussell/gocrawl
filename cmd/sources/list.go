@@ -12,8 +12,9 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	crawlercfg "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
+	internalsources "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -62,14 +63,14 @@ func (r *TableRenderer) RenderTable(sources []*sourceutils.SourceConfig) error {
 
 // Lister handles listing sources
 type Lister struct {
-	sourceManager sources.Interface
+	sourceManager internalsources.Interface
 	logger        logger.Interface
 	renderer      *TableRenderer
 }
 
 // NewLister creates a new Lister instance
 func NewLister(
-	sourceManager sources.Interface,
+	sourceManager internalsources.Interface,
 	logger logger.Interface,
 	renderer *TableRenderer,
 ) *Lister {
@@ -119,10 +120,32 @@ func NewListCommand() *cobra.Command {
 				return errors.New("config not found in context")
 			}
 
+			// Ensure crawler config exists to avoid nil dereference in sources loader
+			if cfg.GetCrawlerConfig() == nil {
+				if concrete, ok := cfg.(*config.Config); ok {
+					concrete.Crawler = crawlercfg.New()
+				}
+			}
+
+			// If the configured source file does not exist, fall back to sources.example.yml
+			if concrete, ok := cfg.(*config.Config); ok {
+				path := concrete.GetCrawlerConfig().SourceFile
+				if path == "" {
+					path = "sources.yml"
+				}
+				if _, statErr := os.Stat(path); statErr != nil {
+					alt := "./sources.example.yml"
+					if _, altErr := os.Stat(alt); altErr == nil {
+						concrete.Crawler.SourceFile = alt
+					}
+				}
+			}
+
 			// Create Fx app with the module
 			fxApp := fx.New(
 				// Include required modules
 				Module,
+				internalsources.Module,
 
 				// Provide existing config
 				fx.Provide(func() config.Interface { return cfg }),
