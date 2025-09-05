@@ -1,0 +1,20 @@
+version: '3'
+
+tasks:
+  sources:list:
+    desc: "List all sources"
+    cmds:
+      - go run main.go sources list
+    ignore_error: true
+
+  sources:add:
+    desc: Add a new source
+    cmds:
+      - go run main.go sources add
+
+  sources:remove:
+    desc: Remove a source
+    cmds:
+      - go run main.go sources remove
+
+

@@ -1,0 +1,33 @@
+version: '3'
+
+tasks:
+  index:create:
+    desc: "Create an Elasticsearch index"
+    cmds:
+      - go run main.go index create {{.CLI_ARGS}}
+    ignore_error: true
+    interactive: true
+
+  index:list:
+    desc: "List all Elasticsearch index"
+    cmds:
+      - go run main.go index list
+    ignore_error: true
+
+  index:delete:
+    desc: "Delete one or more Elasticsearch index"
+    cmds:
+      - go run main.go index delete {{.CLI_ARGS}}
+    ignore_error: true
+    interactive: true
+
+  index:delete:source:
+    desc: "Delete index for a specific source"
+    cmds:
+      - go run main.go index delete --source "{{.SOURCE}}" --force
+    ignore_error: true
+    interactive: false
+    vars:
+      SOURCE: '{{.SOURCE}}'
+
+

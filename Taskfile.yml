@@ -10,7 +10,15 @@ output:
     warning: "⚠️"
     error: "❌"
 
+includes:
+  index: ./tasks/index.yml
+  sources: ./tasks/sources.yml
+
 tasks:
+  default:
+    desc: "Show help and list common tasks"
+    cmds:
+      - build
   api:
     desc: "Run the HTTP API server"
     cmds:
@@ -44,34 +52,7 @@ tasks:
     cmds:
       - go run main.go --help
 
-  index:create:
-    desc: "Create an Elasticsearch index"
-    cmds:
-      - go run main.go index create {{.CLI_ARGS}}
-    ignore_error: true
-    interactive: true
-
-  index:list:
-    desc: "List all Elasticsearch index"
-    cmds:
-      - go run main.go index list
-    ignore_error: true
-
-  index:delete:
-    desc: "Delete one or more Elasticsearch index"
-    cmds:
-      - go run main.go index delete {{.CLI_ARGS}}
-    ignore_error: true
-    interactive: true
-
-  index:delete:source:
-    desc: "Delete index for a specific source"
-    cmds:
-      - go run main.go index delete --source "{{.SOURCE}}" --force
-    ignore_error: true
-    interactive: false
-    vars:
-      SOURCE: '{{.SOURCE}}'
+  # index:* tasks moved to includes.index
 
   job:
     desc: "Run the job scheduler for automated crawling based on sources.yml schedules"
@@ -94,11 +75,7 @@ tasks:
     ignore_error: true
     interactive: true
 
-  sources:list:
-    desc: "List all sources"
-    cmds:
-      - go run main.go sources list
-    ignore_error: true
+  # sources:list moved to includes.sources
 
   test:
     desc: "Run the tests"
@@ -127,12 +104,6 @@ tasks:
       - rm -rf bin/
       - rm -rf testutils/mocks/
 
-  sources:add:
-    desc: Add a new source
-    cmds:
-      - go run main.go sources add
+  # sources:add moved to includes.sources
 
-  sources:remove:
-    desc: Remove a source
-    cmds:
-      - go run main.go sources remove
+  # sources:remove moved to includes.sources
