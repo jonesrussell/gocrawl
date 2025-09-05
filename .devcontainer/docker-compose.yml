@@ -26,9 +26,8 @@ services:
       - "../.env"
     environment:
       - discovery.type=single-node
-      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
-    ports:
-      - "9200:9200"
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}
+    # Expose via devcontainer forwardPorts instead of binding host ports
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
     deploy:
@@ -40,9 +39,8 @@ services:
     image: docker.elastic.co/kibana/kibana:8.17.1  # Set image version
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200  # Connect to Elasticsearch
-      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}  # Use the same password as Elasticsearch
-    ports:
-      - "5601:5601"  # Expose Kibana on port 5601
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}  # Use the same password as Elasticsearch
+    # Expose via devcontainer forwardPorts instead of binding host ports
 
 volumes:
   elasticsearch-data:

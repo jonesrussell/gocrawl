@@ -44,7 +44,6 @@ type IndexParams struct {
 // Module provides the index module for dependency injection.
 var Module = fx.Module("index",
 	common.Module,
-	storage.Module,
 	sources.Module,
 	fx.Provide(
 		NewTableRenderer,
@@ -110,6 +109,8 @@ func runListCmd(cmd *cobra.Command, args []string) error {
 
 	app := fx.New(
 		Module,
+		storage.ClientModule,
+		storage.Module,
 		fx.Provide(
 			func() config.Interface { return cfg },
 			func() logger.Interface { return log },
@@ -132,6 +133,8 @@ func runCreateCmd(cmd *cobra.Command, args []string) error {
 
 	app := fx.New(
 		Module,
+		storage.ClientModule,
+		storage.Module,
 		fx.Provide(
 			func() config.Interface { return cfg },
 			func() logger.Interface { return log },
@@ -155,6 +158,8 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 
 	app := fx.New(
 		Module,
+		storage.ClientModule,
+		storage.Module,
 		fx.Provide(
 			func() config.Interface { return cfg },
 			func() logger.Interface { return log },

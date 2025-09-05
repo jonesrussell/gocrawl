@@ -3,6 +3,7 @@ package sources
 
 import (
 	"github.com/jonesrussell/gocrawl/cmd/common"
+	intsources "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -11,9 +12,12 @@ import (
 var Module = fx.Module("sources",
 	// Include required modules
 	common.Module,
+	intsources.Module,
 
 	// Provide the command registrar
 	fx.Provide(
+		NewTableRenderer,
+		NewLister,
 		fx.Annotated{
 			Group: "commands",
 			Target: func(

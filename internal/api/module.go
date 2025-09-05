@@ -85,7 +85,6 @@ func ProvideAPI(p struct {
 	fx.Out
 
 	Search          Search
-	IndexManager    IndexManager
 	DocumentManager DocumentManager
 	Server          *Server
 }, error) {
@@ -114,12 +113,10 @@ func ProvideAPI(p struct {
 		fx.Out
 
 		Search          Search
-		IndexManager    IndexManager
 		DocumentManager DocumentManager
 		Server          *Server
 	}{
 		Search:          search,
-		IndexManager:    p.IndexManager,
 		DocumentManager: docManager,
 		Server:          server,
 	}, nil

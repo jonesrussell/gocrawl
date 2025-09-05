@@ -17,6 +17,7 @@ import (
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/index"
 	"github.com/jonesrussell/gocrawl/cmd/search"
+	cmdsources "github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -53,6 +54,7 @@ var Module = fx.Module("root",
 	storage.ClientModule,
 	storage.Module,
 	index.Module,
+	cmdsources.Module,
 	search.Module,
 	httpd.Module,
 	fx.WithLogger(logger.NewFxLogger),
@@ -129,6 +131,7 @@ func init() {
 
 	// Add subcommands
 	rootCmd.AddCommand(index.Command)
+	rootCmd.AddCommand(cmdsources.NewSourcesCommand())
 	rootCmd.AddCommand(search.Command())
 	rootCmd.AddCommand(httpd.Command())
 }
