@@ -1,34 +1,35 @@
-	// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-	// README at: https://github.com/devcontainers/templates/tree/main/src/go
-	{
-		"name": "GoCrawl Dev",
-		"dockerComposeFile": "docker-compose.yml",
-		"service": "app",
-		"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-		"customizations": {
-			"vscode": {
-				"extensions": [
-					"humao.rest-client",
-					"docker.docker",
-					"dbaeumer.vscode-eslint",
-					"golang.go",
-					"ms-edgedevtools.vscode-edge-devtools"
-				]
-			}
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/go
+{
+	"name": "GoCrawl Dev",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "app",
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"humao.rest-client",
+				"docker.docker",
+				"dbaeumer.vscode-eslint",
+				"golang.go",
+				"ms-edgedevtools.vscode-edge-devtools"
+			]
+		}
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+			"moby": true,
+			"installDockerBuildx": true,
+			"installDockerComposeSwitch": true,
+			"version": "latest",
+			"dockerDashComposeVersion": "v2"
 		},
-		"features": {
-			"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
-				"moby": true,
-				"installDockerBuildx": true,
-				"installDockerComposeSwitch": true,
-				"version": "latest",
-				"dockerDashComposeVersion": "v2"
-			},
-			"ghcr.io/devcontainers-extra/features/go-task:1": {
-				"version": "latest"
-			}
-		},
-		"mounts": [
-			"type=bind,source=/home/${localEnv:USER}/.ssh,target=/home/vscode/.ssh"
-		]
-	}
+		"ghcr.io/devcontainers-extra/features/go-task:1": {
+			"version": "latest"
+		}
+	},
+	"mounts": [
+		"type=bind,source=/home/${localEnv:USER}/.ssh,target=/home/vscode/.ssh"
+	],
+	"forwardPorts": [8080,9200,5601]
+}
