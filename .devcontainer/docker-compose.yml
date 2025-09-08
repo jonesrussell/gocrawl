@@ -21,7 +21,7 @@ services:
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.0.0
     env_file:
       - "../.env"
     environment:
@@ -37,11 +37,17 @@ services:
           memory: 1G
 
   kibana:  # New Kibana service
-    image: docker.elastic.co/kibana/kibana:8.17.1  # Set image version
+    image: docker.elastic.co/kibana/kibana:9.0.0  # Set image version
     env_file:
       - "../.env"
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200  # Connect to Elasticsearch over HTTP
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD:-changeme}
+      # Static encryption keys to avoid rotation on restart and across instances
+      - XPACK_SECURITY_ENCRYPTIONKEY=changeme_min_32_chars_static_key_for_sessions_1234
+      - XPACK_REPORTING_ENCRYPTIONKEY=changeme_min_32_chars_static_key_for_reporting_123
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=changeme_min_32_chars_static_key_for_saved_objs
       # Token is injected via env_file at runtime
     # Expose via devcontainer forwardPorts instead of binding host ports
 
