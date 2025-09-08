@@ -31,5 +31,6 @@
 	"mounts": [
 		"type=bind,source=/home/${localEnv:USER}/.ssh,target=/home/vscode/.ssh"
 	],
-	"forwardPorts": [8080,9200,5601]
+	"forwardPorts": [8080,9200,5601],
+	"updateRemoteUserUID": false
 }

@@ -4,6 +4,8 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
+      args:
+        VARIANT: 1-1.24-bookworm
     env_file:
         # Ensure that the variables in .env match the same variables in devcontainer.json
         - "../.env"
@@ -13,6 +15,11 @@ services:
       
     # Overrides default command so things don't shut down after the process ends.
     command: sleep infinity
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
 
     # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
     # network_mode: service:elasticsearch
@@ -28,6 +35,7 @@ services:
       - discovery.type=single-node
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-changeme}
       - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
     # Expose via devcontainer forwardPorts instead of binding host ports
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
@@ -35,6 +43,11 @@ services:
       resources:
         limits:
           memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs -u elastic:${ELASTIC_PASSWORD:-changeme} http://localhost:9200/_cluster/health?wait_for_status=yellow || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   kibana:  # New Kibana service
     image: docker.elastic.co/kibana/kibana:9.0.0  # Set image version
@@ -50,6 +63,14 @@ services:
       - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=changeme_min_32_chars_static_key_for_saved_objs
       # Token is injected via env_file at runtime
     # Expose via devcontainer forwardPorts instead of binding host ports
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:5601/api/status | grep -q 'available' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
 
 volumes:
   elasticsearch-data:
