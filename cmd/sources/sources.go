@@ -3,16 +3,12 @@ package sources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 )
 
 // SourcesCommand implements the sources command.
@@ -28,57 +24,24 @@ func NewSourcesCommand() *cobra.Command {
 		Short: "Manage content sources",
 		Long:  `Manage content sources for crawling`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get logger from context
-			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
-			log, ok := loggerValue.(logger.Interface)
-			if !ok {
-				return errors.New("logger not found in context or invalid type")
+			// Get dependencies from context using helper
+			log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("failed to get dependencies: %w", err)
 			}
 
-			// Get config from context
-			configValue := cmd.Context().Value(cmdcommon.ConfigKey)
-			cfg, ok := configValue.(config.Interface)
-			if !ok {
-				return errors.New("config not found in context or invalid type")
+			// Construct dependencies directly without FX
+			sourceManager, err := sources.LoadSources(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to load sources: %w", err)
 			}
 
-			// Create Fx application
-			app := fx.New(
-				// Include required modules
-				Module,
-
-				// Provide existing config
-				fx.Provide(func() config.Interface { return cfg }),
-
-				// Provide existing logger
-				fx.Provide(func() logger.Interface { return log }),
-
-				// Use custom Fx logger
-				fx.WithLogger(func() fxevent.Logger {
-					return logger.NewFxLogger(log)
-				}),
-
-				// Invoke sources command
-				fx.Invoke(func(sourceManager sources.Interface, logger logger.Interface) error {
-					sourcesCmd := &SourcesCommand{
-						sourceManager: sourceManager,
-						logger:        logger,
-					}
-					return sourcesCmd.Run(cmd.Context())
-				}),
-			)
-
-			// Start application
-			if err := app.Start(context.Background()); err != nil {
-				return err
+			sourcesCmd := &SourcesCommand{
+				sourceManager: sourceManager,
+				logger:        log,
 			}
 
-			// Stop application
-			if err := app.Stop(context.Background()); err != nil {
-				return err
-			}
-
-			return nil
+			return sourcesCmd.Run(cmd.Context())
 		},
 	}
 

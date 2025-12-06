@@ -21,7 +21,7 @@ const (
 
 // Default configuration values
 const (
-	DefaultAddresses     = "https://localhost:9200"
+	DefaultAddresses     = "http://elasticsearch:9200"
 	DefaultIndexName     = "gocrawl"
 	DefaultRetryEnabled  = true
 	DefaultInitialWait   = 1 * time.Second
@@ -383,8 +383,14 @@ func WithTLSInsecureSkipVerify(skip bool) Option {
 
 // LoadFromViper loads Elasticsearch configuration from Viper
 func LoadFromViper(v *viper.Viper) *Config {
+	addresses := v.GetStringSlice("elasticsearch.addresses")
+	// If addresses is empty, use default
+	if len(addresses) == 0 {
+		addresses = []string{DefaultAddresses}
+	}
+
 	cfg := &Config{
-		Addresses: v.GetStringSlice("elasticsearch.addresses"),
+		Addresses: addresses,
 		Username:  v.GetString("elasticsearch.username"),
 		Password:  v.GetString("elasticsearch.password"),
 		APIKey:    v.GetString("elasticsearch.api_key"),

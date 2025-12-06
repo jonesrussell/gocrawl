@@ -5,7 +5,6 @@ package sources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -17,8 +16,6 @@ import (
 	internalsources "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 )
 
 // TableRenderer handles the display of source data in a table format
@@ -106,18 +103,10 @@ func NewListCommand() *cobra.Command {
 		Short: "List all configured sources",
 		Long:  `List all content sources configured in the system.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get logger from context
-			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
-			log, ok := loggerValue.(logger.Interface)
-			if !ok {
-				return errors.New("logger not found in context")
-			}
-
-			// Get config from context
-			configValue := cmd.Context().Value(cmdcommon.ConfigKey)
-			cfg, ok := configValue.(config.Interface)
-			if !ok {
-				return errors.New("config not found in context")
+			// Get dependencies from context using helper
+			log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("failed to get dependencies: %w", err)
 			}
 
 			// Ensure crawler config exists to avoid nil dereference in sources loader
@@ -141,40 +130,17 @@ func NewListCommand() *cobra.Command {
 				}
 			}
 
-			// Create Fx app with the module
-			fxApp := fx.New(
-				// Include required modules
-				Module,
-				internalsources.Module,
-
-				// Provide existing config
-				fx.Provide(func() config.Interface { return cfg }),
-
-				// Provide existing logger
-				fx.Provide(func() logger.Interface { return log }),
-
-				// Use custom Fx logger
-				fx.WithLogger(func() fxevent.Logger {
-					return logger.NewFxLogger(log)
-				}),
-
-				// Invoke list command
-				fx.Invoke(func(l *Lister) error {
-					return l.Start(cmd.Context())
-				}),
-			)
-
-			// Start application
-			if err := fxApp.Start(cmd.Context()); err != nil {
-				return err
+			// Construct dependencies directly without FX
+			sourceManager, err := internalsources.LoadSources(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to load sources: %w", err)
 			}
 
-			// Stop application
-			if err := fxApp.Stop(cmd.Context()); err != nil {
-				return err
-			}
+			renderer := NewTableRenderer(log)
+			lister := NewLister(sourceManager, log, renderer)
 
-			return nil
+			// Execute the list command
+			return lister.Start(cmd.Context())
 		},
 	}
 

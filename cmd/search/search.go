@@ -3,20 +3,19 @@ package search
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
+	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jedib0t/go-pretty/v6/table"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 )
 
 // Constants for default values
@@ -31,14 +30,6 @@ const (
 
 	// DefaultTableWidth defines the maximum width for the content preview column
 	DefaultTableWidth = 160
-
-	// Table column configuration constants
-	columnNumberIndex       = 1
-	columnNumberURL         = 2
-	columnNumberContent     = 3
-	columnWidthIndex        = 4
-	columnWidthURLRatio     = 3 // URL column takes 1/3 of table width
-	columnWidthContentRatio = 3 // Content column takes 2/3 of table width
 )
 
 // Error constants
@@ -52,8 +43,6 @@ const (
 
 // Params holds the search operation parameters
 type Params struct {
-	fx.In
-
 	// Logger provides logging capabilities for the search operation
 	Logger logger.Interface
 	// Config holds the application configuration
@@ -61,11 +50,11 @@ type Params struct {
 	// SearchManager is the service responsible for executing searches
 	SearchManager api.SearchManager
 	// IndexName specifies which Elasticsearch index to search
-	IndexName string `name:"searchIndex"`
+	IndexName string
 	// Query contains the search query string
-	Query string `name:"searchQuery"`
+	Query string
 	// ResultSize determines how many results to return
-	ResultSize int `name:"searchSize"`
+	ResultSize int
 }
 
 // Result represents a search result
@@ -122,11 +111,10 @@ func Command() *cobra.Command {
 // - Application lifecycle management
 // - Search execution and result display
 func runSearch(cmd *cobra.Command, _ []string) error {
-	// Get logger from context
-	loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
-	log, ok := loggerValue.(logger.Interface)
-	if !ok {
-		return errors.New(ErrLoggerNotFound)
+	// Get dependencies from context using helper
+	log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to get dependencies: %w", err)
 	}
 
 	// Convert size string to int
@@ -136,54 +124,52 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("%s: %w", ErrInvalidSize, err)
 	}
 
-	// Create Fx app with the module
-	fxApp := fx.New(
-		searchModule,
-		fx.Provide(
-			func() logger.Interface { return log },
-			fx.Annotate(
-				func() string { return cmd.Flag("index").Value.String() },
-				fx.ResultTags(`name:"searchIndex"`),
-			),
-			fx.Annotate(
-				func() string { return cmd.Flag("query").Value.String() },
-				fx.ResultTags(`name:"searchQuery"`),
-			),
-			fx.Annotate(
-				func() int { return size },
-				fx.ResultTags(`name:"searchSize"`),
-			),
-		),
-		fx.Invoke(func(p Params) error {
-			return ExecuteSearch(cmd.Context(), p)
-		}),
-		fx.WithLogger(func() fxevent.Logger {
-			return logger.NewFxLogger(log)
-		}),
-	)
+	// Get command-line parameters
+	indexName := cmd.Flag("index").Value.String()
+	queryStr := cmd.Flag("query").Value.String()
 
-	// Start the application
-	log.Info("Starting search")
-	startErr := fxApp.Start(cmd.Context())
-	if startErr != nil {
-		log.Error("Failed to start application", "error", startErr)
-		return fmt.Errorf("%s: %w", ErrStartFailed, startErr)
+	// Construct dependencies directly without FX
+	storageClient, err := createStorageClientForSearch(cfg, log)
+	if err != nil {
+		return fmt.Errorf("failed to create storage client: %w", err)
 	}
 
-	// Wait for interrupt signal
-	log.Info("Waiting for interrupt signal")
-	<-cmd.Context().Done()
-
-	// Stop the application
-	log.Info("Stopping application")
-	stopErr := fxApp.Stop(cmd.Context())
-	if stopErr != nil {
-		log.Error("Failed to stop application", "error", stopErr)
-		return fmt.Errorf("%s: %w", ErrStopFailed, stopErr)
+	storageResult, err := storage.NewStorage(storage.StorageParams{
+		Config: cfg,
+		Logger: log,
+		Client: storageClient,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
 	}
 
-	log.Info("Application stopped successfully")
-	return nil
+	// Create search manager
+	searchManager := storage.NewSearchManager(storageResult.Storage, log)
+
+	// Create params and execute search directly
+	params := Params{
+		Logger:        log,
+		Config:        cfg,
+		SearchManager: searchManager,
+		IndexName:     indexName,
+		Query:         queryStr,
+		ResultSize:    size,
+	}
+
+	// Execute search
+	return ExecuteSearch(cmd.Context(), params)
+}
+
+// createStorageClientForSearch creates an Elasticsearch client for the search command
+func createStorageClientForSearch(cfg config.Interface, log logger.Interface) (*es.Client, error) {
+	clientResult, err := storage.NewClient(storage.ClientParams{
+		Config: cfg,
+		Logger: log,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return clientResult.Client, nil
 }
 
 // buildSearchQuery constructs the Elasticsearch query
@@ -240,9 +226,9 @@ func configureResultsTable() table.Writer {
 	t.Style().Options.SeparateRows = true
 
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Number: columnNumberIndex, WidthMax: columnWidthIndex},
-		{Number: columnNumberURL, WidthMax: DefaultTableWidth / columnWidthURLRatio},
-		{Number: columnNumberContent, WidthMax: DefaultTableWidth * 2 / columnWidthContentRatio},
+		{Number: 1, WidthMax: 4},                         // Index column (#)
+		{Number: 2, WidthMax: DefaultTableWidth / 3},     // URL column (1/3 of table width)
+		{Number: 3, WidthMax: DefaultTableWidth * 2 / 3}, // Content preview column (2/3 of table width)
 	})
 
 	t.AppendHeader(table.Row{"#", "URL", "Content Preview"})

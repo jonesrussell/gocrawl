@@ -6,20 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
+	es "github.com/elastic/go-elasticsearch/v8"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 )
 
 const (
@@ -27,26 +22,11 @@ const (
 	DefaultShutdownTimeout = 5 * time.Second
 )
 
-// Dependencies holds the HTTP server's dependencies
-type Dependencies struct {
-	fx.In
-
-	Lifecycle    fx.Lifecycle
-	Logger       logger.Interface
-	Config       config.Interface
-	Storage      storagetypes.Interface
-	IndexManager api.IndexManager
-	Context      context.Context
-	Sources      sources.Interface
-}
-
 // Params holds the parameters required for running the HTTP server.
 type Params struct {
-	fx.In
-	Server  *http.Server
-	Logger  logger.Interface
-	Storage storagetypes.Interface
-	Config  config.Interface
+	Server *http.Server
+	Logger logger.Interface
+	Config config.Interface
 }
 
 // Server implements the HTTP server
@@ -137,53 +117,65 @@ var Cmd = &cobra.Command{
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		// Get logger from context
-		loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
-		log, ok := loggerValue.(logger.Interface)
-		if !ok {
-			return errors.New("logger not found in context or invalid type")
+		// Get dependencies from context using helper
+		log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+		if err != nil {
+			return fmt.Errorf("failed to get dependencies: %w", err)
 		}
 
-		// Create Fx app with the module
-		fxApp := fx.New(
-			Module,
-			fx.Provide(
-				func() logger.Interface { return log },
-				func() config.Interface {
-					cfgValue := cmd.Context().Value(cmdcommon.ConfigKey)
-					if cfg, isConfig := cfgValue.(config.Interface); isConfig {
-						return cfg
-					}
-					return nil
-				},
-			),
-			fx.WithLogger(func() fxevent.Logger {
-				return logger.NewFxLogger(log)
-			}),
-		)
-
-		// Start the application
-		log.Info("Starting HTTP server")
-		startErr := fxApp.Start(cmd.Context())
-		if startErr != nil {
-			log.Error("Failed to start application", "error", startErr)
-			return fmt.Errorf("failed to start application: %w", startErr)
+		// Construct dependencies directly without FX
+		storageClient, err := createStorageClientForHttpd(cfg, log)
+		if err != nil {
+			return fmt.Errorf("failed to create storage client: %w", err)
 		}
 
-		// Wait for interrupt signal
-		log.Info("Waiting for interrupt signal")
-		<-cmd.Context().Done()
-
-		// Stop the application
-		log.Info("Stopping application")
-		stopErr := fxApp.Stop(cmd.Context())
-		if stopErr != nil {
-			log.Error("Failed to stop application", "error", stopErr)
-			return fmt.Errorf("failed to stop application: %w", stopErr)
+		storageResult, err := storage.NewStorage(storage.StorageParams{
+			Config: cfg,
+			Logger: log,
+			Client: storageClient,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create storage: %w", err)
 		}
 
-		log.Info("Application stopped successfully")
-		return nil
+		// Create search manager
+		searchManager := storage.NewSearchManager(storageResult.Storage, log)
+
+		// Create HTTP server
+		srv, _, err := api.StartHTTPServer(log, searchManager, cfg)
+		if err != nil {
+			return fmt.Errorf("failed to start HTTP server: %w", err)
+		}
+
+		// Start server in goroutine
+		log.Info("Starting HTTP server", "addr", cfg.GetServerConfig().Address)
+		errChan := make(chan error, 1)
+		go func() {
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				errChan <- err
+			}
+		}()
+
+		// Wait for interrupt signal or error
+		select {
+		case err := <-errChan:
+			log.Error("Server error", "error", err)
+			return fmt.Errorf("server error: %w", err)
+		case <-cmd.Context().Done():
+			// Graceful shutdown with timeout
+			log.Info("Shutdown signal received")
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), cmdcommon.DefaultShutdownTimeout)
+			defer cancel()
+
+			log.Info("Stopping HTTP server")
+			if shutdownErr := srv.Shutdown(shutdownCtx); shutdownErr != nil {
+				log.Error("Failed to stop server", "error", shutdownErr)
+				return fmt.Errorf("failed to stop server: %w", shutdownErr)
+			}
+
+			log.Info("Server stopped successfully")
+			return nil
+		}
 	},
 }
 
@@ -192,27 +184,14 @@ func Command() *cobra.Command {
 	return Cmd
 }
 
-// Run starts the HTTP server.
-func Run() error {
-	// Create a new Fx application
-	app := fx.New(
-		Module,
-	)
-
-	// Create a context that will be cancelled on interrupt
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Start the application
-	if err := app.Start(ctx); err != nil {
-		return err
+// createStorageClientForHttpd creates an Elasticsearch client for the httpd command
+func createStorageClientForHttpd(cfg config.Interface, log logger.Interface) (*es.Client, error) {
+	clientResult, err := storage.NewClient(storage.ClientParams{
+		Config: cfg,
+		Logger: log,
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	// Wait for interrupt signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
-
-	// Stop the application
-	return app.Stop(ctx)
+	return clientResult.Client, nil
 }

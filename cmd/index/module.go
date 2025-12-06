@@ -3,9 +3,9 @@ package index
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -107,20 +107,25 @@ func runListCmd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	app := fx.New(
-		Module,
-		storage.ClientModule,
-		storage.Module,
-		fx.Provide(
-			func() config.Interface { return cfg },
-			func() logger.Interface { return log },
-		),
-		fx.Invoke(func(lister *Lister) error {
-			return lister.Start(ctx)
-		}),
-	)
+	// Construct dependencies directly without FX
+	storageClient, err := createStorageClient(cfg, log)
+	if err != nil {
+		return fmt.Errorf("failed to create storage client: %w", err)
+	}
 
-	return runApp(ctx, app, log)
+	storageResult, err := storage.NewStorage(storage.StorageParams{
+		Config: cfg,
+		Logger: log,
+		Client: storageClient,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	renderer := NewTableRenderer(log)
+	lister := NewLister(cfg, log, storageResult.Storage, renderer)
+
+	return lister.Start(ctx)
 }
 
 // runCreateCmd executes the create command
@@ -131,21 +136,25 @@ func runCreateCmd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	app := fx.New(
-		Module,
-		storage.ClientModule,
-		storage.Module,
-		fx.Provide(
-			func() config.Interface { return cfg },
-			func() logger.Interface { return log },
-		),
-		fx.Invoke(func(creator *Creator) error {
-			creator.index = args[0]
-			return creator.Start(ctx)
-		}),
-	)
+	// Construct dependencies directly without FX
+	storageClient, err := createStorageClient(cfg, log)
+	if err != nil {
+		return fmt.Errorf("failed to create storage client: %w", err)
+	}
 
-	return runApp(ctx, app, log)
+	storageResult, err := storage.NewStorage(storage.StorageParams{
+		Config: cfg,
+		Logger: log,
+		Client: storageClient,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	creator := NewCreator(cfg, log, storageResult.Storage, CreateParams{})
+	creator.index = args[0]
+
+	return creator.Start(ctx)
 }
 
 // runDeleteCmd executes the delete command
@@ -156,51 +165,47 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	app := fx.New(
-		Module,
-		storage.ClientModule,
-		storage.Module,
-		fx.Provide(
-			func() config.Interface { return cfg },
-			func() logger.Interface { return log },
-		),
-		fx.Invoke(func(deleter *Deleter) error {
-			deleter.index = args
-			return deleter.Start(ctx)
-		}),
-	)
-
-	return runApp(ctx, app, log)
-}
-
-// runApp starts and stops the fx application
-func runApp(ctx context.Context, app *fx.App, log logger.Interface) error {
-	if startErr := app.Start(ctx); startErr != nil {
-		return fmt.Errorf("failed to start application: %w", startErr)
+	// Construct dependencies directly without FX
+	storageClient, err := createStorageClient(cfg, log)
+	if err != nil {
+		return fmt.Errorf("failed to create storage client: %w", err)
 	}
-	defer func() {
-		if stopErr := app.Stop(ctx); stopErr != nil {
-			log.Error("failed to stop application", "error", stopErr)
-		}
-	}()
-	return nil
+
+	storageResult, err := storage.NewStorage(storage.StorageParams{
+		Config: cfg,
+		Logger: log,
+		Client: storageClient,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	sourcesManager, err := sources.LoadSources(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to load sources: %w", err)
+	}
+
+	deleter := NewDeleter(cfg, log, storageResult.Storage, sourcesManager, DeleteParams{
+		Force: forceDelete,
+	})
+	deleter.index = args
+
+	return deleter.Start(ctx)
 }
 
-// getDependencies retrieves logger and config from context
+// getDependencies retrieves logger and config from context using helper
 func getDependencies(ctx context.Context) (log logger.Interface, cfg config.Interface, err error) {
-	// Get logger from context
-	loggerValue := ctx.Value(common.LoggerKey)
-	log, ok := loggerValue.(logger.Interface)
-	if !ok {
-		return nil, nil, errors.New("logger not found in context")
-	}
+	return common.GetDependencies(ctx)
+}
 
-	// Get config from context
-	configValue := ctx.Value(common.ConfigKey)
-	cfg, ok = configValue.(config.Interface)
-	if !ok {
-		return nil, nil, errors.New("config not found in context")
+// createStorageClient creates an Elasticsearch client without using FX
+func createStorageClient(cfg config.Interface, log logger.Interface) (*es.Client, error) {
+	clientResult, err := storage.NewClient(storage.ClientParams{
+		Config: cfg,
+		Logger: log,
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	return log, cfg, nil
+	return clientResult.Client, nil
 }

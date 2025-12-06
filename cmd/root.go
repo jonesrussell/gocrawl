@@ -14,8 +14,10 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/index"
+	cmdscheduler "github.com/jonesrussell/gocrawl/cmd/scheduler"
 	"github.com/jonesrussell/gocrawl/cmd/search"
 	cmdsources "github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -40,6 +42,18 @@ var (
 			if err := initConfig(); err != nil {
 				return fmt.Errorf("failed to initialize configuration: %w", err)
 			}
+			// Ensure the CommandContext is propagated from the root command to all subcommands
+			// This is necessary because Cobra may create new contexts for subcommands
+			rootCtx := cmd.Root().Context()
+			if rootCtx != nil {
+				if cmdCtx := rootCtx.Value(common.CommandContextKey); cmdCtx != nil {
+					// If this command's context doesn't have the CommandContext, propagate it
+					if cmd.Context().Value(common.CommandContextKey) == nil {
+						newCtx := context.WithValue(cmd.Context(), common.CommandContextKey, cmdCtx)
+						cmd.SetContext(newCtx)
+					}
+				}
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -53,10 +67,12 @@ var Module = fx.Module("root",
 	common.Module,
 	storage.ClientModule,
 	storage.Module,
+	crawl.Module,
 	index.Module,
 	cmdsources.Module,
 	search.Module,
 	httpd.Module,
+	cmdscheduler.Module,
 	fx.WithLogger(logger.NewFxLogger),
 )
 
@@ -81,9 +97,12 @@ func Execute() error {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	// Create a context with dependencies
-	ctx := context.WithValue(context.Background(), common.ConfigKey, cfg)
-	ctx = context.WithValue(ctx, common.LoggerKey, log)
+	// Create a context with dependencies using CommandContext
+	cmdCtx := &common.CommandContext{
+		Logger: log,
+		Config: cfg,
+	}
+	ctx := context.WithValue(context.Background(), common.CommandContextKey, cmdCtx)
 
 	// Initialize the application with the root module
 	app := fx.New(
@@ -105,7 +124,11 @@ func Execute() error {
 		}
 	}()
 
-	// Execute the root command
+	// Set the context on the root command to ensure it's available to all subcommands
+	// This is necessary because ExecuteContext may not propagate the context to all commands
+	rootCmd.SetContext(ctx)
+
+	// Execute the root command with the context
 	return rootCmd.ExecuteContext(ctx)
 }
 
@@ -130,10 +153,12 @@ func init() {
 	})
 
 	// Add subcommands
+	rootCmd.AddCommand(crawl.Command())
 	rootCmd.AddCommand(index.Command)
 	rootCmd.AddCommand(cmdsources.NewSourcesCommand())
 	rootCmd.AddCommand(search.Command())
 	rootCmd.AddCommand(httpd.Command())
+	rootCmd.AddCommand(cmdscheduler.Command())
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -152,9 +177,11 @@ func initConfig() error {
 	setDefaults()
 
 	// Read config file
+	// Note: Config file is optional - if not found, we'll use defaults and environment variables
 	if err := viper.ReadInConfig(); err != nil {
 		// Config file not found, that's ok - we'll use defaults
-		fmt.Fprintf(os.Stderr, "Warning: Config file not found: %v\n", err)
+		// This is expected behavior: config can come from file, environment variables, or defaults
+		fmt.Fprintf(os.Stderr, "Warning: Config file not found: %v (using defaults and environment variables)\n", err)
 	}
 
 	// Bind environment variables
@@ -233,8 +260,9 @@ func setDefaults() {
 	})
 
 	// Elasticsearch defaults - production safe
+	// Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
 	viper.SetDefault("elasticsearch", map[string]any{
-		"addresses": []string{"http://localhost:9200"},
+		"addresses": []string{"http://127.0.0.1:9200"},
 		"tls": map[string]any{
 			"enabled":              true,
 			"insecure_skip_verify": false,

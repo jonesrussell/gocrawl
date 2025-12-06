@@ -6,21 +6,22 @@ import (
 	"errors"
 	"fmt"
 
+	es "github.com/elastic/go-elasticsearch/v8"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
-	"github.com/jonesrussell/gocrawl/internal/content/articles"
-	"github.com/jonesrussell/gocrawl/internal/content/page"
+	articlespkg "github.com/jonesrussell/gocrawl/internal/content/articles"
+	pagepkg "github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	loggerpkg "github.com/jonesrussell/gocrawl/internal/logger"
 	sourcespkg "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 )
 
 // Crawler handles the crawl operation
@@ -71,8 +72,13 @@ func (c *Crawler) Start(ctx context.Context) error {
 	c.logger.Info("Waiting for interrupt signal")
 	<-ctx.Done()
 
+	// Graceful shutdown with timeout
+	c.logger.Info("Shutdown signal received")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cmdcommon.DefaultShutdownTimeout)
+	defer cancel()
+
 	// Stop the job service
-	if err := c.jobService.Stop(ctx); err != nil {
+	if err := c.jobService.Stop(shutdownCtx); err != nil {
 		c.logger.Error("Failed to stop job service", "error", err)
 		return fmt.Errorf("failed to stop job service: %w", err)
 	}
@@ -89,59 +95,20 @@ func Command() *cobra.Command {
 Specify the source name as an argument.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get logger from context
-			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
-			log, ok := loggerValue.(loggerpkg.Interface)
-			if !ok {
-				return errors.New("logger not found in context or invalid type")
+			// Get dependencies from context using helper
+			log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("failed to get dependencies: %w", err)
 			}
 
-			// Get config from context
-			configValue := cmd.Context().Value(cmdcommon.ConfigKey)
-			cfg, ok := configValue.(config.Interface)
-			if !ok {
-				return errors.New("config not found in context or invalid type")
+			// Construct dependencies directly using the same functions FX would use
+			// This avoids creating a new FX app per command execution
+			crawlerInstance, err := constructCrawlerDependencies(log, cfg, args[0])
+			if err != nil {
+				return fmt.Errorf("failed to construct crawler dependencies: %w", err)
 			}
 
-			// Create Fx application
-			app := fx.New(
-				// Include required modules
-				Module,
-
-				// Provide existing config
-				fx.Provide(func() config.Interface { return cfg }),
-
-				// Provide existing logger
-				fx.Provide(func() loggerpkg.Interface { return log }),
-
-				// Provide source name
-				fx.Provide(fx.Annotate(
-					func() string { return args[0] },
-					fx.ResultTags(`name:"sourceName"`),
-				)),
-
-				// Use custom Fx logger
-				fx.WithLogger(func() fxevent.Logger {
-					return loggerpkg.NewFxLogger(log)
-				}),
-
-				// Invoke crawler
-				fx.Invoke(func(c *Crawler) error {
-					return c.Start(cmd.Context())
-				}),
-			)
-
-			// Start application
-			if err := app.Start(cmd.Context()); err != nil {
-				return fmt.Errorf("failed to start application: %w", err)
-			}
-
-			// Stop application
-			if err := app.Stop(cmd.Context()); err != nil {
-				return fmt.Errorf("failed to stop application: %w", err)
-			}
-
-			return nil
+			return crawlerInstance.Start(cmd.Context())
 		},
 	}
 
@@ -155,8 +122,8 @@ func SetupCollector(
 	indexManager types.IndexManager,
 	sources sourcespkg.Interface,
 	eventBus *events.EventBus,
-	articleService articles.Interface,
-	pageService page.Interface,
+	articleService articlespkg.Interface,
+	pageService pagepkg.Interface,
 	cfg *crawlerconfig.Config,
 ) (crawler.Interface, error) {
 	// Create crawler instance using ProvideCrawler
@@ -172,8 +139,8 @@ func SetupCollector(
 		IndexManager   types.IndexManager
 		Sources        sourcespkg.Interface
 		Config         *crawlerconfig.Config
-		ArticleService articles.Interface
-		PageService    page.Interface
+		ArticleService articlespkg.Interface
+		PageService    pagepkg.Interface
 		Storage        types.Interface
 	}{
 		Logger:         logger,
@@ -190,4 +157,111 @@ func SetupCollector(
 	}
 
 	return result.Crawler, nil
+}
+
+// constructCrawlerDependencies constructs all dependencies needed for the crawl command
+// without using FX, by directly calling the same constructors that FX modules use
+func constructCrawlerDependencies(log loggerpkg.Interface, cfg config.Interface, sourceName string) (*Crawler, error) {
+	// Load sources
+	sourceManager, err := sourcespkg.LoadSources(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load sources: %w", err)
+	}
+
+	// Create storage client and storage
+	storageClient, err := createStorageClientForCrawl(cfg, log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage client: %w", err)
+	}
+
+	storageResult, err := storage.NewStorage(storage.StorageParams{
+		Config: cfg,
+		Logger: log,
+		Client: storageClient,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	// Create event bus
+	bus := events.NewEventBus(log)
+
+	// Get crawler config
+	crawlerCfg := cfg.GetCrawlerConfig()
+	if crawlerCfg == nil {
+		return nil, fmt.Errorf("crawler configuration is required")
+	}
+
+	// Construct article and page services directly
+	// Get index names from config or use defaults
+	articleIndexName := "articles"
+	pageIndexName := "pages"
+	if source := sourceManager.FindByName(sourceName); source != nil {
+		if source.ArticleIndex != "" {
+			articleIndexName = source.ArticleIndex
+		}
+		if source.Index != "" {
+			pageIndexName = source.Index
+		}
+	}
+
+	articleService := articlespkg.NewContentService(log, storageResult.Storage, articleIndexName)
+	pageService := pagepkg.NewContentService(log, storageResult.Storage, pageIndexName)
+
+	// Use the crawler's ProvideCrawler to construct the crawler
+	crawlerResult, err := crawler.ProvideCrawler(struct {
+		fx.In
+		Logger         loggerpkg.Interface
+		Bus            *events.EventBus
+		IndexManager   types.IndexManager
+		Sources        sourcespkg.Interface
+		Config         *crawlerconfig.Config
+		ArticleService articlespkg.Interface
+		PageService    pagepkg.Interface
+		Storage        types.Interface
+	}{
+		Logger:         log,
+		Bus:            bus,
+		IndexManager:   storageResult.IndexManager,
+		Sources:        sourceManager,
+		Config:         crawlerCfg,
+		ArticleService: articleService,
+		PageService:    pageService,
+		Storage:        storageResult.Storage,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create crawler: %w", err)
+	}
+
+	// Create done channel for job service
+	done := make(chan struct{})
+
+	// Create processor factory (simplified)
+	processorFactory := crawler.NewProcessorFactory(log, storageResult.Storage, "content")
+
+	// Create job service
+	jobService := NewJobService(JobServiceParams{
+		Logger:           log,
+		Sources:          sourceManager,
+		Crawler:          crawlerResult.Crawler,
+		Done:             done,
+		Storage:          storageResult.Storage,
+		ProcessorFactory: processorFactory,
+		SourceName:       sourceName,
+	})
+
+	// Create crawler command instance
+	return NewCrawler(cfg, log, jobService, sourceManager, crawlerResult.Crawler), nil
+}
+
+// createStorageClientForCrawl creates an Elasticsearch client for the crawl command
+func createStorageClientForCrawl(cfg config.Interface, log loggerpkg.Interface) (*es.Client, error) {
+	clientResult, err := storage.NewClient(storage.ClientParams{
+		Config: cfg,
+		Logger: log,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return clientResult.Client, nil
 }
