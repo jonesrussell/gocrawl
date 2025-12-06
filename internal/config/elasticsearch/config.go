@@ -21,7 +21,7 @@ const (
 
 // Default configuration values
 const (
-	DefaultAddresses     = "http://elasticsearch:9200"
+	DefaultAddresses     = "http://127.0.0.1:9200"
 	DefaultIndexName     = "gocrawl"
 	DefaultRetryEnabled  = true
 	DefaultInitialWait   = 1 * time.Second

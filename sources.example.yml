@@ -20,22 +20,36 @@ sources:
     # Detailed selectors for content extraction
     selectors:
       article:
-        # Main content container selectors
-        container: ".article-content"
-        title: "meta[property='og:title'],.article-title"
-        body: ".article-body"
-        intro: "meta[property='og:description']"
-        byline: ".article-author"
-        published_time: "meta[property='article:published_time']"
-        time_ago: "time"
+        # Main content selectors
+        container: "article.article-card, main#main-content, .article-content"
+        title: "h1, h2.article-title, meta[property='og:title']"
+        body: ".article-body, .article-content"
+        intro: ".article-excerpt, meta[property='og:description']"
         
-        # Structured data selectors
+        # Link extraction - CRITICAL for article discovery
+        link: "a.article-link[href^='/news/'], a[href*='/article/']"
+        
+        # Image extraction - handles both eager and lazy loading
+        image: "img.article-image, img[data-src], meta[property='og:image']"
+        
+        # Metadata selectors
+        byline: ".article-author, meta[property='article:author']"
+        published_time: "meta[property='article:published_time'], time[datetime]"
+        time_ago: "time, .article-date"
+        
+        # Category and section
+        section: ".article-section, meta[property='article:section']"
+        category: "meta[property='article:section'], .article-category"
+        
+        # Article identifiers
+        article_id: "[data-article-id], [data-post-id]"
+        
+        # Structured data
         json_ld: "script[type='application/ld+json']"
-        section: "meta[property='article:section']"
         keywords: "meta[name='keywords']"
-        description: "meta[property='og:description']"
+        description: "meta[name='description']"
         
-        # Open Graph metadata selectors
+        # Open Graph metadata
         og_title: "meta[property='og:title']"
         og_description: "meta[property='og:description']"
         og_image: "meta[property='og:image']"
@@ -43,28 +57,62 @@ sources:
         og_type: "meta[property='og:type']"
         og_site_name: "meta[property='og:site_name']"
         
-        # Additional metadata selectors
+        # Additional metadata
         canonical: "link[rel='canonical']"
-        author: "meta[property='article:author'],.author-name"
-        category: "meta[property='article:section']"
+        author: "meta[property='article:author'], .author-name"
         
-        # Elements to exclude from content extraction
-        # These patterns help clean up the extracted content
+        # Elements to exclude - comprehensive and optimized
         exclude: [
-          ".clearfix",              # Layout cleanup elements
-          ".share-buttons",         # Social sharing elements
-          ".advertisement",         # Ad containers
-          "style",                  # Inline styles
-          "script",                 # JavaScript
-          ".comments-section",      # User comments
-          ".related-posts",         # Related content widgets
-          ".sidebar",              # Sidebar content
-          ".navigation",           # Navigation elements
-          ".social-media",         # Social media widgets
-          ".view-counter",         # Analytics elements
-          ".author-bio",          # Author biography sections
-          ".newsletter-signup"     # Newsletter forms
+          # Advertisements - all patterns consolidated
+          ".ad, .advertisement, [class*='ad__'], [id^='ad-'], [id*='ad__']",
+          "[data-ad], [data-ad-loc], [data-ad-mobile], [data-native]",
+          ".close-sticky-ad",
+          
+          # Navigation - all nav elements
+          ".header, .footer, nav, [class*='-nav'], .header__after",
+          
+          # Scripts, styles, hidden elements
+          "script, style, noscript, [aria-hidden='true'], .visually-hidden, svg",
+          
+          # Analytics and tracking - KEY EXCLUSIONS
+          "[data-evt], [data-evt-val], [data-evt-typ]",
+          "[data-track], [data-analytics]",
+          
+          # Widgets and auxiliary content
+          ".video-playlist, .video-playlist__queue",
+          ".weather-widget",
+          ".widget--local-ads, .local-spotlight",
+          ".newsletter-widget",
+          ".list-widget",
+          
+          # Social, forms, buttons
+          ".social-follow, .share-buttons",
+          "button, form, .button, .subscribe-btn",
+          
+          # Lazy loading placeholders and low-quality images
+          "img[src*='placeholder']",
+          "img[src*='fallback']", 
+          "img[src*='data:image/svg']",
+          "img[src*='quality=5']",
+          ".ad__placeholder, .placeholder-inner",
+          
+          # Auxiliary content
+          ".consent__banner, .fixed-bottom",
+          ".pagination, .more-stories",
+          ".related-posts, .hero-feed__widget",
+          ".sidebar, .comments-section",
+          ".view-counter, .author-bio",
+          ".clearfix",
         ]
+
+      # Article list page specific selectors
+      list:
+        container: ".article-list, .feed-section, main#main-content"
+        article_cards: "article.article-card:not(.ad), .article-item"
+        article_list: "ol.article-list li, ul.article-list li"
+        
+        # Exclude native ads and unwanted items from lists
+        exclude_from_list: ".ad, .ad__native, article[data-native]"
 
   # Example of a custom CMS news site configuration
   - name: "Local Monitor News"
@@ -79,9 +127,17 @@ sources:
     selectors:
       article:
         # Basic content selectors
+        container: "article, main.content"
         title: "h1.article-title"
         body: ".article-content"
         intro: ".article-intro"
+        
+        # Link extraction - CRITICAL for article discovery
+        link: "a.article-link[href*='/article/']"
+        
+        # Image extraction
+        image: "img.article-image, meta[property='og:image']"
+        
         byline: ".article-byline"
         published_time: "meta[property='article:published_time']"
         time_ago: "time"
@@ -90,6 +146,21 @@ sources:
         json_ld: "script[type='application/ld+json']"
         section: "meta[property='article:section']"
         keywords: "meta[name='keywords']"
+        
+        # Open Graph metadata
+        og_title: "meta[property='og:title']"
+        og_description: "meta[property='og:description']"
+        og_image: "meta[property='og:image']"
+        
+        # Elements to exclude
+        exclude: [
+          ".ad, .advertisement, [class*='ad']",
+          "script, style, noscript",
+          ".header, .footer, nav",
+          ".share-buttons, .social-media",
+          ".comments-section, .sidebar",
+          ".related-posts, .newsletter-widget",
+        ]
 
   # Example of a modern news platform configuration
   - name: "City Today News"
@@ -104,13 +175,23 @@ sources:
     selectors:
       article:
         # Content container and basic selectors
-        container: "div.article-details"
+        container: "div.article-details, main.article"
         title: "h1.details-title"
         body: "#article-body"
         intro: ".article-intro"
+        
+        # Link extraction - CRITICAL for article discovery
+        link: "a[href*='/article/'], a.article-link"
+        
+        # Image extraction
+        image: "img.article-image, img[data-src], meta[property='og:image']"
+        
         byline: ".article-byline"
-        published_time: "time.timeago"
+        published_time: "time.timeago, meta[property='article:published_time']"
         time_ago: "time.timeago"
+        
+        # Article identifiers
+        article_id: "[data-article-id], [data-post-id]"
         
         # Metadata and structured data
         json_ld: "script[type='application/ld+json']"
@@ -123,15 +204,30 @@ sources:
         og_description: "meta[property='og:description']"
         og_image: "meta[property='og:image']"
         og_url: "meta[property='og:url']"
+        og_type: "meta[property='og:type']"
+        og_site_name: "meta[property='og:site_name']"
         
         # Additional metadata
         canonical: "link[rel='canonical']"
-        word_count: "script:contains('WordCount')"
-        publish_date: "script:contains('PublishDate')"
-        category: "script:contains('CategoryName')"
-        tags: "script:contains('Tags')"
-        author: "script:contains('AuthorName')"
-        byline_name: "script:contains('BylineName')"
+        author: "meta[property='article:author'], .author-name"
+        category: "meta[property='article:section']"
+        
+        # Elements to exclude
+        exclude: [
+          ".ad, .advertisement, [class*='ad__'], [id^='ad-']",
+          "[data-ad], [data-ad-loc], [data-ad-mobile]",
+          "script, style, noscript, [aria-hidden='true']",
+          ".header, .footer, nav, [class*='-nav']",
+          "[data-evt], [data-track], [data-analytics]",
+          ".video-playlist, .weather-widget",
+          ".widget--local-ads, .newsletter-widget",
+          ".social-follow, .share-buttons",
+          "button, form, .button",
+          "img[src*='placeholder'], img[src*='fallback']",
+          ".consent__banner, .pagination",
+          ".related-posts, .sidebar, .comments-section",
+          ".view-counter, .author-bio",
+        ]
 
   - name: "Fictional News Network"
     url: "https://www.fictionalnewsnetwork.com/latest/"
