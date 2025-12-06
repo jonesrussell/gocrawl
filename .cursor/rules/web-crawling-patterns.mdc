@@ -11,6 +11,10 @@
 - Handle different content types (HTML, JSON, XML)
 - Implement content cleaning and normalization
 - Store raw content alongside processed content
+- Use `link` selector for article discovery (CRITICAL)
+- Support lazy-loaded images via `data-src` attributes
+- Use `exclude` patterns to filter ads, navigation, and unwanted content
+- Leverage list selectors for efficient article discovery on index pages
 
 ## Error Handling
 - Handle network timeouts gracefully
@@ -29,6 +33,9 @@
 - Allow custom crawling rules per source
 - Implement scheduling for automated crawling
 - Support incremental crawling
+- Configure comprehensive selector patterns for each source
+- Use article and list selectors for optimal content extraction
+- See sources-configuration.mdc for detailed selector documentation
 
 ## Monitoring
 - Track crawling metrics and performance

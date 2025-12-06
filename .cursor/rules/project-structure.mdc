@@ -37,8 +37,9 @@ This is a Go web crawler and search engine project with the following architectu
 
 ## Configuration
 - [config.example.yaml](mdc:config.example.yaml) - Main configuration template
-- [sources.example.yml](mdc:sources.example.yml) - Source configuration template
+- [sources.example.yml](mdc:sources.example.yml) - Source configuration template with comprehensive selector examples
 - [.env.example](mdc:.env.example) - Environment variables template
+- See sources-configuration.mdc for detailed selector field documentation
 
 ## Dependencies
 - Web crawling: `github.com/gocolly/colly/v2`
