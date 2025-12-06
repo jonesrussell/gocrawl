@@ -2,7 +2,8 @@
 	"name": "GoCrawl Dev",
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "app",
-		
+	"workspaceFolder": "/workspaces",
+	
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -34,14 +35,20 @@
 		"source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
 	],
 	
-	"forwardPorts": [8080],
+	"forwardPorts": [8080, 9200, 5601],
 	"portsAttributes": {
 		"8080": {
 			"label": "GoCrawl API"
+		},
+		"9200": {
+			"label": "Elasticsearch"
+		},
+		"5601": {
+			"label": "Kibana"
 		}
 	},
 	
-	"postCreateCommand": "go mod download && chmod +x test-connectivity.sh",
+	"postCreateCommand": "go mod download && chmod +x scripts/test-connectivity.sh && ./scripts/test-connectivity.sh",
 	"remoteUser": "vscode",
 	"containerEnv": {
 		"ELASTICSEARCH_HOSTS": "http://elasticsearch:9200",
