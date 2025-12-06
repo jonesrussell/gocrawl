@@ -50,9 +50,5 @@
 	
 	"postCreateCommand": "go mod download && chmod +x scripts/test-connectivity.sh && ./scripts/test-connectivity.sh",
 	"remoteUser": "vscode",
-	"containerEnv": {
-		"ELASTICSEARCH_HOSTS": "http://elasticsearch:9200",
-		"KIBANA_HOSTS": "http://kibana:5601"
-	},
 	"runArgs": ["--env-file","../.env"]
 }
