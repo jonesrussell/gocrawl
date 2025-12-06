@@ -1,0 +1,300 @@
+# Command Architecture and Dependency Injection Patterns
+
+## Overview
+This document describes the command architecture and dependency injection patterns used in the GoCrawl CLI application after the FX refactoring.
+
+## Command Registration Pattern
+
+### Standard Pattern: Command() Function
+All commands MUST use the `Command()` function pattern for registration, NOT FX Group annotations.
+
+**Pattern:**
+```go
+// Command returns the command for use in the root command
+func Command() *cobra.Command {
+    cmd := &cobra.Command{
+        Use:   "command-name",
+        Short: "Short description",
+        Long:  "Long description",
+        RunE: func(cmd *cobra.Command, args []string) error {
+            // Implementation
+        },
+    }
+    return cmd
+}
+```
+
+**Registration in root.go:**
+```go
+rootCmd.AddCommand(crawl.Command())
+rootCmd.AddCommand(search.Command())
+rootCmd.AddCommand(httpd.Command())
+```
+
+### Why This Pattern?
+- Consistent command registration across all commands
+- No reliance on FX Group annotations which were removed
+- Explicit and easy to understand
+- Commands are registered at init time, not through FX lifecycle
+
+## Dependency Access Pattern
+
+### CommandContext Pattern
+Commands MUST use `CommandContext` for type-safe dependency access, NOT individual context values.
+
+**Pattern:**
+```go
+// In RunE function
+log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+if err != nil {
+    return fmt.Errorf("failed to get dependencies: %w", err)
+}
+```
+
+**Implementation:**
+- `CommandContext` is created in `cmd/root.go` Execute() function
+- Stored in context with key `common.CommandContextKey`
+- Propagated to all subcommands via `PersistentPreRunE` hook
+- Retrieved using `cmdcommon.GetDependencies()` helper
+
+**DO NOT:**
+- Use `context.Value(common.LoggerKey)` directly
+- Use `context.Value(common.ConfigKey)` directly
+- Access dependencies without type checking
+
+## FX Module Pattern
+
+### Module Structure
+FX modules should be minimal and only include what's necessary for dependency injection.
+
+**Pattern:**
+```go
+// Module provides the command module for dependency injection.
+// Note: Command registration is handled by Command() function, not through FX Group annotation.
+var Module = fx.Module("module-name",
+    // Include required modules
+    common.Module,
+    // Only include other modules if needed for FX-based dependency injection
+)
+```
+
+### When to Use FX Modules
+- For internal packages that use FX for dependency injection (e.g., `storage.Module`, `crawler.Module`)
+- When providing shared dependencies that multiple commands might need
+- NOT for command registration (use `Command()` function instead)
+- NOT for command-specific dependencies (construct directly in RunE)
+
+### Module Naming
+- Use descriptive names: `fx.Module("crawl")`, `fx.Module("scheduler")`
+- Prefix command modules with `cmd_` if needed: `fx.Module("cmd_sources")`
+
+## Dependency Construction Pattern
+
+### Direct Construction in Commands
+Commands MUST construct their dependencies directly in `RunE` functions, NOT by creating new FX apps.
+
+**Pattern:**
+```go
+RunE: func(cmd *cobra.Command, args []string) error {
+    // 1. Get dependencies from context
+    log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+    if err != nil {
+        return fmt.Errorf("failed to get dependencies: %w", err)
+    }
+
+    // 2. Construct dependencies directly using helper functions
+    storageClient, err := createStorageClientForCommand(cfg, log)
+    if err != nil {
+        return fmt.Errorf("failed to create storage client: %w", err)
+    }
+
+    storageResult, err := storage.NewStorage(storage.StorageParams{
+        Config: cfg,
+        Logger: log,
+        Client: storageClient,
+    })
+    if err != nil {
+        return fmt.Errorf("failed to create storage: %w", err)
+    }
+
+    // 3. Use dependencies directly
+    // ... command logic ...
+}
+```
+
+### Helper Functions
+Create helper functions for common dependency construction patterns:
+
+```go
+// createStorageClientForCommand creates an Elasticsearch client
+func createStorageClientForCommand(cfg config.Interface, log logger.Interface) (*es.Client, error) {
+    clientResult, err := storage.NewClient(storage.ClientParams{
+        Config: cfg,
+        Logger: log,
+    })
+    if err != nil {
+        return nil, err
+    }
+    return clientResult.Client, nil
+}
+```
+
+**DO NOT:**
+- Create new `fx.New()` apps in command RunE functions
+- Use FX lifecycle hooks in commands
+- Rely on FX to construct command-specific dependencies
+
+## Context Propagation
+
+### Root Command Context Setup
+The root command MUST set up the context with dependencies before execution:
+
+```go
+// In cmd/root.go Execute()
+cmdCtx := &common.CommandContext{
+    Logger: log,
+    Config: cfg,
+}
+ctx := context.WithValue(context.Background(), common.CommandContextKey, cmdCtx)
+
+// Set context on root command
+rootCmd.SetContext(ctx)
+
+// Execute with context
+return rootCmd.ExecuteContext(ctx)
+```
+
+### Context Propagation Hook
+The `PersistentPreRunE` hook MUST propagate context to all subcommands:
+
+```go
+PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+    // ... config initialization ...
+    
+    // Ensure CommandContext is propagated from root to all subcommands
+    rootCtx := cmd.Root().Context()
+    if rootCtx != nil {
+        if cmdCtx := rootCtx.Value(common.CommandContextKey); cmdCtx != nil {
+            if cmd.Context().Value(common.CommandContextKey) == nil {
+                newCtx := context.WithValue(cmd.Context(), common.CommandContextKey, cmdCtx)
+                cmd.SetContext(newCtx)
+            }
+        }
+    }
+    return nil
+}
+```
+
+## Error Handling Pattern
+
+### Command-Level Error Handling
+Commands MUST handle errors at the boundary and return them:
+
+```go
+RunE: func(cmd *cobra.Command, args []string) error {
+    // Get dependencies
+    log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+    if err != nil {
+        return fmt.Errorf("failed to get dependencies: %w", err)
+    }
+
+    // Construct dependencies
+    // ... if error occurs, return it ...
+
+    // Execute command logic
+    // ... if error occurs, log and return it ...
+}
+```
+
+### Error Wrapping
+Always wrap errors with context:
+- Use `fmt.Errorf("operation failed: %w", err)` for wrapping
+- Include operation context in error messages
+- Log errors at the command boundary before returning
+
+## Graceful Shutdown Pattern
+
+### Long-Running Commands
+Commands that run indefinitely MUST implement graceful shutdown:
+
+```go
+// Wait for interrupt signal
+<-cmd.Context().Done()
+
+// Graceful shutdown with timeout
+shutdownCtx, cancel := context.WithTimeout(context.Background(), cmdcommon.DefaultShutdownTimeout)
+defer cancel()
+
+// Cleanup operations
+if err := service.Shutdown(shutdownCtx); err != nil {
+    log.Error("Failed to shutdown", "error", err)
+    return fmt.Errorf("failed to shutdown: %w", err)
+}
+```
+
+## Configuration Defaults
+
+### Elasticsearch Configuration
+- Default address: `http://elasticsearch:9200` (for container environments)
+- Fallback: `http://127.0.0.1:9200` (for local development)
+- DO NOT use `localhost` as it may resolve to IPv6 `[::1]`
+
+### Config File Loading
+- Config file is optional
+- Defaults are set in `cmd/root.go` setDefaults()
+- Environment variables override config file values
+- Config file values override defaults
+
+## Module Dependencies
+
+### Avoiding Duplicate Providers
+- DO NOT include the same FX module in multiple command modules
+- Example: Both `crawl.Module` and `scheduler.Module` should NOT include `crawler.Module`
+- Only include modules that are actually needed for FX-based dependency injection
+- Commands construct dependencies directly, so they don't need FX modules for their own dependencies
+
+### Module Inclusion Rules
+- Include `common.Module` if the command module needs shared utilities
+- Include internal modules (e.g., `storage.Module`, `crawler.Module`) only if they're used by FX-based code
+- Keep command modules minimal - they're mainly for organizational purposes
+
+## Code Organization
+
+### File Structure
+Each command package should have:
+- `module.go` - FX module definition (minimal)
+- `command.go` or `{command}.go` - Command definition with `Command()` function
+- Helper functions for dependency construction (if needed)
+
+### Naming Conventions
+- Command functions: `Command()` returns `*cobra.Command`
+- Helper functions: `create{Resource}For{Command}()` for dependency construction
+- Module variables: `Module` of type `fx.Option`
+
+## Anti-Patterns to Avoid
+
+### DO NOT:
+1. Use `context.Value()` with individual keys (`LoggerKey`, `ConfigKey`) - use `CommandContext` instead
+2. Create new `fx.New()` apps in command `RunE` functions
+3. Use FX Group annotations for command registration
+4. Use `fx.Invoke` hooks that automatically start services
+5. Include duplicate FX modules (causes "already provided" errors)
+6. Use `localhost` in Elasticsearch addresses (use `127.0.0.1` or service name)
+7. Access dependencies without error checking
+8. Create FX apps per command execution
+
+### DO:
+1. Use `Command()` function pattern for all commands
+2. Use `cmdcommon.GetDependencies()` to retrieve dependencies
+3. Construct dependencies directly in `RunE` functions
+4. Use helper functions for common construction patterns
+5. Implement graceful shutdown for long-running commands
+6. Propagate context via `PersistentPreRunE` hook
+7. Keep FX modules minimal and focused
+8. Use type-safe `CommandContext` for dependency access
+
+description:
+globs:
+  - "cmd/**/*.go"
+alwaysApply: true
+---
