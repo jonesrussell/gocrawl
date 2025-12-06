@@ -1,42 +1,198 @@
-# Sensitive Configuration Files
-## Environment Variables
+# =================================================================
+# SECURITY - NEVER COMMIT THESE FILES
+# =================================================================
+
+# Environment Variables
 .env
 .env.*
+.devcontainer/.env
 !.env.example
+!.devcontainer/.env.example
 
-## Application Config
+# Application Configuration
 /config.yml
 /config.yaml
 /config.production.yaml
 !/config.example.yaml
 
-## Source Configuration
+# Source Configuration
 /sources.yml
 
-# Security Files
-## Certificates and Keys
+# Certificates and Keys
 *.pem
 *.key
 *.crt
 *.ca
+*.p12
+*.pfx
 http_ca.crt
 
-# Build and Binary Files
+# API Keys and Secrets
+secrets/
+*.secret
+
+# =================================================================
+# BUILD ARTIFACTS
+# =================================================================
+
+# Binary Output
 bin/
+build/
+dist/
 gocrawl
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# IDE and Editor Files
-.idea/
-.idea/.gitignore
-.idea/gocrawl.iml
-.idea/modules.xml
-.idea/vcs.xml
+# Test Binaries
+*.test
 
-# Test and Coverage Reports
-coverage/coverage.html
-coverage/coverage.out
+# Go Build Cache
+*.out
 
-# Temporary and Log Files
-*.bak
-*.log
+# Go Workspace
+go.work
+go.work.sum
+
+# Vendored Dependencies (optional - some teams commit vendor/)
+vendor/
+
+# =================================================================
+# TESTING AND COVERAGE
+# =================================================================
+
+# Coverage Reports
+coverage/
+coverage.html
 coverage.out
+*.cover
+*.coverage
+
+# Test Cache
+.testcache/
+
+# Benchmark Results
+*.bench
+
+# =================================================================
+# IDE AND EDITORS
+# =================================================================
+
+# JetBrains IDEs (GoLand, IntelliJ IDEA)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+*.code-workspace
+
+# Vim
+*.swp
+*.swo
+*.swn
+*~
+.vim/
+Session.vim
+
+# Emacs
+*~
+\#*\#
+.\#*
+.emacs.desktop
+.emacs.desktop.lock
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# =================================================================
+# OPERATING SYSTEMS
+# =================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+.Trash-*
+.directory
+.nfs*
+
+# =================================================================
+# LOGS AND TEMPORARY FILES
+# =================================================================
+
+# Log Files
+*.log
+logs/
+log/
+*.log.*
+
+# Temporary Files
+tmp/
+temp/
+.tmp/
+*.tmp
+*.bak
+*.swp
+*.backup
+
+# PID Files
+*.pid
+
+# =================================================================
+# DOCKER AND CONTAINERS
+# =================================================================
+
+# Docker volumes (if stored locally)
+.docker-data/
+docker-data/
+
+# Docker Compose override (personal dev settings)
+docker-compose.override.yml
+
+# =================================================================
+# PROJECT SPECIFIC
+# =================================================================
+
+# Downloaded/Scraped Data (adjust as needed)
+data/
+downloads/
+*.crawl
+
+# Generated Documentation
+docs/_build/
+site/
+
+# Database Files (if using SQLite for dev)
+*.db
+*.sqlite
+*.sqlite3

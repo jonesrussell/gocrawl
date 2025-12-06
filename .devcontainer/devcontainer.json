@@ -1,26 +1,28 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/go
 {
 	"name": "GoCrawl Dev",
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "app",
 	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+	
 	"customizations": {
 		"vscode": {
 			"extensions": [
 				"humao.rest-client",
-				"docker.docker",
-				"dbaeumer.vscode-eslint",
 				"golang.go",
-				"ms-edgedevtools.vscode-edge-devtools"
-			]
+				"ms-azuretools.vscode-docker"
+			],
+			"settings": {
+				"go.useLanguageServer": true,
+				"go.gopath": "/go",
+				"go.toolsManagement.autoUpdate": true
+			}
 		}
 	},
+	
 	"features": {
 		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
 			"moby": true,
 			"installDockerBuildx": true,
-			"installDockerComposeSwitch": true,
 			"version": "latest",
 			"dockerDashComposeVersion": "v2"
 		},
@@ -28,9 +30,23 @@
 			"version": "latest"
 		}
 	},
+	
 	"mounts": [
-		"type=bind,source=/home/${localEnv:USER}/.ssh,target=/home/vscode/.ssh"
+		"source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
 	],
-	"forwardPorts": [8080,9200,5601],
-	"updateRemoteUserUID": false
+	
+	"forwardPorts": [8080],
+	"portsAttributes": {
+		"8080": {
+			"label": "GoCrawl API"
+		}
+	},
+	
+	"postCreateCommand": "go mod download && chmod +x test-connectivity.sh",
+	"remoteUser": "vscode",
+	"containerEnv": {
+		"ELASTICSEARCH_HOSTS": "http://elasticsearch:9200",
+		"KIBANA_HOSTS": "http://kibana:5601"
+	},
+	"runArgs": ["--env-file","../.env"]
 }
