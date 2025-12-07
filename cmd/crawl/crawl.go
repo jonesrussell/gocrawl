@@ -9,7 +9,6 @@ import (
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	articlespkg "github.com/jonesrussell/gocrawl/internal/content/articles"
 	pagepkg "github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -17,9 +16,7 @@ import (
 	loggerpkg "github.com/jonesrussell/gocrawl/internal/logger"
 	sourcespkg "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
 )
 
 // Crawler handles the crawl operation
@@ -176,18 +173,8 @@ func createCrawlerInstance(
 		return nil, errors.New("crawler configuration is required")
 	}
 
-	// Create crawler using ProvideCrawler
-	crawlerResult, err := crawler.ProvideCrawler(struct {
-		fx.In
-		Logger         loggerpkg.Interface
-		Bus            *events.EventBus
-		IndexManager   types.IndexManager
-		Sources        sourcespkg.Interface
-		Config         *crawlerconfig.Config
-		ArticleService articlespkg.Interface
-		PageService    pagepkg.Interface
-		Storage        types.Interface
-	}{
+	// Create crawler using NewCrawlerWithParams
+	crawlerResult, err := crawler.NewCrawlerWithParams(crawler.CrawlerParams{
 		Logger:         log,
 		Bus:            bus,
 		IndexManager:   storageResult.IndexManager,

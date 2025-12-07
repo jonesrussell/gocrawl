@@ -1,5 +1,5 @@
-// Package models provides data models used across the application.
-package models
+// Package domain provides domain models used across the application.
+package domain
 
 import (
 	"time"

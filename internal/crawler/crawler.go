@@ -20,6 +20,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/jonesrussell/gocrawl/internal/models"
@@ -48,7 +49,7 @@ type Crawler struct {
 	state            *State
 	done             chan struct{}
 	wg               sync.WaitGroup
-	articleChannel   chan *models.Article
+	articleChannel   chan *domain.Article
 	processors       []content.Processor
 	linkHandler      *LinkHandler
 	htmlProcessor    *HTMLProcessor

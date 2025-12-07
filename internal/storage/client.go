@@ -8,21 +8,16 @@ import (
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"go.uber.org/fx"
 )
 
 // ClientParams contains dependencies for creating the Elasticsearch client
 type ClientParams struct {
-	fx.In
-
 	Config config.Interface
 	Logger logger.Interface
 }
 
 // ClientResult contains the Elasticsearch client
 type ClientResult struct {
-	fx.Out
-
 	Client *es.Client
 }
 
@@ -64,10 +59,3 @@ func NewClient(p ClientParams) (ClientResult, error) {
 		Client: client,
 	}, nil
 }
-
-// ClientModule provides the Elasticsearch client
-var ClientModule = fx.Module("elasticsearch-client",
-	fx.Provide(
-		NewClient,
-	),
-)

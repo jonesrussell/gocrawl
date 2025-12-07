@@ -14,34 +14,34 @@ import (
 	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
-	"github.com/jonesrussell/gocrawl/internal/sourceutils"
+	"github.com/jonesrussell/gocrawl/internal/sources/types"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Config represents a source configuration.
-type Config = sourceutils.SourceConfig
+type Config = types.SourceConfig
 
 // SelectorConfig defines the CSS selectors used for content extraction.
-type SelectorConfig = sourceutils.SelectorConfig
+type SelectorConfig = types.SelectorConfig
 
 // ArticleSelectors defines the CSS selectors used for article content extraction.
-type ArticleSelectors = sourceutils.ArticleSelectors
+type ArticleSelectors = types.ArticleSelectors
 
 // Sources manages a collection of web content sources.
 type Sources struct {
 	sources []Config
 	logger  logger.Interface
-	metrics *sourceutils.SourcesMetrics
+	metrics *types.SourcesMetrics
 }
 
 // Ensure Sources implements Interface
 var _ Interface = (*Sources)(nil)
 
-// convertArticleSelectors converts article selectors from various types to sourceutils.ArticleSelectors.
-func convertArticleSelectors(s any) sourceutils.ArticleSelectors {
+// convertArticleSelectors converts article selectors from various types to types.ArticleSelectors.
+func convertArticleSelectors(s any) types.ArticleSelectors {
 	switch v := s.(type) {
 	case configtypes.ArticleSelectors:
-		return sourceutils.ArticleSelectors{
+		return types.ArticleSelectors{
 			Container:     v.Container,
 			Title:         v.Title,
 			Body:          v.Body,
@@ -72,7 +72,7 @@ func convertArticleSelectors(s any) sourceutils.ArticleSelectors {
 			Exclude:       v.Exclude,
 		}
 	case loader.ArticleSelectors:
-		return sourceutils.ArticleSelectors{
+		return types.ArticleSelectors{
 			Container:     v.Container,
 			Title:         v.Title,
 			Body:          v.Body,
@@ -103,37 +103,37 @@ func convertArticleSelectors(s any) sourceutils.ArticleSelectors {
 			Exclude:       v.Exclude,
 		}
 	default:
-		return sourceutils.ArticleSelectors{}
+		return types.ArticleSelectors{}
 	}
 }
 
-// convertListSelectors converts list selectors from various types to sourceutils.ListSelectors.
-func convertListSelectors(s any) sourceutils.ListSelectors {
+// convertListSelectors converts list selectors from various types to types.ListSelectors.
+func convertListSelectors(s any) types.ListSelectors {
 	switch v := s.(type) {
 	case configtypes.ListSelectors:
-		return sourceutils.ListSelectors{
+		return types.ListSelectors{
 			Container:       v.Container,
 			ArticleCards:    v.ArticleCards,
 			ArticleList:     v.ArticleList,
 			ExcludeFromList: v.ExcludeFromList,
 		}
 	case loader.ListSelectors:
-		return sourceutils.ListSelectors{
+		return types.ListSelectors{
 			Container:       v.Container,
 			ArticleCards:    v.ArticleCards,
 			ArticleList:     v.ArticleList,
 			ExcludeFromList: v.ExcludeFromList,
 		}
 	default:
-		return sourceutils.ListSelectors{}
+		return types.ListSelectors{}
 	}
 }
 
-// convertPageSelectors converts page selectors from various types to sourceutils.PageSelectors.
-func convertPageSelectors(s any) sourceutils.PageSelectors {
+// convertPageSelectors converts page selectors from various types to types.PageSelectors.
+func convertPageSelectors(s any) types.PageSelectors {
 	switch v := s.(type) {
 	case configtypes.PageSelectors:
-		return sourceutils.PageSelectors{
+		return types.PageSelectors{
 			Container:     v.Container,
 			Title:         v.Title,
 			Content:       v.Content,
@@ -147,7 +147,7 @@ func convertPageSelectors(s any) sourceutils.PageSelectors {
 			Exclude:       v.Exclude,
 		}
 	case loader.PageSelectors:
-		return sourceutils.PageSelectors{
+		return types.PageSelectors{
 			Container:     v.Container,
 			Title:         v.Title,
 			Content:       v.Content,
@@ -161,7 +161,7 @@ func convertPageSelectors(s any) sourceutils.PageSelectors {
 			Exclude:       v.Exclude,
 		}
 	default:
-		return sourceutils.PageSelectors{}
+		return types.PageSelectors{}
 	}
 }
 
@@ -224,7 +224,7 @@ func LoadSources(cfg config.Interface, log logger.Interface) (*Sources, error) {
 	return &Sources{
 		sources: sources,
 		logger:  log,
-		metrics: sourceutils.NewSourcesMetrics(),
+		metrics: types.NewSourcesMetrics(),
 	}, nil
 }
 
@@ -253,7 +253,7 @@ func loadSourcesFromFile(path string) ([]Config, error) {
 	return sourceConfigs, nil
 }
 
-// convertLoaderConfig converts a loader.Config to a sourceutils.SourceConfig
+// convertLoaderConfig converts a loader.Config to a types.SourceConfig
 func convertLoaderConfig(cfg loader.Config) Config {
 	// Parse rate limit duration
 	var rateLimit time.Duration
@@ -424,7 +424,7 @@ func (s *Sources) ValidateSource(
 	}
 
 	// Convert to configtypes.Source
-	source := sourceutils.ConvertToConfigSource(selectedSource)
+	source := types.ConvertToConfigSource(selectedSource)
 
 	// Ensure article index exists if specified
 	if selectedSource.ArticleIndex != "" {
@@ -449,7 +449,7 @@ func (s *Sources) ValidateSource(
 }
 
 // GetMetrics returns the current metrics.
-func (s *Sources) GetMetrics() sourceutils.SourcesMetrics {
+func (s *Sources) GetMetrics() types.SourcesMetrics {
 	return *s.metrics
 }
 

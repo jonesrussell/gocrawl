@@ -1,4 +1,5 @@
-package models
+// Package domain provides domain models used across the application.
+package domain
 
 import (
 	"time"
@@ -6,6 +7,7 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
+// Article represents an article.
 type Article struct {
 	// Unique identifier for the article
 	ID string `json:"id" mapstructure:"id"`

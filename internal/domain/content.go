@@ -1,4 +1,5 @@
-package models
+// Package domain provides domain models used across the application.
+package domain
 
 import "time"
 

@@ -10,10 +10,10 @@ import (
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
+	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/mitchellh/mapstructure"
 )
 
 // Constants for timeout durations
@@ -23,6 +23,40 @@ const (
 	DefaultTestConnectionTimeout = 5 * time.Second
 	DefaultSearchTimeout         = 10 * time.Second
 )
+
+// StorageParams contains dependencies for creating a storage instance
+type StorageParams struct {
+	Config config.Interface
+	Logger logger.Interface
+	Client *es.Client
+}
+
+// StorageResult holds the storage instance and index manager
+type StorageResult struct {
+	Storage      types.Interface
+	IndexManager types.IndexManager
+}
+
+// NewStorage creates a new storage instance with the given parameters.
+// This replaces the FX-based ProvideStorage function.
+func NewStorage(p StorageParams) (StorageResult, error) {
+	// Create storage with default options
+	opts := DefaultOptions()
+	storage := &Storage{
+		client: p.Client,
+		logger: p.Logger,
+		opts:   opts,
+	}
+
+	// Create index manager
+	indexManager := NewElasticsearchIndexManager(p.Client, p.Logger)
+	storage.indexManager = indexManager
+
+	return StorageResult{
+		Storage:      storage,
+		IndexManager: indexManager,
+	}, nil
+}
 
 // Storage implements the storage interface
 type Storage struct {
@@ -41,6 +75,11 @@ func (s *Storage) createContextWithTimeout(
 	timeout time.Duration,
 ) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, timeout)
+}
+
+// GetIndexManager returns the index manager for this storage
+func (s *Storage) GetIndexManager() types.IndexManager {
+	return s.indexManager
 }
 
 // IndexDocument indexes a document in Elasticsearch
@@ -103,32 +142,26 @@ func (s *Storage) IndexDocument(ctx context.Context, index, id string, document 
 // getURLFromDocument extracts the URL from a document
 func getURLFromDocument(doc any) string {
 	switch v := doc.(type) {
-	case *models.Article:
+	case *domain.Article:
 		return v.Source
-	case *models.Content:
+	case *domain.Content:
+		return v.URL
+	case *domain.Page:
 		return v.URL
 	default:
 		return ""
 	}
 }
 
-// BulkIndex performs bulk indexing of documents
-func (s *Storage) BulkIndex(ctx context.Context, index string, documents []any) error {
-	ctx, cancel := s.createContextWithTimeout(ctx, DefaultBulkIndexTimeout)
-	defer cancel()
-
-	var buf bytes.Buffer
-	if err := s.prepareBulkIndexRequest(&buf, index, documents); err != nil {
-		return err
-	}
-
-	res, err := s.client.Bulk(
-		bytes.NewReader(buf.Bytes()),
-		s.client.Bulk.WithContext(ctx),
-		s.client.Bulk.WithRefresh("true"),
+// GetDocument retrieves a document from Elasticsearch
+func (s *Storage) GetDocument(ctx context.Context, index, id string, document any) error {
+	res, err := s.client.Get(
+		index,
+		id,
+		s.client.Get.WithContext(ctx),
 	)
 	if err != nil {
-		return fmt.Errorf("bulk indexing failed: %w", err)
+		return fmt.Errorf("error getting document: %w", err)
 	}
 	defer func() {
 		if closeErr := res.Body.Close(); closeErr != nil {
@@ -137,33 +170,87 @@ func (s *Storage) BulkIndex(ctx context.Context, index string, documents []any) 
 	}()
 
 	if res.IsError() {
-		return fmt.Errorf("bulk indexing failed: %s", res.String())
+		return fmt.Errorf("error getting document: %s", res.String())
 	}
 
-	s.logger.Info("Bulk indexed documents", "count", len(documents), "index", index)
+	if decodeErr := json.NewDecoder(res.Body).Decode(document); decodeErr != nil {
+		return fmt.Errorf("error decoding document: %w", decodeErr)
+	}
+
 	return nil
 }
 
-// prepareBulkIndexRequest prepares the bulk index request
-func (s *Storage) prepareBulkIndexRequest(
-	buf *bytes.Buffer,
-	index string,
-	documents []any,
-) error {
-	for _, doc := range documents {
-		action := map[string]any{
-			"index": map[string]any{
-				"_index": index,
-			},
-		}
-		if err := json.NewEncoder(buf).Encode(action); err != nil {
-			return fmt.Errorf("error encoding action: %w", err)
-		}
+// DeleteDocument deletes a document from Elasticsearch
+func (s *Storage) DeleteDocument(ctx context.Context, index, docID string) error {
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
+	defer cancel()
 
-		if err := json.NewEncoder(buf).Encode(doc); err != nil {
-			return fmt.Errorf("error encoding document: %w", err)
-		}
+	res, err := s.client.Delete(
+		index,
+		docID,
+		s.client.Delete.WithContext(ctx),
+	)
+	if err != nil {
+		s.logger.Error("Failed to delete document", "error", err)
+		return fmt.Errorf("error deleting document: %w", err)
 	}
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			s.logger.Error("Error closing response body", "error", closeErr)
+		}
+	}()
+
+	if res.IsError() {
+		s.logger.Error("Failed to delete document", "error", res.String())
+		return fmt.Errorf("error deleting document: %s", res.String())
+	}
+
+	s.logger.Info("Deleted document", "index", index, "docID", docID)
+	return nil
+}
+
+// SearchDocuments performs a search query and decodes the result into the provided value
+func (s *Storage) SearchDocuments(ctx context.Context, index string, query map[string]any, result any) error {
+	if s.client == nil {
+		return errors.New("elasticsearch client is not initialized")
+	}
+
+	// First check if the index exists
+	exists, err := s.IndexExists(ctx, index)
+	if err != nil {
+		return fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		s.logger.Error("Index not found", "index", index)
+		return fmt.Errorf("%w: %s", ErrIndexNotFound, index)
+	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	body, err := marshalJSON(query)
+	if err != nil {
+		return fmt.Errorf("error marshaling search query: %w", err)
+	}
+
+	res, err := s.client.Search(
+		s.client.Search.WithContext(ctx),
+		s.client.Search.WithIndex(index),
+		s.client.Search.WithBody(bytes.NewReader(body)),
+	)
+	if err != nil {
+		return fmt.Errorf("error executing search: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("search error: %s", res.String())
+	}
+
+	if decodeErr := json.NewDecoder(res.Body).Decode(result); decodeErr != nil {
+		return fmt.Errorf("error decoding search response: %w", decodeErr)
+	}
+
 	return nil
 }
 
@@ -221,6 +308,111 @@ func (s *Storage) Search(ctx context.Context, index string, query any) ([]any, e
 	}
 
 	return hitsArray, nil
+}
+
+// Count returns the number of documents matching the query
+func (s *Storage) Count(ctx context.Context, index string, query any) (int64, error) {
+	if s.client == nil {
+		return 0, errors.New("elasticsearch client is not initialized")
+	}
+
+	// First check if the index exists
+	exists, err := s.IndexExists(ctx, index)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		s.logger.Error("Index not found", "index", index)
+		return 0, fmt.Errorf("%w: %s", ErrIndexNotFound, index)
+	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	body, err := marshalJSON(query)
+	if err != nil {
+		return 0, fmt.Errorf("error marshaling count query: %w", err)
+	}
+
+	res, err := s.client.Count(
+		s.client.Count.WithContext(ctx),
+		s.client.Count.WithIndex(index),
+		s.client.Count.WithBody(bytes.NewReader(body)),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("error executing count: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return 0, fmt.Errorf("count error: %s", res.String())
+	}
+
+	var result map[string]any
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return 0, fmt.Errorf("error decoding count response: %w", decodeErr)
+	}
+
+	count, ok := result["count"].(float64)
+	if !ok {
+		return 0, errors.New("invalid response format: count not found")
+	}
+
+	return int64(count), nil
+}
+
+// Aggregate performs an aggregation query
+func (s *Storage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
+	if s.client == nil {
+		return nil, errors.New("elasticsearch client is not initialized")
+	}
+
+	// First check if the index exists
+	exists, err := s.IndexExists(ctx, index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check index existence: %w", err)
+	}
+	if !exists {
+		s.logger.Error("Index not found", "index", index)
+		return nil, fmt.Errorf("%w: %s", ErrIndexNotFound, index)
+	}
+
+	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
+	defer cancel()
+
+	body, err := marshalJSON(map[string]any{
+		"size": 0,
+		"aggs": aggs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling aggregation query: %w", err)
+	}
+
+	res, err := s.client.Search(
+		s.client.Search.WithContext(ctx),
+		s.client.Search.WithIndex(index),
+		s.client.Search.WithBody(bytes.NewReader(body)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error executing aggregation: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("aggregation error: %s", res.String())
+	}
+
+	var result map[string]any
+	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
+		return nil, fmt.Errorf("error decoding aggregation response: %w", decodeErr)
+	}
+
+	aggregations, ok := result["aggregations"].(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid response format: aggregations not found")
+	}
+
+	return aggregations, nil
 }
 
 // CreateIndex creates a new index with the specified mapping
@@ -291,77 +483,6 @@ func (s *Storage) DeleteIndex(ctx context.Context, index string) error {
 	return nil
 }
 
-// UpdateDocument updates a document in Elasticsearch
-func (s *Storage) UpdateDocument(
-	ctx context.Context,
-	index, docID string,
-	update map[string]any,
-) error {
-	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
-	defer cancel()
-
-	body := map[string]any{
-		"doc":           update,
-		"doc_as_upsert": true,
-	}
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(body); err != nil {
-		return fmt.Errorf("error encoding update: %w", err)
-	}
-
-	res, err := s.client.Update(
-		index,
-		docID,
-		&buf,
-		s.client.Update.WithContext(ctx),
-	)
-	if err != nil {
-		return fmt.Errorf("update failed: %w", err)
-	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			s.logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
-
-	if res.IsError() {
-		return fmt.Errorf("update failed: %s", res.String())
-	}
-
-	s.logger.Info("Updated document", "index", index, "docID", docID)
-	return nil
-}
-
-// DeleteDocument deletes a document from Elasticsearch
-func (s *Storage) DeleteDocument(ctx context.Context, index, docID string) error {
-	ctx, cancel := s.createContextWithTimeout(ctx, DefaultIndexTimeout)
-	defer cancel()
-
-	res, err := s.client.Delete(
-		index,
-		docID,
-		s.client.Delete.WithContext(ctx),
-	)
-	if err != nil {
-		s.logger.Error("Failed to delete document", "error", err)
-		return fmt.Errorf("error deleting document: %w", err)
-	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			s.logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
-
-	if res.IsError() {
-		s.logger.Error("Failed to delete document", "error", res.String())
-		return fmt.Errorf("error deleting document: %s", res.String())
-	}
-
-	s.logger.Info("Deleted document", "index", index, "docID", docID)
-	return nil
-}
-
 // IndexExists checks if the specified index exists
 func (s *Storage) IndexExists(ctx context.Context, indexName string) (bool, error) {
 	ctx, cancel := s.createContextWithTimeout(ctx, DefaultTestConnectionTimeout)
@@ -378,101 +499,6 @@ func (s *Storage) IndexExists(ctx context.Context, indexName string) (bool, erro
 	}()
 
 	return res.StatusCode == http.StatusOK, nil
-}
-
-// GetDocument retrieves a document from Elasticsearch
-func (s *Storage) GetDocument(ctx context.Context, index, id string, document any) error {
-	res, err := s.client.Get(
-		index,
-		id,
-		s.client.Get.WithContext(ctx),
-	)
-	if err != nil {
-		return fmt.Errorf("error getting document: %w", err)
-	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			s.logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
-
-	if res.IsError() {
-		return fmt.Errorf("error getting document: %s", res.String())
-	}
-
-	if decodeErr := json.NewDecoder(res.Body).Decode(document); decodeErr != nil {
-		return fmt.Errorf("error decoding document: %w", decodeErr)
-	}
-
-	return nil
-}
-
-// SearchDocuments performs a search query and decodes the result into the provided value
-func (s *Storage) SearchDocuments(ctx context.Context, index string, query map[string]any, result any) error {
-	if s.client == nil {
-		return errors.New("elasticsearch client is not initialized")
-	}
-
-	// First check if the index exists
-	exists, err := s.IndexExists(ctx, index)
-	if err != nil {
-		return fmt.Errorf("failed to check index existence: %w", err)
-	}
-	if !exists {
-		s.logger.Error("Index not found", "index", index)
-		return fmt.Errorf("%w: %s", ErrIndexNotFound, index)
-	}
-
-	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
-	defer cancel()
-
-	body, err := marshalJSON(query)
-	if err != nil {
-		return fmt.Errorf("error marshaling search query: %w", err)
-	}
-
-	res, err := s.client.Search(
-		s.client.Search.WithContext(ctx),
-		s.client.Search.WithIndex(index),
-		s.client.Search.WithBody(bytes.NewReader(body)),
-	)
-	if err != nil {
-		return fmt.Errorf("error executing search: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return fmt.Errorf("search error: %s", res.String())
-	}
-
-	if decodeErr := json.NewDecoder(res.Body).Decode(result); decodeErr != nil {
-		return fmt.Errorf("error decoding search response: %w", decodeErr)
-	}
-
-	return nil
-}
-
-// Ping implements Interface
-func (s *Storage) Ping(ctx context.Context) error {
-	if s.client == nil {
-		return errors.New("elasticsearch client is nil")
-	}
-
-	res, err := s.client.Ping(s.client.Ping.WithContext(ctx))
-	if err != nil {
-		return fmt.Errorf("error pinging Elasticsearch: %w", err)
-	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			s.logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
-
-	if res.IsError() {
-		return fmt.Errorf("error pinging Elasticsearch: %s", res.String())
-	}
-
-	return nil
 }
 
 // ListIndices lists all index in the cluster
@@ -645,194 +671,6 @@ func marshalJSON(v any) ([]byte, error) {
 	return data, nil
 }
 
-// SearchArticles searches for articles in Elasticsearch
-func (s *Storage) SearchArticles(ctx context.Context, query string, size int) ([]*models.Article, error) {
-	if s.client == nil {
-		return nil, errors.New("elasticsearch client is not initialized")
-	}
-
-	body, err := json.Marshal(map[string]any{
-		"query": map[string]any{
-			"multi_match": map[string]any{
-				"query":  query,
-				"fields": []string{"title^2", "content"},
-			},
-		},
-		"size": size,
-	})
-	if err != nil {
-		s.logger.Error("Failed to marshal search query", "error", err)
-		return nil, fmt.Errorf("error marshaling search query: %w", err)
-	}
-
-	res, searchErr := s.client.Search(
-		s.client.Search.WithContext(ctx),
-		s.client.Search.WithIndex(s.opts.IndexName),
-		s.client.Search.WithBody(bytes.NewReader(body)),
-	)
-	if searchErr != nil {
-		s.logger.Error("Failed to execute search", "error", searchErr)
-		return nil, fmt.Errorf("error executing search: %w", searchErr)
-	}
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != nil {
-			s.logger.Error("Error closing response body", "error", closeErr)
-		}
-	}()
-
-	if res.IsError() {
-		s.logger.Error("Failed to execute search", "error", res.String())
-		return nil, fmt.Errorf("error executing search: %s", res.String())
-	}
-
-	var result map[string]any
-	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		s.logger.Error("Failed to decode search result", "error", decodeErr)
-		return nil, fmt.Errorf("error decoding search result: %w", decodeErr)
-	}
-
-	hits, ok := result["hits"].(map[string]any)
-	if !ok {
-		s.logger.Error("Failed to decode search result", "error", "invalid search result format")
-		return nil, errors.New("invalid search result format")
-	}
-
-	hitsArray, ok := hits["hits"].([]any)
-	if !ok {
-		s.logger.Error("Failed to decode search result", "error", "invalid search result format")
-		return nil, errors.New("invalid search result format")
-	}
-
-	articles := make([]*models.Article, 0, len(hitsArray))
-	for _, hit := range hitsArray {
-		hitMap, hitOk := hit.(map[string]any)
-		if !hitOk {
-			continue
-		}
-
-		source, sourceOk := hitMap["_source"].(map[string]any)
-		if !sourceOk {
-			continue
-		}
-
-		article := &models.Article{}
-		if decodeErr := mapstructure.Decode(source, article); decodeErr != nil {
-			s.logger.Error("Failed to decode article", "error", decodeErr)
-			continue
-		}
-
-		articles = append(articles, article)
-	}
-
-	s.logger.Info("Executed search successfully", "query", query, "size", size)
-	return articles, nil
-}
-
-// Aggregate performs an aggregation query
-func (s *Storage) Aggregate(ctx context.Context, index string, aggs any) (any, error) {
-	if s.client == nil {
-		return nil, errors.New("elasticsearch client is not initialized")
-	}
-
-	// First check if the index exists
-	exists, err := s.IndexExists(ctx, index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check index existence: %w", err)
-	}
-	if !exists {
-		s.logger.Error("Index not found", "index", index)
-		return nil, fmt.Errorf("%w: %s", ErrIndexNotFound, index)
-	}
-
-	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
-	defer cancel()
-
-	body, err := marshalJSON(map[string]any{
-		"size": 0,
-		"aggs": aggs,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling aggregation query: %w", err)
-	}
-
-	res, err := s.client.Search(
-		s.client.Search.WithContext(ctx),
-		s.client.Search.WithIndex(index),
-		s.client.Search.WithBody(bytes.NewReader(body)),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error executing aggregation: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return nil, fmt.Errorf("aggregation error: %s", res.String())
-	}
-
-	var result map[string]any
-	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		return nil, fmt.Errorf("error decoding aggregation response: %w", decodeErr)
-	}
-
-	aggregations, ok := result["aggregations"].(map[string]any)
-	if !ok {
-		return nil, errors.New("invalid response format: aggregations not found")
-	}
-
-	return aggregations, nil
-}
-
-// Count returns the number of documents matching the query
-func (s *Storage) Count(ctx context.Context, index string, query any) (int64, error) {
-	if s.client == nil {
-		return 0, errors.New("elasticsearch client is not initialized")
-	}
-
-	// First check if the index exists
-	exists, err := s.IndexExists(ctx, index)
-	if err != nil {
-		return 0, fmt.Errorf("failed to check index existence: %w", err)
-	}
-	if !exists {
-		s.logger.Error("Index not found", "index", index)
-		return 0, fmt.Errorf("%w: %s", ErrIndexNotFound, index)
-	}
-
-	ctx, cancel := s.createContextWithTimeout(ctx, DefaultSearchTimeout)
-	defer cancel()
-
-	body, err := marshalJSON(query)
-	if err != nil {
-		return 0, fmt.Errorf("error marshaling count query: %w", err)
-	}
-
-	res, err := s.client.Count(
-		s.client.Count.WithContext(ctx),
-		s.client.Count.WithIndex(index),
-		s.client.Count.WithBody(bytes.NewReader(body)),
-	)
-	if err != nil {
-		return 0, fmt.Errorf("error executing count: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return 0, fmt.Errorf("count error: %s", res.String())
-	}
-
-	var result map[string]any
-	if decodeErr := json.NewDecoder(res.Body).Decode(&result); decodeErr != nil {
-		return 0, fmt.Errorf("error decoding count response: %w", decodeErr)
-	}
-
-	count, ok := result["count"].(float64)
-	if !ok {
-		return 0, errors.New("invalid response format: count not found")
-	}
-
-	return int64(count), nil
-}
-
 // TestConnection tests the connection to the storage backend
 func (s *Storage) TestConnection(ctx context.Context) error {
 	if s.client == nil {
@@ -856,9 +694,4 @@ func (s *Storage) TestConnection(ctx context.Context) error {
 func (s *Storage) Close() error {
 	// No resources to close in this implementation
 	return nil
-}
-
-// GetIndexManager returns the index manager for this storage
-func (s *Storage) GetIndexManager() types.IndexManager {
-	return s.indexManager
 }

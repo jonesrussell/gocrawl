@@ -10,8 +10,8 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/processor"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
@@ -23,7 +23,7 @@ type ArticleProcessor struct {
 	validator      content.JobValidator
 	storage        types.Interface
 	indexName      string
-	articleChannel chan *models.Article
+	articleChannel chan *domain.Article
 	articleIndexer processor.Processor
 	pageIndexer    processor.Processor
 }
@@ -35,7 +35,7 @@ func NewProcessor(
 	validator content.JobValidator,
 	storage types.Interface,
 	indexName string,
-	articleChannel chan *models.Article,
+	articleChannel chan *domain.Article,
 	articleIndexer processor.Processor,
 	pageIndexer processor.Processor,
 ) *ArticleProcessor {

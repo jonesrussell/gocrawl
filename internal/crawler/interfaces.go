@@ -8,9 +8,9 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/metrics"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
@@ -94,11 +94,11 @@ type ContentProcessor interface {
 // ArticleStorage handles data persistence.
 type ArticleStorage interface {
 	// SaveArticle saves an article.
-	SaveArticle(ctx context.Context, article *models.Article) error
+	SaveArticle(ctx context.Context, article *domain.Article) error
 	// GetArticle retrieves an article.
-	GetArticle(ctx context.Context, id string) (*models.Article, error)
+	GetArticle(ctx context.Context, id string) (*domain.Article, error)
 	// ListArticles lists articles matching the query.
-	ListArticles(ctx context.Context, query string) ([]*models.Article, error)
+	ListArticles(ctx context.Context, query string) ([]*domain.Article, error)
 }
 
 // Extended Interface
@@ -125,7 +125,7 @@ type Interface interface {
 	// GetProcessors returns the processors
 	GetProcessors() []content.Processor
 	// GetArticleChannel returns the article channel
-	GetArticleChannel() chan *models.Article
+	GetArticleChannel() chan *domain.Article
 	// Done returns a channel that's closed when the crawler is done
 	Done() <-chan struct{}
 }

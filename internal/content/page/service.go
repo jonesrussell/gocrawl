@@ -10,10 +10,10 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	sourceutils "github.com/jonesrussell/gocrawl/internal/sourceutils"
+	"github.com/jonesrussell/gocrawl/internal/sources/types"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -79,7 +79,7 @@ func (s *sourceWrapper) FindSourceByURL(rawURL string) *configtypes.Source {
 		source := &allSources[i]
 		// A more robust check might involve parsing domains or using a more sophisticated matching logic
 		if strings.Contains(rawURL, source.URL) {
-			return sourceutils.ConvertToConfigSource(source)
+			return types.ConvertToConfigSource(source)
 		}
 	}
 	return nil
@@ -113,8 +113,8 @@ func (s *ContentService) Process(e *colly.HTMLElement) error {
 	// Extract page data using Colly methods with selectors
 	pageData := extractPage(e, selectors, sourceURL)
 
-	// Convert to models.Page
-	page := &models.Page{
+	// Convert to domain.Page
+	page := &domain.Page{
 		ID:            pageData.ID,
 		URL:           pageData.URL,
 		Title:         pageData.Title,

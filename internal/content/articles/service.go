@@ -9,8 +9,8 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
@@ -63,7 +63,7 @@ func (s *ContentService) Process(e *colly.HTMLElement) error {
 		// Try to find source by matching URL domain
 		sourceConfig := s.findSourceByURL(sourceURL)
 		if sourceConfig != nil {
-			// Convert sourceutils.ArticleSelectors to configtypes.ArticleSelectors
+			// Convert types.ArticleSelectors to configtypes.ArticleSelectors
 			selectors = configtypes.ArticleSelectors{
 				Container:     sourceConfig.Selectors.Article.Container,
 				Title:         sourceConfig.Selectors.Article.Title,
@@ -107,8 +107,8 @@ func (s *ContentService) Process(e *colly.HTMLElement) error {
 	// Extract article data using Colly methods
 	articleData := extractArticle(e, selectors, sourceURL)
 
-	// Convert to models.Article
-	article := &models.Article{
+	// Convert to domain.Article
+	article := &domain.Article{
 		ID:            articleData.ID,
 		Title:         articleData.Title,
 		Body:          articleData.Body,
@@ -176,13 +176,13 @@ func (s *ContentService) findSourceByURL(pageURL string) *sources.Config {
 }
 
 // ProcessArticle implements the ServiceInterface for article processing.
-func (s *ContentService) ProcessArticle(ctx context.Context, article *models.Article) error {
+func (s *ContentService) ProcessArticle(ctx context.Context, article *domain.Article) error {
 	return s.ProcessArticleWithIndex(ctx, article, s.indexName)
 }
 
 // ProcessArticleWithIndex processes an article and indexes it to the specified index.
 // This method uses a local indexName parameter to avoid data races when called concurrently.
-func (s *ContentService) ProcessArticleWithIndex(ctx context.Context, article *models.Article, indexName string) error {
+func (s *ContentService) ProcessArticleWithIndex(ctx context.Context, article *domain.Article, indexName string) error {
 	if article == nil {
 		return errors.New("article is nil")
 	}
@@ -215,13 +215,13 @@ func (s *ContentService) ProcessArticleWithIndex(ctx context.Context, article *m
 }
 
 // Get implements the ServiceInterface.
-func (s *ContentService) Get(ctx context.Context, id string) (*models.Article, error) {
+func (s *ContentService) Get(ctx context.Context, id string) (*domain.Article, error) {
 	// Implementation
 	return nil, errors.New("not implemented")
 }
 
 // List returns a list of articles matching the query
-func (s *ContentService) List(ctx context.Context, query map[string]any) ([]*models.Article, error) {
+func (s *ContentService) List(ctx context.Context, query map[string]any) ([]*domain.Article, error) {
 	// TODO: Implement article listing
 	return nil, errors.New("not implemented")
 }
@@ -233,13 +233,13 @@ func (s *ContentService) Delete(ctx context.Context, id string) error {
 }
 
 // Update implements the ServiceInterface.
-func (s *ContentService) Update(ctx context.Context, article *models.Article) error {
+func (s *ContentService) Update(ctx context.Context, article *domain.Article) error {
 	// Implementation
 	return nil
 }
 
 // Create implements the ServiceInterface.
-func (s *ContentService) Create(ctx context.Context, article *models.Article) error {
+func (s *ContentService) Create(ctx context.Context, article *domain.Article) error {
 	// Implementation
 	return nil
 }

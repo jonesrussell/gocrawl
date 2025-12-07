@@ -11,8 +11,8 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -23,7 +23,7 @@ type PageProcessor struct {
 	validator   content.JobValidator
 	storage     types.Interface
 	indexName   string
-	pageChannel chan *models.Page
+	pageChannel chan *domain.Page
 	registry    []content.ContentProcessor
 }
 
@@ -34,7 +34,7 @@ func NewPageProcessor(
 	validator content.JobValidator,
 	storage types.Interface,
 	indexName string,
-	pageChannel chan *models.Page,
+	pageChannel chan *domain.Page,
 ) *PageProcessor {
 	return &PageProcessor{
 		logger:      log,

@@ -8,16 +8,13 @@ import (
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
-	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	articlespkg "github.com/jonesrussell/gocrawl/internal/content/articles"
 	pagepkg "github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
 )
 
 // Cmd represents the scheduler command.
@@ -125,18 +122,8 @@ func createCrawlerInstance(
 		return nil, errors.New("crawler configuration is required")
 	}
 
-	// Create crawler using ProvideCrawler
-	crawlerResult, err := crawler.ProvideCrawler(struct {
-		fx.In
-		Logger         logger.Interface
-		Bus            *events.EventBus
-		IndexManager   types.IndexManager
-		Sources        sources.Interface
-		Config         *crawlerconfig.Config
-		ArticleService articlespkg.Interface
-		PageService    pagepkg.Interface
-		Storage        types.Interface
-	}{
+	// Create crawler using NewCrawlerWithParams
+	crawlerResult, err := crawler.NewCrawlerWithParams(crawler.CrawlerParams{
 		Logger:         log,
 		Bus:            bus,
 		IndexManager:   storageResult.IndexManager,

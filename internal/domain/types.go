@@ -1,5 +1,5 @@
-// Package content provides content processing types and interfaces.
-package content
+// Package domain provides domain models used across the application.
+package domain
 
 // Type represents the type of content being processed.
 type Type string
@@ -15,7 +15,7 @@ const (
 	Image Type = "image"
 	// HTML represents HTML content.
 	HTML Type = "html"
-	// Job represents job content.
+	// JobType represents job content.
 	JobType Type = "job"
 )
 
