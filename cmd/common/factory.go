@@ -1,24 +1,16 @@
 package common
 
-
-
 import (
-
 	"fmt"
 
 	"strings"
-
-
 
 	"github.com/jonesrussell/gocrawl/internal/config"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
 
 	"github.com/spf13/viper"
-
 )
-
-
 
 // NewCommandDeps creates CommandDeps by loading config and creating logger.
 
@@ -36,8 +28,6 @@ func NewCommandDeps() (CommandDeps, error) {
 
 	}
 
-
-
 	// Get logger configuration from Viper
 
 	logLevel := viper.GetString("logger.level")
@@ -50,23 +40,18 @@ func NewCommandDeps() (CommandDeps, error) {
 
 	logLevel = strings.ToLower(logLevel)
 
-
-
 	logCfg := &logger.Config{
 
-		Level:       logger.Level(logLevel),
+		Level: logger.Level(logLevel),
 
 		Development: viper.GetBool("logger.development"),
 
-		Encoding:    viper.GetString("logger.encoding"),
+		Encoding: viper.GetString("logger.encoding"),
 
 		OutputPaths: viper.GetStringSlice("logger.output_paths"),
 
 		EnableColor: viper.GetBool("logger.enable_color"),
-
 	}
-
-
 
 	log, err := logger.New(logCfg)
 
@@ -76,25 +61,18 @@ func NewCommandDeps() (CommandDeps, error) {
 
 	}
 
-
-
 	deps := CommandDeps{
 
 		Logger: log,
 
 		Config: cfg,
-
 	}
-
-
 
 	if err := deps.Validate(); err != nil {
 
 		return CommandDeps{}, fmt.Errorf("validate deps: %w", err)
 
 	}
-
-
 
 	return deps, nil
 
