@@ -37,6 +37,7 @@ type SourceConfig struct {
 	Time           []string
 	Index          string
 	ArticleIndex   string
+	PageIndex      string
 	Selectors      SelectorConfig
 	Rules          types.Rules
 }
@@ -45,6 +46,7 @@ type SourceConfig struct {
 type SelectorConfig struct {
 	Article ArticleSelectors
 	List    ListSelectors
+	Page    PageSelectors
 }
 
 // ListSelectors defines the CSS selectors used for article list page extraction.
@@ -87,6 +89,21 @@ type ArticleSelectors struct {
 	Exclude       []string
 }
 
+// PageSelectors defines the CSS selectors used for page content extraction.
+type PageSelectors struct {
+	Container     string
+	Title         string
+	Content       string
+	Description   string
+	Keywords      string
+	OGTitle       string
+	OGDescription string
+	OGImage       string
+	OgURL         string
+	Canonical     string
+	Exclude       []string
+}
+
 // ConvertToConfigSource converts a SourceConfig to a types.Source.
 func ConvertToConfigSource(source *SourceConfig) *types.Source {
 	if source == nil {
@@ -101,8 +118,9 @@ func ConvertToConfigSource(source *SourceConfig) *types.Source {
 		RateLimit:      source.RateLimit.String(),
 		MaxDepth:       source.MaxDepth,
 		Time:           source.Time,
-		Index:          source.Index,
-		ArticleIndex:   source.ArticleIndex,
+		Index:        source.Index,
+		ArticleIndex: source.ArticleIndex,
+		PageIndex:    source.PageIndex,
 		Selectors: types.SourceSelectors{
 			Article: types.ArticleSelectors{
 				Container:     source.Selectors.Article.Container,

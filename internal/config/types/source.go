@@ -24,6 +24,8 @@ type Source struct {
 	Index string `yaml:"index"`
 	// ArticleIndex is the name of the index for articles
 	ArticleIndex string `yaml:"article_index"`
+	// PageIndex is the name of the index for pages
+	PageIndex string `yaml:"page_index"`
 	// Selectors define CSS selectors for extracting content
 	Selectors SourceSelectors `yaml:"selectors"`
 	// Rules define crawling rules for this source

@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/gocolly/colly/v2"
+	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	sourceutils "github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -21,10 +24,16 @@ type Interface interface {
 
 // ContentService implements the Interface for page processing.
 type ContentService struct {
-	logger    logger.Interface
-	storage   types.Interface
-	indexName string
-	sources   sources.Interface
+	logger        logger.Interface
+	storage       types.Interface
+	indexName     string
+	sources       sources.Interface
+	sourceManager SourceManager
+}
+
+// SourceManager defines the interface for managing sources.
+type SourceManager interface {
+	FindSourceByURL(rawURL string) *configtypes.Source
 }
 
 // NewContentService creates a new page content service.
@@ -39,11 +48,35 @@ func NewContentService(logger logger.Interface, storage types.Interface, indexNa
 // NewContentServiceWithSources creates a new page content service with sources access.
 func NewContentServiceWithSources(logger logger.Interface, storage types.Interface, indexName string, sources sources.Interface) Interface {
 	return &ContentService{
-		logger:    logger,
-		storage:   storage,
-		indexName: indexName,
-		sources:   sources,
+		logger:        logger,
+		storage:       storage,
+		indexName:     indexName,
+		sources:       sources,
+		sourceManager: &sourceWrapper{sources: sources},
 	}
+}
+
+// sourceWrapper wraps sources.Interface to implement SourceManager.
+type sourceWrapper struct {
+	sources sources.Interface
+}
+
+// FindSourceByURL implements SourceManager.
+func (s *sourceWrapper) FindSourceByURL(rawURL string) *configtypes.Source {
+	if s.sources == nil {
+		return nil
+	}
+	allSources, err := s.sources.GetSources()
+	if err != nil {
+		return nil
+	}
+	for _, source := range allSources {
+		// A more robust check might involve parsing domains or using a more sophisticated matching logic
+		if strings.Contains(rawURL, source.URL) {
+			return sourceutils.ConvertToConfigSource(&source)
+		}
+	}
+	return nil
 }
 
 // Process implements the Interface.
@@ -57,18 +90,22 @@ func (s *ContentService) Process(e *colly.HTMLElement) error {
 	// Get source configuration and determine index name
 	// Use local variable to avoid data race when Process() is called concurrently
 	indexName := s.indexName
+	selectors := GetSelectorsForURL(s.sourceManager, sourceURL)
 	if s.sources != nil {
 		sourceConfig := s.findSourceByURL(sourceURL)
 		if sourceConfig != nil {
 			// Use source's page index if available (local variable, no race condition)
-			if sourceConfig.Index != "" {
+			// Prefer PageIndex, fallback to Index for backward compatibility
+			if sourceConfig.PageIndex != "" {
+				indexName = sourceConfig.PageIndex
+			} else if sourceConfig.Index != "" {
 				indexName = sourceConfig.Index
 			}
 		}
 	}
 
-	// Extract page data using Colly methods
-	pageData := extractPage(e, sourceURL)
+	// Extract page data using Colly methods with selectors
+	pageData := extractPage(e, selectors, sourceURL)
 
 	// Convert to models.Page
 	page := &models.Page{
@@ -107,6 +144,7 @@ func (s *ContentService) Process(e *colly.HTMLElement) error {
 }
 
 // findSourceByURL attempts to find a source configuration by matching the URL domain.
+// This is a helper method that returns sources.Config (which has PageIndex field).
 func (s *ContentService) findSourceByURL(pageURL string) *sources.Config {
 	if s.sources == nil {
 		return nil

@@ -387,18 +387,15 @@ func LoadFromViper(v *viper.Viper) *Config {
 	var addresses []string
 
 	// First, check environment variables directly to ensure they take precedence over defaults
-	// This is important because GetStringSlice might return defaults even when env vars are set
+	// Environment variables are always comma-separated strings
 	var addrStr string
 	if envAddr := os.Getenv("ELASTICSEARCH_HOSTS"); envAddr != "" {
 		addrStr = envAddr
 	} else if envAddr := os.Getenv("ELASTICSEARCH_ADDRESSES"); envAddr != "" {
 		addrStr = envAddr
-	} else {
-		// If no env var is set, try Viper's GetString (which respects bindings)
-		addrStr = v.GetString("elasticsearch.addresses")
 	}
 
-	// If we have a string value (from env var or Viper), parse it
+	// If we have an environment variable, parse it as a comma-separated string
 	if addrStr != "" {
 		// Split comma-separated addresses
 		addresses = strings.Split(addrStr, ",")
@@ -415,7 +412,8 @@ func LoadFromViper(v *viper.Viper) *Config {
 		}
 		addresses = filtered
 	} else {
-		// If no string value, try GetStringSlice (for YAML configs with array syntax)
+		// No environment variable set, try GetStringSlice first (for YAML configs with array syntax)
+		// This properly handles YAML arrays like: addresses: ["http://127.0.0.1:9200"]
 		addresses = v.GetStringSlice("elasticsearch.addresses")
 		// Filter out empty strings
 		var filtered []string
@@ -425,6 +423,28 @@ func LoadFromViper(v *viper.Viper) *Config {
 			}
 		}
 		addresses = filtered
+
+		// If GetStringSlice returned empty (e.g., config has a string value instead of array),
+		// fall back to GetString and parse as comma-separated
+		if len(addresses) == 0 {
+			addrStr = v.GetString("elasticsearch.addresses")
+			if addrStr != "" {
+				// Split comma-separated addresses
+				addresses = strings.Split(addrStr, ",")
+				// Trim whitespace from each address
+				for i := range addresses {
+					addresses[i] = strings.TrimSpace(addresses[i])
+				}
+				// Remove any empty strings after trimming
+				filtered = []string{}
+				for _, addr := range addresses {
+					if addr != "" {
+						filtered = append(filtered, addr)
+					}
+				}
+				addresses = filtered
+			}
+		}
 	}
 
 	// If addresses is still empty, use default

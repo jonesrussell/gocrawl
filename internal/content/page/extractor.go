@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
 // extractText extracts text from the first element matching the selector.
@@ -78,9 +79,38 @@ func generateID(url string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// extractPage extracts page data from HTML element.
-// For pages, we use simpler extraction since pages don't have article-specific selectors.
-func extractPage(e *colly.HTMLElement, sourceURL string) *PageData {
+// applyExcludes removes elements matching exclude selectors from the HTML element.
+func applyExcludes(e *colly.HTMLElement, excludes []string) {
+	for _, excludeSelector := range excludes {
+		if excludeSelector != "" {
+			e.DOM.Find(excludeSelector).Remove()
+		}
+	}
+}
+
+// GetSelectorsForURL retrieves the appropriate PageSelectors for a given URL.
+func GetSelectorsForURL(sourceManager interface {
+	FindSourceByURL(rawURL string) *configtypes.Source
+}, url string) configtypes.PageSelectors {
+	if sourceManager == nil {
+		var defaultSelectors configtypes.PageSelectors
+		return defaultSelectors.Default()
+	}
+
+	sourceConfig := sourceManager.FindSourceByURL(url)
+	if sourceConfig != nil {
+		return sourceConfig.Selectors.Page
+	}
+
+	var defaultSelectors configtypes.PageSelectors
+	return defaultSelectors.Default()
+}
+
+// extractPage extracts page data from HTML element using selectors.
+func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sourceURL string) *PageData {
+	// Apply exclude selectors before extraction
+	applyExcludes(e, selectors.Exclude)
+
 	data := &PageData{
 		URL:       sourceURL,
 		CreatedAt: time.Now(),
@@ -90,8 +120,8 @@ func extractPage(e *colly.HTMLElement, sourceURL string) *PageData {
 	// Generate ID from URL
 	data.ID = generateID(sourceURL)
 
-	// Extract title - try h1, then og:title, then title tag
-	data.Title = extractText(e, "h1")
+	// Extract title using selector, with fallbacks
+	data.Title = extractText(e, selectors.Title)
 	if data.Title == "" {
 		data.Title = extractMeta(e, "og:title")
 	}
@@ -100,8 +130,11 @@ func extractPage(e *colly.HTMLElement, sourceURL string) *PageData {
 		data.Title = e.ChildText("title")
 	}
 
-	// Extract content - try main, article, or body
-	data.Content = extractText(e, "main")
+	// Extract content using selector, with fallbacks
+	data.Content = extractText(e, selectors.Content)
+	if data.Content == "" {
+		data.Content = extractText(e, "main")
+	}
 	if data.Content == "" {
 		data.Content = extractText(e, "article")
 	}
@@ -109,14 +142,20 @@ func extractPage(e *colly.HTMLElement, sourceURL string) *PageData {
 		data.Content = extractText(e, "body")
 	}
 
-	// Extract description
-	data.Description = extractMetaName(e, "description")
+	// Extract description using selector, with fallbacks
+	data.Description = extractText(e, selectors.Description)
+	if data.Description == "" {
+		data.Description = extractMetaName(e, "description")
+	}
 	if data.Description == "" {
 		data.Description = extractMeta(e, "og:description")
 	}
 
-	// Extract keywords
-	keywordsStr := extractMetaName(e, "keywords")
+	// Extract keywords using selector, with fallbacks
+	keywordsStr := extractText(e, selectors.Keywords)
+	if keywordsStr == "" {
+		keywordsStr = extractMetaName(e, "keywords")
+	}
 	if keywordsStr != "" {
 		data.Keywords = strings.Split(keywordsStr, ",")
 		for i := range data.Keywords {
@@ -124,22 +163,38 @@ func extractPage(e *colly.HTMLElement, sourceURL string) *PageData {
 		}
 	}
 
-	// Extract Open Graph metadata
-	data.OgTitle = extractMeta(e, "og:title")
+	// Extract Open Graph metadata using selectors, with fallbacks
+	data.OgTitle = extractText(e, selectors.OGTitle)
+	if data.OgTitle == "" {
+		data.OgTitle = extractMeta(e, "og:title")
+	}
 	if data.OgTitle == "" {
 		data.OgTitle = data.Title
 	}
 
-	data.OgDescription = extractMeta(e, "og:description")
+	data.OgDescription = extractText(e, selectors.OGDescription)
+	if data.OgDescription == "" {
+		data.OgDescription = extractMeta(e, "og:description")
+	}
 	if data.OgDescription == "" {
 		data.OgDescription = data.Description
 	}
 
-	data.OgImage = extractMeta(e, "og:image")
-	data.OgURL = extractMeta(e, "og:url")
+	data.OgImage = extractText(e, selectors.OGImage)
+	if data.OgImage == "" {
+		data.OgImage = extractMeta(e, "og:image")
+	}
 
-	// Extract canonical URL
-	data.CanonicalURL = extractAttr(e, "link[rel='canonical']", "href")
+	data.OgURL = extractText(e, selectors.OgURL)
+	if data.OgURL == "" {
+		data.OgURL = extractMeta(e, "og:url")
+	}
+
+	// Extract canonical URL using selector, with fallback
+	data.CanonicalURL = extractAttr(e, selectors.Canonical, "href")
+	if data.CanonicalURL == "" {
+		data.CanonicalURL = extractAttr(e, "link[rel='canonical']", "href")
+	}
 	if data.CanonicalURL == "" {
 		data.CanonicalURL = sourceURL
 	}

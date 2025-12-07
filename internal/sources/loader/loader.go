@@ -28,6 +28,7 @@ type Config struct {
 	MaxDepth     int               `mapstructure:"max_depth"`
 	Time         []string          `mapstructure:"time"`
 	ArticleIndex string            `mapstructure:"article_index"`
+	PageIndex    string            `mapstructure:"page_index"`
 	Index        string            `mapstructure:"index"`
 	Selectors    SourceSelectors   `mapstructure:"selectors"`
 	UserAgent    string            `mapstructure:"user_agent"`
@@ -38,6 +39,7 @@ type Config struct {
 type SourceSelectors struct {
 	Article ArticleSelectors `mapstructure:"article"`
 	List    ListSelectors    `mapstructure:"list"`
+	Page    PageSelectors    `mapstructure:"page"`
 }
 
 // ListSelectors defines the CSS selectors used for article list page extraction.
@@ -77,6 +79,21 @@ type ArticleSelectors struct {
 	Author        string   `mapstructure:"author"`
 	BylineName    string   `mapstructure:"byline_name"`
 	ArticleID     string   `mapstructure:"article_id"`
+	Exclude       []string `mapstructure:"exclude"`
+}
+
+// PageSelectors defines the CSS selectors used for page content extraction.
+type PageSelectors struct {
+	Container     string   `mapstructure:"container"`
+	Title         string   `mapstructure:"title"`
+	Content       string   `mapstructure:"content"`
+	Description   string   `mapstructure:"description"`
+	Keywords      string   `mapstructure:"keywords"`
+	OGTitle       string   `mapstructure:"og_title"`
+	OGDescription string   `mapstructure:"og_description"`
+	OGImage       string   `mapstructure:"og_image"`
+	OgURL         string   `mapstructure:"og_url"`
+	Canonical     string   `mapstructure:"canonical"`
 	Exclude       []string `mapstructure:"exclude"`
 }
 

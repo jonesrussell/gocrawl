@@ -41,6 +41,7 @@ var _ Interface = (*Sources)(nil)
 func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
 	var articleSelectors sourceutils.ArticleSelectors
 	var listSelectors sourceutils.ListSelectors
+	var pageSelectors sourceutils.PageSelectors
 
 	switch s := selectors.(type) {
 	case configtypes.SourceSelectors:
@@ -79,6 +80,19 @@ func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
 			ArticleCards:    s.List.ArticleCards,
 			ArticleList:     s.List.ArticleList,
 			ExcludeFromList: s.List.ExcludeFromList,
+		}
+		pageSelectors = sourceutils.PageSelectors{
+			Container:     s.Page.Container,
+			Title:         s.Page.Title,
+			Content:       s.Page.Content,
+			Description:   s.Page.Description,
+			Keywords:      s.Page.Keywords,
+			OGTitle:       s.Page.OGTitle,
+			OGDescription: s.Page.OGDescription,
+			OGImage:       s.Page.OGImage,
+			OgURL:         s.Page.OgURL,
+			Canonical:     s.Page.Canonical,
+			Exclude:       s.Page.Exclude,
 		}
 	case configtypes.ArticleSelectors:
 		articleSelectors = sourceutils.ArticleSelectors{
@@ -179,15 +193,17 @@ func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
 			ArticleID:     s.ArticleID,
 			Exclude:       s.Exclude,
 		}
-	default:
+		default:
 		// Return empty selectors for unknown types
 		articleSelectors = sourceutils.ArticleSelectors{}
 		listSelectors = sourceutils.ListSelectors{}
+		pageSelectors = sourceutils.PageSelectors{}
 	}
 
 	return sourceutils.SelectorConfig{
 		Article: articleSelectors,
 		List:    listSelectors,
+		Page:    pageSelectors,
 	}
 }
 
@@ -296,6 +312,7 @@ func convertLoaderConfig(cfg loader.Config) Config {
 			Time:           cfg.Time,
 			Index:          cfg.Index,
 			ArticleIndex:   cfg.ArticleIndex,
+			PageIndex:      cfg.PageIndex,
 			Selectors:      createSelectorConfig(cfg.Selectors),
 			Rules:          configtypes.Rules{},
 		}
@@ -317,6 +334,7 @@ func convertLoaderConfig(cfg loader.Config) Config {
 		Time:           cfg.Time,
 		Index:          cfg.Index,
 		ArticleIndex:   cfg.ArticleIndex,
+		PageIndex:      cfg.PageIndex,
 		Selectors:      createSelectorConfig(cfg.Selectors),
 		Rules:          configtypes.Rules{},
 	}
@@ -461,8 +479,13 @@ func (s *Sources) ValidateSource(
 	}
 
 	// Ensure page index exists if specified
-	if selectedSource.Index != "" {
-		if pageErr := indexManager.EnsurePageIndex(ctx, selectedSource.Index); pageErr != nil {
+	// Use PageIndex if available, fallback to Index for backward compatibility
+	pageIndexName := selectedSource.PageIndex
+	if pageIndexName == "" {
+		pageIndexName = selectedSource.Index
+	}
+	if pageIndexName != "" {
+		if pageErr := indexManager.EnsurePageIndex(ctx, pageIndexName); pageErr != nil {
 			return nil, fmt.Errorf("failed to ensure page index exists: %w", pageErr)
 		}
 	}
@@ -633,6 +656,19 @@ func NewSelectorConfigFromLoader(src loader.Config) SelectorConfig {
 			ArticleCards:    src.Selectors.List.ArticleCards,
 			ArticleList:     src.Selectors.List.ArticleList,
 			ExcludeFromList: src.Selectors.List.ExcludeFromList,
+		},
+		Page: sourceutils.PageSelectors{
+			Container:     src.Selectors.Page.Container,
+			Title:         src.Selectors.Page.Title,
+			Content:       src.Selectors.Page.Content,
+			Description:   src.Selectors.Page.Description,
+			Keywords:      src.Selectors.Page.Keywords,
+			OGTitle:       src.Selectors.Page.OGTitle,
+			OGDescription: src.Selectors.Page.OGDescription,
+			OGImage:       src.Selectors.Page.OGImage,
+			OgURL:         src.Selectors.Page.OgURL,
+			Canonical:     src.Selectors.Page.Canonical,
+			Exclude:       src.Selectors.Page.Exclude,
 		},
 	}
 }
