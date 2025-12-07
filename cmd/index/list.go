@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"github.com/olekukonko/tablewriter"
 )
 
 // TableRenderer handles the display of index data in a table format
@@ -48,20 +48,43 @@ func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface
 		return nil
 	}
 
-	// Create table
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Index", "Health", "Status", "Docs", "Size"})
-	table.SetAutoWrapText(false)
-	table.SetAutoFormatHeaders(true)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetCenterSeparator("")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetTablePadding("\t")
-	table.SetNoWhiteSpace(true)
+	// Initialize table writer with stdout as output
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+
+	// Configure table to match original tablewriter behavior:
+	// - No borders or separators (plain text format)
+	// - Tab padding between columns
+	noBorderStyle := table.Style{
+		Box: table.BoxStyle{
+			BottomLeft:       "",
+			BottomRight:      "",
+			BottomSeparator:  "",
+			Left:             "",
+			LeftSeparator:    "",
+			MiddleHorizontal: "",
+			MiddleSeparator:  "",
+			MiddleVertical:   "",
+			PaddingLeft:      "\t",
+			PaddingRight:     "\t",
+			Right:            "",
+			RightSeparator:   "",
+			TopLeft:          "",
+			TopRight:         "",
+			TopSeparator:     "",
+			UnfinishedRow:    "",
+		},
+		Options: table.Options{
+			DrawBorder:      false,
+			SeparateColumns: false,
+			SeparateHeader:  false,
+			SeparateRows:    false,
+		},
+	}
+	t.SetStyle(noBorderStyle)
+
+	// Add table headers
+	t.AppendHeader(table.Row{"Index", "Health", "Status", "Docs", "Size"})
 
 	// Add rows
 	for _, index := range indices {
@@ -81,7 +104,7 @@ func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface
 		ingestionStatus := getIngestionStatus(health)
 
 		// Add row
-		table.Append([]string{
+		t.AppendRow(table.Row{
 			index,
 			health,
 			ingestionStatus,
@@ -90,7 +113,8 @@ func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface
 		})
 	}
 
-	table.Render()
+	// Render the table
+	t.Render()
 	return nil
 }
 
