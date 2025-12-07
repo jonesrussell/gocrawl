@@ -45,7 +45,7 @@ func (r *TableRenderer) handleIndexError(operation, index string, err error, act
 }
 
 // RenderTable formats and displays the index in a table format
-func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface, indices []string) error {
+func (r *TableRenderer) RenderTable(ctx context.Context, stor types.Interface, indices []string) error {
 	if len(indices) == 0 {
 		r.logger.Info("No indices found in Elasticsearch")
 		return nil
@@ -92,13 +92,13 @@ func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface
 	// Add rows
 	for _, index := range indices {
 		// Get index health
-		health, err := storage.GetIndexHealth(ctx, index)
+		health, err := stor.GetIndexHealth(ctx, index)
 		if err != nil {
 			return r.handleIndexError("get health", index, err, "Skipping index", "Failed to retrieve index health")
 		}
 
 		// Get document count
-		count, err := storage.GetIndexDocCount(ctx, index)
+		count, err := stor.GetIndexDocCount(ctx, index)
 		if err != nil {
 			return r.handleIndexError("get doc count", index, err, "Skipping index", "Failed to retrieve document count")
 		}
@@ -133,13 +133,13 @@ type Lister struct {
 func NewLister(
 	cfg config.Interface,
 	log logger.Interface,
-	storage types.Interface,
+	stor types.Interface,
 	renderer *TableRenderer,
 ) *Lister {
 	return &Lister{
 		config:   cfg,
 		logger:   log,
-		storage:  storage,
+		storage:  stor,
 		renderer: renderer,
 	}
 }

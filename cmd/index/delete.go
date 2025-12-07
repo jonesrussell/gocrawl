@@ -49,14 +49,14 @@ type Deleter struct {
 func NewDeleter(
 	cfg config.Interface,
 	log logger.Interface,
-	storage storagetypes.Interface,
+	stor storagetypes.Interface,
 	sourcesManager sources.Interface,
 	params DeleteParams,
 ) *Deleter {
 	return &Deleter{
 		config:     cfg,
 		logger:     log,
-		storage:    storage,
+		storage:    stor,
 		sources:    sourcesManager,
 		index:      params.Indices,
 		force:      params.Force,

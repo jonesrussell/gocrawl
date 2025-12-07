@@ -59,13 +59,13 @@ type Creator struct {
 func NewCreator(
 	cfg config.Interface,
 	log logger.Interface,
-	storage types.Interface,
+	stor types.Interface,
 	params CreateParams,
 ) *Creator {
 	return &Creator{
 		config:  cfg,
 		logger:  log,
-		storage: storage,
+		storage: stor,
 		index:   params.IndexName,
 	}
 }
