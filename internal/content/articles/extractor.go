@@ -14,6 +14,7 @@ import (
 
 // extractText extracts text from the first element matching the selector.
 // Returns empty string if not found (Colly returns empty string safely).
+// Uses DOM.Find() to search anywhere in the element, not just direct children.
 func extractText(e *colly.HTMLElement, selector string) string {
 	if selector == "" {
 		return ""
@@ -25,9 +26,57 @@ func extractText(e *colly.HTMLElement, selector string) string {
 		if sel == "" {
 			continue
 		}
+		// First try ChildText (for direct children, faster)
 		text := e.ChildText(sel)
 		if text != "" {
 			return strings.TrimSpace(text)
+		}
+		// If ChildText didn't find it, try DOM.Find() to search anywhere
+		element := e.DOM.Find(sel).First()
+		if element.Length() > 0 {
+			text = element.Text()
+			if text != "" {
+				return strings.TrimSpace(text)
+			}
+		}
+	}
+	return ""
+}
+
+// extractTextFromContainer extracts text from a container element, applying excludes first.
+func extractTextFromContainer(e *colly.HTMLElement, containerSelector string, excludes []string) string {
+	if containerSelector == "" {
+		return ""
+	}
+
+	// Try each container selector if comma-separated
+	selectors := strings.Split(containerSelector, ",")
+	for _, sel := range selectors {
+		sel = strings.TrimSpace(sel)
+		if sel == "" {
+			continue
+		}
+
+		// Find the container element
+		container := e.DOM.Find(sel).First()
+		if container.Length() == 0 {
+			continue
+		}
+
+		// Apply exclude patterns to the container
+		for _, excludeSelector := range excludes {
+			if excludeSelector != "" {
+				container.Find(excludeSelector).Remove()
+			}
+		}
+
+		// Extract text from the cleaned container
+		text := container.Text()
+		if text != "" {
+			cleaned := strings.TrimSpace(text)
+			if cleaned != "" {
+				return cleaned
+			}
 		}
 	}
 	return ""
@@ -126,6 +175,15 @@ func generateID(url string) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// applyExcludes removes elements matching exclude selectors from the HTML element.
+func applyExcludes(e *colly.HTMLElement, excludes []string) {
+	for _, excludeSelector := range excludes {
+		if excludeSelector != "" {
+			e.DOM.Find(excludeSelector).Remove()
+		}
+	}
+}
+
 // extractArticle extracts article data from HTML element using selectors.
 func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors, sourceURL string) *ArticleData {
 	data := &ArticleData{
@@ -134,14 +192,36 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 		UpdatedAt:  time.Now(),
 	}
 
-	// Extract basic fields
+	// Extract basic fields (before applying excludes, as these are usually in head or specific locations)
 	data.Title = extractText(e, selectors.Title)
 	if data.Title == "" {
 		// Fallback to OG title
 		data.Title = extractMeta(e, "og:title")
 	}
 
-	data.Body = extractText(e, selectors.Body)
+	// Extract body - use container-based extraction if container selector is available
+	// This is the most reliable method as it scopes to the article container and applies excludes
+	if selectors.Container != "" {
+		// Use container-based extraction with excludes applied
+		data.Body = extractTextFromContainer(e, selectors.Container, selectors.Exclude)
+		// If container extraction didn't work, fall back to body selector with excludes
+		if data.Body == "" {
+			// Apply excludes to the element before extracting body
+			applyExcludes(e, selectors.Exclude)
+			data.Body = extractText(e, selectors.Body)
+		}
+	} else {
+		// No container selector, apply excludes and use body selector directly
+		applyExcludes(e, selectors.Exclude)
+		data.Body = extractText(e, selectors.Body)
+	}
+
+	// Additional fallbacks for body if still empty
+	if data.Body == "" {
+		// Try common article content containers
+		data.Body = extractTextFromContainer(e, "article, main, .article-content, .article-body", selectors.Exclude)
+	}
+
 	data.Intro = extractText(e, selectors.Intro)
 	if data.Intro == "" {
 		// Fallback to OG description
