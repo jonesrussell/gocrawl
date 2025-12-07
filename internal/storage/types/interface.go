@@ -6,6 +6,7 @@ import (
 )
 
 // Interface defines the interface for storage operations.
+// Note: The implementation is in internal/storage/storage.go (Storage type).
 type Interface interface {
 	// GetIndexManager returns the index manager for this storage
 	GetIndexManager() IndexManager

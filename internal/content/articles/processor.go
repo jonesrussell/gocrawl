@@ -16,6 +16,10 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
+// Type conversion helper: domain.Type and contenttype.Type are both string types,
+// but we need to compare Item.Type (domain.Type) with contenttype constants.
+// Since Item.Type is domain.Type, we compare with domain.TypeArticle.
+
 // ArticleProcessor implements the common.Processor interface for articles.
 type ArticleProcessor struct {
 	logger         logger.Interface
@@ -104,7 +108,7 @@ func (p *ArticleProcessor) ValidateJob(job *content.Job) error {
 		return errors.New("job must have at least one item")
 	}
 	for _, item := range job.Items {
-		if item.Type != content.Article {
+		if item.Type != domain.TypeArticle {
 			return errors.New("invalid item type: expected article")
 		}
 	}
@@ -177,7 +181,7 @@ func (p *ArticleProcessor) ProcessContent(ctx context.Context, ct contenttype.Ty
 }
 
 // Get retrieves an article by its ID
-func (p *ArticleProcessor) Get(ctx context.Context, id string) (*models.Article, error) {
+func (p *ArticleProcessor) Get(ctx context.Context, id string) (*domain.Article, error) {
 	// TODO: Implement article retrieval
 	return nil, errors.New("not implemented")
 }

@@ -3,8 +3,8 @@ package events
 import (
 	"context"
 
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
 // DefaultHandler provides a basic implementation of EventHandler that logs events.
@@ -20,7 +20,7 @@ func NewDefaultHandler(log logger.Interface) EventHandler {
 }
 
 // HandleArticle logs article events.
-func (h *DefaultHandler) HandleArticle(ctx context.Context, article *models.Article) error {
+func (h *DefaultHandler) HandleArticle(ctx context.Context, article *domain.Article) error {
 	h.logger.Info("Article processed",
 		"id", article.ID,
 		"title", article.Title,

@@ -15,6 +15,35 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
+// Interface defines the interface for processing articles.
+// It handles the extraction and processing of article content from web pages.
+type Interface interface {
+	// Process handles the processing of article content.
+	// It takes a colly.HTMLElement and processes the article found within it.
+	Process(e *colly.HTMLElement) error
+
+	// ProcessArticle processes an article and returns any errors
+	ProcessArticle(ctx context.Context, article *domain.Article) error
+
+	// Get retrieves an article by its ID
+	Get(ctx context.Context, id string) (*domain.Article, error)
+
+	// List retrieves a list of articles based on the provided query
+	List(ctx context.Context, query map[string]any) ([]*domain.Article, error)
+
+	// Delete removes an article by its ID
+	Delete(ctx context.Context, id string) error
+
+	// Update updates an existing article
+	Update(ctx context.Context, article *domain.Article) error
+
+	// Create creates a new article
+	Create(ctx context.Context, article *domain.Article) error
+}
+
+// Ensure ContentService implements Interface
+var _ Interface = (*ContentService)(nil)
+
 // ContentService implements both Interface and ServiceInterface for article processing.
 type ContentService struct {
 	logger    logger.Interface
@@ -145,8 +174,8 @@ func (s *ContentService) findSourceByURL(pageURL string) *sources.Config {
 		return nil
 	}
 
-	domain := parsedURL.Hostname()
-	if domain == "" {
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
 		return nil
 	}
 
@@ -160,13 +189,13 @@ func (s *ContentService) findSourceByURL(pageURL string) *sources.Config {
 		source := &sourceConfigs[i]
 		// Check if domain matches any allowed domain
 		for _, allowedDomain := range source.AllowedDomains {
-			if allowedDomain == domain || allowedDomain == "*."+domain {
+			if allowedDomain == hostname || allowedDomain == "*."+hostname {
 				return source
 			}
 		}
 		// Also check source URL
 		if sourceParsedURL, parseErr := url.Parse(source.URL); parseErr == nil {
-			if sourceParsedURL.Hostname() == domain {
+			if sourceParsedURL.Hostname() == hostname {
 				return source
 			}
 		}

@@ -5,18 +5,18 @@ package domain
 type Type string
 
 const (
-	// Article represents article content.
-	Article Type = "article"
-	// Page represents generic page content.
-	Page Type = "page"
-	// Video represents video content.
-	Video Type = "video"
-	// Image represents image content.
-	Image Type = "image"
-	// HTML represents HTML content.
-	HTML Type = "html"
-	// JobType represents job content.
-	JobType Type = "job"
+	// TypeArticle represents article content.
+	TypeArticle Type = "article"
+	// TypePage represents generic page content.
+	TypePage Type = "page"
+	// TypeVideo represents video content.
+	TypeVideo Type = "video"
+	// TypeImage represents image content.
+	TypeImage Type = "image"
+	// TypeHTML represents HTML content.
+	TypeHTML Type = "html"
+	// TypeJob represents job content.
+	TypeJob Type = "job"
 )
 
 // These types are defined as any to avoid import cycles.

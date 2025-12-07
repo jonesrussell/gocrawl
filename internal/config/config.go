@@ -18,6 +18,26 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Interface defines the interface for configuration management.
+type Interface interface {
+	// GetAppConfig returns the application configuration.
+	GetAppConfig() *app.Config
+	// GetLogConfig returns the logging configuration.
+	GetLogConfig() *logging.Config
+	// GetServerConfig returns the server configuration.
+	GetServerConfig() *server.Config
+	// GetCrawlerConfig returns the crawler configuration.
+	GetCrawlerConfig() *crawler.Config
+	// GetElasticsearchConfig returns the Elasticsearch configuration.
+	GetElasticsearchConfig() *elasticsearch.Config
+	// GetCommand returns the current command.
+	GetCommand() string
+	// GetConfigFile returns the path to the configuration file.
+	GetConfigFile() string
+	// Validate validates the configuration based on the current command.
+	Validate() error
+}
+
 // Default configuration values
 const (
 	// DefaultMaxLogSize is the default maximum size of a log file in MB
@@ -33,6 +53,9 @@ const (
 	DefaultServerWriteTimeout = 30 * time.Second
 	DefaultServerIdleTimeout  = 60 * time.Second
 )
+
+// Ensure Config implements Interface
+var _ Interface = (*Config)(nil)
 
 // Config represents the application configuration.
 type Config struct {

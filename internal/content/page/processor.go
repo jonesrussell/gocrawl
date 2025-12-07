@@ -61,7 +61,7 @@ func (p *PageProcessor) Process(ctx context.Context, contentData any) error {
 
 	// Send the processed page to the channel
 	if p.pageChannel != nil {
-		page := &models.Page{
+		page := &domain.Page{
 			URL:       e.Request.URL.String(),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),

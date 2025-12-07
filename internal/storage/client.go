@@ -2,11 +2,14 @@
 package storage
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/config/elasticsearch"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 )
 
@@ -39,7 +42,7 @@ func NewClient(p ClientParams) (ClientResult, error) {
 	clientConfig := CreateClientConfig(esConfig, transport)
 
 	// Create client
-	client, err := es.NewClient(clientConfig)
+	client, err := es.NewClient(*clientConfig)
 	if err != nil {
 		return ClientResult{}, fmt.Errorf("failed to create Elasticsearch client: %w", err)
 	}
@@ -58,4 +61,61 @@ func NewClient(p ClientParams) (ClientResult, error) {
 	return ClientResult{
 		Client: client,
 	}, nil
+}
+
+// CreateTransport creates an HTTP transport with TLS configuration.
+func CreateTransport(cfg *elasticsearch.Config) *http.Transport {
+	transport := &http.Transport{}
+
+	// Configure TLS if enabled
+	if cfg.TLS != nil && cfg.TLS.Enabled {
+		tlsConfig := &tls.Config{
+			//nolint:gosec // InsecureSkipVerify is configurable for development/testing environments
+			InsecureSkipVerify: cfg.TLS.InsecureSkipVerify,
+		}
+
+		// Load certificates if provided
+		if cfg.TLS.CertFile != "" && cfg.TLS.KeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(cfg.TLS.CertFile, cfg.TLS.KeyFile)
+			if err == nil {
+				tlsConfig.Certificates = []tls.Certificate{cert}
+			}
+		}
+
+		// Load CA certificate if provided
+		// TODO: Implement CA certificate loading using crypto/x509
+		if cfg.TLS.CAFile != "" {
+			_ = cfg.TLS.CAFile // Placeholder for future CA certificate loading implementation
+		}
+
+		transport.TLSClientConfig = tlsConfig
+	}
+
+	return transport
+}
+
+// CreateClientConfig creates an Elasticsearch client configuration.
+func CreateClientConfig(cfg *elasticsearch.Config, transport *http.Transport) *es.Config {
+	clientConfig := es.Config{
+		Addresses: cfg.Addresses,
+		Transport: transport,
+	}
+
+	// Configure authentication
+	if cfg.APIKey != "" {
+		clientConfig.APIKey = cfg.APIKey
+	} else if cfg.Username != "" && cfg.Password != "" {
+		clientConfig.Username = cfg.Username
+		clientConfig.Password = cfg.Password
+	}
+
+	// Configure cloud settings if provided
+	if cfg.Cloud.ID != "" {
+		clientConfig.CloudID = cfg.Cloud.ID
+	}
+	if cfg.Cloud.APIKey != "" {
+		clientConfig.APIKey = cfg.Cloud.APIKey
+	}
+
+	return &clientConfig
 }

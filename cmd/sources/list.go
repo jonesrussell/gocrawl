@@ -14,7 +14,6 @@ import (
 	crawlercfg "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	internalsources "github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +30,7 @@ func NewTableRenderer(log logger.Interface) *TableRenderer {
 }
 
 // RenderTable formats and displays the sources in a table format
-func (r *TableRenderer) RenderTable(sources []*sourceutils.SourceConfig) error {
+func (r *TableRenderer) RenderTable(sources []*internalsources.Config) error {
 	// Initialize table writer with stdout as output
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)

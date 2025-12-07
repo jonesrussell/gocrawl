@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -33,7 +33,7 @@ func NewStorage(
 }
 
 // SaveArticle saves an article to storage.
-func (s *Storage) SaveArticle(ctx context.Context, article *models.Article) error {
+func (s *Storage) SaveArticle(ctx context.Context, article *domain.Article) error {
 	if article == nil {
 		return errors.New("article is nil")
 	}
@@ -53,12 +53,12 @@ func (s *Storage) SaveArticle(ctx context.Context, article *models.Article) erro
 }
 
 // GetArticle retrieves an article from storage.
-func (s *Storage) GetArticle(ctx context.Context, id string) (*models.Article, error) {
+func (s *Storage) GetArticle(ctx context.Context, id string) (*domain.Article, error) {
 	if id == "" {
 		return nil, errors.New("article ID is empty")
 	}
 
-	article := &models.Article{}
+	article := &domain.Article{}
 	if err := s.storage.GetDocument(ctx, s.indexName, id, article); err != nil {
 		s.logger.Error("Failed to get article",
 			"error", err,
@@ -72,7 +72,7 @@ func (s *Storage) GetArticle(ctx context.Context, id string) (*models.Article, e
 }
 
 // ListArticles lists articles matching the query.
-func (s *Storage) ListArticles(ctx context.Context, query string) ([]*models.Article, error) {
+func (s *Storage) ListArticles(ctx context.Context, query string) ([]*domain.Article, error) {
 	// Create a search query
 	searchQuery := s.createSearchQuery(query)
 
@@ -108,8 +108,8 @@ func (s *Storage) createSearchQuery(query string) map[string]any {
 }
 
 // convertResultsToArticles converts search results to articles.
-func (s *Storage) convertResultsToArticles(results []any) []*models.Article {
-	articles := make([]*models.Article, 0, len(results))
+func (s *Storage) convertResultsToArticles(results []any) []*domain.Article {
+	articles := make([]*domain.Article, 0, len(results))
 	for _, result := range results {
 		article, err := s.convertResultToArticle(result)
 		if err != nil {
@@ -121,13 +121,13 @@ func (s *Storage) convertResultsToArticles(results []any) []*models.Article {
 }
 
 // convertResultToArticle converts a single result to an article.
-func (s *Storage) convertResultToArticle(result any) (*models.Article, error) {
-	if article, isArticle := result.(*models.Article); isArticle {
+func (s *Storage) convertResultToArticle(result any) (*domain.Article, error) {
+	if article, isArticle := result.(*domain.Article); isArticle {
 		return article, nil
 	}
 
 	if m, isMap := result.(map[string]any); isMap {
-		newArticle := &models.Article{}
+		newArticle := &domain.Article{}
 		data, err := json.Marshal(m)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal result: %w", err)
@@ -148,7 +148,7 @@ func (s *Storage) Store(ctx context.Context, result any) error {
 	}
 
 	// Handle article storage
-	if article, isArticle := result.(*models.Article); isArticle {
+	if article, isArticle := result.(*domain.Article); isArticle {
 		if article == nil {
 			return errors.New("article cannot be nil")
 		}
