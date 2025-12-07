@@ -188,7 +188,7 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create storage: %w", err)
 	}
 
-	sourcesManager, err := sources.LoadSources(cfg)
+	sourcesManager, err := sources.LoadSources(cfg, log)
 	if err != nil {
 		return fmt.Errorf("failed to load sources: %w", err)
 	}

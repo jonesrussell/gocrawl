@@ -31,7 +31,7 @@ func NewSourcesCommand() *cobra.Command {
 			}
 
 			// Construct dependencies directly without FX
-			sourceManager, err := sources.LoadSources(cfg)
+			sourceManager, err := sources.LoadSources(cfg, log)
 			if err != nil {
 				return fmt.Errorf("failed to load sources: %w", err)
 			}

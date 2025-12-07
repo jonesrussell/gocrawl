@@ -194,7 +194,9 @@ func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
 // LoadSources creates a new Sources instance by loading sources from either:
 // 1. A YAML file specified in the crawler config
 // Returns an error if no sources are found
-func LoadSources(cfg config.Interface) (*Sources, error) {
+// The logger parameter is optional and can be nil, but it's recommended to provide one
+// for consistency with LoadFromFile and to avoid potential nil pointer dereferences.
+func LoadSources(cfg config.Interface, logger logger.Interface) (*Sources, error) {
 	// Determine source file path, handling nil crawler config
 	sourceFile := "sources.yml" // Default source file
 	if crawlerCfg := cfg.GetCrawlerConfig(); crawlerCfg != nil {
@@ -216,6 +218,7 @@ func LoadSources(cfg config.Interface) (*Sources, error) {
 
 	return &Sources{
 		sources: sources,
+		logger:  logger, // Initialize logger field for consistency with LoadFromFile
 		metrics: sourceutils.NewSourcesMetrics(),
 	}, nil
 }

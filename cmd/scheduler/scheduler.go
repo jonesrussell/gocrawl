@@ -39,7 +39,7 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Create source manager
-	sourceManager, err := sources.LoadSources(cfg)
+	sourceManager, err := sources.LoadSources(cfg, log)
 	if err != nil {
 		return fmt.Errorf("failed to load sources: %w", err)
 	}

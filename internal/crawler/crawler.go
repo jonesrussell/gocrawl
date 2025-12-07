@@ -48,6 +48,7 @@ type Crawler struct {
 	htmlProcessor    *HTMLProcessor
 	cfg              *crawler.Config
 	abortChan        chan struct{} // Channel to signal abort
+	maxDepthOverride int           // Override for source's max_depth (0 means use source default)
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -59,12 +60,19 @@ var _ CrawlerMetrics = (*Crawler)(nil)
 
 // setupCollector configures the collector with the given source settings
 func (c *Crawler) setupCollector(source *configtypes.Source) error {
+	// Use override if set, otherwise use source's max depth
+	maxDepth := source.MaxDepth
+	if c.maxDepthOverride > 0 {
+		maxDepth = c.maxDepthOverride
+		c.logger.Info("Using max_depth override", "override", maxDepth, "source_default", source.MaxDepth)
+	}
+
 	c.logger.Debug("Setting up collector",
-		"max_depth", source.MaxDepth,
+		"max_depth", maxDepth,
 		"allowed_domains", source.AllowedDomains)
 
 	opts := []colly.CollectorOption{
-		colly.MaxDepth(source.MaxDepth),
+		colly.MaxDepth(maxDepth),
 		colly.Async(true),
 		colly.ParseHTTPErrorResponse(),
 		colly.IgnoreRobotsTxt(),
@@ -240,7 +248,12 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	// Initialize abort channel
 	c.abortChan = make(chan struct{})
-	defer close(c.abortChan) // Ensure channel is closed when done
+	abortChanClosed := false
+	defer func() {
+		if !abortChanClosed {
+			close(c.abortChan)
+		}
+	}()
 
 	// Start cleanup goroutine
 	cleanupDone := make(chan struct{})
@@ -284,15 +297,58 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		return fmt.Errorf("failed to visit source URL: %w", visitErr)
 	}
 
-	// Wait for the crawler to finish
-	c.collector.Wait()
+	// Wait for the crawler to finish, but respect context cancellation
+	// Run Wait() in a goroutine so we can check for context cancellation
+	waitDone := make(chan struct{})
+	go func() {
+		c.collector.Wait()
+		close(waitDone)
+	}()
 
-	// Wait for cleanup goroutine
+	// Wait for either completion or context cancellation
 	select {
-	case <-cleanupDone:
+	case <-waitDone:
+		// Collector finished normally
+		c.logger.Debug("Collector finished normally")
 	case <-ctx.Done():
+		// Context was cancelled - abort all pending requests
+		c.logger.Info("Context cancelled, aborting collector")
+		// Signal abort to stop new requests
+		if !abortChanClosed {
+			close(c.abortChan)
+			abortChanClosed = true
+		}
+		// Wait a bit for in-flight requests to abort, then return
+		select {
+		case <-waitDone:
+			// Collector finished after abort
+		case <-time.After(2 * time.Second):
+			// Timeout waiting for collector to finish
+			c.logger.Warn("Collector did not finish within timeout after cancellation")
+		}
 		return ctx.Err()
 	}
+
+	// Signal cleanup goroutine to stop by closing abortChan
+	// This will cause the cleanup goroutine to exit
+	if !abortChanClosed {
+		close(c.abortChan)
+		abortChanClosed = true
+	}
+
+	// Wait for cleanup goroutine to finish
+	select {
+	case <-cleanupDone:
+		c.logger.Debug("Cleanup goroutine finished")
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(5 * time.Second):
+		// Timeout after 5 seconds - cleanup goroutine should have finished by now
+		c.logger.Warn("Cleanup goroutine did not finish within timeout")
+	}
+
+	// Stop the crawler state
+	c.state.Stop()
 
 	return nil
 }
@@ -461,11 +517,9 @@ func (c *Crawler) Reset() {
 // ------------------
 
 // SetMaxDepth sets the maximum depth for the crawler.
+// If the collector hasn't been created yet, this sets an override that will be used
+// when the collector is created. Otherwise, it updates the existing collector.
 func (c *Crawler) SetMaxDepth(depth int) {
-	if c.collector == nil {
-		return
-	}
-
 	config := NewCollectorConfig()
 	config.MaxDepth = depth
 
@@ -476,7 +530,15 @@ func (c *Crawler) SetMaxDepth(depth int) {
 		return
 	}
 
-	c.collector.MaxDepth = config.MaxDepth
+	if c.collector == nil {
+		// Collector not created yet, store as override to use when collector is created
+		c.maxDepthOverride = config.MaxDepth
+		c.logger.Debug("Set max_depth override (collector not yet created)", "max_depth", config.MaxDepth)
+	} else {
+		// Collector exists, update it directly
+		c.collector.MaxDepth = config.MaxDepth
+		c.logger.Debug("Updated collector max_depth", "max_depth", config.MaxDepth)
+	}
 }
 
 // SetRateLimit sets the rate limit for the crawler.
@@ -682,6 +744,17 @@ func (c *Crawler) GetIndexManager() storagetypes.IndexManager {
 
 // ProcessHTML processes the HTML content.
 func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
+	// Check if context is cancelled before processing
+	ctx := c.state.Context()
+	select {
+	case <-ctx.Done():
+		// Context cancelled, abort this request
+		e.Request.Abort()
+		return
+	default:
+		// Continue processing
+	}
+
 	// Detect content type and get appropriate processor
 	processor := c.selectProcessor(e)
 	if processor == nil {
