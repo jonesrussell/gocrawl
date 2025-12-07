@@ -40,13 +40,15 @@ type JobServiceParams struct {
 
 // NewJobService creates a new JobService instance.
 func NewJobService(p JobServiceParams) common.JobService {
-	var jobs int32
+	// Allocate activeJobs on the heap to avoid dangling pointer
+	// when the function returns and the local variable goes out of scope
+	activeJobs := new(int32)
 	return &JobService{
 		logger:           p.Logger,
 		sources:          p.Sources,
 		crawler:          p.Crawler,
 		done:             p.Done,
-		activeJobs:       &jobs,
+		activeJobs:       activeJobs,
 		storage:          p.Storage,
 		processorFactory: p.ProcessorFactory,
 		sourceName:       p.SourceName,

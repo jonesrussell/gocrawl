@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	colly "github.com/gocolly/colly/v2"
@@ -48,7 +49,7 @@ type Crawler struct {
 	htmlProcessor    *HTMLProcessor
 	cfg              *crawler.Config
 	abortChan        chan struct{} // Channel to signal abort
-	maxDepthOverride int           // Override for source's max_depth (0 means use source default)
+	maxDepthOverride int32          // Override for source's max_depth (0 means use source default), accessed atomically
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -62,8 +63,9 @@ var _ CrawlerMetrics = (*Crawler)(nil)
 func (c *Crawler) setupCollector(source *configtypes.Source) error {
 	// Use override if set, otherwise use source's max depth
 	maxDepth := source.MaxDepth
-	if c.maxDepthOverride > 0 {
-		maxDepth = c.maxDepthOverride
+	override := int(atomic.LoadInt32(&c.maxDepthOverride))
+	if override > 0 {
+		maxDepth = override
 		c.logger.Info("Using max_depth override", "override", maxDepth, "source_default", source.MaxDepth)
 	}
 
@@ -532,7 +534,7 @@ func (c *Crawler) SetMaxDepth(depth int) {
 
 	if c.collector == nil {
 		// Collector not created yet, store as override to use when collector is created
-		c.maxDepthOverride = config.MaxDepth
+		atomic.StoreInt32(&c.maxDepthOverride, int32(config.MaxDepth))
 		c.logger.Debug("Set max_depth override (collector not yet created)", "max_depth", config.MaxDepth)
 	} else {
 		// Collector exists, update it directly

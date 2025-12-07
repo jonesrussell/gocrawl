@@ -170,7 +170,14 @@ func (s *PageSelectors) Default() PageSelectors {
 		OGImage:       "meta[property='og:image']",
 		OgURL:         "meta[property='og:url']",
 		Canonical:     "link[rel='canonical']",
-		Exclude:       []string{},
+		Exclude: []string{
+			// Default exclude patterns for clean content extraction
+			"script, style, noscript",
+			".ad, .advertisement, [class*='ad']",
+			".header, .footer, nav",
+			"button, form",
+			".sidebar, .comments",
+		},
 	}
 }
 

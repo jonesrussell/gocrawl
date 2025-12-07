@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,7 +13,51 @@ import (
 	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
 )
 
+var (
+	// JavaScript patterns to remove from extracted text
+	jsPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`),
+		regexp.MustCompile(`(?i)document\.addEventListener[^)]*\)`),
+		regexp.MustCompile(`(?i)function\s*\([^)]*\)\s*\{[^}]*\}`),
+		regexp.MustCompile(`(?i)\.replaceWith\([^)]*\)`),
+		regexp.MustCompile(`(?i)\.cloneNode\([^)]*\)`),
+		regexp.MustCompile(`(?i)template\.content`),
+		regexp.MustCompile(`(?i)\.dataset\.[a-zA-Z]+`),
+		regexp.MustCompile(`(?i)\.parentElement`),
+		regexp.MustCompile(`(?i)getElementById\([^)]*\)`),
+		regexp.MustCompile(`(?i)querySelector\([^)]*\)`),
+	}
+	// Whitespace normalization regex
+	whitespaceRegex = regexp.MustCompile(`\s+`)
+	// Multiple newlines regex
+	newlineRegex = regexp.MustCompile(`\n{3,}`)
+)
+
+// cleanText removes JavaScript code, normalizes whitespace, and cleans extracted text.
+func cleanText(text string) string {
+	if text == "" {
+		return ""
+	}
+
+	// Remove JavaScript patterns
+	for _, pattern := range jsPatterns {
+		text = pattern.ReplaceAllString(text, "")
+	}
+
+	// Normalize whitespace (replace multiple spaces/tabs with single space)
+	text = whitespaceRegex.ReplaceAllString(text, " ")
+
+	// Replace multiple newlines with double newline
+	text = newlineRegex.ReplaceAllString(text, "\n\n")
+
+	// Trim leading/trailing whitespace
+	text = strings.TrimSpace(text)
+
+	return text
+}
+
 // extractText extracts text from the first element matching the selector.
+// If a container selector is provided, it extracts from within that container.
 func extractText(e *colly.HTMLElement, selector string) string {
 	if selector == "" {
 		return ""
@@ -26,7 +71,49 @@ func extractText(e *colly.HTMLElement, selector string) string {
 		}
 		text := e.ChildText(sel)
 		if text != "" {
-			return strings.TrimSpace(text)
+			cleaned := cleanText(text)
+			if cleaned != "" {
+				return cleaned
+			}
+		}
+	}
+	return ""
+}
+
+// extractTextFromContainer extracts text from a container element, applying excludes first.
+func extractTextFromContainer(e *colly.HTMLElement, containerSelector string, excludes []string) string {
+	if containerSelector == "" {
+		return ""
+	}
+
+	// Try each container selector if comma-separated
+	selectors := strings.Split(containerSelector, ",")
+	for _, sel := range selectors {
+		sel = strings.TrimSpace(sel)
+		if sel == "" {
+			continue
+		}
+
+		// Find the container element
+		container := e.DOM.Find(sel).First()
+		if container.Length() == 0 {
+			continue
+		}
+
+		// Apply exclude patterns to the container
+		for _, excludeSelector := range excludes {
+			if excludeSelector != "" {
+				container.Find(excludeSelector).Remove()
+			}
+		}
+
+		// Extract text from the cleaned container
+		text := container.Text()
+		if text != "" {
+			cleaned := cleanText(text)
+			if cleaned != "" {
+				return cleaned
+			}
 		}
 	}
 	return ""
@@ -108,9 +195,6 @@ func GetSelectorsForURL(sourceManager interface {
 
 // extractPage extracts page data from HTML element using selectors.
 func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sourceURL string) *PageData {
-	// Apply exclude selectors before extraction
-	applyExcludes(e, selectors.Exclude)
-
 	data := &PageData{
 		URL:       sourceURL,
 		CreatedAt: time.Now(),
@@ -127,19 +211,36 @@ func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sour
 	}
 	if data.Title == "" {
 		// Try to get from title tag
-		data.Title = e.ChildText("title")
+		titleText := e.ChildText("title")
+		data.Title = cleanText(titleText)
 	}
 
-	// Extract content using selector, with fallbacks
-	data.Content = extractText(e, selectors.Content)
+	// Extract content - use container selector if available, otherwise use content selector
+	if selectors.Container != "" {
+		// Use container-based extraction with excludes applied
+		data.Content = extractTextFromContainer(e, selectors.Container, selectors.Exclude)
+	}
+
+	// Fallback to content selector if container extraction didn't work
 	if data.Content == "" {
-		data.Content = extractText(e, "main")
+		// Apply excludes to the entire element before extracting
+		applyExcludes(e, selectors.Exclude)
+		data.Content = extractText(e, selectors.Content)
+	}
+
+	// Additional fallbacks if still empty
+	if data.Content == "" {
+		// Try common content containers
+		data.Content = extractTextFromContainer(e, "main", selectors.Exclude)
 	}
 	if data.Content == "" {
-		data.Content = extractText(e, "article")
+		data.Content = extractTextFromContainer(e, "article", selectors.Exclude)
 	}
 	if data.Content == "" {
-		data.Content = extractText(e, "body")
+		// Last resort: extract from body but apply excludes
+		applyExcludes(e, selectors.Exclude)
+		bodyText := e.ChildText("body")
+		data.Content = cleanText(bodyText)
 	}
 
 	// Extract description using selector, with fallbacks

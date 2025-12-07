@@ -162,6 +162,19 @@ func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
 			ArticleList:     s.List.ArticleList,
 			ExcludeFromList: s.List.ExcludeFromList,
 		}
+		pageSelectors = sourceutils.PageSelectors{
+			Container:     s.Page.Container,
+			Title:         s.Page.Title,
+			Content:       s.Page.Content,
+			Description:   s.Page.Description,
+			Keywords:      s.Page.Keywords,
+			OGTitle:       s.Page.OGTitle,
+			OGDescription: s.Page.OGDescription,
+			OGImage:       s.Page.OGImage,
+			OgURL:         s.Page.OgURL,
+			Canonical:     s.Page.Canonical,
+			Exclude:       s.Page.Exclude,
+		}
 	case loader.ArticleSelectors:
 		articleSelectors = sourceutils.ArticleSelectors{
 			Container:     s.Container,
@@ -193,7 +206,7 @@ func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
 			ArticleID:     s.ArticleID,
 			Exclude:       s.Exclude,
 		}
-		default:
+	default:
 		// Return empty selectors for unknown types
 		articleSelectors = sourceutils.ArticleSelectors{}
 		listSelectors = sourceutils.ListSelectors{}
@@ -682,6 +695,19 @@ func NewSelectorConfigFromSource(src configtypes.Source) SelectorConfig {
 			ArticleCards:    src.Selectors.List.ArticleCards,
 			ArticleList:     src.Selectors.List.ArticleList,
 			ExcludeFromList: src.Selectors.List.ExcludeFromList,
+		},
+		Page: sourceutils.PageSelectors{
+			Container:     src.Selectors.Page.Container,
+			Title:         src.Selectors.Page.Title,
+			Content:       src.Selectors.Page.Content,
+			Description:   src.Selectors.Page.Description,
+			Keywords:      src.Selectors.Page.Keywords,
+			OGTitle:       src.Selectors.Page.OGTitle,
+			OGDescription: src.Selectors.Page.OGDescription,
+			OGImage:       src.Selectors.Page.OGImage,
+			OgURL:         src.Selectors.Page.OgURL,
+			Canonical:     src.Selectors.Page.Canonical,
+			Exclude:       src.Selectors.Page.Exclude,
 		},
 	}
 }
