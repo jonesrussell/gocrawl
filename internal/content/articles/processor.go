@@ -4,8 +4,10 @@ package articles
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 
+	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -51,8 +53,21 @@ func NewProcessor(
 
 // Process implements the common.Processor interface.
 func (p *ArticleProcessor) Process(ctx context.Context, content any) error {
-	// TODO: Implement article processing
-	return errors.New("not implemented")
+	e, ok := content.(*colly.HTMLElement)
+	if !ok {
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
+	}
+
+	// Use the service to process the article
+	// The service will extract data and index it
+	if err := p.service.Process(e); err != nil {
+		p.logger.Error("Failed to process article",
+			"error", err,
+			"url", e.Request.URL.String())
+		return fmt.Errorf("failed to process article: %w", err)
+	}
+
+	return nil
 }
 
 // ContentType implements the common.Processor interface.

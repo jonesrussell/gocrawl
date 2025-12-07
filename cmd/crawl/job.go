@@ -64,6 +64,12 @@ func (s *JobService) Start(ctx context.Context) error {
 		if err := s.crawler.Start(ctx, s.sourceName); err != nil {
 			s.logger.Error("Crawler failed", "error", err)
 		}
+		// Wait for the crawler to complete all async operations
+		// crawler.Start() returns immediately after starting async operations,
+		// so we must wait for them to complete
+		if err := s.crawler.Wait(); err != nil {
+			s.logger.Error("Error waiting for crawler", "error", err)
+		}
 		// Signal completion when crawler finishes
 		s.doneOnce.Do(func() {
 			close(s.done)

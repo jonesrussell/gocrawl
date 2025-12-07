@@ -248,12 +248,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 
 	// Initialize abort channel
 	c.abortChan = make(chan struct{})
-	abortChanClosed := false
-	defer func() {
-		if !abortChanClosed {
-			close(c.abortChan)
-		}
-	}()
+	var abortChanOnce sync.Once
 
 	// Start cleanup goroutine
 	cleanupDone := make(chan struct{})
@@ -272,6 +267,13 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 				c.cleanupResources()
 			}
 		}
+	}()
+
+	// Ensure abortChan is closed on exit
+	defer func() {
+		abortChanOnce.Do(func() {
+			close(c.abortChan)
+		})
 	}()
 
 	// Validate source
@@ -313,11 +315,10 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	case <-ctx.Done():
 		// Context was cancelled - abort all pending requests
 		c.logger.Info("Context cancelled, aborting collector")
-		// Signal abort to stop new requests
-		if !abortChanClosed {
+		// Signal abort to stop new requests (safe to call multiple times)
+		abortChanOnce.Do(func() {
 			close(c.abortChan)
-			abortChanClosed = true
-		}
+		})
 		// Wait a bit for in-flight requests to abort, then return
 		select {
 		case <-waitDone:
@@ -330,11 +331,10 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	}
 
 	// Signal cleanup goroutine to stop by closing abortChan
-	// This will cause the cleanup goroutine to exit
-	if !abortChanClosed {
+	// This will cause the cleanup goroutine to exit (safe to call multiple times)
+	abortChanOnce.Do(func() {
 		close(c.abortChan)
-		abortChanClosed = true
-	}
+	})
 
 	// Wait for cleanup goroutine to finish
 	select {

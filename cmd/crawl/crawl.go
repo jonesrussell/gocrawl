@@ -221,8 +221,8 @@ func constructCrawlerDependencies(log loggerpkg.Interface, cfg config.Interface,
 		}
 	}
 
-	articleService := articlespkg.NewContentService(log, storageResult.Storage, articleIndexName)
-	pageService := pagepkg.NewContentService(log, storageResult.Storage, pageIndexName)
+	articleService := articlespkg.NewContentServiceWithSources(log, storageResult.Storage, articleIndexName, sourceManager)
+	pageService := pagepkg.NewContentServiceWithSources(log, storageResult.Storage, pageIndexName, sourceManager)
 
 	// Use the crawler's ProvideCrawler to construct the crawler
 	crawlerResult, err := crawler.ProvideCrawler(struct {
