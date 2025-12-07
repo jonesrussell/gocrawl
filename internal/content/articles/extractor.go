@@ -188,8 +188,8 @@ func applyExcludes(e *colly.HTMLElement, excludes []string) {
 func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors, sourceURL string) *ArticleData {
 	data := &ArticleData{
 		Source:    sourceURL,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	// Extract basic fields (before applying excludes, as these are usually in head or specific locations)
@@ -264,22 +264,24 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 	}
 
 	// Extract tags from tags selector
-	if tagsStr := extractText(e, selectors.Tags); tagsStr != "" {
+	tagsStr := extractText(e, selectors.Tags)
+	if tagsStr != "" {
 		tags := strings.Split(tagsStr, ",")
 		for _, tag := range tags {
 			tag = strings.TrimSpace(tag)
-			if tag != "" {
-				// Avoid duplicates
-				found := false
-				for _, existing := range data.Tags {
-					if existing == tag {
-						found = true
-						break
-					}
+			if tag == "" {
+				continue
+			}
+			// Avoid duplicates
+			found := false
+			for _, existing := range data.Tags {
+				if existing == tag {
+					found = true
+					break
 				}
-				if !found {
-					data.Tags = append(data.Tags, tag)
-				}
+			}
+			if !found {
+				data.Tags = append(data.Tags, tag)
 			}
 		}
 	}
@@ -363,4 +365,3 @@ type ArticleData struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
-

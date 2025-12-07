@@ -24,9 +24,9 @@ type TableRenderer struct {
 }
 
 // NewTableRenderer creates a new TableRenderer instance
-func NewTableRenderer(logger logger.Interface) *TableRenderer {
+func NewTableRenderer(log logger.Interface) *TableRenderer {
 	return &TableRenderer{
-		logger: logger,
+		logger: log,
 	}
 }
 
@@ -68,12 +68,12 @@ type Lister struct {
 // NewLister creates a new Lister instance
 func NewLister(
 	sourceManager internalsources.Interface,
-	logger logger.Interface,
+	log logger.Interface,
 	renderer *TableRenderer,
 ) *Lister {
 	return &Lister{
 		sourceManager: sourceManager,
-		logger:        logger,
+		logger:        log,
 		renderer:      renderer,
 	}
 }

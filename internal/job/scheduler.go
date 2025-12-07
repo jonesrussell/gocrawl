@@ -45,11 +45,11 @@ type Scheduler struct {
 	metrics  *Metrics
 }
 
-// New creates a new job scheduler.
-func NewScheduler(logger logger.Interface, sources *sources.Sources, storage storagetypes.Interface) *Scheduler {
+// NewScheduler creates a new job scheduler.
+func NewScheduler(log logger.Interface, sourcesList *sources.Sources, storage storagetypes.Interface) *Scheduler {
 	return &Scheduler{
-		logger:  logger,
-		sources: sources,
+		logger:  log,
+		sources: sourcesList,
 		storage: storage,
 		metrics: &Metrics{},
 	}
@@ -119,21 +119,21 @@ func (s *Scheduler) Stop() error {
 
 // runJobs runs all configured jobs.
 func (s *Scheduler) runJobs(ctx context.Context) error {
-	sources, sourceErr := s.sources.GetSources()
+	sourcesList, sourceErr := s.sources.GetSources()
 	if sourceErr != nil {
 		return fmt.Errorf("failed to get sources: %w", sourceErr)
 	}
-	s.logger.Info("Running jobs for sources", "count", len(sources))
-	for i := range sources {
+	s.logger.Info("Running jobs for sources", "count", len(sourcesList))
+	for i := range sourcesList {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			s.logger.Info("Starting crawler for source", "source", sources[i].Name)
-			if err := s.crawler.Start(ctx, sources[i].Name); err != nil {
-				s.logger.Error("Failed to start crawler for source", "source", sources[i].Name, "error", err)
+			s.logger.Info("Starting crawler for source", "source", sourcesList[i].Name)
+			if err := s.crawler.Start(ctx, sourcesList[i].Name); err != nil {
+				s.logger.Error("Failed to start crawler for source", "source", sourcesList[i].Name, "error", err)
 			} else {
-				s.logger.Info("Successfully started crawler for source", "source", sources[i].Name)
+				s.logger.Info("Successfully started crawler for source", "source", sourcesList[i].Name)
 			}
 		}
 	}

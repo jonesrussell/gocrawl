@@ -36,19 +36,19 @@ type Crawler struct {
 
 // NewCrawler creates a new crawler instance
 func NewCrawler(
-	config config.Interface,
+	cfg config.Interface,
 	logger loggerpkg.Interface,
 	jobService common.JobService,
 	sourceManager sourcespkg.Interface,
-	crawler crawler.Interface,
+	crawlerInstance crawler.Interface,
 	done chan struct{},
 ) *Crawler {
 	return &Crawler{
-		config:        config,
+		config:        cfg,
 		logger:        logger,
 		jobService:    jobService,
 		sourceManager: sourceManager,
-		crawler:       crawler,
+		crawler:       crawlerInstance,
 		done:          done,
 	}
 }
@@ -125,7 +125,8 @@ The --max-depth flag can be used to override the max_depth setting from the sour
 	}
 
 	// Add --max-depth flag
-	cmd.Flags().IntVar(&maxDepth, "max-depth", 0, "Override the max_depth setting from source configuration (0 means use source default)")
+	cmd.Flags().IntVar(&maxDepth, "max-depth", 0,
+		"Override the max_depth setting from source configuration (0 means use source default)")
 
 	return cmd
 }
@@ -142,7 +143,7 @@ func SetupCollector(
 	cfg *crawlerconfig.Config,
 ) (crawler.Interface, error) {
 	// Create crawler instance using ProvideCrawler
-	storage, ok := indexManager.(types.Interface)
+	storageInterface, ok := indexManager.(types.Interface)
 	if !ok {
 		return nil, errors.New("index manager does not implement types.Interface")
 	}
@@ -165,7 +166,7 @@ func SetupCollector(
 		Config:         cfg,
 		ArticleService: articleService,
 		PageService:    pageService,
-		Storage:        storage,
+		Storage:        storageInterface,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create crawler: %w", err)
@@ -175,9 +176,14 @@ func SetupCollector(
 }
 
 // constructCrawlerDependencies constructs all dependencies needed for the crawl command
-// without using FX, by directly calling the same constructors that FX modules use
-// maxDepthOverride: if > 0, overrides the source's max_depth setting
-func constructCrawlerDependencies(log loggerpkg.Interface, cfg config.Interface, sourceName string, maxDepthOverride int) (*Crawler, error) {
+// without using FX, by directly calling the same constructors that FX modules use.
+// maxDepthOverride: if > 0, overrides the source's max_depth setting.
+func constructCrawlerDependencies(
+	log loggerpkg.Interface,
+	cfg config.Interface,
+	sourceName string,
+	maxDepthOverride int,
+) (*Crawler, error) {
 	// Load sources
 	sourceManager, err := sourcespkg.LoadSources(cfg, log)
 	if err != nil {
@@ -205,7 +211,7 @@ func constructCrawlerDependencies(log loggerpkg.Interface, cfg config.Interface,
 	// Get crawler config
 	crawlerCfg := cfg.GetCrawlerConfig()
 	if crawlerCfg == nil {
-		return nil, fmt.Errorf("crawler configuration is required")
+		return nil, errors.New("crawler configuration is required")
 	}
 
 	// Construct article and page services directly

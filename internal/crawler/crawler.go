@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -29,6 +30,10 @@ import (
 const (
 	// RandomDelayDivisor is used to calculate random delay from rate limit
 	RandomDelayDivisor = 2
+	// collectorTimeoutDuration is the timeout for waiting for collector to finish
+	collectorTimeoutDuration = 2 * time.Second
+	// cleanupTimeoutDuration is the timeout for waiting for cleanup goroutine to finish
+	cleanupTimeoutDuration = 5 * time.Second
 )
 
 // Crawler implements the Processor interface for web crawling.
@@ -49,7 +54,7 @@ type Crawler struct {
 	htmlProcessor    *HTMLProcessor
 	cfg              *crawler.Config
 	abortChan        chan struct{} // Channel to signal abort
-	maxDepthOverride int32          // Override for source's max_depth (0 means use source default), accessed atomically
+	maxDepthOverride int32         // Override for source's max_depth (0 means use source default), accessed atomically
 }
 
 var _ Interface = (*Crawler)(nil)
@@ -325,7 +330,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		select {
 		case <-waitDone:
 			// Collector finished after abort
-		case <-time.After(2 * time.Second):
+		case <-time.After(collectorTimeoutDuration):
 			// Timeout waiting for collector to finish
 			c.logger.Warn("Collector did not finish within timeout after cancellation")
 		}
@@ -344,7 +349,7 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 		c.logger.Debug("Cleanup goroutine finished")
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-time.After(5 * time.Second):
+	case <-time.After(cleanupTimeoutDuration):
 		// Timeout after 5 seconds - cleanup goroutine should have finished by now
 		c.logger.Warn("Cleanup goroutine did not finish within timeout")
 	}
@@ -506,8 +511,8 @@ func (c *Crawler) GetStartTime() time.Time {
 }
 
 // Update updates the metrics with new values.
-func (c *Crawler) Update(startTime time.Time, processed, errors int64) {
-	c.state.Update(startTime, processed, errors)
+func (c *Crawler) Update(startTime time.Time, processed, errorCount int64) {
+	c.state.Update(startTime, processed, errorCount)
 }
 
 // Reset resets all metrics to zero.
@@ -534,7 +539,11 @@ func (c *Crawler) SetMaxDepth(depth int) {
 
 	if c.collector == nil {
 		// Collector not created yet, store as override to use when collector is created
-		atomic.StoreInt32(&c.maxDepthOverride, int32(config.MaxDepth))
+		// Bounds check to prevent integer overflow
+		maxDepth := config.MaxDepth
+		if maxDepth >= math.MinInt32 && maxDepth <= math.MaxInt32 {
+			atomic.StoreInt32(&c.maxDepthOverride, int32(maxDepth))
+		}
 		c.logger.Debug("Set max_depth override (collector not yet created)", "max_depth", config.MaxDepth)
 	} else {
 		// Collector exists, update it directly
@@ -655,13 +664,13 @@ func (p *processorWrapper) ContentType() contenttype.Type {
 }
 
 // CanProcess implements content.ContentProcessor
-func (p *processorWrapper) CanProcess(content contenttype.Type) bool {
-	return p.processor.CanProcess(content)
+func (p *processorWrapper) CanProcess(ct contenttype.Type) bool {
+	return p.processor.CanProcess(ct)
 }
 
 // Process implements content.ContentProcessor
-func (p *processorWrapper) Process(ctx context.Context, content any) error {
-	return p.processor.Process(ctx, content)
+func (p *processorWrapper) Process(ctx context.Context, contentData any) error {
+	return p.processor.Process(ctx, contentData)
 }
 
 // ParseHTML implements content.HTMLProcessor
@@ -680,27 +689,27 @@ func (p *processorWrapper) ExtractContent() (string, error) {
 }
 
 // RegisterProcessor implements content.ProcessorRegistry
-func (p *processorWrapper) RegisterProcessor(processor content.ContentProcessor) {
-	p.registry = append(p.registry, processor)
+func (p *processorWrapper) RegisterProcessor(proc content.ContentProcessor) {
+	p.registry = append(p.registry, proc)
 }
 
 // GetProcessor implements content.ProcessorRegistry
-func (p *processorWrapper) GetProcessor(contentType contenttype.Type) (content.ContentProcessor, error) {
-	for _, processor := range p.registry {
-		if processor.CanProcess(contentType) {
-			return processor, nil
+func (p *processorWrapper) GetProcessor(ct contenttype.Type) (content.ContentProcessor, error) {
+	for _, proc := range p.registry {
+		if proc.CanProcess(ct) {
+			return proc, nil
 		}
 	}
-	return nil, fmt.Errorf("no processor found for content type: %s", contentType)
+	return nil, fmt.Errorf("no processor found for content type: %s", ct)
 }
 
 // ProcessContent implements content.ProcessorRegistry
-func (p *processorWrapper) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
-	processor, err := p.GetProcessor(contentType)
+func (p *processorWrapper) ProcessContent(ctx context.Context, ct contenttype.Type, contentData any) error {
+	proc, err := p.GetProcessor(ct)
 	if err != nil {
 		return err
 	}
-	return processor.Process(ctx, content)
+	return proc.Process(ctx, contentData)
 }
 
 // Start implements content.Processor

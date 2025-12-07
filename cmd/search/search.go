@@ -85,9 +85,6 @@ Flags:
 	RunE: runSearch,
 }
 
-// searchModule provides the search command dependencies
-var searchModule = Module
-
 // Command returns the search command for use in the root command
 func Command() *cobra.Command {
 	// Define flags for the search command
@@ -185,12 +182,12 @@ func buildSearchQuery(size int, query string) map[string]any {
 }
 
 // processSearchResults converts raw search results to Result structs
-func processSearchResults(rawResults []any, logger logger.Interface) []Result {
+func processSearchResults(rawResults []any, log logger.Interface) []Result {
 	var results []Result
 	for _, raw := range rawResults {
 		hit, ok := raw.(map[string]any)
 		if !ok {
-			logger.Error("Failed to convert search result to map",
+			log.Error("Failed to convert search result to map",
 				"error", "type assertion failed",
 				"got_type", fmt.Sprintf("%T", raw),
 				"expected_type", "map[string]any")
@@ -199,7 +196,7 @@ func processSearchResults(rawResults []any, logger logger.Interface) []Result {
 
 		source, ok := hit["_source"].(map[string]any)
 		if !ok {
-			logger.Error("Failed to extract _source from hit",
+			log.Error("Failed to extract _source from hit",
 				"error", "type assertion failed",
 				"got_type", fmt.Sprintf("%T", hit["_source"]),
 				"expected_type", "map[string]any")
@@ -225,10 +222,20 @@ func configureResultsTable() table.Writer {
 	t.Style().Options.DrawBorder = true
 	t.Style().Options.SeparateRows = true
 
+	const (
+		indexColumnNumber   = 1
+		indexColumnWidth    = 4
+		urlColumnNumber     = 2
+		contentColumnNumber = 3
+		urlColumnWidthRatio = 3
+		contentColumnRatio  = 3
+	)
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, WidthMax: 4},                         // Index column (#)
-		{Number: 2, WidthMax: DefaultTableWidth / 3},     // URL column (1/3 of table width)
-		{Number: 3, WidthMax: DefaultTableWidth * 2 / 3}, // Content preview column (2/3 of table width)
+		{Number: indexColumnNumber, WidthMax: indexColumnWidth}, // Index column (#)
+		// URL column (1/3 of table width)
+		{Number: urlColumnNumber, WidthMax: DefaultTableWidth / urlColumnWidthRatio},
+		// Content preview column (2/3 of table width)
+		{Number: contentColumnNumber, WidthMax: DefaultTableWidth * 2 / contentColumnRatio},
 	})
 
 	t.AppendHeader(table.Row{"#", "URL", "Content Preview"})

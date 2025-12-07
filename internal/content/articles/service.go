@@ -24,21 +24,26 @@ type ContentService struct {
 }
 
 // NewContentService creates a new article service.
-func NewContentService(logger logger.Interface, storage types.Interface, indexName string) *ContentService {
+func NewContentService(log logger.Interface, storage types.Interface, indexName string) *ContentService {
 	return &ContentService{
-		logger:    logger,
+		logger:    log,
 		storage:   storage,
 		indexName: indexName,
 	}
 }
 
 // NewContentServiceWithSources creates a new article service with sources access.
-func NewContentServiceWithSources(logger logger.Interface, storage types.Interface, indexName string, sources sources.Interface) *ContentService {
+func NewContentServiceWithSources(
+	log logger.Interface,
+	storage types.Interface,
+	indexName string,
+	sourcesManager sources.Interface,
+) *ContentService {
 	return &ContentService{
-		logger:    logger,
+		logger:    log,
 		storage:   storage,
 		indexName: indexName,
-		sources:   sources,
+		sources:   sourcesManager,
 	}
 }
 
@@ -160,8 +165,8 @@ func (s *ContentService) findSourceByURL(pageURL string) *sources.Config {
 			}
 		}
 		// Also check source URL
-		if sourceURL, err := url.Parse(source.URL); err == nil {
-			if sourceURL.Hostname() == domain {
+		if sourceParsedURL, parseErr := url.Parse(source.URL); parseErr == nil {
+			if sourceParsedURL.Hostname() == domain {
 				return source
 			}
 		}

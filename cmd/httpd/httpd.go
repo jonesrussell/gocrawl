@@ -151,16 +151,16 @@ You can send POST requests to /search with a JSON body containing the search par
 		log.Info("Starting HTTP server", "addr", cfg.GetServerConfig().Address)
 		errChan := make(chan error, 1)
 		go func() {
-			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				errChan <- err
+			if serveErr := srv.ListenAndServe(); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+				errChan <- serveErr
 			}
 		}()
 
 		// Wait for interrupt signal or error
 		select {
-		case err := <-errChan:
-			log.Error("Server error", "error", err)
-			return fmt.Errorf("server error: %w", err)
+		case serverErr := <-errChan:
+			log.Error("Server error", "error", serverErr)
+			return fmt.Errorf("server error: %w", serverErr)
 		case <-cmd.Context().Done():
 			// Graceful shutdown with timeout
 			log.Info("Shutdown signal received")

@@ -3,6 +3,7 @@ package index
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	es "github.com/elastic/go-elasticsearch/v8"
@@ -93,9 +94,10 @@ func createDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete [index-name...]",
 		Short: "Delete an index",
-		Long:  `Delete one or more indices. Either provide index names as arguments or use --source to delete indices for a specific source.`,
-		Args:  cobra.MinimumNArgs(0),
-		RunE:  runDeleteCmd,
+		Long: `Delete one or more indices. Either provide index names as arguments ` +
+			`or use --source to delete indices for a specific source.`,
+		Args: cobra.MinimumNArgs(0),
+		RunE: runDeleteCmd,
 	}
 	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Force deletion without confirmation")
 	cmd.Flags().StringVar(&sourceName, "source", "", "Delete index for a specific source by name")
@@ -164,7 +166,7 @@ func runCreateCmd(cmd *cobra.Command, args []string) error {
 func runDeleteCmd(cmd *cobra.Command, args []string) error {
 	// Validate that either --source is provided or at least one index name is provided
 	if sourceName == "" && len(args) == 0 {
-		return fmt.Errorf("either --source flag or at least one index name must be provided")
+		return errors.New("either --source flag or at least one index name must be provided")
 	}
 
 	ctx := cmd.Context()

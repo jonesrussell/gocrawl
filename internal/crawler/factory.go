@@ -29,12 +29,12 @@ type DefaultProcessorFactory struct {
 
 // NewProcessorFactory creates a new processor factory.
 func NewProcessorFactory(
-	logger logger.Interface,
+	log logger.Interface,
 	storage types.Interface,
 	indexName string,
 ) ProcessorFactory {
 	return &DefaultProcessorFactory{
-		logger:     logger,
+		logger:     log,
 		storage:    storage,
 		indexName:  indexName,
 		processors: make(map[contenttype.Type]content.Processor),

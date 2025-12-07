@@ -21,13 +21,13 @@ type Storage struct {
 
 // NewStorage creates a new Storage instance.
 func NewStorage(
-	logger logger.Interface,
-	storage storagetypes.Interface,
+	log logger.Interface,
+	storageInterface storagetypes.Interface,
 	indexName string,
 ) *Storage {
 	return &Storage{
-		logger:    logger,
-		storage:   storage,
+		logger:    log,
+		storage:   storageInterface,
 		indexName: indexName,
 	}
 }

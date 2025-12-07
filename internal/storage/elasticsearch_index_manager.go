@@ -25,10 +25,10 @@ type ElasticsearchIndexManager struct {
 }
 
 // NewElasticsearchIndexManager creates a new Elasticsearch index manager.
-func NewElasticsearchIndexManager(client *elasticsearch.Client, logger logger.Interface) types.IndexManager {
+func NewElasticsearchIndexManager(client *elasticsearch.Client, log logger.Interface) types.IndexManager {
 	return &ElasticsearchIndexManager{
 		client: client,
-		logger: logger,
+		logger: log,
 	}
 }
 

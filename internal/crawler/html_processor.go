@@ -22,19 +22,19 @@ type HTMLProcessor struct {
 }
 
 // NewHTMLProcessor creates a new HTMLProcessor.
-func NewHTMLProcessor(logger logger.Interface) *HTMLProcessor {
+func NewHTMLProcessor(log logger.Interface) *HTMLProcessor {
 	return &HTMLProcessor{
-		logger:       logger,
+		logger:       log,
 		processors:   make([]content.Processor, 0, DefaultProcessorsCapacity), // Pre-allocate for article and page processors
 		unknownTypes: make(map[contenttype.Type]int),
 	}
 }
 
 // Process processes an HTML element.
-func (p *HTMLProcessor) Process(ctx context.Context, content any) error {
-	e, ok := content.(*colly.HTMLElement)
+func (p *HTMLProcessor) Process(ctx context.Context, contentData any) error {
+	e, ok := contentData.(*colly.HTMLElement)
 	if !ok {
-		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", contentData)
 	}
 
 	// Detect content type
@@ -114,12 +114,12 @@ func (p *HTMLProcessor) RegisterProcessor(processor content.Processor) {
 }
 
 // ProcessContent processes content using the appropriate processor.
-func (p *HTMLProcessor) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
-	processor, err := p.GetProcessor(contentType)
+func (p *HTMLProcessor) ProcessContent(ctx context.Context, ct contenttype.Type, contentData any) error {
+	proc, err := p.GetProcessor(ct)
 	if err != nil {
 		return err
 	}
-	return processor.Process(ctx, content)
+	return proc.Process(ctx, contentData)
 }
 
 // selectProcessor selects a processor for the given content type.

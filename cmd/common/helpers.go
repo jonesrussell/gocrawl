@@ -28,7 +28,7 @@ func GetCommandContext(ctx context.Context) (*CommandContext, error) {
 // GetDependencies retrieves logger and config from context.
 // This is a convenience function that extracts dependencies from CommandContext.
 // Returns an error if dependencies are not found or have invalid types.
-func GetDependencies(ctx context.Context) (logger.Interface, config.Interface, error) {
+func GetDependencies(ctx context.Context) (log logger.Interface, cfg config.Interface, err error) {
 	cmdCtx, err := GetCommandContext(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -42,5 +42,7 @@ func GetDependencies(ctx context.Context) (logger.Interface, config.Interface, e
 		return nil, nil, errors.New("config not found in command context")
 	}
 
-	return cmdCtx.Logger, cmdCtx.Config, nil
+	log = cmdCtx.Logger
+	cfg = cmdCtx.Config
+	return log, cfg, nil
 }

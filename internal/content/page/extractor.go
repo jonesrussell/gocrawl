@@ -305,18 +305,17 @@ func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sour
 
 // PageData holds extracted page data before conversion to models.Page
 type PageData struct {
-	ID           string
-	URL          string
-	Title        string
-	Content      string
-	Description  string
-	Keywords     []string
-	OgTitle      string
+	ID            string
+	URL           string
+	Title         string
+	Content       string
+	Description   string
+	Keywords      []string
+	OgTitle       string
 	OgDescription string
-	OgImage      string
-	OgURL        string
-	CanonicalURL string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	OgImage       string
+	OgURL         string
+	CanonicalURL  string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
-

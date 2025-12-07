@@ -30,7 +30,7 @@ type ArticleProcessor struct {
 
 // NewProcessor creates a new article processor.
 func NewProcessor(
-	logger logger.Interface,
+	log logger.Interface,
 	service Interface,
 	validator content.JobValidator,
 	storage types.Interface,
@@ -40,7 +40,7 @@ func NewProcessor(
 	pageIndexer processor.Processor,
 ) *ArticleProcessor {
 	return &ArticleProcessor{
-		logger:         logger,
+		logger:         log,
 		service:        service,
 		validator:      validator,
 		storage:        storage,
@@ -52,10 +52,10 @@ func NewProcessor(
 }
 
 // Process implements the common.Processor interface.
-func (p *ArticleProcessor) Process(ctx context.Context, content any) error {
-	e, ok := content.(*colly.HTMLElement)
+func (p *ArticleProcessor) Process(ctx context.Context, contentData any) error {
+	e, ok := contentData.(*colly.HTMLElement)
 	if !ok {
-		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", contentData)
 	}
 
 	// Use the service to process the article
@@ -76,8 +76,8 @@ func (p *ArticleProcessor) ContentType() contenttype.Type {
 }
 
 // CanProcess implements the common.Processor interface.
-func (p *ArticleProcessor) CanProcess(contentType contenttype.Type) bool {
-	return contentType == contenttype.Article
+func (p *ArticleProcessor) CanProcess(ct contenttype.Type) bool {
+	return ct == contenttype.Article
 }
 
 // ParseHTML implements the common.Processor interface.
@@ -112,7 +112,7 @@ func (p *ArticleProcessor) ValidateJob(job *content.Job) error {
 }
 
 // RegisterProcessor implements content.ProcessorRegistry
-func (p *ArticleProcessor) RegisterProcessor(processor content.ContentProcessor) {
+func (p *ArticleProcessor) RegisterProcessor(proc content.ContentProcessor) {
 	// Not implemented - we only handle article processing
 }
 
@@ -130,8 +130,8 @@ type articleContentProcessor struct {
 }
 
 // Process implements content.ContentProcessor
-func (p *articleContentProcessor) Process(ctx context.Context, content any) error {
-	return p.ArticleProcessor.Process(ctx, content)
+func (p *articleContentProcessor) Process(ctx context.Context, contentData any) error {
+	return p.ArticleProcessor.Process(ctx, contentData)
 }
 
 // ContentType implements content.ContentProcessor
@@ -140,8 +140,8 @@ func (p *articleContentProcessor) ContentType() contenttype.Type {
 }
 
 // CanProcess implements content.ContentProcessor
-func (p *articleContentProcessor) CanProcess(content contenttype.Type) bool {
-	return p.ArticleProcessor.CanProcess(content)
+func (p *articleContentProcessor) CanProcess(ct contenttype.Type) bool {
+	return p.ArticleProcessor.CanProcess(ct)
 }
 
 // ValidateJob implements content.ContentProcessor
@@ -168,12 +168,12 @@ func (p *ArticleProcessor) Close() error {
 }
 
 // ProcessContent implements content.ProcessorRegistry
-func (p *ArticleProcessor) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
-	processor, err := p.GetProcessor(contentType)
+func (p *ArticleProcessor) ProcessContent(ctx context.Context, ct contenttype.Type, contentData any) error {
+	proc, err := p.GetProcessor(ct)
 	if err != nil {
 		return err
 	}
-	return processor.Process(ctx, content)
+	return proc.Process(ctx, contentData)
 }
 
 // Get retrieves an article by its ID

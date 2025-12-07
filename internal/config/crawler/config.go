@@ -266,8 +266,6 @@ func LoadFromViper(v *viper.Viper) *Config {
 		cfg.MaxConcurrency = v.GetInt("crawler.parallelism")
 	} else if v.IsSet("crawler.max_concurrency") {
 		cfg.MaxConcurrency = v.GetInt("crawler.max_concurrency")
-	} else {
-		cfg.MaxConcurrency = v.GetInt("crawler.max_concurrency")
 	}
 
 	cfg.MaxDepth = v.GetInt("crawler.max_depth")
@@ -301,10 +299,16 @@ func LoadFromViper(v *viper.Viper) *Config {
 	// Load TLS configuration
 	cfg.TLS.InsecureSkipVerify = v.GetBool("crawler.tls.insecure_skip_verify")
 	if v.IsSet("crawler.tls.min_version") {
-		cfg.TLS.MinVersion = uint16(v.GetInt("crawler.tls.min_version"))
+		minVer := v.GetInt("crawler.tls.min_version")
+		if minVer >= 0 && minVer <= 65535 {
+			cfg.TLS.MinVersion = uint16(minVer)
+		}
 	}
 	if v.IsSet("crawler.tls.max_version") {
-		cfg.TLS.MaxVersion = uint16(v.GetInt("crawler.tls.max_version"))
+		maxVer := v.GetInt("crawler.tls.max_version")
+		if maxVer >= 0 && maxVer <= 65535 {
+			cfg.TLS.MaxVersion = uint16(maxVer)
+		}
 	}
 	cfg.TLS.PreferServerCipherSuites = v.GetBool("crawler.tls.prefer_server_cipher_suites")
 

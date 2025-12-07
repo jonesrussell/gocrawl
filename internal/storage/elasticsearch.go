@@ -24,13 +24,13 @@ type ElasticsearchStorage struct {
 // NewElasticsearchStorage creates a new Elasticsearch storage instance
 func NewElasticsearchStorage(
 	client *es.Client,
-	config *elasticsearch.Config,
-	logger logger.Interface,
+	cfg *elasticsearch.Config,
+	log logger.Interface,
 ) *ElasticsearchStorage {
 	return &ElasticsearchStorage{
 		client: client,
-		config: config,
-		logger: logger,
+		config: cfg,
+		logger: log,
 	}
 }
 
@@ -442,11 +442,11 @@ func (s *ElasticsearchStorage) Close() error {
 
 // mustJSON marshals a value to JSON, panicking on error
 func mustJSON(v any) []byte {
-	bytes, err := json.Marshal(v)
+	data, err := json.Marshal(v)
 	if err != nil {
 		panic(fmt.Sprintf("failed to marshal to JSON: %v", err))
 	}
-	return bytes
+	return data
 }
 
 // EnsureArticleIndex ensures the article index exists with the correct mapping

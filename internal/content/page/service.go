@@ -37,22 +37,27 @@ type SourceManager interface {
 }
 
 // NewContentService creates a new page content service.
-func NewContentService(logger logger.Interface, storage types.Interface, indexName string) Interface {
+func NewContentService(log logger.Interface, storage types.Interface, indexName string) Interface {
 	return &ContentService{
-		logger:    logger,
+		logger:    log,
 		storage:   storage,
 		indexName: indexName,
 	}
 }
 
 // NewContentServiceWithSources creates a new page content service with sources access.
-func NewContentServiceWithSources(logger logger.Interface, storage types.Interface, indexName string, sources sources.Interface) Interface {
+func NewContentServiceWithSources(
+	log logger.Interface,
+	storage types.Interface,
+	indexName string,
+	sourcesManager sources.Interface,
+) Interface {
 	return &ContentService{
-		logger:        logger,
+		logger:        log,
 		storage:       storage,
 		indexName:     indexName,
-		sources:       sources,
-		sourceManager: &sourceWrapper{sources: sources},
+		sources:       sourcesManager,
+		sourceManager: &sourceWrapper{sources: sourcesManager},
 	}
 }
 
@@ -70,10 +75,11 @@ func (s *sourceWrapper) FindSourceByURL(rawURL string) *configtypes.Source {
 	if err != nil {
 		return nil
 	}
-	for _, source := range allSources {
+	for i := range allSources {
+		source := &allSources[i]
 		// A more robust check might involve parsing domains or using a more sophisticated matching logic
 		if strings.Contains(rawURL, source.URL) {
-			return sourceutils.ConvertToConfigSource(&source)
+			return sourceutils.ConvertToConfigSource(source)
 		}
 	}
 	return nil
@@ -109,19 +115,19 @@ func (s *ContentService) Process(e *colly.HTMLElement) error {
 
 	// Convert to models.Page
 	page := &models.Page{
-		ID:           pageData.ID,
-		URL:          pageData.URL,
-		Title:        pageData.Title,
-		Content:      pageData.Content,
-		Description:  pageData.Description,
-		Keywords:     pageData.Keywords,
-		OgTitle:      pageData.OgTitle,
+		ID:            pageData.ID,
+		URL:           pageData.URL,
+		Title:         pageData.Title,
+		Content:       pageData.Content,
+		Description:   pageData.Description,
+		Keywords:      pageData.Keywords,
+		OgTitle:       pageData.OgTitle,
 		OgDescription: pageData.OgDescription,
-		OgImage:      pageData.OgImage,
-		OgURL:        pageData.OgURL,
-		CanonicalURL: pageData.CanonicalURL,
-		CreatedAt:    pageData.CreatedAt,
-		UpdatedAt:    pageData.UpdatedAt,
+		OgImage:       pageData.OgImage,
+		OgURL:         pageData.OgURL,
+		CanonicalURL:  pageData.CanonicalURL,
+		CreatedAt:     pageData.CreatedAt,
+		UpdatedAt:     pageData.UpdatedAt,
 	}
 
 	// Index the page to Elasticsearch
@@ -175,8 +181,8 @@ func (s *ContentService) findSourceByURL(pageURL string) *sources.Config {
 			}
 		}
 		// Also check source URL
-		if sourceURL, err := url.Parse(source.URL); err == nil {
-			if sourceURL.Hostname() == domain {
+		if sourceParsedURL, parseErr := url.Parse(source.URL); parseErr == nil {
+			if sourceParsedURL.Hostname() == domain {
 				return source
 			}
 		}

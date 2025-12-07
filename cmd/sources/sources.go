@@ -57,12 +57,12 @@ func NewSourcesCommand() *cobra.Command {
 func (c *SourcesCommand) Run(ctx context.Context) error {
 	c.logger.Info("Listing sources")
 
-	sources, err := c.sourceManager.GetSources()
+	sourcesList, err := c.sourceManager.GetSources()
 	if err != nil {
 		return fmt.Errorf("failed to get sources: %w", err)
 	}
 
-	if len(sources) == 0 {
+	if len(sourcesList) == 0 {
 		c.logger.Info("No sources configured")
 		return nil
 	}
@@ -71,8 +71,8 @@ func (c *SourcesCommand) Run(ctx context.Context) error {
 	log := c.logger
 	log.Info("Configured Sources:")
 	log.Info("------------------")
-	for i := range sources {
-		src := &sources[i]
+	for i := range sourcesList {
+		src := &sourcesList[i]
 		log.Info("Source details",
 			"name", src.Name,
 			"url", src.URL,

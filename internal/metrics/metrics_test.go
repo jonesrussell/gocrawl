@@ -10,107 +10,107 @@ import (
 )
 
 func TestNewMetrics(t *testing.T) {
-	metrics := metrics.NewMetrics()
-	assert.NotNil(t, metrics)
-	assert.False(t, metrics.GetStartTime().IsZero())
+	m := metrics.NewMetrics()
+	assert.NotNil(t, m)
+	assert.False(t, m.GetStartTime().IsZero())
 }
 
 func TestUpdateMetrics(t *testing.T) {
-	metrics := metrics.NewMetrics()
+	m := metrics.NewMetrics()
 
 	// Test successful processing
-	metrics.UpdateMetrics(true)
-	assert.Equal(t, int64(1), metrics.GetProcessedCount())
-	assert.Equal(t, int64(0), metrics.GetErrorCount())
-	assert.False(t, metrics.GetLastProcessedTime().IsZero())
+	m.UpdateMetrics(true)
+	assert.Equal(t, int64(1), m.GetProcessedCount())
+	assert.Equal(t, int64(0), m.GetErrorCount())
+	assert.False(t, m.GetLastProcessedTime().IsZero())
 
 	// Test error processing
-	metrics.UpdateMetrics(false)
-	assert.Equal(t, int64(2), metrics.GetProcessedCount())
-	assert.Equal(t, int64(1), metrics.GetErrorCount())
+	m.UpdateMetrics(false)
+	assert.Equal(t, int64(2), m.GetProcessedCount())
+	assert.Equal(t, int64(1), m.GetErrorCount())
 }
 
 func TestResetMetrics(t *testing.T) {
-	metrics := metrics.NewMetrics()
-	metrics.UpdateMetrics(true)
-	metrics.UpdateMetrics(false)
-	metrics.SetCurrentSource("test")
+	m := metrics.NewMetrics()
+	m.UpdateMetrics(true)
+	m.UpdateMetrics(false)
+	m.SetCurrentSource("test")
 
-	metrics.ResetMetrics()
+	m.ResetMetrics()
 
-	assert.Equal(t, int64(0), metrics.GetProcessedCount())
-	assert.Equal(t, int64(0), metrics.GetErrorCount())
-	assert.True(t, metrics.GetLastProcessedTime().IsZero())
-	assert.Empty(t, metrics.GetCurrentSource())
+	assert.Equal(t, int64(0), m.GetProcessedCount())
+	assert.Equal(t, int64(0), m.GetErrorCount())
+	assert.True(t, m.GetLastProcessedTime().IsZero())
+	assert.Empty(t, m.GetCurrentSource())
 }
 
 func TestCurrentSource(t *testing.T) {
-	metrics := metrics.NewMetrics()
-	assert.Empty(t, metrics.GetCurrentSource())
+	m := metrics.NewMetrics()
+	assert.Empty(t, m.GetCurrentSource())
 
-	metrics.SetCurrentSource("test")
-	assert.Equal(t, "test", metrics.GetCurrentSource())
+	m.SetCurrentSource("test")
+	assert.Equal(t, "test", m.GetCurrentSource())
 }
 
 func TestUpdateMetricsConcurrently(t *testing.T) {
-	metrics := metrics.NewMetrics()
+	m := metrics.NewMetrics()
 
 	// Start a goroutine to update metrics
 	go func() {
-		metrics.UpdateMetrics(true)
+		m.UpdateMetrics(true)
 	}()
 
 	// Wait for goroutine to complete
 	time.Sleep(common.DefaultTestSleepDuration)
 
 	// Verify metrics
-	assert.Equal(t, int64(1), metrics.GetProcessedCount())
-	assert.Equal(t, int64(0), metrics.GetErrorCount())
+	assert.Equal(t, int64(1), m.GetProcessedCount())
+	assert.Equal(t, int64(0), m.GetErrorCount())
 }
 
 func TestHTTPRequestMetrics(t *testing.T) {
-	metrics := metrics.NewMetrics()
+	m := metrics.NewMetrics()
 
 	// Test successful requests
-	metrics.IncrementSuccessfulRequests()
-	metrics.IncrementSuccessfulRequests()
-	assert.Equal(t, int64(2), metrics.GetSuccessfulRequests(), "Should have 2 successful requests")
+	m.IncrementSuccessfulRequests()
+	m.IncrementSuccessfulRequests()
+	assert.Equal(t, int64(2), m.GetSuccessfulRequests(), "Should have 2 successful requests")
 
 	// Test failed requests
-	metrics.IncrementFailedRequests()
-	assert.Equal(t, int64(1), metrics.GetFailedRequests(), "Should have 1 failed request")
+	m.IncrementFailedRequests()
+	assert.Equal(t, int64(1), m.GetFailedRequests(), "Should have 1 failed request")
 
 	// Test rate limited requests
-	metrics.IncrementRateLimitedRequests()
-	metrics.IncrementRateLimitedRequests()
-	assert.Equal(t, int64(2), metrics.GetRateLimitedRequests(), "Should have 2 rate limited requests")
+	m.IncrementRateLimitedRequests()
+	m.IncrementRateLimitedRequests()
+	assert.Equal(t, int64(2), m.GetRateLimitedRequests(), "Should have 2 rate limited requests")
 
 	// Test reset
-	metrics.ResetMetrics()
-	assert.Equal(t, int64(0), metrics.GetSuccessfulRequests(), "Should have no successful requests after reset")
-	assert.Equal(t, int64(0), metrics.GetFailedRequests(), "Should have no failed requests after reset")
-	assert.Equal(t, int64(0), metrics.GetRateLimitedRequests(), "Should have no rate limited requests after reset")
+	m.ResetMetrics()
+	assert.Equal(t, int64(0), m.GetSuccessfulRequests(), "Should have no successful requests after reset")
+	assert.Equal(t, int64(0), m.GetFailedRequests(), "Should have no failed requests after reset")
+	assert.Equal(t, int64(0), m.GetRateLimitedRequests(), "Should have no rate limited requests after reset")
 }
 
 func TestHTTPRequestMetricsConcurrently(t *testing.T) {
-	metrics := metrics.NewMetrics()
+	m := metrics.NewMetrics()
 
 	// Start goroutines to update metrics
 	go func() {
-		metrics.IncrementSuccessfulRequests()
+		m.IncrementSuccessfulRequests()
 	}()
 	go func() {
-		metrics.IncrementFailedRequests()
+		m.IncrementFailedRequests()
 	}()
 	go func() {
-		metrics.IncrementRateLimitedRequests()
+		m.IncrementRateLimitedRequests()
 	}()
 
 	// Wait for goroutines to complete
 	time.Sleep(common.DefaultTestSleepDuration)
 
 	// Verify metrics
-	assert.Equal(t, int64(1), metrics.GetSuccessfulRequests(), "Should have 1 successful request")
-	assert.Equal(t, int64(1), metrics.GetFailedRequests(), "Should have 1 failed request")
-	assert.Equal(t, int64(1), metrics.GetRateLimitedRequests(), "Should have 1 rate limited request")
+	assert.Equal(t, int64(1), m.GetSuccessfulRequests(), "Should have 1 successful request")
+	assert.Equal(t, int64(1), m.GetFailedRequests(), "Should have 1 failed request")
+	assert.Equal(t, int64(1), m.GetRateLimitedRequests(), "Should have 1 rate limited request")
 }

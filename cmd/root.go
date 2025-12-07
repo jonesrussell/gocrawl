@@ -108,7 +108,9 @@ func Execute() error {
 
 	// Debug: Print to stderr to verify what we're getting (before logger is created)
 	if Debug {
-		fmt.Fprintf(os.Stderr, "DEBUG: Debug flag is true, logger.level=%s, viper.app.debug=%v\n", logLevel, viper.GetBool("app.debug"))
+		fmt.Fprintf(os.Stderr,
+			"DEBUG: Debug flag is true, logger.level=%s, viper.app.debug=%v\n",
+			logLevel, viper.GetBool("app.debug"))
 	}
 
 	logCfg := &logger.Config{
@@ -269,7 +271,8 @@ func initConfig() error {
 		return fmt.Errorf("failed to bind Elasticsearch API key: %w", err)
 	}
 	// Bind index_name (supports both ELASTICSEARCH_INDEX_PREFIX and ELASTICSEARCH_INDEX_NAME)
-	if err := viper.BindEnv("elasticsearch.index_name", "ELASTICSEARCH_INDEX_PREFIX", "ELASTICSEARCH_INDEX_NAME"); err != nil {
+	if err := viper.BindEnv("elasticsearch.index_name",
+		"ELASTICSEARCH_INDEX_PREFIX", "ELASTICSEARCH_INDEX_NAME"); err != nil {
 		return fmt.Errorf("failed to bind Elasticsearch index name: %w", err)
 	}
 	if err := viper.BindEnv("elasticsearch.retry.max_retries", "ELASTICSEARCH_MAX_RETRIES"); err != nil {

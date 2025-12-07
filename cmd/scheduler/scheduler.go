@@ -3,6 +3,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	es "github.com/elastic/go-elasticsearch/v8"
@@ -120,16 +121,21 @@ func createStorageClientForScheduler(cfg config.Interface, log logger.Interface)
 	return clientResult.Client, nil
 }
 
-// createCrawlerForScheduler creates a crawler instance for the scheduler
-// The scheduler uses a single crawler instance and calls Start with different source URLs
-func createCrawlerForScheduler(cfg config.Interface, log logger.Interface, sourceManager sources.Interface, storageResult storage.StorageResult) (crawler.Interface, error) {
+// createCrawlerForScheduler creates a crawler instance for the scheduler.
+// The scheduler uses a single crawler instance and calls Start with different source URLs.
+func createCrawlerForScheduler(
+	cfg config.Interface,
+	log logger.Interface,
+	sourceManager sources.Interface,
+	storageResult storage.StorageResult,
+) (crawler.Interface, error) {
 	// Create event bus
 	bus := events.NewEventBus(log)
 
 	// Get crawler config
 	crawlerCfg := cfg.GetCrawlerConfig()
 	if crawlerCfg == nil {
-		return nil, fmt.Errorf("crawler configuration is required")
+		return nil, errors.New("crawler configuration is required")
 	}
 
 	// Use default index names for scheduler (it will use source-specific indices when crawling)

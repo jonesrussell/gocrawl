@@ -13,9 +13,9 @@ type DefaultHandler struct {
 }
 
 // NewDefaultHandler creates a new DefaultHandler instance.
-func NewDefaultHandler(logger logger.Interface) EventHandler {
+func NewDefaultHandler(log logger.Interface) EventHandler {
 	return &DefaultHandler{
-		logger: logger,
+		logger: log,
 	}
 }
 

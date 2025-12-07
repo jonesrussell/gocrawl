@@ -382,6 +382,51 @@ func WithTLSInsecureSkipVerify(skip bool) Option {
 	}
 }
 
+// parseAddressesFromString parses comma-separated addresses from a string
+func parseAddressesFromString(addrStr string) []string {
+	addresses := strings.Split(addrStr, ",")
+	// Trim whitespace from each address
+	for i := range addresses {
+		addresses[i] = strings.TrimSpace(addresses[i])
+	}
+	// Remove any empty strings after trimming
+	var filtered []string
+	for _, addr := range addresses {
+		if addr != "" {
+			filtered = append(filtered, addr)
+		}
+	}
+	return filtered
+}
+
+// parseAddressesFromConfig parses addresses from Viper configuration
+func parseAddressesFromConfig(v *viper.Viper) []string {
+	// Try GetStringSlice first (for YAML configs with array syntax)
+	addresses := v.GetStringSlice("elasticsearch.addresses")
+	// Filter out empty strings
+	var filtered []string
+	for _, addr := range addresses {
+		if addr != "" {
+			filtered = append(filtered, addr)
+		}
+	}
+	addresses = filtered
+
+	// If GetStringSlice returned empty, fall back to GetString and parse as comma-separated
+	if len(addresses) == 0 {
+		addrStr := v.GetString("elasticsearch.addresses")
+		if addrStr != "" {
+			addresses = parseAddressesFromString(addrStr)
+		} else {
+			// Fallback to single string value
+			if addr := v.GetString("elasticsearch.address"); addr != "" {
+				addresses = []string{addr}
+			}
+		}
+	}
+	return addresses
+}
+
 // LoadFromViper loads Elasticsearch configuration from Viper
 func LoadFromViper(v *viper.Viper) *Config {
 	var addresses []string
@@ -391,60 +436,15 @@ func LoadFromViper(v *viper.Viper) *Config {
 	var addrStr string
 	if envAddr := os.Getenv("ELASTICSEARCH_HOSTS"); envAddr != "" {
 		addrStr = envAddr
-	} else if envAddr := os.Getenv("ELASTICSEARCH_ADDRESSES"); envAddr != "" {
-		addrStr = envAddr
+	} else if envAddr2 := os.Getenv("ELASTICSEARCH_ADDRESSES"); envAddr2 != "" {
+		addrStr = envAddr2
 	}
 
 	// If we have an environment variable, parse it as a comma-separated string
 	if addrStr != "" {
-		// Split comma-separated addresses
-		addresses = strings.Split(addrStr, ",")
-		// Trim whitespace from each address
-		for i := range addresses {
-			addresses[i] = strings.TrimSpace(addresses[i])
-		}
-		// Remove any empty strings after trimming
-		var filtered []string
-		for _, addr := range addresses {
-			if addr != "" {
-				filtered = append(filtered, addr)
-			}
-		}
-		addresses = filtered
+		addresses = parseAddressesFromString(addrStr)
 	} else {
-		// No environment variable set, try GetStringSlice first (for YAML configs with array syntax)
-		// This properly handles YAML arrays like: addresses: ["http://127.0.0.1:9200"]
-		addresses = v.GetStringSlice("elasticsearch.addresses")
-		// Filter out empty strings
-		var filtered []string
-		for _, addr := range addresses {
-			if addr != "" {
-				filtered = append(filtered, addr)
-			}
-		}
-		addresses = filtered
-
-		// If GetStringSlice returned empty (e.g., config has a string value instead of array),
-		// fall back to GetString and parse as comma-separated
-		if len(addresses) == 0 {
-			addrStr = v.GetString("elasticsearch.addresses")
-			if addrStr != "" {
-				// Split comma-separated addresses
-				addresses = strings.Split(addrStr, ",")
-				// Trim whitespace from each address
-				for i := range addresses {
-					addresses[i] = strings.TrimSpace(addresses[i])
-				}
-				// Remove any empty strings after trimming
-				filtered = []string{}
-				for _, addr := range addresses {
-					if addr != "" {
-						filtered = append(filtered, addr)
-					}
-				}
-				addresses = filtered
-			}
-		}
+		addresses = parseAddressesFromConfig(v)
 	}
 
 	// If addresses is still empty, use default
