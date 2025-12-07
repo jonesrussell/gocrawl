@@ -204,7 +204,26 @@ func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sour
 	// Generate ID from URL
 	data.ID = generateID(sourceURL)
 
-	// Extract title using selector, with fallbacks
+	// Extract title
+	extractPageTitle(data, e, selectors)
+
+	// Extract content
+	extractPageContent(data, e, selectors)
+
+	// Extract description and keywords
+	extractPageDescriptionKeywords(data, e, selectors)
+
+	// Extract Open Graph metadata
+	extractPageOpenGraphMetadata(data, e, selectors)
+
+	// Extract canonical URL
+	extractPageCanonicalURL(data, e, selectors, sourceURL)
+
+	return data
+}
+
+// extractPageTitle extracts the page title with fallbacks.
+func extractPageTitle(data *PageData, e *colly.HTMLElement, selectors configtypes.PageSelectors) {
 	data.Title = extractText(e, selectors.Title)
 	if data.Title == "" {
 		data.Title = extractMeta(e, "og:title")
@@ -214,7 +233,10 @@ func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sour
 		titleText := e.ChildText("title")
 		data.Title = cleanText(titleText)
 	}
+}
 
+// extractPageContent extracts the page content with multiple fallback strategies.
+func extractPageContent(data *PageData, e *colly.HTMLElement, selectors configtypes.PageSelectors) {
 	// Extract content - use container selector if available, otherwise use content selector
 	if selectors.Container != "" {
 		// Use container-based extraction with excludes applied
@@ -242,7 +264,10 @@ func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sour
 		bodyText := e.ChildText("body")
 		data.Content = cleanText(bodyText)
 	}
+}
 
+// extractPageDescriptionKeywords extracts description and keywords.
+func extractPageDescriptionKeywords(data *PageData, e *colly.HTMLElement, selectors configtypes.PageSelectors) {
 	// Extract description using selector, with fallbacks
 	data.Description = extractText(e, selectors.Description)
 	if data.Description == "" {
@@ -263,8 +288,10 @@ func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sour
 			data.Keywords[i] = strings.TrimSpace(data.Keywords[i])
 		}
 	}
+}
 
-	// Extract Open Graph metadata using selectors, with fallbacks
+// extractPageOpenGraphMetadata extracts Open Graph metadata.
+func extractPageOpenGraphMetadata(data *PageData, e *colly.HTMLElement, selectors configtypes.PageSelectors) {
 	data.OgTitle = extractText(e, selectors.OGTitle)
 	if data.OgTitle == "" {
 		data.OgTitle = extractMeta(e, "og:title")
@@ -290,8 +317,15 @@ func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sour
 	if data.OgURL == "" {
 		data.OgURL = extractMeta(e, "og:url")
 	}
+}
 
-	// Extract canonical URL using selector, with fallback
+// extractPageCanonicalURL extracts the canonical URL.
+func extractPageCanonicalURL(
+	data *PageData,
+	e *colly.HTMLElement,
+	selectors configtypes.PageSelectors,
+	sourceURL string,
+) {
 	data.CanonicalURL = extractAttr(e, selectors.Canonical, "href")
 	if data.CanonicalURL == "" {
 		data.CanonicalURL = extractAttr(e, "link[rel='canonical']", "href")
@@ -299,8 +333,6 @@ func extractPage(e *colly.HTMLElement, selectors configtypes.PageSelectors, sour
 	if data.CanonicalURL == "" {
 		data.CanonicalURL = sourceURL
 	}
-
-	return data
 }
 
 // PageData holds extracted page data before conversion to models.Page

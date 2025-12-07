@@ -109,25 +109,9 @@ func NewListCommand() *cobra.Command {
 				return fmt.Errorf("failed to get dependencies: %w", err)
 			}
 
-			// Ensure crawler config exists to avoid nil dereference in sources loader
-			if cfg.GetCrawlerConfig() == nil {
-				if concrete, ok := cfg.(*config.Config); ok {
-					concrete.Crawler = crawlercfg.New()
-				}
-			}
-
-			// If the configured source file does not exist, fall back to sources.example.yml
-			if concrete, ok := cfg.(*config.Config); ok {
-				path := concrete.GetCrawlerConfig().SourceFile
-				if path == "" {
-					path = "sources.yml"
-				}
-				if _, statErr := os.Stat(path); statErr != nil {
-					alt := "./sources.example.yml"
-					if _, altErr := os.Stat(alt); altErr == nil {
-						concrete.Crawler.SourceFile = alt
-					}
-				}
+			// Ensure crawler config is properly set up
+			if setupErr := setupCrawlerConfig(cfg); setupErr != nil {
+				return setupErr
 			}
 
 			// Construct dependencies directly without FX
@@ -145,4 +129,31 @@ func NewListCommand() *cobra.Command {
 	}
 
 	return cmd
+}
+
+// setupCrawlerConfig ensures crawler config exists and source file is properly configured.
+func setupCrawlerConfig(cfg config.Interface) error {
+	concrete, ok := cfg.(*config.Config)
+	if !ok {
+		return nil
+	}
+
+	// Ensure crawler config exists to avoid nil dereference in sources loader
+	if cfg.GetCrawlerConfig() == nil {
+		concrete.Crawler = crawlercfg.New()
+	}
+
+	// If the configured source file does not exist, fall back to sources.example.yml
+	path := concrete.GetCrawlerConfig().SourceFile
+	if path == "" {
+		path = "sources.yml"
+	}
+	if _, statErr := os.Stat(path); statErr != nil {
+		alt := "./sources.example.yml"
+		if _, altErr := os.Stat(alt); altErr == nil {
+			concrete.Crawler.SourceFile = alt
+		}
+	}
+
+	return nil
 }

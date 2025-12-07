@@ -55,9 +55,9 @@ type Config struct {
 }
 
 // NewConfig creates a new config instance.
-func NewConfig(logger logger.Interface) *Config {
+func NewConfig(log logger.Interface) *Config {
 	return &Config{
-		logger: logger,
+		logger: log,
 	}
 }
 

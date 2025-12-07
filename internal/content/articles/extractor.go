@@ -193,12 +193,46 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 	}
 
 	// Extract basic fields (before applying excludes, as these are usually in head or specific locations)
+	extractBasicFields(data, e, selectors)
+
+	// Extract body content
+	extractBodyContent(data, e, selectors)
+
+	// Extract metadata
+	extractMetadata(data, e, selectors)
+
+	// Extract tags
+	extractTags(data, e, selectors)
+
+	// Extract Open Graph metadata
+	extractOpenGraphMetadata(data, e)
+
+	// Extract other metadata
+	extractOtherMetadata(data, e, selectors, sourceURL)
+
+	// Extract article ID
+	data.ID = extractArticleID(e, selectors, sourceURL)
+
+	return data
+}
+
+// extractBasicFields extracts title and intro fields.
+func extractBasicFields(data *ArticleData, e *colly.HTMLElement, selectors configtypes.ArticleSelectors) {
 	data.Title = extractText(e, selectors.Title)
 	if data.Title == "" {
 		// Fallback to OG title
 		data.Title = extractMeta(e, "og:title")
 	}
 
+	data.Intro = extractText(e, selectors.Intro)
+	if data.Intro == "" {
+		// Fallback to OG description
+		data.Intro = extractMeta(e, "og:description")
+	}
+}
+
+// extractBodyContent extracts the article body content.
+func extractBodyContent(data *ArticleData, e *colly.HTMLElement, selectors configtypes.ArticleSelectors) {
 	// Extract body - use container-based extraction if container selector is available
 	// This is the most reliable method as it scopes to the article container and applies excludes
 	if selectors.Container != "" {
@@ -221,14 +255,10 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 		// Try common article content containers
 		data.Body = extractTextFromContainer(e, "article, main, .article-content, .article-body", selectors.Exclude)
 	}
+}
 
-	data.Intro = extractText(e, selectors.Intro)
-	if data.Intro == "" {
-		// Fallback to OG description
-		data.Intro = extractMeta(e, "og:description")
-	}
-
-	// Extract metadata
+// extractMetadata extracts author, byline, and published date.
+func extractMetadata(data *ArticleData, e *colly.HTMLElement, selectors configtypes.ArticleSelectors) {
 	data.Author = extractText(e, selectors.Author)
 	if data.Author == "" {
 		data.Author = extractMeta(e, "article:author")
@@ -250,7 +280,10 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 	if publishedTimeStr != "" {
 		data.PublishedDate = parseDate(publishedTimeStr)
 	}
+}
 
+// extractTags extracts tags and keywords from the article.
+func extractTags(data *ArticleData, e *colly.HTMLElement, selectors configtypes.ArticleSelectors) {
 	// Extract tags/keywords
 	keywordsStr := extractText(e, selectors.Keywords)
 	if keywordsStr == "" {
@@ -285,8 +318,10 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 			}
 		}
 	}
+}
 
-	// Extract Open Graph metadata
+// extractOpenGraphMetadata extracts Open Graph metadata.
+func extractOpenGraphMetadata(data *ArticleData, e *colly.HTMLElement) {
 	data.OgTitle = extractMeta(e, "og:title")
 	if data.OgTitle == "" {
 		data.OgTitle = data.Title
@@ -301,8 +336,15 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 	data.OgURL = extractMeta(e, "og:url")
 	data.OgType = extractMeta(e, "og:type")
 	data.OgSiteName = extractMeta(e, "og:site_name")
+}
 
-	// Extract other metadata
+// extractOtherMetadata extracts description, section, category, and canonical URL.
+func extractOtherMetadata(
+	data *ArticleData,
+	e *colly.HTMLElement,
+	selectors configtypes.ArticleSelectors,
+	sourceURL string,
+) {
 	data.Description = extractMetaName(e, "description")
 	if data.Description == "" {
 		data.Description = data.Intro
@@ -322,7 +364,10 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 	if data.CanonicalURL == "" {
 		data.CanonicalURL = sourceURL
 	}
+}
 
+// extractArticleID extracts the article ID from various attributes or generates one from URL.
+func extractArticleID(e *colly.HTMLElement, selectors configtypes.ArticleSelectors, sourceURL string) string {
 	// Extract article ID if available
 	articleID := extractAttr(e, selectors.ArticleID, "data-article-id")
 	if articleID == "" {
@@ -336,9 +381,7 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 	if articleID == "" {
 		articleID = generateID(sourceURL)
 	}
-	data.ID = articleID
-
-	return data
+	return articleID
 }
 
 // ArticleData holds extracted article data before conversion to models.Article

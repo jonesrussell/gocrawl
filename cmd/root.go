@@ -230,17 +230,40 @@ func initConfig() error {
 		fmt.Fprintf(os.Stderr, "Warning: Config file not found: %v (using defaults and environment variables)\n", err)
 	}
 
-	// Bind environment variables (explicit bindings for clarity and to support multiple env var names)
-
 	// Bind command-line flags to Viper
+	if err := bindCommandLineFlags(); err != nil {
+		return err
+	}
+
+	// Map environment variables to config keys
+	if err := bindAppEnvVars(); err != nil {
+		return err
+	}
+
+	// Bind Elasticsearch environment variables
+	if err := bindElasticsearchEnvVars(); err != nil {
+		return err
+	}
+
+	// Set development logging settings
+	setupDevelopmentLogging()
+
+	return nil
+}
+
+// bindCommandLineFlags binds command-line flags to Viper.
+func bindCommandLineFlags() error {
 	if err := viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug")); err != nil {
 		return fmt.Errorf("failed to bind debug flag: %w", err)
 	}
 	if err := viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config")); err != nil {
 		return fmt.Errorf("failed to bind config flag: %w", err)
 	}
+	return nil
+}
 
-	// Map environment variables to config keys
+// bindAppEnvVars binds application and logger environment variables to config keys.
+func bindAppEnvVars() error {
 	if err := viper.BindEnv("app.environment", "APP_ENV"); err != nil {
 		return fmt.Errorf("failed to bind APP_ENV: %w", err)
 	}
@@ -253,8 +276,11 @@ func initConfig() error {
 	if err := viper.BindEnv("logger.encoding", "LOG_FORMAT"); err != nil {
 		return fmt.Errorf("failed to bind LOG_FORMAT: %w", err)
 	}
+	return nil
+}
 
-	// Bind Elasticsearch environment variables
+// bindElasticsearchEnvVars binds Elasticsearch environment variables to config keys.
+func bindElasticsearchEnvVars() error {
 	// Support both ELASTICSEARCH_HOSTS and ELASTICSEARCH_ADDRESSES
 	// Note: ELASTICSEARCH_ADDRESSES is also handled by AutomaticEnv via the replacer,
 	// but we explicitly bind ELASTICSEARCH_HOSTS for clarity
@@ -284,8 +310,11 @@ func initConfig() error {
 	if err := viper.BindEnv("elasticsearch.retry.max_wait", "ELASTICSEARCH_RETRY_MAX_WAIT"); err != nil {
 		return fmt.Errorf("failed to bind Elasticsearch retry max wait: %w", err)
 	}
+	return nil
+}
 
-	// Set development logging settings based on environment and debug flag
+// setupDevelopmentLogging configures development logging settings based on environment and debug flag.
+func setupDevelopmentLogging() {
 	// Check both the flag variable and Viper to ensure we catch the debug flag
 	// Note: Debug variable is set by ParseFlags(), and we bind it to Viper above
 	debugFlag := Debug || viper.GetBool("app.debug")
@@ -310,8 +339,6 @@ func initConfig() error {
 
 	// Synchronize global Debug variable with Viper's value
 	Debug = debugFlag
-
-	return nil
 }
 
 // setDefaults sets default configuration values
