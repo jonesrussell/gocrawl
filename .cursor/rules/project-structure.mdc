@@ -13,12 +13,14 @@ This is a Go web crawler and search engine project with the following architectu
 - `scheduler/` - Job scheduling for automated crawling
 - `search/` - Search functionality
 - `sources/` - Source management
-- `common/` - Shared command utilities (CommandContext, helpers)
+- `common/` - Shared command utilities (CommandDeps, factory functions, constants)
 
 **Command Architecture:**
 - All commands use `Command()` function pattern for registration
-- Dependencies accessed via `CommandContext` in context
-- Commands construct dependencies directly (no per-command FX apps)
+- Dependencies created via `common.NewCommandDeps()` factory
+- Commands construct dependencies directly (no FX, no context.Value)
+- Storage clients created via `common.CreateStorageClient()`
+- Constants defined in `cmd/common/constants.go`
 - See command-architecture.mdc for detailed patterns
 
 ## Core Components (internal/)
@@ -48,7 +50,7 @@ This is a Go web crawler and search engine project with the following architectu
 - CLI framework: `github.com/spf13/cobra`
 - Configuration: `github.com/spf13/viper`
 - Logging: `go.uber.org/zap`
-- Dependency injection: `go.uber.org/fx`
+- Dependency injection: `go.uber.org/fx` (used in internal packages only, not in commands)
 description:
 globs:
 alwaysApply: true

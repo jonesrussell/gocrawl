@@ -56,24 +56,31 @@
 - Refactor when linters detect duplication or excessive function length
 
 ## Context Usage
-- Use `CommandContext` for type-safe dependency passing (see command-architecture.mdc)
-- DO NOT use `context.Value()` with individual keys - use `CommandContext` instead
-- Always check for errors when retrieving dependencies from context
-- Propagate context properly to all subcommands
+- Use `CommandDeps` struct for explicit dependency passing (see command-architecture.mdc)
+- DO NOT use `context.Value()` for dependency injection - use `common.NewCommandDeps()` factory
+- Always check for errors when creating dependencies
+- Use `cmd.Context()` for cancellation and timeouts only
 
-## FX (Uber FX) Usage
-- Use FX modules for internal package dependency injection
-- DO NOT create new `fx.New()` apps in command RunE functions
-- Construct dependencies directly in commands
-- Keep FX modules minimal - only include what's needed
-- Avoid duplicate module inclusions (causes "already provided" errors)
+## Dependency Injection
+- Use `common.NewCommandDeps()` factory to get logger and config
+- Use `common.CreateStorageClient()` for storage client creation
+- Construct dependencies directly in command RunE functions
+- DO NOT use FX modules for commands - FX was removed from command layer
+- Keep dependency construction explicit and clear
 
 ## Command Implementation
 - All commands MUST use `Command()` function pattern for registration
-- Commands MUST construct dependencies directly in RunE functions
-- Use helper functions for common dependency construction patterns
+- Commands MUST use `common.NewCommandDeps()` to get dependencies
+- Commands MUST use `common.CreateStorageClient()` for storage
+- Use constants from `cmd/common/constants.go` instead of magic strings/numbers
+- Use `atomic.Int32` directly for atomic operations (not `*int32`)
 - Implement graceful shutdown for long-running commands
 - See command-architecture.mdc for detailed patterns
+
+## Parameter Naming
+- Avoid shadowing imported package names with parameters
+- Use shortened names when needed (e.g., `stor` instead of `storage`)
+- Follow established naming conventions consistently
 
 description:
 globs:
