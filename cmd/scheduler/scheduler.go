@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	es "github.com/elastic/go-elasticsearch/v8"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	crawlerconfig "github.com/jonesrussell/gocrawl/internal/config/crawler"
@@ -33,27 +32,27 @@ The scheduler will run continuously until interrupted with Ctrl+C.`,
 
 // runScheduler executes the scheduler command
 func runScheduler(cmd *cobra.Command, _ []string) error {
-	// Get dependencies from context using helper
-	log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+	// Get dependencies - NEW WAY
+	deps, err := cmdcommon.NewCommandDeps()
 	if err != nil {
 		return fmt.Errorf("failed to get dependencies: %w", err)
 	}
 
 	// Create source manager
-	sourceManager, err := sources.LoadSources(cfg, log)
+	sourceManager, err := sources.LoadSources(deps.Config, deps.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to load sources: %w", err)
 	}
 
-	// Construct dependencies directly without FX
-	storageClient, err := createStorageClientForScheduler(cfg, log)
+	// Create storage using common function
+	storageClient, err := cmdcommon.CreateStorageClient(deps.Config, deps.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create storage client: %w", err)
 	}
 
 	storageResult, err := storage.NewStorage(storage.StorageParams{
-		Config: cfg,
-		Logger: log,
+		Config: deps.Config,
+		Logger: deps.Logger,
 		Client: storageClient,
 	})
 	if err != nil {
@@ -61,64 +60,52 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Create crawler (simplified - scheduler needs crawler for jobs)
-	crawlerInstance, err := createCrawlerForScheduler(cfg, log, sourceManager, storageResult)
+	crawlerInstance, err := createCrawlerForScheduler(deps.Config, deps.Logger, sourceManager, storageResult)
 	if err != nil {
 		return fmt.Errorf("failed to create crawler: %w", err)
 	}
 
 	// Create processor factory
-	processorFactory := crawler.NewProcessorFactory(log, storageResult.Storage, "content")
+	processorFactory := crawler.NewProcessorFactory(deps.Logger, storageResult.Storage, cmdcommon.DefaultContentIndex)
 
 	// Create done channel
 	done := make(chan struct{})
 
 	// Create scheduler service directly
 	schedulerService := NewSchedulerService(
-		log,
+		deps.Logger,
 		sourceManager,
 		crawlerInstance,
 		done,
-		cfg,
+		deps.Config,
 		storageResult.Storage,
 		processorFactory,
 	)
 
 	// Start the scheduler service
-	log.Info("Starting scheduler service")
+	deps.Logger.Info("Starting scheduler service")
 	if startSchedulerErr := schedulerService.Start(cmd.Context()); startSchedulerErr != nil {
-		log.Error("Failed to start scheduler service", "error", startSchedulerErr)
+		deps.Logger.Error("Failed to start scheduler service", "error", startSchedulerErr)
 		return fmt.Errorf("failed to start scheduler service: %w", startSchedulerErr)
 	}
 
 	// Wait for interrupt signal
-	log.Info("Waiting for interrupt signal")
+	deps.Logger.Info("Waiting for interrupt signal")
 	<-cmd.Context().Done()
 
 	// Graceful shutdown with timeout
-	log.Info("Shutdown signal received")
+	deps.Logger.Info("Shutdown signal received")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cmdcommon.DefaultShutdownTimeout)
 	defer cancel()
 
 	// Stop the scheduler service
 	if stopSchedulerErr := schedulerService.Stop(shutdownCtx); stopSchedulerErr != nil {
-		log.Error("Failed to stop scheduler service", "error", stopSchedulerErr)
+		deps.Logger.Error("Failed to stop scheduler service", "error", stopSchedulerErr)
 		return fmt.Errorf("failed to stop scheduler service: %w", stopSchedulerErr)
 	}
 
-	log.Info("Scheduler stopped successfully")
+	deps.Logger.Info("Scheduler stopped successfully")
 	return nil
-}
-
-// createStorageClientForScheduler creates an Elasticsearch client for the scheduler command
-func createStorageClientForScheduler(cfg config.Interface, log logger.Interface) (*es.Client, error) {
-	clientResult, err := storage.NewClient(storage.ClientParams{
-		Config: cfg,
-		Logger: log,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return clientResult.Client, nil
 }
 
 // createCrawlerForScheduler creates a crawler instance for the scheduler.
@@ -139,8 +126,8 @@ func createCrawlerForScheduler(
 	}
 
 	// Use default index names for scheduler (it will use source-specific indices when crawling)
-	articleIndexName := "articles"
-	pageIndexName := "pages"
+	articleIndexName := cmdcommon.DefaultArticleIndex
+	pageIndexName := cmdcommon.DefaultPageIndex
 
 	// Construct article and page services
 	articleService := articlespkg.NewContentService(log, storageResult.Storage, articleIndexName)

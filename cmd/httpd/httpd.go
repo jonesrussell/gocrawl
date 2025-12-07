@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	es "github.com/elastic/go-elasticsearch/v8"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -117,21 +116,21 @@ var Cmd = &cobra.Command{
 	Long: `This command starts an HTTP server that listens for search requests.
 You can send POST requests to /search with a JSON body containing the search parameters.`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		// Get dependencies from context using helper
-		log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+		// Get dependencies - NEW WAY
+		deps, err := cmdcommon.NewCommandDeps()
 		if err != nil {
 			return fmt.Errorf("failed to get dependencies: %w", err)
 		}
 
-		// Construct dependencies directly without FX
-		storageClient, err := createStorageClientForHttpd(cfg, log)
+		// Create storage using common function
+		storageClient, err := cmdcommon.CreateStorageClient(deps.Config, deps.Logger)
 		if err != nil {
 			return fmt.Errorf("failed to create storage client: %w", err)
 		}
 
 		storageResult, err := storage.NewStorage(storage.StorageParams{
-			Config: cfg,
-			Logger: log,
+			Config: deps.Config,
+			Logger: deps.Logger,
 			Client: storageClient,
 		})
 		if err != nil {
@@ -139,16 +138,16 @@ You can send POST requests to /search with a JSON body containing the search par
 		}
 
 		// Create search manager
-		searchManager := storage.NewSearchManager(storageResult.Storage, log)
+		searchManager := storage.NewSearchManager(storageResult.Storage, deps.Logger)
 
 		// Create HTTP server
-		srv, _, err := api.StartHTTPServer(log, searchManager, cfg)
+		srv, _, err := api.StartHTTPServer(deps.Logger, searchManager, deps.Config)
 		if err != nil {
 			return fmt.Errorf("failed to start HTTP server: %w", err)
 		}
 
 		// Start server in goroutine
-		log.Info("Starting HTTP server", "addr", cfg.GetServerConfig().Address)
+		deps.Logger.Info("Starting HTTP server", "addr", deps.Config.GetServerConfig().Address)
 		errChan := make(chan error, 1)
 		go func() {
 			if serveErr := srv.ListenAndServe(); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
@@ -159,21 +158,21 @@ You can send POST requests to /search with a JSON body containing the search par
 		// Wait for interrupt signal or error
 		select {
 		case serverErr := <-errChan:
-			log.Error("Server error", "error", serverErr)
+			deps.Logger.Error("Server error", "error", serverErr)
 			return fmt.Errorf("server error: %w", serverErr)
 		case <-cmd.Context().Done():
 			// Graceful shutdown with timeout
-			log.Info("Shutdown signal received")
+			deps.Logger.Info("Shutdown signal received")
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), cmdcommon.DefaultShutdownTimeout)
 			defer cancel()
 
-			log.Info("Stopping HTTP server")
+			deps.Logger.Info("Stopping HTTP server")
 			if shutdownErr := srv.Shutdown(shutdownCtx); shutdownErr != nil {
-				log.Error("Failed to stop server", "error", shutdownErr)
+				deps.Logger.Error("Failed to stop server", "error", shutdownErr)
 				return fmt.Errorf("failed to stop server: %w", shutdownErr)
 			}
 
-			log.Info("Server stopped successfully")
+			deps.Logger.Info("Server stopped successfully")
 			return nil
 		}
 	},
@@ -182,16 +181,4 @@ You can send POST requests to /search with a JSON body containing the search par
 // Command returns the httpd command for use in the root command
 func Command() *cobra.Command {
 	return Cmd
-}
-
-// createStorageClientForHttpd creates an Elasticsearch client for the httpd command
-func createStorageClientForHttpd(cfg config.Interface, log logger.Interface) (*es.Client, error) {
-	clientResult, err := storage.NewClient(storage.ClientParams{
-		Config: cfg,
-		Logger: log,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return clientResult.Client, nil
 }

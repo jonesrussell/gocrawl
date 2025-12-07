@@ -24,7 +24,7 @@ type SchedulerService struct {
 	crawler          crawler.Interface
 	done             chan struct{}
 	config           config.Interface
-	activeJobs       *int32
+	activeJobs       atomic.Int32 // Use atomic.Int32 directly
 	storage          types.Interface
 	processorFactory crawler.ProcessorFactory
 	items            map[string][]*content.Item
@@ -40,14 +40,13 @@ func NewSchedulerService(
 	storage types.Interface,
 	processorFactory crawler.ProcessorFactory,
 ) common.JobService {
-	var jobs int32
 	return &SchedulerService{
-		logger:           log,
-		sources:          sourcesManager,
-		crawler:          crawlerInstance,
-		done:             done,
-		config:           cfg,
-		activeJobs:       &jobs,
+		logger:  log,
+		sources: sourcesManager,
+		crawler: crawlerInstance,
+		done:    done,
+		config:  cfg,
+		// activeJobs is zero-initialized
 		storage:          storage,
 		processorFactory: processorFactory,
 		items:            make(map[string][]*content.Item),
@@ -117,7 +116,7 @@ func (s *SchedulerService) UpdateItem(ctx context.Context, item *content.Item) e
 // Status returns the current status of the scheduler service.
 func (s *SchedulerService) Status(ctx context.Context) (content.JobStatus, error) {
 	state := content.JobStatusProcessing
-	if atomic.LoadInt32(s.activeJobs) == 0 {
+	if s.activeJobs.Load() == 0 { // Use .Load() method
 		state = content.JobStatusCompleted
 	}
 	return state, nil
@@ -166,8 +165,8 @@ func (s *SchedulerService) checkAndRunJobs(ctx context.Context, now time.Time) e
 
 // executeCrawl performs the crawl operation for a single source.
 func (s *SchedulerService) executeCrawl(ctx context.Context, source *sources.Config) error {
-	atomic.AddInt32(s.activeJobs, 1)
-	defer atomic.AddInt32(s.activeJobs, -1)
+	s.activeJobs.Add(1)        // Use .Add() method
+	defer s.activeJobs.Add(-1) // Use .Add(-1) instead of atomic.AddInt32
 
 	// Start crawler
 	if err := s.crawler.Start(ctx, source.URL); err != nil {

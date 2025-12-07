@@ -8,9 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/jedib0t/go-pretty/v6/table"
-	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/api"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -102,14 +101,9 @@ func Command() *cobra.Command {
 }
 
 // runSearch executes the search command with the provided parameters.
-// It handles:
-// - Parameter validation and retrieval
-// - Signal handling for graceful shutdown
-// - Application lifecycle management
-// - Search execution and result display
 func runSearch(cmd *cobra.Command, _ []string) error {
-	// Get dependencies from context using helper
-	log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+	// Get dependencies - NEW WAY using factory
+	deps, err := common.NewCommandDeps()
 	if err != nil {
 		return fmt.Errorf("failed to get dependencies: %w", err)
 	}
@@ -125,15 +119,15 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	indexName := cmd.Flag("index").Value.String()
 	queryStr := cmd.Flag("query").Value.String()
 
-	// Construct dependencies directly without FX
-	storageClient, err := createStorageClientForSearch(cfg, log)
+	// Create storage using common function
+	storageClient, err := common.CreateStorageClient(deps.Config, deps.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create storage client: %w", err)
 	}
 
 	storageResult, err := storage.NewStorage(storage.StorageParams{
-		Config: cfg,
-		Logger: log,
+		Config: deps.Config,
+		Logger: deps.Logger,
 		Client: storageClient,
 	})
 	if err != nil {
@@ -141,12 +135,12 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Create search manager
-	searchManager := storage.NewSearchManager(storageResult.Storage, log)
+	searchManager := storage.NewSearchManager(storageResult.Storage, deps.Logger)
 
-	// Create params and execute search directly
+	// Create params and execute search
 	params := Params{
-		Logger:        log,
-		Config:        cfg,
+		Logger:        deps.Logger,
+		Config:        deps.Config,
 		SearchManager: searchManager,
 		IndexName:     indexName,
 		Query:         queryStr,
@@ -155,18 +149,6 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 
 	// Execute search
 	return ExecuteSearch(cmd.Context(), params)
-}
-
-// createStorageClientForSearch creates an Elasticsearch client for the search command
-func createStorageClientForSearch(cfg config.Interface, log logger.Interface) (*es.Client, error) {
-	clientResult, err := storage.NewClient(storage.ClientParams{
-		Config: cfg,
-		Logger: log,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return clientResult.Client, nil
 }
 
 // buildSearchQuery constructs the Elasticsearch query

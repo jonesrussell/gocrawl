@@ -20,8 +20,8 @@ type JobService struct {
 	sources          sources.Interface
 	crawler          crawler.Interface
 	done             chan struct{}
-	doneOnce         sync.Once // Ensures done channel is only closed once
-	activeJobs       *int32
+	doneOnce         sync.Once    // Ensures done channel is only closed once
+	activeJobs       atomic.Int32 // Use atomic.Int32 directly
 	storage          storagetypes.Interface
 	processorFactory crawler.ProcessorFactory
 	sourceName       string
@@ -40,15 +40,12 @@ type JobServiceParams struct {
 
 // NewJobService creates a new JobService instance.
 func NewJobService(p JobServiceParams) common.JobService {
-	// Allocate activeJobs on the heap to avoid dangling pointer
-	// when the function returns and the local variable goes out of scope
-	activeJobs := new(int32)
 	return &JobService{
-		logger:           p.Logger,
-		sources:          p.Sources,
-		crawler:          p.Crawler,
-		done:             p.Done,
-		activeJobs:       activeJobs,
+		logger:  p.Logger,
+		sources: p.Sources,
+		crawler: p.Crawler,
+		done:    p.Done,
+		// activeJobs is zero-initialized (no need to set it)
 		storage:          p.Storage,
 		processorFactory: p.ProcessorFactory,
 		sourceName:       p.SourceName,
@@ -93,7 +90,7 @@ func (s *JobService) Stop(ctx context.Context) error {
 
 // Status implements the common.JobService interface.
 func (s *JobService) Status(ctx context.Context) (content.JobStatus, error) {
-	activeJobs := atomic.LoadInt32(s.activeJobs)
+	activeJobs := s.activeJobs.Load() // Use .Load() method
 	state := content.JobStatusProcessing
 	if activeJobs == 0 {
 		state = content.JobStatusCompleted

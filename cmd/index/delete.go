@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
@@ -21,11 +22,6 @@ import (
 var (
 	// ErrDeletionCancelled is returned when the user cancels the deletion
 	ErrDeletionCancelled = errors.New("deletion cancelled by user")
-)
-
-const (
-	// defaultIndicesCapacity is the initial capacity for the index slice
-	defaultIndicesCapacity = 2
 )
 
 // DeleteParams holds the parameters for the delete command
@@ -130,7 +126,7 @@ func (d *Deleter) deleteIndices(ctx context.Context) error {
 			return fmt.Errorf("source %s has no index configured", d.sourceName)
 		}
 		// Add both content and article index if they exist
-		d.index = make([]string, 0, defaultIndicesCapacity)
+		d.index = make([]string, 0, cmdcommon.DefaultIndicesCapacity)
 		if source.Index != "" {
 			d.index = append(d.index, source.Index)
 		}

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	es "github.com/elastic/go-elasticsearch/v8"
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -107,15 +106,14 @@ Specify the source name as an argument.
 The --max-depth flag can be used to override the max_depth setting from the source configuration.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get dependencies from context using helper
-			log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+			// Get dependencies - NEW WAY
+			deps, err := cmdcommon.NewCommandDeps()
 			if err != nil {
 				return fmt.Errorf("failed to get dependencies: %w", err)
 			}
 
-			// Construct dependencies directly using the same functions FX would use
-			// This avoids creating a new FX app per command execution
-			crawlerInstance, err := constructCrawlerDependencies(log, cfg, args[0], maxDepth)
+			// Construct dependencies
+			crawlerInstance, err := constructCrawlerDependencies(deps.Logger, deps.Config, args[0], maxDepth)
 			if err != nil {
 				return fmt.Errorf("failed to construct crawler dependencies: %w", err)
 			}
@@ -190,8 +188,8 @@ func constructCrawlerDependencies(
 		return nil, fmt.Errorf("failed to load sources: %w", err)
 	}
 
-	// Create storage client and storage
-	storageClient, err := createStorageClientForCrawl(cfg, log)
+	// Create storage client using common function - NEW WAY
+	storageClient, err := cmdcommon.CreateStorageClient(cfg, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage client: %w", err)
 	}
@@ -216,8 +214,8 @@ func constructCrawlerDependencies(
 
 	// Construct article and page services directly
 	// Get index names from config or use defaults
-	articleIndexName := "articles"
-	pageIndexName := "pages"
+	articleIndexName := cmdcommon.DefaultArticleIndex
+	pageIndexName := cmdcommon.DefaultPageIndex
 	if source := sourceManager.FindByName(sourceName); source != nil {
 		if source.ArticleIndex != "" {
 			articleIndexName = source.ArticleIndex
@@ -265,7 +263,7 @@ func constructCrawlerDependencies(
 	done := make(chan struct{})
 
 	// Create processor factory (simplified)
-	processorFactory := crawler.NewProcessorFactory(log, storageResult.Storage, "content")
+	processorFactory := crawler.NewProcessorFactory(log, storageResult.Storage, cmdcommon.DefaultContentIndex)
 
 	// Create job service
 	jobService := NewJobService(JobServiceParams{
@@ -280,16 +278,4 @@ func constructCrawlerDependencies(
 
 	// Create crawler command instance
 	return NewCrawler(cfg, log, jobService, sourceManager, crawlerResult.Crawler, done), nil
-}
-
-// createStorageClientForCrawl creates an Elasticsearch client for the crawl command
-func createStorageClientForCrawl(cfg config.Interface, log loggerpkg.Interface) (*es.Client, error) {
-	clientResult, err := storage.NewClient(storage.ClientParams{
-		Config: cfg,
-		Logger: log,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return clientResult.Client, nil
 }

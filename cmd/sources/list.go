@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	crawlercfg "github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -103,25 +103,25 @@ func NewListCommand() *cobra.Command {
 		Short: "List all configured sources",
 		Long:  `List all content sources configured in the system.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get dependencies from context using helper
-			log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+			// Get dependencies - NEW WAY
+			deps, err := common.NewCommandDeps()
 			if err != nil {
 				return fmt.Errorf("failed to get dependencies: %w", err)
 			}
 
 			// Ensure crawler config is properly set up
-			if setupErr := setupCrawlerConfig(cfg); setupErr != nil {
+			if setupErr := setupCrawlerConfig(deps.Config); setupErr != nil {
 				return setupErr
 			}
 
-			// Construct dependencies directly without FX
-			sourceManager, err := internalsources.LoadSources(cfg, log)
+			// Construct dependencies
+			sourceManager, err := internalsources.LoadSources(deps.Config, deps.Logger)
 			if err != nil {
 				return fmt.Errorf("failed to load sources: %w", err)
 			}
 
-			renderer := NewTableRenderer(log)
-			lister := NewLister(sourceManager, log, renderer)
+			renderer := NewTableRenderer(deps.Logger)
+			lister := NewLister(sourceManager, deps.Logger, renderer)
 
 			// Execute the list command
 			return lister.Start(cmd.Context())
