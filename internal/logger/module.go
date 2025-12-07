@@ -12,10 +12,16 @@ var Module = fx.Module("logger",
 	fx.Provide(
 		// Provide the logger interface
 		func(cfg *app.Config) (Interface, error) {
+			// Determine log level - use debug if debug flag is set or in development
+			level := InfoLevel
+			if cfg.Debug || cfg.Environment == "development" {
+				level = DebugLevel
+			}
+
 			// Create logger config with sensible defaults
 			logConfig := &Config{
-				Level:       InfoLevel, // Default to info level
-				Development: cfg.Environment != "production",
+				Level:       level,
+				Development: cfg.Environment != "production" || cfg.Debug,
 				Encoding:    "console",
 				EnableColor: true,
 				OutputPaths: []string{"stdout"},

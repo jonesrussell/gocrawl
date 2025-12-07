@@ -3,6 +3,7 @@ package elasticsearch
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -383,14 +384,66 @@ func WithTLSInsecureSkipVerify(skip bool) Option {
 
 // LoadFromViper loads Elasticsearch configuration from Viper
 func LoadFromViper(v *viper.Viper) *Config {
-	addresses := v.GetStringSlice("elasticsearch.addresses")
-	// If addresses is empty, use default
+	var addresses []string
+
+	// First, check environment variables directly to ensure they take precedence over defaults
+	// This is important because GetStringSlice might return defaults even when env vars are set
+	var addrStr string
+	if envAddr := os.Getenv("ELASTICSEARCH_HOSTS"); envAddr != "" {
+		addrStr = envAddr
+	} else if envAddr := os.Getenv("ELASTICSEARCH_ADDRESSES"); envAddr != "" {
+		addrStr = envAddr
+	} else {
+		// If no env var is set, try Viper's GetString (which respects bindings)
+		addrStr = v.GetString("elasticsearch.addresses")
+	}
+
+	// If we have a string value (from env var or Viper), parse it
+	if addrStr != "" {
+		// Split comma-separated addresses
+		addresses = strings.Split(addrStr, ",")
+		// Trim whitespace from each address
+		for i := range addresses {
+			addresses[i] = strings.TrimSpace(addresses[i])
+		}
+		// Remove any empty strings after trimming
+		var filtered []string
+		for _, addr := range addresses {
+			if addr != "" {
+				filtered = append(filtered, addr)
+			}
+		}
+		addresses = filtered
+	} else {
+		// If no string value, try GetStringSlice (for YAML configs with array syntax)
+		addresses = v.GetStringSlice("elasticsearch.addresses")
+		// Filter out empty strings
+		var filtered []string
+		for _, addr := range addresses {
+			if addr != "" {
+				filtered = append(filtered, addr)
+			}
+		}
+		addresses = filtered
+	}
+
+	// If addresses is still empty, use default
 	if len(addresses) == 0 {
 		addresses = []string{DefaultAddresses}
 	}
 
+	// Get index name - support both index_name and index_prefix for backward compatibility
+	indexName := v.GetString("elasticsearch.index_name")
+	if indexName == "" {
+		indexName = v.GetString("elasticsearch.index_prefix")
+	}
+	if indexName == "" {
+		indexName = DefaultIndexName
+	}
+
 	cfg := &Config{
 		Addresses: addresses,
+		IndexName: indexName,
 		Username:  v.GetString("elasticsearch.username"),
 		Password:  v.GetString("elasticsearch.password"),
 		APIKey:    v.GetString("elasticsearch.api_key"),

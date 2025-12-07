@@ -6,6 +6,20 @@ import "errors"
 type SourceSelectors struct {
 	// Article contains selectors for article-specific content
 	Article ArticleSelectors `yaml:"article"`
+	// List contains selectors for article list pages
+	List ListSelectors `yaml:"list"`
+}
+
+// ListSelectors defines the CSS selectors for article list page extraction.
+type ListSelectors struct {
+	// Container is the selector for the list container
+	Container string `yaml:"container"`
+	// ArticleCards is the selector for article card elements
+	ArticleCards string `yaml:"article_cards"`
+	// ArticleList is the selector for article list elements
+	ArticleList string `yaml:"article_list"`
+	// ExcludeFromList are selectors to exclude from list extraction
+	ExcludeFromList []string `yaml:"exclude_from_list"`
 }
 
 // Validate validates the source selectors.
@@ -23,6 +37,10 @@ type ArticleSelectors struct {
 	Body string `yaml:"body"`
 	// Intro is the selector for the article introduction
 	Intro string `yaml:"intro"`
+	// Link is the selector for article links (CRITICAL for article discovery)
+	Link string `yaml:"link"`
+	// Image is the selector for article images
+	Image string `yaml:"image"`
 	// Byline is the selector for the article byline
 	Byline string `yaml:"byline"`
 	// PublishedTime is the selector for the article published time
@@ -43,6 +61,10 @@ type ArticleSelectors struct {
 	OGDescription string `yaml:"og_description"`
 	// OGImage is the selector for the Open Graph image
 	OGImage string `yaml:"og_image"`
+	// OGType is the selector for the Open Graph type
+	OGType string `yaml:"og_type"`
+	// OGSiteName is the selector for the Open Graph site name
+	OGSiteName string `yaml:"og_site_name"`
 	// OgURL is the selector for the Open Graph URL
 	OgURL string `yaml:"og_url"`
 	// Canonical is the selector for the canonical URL
@@ -59,6 +81,10 @@ type ArticleSelectors struct {
 	Author string `yaml:"author"`
 	// BylineName is the selector for the byline name
 	BylineName string `yaml:"byline_name"`
+	// ArticleID is the selector for article identifiers
+	ArticleID string `yaml:"article_id"`
+	// Exclude are selectors for elements to exclude from content extraction
+	Exclude []string `yaml:"exclude"`
 }
 
 // Validate validates the article selectors.

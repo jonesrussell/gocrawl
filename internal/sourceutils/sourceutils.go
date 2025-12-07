@@ -44,6 +44,15 @@ type SourceConfig struct {
 // SelectorConfig defines the CSS selectors used for content extraction.
 type SelectorConfig struct {
 	Article ArticleSelectors
+	List    ListSelectors
+}
+
+// ListSelectors defines the CSS selectors used for article list page extraction.
+type ListSelectors struct {
+	Container       string
+	ArticleCards    string
+	ArticleList     string
+	ExcludeFromList []string
 }
 
 // ArticleSelectors defines the CSS selectors used for article content extraction.
@@ -52,6 +61,8 @@ type ArticleSelectors struct {
 	Title         string
 	Body          string
 	Intro         string
+	Link          string
+	Image         string
 	Byline        string
 	PublishedTime string
 	TimeAgo       string
@@ -62,6 +73,8 @@ type ArticleSelectors struct {
 	OGTitle       string
 	OGDescription string
 	OGImage       string
+	OGType        string
+	OGSiteName    string
 	OgURL         string
 	Canonical     string
 	WordCount     string
@@ -70,6 +83,8 @@ type ArticleSelectors struct {
 	Tags          string
 	Author        string
 	BylineName    string
+	ArticleID     string
+	Exclude       []string
 }
 
 // ConvertToConfigSource converts a SourceConfig to a types.Source.
@@ -94,6 +109,8 @@ func ConvertToConfigSource(source *SourceConfig) *types.Source {
 				Title:         source.Selectors.Article.Title,
 				Body:          source.Selectors.Article.Body,
 				Intro:         source.Selectors.Article.Intro,
+				Link:          source.Selectors.Article.Link,
+				Image:         source.Selectors.Article.Image,
 				Byline:        source.Selectors.Article.Byline,
 				PublishedTime: source.Selectors.Article.PublishedTime,
 				TimeAgo:       source.Selectors.Article.TimeAgo,
@@ -104,6 +121,8 @@ func ConvertToConfigSource(source *SourceConfig) *types.Source {
 				OGTitle:       source.Selectors.Article.OGTitle,
 				OGDescription: source.Selectors.Article.OGDescription,
 				OGImage:       source.Selectors.Article.OGImage,
+				OGType:        source.Selectors.Article.OGType,
+				OGSiteName:    source.Selectors.Article.OGSiteName,
 				OgURL:         source.Selectors.Article.OgURL,
 				Canonical:     source.Selectors.Article.Canonical,
 				WordCount:     source.Selectors.Article.WordCount,
@@ -112,6 +131,14 @@ func ConvertToConfigSource(source *SourceConfig) *types.Source {
 				Tags:          source.Selectors.Article.Tags,
 				Author:        source.Selectors.Article.Author,
 				BylineName:    source.Selectors.Article.BylineName,
+				ArticleID:     source.Selectors.Article.ArticleID,
+				Exclude:       source.Selectors.Article.Exclude,
+			},
+			List: types.ListSelectors{
+				Container:       source.Selectors.List.Container,
+				ArticleCards:    source.Selectors.List.ArticleCards,
+				ArticleList:     source.Selectors.List.ArticleList,
+				ExcludeFromList: source.Selectors.List.ExcludeFromList,
 			},
 		},
 		Rules: source.Rules,

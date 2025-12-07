@@ -18,6 +18,7 @@ import (
 
 var (
 	forceDelete bool
+	sourceName  string
 )
 
 // Command is the index command
@@ -90,12 +91,14 @@ func createCreateCmd() *cobra.Command {
 // createDeleteCmd creates the delete command
 func createDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete [index-name]",
+		Use:   "delete [index-name...]",
 		Short: "Delete an index",
-		Args:  cobra.MinimumNArgs(1),
+		Long:  `Delete one or more indices. Either provide index names as arguments or use --source to delete indices for a specific source.`,
+		Args:  cobra.MinimumNArgs(0),
 		RunE:  runDeleteCmd,
 	}
 	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Force deletion without confirmation")
+	cmd.Flags().StringVar(&sourceName, "source", "", "Delete index for a specific source by name")
 	return cmd
 }
 
@@ -159,6 +162,11 @@ func runCreateCmd(cmd *cobra.Command, args []string) error {
 
 // runDeleteCmd executes the delete command
 func runDeleteCmd(cmd *cobra.Command, args []string) error {
+	// Validate that either --source is provided or at least one index name is provided
+	if sourceName == "" && len(args) == 0 {
+		return fmt.Errorf("either --source flag or at least one index name must be provided")
+	}
+
 	ctx := cmd.Context()
 	log, cfg, err := getDependencies(ctx)
 	if err != nil {
@@ -186,9 +194,10 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	deleter := NewDeleter(cfg, log, storageResult.Storage, sourcesManager, DeleteParams{
-		Force: forceDelete,
+		Force:      forceDelete,
+		SourceName: sourceName,
+		Indices:    args,
 	})
-	deleter.index = args
 
 	return deleter.Start(ctx)
 }
