@@ -93,7 +93,7 @@ func createJobValidator() content.JobValidator {
 }
 
 // createCollector creates and configures a new colly collector
-func createCollector(cfg *crawler.Config, logger logger.Interface) (*colly.Collector, error) {
+func createCollector(cfg *crawler.Config, log logger.Interface) (*colly.Collector, error) {
 	collector := colly.NewCollector(
 		colly.MaxDepth(cfg.MaxDepth),
 		colly.Async(true),
@@ -131,22 +131,22 @@ func createCollector(cfg *crawler.Config, logger logger.Interface) (*colly.Colle
 	})
 
 	if cfg.TLS.InsecureSkipVerify {
-		logger.Warn("TLS certificate verification is disabled. This is not recommended for production use.",
+		log.Warn("TLS certificate verification is disabled. This is not recommended for production use.",
 			"component", "crawler",
 			"warning", "This makes HTTPS connections vulnerable to man-in-the-middle attacks")
 	}
 
 	// Set up callbacks
 	collector.OnRequest(func(r *colly.Request) {
-		logger.Info("Visiting", "url", r.URL.String())
+		log.Info("Visiting", "url", r.URL.String())
 	})
 
 	collector.OnResponse(func(r *colly.Response) {
-		logger.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
+		log.Info("Visited", "url", r.Request.URL.String(), "status", r.StatusCode)
 	})
 
 	collector.OnError(func(r *colly.Response, err error) {
-		logger.Error("Error while crawling",
+		log.Error("Error while crawling",
 			"url", r.Request.URL.String(),
 			"status", r.StatusCode,
 			"error", err)

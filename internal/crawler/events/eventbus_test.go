@@ -150,8 +150,8 @@ func (h *MockEventHandler) HandleStop(ctx context.Context) error {
 func TestEventBus(t *testing.T) {
 	t.Parallel()
 
-	logger := NewMockLogger()
-	bus := events.NewEventBus(logger)
+	log := NewMockLogger()
+	bus := events.NewEventBus(log)
 
 	t.Run("NewEventBus", func(t *testing.T) {
 		t.Parallel()

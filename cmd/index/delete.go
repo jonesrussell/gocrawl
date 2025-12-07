@@ -49,17 +49,17 @@ type Deleter struct {
 
 // NewDeleter creates a new deleter instance
 func NewDeleter(
-	config config.Interface,
-	logger logger.Interface,
+	cfg config.Interface,
+	log logger.Interface,
 	storage storagetypes.Interface,
-	sources sources.Interface,
+	sourcesManager sources.Interface,
 	params DeleteParams,
 ) *Deleter {
 	return &Deleter{
-		config:     config,
-		logger:     logger,
+		config:     cfg,
+		logger:     log,
 		storage:    storage,
-		sources:    sources,
+		sources:    sourcesManager,
 		index:      params.Indices,
 		force:      params.Force,
 		sourceName: params.SourceName,

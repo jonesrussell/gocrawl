@@ -14,8 +14,10 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/index"
+	cmdscheduler "github.com/jonesrussell/gocrawl/cmd/scheduler"
 	"github.com/jonesrussell/gocrawl/cmd/search"
 	cmdsources "github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -37,8 +39,18 @@ var (
 		Short: "A web crawler and search engine",
 		Long:  `A web crawler and search engine built with Go.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := initConfig(); err != nil {
-				return fmt.Errorf("failed to initialize configuration: %w", err)
+			// Config is already initialized in Execute(), but we ensure context propagation
+			// Ensure the CommandContext is propagated from the root command to all subcommands
+			// This is necessary because Cobra may create new contexts for subcommands
+			rootCtx := cmd.Root().Context()
+			if rootCtx != nil {
+				if cmdCtx := rootCtx.Value(common.CommandContextKey); cmdCtx != nil {
+					// If this command's context doesn't have the CommandContext, propagate it
+					if cmd.Context().Value(common.CommandContextKey) == nil {
+						newCtx := context.WithValue(cmd.Context(), common.CommandContextKey, cmdCtx)
+						cmd.SetContext(newCtx)
+					}
+				}
 			}
 			return nil
 		},
@@ -53,23 +65,56 @@ var Module = fx.Module("root",
 	common.Module,
 	storage.ClientModule,
 	storage.Module,
+	crawl.Module,
 	index.Module,
 	cmdsources.Module,
 	search.Module,
 	httpd.Module,
+	cmdscheduler.Module,
 	fx.WithLogger(logger.NewFxLogger),
 )
 
 // Execute runs the root command
 func Execute() error {
+	// Load .env file early so environment variables are available when LoadConfig() is called
+	// This must happen before LoadConfig() because LoadFromViper checks os.Getenv() directly
+	// Note: We ignore errors here as .env is optional; initConfig() will handle warnings
+	_ = godotenv.Load()
+
+	// Parse flags early to get debug flag before creating logger
+	// This is a minimal parse just to get the debug flag value
+	// Note: We ignore parse errors here as they'll be caught by ExecuteContext
+	_ = rootCmd.ParseFlags(os.Args[1:])
+
+	// Initialize configuration early so logger level is set correctly
+	// This must happen before LoadConfig() creates the logger
+	if err := initConfig(); err != nil {
+		return fmt.Errorf("failed to initialize configuration: %w", err)
+	}
+
 	// Load config and create logger
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
+	// Get logger configuration from Viper
+	logLevel := viper.GetString("logger.level")
+	if logLevel == "" {
+		logLevel = "info" // Fallback to info if not set
+	}
+	// Ensure lowercase for consistency
+	logLevel = strings.ToLower(logLevel)
+
+	// Debug: Print to stderr to verify what we're getting (before logger is created)
+	if Debug {
+		fmt.Fprintf(os.Stderr,
+			"DEBUG: Debug flag is true, logger.level=%s, viper.app.debug=%v\n",
+			logLevel, viper.GetBool("app.debug"))
+	}
+
 	logCfg := &logger.Config{
-		Level:       logger.Level(viper.GetString("logger.level")),
+		Level:       logger.Level(logLevel),
 		Development: viper.GetBool("logger.development"),
 		Encoding:    viper.GetString("logger.encoding"),
 		OutputPaths: viper.GetStringSlice("logger.output_paths"),
@@ -81,9 +126,15 @@ func Execute() error {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	// Create a context with dependencies
-	ctx := context.WithValue(context.Background(), common.ConfigKey, cfg)
-	ctx = context.WithValue(ctx, common.LoggerKey, log)
+	// Test debug logging to verify level is set correctly
+	log.Debug("Logger initialized", "level", logLevel, "debug_flag", Debug, "viper_debug", viper.GetBool("app.debug"))
+
+	// Create a context with dependencies using CommandContext
+	cmdCtx := &common.CommandContext{
+		Logger: log,
+		Config: cfg,
+	}
+	ctx := context.WithValue(context.Background(), common.CommandContextKey, cmdCtx)
 
 	// Initialize the application with the root module
 	app := fx.New(
@@ -105,7 +156,11 @@ func Execute() error {
 		}
 	}()
 
-	// Execute the root command
+	// Set the context on the root command to ensure it's available to all subcommands
+	// This is necessary because ExecuteContext may not propagate the context to all commands
+	rootCmd.SetContext(ctx)
+
+	// Execute the root command with the context
 	return rootCmd.ExecuteContext(ctx)
 }
 
@@ -130,10 +185,12 @@ func init() {
 	})
 
 	// Add subcommands
+	rootCmd.AddCommand(crawl.Command())
 	rootCmd.AddCommand(index.Command)
 	rootCmd.AddCommand(cmdsources.NewSourcesCommand())
 	rootCmd.AddCommand(search.Command())
 	rootCmd.AddCommand(httpd.Command())
+	rootCmd.AddCommand(cmdscheduler.Command())
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -148,20 +205,65 @@ func initConfig() error {
 		viper.AddConfigPath("./config")
 	}
 
-	// Set defaults first
-	setDefaults()
-
-	// Read config file
-	if err := viper.ReadInConfig(); err != nil {
-		// Config file not found, that's ok - we'll use defaults
-		fmt.Fprintf(os.Stderr, "Warning: Config file not found: %v\n", err)
+	// Load .env file first, before setting defaults and reading config
+	// This ensures environment variables from .env are available when Viper reads them
+	// Note: This may be called twice (once in Execute(), once here), but godotenv.Load()
+	// is idempotent and won't overwrite existing environment variables
+	if err := godotenv.Load(); err != nil {
+		// .env file not found, that's ok - we'll use environment variables
+		fmt.Fprintf(os.Stderr, "Warning: .env file not found: %v\n", err)
 	}
 
-	// Bind environment variables
+	// Enable automatic environment variable reading BEFORE setting defaults
+	// This ensures environment variables take precedence over defaults
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
+	// Set defaults (only used if environment variables or config file don't provide values)
+	setDefaults()
+
+	// Read config file
+	// Note: Config file is optional - if not found, we'll use defaults and environment variables
+	if err := viper.ReadInConfig(); err != nil {
+		// Config file not found, that's ok - we'll use defaults
+		// This is expected behavior: config can come from file, environment variables, or defaults
+		fmt.Fprintf(os.Stderr, "Warning: Config file not found: %v (using defaults and environment variables)\n", err)
+	}
+
+	// Bind command-line flags to Viper
+	if err := bindCommandLineFlags(); err != nil {
+		return err
+	}
+
 	// Map environment variables to config keys
+	if err := bindAppEnvVars(); err != nil {
+		return err
+	}
+
+	// Bind Elasticsearch environment variables
+	if err := bindElasticsearchEnvVars(); err != nil {
+		return err
+	}
+
+	// Set development logging settings
+	setupDevelopmentLogging()
+
+	return nil
+}
+
+// bindCommandLineFlags binds command-line flags to Viper.
+func bindCommandLineFlags() error {
+	if err := viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug")); err != nil {
+		return fmt.Errorf("failed to bind debug flag: %w", err)
+	}
+	if err := viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config")); err != nil {
+		return fmt.Errorf("failed to bind config flag: %w", err)
+	}
+	return nil
+}
+
+// bindAppEnvVars binds application and logger environment variables to config keys.
+func bindAppEnvVars() error {
 	if err := viper.BindEnv("app.environment", "APP_ENV"); err != nil {
 		return fmt.Errorf("failed to bind APP_ENV: %w", err)
 	}
@@ -174,28 +276,69 @@ func initConfig() error {
 	if err := viper.BindEnv("logger.encoding", "LOG_FORMAT"); err != nil {
 		return fmt.Errorf("failed to bind LOG_FORMAT: %w", err)
 	}
+	return nil
+}
 
-	// Load .env file if it exists
-	if err := godotenv.Load(); err != nil {
-		// .env file not found, that's ok - we'll use environment variables
-		fmt.Fprintf(os.Stderr, "Warning: .env file not found: %v\n", err)
+// bindElasticsearchEnvVars binds Elasticsearch environment variables to config keys.
+func bindElasticsearchEnvVars() error {
+	// Support both ELASTICSEARCH_HOSTS and ELASTICSEARCH_ADDRESSES
+	// Note: ELASTICSEARCH_ADDRESSES is also handled by AutomaticEnv via the replacer,
+	// but we explicitly bind ELASTICSEARCH_HOSTS for clarity
+	if err := viper.BindEnv("elasticsearch.addresses", "ELASTICSEARCH_HOSTS", "ELASTICSEARCH_ADDRESSES"); err != nil {
+		return fmt.Errorf("failed to bind Elasticsearch addresses: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.password", "ELASTIC_PASSWORD", "ELASTICSEARCH_PASSWORD"); err != nil {
+		return fmt.Errorf("failed to bind Elasticsearch password: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.tls.insecure_skip_verify", "ELASTICSEARCH_SKIP_TLS"); err != nil {
+		return fmt.Errorf("failed to bind Elasticsearch TLS skip verify: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.api_key", "ELASTICSEARCH_API_KEY"); err != nil {
+		return fmt.Errorf("failed to bind Elasticsearch API key: %w", err)
+	}
+	// Bind index_name (supports both ELASTICSEARCH_INDEX_PREFIX and ELASTICSEARCH_INDEX_NAME)
+	if err := viper.BindEnv("elasticsearch.index_name",
+		"ELASTICSEARCH_INDEX_PREFIX", "ELASTICSEARCH_INDEX_NAME"); err != nil {
+		return fmt.Errorf("failed to bind Elasticsearch index name: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.retry.max_retries", "ELASTICSEARCH_MAX_RETRIES"); err != nil {
+		return fmt.Errorf("failed to bind Elasticsearch max retries: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.retry.initial_wait", "ELASTICSEARCH_RETRY_INITIAL_WAIT"); err != nil {
+		return fmt.Errorf("failed to bind Elasticsearch retry initial wait: %w", err)
+	}
+	if err := viper.BindEnv("elasticsearch.retry.max_wait", "ELASTICSEARCH_RETRY_MAX_WAIT"); err != nil {
+		return fmt.Errorf("failed to bind Elasticsearch retry max wait: %w", err)
+	}
+	return nil
+}
+
+// setupDevelopmentLogging configures development logging settings based on environment and debug flag.
+func setupDevelopmentLogging() {
+	// Check both the flag variable and Viper to ensure we catch the debug flag
+	// Note: Debug variable is set by ParseFlags(), and we bind it to Viper above
+	debugFlag := Debug || viper.GetBool("app.debug")
+	isDev := viper.GetString("app.environment") == "development" || debugFlag
+
+	// Force set debug level if debug flag is set
+	if debugFlag {
+		viper.Set("logger.level", "debug")
 	}
 
-	// Set development logging settings based on environment and debug flag
-	isDev := viper.GetString("app.environment") == "development" || viper.GetBool("app.debug")
 	if isDev {
 		viper.Set("logger.development", true)
 		viper.Set("logger.enable_color", true)
 		viper.Set("logger.caller", true)
 		viper.Set("logger.stacktrace", true)
 		viper.Set("logger.encoding", "console")
-		viper.Set("logger.level", "debug")
+		// Ensure debug level is set for development mode
+		if !debugFlag {
+			viper.Set("logger.level", "debug")
+		}
 	}
 
 	// Synchronize global Debug variable with Viper's value
-	Debug = viper.GetBool("app.debug")
-
-	return nil
+	Debug = debugFlag
 }
 
 // setDefaults sets default configuration values
@@ -233,8 +376,9 @@ func setDefaults() {
 	})
 
 	// Elasticsearch defaults - production safe
+	// Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
 	viper.SetDefault("elasticsearch", map[string]any{
-		"addresses": []string{"http://localhost:9200"},
+		"addresses": []string{"http://127.0.0.1:9200"},
 		"tls": map[string]any{
 			"enabled":              true,
 			"insecure_skip_verify": false,
@@ -273,9 +417,10 @@ func setDefaults() {
 			"insecure_skip_verify": false,
 		},
 		"retry_delay":      "5s",
+		"max_retries":      crawler.DefaultMaxRetries,
 		"follow_redirects": true,
 		"max_redirects":    crawler.DefaultMaxRedirects,
 		"validate_urls":    true,
-		"cleanup_interval": "1h",
+		"cleanup_interval": crawler.DefaultCleanupInterval.String(),
 	})
 }

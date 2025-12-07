@@ -55,9 +55,9 @@ type Config struct {
 }
 
 // NewConfig creates a new config instance.
-func NewConfig(logger logger.Interface) *Config {
+func NewConfig(log logger.Interface) *Config {
 	return &Config{
-		logger: logger,
+		logger: log,
 	}
 }
 
@@ -129,9 +129,17 @@ func (c *Config) Validate() error {
 // LoadConfig loads the configuration from Viper
 func LoadConfig() (*Config, error) {
 	// Create a temporary logger for config loading
+	// Use the logger level from Viper if available, otherwise default to info
+	logLevel := logger.InfoLevel
+	if viper.IsSet("logger.level") {
+		logLevel = logger.Level(viper.GetString("logger.level"))
+	} else if viper.GetBool("app.debug") {
+		logLevel = logger.DebugLevel
+	}
+
 	tempLogger, err := logger.New(&logger.Config{
-		Level:       logger.InfoLevel,
-		Development: true,
+		Level:       logLevel,
+		Development: viper.GetBool("logger.development") || viper.GetBool("app.debug"),
 		Encoding:    "console",
 	})
 	if err != nil {
@@ -147,6 +155,7 @@ func LoadConfig() (*Config, error) {
 		},
 		Server:        server.NewConfig(),
 		Elasticsearch: elasticsearch.LoadFromViper(viper.GetViper()),
+		Crawler:       crawler.LoadFromViper(viper.GetViper()),
 		App: &app.Config{
 			Name:        viper.GetString("app.name"),
 			Version:     viper.GetString("app.version"),

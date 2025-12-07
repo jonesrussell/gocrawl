@@ -24,9 +24,9 @@ type State struct {
 }
 
 // NewState creates a new crawler state.
-func NewState(logger logger.Interface) *State {
+func NewState(log logger.Interface) *State {
 	return &State{
-		logger: logger,
+		logger: log,
 	}
 }
 

@@ -22,9 +22,9 @@ type TableRenderer struct {
 }
 
 // NewTableRenderer creates a new TableRenderer instance
-func NewTableRenderer(logger logger.Interface) *TableRenderer {
+func NewTableRenderer(log logger.Interface) *TableRenderer {
 	return &TableRenderer{
-		logger: logger,
+		logger: log,
 	}
 }
 
@@ -104,14 +104,14 @@ type Lister struct {
 
 // NewLister creates a new Lister instance
 func NewLister(
-	config config.Interface,
-	logger logger.Interface,
+	cfg config.Interface,
+	log logger.Interface,
 	storage types.Interface,
 	renderer *TableRenderer,
 ) *Lister {
 	return &Lister{
-		config:   config,
-		logger:   logger,
+		config:   cfg,
+		logger:   log,
 		storage:  storage,
 		renderer: renderer,
 	}

@@ -18,10 +18,10 @@ type SearchManager struct {
 }
 
 // NewSearchManager creates a new search manager instance
-func NewSearchManager(storage types.Interface, logger logger.Interface) api.SearchManager {
+func NewSearchManager(storage types.Interface, log logger.Interface) api.SearchManager {
 	return &SearchManager{
 		storage: storage,
-		logger:  logger,
+		logger:  log,
 	}
 }
 

@@ -6,6 +6,22 @@ import "errors"
 type SourceSelectors struct {
 	// Article contains selectors for article-specific content
 	Article ArticleSelectors `yaml:"article"`
+	// List contains selectors for article list pages
+	List ListSelectors `yaml:"list"`
+	// Page contains selectors for page-specific content
+	Page PageSelectors `yaml:"page"`
+}
+
+// ListSelectors defines the CSS selectors for article list page extraction.
+type ListSelectors struct {
+	// Container is the selector for the list container
+	Container string `yaml:"container"`
+	// ArticleCards is the selector for article card elements
+	ArticleCards string `yaml:"article_cards"`
+	// ArticleList is the selector for article list elements
+	ArticleList string `yaml:"article_list"`
+	// ExcludeFromList are selectors to exclude from list extraction
+	ExcludeFromList []string `yaml:"exclude_from_list"`
 }
 
 // Validate validates the source selectors.
@@ -23,6 +39,10 @@ type ArticleSelectors struct {
 	Body string `yaml:"body"`
 	// Intro is the selector for the article introduction
 	Intro string `yaml:"intro"`
+	// Link is the selector for article links (CRITICAL for article discovery)
+	Link string `yaml:"link"`
+	// Image is the selector for article images
+	Image string `yaml:"image"`
 	// Byline is the selector for the article byline
 	Byline string `yaml:"byline"`
 	// PublishedTime is the selector for the article published time
@@ -43,6 +63,10 @@ type ArticleSelectors struct {
 	OGDescription string `yaml:"og_description"`
 	// OGImage is the selector for the Open Graph image
 	OGImage string `yaml:"og_image"`
+	// OGType is the selector for the Open Graph type
+	OGType string `yaml:"og_type"`
+	// OGSiteName is the selector for the Open Graph site name
+	OGSiteName string `yaml:"og_site_name"`
 	// OgURL is the selector for the Open Graph URL
 	OgURL string `yaml:"og_url"`
 	// Canonical is the selector for the canonical URL
@@ -59,6 +83,10 @@ type ArticleSelectors struct {
 	Author string `yaml:"author"`
 	// BylineName is the selector for the byline name
 	BylineName string `yaml:"byline_name"`
+	// ArticleID is the selector for article identifiers
+	ArticleID string `yaml:"article_id"`
+	// Exclude are selectors for elements to exclude from content extraction
+	Exclude []string `yaml:"exclude"`
 }
 
 // Validate validates the article selectors.
@@ -101,4 +129,60 @@ func (s *ArticleSelectors) Default() ArticleSelectors {
 		Author:        ".author",
 		BylineName:    ".byline-name",
 	}
+}
+
+// PageSelectors defines the CSS selectors for page content.
+type PageSelectors struct {
+	// Container is the selector for the page container
+	Container string `yaml:"container"`
+	// Title is the selector for the page title
+	Title string `yaml:"title"`
+	// Content is the selector for the page content/body
+	Content string `yaml:"content"`
+	// Description is the selector for the page description
+	Description string `yaml:"description"`
+	// Keywords is the selector for page keywords
+	Keywords string `yaml:"keywords"`
+	// OGTitle is the selector for the Open Graph title
+	OGTitle string `yaml:"og_title"`
+	// OGDescription is the selector for the Open Graph description
+	OGDescription string `yaml:"og_description"`
+	// OGImage is the selector for the Open Graph image
+	OGImage string `yaml:"og_image"`
+	// OgURL is the selector for the Open Graph URL
+	OgURL string `yaml:"og_url"`
+	// Canonical is the selector for the canonical URL
+	Canonical string `yaml:"canonical"`
+	// Exclude are selectors for elements to exclude from content extraction
+	Exclude []string `yaml:"exclude"`
+}
+
+// Default returns default page selectors.
+func (s *PageSelectors) Default() PageSelectors {
+	return PageSelectors{
+		Container:     "main, article, body",
+		Title:         "h1, title",
+		Content:       "main, article, .content",
+		Description:   "meta[name='description']",
+		Keywords:      "meta[name='keywords']",
+		OGTitle:       "meta[property='og:title']",
+		OGDescription: "meta[property='og:description']",
+		OGImage:       "meta[property='og:image']",
+		OgURL:         "meta[property='og:url']",
+		Canonical:     "link[rel='canonical']",
+		Exclude: []string{
+			// Default exclude patterns for clean content extraction
+			"script, style, noscript",
+			".ad, .advertisement, [class*='ad']",
+			".header, .footer, nav",
+			"button, form",
+			".sidebar, .comments",
+		},
+	}
+}
+
+// Validate validates the page selectors (optional validation).
+func (s *PageSelectors) Validate() error {
+	// Page selectors are optional, so no strict validation required
+	return nil
 }

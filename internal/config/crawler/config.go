@@ -1,3 +1,6 @@
+// Package crawler provides configuration management for the web crawler component.
+// It handles loading, validation, and access to crawler-specific settings
+// such as crawl depth, concurrency, rate limiting, and TLS configuration.
 package crawler
 
 import (
@@ -5,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 // Default configuration values
@@ -245,4 +250,67 @@ func (c *TLSConfig) Validate() error {
 			"production use as it makes HTTPS connections vulnerable to man-in-the-middle attacks")
 	}
 	return nil
+}
+
+// LoadFromViper loads crawler configuration from Viper
+// Viper will return values from (in order of precedence):
+// 1. Environment variables
+// 2. Config file
+// 3. Defaults set via viper.SetDefault()
+func LoadFromViper(v *viper.Viper) *Config {
+	cfg := New()
+
+	// Load values from Viper (will use defaults if not set)
+	// Note: parallelism is an alias for max_concurrency
+	if v.IsSet("crawler.parallelism") {
+		cfg.MaxConcurrency = v.GetInt("crawler.parallelism")
+	} else if v.IsSet("crawler.max_concurrency") {
+		cfg.MaxConcurrency = v.GetInt("crawler.max_concurrency")
+	}
+
+	cfg.MaxDepth = v.GetInt("crawler.max_depth")
+	cfg.RequestTimeout = v.GetDuration("crawler.request_timeout")
+	cfg.UserAgent = v.GetString("crawler.user_agent")
+	cfg.RespectRobotsTxt = v.GetBool("crawler.respect_robots_txt")
+	cfg.AllowedDomains = v.GetStringSlice("crawler.allowed_domains")
+	cfg.DisallowedDomains = v.GetStringSlice("crawler.disallowed_domains")
+	cfg.Delay = v.GetDuration("crawler.delay")
+	cfg.RandomDelay = v.GetDuration("crawler.random_delay")
+	cfg.SourceFile = v.GetString("crawler.source_file")
+	cfg.Debug = v.GetBool("crawler.debug")
+	// Only set MaxRetries if it's actually set and > 0 in Viper
+	// This prevents overwriting the default with 0 when defaults haven't been loaded yet
+	if maxRetries := v.GetInt("crawler.max_retries"); maxRetries > 0 {
+		cfg.MaxRetries = maxRetries
+	}
+	// Only set RetryDelay if it's actually set and > 0 in Viper
+	if retryDelay := v.GetDuration("crawler.retry_delay"); retryDelay > 0 {
+		cfg.RetryDelay = retryDelay
+	}
+	cfg.FollowRedirects = v.GetBool("crawler.follow_redirects")
+	cfg.MaxRedirects = v.GetInt("crawler.max_redirects")
+	cfg.ValidateURLs = v.GetBool("crawler.validate_urls")
+	// Only set CleanupInterval if it's actually set and non-zero in Viper
+	// This prevents overwriting the default with 0 when defaults haven't been loaded yet
+	if cleanupInterval := v.GetDuration("crawler.cleanup_interval"); cleanupInterval > 0 {
+		cfg.CleanupInterval = cleanupInterval
+	}
+
+	// Load TLS configuration
+	cfg.TLS.InsecureSkipVerify = v.GetBool("crawler.tls.insecure_skip_verify")
+	if v.IsSet("crawler.tls.min_version") {
+		minVer := v.GetInt("crawler.tls.min_version")
+		if minVer >= 0 && minVer <= 65535 {
+			cfg.TLS.MinVersion = uint16(minVer)
+		}
+	}
+	if v.IsSet("crawler.tls.max_version") {
+		maxVer := v.GetInt("crawler.tls.max_version")
+		if maxVer >= 0 && maxVer <= 65535 {
+			cfg.TLS.MaxVersion = uint16(maxVer)
+		}
+	}
+	cfg.TLS.PreferServerCipherSuites = v.GetBool("crawler.tls.prefer_server_cipher_suites")
+
+	return cfg
 }

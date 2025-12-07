@@ -28,6 +28,7 @@ type Config struct {
 	MaxDepth     int               `mapstructure:"max_depth"`
 	Time         []string          `mapstructure:"time"`
 	ArticleIndex string            `mapstructure:"article_index"`
+	PageIndex    string            `mapstructure:"page_index"`
 	Index        string            `mapstructure:"index"`
 	Selectors    SourceSelectors   `mapstructure:"selectors"`
 	UserAgent    string            `mapstructure:"user_agent"`
@@ -37,32 +38,63 @@ type Config struct {
 // SourceSelectors defines the selectors for a source.
 type SourceSelectors struct {
 	Article ArticleSelectors `mapstructure:"article"`
+	List    ListSelectors    `mapstructure:"list"`
+	Page    PageSelectors    `mapstructure:"page"`
+}
+
+// ListSelectors defines the CSS selectors used for article list page extraction.
+type ListSelectors struct {
+	Container       string   `mapstructure:"container"`
+	ArticleCards    string   `mapstructure:"article_cards"`
+	ArticleList     string   `mapstructure:"article_list"`
+	ExcludeFromList []string `mapstructure:"exclude_from_list"`
 }
 
 // ArticleSelectors defines the CSS selectors used for article content extraction.
 type ArticleSelectors struct {
-	Container     string `mapstructure:"container"`
-	Title         string `mapstructure:"title"`
-	Body          string `mapstructure:"body"`
-	Intro         string `mapstructure:"intro"`
-	Byline        string `mapstructure:"byline"`
-	PublishedTime string `mapstructure:"published_time"`
-	TimeAgo       string `mapstructure:"time_ago"`
-	JSONLD        string `mapstructure:"jsonld"`
-	Section       string `mapstructure:"section"`
-	Keywords      string `mapstructure:"keywords"`
-	Description   string `mapstructure:"description"`
-	OGTitle       string `mapstructure:"og_title"`
-	OGDescription string `mapstructure:"og_description"`
-	OGImage       string `mapstructure:"og_image"`
-	OgURL         string `mapstructure:"og_url"`
-	Canonical     string `mapstructure:"canonical"`
-	WordCount     string `mapstructure:"word_count"`
-	PublishDate   string `mapstructure:"publish_date"`
-	Category      string `mapstructure:"category"`
-	Tags          string `mapstructure:"tags"`
-	Author        string `mapstructure:"author"`
-	BylineName    string `mapstructure:"byline_name"`
+	Container     string   `mapstructure:"container"`
+	Title         string   `mapstructure:"title"`
+	Body          string   `mapstructure:"body"`
+	Intro         string   `mapstructure:"intro"`
+	Link          string   `mapstructure:"link"`
+	Image         string   `mapstructure:"image"`
+	Byline        string   `mapstructure:"byline"`
+	PublishedTime string   `mapstructure:"published_time"`
+	TimeAgo       string   `mapstructure:"time_ago"`
+	JSONLD        string   `mapstructure:"json_ld"`
+	Section       string   `mapstructure:"section"`
+	Keywords      string   `mapstructure:"keywords"`
+	Description   string   `mapstructure:"description"`
+	OGTitle       string   `mapstructure:"og_title"`
+	OGDescription string   `mapstructure:"og_description"`
+	OGImage       string   `mapstructure:"og_image"`
+	OGType        string   `mapstructure:"og_type"`
+	OGSiteName    string   `mapstructure:"og_site_name"`
+	OgURL         string   `mapstructure:"og_url"`
+	Canonical     string   `mapstructure:"canonical"`
+	WordCount     string   `mapstructure:"word_count"`
+	PublishDate   string   `mapstructure:"publish_date"`
+	Category      string   `mapstructure:"category"`
+	Tags          string   `mapstructure:"tags"`
+	Author        string   `mapstructure:"author"`
+	BylineName    string   `mapstructure:"byline_name"`
+	ArticleID     string   `mapstructure:"article_id"`
+	Exclude       []string `mapstructure:"exclude"`
+}
+
+// PageSelectors defines the CSS selectors used for page content extraction.
+type PageSelectors struct {
+	Container     string   `mapstructure:"container"`
+	Title         string   `mapstructure:"title"`
+	Content       string   `mapstructure:"content"`
+	Description   string   `mapstructure:"description"`
+	Keywords      string   `mapstructure:"keywords"`
+	OGTitle       string   `mapstructure:"og_title"`
+	OGDescription string   `mapstructure:"og_description"`
+	OGImage       string   `mapstructure:"og_image"`
+	OgURL         string   `mapstructure:"og_url"`
+	Canonical     string   `mapstructure:"canonical"`
+	Exclude       []string `mapstructure:"exclude"`
 }
 
 // Loader handles loading and validating source configurations.

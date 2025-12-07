@@ -16,10 +16,10 @@ type EventBus struct {
 }
 
 // NewEventBus creates a new EventBus instance.
-func NewEventBus(logger logger.Interface) *EventBus {
+func NewEventBus(log logger.Interface) *EventBus {
 	return &EventBus{
 		handlers: make([]EventHandler, 0),
-		logger:   logger,
+		logger:   log,
 	}
 }
 

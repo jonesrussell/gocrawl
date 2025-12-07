@@ -67,11 +67,25 @@ func (h *LinkHandler) HandleLink(e *colly.HTMLElement) {
 			return
 		}
 
-		// Check if error is non-retryable
-		if errors.Is(err, ErrAlreadyVisited) ||
+		// Check if error is non-retryable by checking both error type and message
+		// Colly may return errors with different message formats
+		errMsg := err.Error()
+		isNonRetryable := errors.Is(err, ErrAlreadyVisited) ||
 			errors.Is(err, ErrMaxDepth) ||
 			errors.Is(err, ErrMissingURL) ||
-			errors.Is(err, ErrForbiddenDomain) {
+			errors.Is(err, ErrForbiddenDomain) ||
+			strings.Contains(errMsg, "forbidden domain") ||
+			strings.Contains(errMsg, "Forbidden domain") ||
+			strings.Contains(errMsg, "max depth") ||
+			strings.Contains(errMsg, "Max depth") ||
+			strings.Contains(errMsg, "already visited") ||
+			strings.Contains(errMsg, "Already visited")
+
+		if isNonRetryable {
+			// These are expected conditions, log at debug level
+			h.crawler.logger.Debug("Skipping non-retryable link",
+				"url", absLink,
+				"error", errMsg)
 			return
 		}
 

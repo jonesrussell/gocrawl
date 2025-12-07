@@ -32,21 +32,21 @@ type SchedulerService struct {
 
 // NewSchedulerService creates a new SchedulerService instance.
 func NewSchedulerService(
-	logger logger.Interface,
-	sources sources.Interface,
-	crawler crawler.Interface,
+	log logger.Interface,
+	sourcesManager sources.Interface,
+	crawlerInstance crawler.Interface,
 	done chan struct{},
-	config config.Interface,
+	cfg config.Interface,
 	storage types.Interface,
 	processorFactory crawler.ProcessorFactory,
 ) common.JobService {
 	var jobs int32
 	return &SchedulerService{
-		logger:           logger,
-		sources:          sources,
-		crawler:          crawler,
+		logger:           log,
+		sources:          sourcesManager,
+		crawler:          crawlerInstance,
 		done:             done,
-		config:           config,
+		config:           cfg,
 		activeJobs:       &jobs,
 		storage:          storage,
 		processorFactory: processorFactory,

@@ -29,7 +29,7 @@ type PageProcessor struct {
 
 // NewPageProcessor creates a new page processor.
 func NewPageProcessor(
-	logger logger.Interface,
+	log logger.Interface,
 	service Interface,
 	validator content.JobValidator,
 	storage types.Interface,
@@ -37,7 +37,7 @@ func NewPageProcessor(
 	pageChannel chan *models.Page,
 ) *PageProcessor {
 	return &PageProcessor{
-		logger:      logger,
+		logger:      log,
 		service:     service,
 		validator:   validator,
 		storage:     storage,
@@ -48,10 +48,10 @@ func NewPageProcessor(
 }
 
 // Process implements the content.Processor interface.
-func (p *PageProcessor) Process(ctx context.Context, content any) error {
-	e, ok := content.(*colly.HTMLElement)
+func (p *PageProcessor) Process(ctx context.Context, contentData any) error {
+	e, ok := contentData.(*colly.HTMLElement)
 	if !ok {
-		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", content)
+		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", contentData)
 	}
 
 	// Process the page
@@ -78,8 +78,8 @@ func (p *PageProcessor) ContentType() contenttype.Type {
 }
 
 // CanProcess implements the content.Processor interface.
-func (p *PageProcessor) CanProcess(content contenttype.Type) bool {
-	return content == contenttype.Page
+func (p *PageProcessor) CanProcess(ct contenttype.Type) bool {
+	return ct == contenttype.Page
 }
 
 // Start implements the content.Processor interface.
@@ -138,12 +138,12 @@ func (p *PageProcessor) RegisterProcessor(processor content.ContentProcessor) {
 }
 
 // ProcessContent implements content.ProcessorRegistry
-func (p *PageProcessor) ProcessContent(ctx context.Context, contentType contenttype.Type, content any) error {
-	processor, err := p.GetProcessor(contentType)
+func (p *PageProcessor) ProcessContent(ctx context.Context, ct contenttype.Type, contentData any) error {
+	proc, err := p.GetProcessor(ct)
 	if err != nil {
 		return err
 	}
-	return processor.Process(ctx, content)
+	return proc.Process(ctx, contentData)
 }
 
 // pageContentProcessor wraps PageProcessor to implement content.ContentProcessor
@@ -152,8 +152,8 @@ type pageContentProcessor struct {
 }
 
 // Process implements content.ContentProcessor
-func (p *pageContentProcessor) Process(ctx context.Context, content any) error {
-	return p.PageProcessor.Process(ctx, content)
+func (p *pageContentProcessor) Process(ctx context.Context, contentData any) error {
+	return p.PageProcessor.Process(ctx, contentData)
 }
 
 // ContentType implements content.ContentProcessor
@@ -162,8 +162,8 @@ func (p *pageContentProcessor) ContentType() contenttype.Type {
 }
 
 // CanProcess implements content.ContentProcessor
-func (p *pageContentProcessor) CanProcess(content contenttype.Type) bool {
-	return p.PageProcessor.CanProcess(content)
+func (p *pageContentProcessor) CanProcess(ct contenttype.Type) bool {
+	return p.PageProcessor.CanProcess(ct)
 }
 
 // ValidateJob implements content.ContentProcessor

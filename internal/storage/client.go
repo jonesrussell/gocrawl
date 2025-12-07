@@ -34,6 +34,11 @@ func NewClient(p ClientParams) (ClientResult, error) {
 		return ClientResult{}, errors.New("elasticsearch configuration is required")
 	}
 
+	// Log the addresses being used for debugging
+	if len(esConfig.Addresses) > 0 {
+		p.Logger.Debug("Connecting to Elasticsearch", "addresses", esConfig.Addresses)
+	}
+
 	// Create transport
 	transport := CreateTransport(esConfig)
 	clientConfig := CreateClientConfig(esConfig, transport)

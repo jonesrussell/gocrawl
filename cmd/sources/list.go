@@ -5,7 +5,6 @@ package sources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -17,8 +16,6 @@ import (
 	internalsources "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sourceutils"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 )
 
 // TableRenderer handles the display of source data in a table format
@@ -27,9 +24,9 @@ type TableRenderer struct {
 }
 
 // NewTableRenderer creates a new TableRenderer instance
-func NewTableRenderer(logger logger.Interface) *TableRenderer {
+func NewTableRenderer(log logger.Interface) *TableRenderer {
 	return &TableRenderer{
-		logger: logger,
+		logger: log,
 	}
 }
 
@@ -71,12 +68,12 @@ type Lister struct {
 // NewLister creates a new Lister instance
 func NewLister(
 	sourceManager internalsources.Interface,
-	logger logger.Interface,
+	log logger.Interface,
 	renderer *TableRenderer,
 ) *Lister {
 	return &Lister{
 		sourceManager: sourceManager,
-		logger:        logger,
+		logger:        log,
 		renderer:      renderer,
 	}
 }
@@ -106,77 +103,57 @@ func NewListCommand() *cobra.Command {
 		Short: "List all configured sources",
 		Long:  `List all content sources configured in the system.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get logger from context
-			loggerValue := cmd.Context().Value(cmdcommon.LoggerKey)
-			log, ok := loggerValue.(logger.Interface)
-			if !ok {
-				return errors.New("logger not found in context")
+			// Get dependencies from context using helper
+			log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("failed to get dependencies: %w", err)
 			}
 
-			// Get config from context
-			configValue := cmd.Context().Value(cmdcommon.ConfigKey)
-			cfg, ok := configValue.(config.Interface)
-			if !ok {
-				return errors.New("config not found in context")
+			// Ensure crawler config is properly set up
+			if setupErr := setupCrawlerConfig(cfg); setupErr != nil {
+				return setupErr
 			}
 
-			// Ensure crawler config exists to avoid nil dereference in sources loader
-			if cfg.GetCrawlerConfig() == nil {
-				if concrete, ok := cfg.(*config.Config); ok {
-					concrete.Crawler = crawlercfg.New()
-				}
+			// Construct dependencies directly without FX
+			sourceManager, err := internalsources.LoadSources(cfg, log)
+			if err != nil {
+				return fmt.Errorf("failed to load sources: %w", err)
 			}
 
-			// If the configured source file does not exist, fall back to sources.example.yml
-			if concrete, ok := cfg.(*config.Config); ok {
-				path := concrete.GetCrawlerConfig().SourceFile
-				if path == "" {
-					path = "sources.yml"
-				}
-				if _, statErr := os.Stat(path); statErr != nil {
-					alt := "./sources.example.yml"
-					if _, altErr := os.Stat(alt); altErr == nil {
-						concrete.Crawler.SourceFile = alt
-					}
-				}
-			}
+			renderer := NewTableRenderer(log)
+			lister := NewLister(sourceManager, log, renderer)
 
-			// Create Fx app with the module
-			fxApp := fx.New(
-				// Include required modules
-				Module,
-				internalsources.Module,
-
-				// Provide existing config
-				fx.Provide(func() config.Interface { return cfg }),
-
-				// Provide existing logger
-				fx.Provide(func() logger.Interface { return log }),
-
-				// Use custom Fx logger
-				fx.WithLogger(func() fxevent.Logger {
-					return logger.NewFxLogger(log)
-				}),
-
-				// Invoke list command
-				fx.Invoke(func(l *Lister) error {
-					return l.Start(cmd.Context())
-				}),
-			)
-
-			// Start application
-			if err := fxApp.Start(cmd.Context()); err != nil {
-				return err
-			}
-
-			// Stop application
-			if err := fxApp.Stop(cmd.Context()); err != nil {
-				return err
-			}
-
-			return nil
+			// Execute the list command
+			return lister.Start(cmd.Context())
 		},
 	}
 
 	return cmd
+}
+
+// setupCrawlerConfig ensures crawler config exists and source file is properly configured.
+func setupCrawlerConfig(cfg config.Interface) error {
+	concrete, ok := cfg.(*config.Config)
+	if !ok {
+		return nil
+	}
+
+	// Ensure crawler config exists to avoid nil dereference in sources loader
+	if cfg.GetCrawlerConfig() == nil {
+		concrete.Crawler = crawlercfg.New()
+	}
+
+	// If the configured source file does not exist, fall back to sources.example.yml
+	path := concrete.GetCrawlerConfig().SourceFile
+	if path == "" {
+		path = "sources.yml"
+	}
+	if _, statErr := os.Stat(path); statErr != nil {
+		alt := "./sources.example.yml"
+		if _, altErr := os.Stat(alt); altErr == nil {
+			concrete.Crawler.SourceFile = alt
+		}
+	}
+
+	return nil
 }

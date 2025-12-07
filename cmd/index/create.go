@@ -54,14 +54,14 @@ type Creator struct {
 
 // NewCreator creates a new creator instance
 func NewCreator(
-	config config.Interface,
-	logger logger.Interface,
+	cfg config.Interface,
+	log logger.Interface,
 	storage types.Interface,
 	params CreateParams,
 ) *Creator {
 	return &Creator{
-		config:  config,
-		logger:  logger,
+		config:  cfg,
+		logger:  log,
 		storage: storage,
 		index:   params.IndexName,
 	}

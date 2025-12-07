@@ -3,7 +3,7 @@ package crawl
 
 import (
 	"context"
-	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/jonesrussell/gocrawl/internal/common"
@@ -20,6 +20,7 @@ type JobService struct {
 	sources          sources.Interface
 	crawler          crawler.Interface
 	done             chan struct{}
+	doneOnce         sync.Once // Ensures done channel is only closed once
 	activeJobs       *int32
 	storage          storagetypes.Interface
 	processorFactory crawler.ProcessorFactory
@@ -39,13 +40,15 @@ type JobServiceParams struct {
 
 // NewJobService creates a new JobService instance.
 func NewJobService(p JobServiceParams) common.JobService {
-	var jobs int32
+	// Allocate activeJobs on the heap to avoid dangling pointer
+	// when the function returns and the local variable goes out of scope
+	activeJobs := new(int32)
 	return &JobService{
 		logger:           p.Logger,
 		sources:          p.Sources,
 		crawler:          p.Crawler,
 		done:             p.Done,
-		activeJobs:       &jobs,
+		activeJobs:       activeJobs,
 		storage:          p.Storage,
 		processorFactory: p.ProcessorFactory,
 		sourceName:       p.SourceName,
@@ -57,17 +60,22 @@ func (s *JobService) Start(ctx context.Context) error {
 	s.logger.Info("Starting job service")
 	s.logger.Info("Starting crawl for source", "source", s.sourceName)
 
-	// Start the crawler with the source name
-	if err := s.crawler.Start(ctx, s.sourceName); err != nil {
-		return fmt.Errorf("failed to start crawler: %w", err)
-	}
-
-	// Wait for the crawler to complete
+	// Start the crawler in a goroutine so it doesn't block
 	go func() {
-		if err := s.crawler.Wait(); err != nil {
+		// Start the crawler with the source name
+		if err := s.crawler.Start(ctx, s.sourceName); err != nil {
 			s.logger.Error("Crawler failed", "error", err)
 		}
-		close(s.done)
+		// Wait for the crawler to complete all async operations
+		// crawler.Start() returns immediately after starting async operations,
+		// so we must wait for them to complete
+		if err := s.crawler.Wait(); err != nil {
+			s.logger.Error("Error waiting for crawler", "error", err)
+		}
+		// Signal completion when crawler finishes
+		s.doneOnce.Do(func() {
+			close(s.done)
+		})
 	}()
 
 	return nil
@@ -76,8 +84,10 @@ func (s *JobService) Start(ctx context.Context) error {
 // Stop implements the common.JobService interface.
 func (s *JobService) Stop(ctx context.Context) error {
 	s.logger.Info("Stopping crawl job")
-	// Signal completion
-	close(s.done)
+	// Signal completion (safe to call multiple times)
+	s.doneOnce.Do(func() {
+		close(s.done)
+	})
 	return nil
 }
 

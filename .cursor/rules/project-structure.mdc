@@ -13,7 +13,13 @@ This is a Go web crawler and search engine project with the following architectu
 - `scheduler/` - Job scheduling for automated crawling
 - `search/` - Search functionality
 - `sources/` - Source management
-- `common/` - Shared command utilities
+- `common/` - Shared command utilities (CommandContext, helpers)
+
+**Command Architecture:**
+- All commands use `Command()` function pattern for registration
+- Dependencies accessed via `CommandContext` in context
+- Commands construct dependencies directly (no per-command FX apps)
+- See command-architecture.mdc for detailed patterns
 
 ## Core Components (internal/)
 - `crawler/` - Web crawling engine using Colly
@@ -31,8 +37,9 @@ This is a Go web crawler and search engine project with the following architectu
 
 ## Configuration
 - [config.example.yaml](mdc:config.example.yaml) - Main configuration template
-- [sources.example.yml](mdc:sources.example.yml) - Source configuration template
+- [sources.example.yml](mdc:sources.example.yml) - Source configuration template with comprehensive selector examples
 - [.env.example](mdc:.env.example) - Environment variables template
+- See sources-configuration.mdc for detailed selector field documentation
 
 ## Dependencies
 - Web crawling: `github.com/gocolly/colly/v2`

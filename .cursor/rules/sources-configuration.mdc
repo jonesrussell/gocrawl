@@ -1,0 +1,143 @@
+# Sources Configuration
+
+## Source Configuration Structure
+
+Sources are configured in `sources.yml` and define websites to crawl and how to extract content.
+
+### Source Fields
+- `name` - Unique identifier for the source (required)
+- `url` - Base URL for the source (required)
+- `article_index` - Elasticsearch index name for raw article data
+- `index` - Elasticsearch index name for processed/normalized content
+- `rate_limit` - Time between requests (e.g., "1s", "2s")
+- `max_depth` - How many links deep to follow from starting URL
+- `time` - Schedule crawling times in 24-hour format (HH:MM)
+- `selectors` - CSS selectors for content extraction (see below)
+
+## Selector Structure
+
+### Article Selectors (`selectors.article`)
+
+**Core Content Selectors:**
+- `container` - Main content container selector (required)
+- `title` - Article title selector (required)
+- `body` - Article body content selector (required)
+- `intro` - Article introduction/excerpt selector
+
+**Link and Image Extraction:**
+- `link` - **CRITICAL** selector for article links used for article discovery
+- `image` - Image selector (handles both eager and lazy loading via `data-src`)
+
+**Metadata Selectors:**
+- `byline` - Article byline/author line
+- `published_time` - Published timestamp
+- `time_ago` - Relative time display
+- `article_id` - Article identifier (e.g., `[data-article-id]`)
+
+**Category and Section:**
+- `section` - Article section selector
+- `category` - Article category selector
+
+**Structured Data:**
+- `json_ld` - JSON-LD structured data script tag
+- `keywords` - Meta keywords
+- `description` - Meta description
+
+**Open Graph Metadata:**
+- `og_title` - Open Graph title
+- `og_description` - Open Graph description
+- `og_image` - Open Graph image
+- `og_url` - Open Graph URL
+- `og_type` - Open Graph type
+- `og_site_name` - Open Graph site name
+
+**Additional Metadata:**
+- `canonical` - Canonical URL link
+- `author` - Article author
+- `category` - Article category
+- `tags` - Article tags
+- `word_count` - Word count
+- `publish_date` - Publish date
+
+**Content Filtering:**
+- `exclude` - Array of CSS selectors for elements to exclude from content extraction
+  - Use for ads, navigation, scripts, widgets, social media, etc.
+  - Supports comma-separated selectors in single strings
+  - Example: `[".ad, .advertisement", "script, style", ".header, .footer"]`
+
+### List Selectors (`selectors.list`)
+
+For article list/discovery pages:
+- `container` - Container selector for the list page
+- `article_cards` - Selector for article card elements
+- `article_list` - Selector for article list elements (e.g., `ol.article-list li`)
+- `exclude_from_list` - Selectors to exclude from list extraction (e.g., native ads)
+
+## Type System
+
+### Selector Type Hierarchy
+
+1. **Loader Types** (`internal/sources/loader/loader.go`)
+   - `loader.ArticleSelectors` - Raw loaded selectors from YAML
+   - `loader.ListSelectors` - Raw loaded list selectors
+   - `loader.SourceSelectors` - Container for article and list selectors
+
+2. **Config Types** (`internal/config/types/selectors.go`)
+   - `configtypes.ArticleSelectors` - Validated article selectors
+   - `configtypes.ListSelectors` - Validated list selectors
+   - `configtypes.SourceSelectors` - Container for validated selectors
+
+3. **SourceUtils Types** (`internal/sourceutils/sourceutils.go`)
+   - `sourceutils.ArticleSelectors` - Internal article selectors
+   - `sourceutils.ListSelectors` - Internal list selectors
+   - `sourceutils.SelectorConfig` - Internal selector configuration
+
+### Conversion Functions
+
+All selector types must be converted through the following functions:
+- `createSelectorConfig()` - Converts loader/config types to sourceutils types
+- `extractArticleSelectorsFromLoader()` - Converts loader to internal format
+- `extractArticleSelectorsFromConfig()` - Converts config types to internal format
+- `getArticleSelectorsFromSelector()` - Converts internal articleSelector to ArticleSelectors
+
+**IMPORTANT:** When adding new selector fields:
+1. Add field to `loader.ArticleSelectors` or `loader.ListSelectors`
+2. Add field to `configtypes.ArticleSelectors` or `configtypes.ListSelectors`
+3. Add field to `sourceutils.ArticleSelectors` or `sourceutils.ListSelectors`
+4. Update ALL conversion functions to handle the new field
+5. Update `ConvertToConfigSource()` in `sourceutils.go`
+6. Update `createSelectorConfig()` in `sources.go`
+
+## Field Naming Conventions
+
+- YAML fields use snake_case (e.g., `article_id`, `og_type`)
+- Go struct fields use PascalCase (e.g., `ArticleID`, `OGType`)
+- MapStructure tags use snake_case to match YAML (e.g., `mapstructure:"article_id"`)
+- YAML tags use snake_case (e.g., `yaml:"article_id"`)
+
+## Validation
+
+- `container`, `title`, and `body` are required for article selectors
+- Validation is performed in `configtypes.ArticleSelectors.Validate()`
+- Invalid sources are skipped during loading (logged but not fatal)
+
+## Example Configuration
+
+See `sources.example.yml` for complete examples with all selector fields.
+
+## Best Practices
+
+1. **Link Extraction**: Always provide a `link` selector for article discovery
+2. **Image Extraction**: Include fallbacks for lazy loading (e.g., `img[data-src]`)
+3. **Exclude Patterns**: Be comprehensive with exclude patterns to filter ads, navigation, etc.
+4. **List Selectors**: Use list selectors for efficient article discovery on index pages
+5. **Multiple Selectors**: Use comma-separated selectors for fallbacks (e.g., `"h1, h2.title, meta[property='og:title']"`)
+
+description:
+globs:
+  - "**/sources*.yml"
+  - "internal/sources/**/*.go"
+  - "internal/config/types/selectors.go"
+  - "internal/sourceutils/sourceutils.go"
+alwaysApply: true
+---

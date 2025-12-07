@@ -37,77 +37,181 @@ type Sources struct {
 // Ensure Sources implements Interface
 var _ Interface = (*Sources)(nil)
 
-// createSelectorConfig creates a new SelectorConfig from the given selectors
-func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
-	var articleSelectors sourceutils.ArticleSelectors
-
-	switch s := selectors.(type) {
+// convertArticleSelectors converts article selectors from various types to sourceutils.ArticleSelectors.
+func convertArticleSelectors(s any) sourceutils.ArticleSelectors {
+	switch v := s.(type) {
 	case configtypes.ArticleSelectors:
-		articleSelectors = sourceutils.ArticleSelectors{
-			Container:     s.Container,
-			Title:         s.Title,
-			Body:          s.Body,
-			Intro:         s.Intro,
-			Byline:        s.Byline,
-			PublishedTime: s.PublishedTime,
-			TimeAgo:       s.TimeAgo,
-			JSONLD:        s.JSONLD,
-			Section:       s.Section,
-			Keywords:      s.Keywords,
-			Description:   s.Description,
-			OGTitle:       s.OGTitle,
-			OGDescription: s.OGDescription,
-			OGImage:       s.OGImage,
-			OgURL:         s.OgURL,
-			Canonical:     s.Canonical,
-			WordCount:     s.WordCount,
-			PublishDate:   s.PublishDate,
-			Category:      s.Category,
-			Tags:          s.Tags,
-			Author:        s.Author,
-			BylineName:    s.BylineName,
+		return sourceutils.ArticleSelectors{
+			Container:     v.Container,
+			Title:         v.Title,
+			Body:          v.Body,
+			Intro:         v.Intro,
+			Link:          v.Link,
+			Image:         v.Image,
+			Byline:        v.Byline,
+			PublishedTime: v.PublishedTime,
+			TimeAgo:       v.TimeAgo,
+			JSONLD:        v.JSONLD,
+			Section:       v.Section,
+			Keywords:      v.Keywords,
+			Description:   v.Description,
+			OGTitle:       v.OGTitle,
+			OGDescription: v.OGDescription,
+			OGImage:       v.OGImage,
+			OGType:        v.OGType,
+			OGSiteName:    v.OGSiteName,
+			OgURL:         v.OgURL,
+			Canonical:     v.Canonical,
+			WordCount:     v.WordCount,
+			PublishDate:   v.PublishDate,
+			Category:      v.Category,
+			Tags:          v.Tags,
+			Author:        v.Author,
+			BylineName:    v.BylineName,
+			ArticleID:     v.ArticleID,
+			Exclude:       v.Exclude,
 		}
 	case loader.ArticleSelectors:
-		articleSelectors = sourceutils.ArticleSelectors{
-			Container:     s.Container,
-			Title:         s.Title,
-			Body:          s.Body,
-			Intro:         s.Intro,
-			Byline:        s.Byline,
-			PublishedTime: s.PublishedTime,
-			TimeAgo:       s.TimeAgo,
-			JSONLD:        s.JSONLD,
-			Section:       s.Section,
-			Keywords:      s.Keywords,
-			Description:   s.Description,
-			OGTitle:       s.OGTitle,
-			OGDescription: s.OGDescription,
-			OGImage:       s.OGImage,
-			OgURL:         s.OgURL,
-			Canonical:     s.Canonical,
-			WordCount:     s.WordCount,
-			PublishDate:   s.PublishDate,
-			Category:      s.Category,
-			Tags:          s.Tags,
-			Author:        s.Author,
-			BylineName:    s.BylineName,
+		return sourceutils.ArticleSelectors{
+			Container:     v.Container,
+			Title:         v.Title,
+			Body:          v.Body,
+			Intro:         v.Intro,
+			Link:          v.Link,
+			Image:         v.Image,
+			Byline:        v.Byline,
+			PublishedTime: v.PublishedTime,
+			TimeAgo:       v.TimeAgo,
+			JSONLD:        v.JSONLD,
+			Section:       v.Section,
+			Keywords:      v.Keywords,
+			Description:   v.Description,
+			OGTitle:       v.OGTitle,
+			OGDescription: v.OGDescription,
+			OGImage:       v.OGImage,
+			OGType:        v.OGType,
+			OGSiteName:    v.OGSiteName,
+			OgURL:         v.OgURL,
+			Canonical:     v.Canonical,
+			WordCount:     v.WordCount,
+			PublishDate:   v.PublishDate,
+			Category:      v.Category,
+			Tags:          v.Tags,
+			Author:        v.Author,
+			BylineName:    v.BylineName,
+			ArticleID:     v.ArticleID,
+			Exclude:       v.Exclude,
 		}
+	default:
+		return sourceutils.ArticleSelectors{}
+	}
+}
+
+// convertListSelectors converts list selectors from various types to sourceutils.ListSelectors.
+func convertListSelectors(s any) sourceutils.ListSelectors {
+	switch v := s.(type) {
+	case configtypes.ListSelectors:
+		return sourceutils.ListSelectors{
+			Container:       v.Container,
+			ArticleCards:    v.ArticleCards,
+			ArticleList:     v.ArticleList,
+			ExcludeFromList: v.ExcludeFromList,
+		}
+	case loader.ListSelectors:
+		return sourceutils.ListSelectors{
+			Container:       v.Container,
+			ArticleCards:    v.ArticleCards,
+			ArticleList:     v.ArticleList,
+			ExcludeFromList: v.ExcludeFromList,
+		}
+	default:
+		return sourceutils.ListSelectors{}
+	}
+}
+
+// convertPageSelectors converts page selectors from various types to sourceutils.PageSelectors.
+func convertPageSelectors(s any) sourceutils.PageSelectors {
+	switch v := s.(type) {
+	case configtypes.PageSelectors:
+		return sourceutils.PageSelectors{
+			Container:     v.Container,
+			Title:         v.Title,
+			Content:       v.Content,
+			Description:   v.Description,
+			Keywords:      v.Keywords,
+			OGTitle:       v.OGTitle,
+			OGDescription: v.OGDescription,
+			OGImage:       v.OGImage,
+			OgURL:         v.OgURL,
+			Canonical:     v.Canonical,
+			Exclude:       v.Exclude,
+		}
+	case loader.PageSelectors:
+		return sourceutils.PageSelectors{
+			Container:     v.Container,
+			Title:         v.Title,
+			Content:       v.Content,
+			Description:   v.Description,
+			Keywords:      v.Keywords,
+			OGTitle:       v.OGTitle,
+			OGDescription: v.OGDescription,
+			OGImage:       v.OGImage,
+			OgURL:         v.OgURL,
+			Canonical:     v.Canonical,
+			Exclude:       v.Exclude,
+		}
+	default:
+		return sourceutils.PageSelectors{}
+	}
+}
+
+// createSelectorConfig creates a new SelectorConfig from the given selectors.
+func createSelectorConfig(selectors any) sourceutils.SelectorConfig {
+	var articleSelectors sourceutils.ArticleSelectors
+	var listSelectors sourceutils.ListSelectors
+	var pageSelectors sourceutils.PageSelectors
+
+	switch s := selectors.(type) {
+	case configtypes.SourceSelectors:
+		articleSelectors = convertArticleSelectors(s.Article)
+		listSelectors = convertListSelectors(s.List)
+		pageSelectors = convertPageSelectors(s.Page)
+	case configtypes.ArticleSelectors:
+		articleSelectors = convertArticleSelectors(s)
+	case loader.SourceSelectors:
+		articleSelectors = convertArticleSelectors(s.Article)
+		listSelectors = convertListSelectors(s.List)
+		pageSelectors = convertPageSelectors(s.Page)
+	case loader.ArticleSelectors:
+		articleSelectors = convertArticleSelectors(s)
 	default:
 		// Return empty selectors for unknown types
 		articleSelectors = sourceutils.ArticleSelectors{}
+		listSelectors = sourceutils.ListSelectors{}
+		pageSelectors = sourceutils.PageSelectors{}
 	}
 
 	return sourceutils.SelectorConfig{
 		Article: articleSelectors,
+		List:    listSelectors,
+		Page:    pageSelectors,
 	}
 }
 
-// LoadSources creates a new Sources instance by loading sources from either:
-// 1. A YAML file specified in the crawler config
-// Returns an error if no sources are found
-func LoadSources(cfg config.Interface) (*Sources, error) {
+// LoadSources creates a new Sources instance by loading sources from a YAML file
+// specified in the crawler config. Returns an error if no sources are found.
+// The logger parameter is optional and can be nil.
+func LoadSources(cfg config.Interface, log logger.Interface) (*Sources, error) {
+	// Determine source file path, handling nil crawler config
+	sourceFile := "sources.yml" // Default source file
+	if crawlerCfg := cfg.GetCrawlerConfig(); crawlerCfg != nil {
+		if crawlerCfg.SourceFile != "" {
+			sourceFile = crawlerCfg.SourceFile
+		}
+	}
+
 	// Load sources from config file
-	sources, err := loadSourcesFromFile(cfg.GetCrawlerConfig().SourceFile)
+	sources, err := loadSourcesFromFile(sourceFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sources from file: %w", err)
 	}
@@ -119,6 +223,7 @@ func LoadSources(cfg config.Interface) (*Sources, error) {
 
 	return &Sources{
 		sources: sources,
+		logger:  log,
 		metrics: sourceutils.NewSourcesMetrics(),
 	}, nil
 }
@@ -196,7 +301,8 @@ func convertLoaderConfig(cfg loader.Config) Config {
 			Time:           cfg.Time,
 			Index:          cfg.Index,
 			ArticleIndex:   cfg.ArticleIndex,
-			Selectors:      createSelectorConfig(cfg.Selectors.Article),
+			PageIndex:      cfg.PageIndex,
+			Selectors:      createSelectorConfig(cfg.Selectors),
 			Rules:          configtypes.Rules{},
 		}
 	}
@@ -217,43 +323,10 @@ func convertLoaderConfig(cfg loader.Config) Config {
 		Time:           cfg.Time,
 		Index:          cfg.Index,
 		ArticleIndex:   cfg.ArticleIndex,
-		Selectors:      createSelectorConfig(cfg.Selectors.Article),
+		PageIndex:      cfg.PageIndex,
+		Selectors:      createSelectorConfig(cfg.Selectors),
 		Rules:          configtypes.Rules{},
 	}
-}
-
-// LoadFromFile loads sources from a YAML file.
-func LoadFromFile(path string, logger logger.Interface) (*Sources, error) {
-	sourceLoader, err := loader.NewLoader(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create source loader: %w", err)
-	}
-
-	configs, err := sourceLoader.LoadSources()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load sources: %w", err)
-	}
-
-	sources := &Sources{
-		logger:  logger,
-		metrics: sourceutils.NewSourcesMetrics(),
-	}
-
-	// Convert loaded configs to our source type
-	sourceConfigs := make([]Config, 0, len(configs))
-	for i := range configs {
-		sourceConfigs = append(sourceConfigs, convertLoaderConfig(configs[i]))
-	}
-
-	sources.sources = sourceConfigs
-	return sources, nil
-}
-
-// SetSources sets the sources.
-func (s *Sources) SetSources(configs []Config) {
-	s.sources = configs
-	s.metrics.SourceCount = int64(len(configs))
-	s.metrics.LastUpdated = time.Now()
 }
 
 // ListSources retrieves all sources.
@@ -361,8 +434,13 @@ func (s *Sources) ValidateSource(
 	}
 
 	// Ensure page index exists if specified
-	if selectedSource.Index != "" {
-		if pageErr := indexManager.EnsurePageIndex(ctx, selectedSource.Index); pageErr != nil {
+	// Use PageIndex if available, fallback to Index for backward compatibility
+	pageIndexName := selectedSource.PageIndex
+	if pageIndexName == "" {
+		pageIndexName = selectedSource.Index
+	}
+	if pageIndexName != "" {
+		if pageErr := indexManager.EnsurePageIndex(ctx, pageIndexName); pageErr != nil {
 			return nil, fmt.Errorf("failed to ensure page index exists: %w", pageErr)
 		}
 	}
@@ -388,128 +466,4 @@ func (s *Sources) FindByName(name string) *Config {
 		}
 	}
 	return nil
-}
-
-// articleSelector represents the selectors for article content.
-type articleSelector struct {
-	Container     string `yaml:"container"`
-	Title         string `yaml:"title"`
-	Body          string `yaml:"body"`
-	Intro         string `yaml:"intro"`
-	Byline        string `yaml:"byline"`
-	PublishedTime string `yaml:"published_time"`
-	TimeAgo       string `yaml:"time_ago"`
-	JSONLD        string `yaml:"jsonld"`
-	Section       string `yaml:"section"`
-	Keywords      string `yaml:"keywords"`
-	Description   string `yaml:"description"`
-	OGTitle       string `yaml:"og_title"`
-	OGDescription string `yaml:"og_description"`
-	OGImage       string `yaml:"og_image"`
-	OgURL         string `yaml:"og_url"`
-	Canonical     string `yaml:"canonical"`
-	WordCount     string `yaml:"word_count"`
-	PublishDate   string `yaml:"publish_date"`
-	Category      string `yaml:"category"`
-	Tags          string `yaml:"tags"`
-	Author        string `yaml:"author"`
-	BylineName    string `yaml:"byline_name"`
-}
-
-// getArticleSelectorsFromSelector converts an articleSelector to ArticleSelectors.
-func getArticleSelectorsFromSelector(s articleSelector) ArticleSelectors {
-	return ArticleSelectors{
-		Container:     s.Container,
-		Title:         s.Title,
-		Body:          s.Body,
-		Intro:         s.Intro,
-		Byline:        s.Byline,
-		PublishedTime: s.PublishedTime,
-		TimeAgo:       s.TimeAgo,
-		JSONLD:        s.JSONLD,
-		Section:       s.Section,
-		Keywords:      s.Keywords,
-		Description:   s.Description,
-		OGTitle:       s.OGTitle,
-		OGDescription: s.OGDescription,
-		OGImage:       s.OGImage,
-		OgURL:         s.OgURL,
-		Canonical:     s.Canonical,
-		WordCount:     s.WordCount,
-		PublishDate:   s.PublishDate,
-		Category:      s.Category,
-		Tags:          s.Tags,
-		Author:        s.Author,
-		BylineName:    s.BylineName,
-	}
-}
-
-// extractArticleSelectorsFromLoader converts loader.ArticleSelectors to articleSelector.
-func extractArticleSelectorsFromLoader(selectors loader.ArticleSelectors) articleSelector {
-	return articleSelector{
-		Container:     selectors.Container,
-		Title:         selectors.Title,
-		Body:          selectors.Body,
-		Intro:         selectors.Intro,
-		Byline:        selectors.Byline,
-		PublishedTime: selectors.PublishedTime,
-		TimeAgo:       selectors.TimeAgo,
-		JSONLD:        selectors.JSONLD,
-		Section:       selectors.Section,
-		Keywords:      selectors.Keywords,
-		Description:   selectors.Description,
-		OGTitle:       selectors.OGTitle,
-		OGDescription: selectors.OGDescription,
-		OGImage:       selectors.OGImage,
-		OgURL:         selectors.OgURL,
-		Canonical:     selectors.Canonical,
-		WordCount:     selectors.WordCount,
-		PublishDate:   selectors.PublishDate,
-		Category:      selectors.Category,
-		Tags:          selectors.Tags,
-		Author:        selectors.Author,
-		BylineName:    selectors.BylineName,
-	}
-}
-
-// extractArticleSelectorsFromConfig converts configtypes.ArticleSelectors to articleSelector.
-func extractArticleSelectorsFromConfig(selectors configtypes.ArticleSelectors) articleSelector {
-	return articleSelector{
-		Container:     selectors.Container,
-		Title:         selectors.Title,
-		Body:          selectors.Body,
-		Intro:         selectors.Intro,
-		Byline:        selectors.Byline,
-		PublishedTime: selectors.PublishedTime,
-		TimeAgo:       selectors.TimeAgo,
-		JSONLD:        selectors.JSONLD,
-		Section:       selectors.Section,
-		Keywords:      selectors.Keywords,
-		Description:   selectors.Description,
-		OGTitle:       selectors.OGTitle,
-		OGDescription: selectors.OGDescription,
-		OGImage:       selectors.OGImage,
-		OgURL:         selectors.OgURL,
-		Canonical:     selectors.Canonical,
-		WordCount:     selectors.WordCount,
-		PublishDate:   selectors.PublishDate,
-		Category:      selectors.Category,
-		Tags:          selectors.Tags,
-		Author:        selectors.Author,
-		BylineName:    selectors.BylineName,
-	}
-}
-
-// NewSelectorConfigFromLoader creates a new SelectorConfig from a loader.Config.
-func NewSelectorConfigFromLoader(src loader.Config) SelectorConfig {
-	return SelectorConfig{
-		Article: getArticleSelectorsFromSelector(extractArticleSelectorsFromLoader(src.Selectors.Article)),
-	}
-}
-
-// NewSelectorConfigFromSource creates a new SelectorConfig from a configtypes.Source.
-func NewSelectorConfigFromSource(src configtypes.Source) SelectorConfig {
-	return SelectorConfig{
-		Article: getArticleSelectorsFromSelector(extractArticleSelectorsFromConfig(src.Selectors.Article)),
-	}
 }

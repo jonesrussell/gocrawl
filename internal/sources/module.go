@@ -28,7 +28,7 @@ type SourcesResult struct {
 
 // NewSourcesProvider creates a new Sources instance
 func NewSourcesProvider(p SourcesParams) (SourcesResult, error) {
-	sources, err := LoadSources(p.Config)
+	sources, err := LoadSources(p.Config, p.Logger)
 	if err != nil {
 		return SourcesResult{}, err
 	}
@@ -61,7 +61,7 @@ type Result struct {
 
 // ProvideSources creates a new Sources instance from the given configuration.
 func ProvideSources(params ModuleParams) (Interface, error) {
-	sources, err := LoadSources(params.Deps.Config)
+	sources, err := LoadSources(params.Deps.Config, params.Deps.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sources: %w", err)
 	}

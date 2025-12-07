@@ -94,8 +94,8 @@ func (m *SecurityMiddleware) SetMaxRequests(limit int) {
 }
 
 // SetMetrics sets the metrics instance for the middleware
-func (m *SecurityMiddleware) SetMetrics(metrics *metrics.Metrics) {
-	m.metrics = metrics
+func (m *SecurityMiddleware) SetMetrics(mtrcs *metrics.Metrics) {
+	m.metrics = mtrcs
 }
 
 // checkRateLimit checks if the client has exceeded the rate limit

@@ -37,6 +37,7 @@ type SourceConfig struct {
 	Time           []string
 	Index          string
 	ArticleIndex   string
+	PageIndex      string
 	Selectors      SelectorConfig
 	Rules          types.Rules
 }
@@ -44,6 +45,16 @@ type SourceConfig struct {
 // SelectorConfig defines the CSS selectors used for content extraction.
 type SelectorConfig struct {
 	Article ArticleSelectors
+	List    ListSelectors
+	Page    PageSelectors
+}
+
+// ListSelectors defines the CSS selectors used for article list page extraction.
+type ListSelectors struct {
+	Container       string
+	ArticleCards    string
+	ArticleList     string
+	ExcludeFromList []string
 }
 
 // ArticleSelectors defines the CSS selectors used for article content extraction.
@@ -52,6 +63,8 @@ type ArticleSelectors struct {
 	Title         string
 	Body          string
 	Intro         string
+	Link          string
+	Image         string
 	Byline        string
 	PublishedTime string
 	TimeAgo       string
@@ -62,6 +75,8 @@ type ArticleSelectors struct {
 	OGTitle       string
 	OGDescription string
 	OGImage       string
+	OGType        string
+	OGSiteName    string
 	OgURL         string
 	Canonical     string
 	WordCount     string
@@ -70,6 +85,23 @@ type ArticleSelectors struct {
 	Tags          string
 	Author        string
 	BylineName    string
+	ArticleID     string
+	Exclude       []string
+}
+
+// PageSelectors defines the CSS selectors used for page content extraction.
+type PageSelectors struct {
+	Container     string
+	Title         string
+	Content       string
+	Description   string
+	Keywords      string
+	OGTitle       string
+	OGDescription string
+	OGImage       string
+	OgURL         string
+	Canonical     string
+	Exclude       []string
 }
 
 // ConvertToConfigSource converts a SourceConfig to a types.Source.
@@ -88,12 +120,15 @@ func ConvertToConfigSource(source *SourceConfig) *types.Source {
 		Time:           source.Time,
 		Index:          source.Index,
 		ArticleIndex:   source.ArticleIndex,
+		PageIndex:      source.PageIndex,
 		Selectors: types.SourceSelectors{
 			Article: types.ArticleSelectors{
 				Container:     source.Selectors.Article.Container,
 				Title:         source.Selectors.Article.Title,
 				Body:          source.Selectors.Article.Body,
 				Intro:         source.Selectors.Article.Intro,
+				Link:          source.Selectors.Article.Link,
+				Image:         source.Selectors.Article.Image,
 				Byline:        source.Selectors.Article.Byline,
 				PublishedTime: source.Selectors.Article.PublishedTime,
 				TimeAgo:       source.Selectors.Article.TimeAgo,
@@ -104,6 +139,8 @@ func ConvertToConfigSource(source *SourceConfig) *types.Source {
 				OGTitle:       source.Selectors.Article.OGTitle,
 				OGDescription: source.Selectors.Article.OGDescription,
 				OGImage:       source.Selectors.Article.OGImage,
+				OGType:        source.Selectors.Article.OGType,
+				OGSiteName:    source.Selectors.Article.OGSiteName,
 				OgURL:         source.Selectors.Article.OgURL,
 				Canonical:     source.Selectors.Article.Canonical,
 				WordCount:     source.Selectors.Article.WordCount,
@@ -112,6 +149,27 @@ func ConvertToConfigSource(source *SourceConfig) *types.Source {
 				Tags:          source.Selectors.Article.Tags,
 				Author:        source.Selectors.Article.Author,
 				BylineName:    source.Selectors.Article.BylineName,
+				ArticleID:     source.Selectors.Article.ArticleID,
+				Exclude:       source.Selectors.Article.Exclude,
+			},
+			List: types.ListSelectors{
+				Container:       source.Selectors.List.Container,
+				ArticleCards:    source.Selectors.List.ArticleCards,
+				ArticleList:     source.Selectors.List.ArticleList,
+				ExcludeFromList: source.Selectors.List.ExcludeFromList,
+			},
+			Page: types.PageSelectors{
+				Container:     source.Selectors.Page.Container,
+				Title:         source.Selectors.Page.Title,
+				Content:       source.Selectors.Page.Content,
+				Description:   source.Selectors.Page.Description,
+				Keywords:      source.Selectors.Page.Keywords,
+				OGTitle:       source.Selectors.Page.OGTitle,
+				OGDescription: source.Selectors.Page.OGDescription,
+				OGImage:       source.Selectors.Page.OGImage,
+				OgURL:         source.Selectors.Page.OgURL,
+				Canonical:     source.Selectors.Page.Canonical,
+				Exclude:       source.Selectors.Page.Exclude,
 			},
 		},
 		Rules: source.Rules,

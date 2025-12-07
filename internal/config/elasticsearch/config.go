@@ -3,6 +3,7 @@ package elasticsearch
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -21,7 +22,7 @@ const (
 
 // Default configuration values
 const (
-	DefaultAddresses     = "https://localhost:9200"
+	DefaultAddresses     = "http://127.0.0.1:9200"
 	DefaultIndexName     = "gocrawl"
 	DefaultRetryEnabled  = true
 	DefaultInitialWait   = 1 * time.Second
@@ -381,10 +382,88 @@ func WithTLSInsecureSkipVerify(skip bool) Option {
 	}
 }
 
+// parseAddressesFromString parses comma-separated addresses from a string
+func parseAddressesFromString(addrStr string) []string {
+	addresses := strings.Split(addrStr, ",")
+	// Trim whitespace from each address
+	for i := range addresses {
+		addresses[i] = strings.TrimSpace(addresses[i])
+	}
+	// Remove any empty strings after trimming
+	var filtered []string
+	for _, addr := range addresses {
+		if addr != "" {
+			filtered = append(filtered, addr)
+		}
+	}
+	return filtered
+}
+
+// parseAddressesFromConfig parses addresses from Viper configuration
+func parseAddressesFromConfig(v *viper.Viper) []string {
+	// Try GetStringSlice first (for YAML configs with array syntax)
+	addresses := v.GetStringSlice("elasticsearch.addresses")
+	// Filter out empty strings
+	var filtered []string
+	for _, addr := range addresses {
+		if addr != "" {
+			filtered = append(filtered, addr)
+		}
+	}
+	addresses = filtered
+
+	// If GetStringSlice returned empty, fall back to GetString and parse as comma-separated
+	if len(addresses) == 0 {
+		addrStr := v.GetString("elasticsearch.addresses")
+		if addrStr != "" {
+			addresses = parseAddressesFromString(addrStr)
+		} else {
+			// Fallback to single string value
+			if addr := v.GetString("elasticsearch.address"); addr != "" {
+				addresses = []string{addr}
+			}
+		}
+	}
+	return addresses
+}
+
 // LoadFromViper loads Elasticsearch configuration from Viper
 func LoadFromViper(v *viper.Viper) *Config {
+	var addresses []string
+
+	// First, check environment variables directly to ensure they take precedence over defaults
+	// Environment variables are always comma-separated strings
+	var addrStr string
+	if envAddr := os.Getenv("ELASTICSEARCH_HOSTS"); envAddr != "" {
+		addrStr = envAddr
+	} else if envAddr2 := os.Getenv("ELASTICSEARCH_ADDRESSES"); envAddr2 != "" {
+		addrStr = envAddr2
+	}
+
+	// If we have an environment variable, parse it as a comma-separated string
+	if addrStr != "" {
+		addresses = parseAddressesFromString(addrStr)
+	} else {
+		addresses = parseAddressesFromConfig(v)
+	}
+
+	// If addresses is still empty, use default
+	if len(addresses) == 0 {
+		addresses = []string{DefaultAddresses}
+	}
+
+	// Get index name - support both index_name and index_prefix for backward compatibility
+	indexName := v.GetString("elasticsearch.index_name")
+	if indexName == "" {
+		indexName = v.GetString("elasticsearch.index_prefix")
+	}
+	if indexName == "" {
+		indexName = DefaultIndexName
+	}
+
 	cfg := &Config{
-		Addresses: v.GetStringSlice("elasticsearch.addresses"),
+		Addresses: addresses,
+		IndexName: indexName,
 		Username:  v.GetString("elasticsearch.username"),
 		Password:  v.GetString("elasticsearch.password"),
 		APIKey:    v.GetString("elasticsearch.api_key"),
