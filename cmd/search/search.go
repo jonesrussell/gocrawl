@@ -102,10 +102,10 @@ func Command() *cobra.Command {
 
 // runSearch executes the search command with the provided parameters.
 func runSearch(cmd *cobra.Command, _ []string) error {
-	// Get dependencies - NEW WAY using factory
+	// Get dependencies
 	deps, err := common.NewCommandDeps()
 	if err != nil {
-		return fmt.Errorf("failed to get dependencies: %w", err)
+		return fmt.Errorf("failed to initialize dependencies: %w", err)
 	}
 
 	// Convert size string to int
@@ -120,16 +120,7 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	queryStr := cmd.Flag("query").Value.String()
 
 	// Create storage using common function
-	storageClient, err := common.CreateStorageClient(deps.Config, deps.Logger)
-	if err != nil {
-		return fmt.Errorf("failed to create storage client: %w", err)
-	}
-
-	storageResult, err := storage.NewStorage(storage.StorageParams{
-		Config: deps.Config,
-		Logger: deps.Logger,
-		Client: storageClient,
-	})
+	storageResult, err := common.CreateStorage(deps.Config, deps.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
 	}

@@ -10,7 +10,6 @@ import (
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 )
@@ -106,23 +105,14 @@ func (c *Creator) Start(ctx context.Context) error {
 func runCreateCmd(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	// Get dependencies - NEW WAY
+	// Get dependencies
 	deps, err := cmdcommon.NewCommandDeps()
 	if err != nil {
-		return fmt.Errorf("failed to get dependencies: %w", err)
+		return fmt.Errorf("failed to initialize dependencies: %w", err)
 	}
 
 	// Create storage using common function
-	storageClient, err := cmdcommon.CreateStorageClient(deps.Config, deps.Logger)
-	if err != nil {
-		return fmt.Errorf("failed to create storage client: %w", err)
-	}
-
-	storageResult, err := storage.NewStorage(storage.StorageParams{
-		Config: deps.Config,
-		Logger: deps.Logger,
-		Client: storageClient,
-	})
+	storageResult, err := cmdcommon.CreateStorage(deps.Config, deps.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -32,10 +31,10 @@ The scheduler will run continuously until interrupted with Ctrl+C.`,
 
 // runScheduler executes the scheduler command
 func runScheduler(cmd *cobra.Command, _ []string) error {
-	// Get dependencies - NEW WAY
+	// Get dependencies
 	deps, err := cmdcommon.NewCommandDeps()
 	if err != nil {
-		return fmt.Errorf("failed to get dependencies: %w", err)
+		return fmt.Errorf("failed to initialize dependencies: %w", err)
 	}
 
 	// Create source manager
@@ -45,22 +44,21 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Create storage using common function
-	storageClient, err := cmdcommon.CreateStorageClient(deps.Config, deps.Logger)
-	if err != nil {
-		return fmt.Errorf("failed to create storage client: %w", err)
-	}
-
-	storageResult, err := storage.NewStorage(storage.StorageParams{
-		Config: deps.Config,
-		Logger: deps.Logger,
-		Client: storageClient,
-	})
+	storageResult, err := cmdcommon.CreateStorage(deps.Config, deps.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
 	}
 
-	// Create crawler (simplified - scheduler needs crawler for jobs)
-	crawlerInstance, err := createCrawlerForScheduler(deps.Config, deps.Logger, sourceManager, storageResult)
+	// Create article and page services
+	// Use default index names for scheduler (it will use source-specific indices when crawling)
+	articleService := articlespkg.NewContentService(
+		deps.Logger, storageResult.Storage, cmdcommon.DefaultArticleIndex)
+	pageService := pagepkg.NewContentService(
+		deps.Logger, storageResult.Storage, cmdcommon.DefaultPageIndex)
+
+	// Create crawler
+	crawlerInstance, err := createCrawlerInstance(
+		deps.Logger, deps.Config, sourceManager, storageResult, articleService, pageService)
 	if err != nil {
 		return fmt.Errorf("failed to create crawler: %w", err)
 	}
@@ -108,13 +106,15 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// createCrawlerForScheduler creates a crawler instance for the scheduler.
-// The scheduler uses a single crawler instance and calls Start with different source URLs.
-func createCrawlerForScheduler(
-	cfg config.Interface,
+// createCrawlerInstance creates a crawler instance with the given services.
+// This is a helper function to consolidate crawler creation logic.
+func createCrawlerInstance(
 	log logger.Interface,
+	cfg config.Interface,
 	sourceManager sources.Interface,
-	storageResult storage.StorageResult,
+	storageResult *cmdcommon.StorageResult,
+	articleService articlespkg.Interface,
+	pageService pagepkg.Interface,
 ) (crawler.Interface, error) {
 	// Create event bus
 	bus := events.NewEventBus(log)
@@ -125,15 +125,7 @@ func createCrawlerForScheduler(
 		return nil, errors.New("crawler configuration is required")
 	}
 
-	// Use default index names for scheduler (it will use source-specific indices when crawling)
-	articleIndexName := cmdcommon.DefaultArticleIndex
-	pageIndexName := cmdcommon.DefaultPageIndex
-
-	// Construct article and page services
-	articleService := articlespkg.NewContentService(log, storageResult.Storage, articleIndexName)
-	pageService := pagepkg.NewContentService(log, storageResult.Storage, pageIndexName)
-
-	// Use the crawler's ProvideCrawler to construct the crawler
+	// Create crawler using ProvideCrawler
 	crawlerResult, err := crawler.ProvideCrawler(struct {
 		fx.In
 		Logger         logger.Interface
