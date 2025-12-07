@@ -11,9 +11,12 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/spf13/cobra"
 )
 
 // TableRenderer handles the display of index data in a table format
@@ -179,4 +182,35 @@ func getIngestionStatus(health string) string {
 	default:
 		return "Unknown"
 	}
+}
+
+// runListCmd executes the list command
+func runListCmd(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+
+	// Get dependencies - NEW WAY
+	deps, err := cmdcommon.NewCommandDeps()
+	if err != nil {
+		return fmt.Errorf("failed to get dependencies: %w", err)
+	}
+
+	// Create storage using common function
+	storageClient, err := cmdcommon.CreateStorageClient(deps.Config, deps.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to create storage client: %w", err)
+	}
+
+	storageResult, err := storage.NewStorage(storage.StorageParams{
+		Config: deps.Config,
+		Logger: deps.Logger,
+		Client: storageClient,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	renderer := NewTableRenderer(deps.Logger)
+	lister := NewLister(deps.Config, deps.Logger, storageResult.Storage, renderer)
+
+	return lister.Start(ctx)
 }

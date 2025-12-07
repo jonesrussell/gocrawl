@@ -15,8 +15,10 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	"github.com/jonesrussell/gocrawl/internal/storage"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/mattn/go-isatty"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -229,4 +231,48 @@ func (d *Deleter) reportMissingIndices(missingIndices []string) {
 			fmt.Fprintf(os.Stdout, "  - %s\n", index)
 		}
 	}
+}
+
+// runDeleteCmd executes the delete command
+func runDeleteCmd(cmd *cobra.Command, args []string) error {
+	// Validate that either --source is provided or at least one index name is provided
+	if sourceName == "" && len(args) == 0 {
+		return errors.New("either --source flag or at least one index name must be provided")
+	}
+
+	ctx := cmd.Context()
+
+	// Get dependencies - NEW WAY
+	deps, err := cmdcommon.NewCommandDeps()
+	if err != nil {
+		return fmt.Errorf("failed to get dependencies: %w", err)
+	}
+
+	// Create storage using common function
+	storageClient, err := cmdcommon.CreateStorageClient(deps.Config, deps.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to create storage client: %w", err)
+	}
+
+	storageResult, err := storage.NewStorage(storage.StorageParams{
+		Config: deps.Config,
+		Logger: deps.Logger,
+		Client: storageClient,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	sourcesManager, err := sources.LoadSources(deps.Config, deps.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to load sources: %w", err)
+	}
+
+	deleter := NewDeleter(deps.Config, deps.Logger, storageResult.Storage, sourcesManager, DeleteParams{
+		Force:      forceDelete,
+		SourceName: sourceName,
+		Indices:    args,
+	})
+
+	return deleter.Start(ctx)
 }

@@ -79,7 +79,7 @@ func init() {
 
 	// Add subcommands
 	rootCmd.AddCommand(crawl.Command())
-	rootCmd.AddCommand(index.Command)
+	rootCmd.AddCommand(index.Command())
 	rootCmd.AddCommand(cmdsources.NewSourcesCommand())
 	rootCmd.AddCommand(search.Command())
 	rootCmd.AddCommand(httpd.Command())
