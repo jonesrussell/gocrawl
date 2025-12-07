@@ -42,6 +42,19 @@
 - Avoid unnecessary external dependencies
 - Use `go mod tidy` to clean up dependencies
 
+## Code Maintenance
+- Regularly remove unused code (functions, types, variables)
+- Use static analysis tools to identify dead code
+- Remove helper functions that are only used by unused code
+- Update comments when removing referenced code
+
+## Refactoring and Code Quality
+- Extract helper functions to eliminate code duplication
+- Keep functions under 100 lines when possible
+- Break down complex functions into smaller, focused functions
+- Use helper functions to reduce duplication in type conversions
+- Refactor when linters detect duplication or excessive function length
+
 ## Context Usage
 - Use `CommandContext` for type-safe dependency passing (see command-architecture.mdc)
 - DO NOT use `context.Value()` with individual keys - use `CommandContext` instead
