@@ -8,6 +8,7 @@ import (
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/constants"
 	articlespkg "github.com/jonesrussell/gocrawl/internal/content/articles"
 	pagepkg "github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -49,9 +50,9 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	// Create article and page services
 	// Use default index names for scheduler (it will use source-specific indices when crawling)
 	articleService := articlespkg.NewContentService(
-		deps.Logger, storageResult.Storage, cmdcommon.DefaultArticleIndex)
+		deps.Logger, storageResult.Storage, constants.DefaultArticleIndex)
 	pageService := pagepkg.NewContentService(
-		deps.Logger, storageResult.Storage, cmdcommon.DefaultPageIndex)
+		deps.Logger, storageResult.Storage, constants.DefaultPageIndex)
 
 	// Create crawler
 	crawlerInstance, err := createCrawlerInstance(
@@ -61,7 +62,7 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Create processor factory
-	processorFactory := crawler.NewProcessorFactory(deps.Logger, storageResult.Storage, cmdcommon.DefaultContentIndex)
+	processorFactory := crawler.NewProcessorFactory(deps.Logger, storageResult.Storage, constants.DefaultContentIndex)
 
 	// Create done channel
 	done := make(chan struct{})
@@ -96,7 +97,7 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Graceful shutdown with timeout
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), cmdcommon.DefaultShutdownTimeout)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), constants.DefaultShutdownTimeout)
 	defer cancel()
 
 	// Stop the scheduler service

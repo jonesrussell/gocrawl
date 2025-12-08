@@ -9,6 +9,7 @@ import (
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/api"
+	"github.com/jonesrussell/gocrawl/internal/constants"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/spf13/cobra"
 )
@@ -58,7 +59,7 @@ You can send POST requests to /search with a JSON body containing the search par
 		case <-cmd.Context().Done():
 			// Graceful shutdown with timeout
 			deps.Logger.Info("Shutdown signal received")
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), cmdcommon.DefaultShutdownTimeout)
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), constants.DefaultShutdownTimeout)
 			defer cancel()
 
 			deps.Logger.Info("Stopping HTTP server")

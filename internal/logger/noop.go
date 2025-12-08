@@ -2,8 +2,6 @@ package logger
 
 import (
 	"time"
-
-	"go.uber.org/fx/fxevent"
 )
 
 // NoOpLogger is a logger that does nothing.
@@ -82,9 +80,4 @@ func (l *NoOpLogger) WithVersion(version string) Interface {
 // WithEnvironment adds an environment to the logger.
 func (l *NoOpLogger) WithEnvironment(env string) Interface {
 	return l
-}
-
-// NewFxLogger implements Interface
-func (l *NoOpLogger) NewFxLogger() fxevent.Logger {
-	return &fxevent.NopLogger
 }

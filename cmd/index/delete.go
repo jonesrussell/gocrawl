@@ -13,6 +13,7 @@ import (
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/constants"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -127,7 +128,7 @@ func (d *Deleter) deleteIndices(ctx context.Context) error {
 			return fmt.Errorf("source %s has no index configured", d.sourceName)
 		}
 		// Add both content and article index if they exist
-		d.index = make([]string, 0, cmdcommon.DefaultIndicesCapacity)
+		d.index = make([]string, 0, constants.DefaultIndicesCapacity)
 		if source.Index != "" {
 			d.index = append(d.index, source.Index)
 		}

@@ -9,6 +9,7 @@ import (
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
+	"github.com/jonesrussell/gocrawl/internal/constants"
 	articlespkg "github.com/jonesrussell/gocrawl/internal/content/articles"
 	pagepkg "github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
@@ -88,7 +89,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	case <-ctx.Done():
 		// Interrupt signal received - graceful shutdown
 		c.logger.Info("Shutdown signal received")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), cmdcommon.DefaultShutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), constants.DefaultShutdownTimeout)
 		defer cancel()
 
 		// Stop the job service
@@ -138,8 +139,8 @@ The --max-depth flag can be used to override the max_depth setting from the sour
 
 // getIndexNamesForSource returns the index names for a given source
 func getIndexNamesForSource(sourceManager sourcespkg.Interface, sourceName string) (articleIndex, pageIndex string) {
-	articleIndex = cmdcommon.DefaultArticleIndex
-	pageIndex = cmdcommon.DefaultPageIndex
+	articleIndex = constants.DefaultArticleIndex
+	pageIndex = constants.DefaultPageIndex
 
 	if source := sourceManager.FindByName(sourceName); source != nil {
 		if source.ArticleIndex != "" {
@@ -234,7 +235,7 @@ func constructCrawlerDependencies(
 
 	// Create supporting services
 	done := make(chan struct{})
-	processorFactory := crawler.NewProcessorFactory(log, storageResult.Storage, cmdcommon.DefaultContentIndex)
+	processorFactory := crawler.NewProcessorFactory(log, storageResult.Storage, constants.DefaultContentIndex)
 
 	jobService := NewJobService(JobServiceParams{
 		Logger:           log,
