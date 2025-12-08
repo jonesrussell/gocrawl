@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/fx/fxevent"
 )
 
 // MockLogger is a mock implementation of logger.Interface
@@ -108,15 +107,6 @@ func (m *MockLogger) WithEnvironment(env string) logger.Interface {
 // NewMockLogger creates a new mock logger instance
 func NewMockLogger() *MockLogger {
 	return &MockLogger{}
-}
-
-// NewFxLogger implements logger.Interface
-func (m *MockLogger) NewFxLogger() fxevent.Logger {
-	args := m.Called()
-	if result, ok := args.Get(0).(fxevent.Logger); ok {
-		return result
-	}
-	return &fxevent.NopLogger
 }
 
 // MockEventHandler is a mock implementation of EventHandler

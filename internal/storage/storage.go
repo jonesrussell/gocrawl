@@ -38,7 +38,6 @@ type StorageResult struct {
 }
 
 // NewStorage creates a new storage instance with the given parameters.
-// This replaces the FX-based ProvideStorage function.
 func NewStorage(p StorageParams) (StorageResult, error) {
 	// Create storage with default options
 	opts := DefaultOptions()

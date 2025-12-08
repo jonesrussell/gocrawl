@@ -252,7 +252,7 @@ func (c *Crawler) setupCollector(source *configtypes.Source) error {
 	}
 
 	c.logger.Debug("Collector configured",
-		"max_depth", source.MaxDepth,
+		"max_depth", maxDepth,
 		"allowed_domains", source.AllowedDomains,
 		"rate_limit", rateLimit,
 		"parallelism", constants.DefaultParallelism)
@@ -651,13 +651,15 @@ func (c *Crawler) SetMaxDepth(depth int) {
 		return
 	}
 
+	// Always store the override so it's used when setupCollector creates a new collector
+	// Bounds check to prevent integer overflow
+	maxDepth := config.MaxDepth
+	if maxDepth >= math.MinInt32 && maxDepth <= math.MaxInt32 {
+		atomic.StoreInt32(&c.maxDepthOverride, int32(maxDepth))
+	}
+
 	if c.collector == nil {
-		// Collector not created yet, store as override to use when collector is created
-		// Bounds check to prevent integer overflow
-		maxDepth := config.MaxDepth
-		if maxDepth >= math.MinInt32 && maxDepth <= math.MaxInt32 {
-			atomic.StoreInt32(&c.maxDepthOverride, int32(maxDepth))
-		}
+		// Collector not created yet, override will be used when collector is created
 		c.logger.Debug("Set max_depth override (collector not yet created)", "max_depth", config.MaxDepth)
 	} else {
 		// Collector exists, update it directly

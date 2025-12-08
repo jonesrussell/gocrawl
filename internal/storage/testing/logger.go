@@ -1,10 +1,10 @@
+// Package testing provides a no-op implementation of the logger interface for testing purposes.
 package testing
 
 import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"go.uber.org/fx/fxevent"
 )
 
 // NopLogger is a no-op implementation of logger.Interface
@@ -89,9 +89,4 @@ func (l *NopLogger) WithVersion(version string) logger.Interface {
 // WithEnvironment adds an environment to the logger.
 func (l *NopLogger) WithEnvironment(env string) logger.Interface {
 	return l
-}
-
-// NewFxLogger implements logger.Interface
-func (l *NopLogger) NewFxLogger() fxevent.Logger {
-	return &fxevent.NopLogger
 }
