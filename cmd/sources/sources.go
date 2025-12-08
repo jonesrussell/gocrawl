@@ -48,6 +48,8 @@ func NewSourcesCommand() *cobra.Command {
 	// Add subcommands
 	cmd.AddCommand(
 		NewListCommand(),
+		NewGenerateCommand(),
+		NewValidateCommand(),
 	)
 
 	return cmd

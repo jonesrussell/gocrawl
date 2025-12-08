@@ -13,7 +13,6 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
-	cmdgenerate "github.com/jonesrussell/gocrawl/cmd/generate"
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/index"
 	cmdscheduler "github.com/jonesrussell/gocrawl/cmd/scheduler"
@@ -85,7 +84,6 @@ func init() {
 	rootCmd.AddCommand(search.Command())
 	rootCmd.AddCommand(httpd.Command())
 	rootCmd.AddCommand(cmdscheduler.Command())
-	rootCmd.AddCommand(cmdgenerate.GenerateCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.
