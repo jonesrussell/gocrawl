@@ -59,29 +59,34 @@ func NewSchedulerService(
 func (s *SchedulerService) Start(ctx context.Context) error {
 	s.logger.Info("Starting scheduler service")
 
-	// Check every minute
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
+	// Start the scheduler loop in a goroutine so it doesn't block
+	go func() {
+		// Check every minute
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
 
-	// Do initial check
-	if err := s.checkAndRunJobs(ctx, time.Now()); err != nil {
-		return fmt.Errorf("failed to run initial jobs: %w", err)
-	}
+		// Do initial check
+		if err := s.checkAndRunJobs(ctx, time.Now()); err != nil {
+			s.logger.Error("Failed to run initial jobs", "error", err)
+		}
 
-	for {
-		select {
-		case <-ctx.Done():
-			s.logger.Info("Context cancelled, stopping scheduler service")
-			return nil
-		case <-s.done:
-			s.logger.Info("Done signal received, stopping scheduler service")
-			return nil
-		case t := <-ticker.C:
-			if err := s.checkAndRunJobs(ctx, t); err != nil {
-				s.logger.Error("Failed to run jobs", "error", err)
+		for {
+			select {
+			case <-ctx.Done():
+				s.logger.Info("Context cancelled, stopping scheduler service")
+				return
+			case <-s.done:
+				s.logger.Info("Done signal received, stopping scheduler service")
+				return
+			case t := <-ticker.C:
+				if err := s.checkAndRunJobs(ctx, t); err != nil {
+					s.logger.Error("Failed to run jobs", "error", err)
+				}
 			}
 		}
-	}
+	}()
+
+	return nil
 }
 
 // Stop stops the scheduler service.

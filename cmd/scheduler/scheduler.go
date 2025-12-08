@@ -84,12 +84,18 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to start scheduler service: %w", startSchedulerErr)
 	}
 
-	// Wait for interrupt signal
+	// Wait for interrupt signal or scheduler completion
 	deps.Logger.Info("Waiting for interrupt signal")
-	<-cmd.Context().Done()
+	select {
+	case <-done:
+		// Scheduler completed (unlikely for continuous scheduler, but handle it)
+		deps.Logger.Info("Scheduler completed")
+	case <-cmd.Context().Done():
+		// Interrupt signal received - graceful shutdown
+		deps.Logger.Info("Shutdown signal received")
+	}
 
 	// Graceful shutdown with timeout
-	deps.Logger.Info("Shutdown signal received")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cmdcommon.DefaultShutdownTimeout)
 	defer cancel()
 
