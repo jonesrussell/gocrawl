@@ -109,7 +109,7 @@ func ValidateSelectors(
 				continue
 			}
 
-			value, found := extractValueFromDocument(doc, selector, fieldName)
+			value, found := extractValueFromDocument(doc, selector)
 			fieldResult := result.FieldResults[fieldName]
 
 			if found && value != "" {
@@ -146,7 +146,7 @@ func ValidateSelectors(
 }
 
 // extractValueFromDocument extracts a value from a goquery document using a selector.
-func extractValueFromDocument(doc *goquery.Document, selector, fieldName string) (string, bool) {
+func extractValueFromDocument(doc *goquery.Document, selector string) (string, bool) {
 	if selector == "" {
 		return "", false
 	}

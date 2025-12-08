@@ -240,4 +240,3 @@ func TestDiscoverAll_CompleteResult(t *testing.T) {
 	assert.Greater(t, result.PublishedTime.Confidence, 0.0)
 	assert.Greater(t, result.Image.Confidence, 0.0)
 }
-

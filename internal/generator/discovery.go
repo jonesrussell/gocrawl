@@ -643,4 +643,3 @@ func truncateText(text string, maxLen int) string {
 	}
 	return text[:maxLen] + "..."
 }
-

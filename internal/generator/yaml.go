@@ -9,7 +9,7 @@ import (
 )
 
 // GenerateSourceYAML generates a YAML configuration entry for a source
-// that can be appended to sources.yaml.
+// that can be appended to sources.yml.
 func GenerateSourceYAML(
 	sourceURL string,
 	result DiscoveryResult,
@@ -250,4 +250,3 @@ func escapeYAMLString(s string) string {
 	s = strings.ReplaceAll(s, "\"", "\\\"")
 	return s
 }
-

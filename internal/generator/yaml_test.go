@@ -62,7 +62,7 @@ func TestGenerateYAML_CanAppendToSourcesYAML(t *testing.T) {
 	yamlContent, err := GenerateSourceYAML("https://www.example.com", result)
 	require.NoError(t, err)
 
-	// Create a mock sources.yaml structure
+	// Create a mock sources.yml structure
 	mockSourcesYAML := `sources:
   - name: "Existing Source"
     url: "https://existing.com"
@@ -210,4 +210,3 @@ func TestGenerateYAML_AllFields(t *testing.T) {
 	assert.Contains(t, yamlContent, "category:")
 	assert.Contains(t, yamlContent, "exclude:")
 }
-

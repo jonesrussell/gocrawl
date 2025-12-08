@@ -34,4 +34,3 @@ type DiscoveryResult struct {
 	// Exclusions is a list of CSS selectors for elements to exclude
 	Exclusions []string
 }
-
