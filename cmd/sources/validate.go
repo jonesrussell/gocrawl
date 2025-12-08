@@ -2,17 +2,31 @@
 package sources
 
 import (
-	cmdvalidate "github.com/jonesrussell/gocrawl/cmd/validate"
+	"fmt"
+	"net/url"
+	"os"
+	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/jonesrussell/gocrawl/cmd/common"
+	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/generator"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
+)
+
+var (
+	validateSourceName string
+	validateSamples    int
+	validateURLs       []string
 )
 
 // NewValidateCommand creates a new validate subcommand for sources.
 func NewValidateCommand() *cobra.Command {
-	cmd := cmdvalidate.ValidateCmd
-	// Update the command name and usage
-	cmd.Use = "validate"
-	cmd.Short = "Validate CSS selectors against real articles"
-	cmd.Long = `Tests CSS selectors from a source configuration against real article URLs
+	cmd := &cobra.Command{
+		Use:   "validate",
+		Short: "Validate CSS selectors against real articles",
+		Long: `Tests CSS selectors from a source configuration against real article URLs
 to verify they work correctly.
 
 Example:
@@ -20,6 +34,211 @@ Example:
   gocrawl sources validate --source "Mid-North Monitor" --samples 5
 
   # Validate selectors against specific URLs
-  gocrawl sources validate --source "Mid-North Monitor" --urls "https://example.com/article1" "https://example.com/article2"`
+  gocrawl sources validate --source "Mid-North Monitor" --urls "https://example.com/article1" "https://example.com/article2"`,
+		RunE: runValidate,
+	}
+
+	cmd.Flags().StringVarP(&validateSourceName, "source", "s", "", "Source name to validate (required)")
+	cmd.Flags().IntVarP(&validateSamples, "samples", "n", 5, "Number of sample articles to test (default: 5)")
+	cmd.Flags().StringSliceVarP(&validateURLs, "urls", "u", []string{}, "Specific article URLs to test (overrides samples)")
+	cmd.MarkFlagRequired("source")
+
 	return cmd
+}
+
+func runValidate(cmd *cobra.Command, args []string) error {
+	// Get dependencies
+	deps, err := common.NewCommandDeps()
+	if err != nil {
+		return fmt.Errorf("failed to get dependencies: %w", err)
+	}
+
+	// Load sources
+	sourceManager, err := sources.LoadSources(deps.Config, deps.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to load sources: %w", err)
+	}
+
+	// Find source by name
+	sourceConfig := sourceManager.FindByName(validateSourceName)
+	if sourceConfig == nil {
+		return fmt.Errorf("source not found: %s", validateSourceName)
+	}
+
+	// Convert to configtypes.Source for selectors
+	allSources, err := sourceManager.GetSources()
+	if err != nil {
+		return fmt.Errorf("failed to get sources: %w", err)
+	}
+
+	var articleSelectors configtypes.ArticleSelectors
+	for _, src := range allSources {
+		if src.Name == validateSourceName {
+			// Convert selectors
+			articleSelectors = configtypes.ArticleSelectors{
+				Container:     src.Selectors.Article.Container,
+				Title:         src.Selectors.Article.Title,
+				Body:          src.Selectors.Article.Body,
+				Intro:         src.Selectors.Article.Intro,
+				Link:          src.Selectors.Article.Link,
+				Image:         src.Selectors.Article.Image,
+				Author:        src.Selectors.Article.Author,
+				Byline:        src.Selectors.Article.Byline,
+				PublishedTime: src.Selectors.Article.PublishedTime,
+				TimeAgo:       src.Selectors.Article.TimeAgo,
+				Section:       src.Selectors.Article.Section,
+				Category:      src.Selectors.Article.Category,
+				ArticleID:     src.Selectors.Article.ArticleID,
+				Exclude:       src.Selectors.Article.Exclude,
+			}
+			break
+		}
+	}
+
+	// Get article URLs
+	articleURLs := validateURLs
+	if len(articleURLs) == 0 {
+		// Try to discover article URLs from the source URL
+		discoveredURLs, err := discoverArticleURLs(sourceConfig.URL, articleSelectors, validateSamples)
+		if err != nil {
+			return fmt.Errorf("failed to discover article URLs: %w\n   Please provide URLs with --urls flag", err)
+		}
+		if len(discoveredURLs) == 0 {
+			return fmt.Errorf("no article URLs found on source page\n   Please provide URLs with --urls flag")
+		}
+		articleURLs = discoveredURLs
+		fmt.Fprintf(os.Stderr, "📋 Discovered %d article URL(s) from source page\n", len(articleURLs))
+	}
+
+	// Validate selectors
+	fmt.Fprintf(os.Stderr, "🧪 Testing selectors for \"%s\"...\n", validateSourceName)
+	fmt.Fprintf(os.Stderr, "📄 Testing %d article(s)...\n\n", len(articleURLs))
+
+	result, err := generator.ValidateSelectors(articleSelectors, articleURLs, validateSamples)
+	if err != nil {
+		return fmt.Errorf("failed to validate selectors: %w", err)
+	}
+
+	// Print results
+	printValidationResults(os.Stderr, result)
+
+	return nil
+}
+
+// printValidationResults prints validation results in a user-friendly format.
+func printValidationResults(w *os.File, result *generator.ValidationResult) {
+	fmt.Fprintf(w, "📊 Validation Results:\n\n")
+	fmt.Fprintf(w, "Total articles tested: %d\n", result.TotalArticles)
+	fmt.Fprintf(w, "Articles with all critical fields: %d (%.0f%%)\n\n",
+		result.SuccessfulArticles,
+		float64(result.SuccessfulArticles)/float64(result.TotalArticles)*100)
+
+	// Print field results
+	fieldOrder := []string{"title", "body", "author", "byline", "published_time", "image", "link", "category", "section"}
+
+	for _, fieldName := range fieldOrder {
+		fieldResult, exists := result.FieldResults[fieldName]
+		if !exists {
+			continue
+		}
+
+		// Skip if selector is empty
+		if fieldResult.TotalCount == 0 {
+			continue
+		}
+
+		// Determine status emoji
+		var status string
+		if fieldResult.SuccessRate >= 90 {
+			status = "✅"
+		} else if fieldResult.SuccessRate >= 70 {
+			status = "⚠️"
+		} else {
+			status = "❌"
+		}
+
+		fmt.Fprintf(w, "%s %s: %.0f%% (%d/%d)\n",
+			status,
+			fieldName,
+			fieldResult.SuccessRate,
+			fieldResult.SuccessCount,
+			fieldResult.TotalCount,
+		)
+
+		// Show sample values
+		if len(fieldResult.SampleValues) > 0 {
+			for i, sample := range fieldResult.SampleValues {
+				if i >= 2 { // Limit to 2 samples
+					break
+				}
+				sampleDisplay := sample
+				if len(sampleDisplay) > 60 {
+					sampleDisplay = sampleDisplay[:60] + "..."
+				}
+				fmt.Fprintf(w, "   Sample %d: \"%s\"\n", i+1, sampleDisplay)
+			}
+		}
+
+		// Show failed URLs if any
+		if len(fieldResult.FailedURLs) > 0 && len(fieldResult.FailedURLs) <= 3 {
+			fmt.Fprintf(w, "   Failed on: %s\n", strings.Join(fieldResult.FailedURLs, ", "))
+		} else if len(fieldResult.FailedURLs) > 3 {
+			fmt.Fprintf(w, "   Failed on %d URLs (showing first 3): %s\n",
+				len(fieldResult.FailedURLs),
+				strings.Join(fieldResult.FailedURLs[:3], ", "))
+		}
+
+		fmt.Fprintf(w, "\n")
+	}
+
+	// Summary
+	fmt.Fprintf(w, "---\n\n")
+	if result.SuccessfulArticles == result.TotalArticles {
+		fmt.Fprintf(w, "✅ All articles have all critical fields!\n")
+	} else {
+		fmt.Fprintf(w, "⚠️  Some articles are missing critical fields.\n")
+		fmt.Fprintf(w, "   Review failed URLs above and refine selectors if needed.\n")
+	}
+}
+
+// discoverArticleURLs discovers article URLs from a source page using link selectors.
+func discoverArticleURLs(sourceURL string, selectors configtypes.ArticleSelectors, maxSamples int) ([]string, error) {
+	doc, err := generator.FetchDocumentForValidation(sourceURL)
+	if err != nil {
+		return nil, err
+	}
+
+	var articleURLs []string
+
+	// Use link selector to find article URLs
+	if selectors.Link != "" {
+		linkSelectors := strings.Split(selectors.Link, ",")
+		for _, selector := range linkSelectors {
+			selector = strings.TrimSpace(selector)
+			if selector == "" {
+				continue
+			}
+			doc.Find(selector).Each(func(i int, s *goquery.Selection) {
+				if len(articleURLs) >= maxSamples {
+					return
+				}
+				href, exists := s.Attr("href")
+				if exists && href != "" {
+					// Make absolute URL
+					baseURL, err := url.Parse(sourceURL)
+					if err == nil {
+						hrefURL, err := baseURL.Parse(href)
+						if err == nil {
+							articleURLs = append(articleURLs, hrefURL.String())
+						}
+					}
+				}
+			})
+			if len(articleURLs) >= maxSamples {
+				break
+			}
+		}
+	}
+
+	return articleURLs, nil
 }
