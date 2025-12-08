@@ -2,10 +2,10 @@
 
 set -e  # Exit on error
 
-# Ensure mockgen is installed
+# Ensure mockgen is installed (use go.uber.org/mock/mockgen, not github.com/golang/mock/mockgen)
 if ! command -v mockgen &> /dev/null; then
     echo "Installing mockgen..."
-    go install github.com/golang/mock/mockgen@latest
+    go install go.uber.org/mock/mockgen@latest
     export PATH=$PATH:$(go env GOPATH)/bin
 fi
 
