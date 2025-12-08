@@ -113,8 +113,8 @@ func (s *JobService) UpdateItem(ctx context.Context, item *content.Item) error {
 }
 
 // UpdateJob implements the job.Service interface.
-func (s *JobService) UpdateJob(ctx context.Context, job *content.Job) error {
-	s.logger.Info("Updating job", "jobID", job.ID)
+func (s *JobService) UpdateJob(ctx context.Context, jobObj *content.Job) error {
+	s.logger.Info("Updating job", "jobID", jobObj.ID)
 	// TODO: Implement job update in storage
 	return nil
 }

@@ -8,16 +8,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/job"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// SchedulerService implements the common.JobService interface for the scheduler module.
+// SchedulerService implements the job.Service interface for the scheduler module.
 type SchedulerService struct {
 	logger           logger.Interface
 	sources          sources.Interface
@@ -39,7 +39,7 @@ func NewSchedulerService(
 	cfg config.Interface,
 	storage types.Interface,
 	processorFactory crawler.ProcessorFactory,
-) common.JobService {
+) job.Service {
 	return &SchedulerService{
 		logger:  log,
 		sources: sourcesManager,
@@ -123,8 +123,8 @@ func (s *SchedulerService) Status(ctx context.Context) (content.JobStatus, error
 }
 
 // UpdateJob updates a job in the scheduler service.
-func (s *SchedulerService) UpdateJob(ctx context.Context, job *content.Job) error {
-	s.logger.Info("Updating job", "jobID", job.ID)
+func (s *SchedulerService) UpdateJob(ctx context.Context, jobObj *content.Job) error {
+	s.logger.Info("Updating job", "jobID", jobObj.ID)
 	// TODO: Implement job update in storage
 	return nil
 }
