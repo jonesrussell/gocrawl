@@ -1,0 +1,127 @@
+# GoCrawl Release Workflow
+# This workflow builds and releases GoCrawl binaries when a version tag (v*) is pushed.
+# It uses GoReleaser to build cross-platform binaries and create GitHub releases.
+# After creating the release, it also creates a discussion in the Releases category.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  discussions: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install build dependencies
+        # Install cross-compilation dependencies for building binaries for multiple platforms
+        # gcc: C compiler for CGO dependencies
+        # libgl1-mesa-dev, xorg-dev: X11/OpenGL libraries (may be needed for some Go packages)
+        # mingw-w64: Windows cross-compilation support
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev mingw-w64
+
+      - name: Run GoReleaser
+        # GoReleaser builds cross-platform binaries and creates GitHub releases
+        # If .goreleaser.yml exists, it will be used; otherwise defaults are applied
+        # The binary name will be based on the module name (gocrawl)
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: 'v1.26.2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Discussion
+        # Creates a discussion in the "Releases" category with the release notes
+        # This step is optional and won't fail the workflow if it errors
+        # Requires the repository to have Discussions enabled and a "Releases" category
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+
+            try {
+              // First get the release by tag
+              const releases = await github.rest.repos.listReleases({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+
+              const release = releases.data.find(r => r.tag_name === tag);
+              if (!release) {
+                console.log('Release not found for tag:', tag);
+                return;
+              }
+
+              // Get discussion categories using the GraphQL API
+              const query = `
+                query($owner: String!, $repo: String!) {
+                  repository(owner: $owner, name: $repo) {
+                    discussionCategories(first: 10) {
+                      nodes {
+                        id
+                        name
+                      }
+                    }
+                  }
+                }
+              `;
+
+              const result = await github.graphql(query, {
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+
+              const categories = result.repository.discussionCategories.nodes;
+              const releasesCategory = categories.find(c => c.name === 'Releases');
+
+              if (!releasesCategory) {
+                console.log('Releases discussion category not found');
+                return;
+              }
+
+              // Create the discussion using GraphQL
+              const createDiscussion = `
+                mutation($input: CreateDiscussionInput!) {
+                  createDiscussion(input: $input) {
+                    discussion {
+                      id
+                      url
+                    }
+                  }
+                }
+              `;
+
+              const discussionResult = await github.graphql(createDiscussion, {
+                input: {
+                  repositoryId: result.repository.id,
+                  categoryId: releasesCategory.id,
+                  title: `Release ${tag}`,
+                  body: release.body || 'No release notes provided.'
+                }
+              });
+
+              console.log('Discussion created:', discussionResult.createDiscussion.discussion.url);
+            } catch (error) {
+              console.log('Error creating discussion:', error);
+              // Don't fail the workflow if discussion creation fails
+            }
