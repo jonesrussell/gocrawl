@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,6 +24,7 @@ type SchedulerService struct {
 	sources          sources.Interface
 	crawler          crawler.Interface
 	done             chan struct{}
+	doneOnce         sync.Once // Ensures done channel is only closed once
 	config           config.Interface
 	activeJobs       atomic.Int32 // Use atomic.Int32 directly
 	storage          types.Interface
@@ -85,7 +87,10 @@ func (s *SchedulerService) Start(ctx context.Context) error {
 // Stop stops the scheduler service.
 func (s *SchedulerService) Stop(ctx context.Context) error {
 	s.logger.Info("Stopping scheduler service")
-	close(s.done)
+	// Signal completion (safe to call multiple times)
+	s.doneOnce.Do(func() {
+		close(s.done)
+	})
 	return nil
 }
 
