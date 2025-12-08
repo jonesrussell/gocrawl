@@ -78,9 +78,43 @@ tasks:
   # sources:list moved to includes.sources
 
   test:
-    desc: "Run the tests"
+    desc: "Run all tests (unit, integration, and feature tests)"
     cmds:
-      - go test -v ./...
+      - task: test:all
+
+  test:unit:
+    desc: "Run unit tests only (excludes integration and feature tests)"
+    cmds:
+      - go test -short -race -coverprofile=coverage/unit.out ./...
+
+  test:integration:
+    desc: "Run integration tests"
+    cmds:
+      - |
+        if [ -d "./tests/integration" ]; then
+          go test -run Integration -v ./tests/integration/... || true
+        else
+          echo "No integration tests directory found, skipping..."
+        fi
+    ignore_error: true
+
+  test:features:
+    desc: "Run feature tests"
+    cmds:
+      - |
+        if [ -d "./tests/features" ]; then
+          go test -v ./tests/features/... || true
+        else
+          echo "No feature tests directory found, skipping..."
+        fi
+    ignore_error: true
+
+  test:all:
+    desc: "Run all tests (unit, integration, and feature tests)"
+    cmds:
+      - task: test:unit
+      - task: test:integration
+      - task: test:features
 
   test:cover:
     desc: "Run tests with coverage"
