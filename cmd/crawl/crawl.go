@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -27,6 +28,7 @@ type Crawler struct {
 	sourceManager sourcespkg.Interface
 	crawler       crawler.Interface
 	done          chan struct{} // Channel to signal crawler completion
+	doneOnce      sync.Once     // Ensures done channel is only closed once
 }
 
 // NewCrawler creates a new crawler instance
@@ -50,12 +52,9 @@ func NewCrawler(
 
 // cleanup ensures the done channel is always closed eventually
 func (c *Crawler) cleanup() {
-	select {
-	case <-c.done:
-		// Already closed
-	default:
+	c.doneOnce.Do(func() {
 		close(c.done)
-	}
+	})
 }
 
 // Start begins the crawl operation
