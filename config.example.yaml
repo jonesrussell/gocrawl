@@ -81,6 +81,6 @@ crawler:
   parallelism: 2       # Number of concurrent crawlers
   index_name: "gocrawl" # Index name for articles
   content_index_name: "gocrawl_content" # Index name for content
-  source_file: "config/sources.yaml"    # Path to sources configuration
+  source_file: "config/sources.yml"    # Path to sources configuration
   tls:
     insecure_skip_verify: false  # Set to true only in development for testing
