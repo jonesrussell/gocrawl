@@ -79,8 +79,58 @@
 
 ## Parameter Naming
 - Avoid shadowing imported package names with parameters
-- Use shortened names when needed (e.g., `stor` instead of `storage`)
+- Use shortened names when needed (e.g., `stor` instead of `storage`, `hostname` instead of `domain`)
 - Follow established naming conventions consistently
+- When importing `internal/domain`, avoid using variable name `domain` (use `hostname` for URL hostnames)
+
+## Interface Organization
+- **Interfaces MUST be defined in the same file as their implementation**
+- Do NOT create separate `interface.go` files - consolidate interfaces into implementation files
+- Use compile-time interface checks: `var _ InterfaceName = (*Implementation)(nil)`
+- Pattern:
+  ```go
+  // In implementation file (e.g., internal/sources/sources.go)
+  package sources
+  
+  // Interface defines the contract for source management
+  type Interface interface {
+      // ... methods ...
+  }
+  
+  // Sources implements Interface
+  type Sources struct {
+      // ... fields ...
+  }
+  
+  // Compile-time check
+  var _ Interface = (*Sources)(nil)
+  ```
+- Exceptions: `internal/storage/types/interface.go` is kept separate to avoid circular dependencies
+
+## Constants Organization
+- **All shared constants MUST be defined in `internal/constants/constants.go`**
+- Constants are organized by domain: HTTP/Server, Crawler, Storage, Logger, General
+- Old constant files (e.g., `internal/common/constants.go`, `internal/crawler/constants.go`) may re-export constants for backward compatibility, but new constants should go in `internal/constants/`
+- Use constants from `internal/constants` package instead of defining duplicates
+- Pattern:
+  ```go
+  import "github.com/jonesrussell/gocrawl/internal/constants"
+  
+  // Use constants
+  timeout := constants.DefaultRateLimit
+  ```
+
+## Domain Models
+- **Use `internal/domain` package for all domain models** (not `internal/models`)
+- Domain types: `domain.Article`, `domain.Page`, `domain.Content`, `domain.Job`
+- Import pattern: `import "github.com/jonesrussell/gocrawl/internal/domain"`
+- Type constants are prefixed with `Type` (e.g., `domain.TypeArticle`, `domain.TypePage`) to avoid conflicts with struct types
+
+## Package Structure
+- **Avoid catch-all packages** - each package should have a single, clear responsibility
+- `internal/common/` should only contain truly shared utilities, not domain-specific code
+- Source utilities are in `internal/sources/types/` (consolidated from `internal/sourceutils`)
+- Do not create circular dependencies - use type packages when needed (`internal/storage/types/`)
 
 description:
 globs:
