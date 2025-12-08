@@ -64,6 +64,7 @@ vendor/
 # =================================================================
 
 # Coverage Reports
+coverage/
 coverage.html
 coverage.out
 *.cover
