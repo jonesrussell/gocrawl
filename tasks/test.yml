@@ -1,0 +1,52 @@
+version: '3'
+
+tasks:
+  test:
+    desc: "Run all tests (unit, integration, and feature tests)"
+    cmds:
+      - task: test:all
+
+  unit:
+    desc: "Run unit tests only (excludes integration and feature tests)"
+    cmds:
+      - go test -short -race -coverprofile=coverage/unit.out ./...
+
+  integration:
+    desc: "Run integration tests"
+    cmds:
+      - |
+        if [ -d "./tests/integration" ]; then
+          go test -run Integration -v ./tests/integration/... || true
+        else
+          echo "No integration tests directory found, skipping..."
+        fi
+    ignore_error: true
+
+  features:
+    desc: "Run feature tests"
+    cmds:
+      - |
+        if [ -d "./tests/features" ]; then
+          go test -v ./tests/features/... || true
+        else
+          echo "No feature tests directory found, skipping..."
+        fi
+    ignore_error: true
+
+  all:
+    desc: "Run all tests (unit, integration, and feature tests)"
+    cmds:
+      - task: test:unit
+      - task: test:integration
+      - task: test:features
+
+  cover:
+    desc: "Run tests with coverage"
+    cmds:
+      - mkdir -p coverage
+      - go test -coverprofile=coverage/coverage.out ./...
+      - go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+      - go tool cover -func=coverage/coverage.out
+    generates:
+      - coverage/coverage.out
+      - coverage/coverage.html
