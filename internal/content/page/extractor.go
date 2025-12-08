@@ -185,7 +185,7 @@ func GetSelectorsForURL(sourceManager interface {
 	}
 
 	sourceConfig := sourceManager.FindSourceByURL(url)
-	if sourceConfig != nil && sourceConfig.Selectors.Page.Container != "" {
+	if sourceConfig != nil {
 		return sourceConfig.Selectors.Page
 	}
 
