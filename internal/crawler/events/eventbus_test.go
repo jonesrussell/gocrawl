@@ -3,6 +3,7 @@ package events_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -110,7 +111,9 @@ func NewMockLogger() *MockLogger {
 }
 
 // MockEventHandler is a mock implementation of EventHandler
+// Thread-safe for concurrent access.
 type MockEventHandler struct {
+	mu      sync.RWMutex
 	article *domain.Article
 	err     error
 	started bool
@@ -118,23 +121,59 @@ type MockEventHandler struct {
 }
 
 func (h *MockEventHandler) HandleArticle(ctx context.Context, article *domain.Article) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.article = article
 	return nil
 }
 
 func (h *MockEventHandler) HandleError(ctx context.Context, err error) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.err = err
 	return nil
 }
 
 func (h *MockEventHandler) HandleStart(ctx context.Context) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.started = true
 	return nil
 }
 
 func (h *MockEventHandler) HandleStop(ctx context.Context) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.stopped = true
 	return nil
+}
+
+// GetError returns the last error handled (thread-safe).
+func (h *MockEventHandler) GetError() error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.err
+}
+
+// GetArticle returns the last article handled (thread-safe).
+func (h *MockEventHandler) GetArticle() *domain.Article {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.article
+}
+
+// IsStarted returns whether the start event was handled (thread-safe).
+func (h *MockEventHandler) IsStarted() bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.started
+}
+
+// IsStopped returns whether the stop event was handled (thread-safe).
+func (h *MockEventHandler) IsStopped() bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.stopped
 }
 
 func TestEventBus(t *testing.T) {
@@ -155,9 +194,9 @@ func TestEventBus(t *testing.T) {
 		article := &domain.Article{Title: "Test Article"}
 		bus.PublishArticle(context.Background(), article)
 		require.Eventually(t, func() bool {
-			return handler.article != nil
+			return handler.GetArticle() != nil
 		}, time.Second, time.Millisecond*100)
-		assert.Equal(t, article, handler.article)
+		assert.Equal(t, article, handler.GetArticle())
 	})
 
 	t.Run("PublishError", func(t *testing.T) {
@@ -167,9 +206,9 @@ func TestEventBus(t *testing.T) {
 		err := errors.New("test error")
 		bus.PublishError(context.Background(), err)
 		require.Eventually(t, func() bool {
-			return handler.err != nil
+			return handler.GetError() != nil
 		}, time.Second, time.Millisecond*100)
-		assert.Equal(t, err, handler.err)
+		assert.Equal(t, err, handler.GetError())
 	})
 
 	t.Run("PublishStart", func(t *testing.T) {
@@ -178,7 +217,7 @@ func TestEventBus(t *testing.T) {
 		bus.Subscribe(handler)
 		bus.PublishStart(context.Background())
 		require.Eventually(t, func() bool {
-			return handler.started
+			return handler.IsStarted()
 		}, time.Second, time.Millisecond*100)
 	})
 
@@ -188,7 +227,96 @@ func TestEventBus(t *testing.T) {
 		bus.Subscribe(handler)
 		bus.PublishStop(context.Background())
 		require.Eventually(t, func() bool {
-			return handler.stopped
+			return handler.IsStopped()
 		}, time.Second, time.Millisecond*100)
 	})
+}
+
+// TestEventBus_ConcurrentSubscribe tests concurrent Subscribe calls
+func TestEventBus_ConcurrentSubscribe(t *testing.T) {
+	t.Parallel()
+
+	log := NewMockLogger()
+	bus := events.NewEventBus(log)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			bus.Subscribe(&MockEventHandler{})
+		}()
+	}
+
+	wg.Wait()
+	assert.Equal(t, 100, bus.HandlerCount())
+}
+
+// TestEventBus_ConcurrentPublish tests concurrent Publish calls
+func TestEventBus_ConcurrentPublish(t *testing.T) {
+	t.Parallel()
+
+	log := NewMockLogger()
+	bus := events.NewEventBus(log)
+	handler := &MockEventHandler{}
+	bus.Subscribe(handler)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			bus.PublishError(context.Background(), errors.New("test"))
+		}()
+	}
+
+	wg.Wait()
+	// Should not panic or race
+}
+
+// TestEventBus_ConcurrentSubscribeAndPublish tests Subscribe and Publish concurrently
+func TestEventBus_ConcurrentSubscribeAndPublish(t *testing.T) {
+	t.Parallel()
+
+	log := NewMockLogger()
+	bus := events.NewEventBus(log)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+
+	// Publishers
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					bus.PublishError(context.Background(), errors.New("test"))
+				}
+			}
+		}()
+	}
+
+	// Subscribers
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 10; j++ {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					bus.Subscribe(&MockEventHandler{})
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
 }
