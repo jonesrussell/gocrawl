@@ -13,6 +13,7 @@ output:
 includes:
   index: ./tasks/index.yml
   sources: ./tasks/sources.yml
+  test: ./tasks/test.yml
 
 tasks:
   default:
@@ -77,21 +78,7 @@ tasks:
 
   # sources:list moved to includes.sources
 
-  test:
-    desc: "Run the tests"
-    cmds:
-      - go test -v ./...
-
-  test:cover:
-    desc: "Run tests with coverage"
-    cmds:
-      - mkdir -p coverage
-      - go test -coverprofile=coverage/coverage.out ./...
-      - go tool cover -html=coverage/coverage.out -o coverage/coverage.html
-      - go tool cover -func=coverage/coverage.out
-    generates:
-      - coverage/coverage.out
-      - coverage/coverage.html
+  # test:* tasks moved to includes.test
 
   generate:
     desc: Generate code (mocks, etc.)

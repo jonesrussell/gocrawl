@@ -33,6 +33,7 @@
   - Import shadowing: rename variables to avoid shadowing imported package names
   - Unused nolint directives: remove if not needed (linter may resolve issues automatically)
   - Empty branches: add TODO comments or use `_ = variable` for placeholders
+  - Package comments: add package-level comments for all packages (ST1000)
 
 ## Deployment
 - Build for target platform

@@ -1,0 +1,43 @@
+version: '3'
+
+tasks:
+  test:
+    desc: "Run all tests (unit, integration, and feature tests)"
+    cmds:
+      - task: all
+
+  unit:
+    desc: "Run unit tests only (excludes integration and feature tests)"
+    cmds:
+      - mkdir -p coverage
+      - go test -short -race -coverprofile=coverage/unit.out ./...
+
+  integration:
+    desc: "Run integration tests"
+    cmds:
+      - go test -run Integration -v ./tests/integration/...
+    ignore_error: true
+
+  features:
+    desc: "Run feature tests"
+    cmds:
+      - go test -v ./tests/features/...
+    ignore_error: true
+
+  all:
+    desc: "Run all tests (unit, integration, and feature tests)"
+    cmds:
+      - task: unit
+      - task: integration
+      - task: features
+
+  cover:
+    desc: "Run tests with coverage"
+    cmds:
+      - mkdir -p coverage
+      - go test -coverprofile=coverage/coverage.out ./...
+      - go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+      - go tool cover -func=coverage/coverage.out
+    generates:
+      - coverage/coverage.out
+      - coverage/coverage.html

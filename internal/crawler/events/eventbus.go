@@ -31,15 +31,20 @@ func (b *EventBus) Subscribe(handler EventHandler) {
 }
 
 // PublishArticle publishes an article event to all handlers.
+// Thread-safe: uses read lock and copies handlers slice.
 func (b *EventBus) PublishArticle(ctx context.Context, article *domain.Article) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
+	// Get a snapshot of handlers under read lock
 	b.mu.RLock()
-	defer b.mu.RUnlock()
+	handlers := make([]EventHandler, len(b.handlers))
+	copy(handlers, b.handlers)
+	b.mu.RUnlock()
 
-	for _, handler := range b.handlers {
+	// Dispatch to handlers without holding lock
+	for _, handler := range handlers {
 		if err := handler.HandleArticle(ctx, article); err != nil {
 			b.logger.Error("failed to handle article event",
 				"error", err,
@@ -52,6 +57,7 @@ func (b *EventBus) PublishArticle(ctx context.Context, article *domain.Article) 
 }
 
 // PublishError publishes an error event to all handlers.
+// Thread-safe: uses read lock and copies handlers slice.
 func (b *EventBus) PublishError(ctx context.Context, err error) {
 	if err == nil {
 		return
@@ -61,7 +67,14 @@ func (b *EventBus) PublishError(ctx context.Context, err error) {
 		return
 	}
 
-	for _, handler := range b.handlers {
+	// Get a snapshot of handlers under read lock
+	b.mu.RLock()
+	handlers := make([]EventHandler, len(b.handlers))
+	copy(handlers, b.handlers)
+	b.mu.RUnlock()
+
+	// Dispatch to handlers without holding lock
+	for _, handler := range handlers {
 		handlerErr := handler.HandleError(ctx, err)
 		if handlerErr != nil {
 			b.logger.Error("Failed to handle error",
@@ -73,15 +86,20 @@ func (b *EventBus) PublishError(ctx context.Context, err error) {
 }
 
 // PublishStart publishes a start event to all handlers.
+// Thread-safe: uses read lock and copies handlers slice.
 func (b *EventBus) PublishStart(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
+	// Get a snapshot of handlers under read lock
 	b.mu.RLock()
-	defer b.mu.RUnlock()
+	handlers := make([]EventHandler, len(b.handlers))
+	copy(handlers, b.handlers)
+	b.mu.RUnlock()
 
-	for _, handler := range b.handlers {
+	// Dispatch to handlers without holding lock
+	for _, handler := range handlers {
 		if err := handler.HandleStart(ctx); err != nil {
 			b.logger.Error("failed to handle start event",
 				"error", err,
@@ -92,15 +110,20 @@ func (b *EventBus) PublishStart(ctx context.Context) error {
 }
 
 // PublishStop publishes a stop event to all handlers.
+// Thread-safe: uses read lock and copies handlers slice.
 func (b *EventBus) PublishStop(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
+	// Get a snapshot of handlers under read lock
 	b.mu.RLock()
-	defer b.mu.RUnlock()
+	handlers := make([]EventHandler, len(b.handlers))
+	copy(handlers, b.handlers)
+	b.mu.RUnlock()
 
-	for _, handler := range b.handlers {
+	// Dispatch to handlers without holding lock
+	for _, handler := range handlers {
 		if err := handler.HandleStop(ctx); err != nil {
 			b.logger.Error("failed to handle stop event",
 				"error", err,
@@ -125,4 +148,12 @@ func (b *EventBus) HandleHandlerError(handlerErr, err error) {
 		"error", handlerErr,
 		"original_error", err,
 	)
+}
+
+// HandlerCount returns the number of registered handlers.
+// Thread-safe: uses read lock.
+func (b *EventBus) HandlerCount() int {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return len(b.handlers)
 }
