@@ -37,6 +37,13 @@ mockgen -source=internal/crawler/crawler.go -destination=testutils/mocks/crawler
     exit 1
 }
 
+# Generate mocks for EventHandler interface
+echo "Generating EventHandler mocks..."
+mockgen -source=internal/crawler/events/eventhandler.go -destination=testutils/mocks/crawler/eventhandler.go -package=crawler || {
+    echo "Failed to generate EventHandler mocks" >&2
+    exit 1
+}
+
 # Generate mocks for Logger interface
 echo "Generating Logger mocks..."
 mockgen -source=internal/logger/logger.go -destination=testutils/mocks/logger/logger.go -package=logger || {
