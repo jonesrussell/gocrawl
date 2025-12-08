@@ -235,6 +235,76 @@ if err := service.Shutdown(shutdownCtx); err != nil {
 }
 ```
 
+### Service Start() Pattern
+Service `Start()` methods that run long-running operations MUST return immediately and run asynchronously in goroutines. This allows the calling code to proceed with graceful shutdown handling.
+
+**Pattern for Service Start() Methods:**
+```go
+// Start begins the service and returns immediately
+func (s *Service) Start(ctx context.Context) error {
+    s.logger.Info("Starting service")
+    
+    // Start long-running operations in a goroutine
+    go func() {
+        // Long-running loop or operation
+        for {
+            select {
+            case <-ctx.Done():
+                s.logger.Info("Context cancelled, stopping service")
+                return
+            case <-s.done:
+                s.logger.Info("Done signal received, stopping service")
+                return
+            case t := <-ticker.C:
+                // Do periodic work
+                if err := s.doWork(ctx, t); err != nil {
+                    s.logger.Error("Work failed", "error", err)
+                }
+            }
+        }
+    }()
+    
+    return nil // Return immediately
+}
+```
+
+**Pattern for Command RunE Functions:**
+```go
+// Start the service (returns immediately)
+if err := service.Start(cmd.Context()); err != nil {
+    return fmt.Errorf("failed to start service: %w", err)
+}
+
+// Wait for either completion or interrupt signal using select
+select {
+case <-done:
+    // Service completed
+    deps.Logger.Info("Service completed")
+case <-cmd.Context().Done():
+    // Interrupt signal received - graceful shutdown
+    deps.Logger.Info("Shutdown signal received")
+}
+
+// Graceful shutdown
+shutdownCtx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+defer cancel()
+
+if err := service.Stop(shutdownCtx); err != nil {
+    return fmt.Errorf("failed to stop service: %w", err)
+}
+```
+
+**DO NOT:**
+- Block in `Start()` methods with infinite loops
+- Return from `Start()` only after context cancellation
+- Wait for completion directly in `Start()` without using goroutines
+
+**DO:**
+- Launch long-running operations in goroutines within `Start()`
+- Return immediately from `Start()` after starting the goroutine
+- Use `select` statements in command functions to wait for either completion or cancellation
+- Reference `cmd/crawl/job.go` and `cmd/scheduler/job.go` for correct patterns
+
 ## Configuration Defaults
 
 ### Elasticsearch Configuration
