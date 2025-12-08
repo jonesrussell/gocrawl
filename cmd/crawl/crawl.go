@@ -51,16 +51,10 @@ func NewCrawler(
 	}
 }
 
-// cleanup ensures the done channel is always closed eventually
-func (c *Crawler) cleanup() {
-	c.doneOnce.Do(func() {
-		close(c.done)
-	})
-}
-
 // Start begins the crawl operation
 func (c *Crawler) Start(ctx context.Context) error {
-	defer c.cleanup() // Ensure cleanup on any exit path
+	// Note: The done channel is closed by the JobService, not here.
+	// We don't need to clean it up here to avoid double-close panics.
 
 	// Check if sources exist
 	if _, err := sourcespkg.LoadSources(c.config, c.logger); err != nil {
