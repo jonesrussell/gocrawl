@@ -1,5 +1,5 @@
-// Package common provides shared utilities and types used across the application.
-package common
+// Package sources manages the configuration and lifecycle of web content sources for GoCrawl.
+package sources
 
 import (
 	"fmt"

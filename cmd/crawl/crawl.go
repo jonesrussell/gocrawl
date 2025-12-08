@@ -7,12 +7,12 @@ import (
 	"fmt"
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	articlespkg "github.com/jonesrussell/gocrawl/internal/content/articles"
 	pagepkg "github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/job"
 	loggerpkg "github.com/jonesrussell/gocrawl/internal/logger"
 	sourcespkg "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
@@ -23,7 +23,7 @@ import (
 type Crawler struct {
 	config        config.Interface
 	logger        loggerpkg.Interface
-	jobService    common.JobService
+	jobService    job.Service
 	sourceManager sourcespkg.Interface
 	crawler       crawler.Interface
 	done          chan struct{} // Channel to signal crawler completion
@@ -33,7 +33,7 @@ type Crawler struct {
 func NewCrawler(
 	cfg config.Interface,
 	logger loggerpkg.Interface,
-	jobService common.JobService,
+	jobService job.Service,
 	sourceManager sourcespkg.Interface,
 	crawlerInstance crawler.Interface,
 	done chan struct{},

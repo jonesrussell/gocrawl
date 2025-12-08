@@ -19,9 +19,7 @@ const (
 
 // LifecycleParams holds the dependencies for SetupLifecycle
 type LifecycleParams struct {
-	fx.In
-
-	LC            fx.Lifecycle
+	LC            fx.Lifecycle // Keep for now if ConfigureLifecycle needs it
 	Ctx           context.Context
 	Server        *http.Server
 	SearchManager SearchManager

@@ -6,15 +6,15 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/job"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// JobService implements the common.JobService interface for the crawl module.
+// JobService implements the job.Service interface for the crawl module.
 type JobService struct {
 	logger           logger.Interface
 	sources          sources.Interface
@@ -39,7 +39,7 @@ type JobServiceParams struct {
 }
 
 // NewJobService creates a new JobService instance.
-func NewJobService(p JobServiceParams) common.JobService {
+func NewJobService(p JobServiceParams) job.Service {
 	return &JobService{
 		logger:  p.Logger,
 		sources: p.Sources,
@@ -78,7 +78,7 @@ func (s *JobService) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop implements the common.JobService interface.
+// Stop implements the job.Service interface.
 func (s *JobService) Stop(ctx context.Context) error {
 	s.logger.Info("Stopping crawl job")
 	// Signal completion (safe to call multiple times)
@@ -88,7 +88,7 @@ func (s *JobService) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Status implements the common.JobService interface.
+// Status implements the job.Service interface.
 func (s *JobService) Status(ctx context.Context) (content.JobStatus, error) {
 	activeJobs := s.activeJobs.Load() // Use .Load() method
 	state := content.JobStatusProcessing
@@ -98,21 +98,21 @@ func (s *JobService) Status(ctx context.Context) (content.JobStatus, error) {
 	return state, nil
 }
 
-// GetItems implements the common.JobService interface.
+// GetItems implements the job.Service interface.
 func (s *JobService) GetItems(ctx context.Context, jobID string) ([]*content.Item, error) {
 	s.logger.Info("Getting items for job", "jobID", jobID)
 	// TODO: Implement item retrieval from storage
 	return nil, nil
 }
 
-// UpdateItem implements the common.JobService interface.
+// UpdateItem implements the job.Service interface.
 func (s *JobService) UpdateItem(ctx context.Context, item *content.Item) error {
 	s.logger.Info("Updating item", "itemID", item.ID)
 	// TODO: Implement item update in storage
 	return nil
 }
 
-// UpdateJob implements the common.JobService interface.
+// UpdateJob implements the job.Service interface.
 func (s *JobService) UpdateJob(ctx context.Context, job *content.Job) error {
 	s.logger.Info("Updating job", "jobID", job.ID)
 	// TODO: Implement job update in storage

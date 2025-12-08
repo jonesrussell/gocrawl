@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/constants"
 	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
@@ -103,7 +103,7 @@ func (s *Storage) createSearchQuery(query string) map[string]any {
 				"fields": []string{"title^2", "body", "description"},
 			},
 		},
-		"size": common.DefaultBufferSize,
+		"size": constants.DefaultBufferSize,
 	}
 }
 
