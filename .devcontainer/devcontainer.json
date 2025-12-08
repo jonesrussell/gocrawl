@@ -28,6 +28,9 @@
 		},
 		"ghcr.io/devcontainers-extra/features/go-task:1": {
 			"version": "latest"
+		},
+		"ghcr.io/dhoeric/features/act:1": {
+			"version": "latest"
 		}
 	},
 	
