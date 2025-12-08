@@ -87,26 +87,19 @@ For article list/discovery pages:
    - `configtypes.ListSelectors` - Validated list selectors
    - `configtypes.SourceSelectors` - Container for validated selectors
 
-3. **SourceUtils Types** (`internal/sourceutils/sourceutils.go`)
-   - `sourceutils.ArticleSelectors` - Internal article selectors
-   - `sourceutils.ListSelectors` - Internal list selectors
-   - `sourceutils.SelectorConfig` - Internal selector configuration
+3. **Source Types** (`internal/sources/sources.go`)
+   - Internal selector types used for processing
+   - Conversion functions handle type transformations
 
 ### Conversion Functions
 
-All selector types must be converted through the following functions:
-- `createSelectorConfig()` - Converts loader/config types to sourceutils types
-- `extractArticleSelectorsFromLoader()` - Converts loader to internal format
-- `extractArticleSelectorsFromConfig()` - Converts config types to internal format
-- `getArticleSelectorsFromSelector()` - Converts internal articleSelector to ArticleSelectors
+All selector types must be converted through the appropriate conversion functions in `internal/sources/`.
 
 **IMPORTANT:** When adding new selector fields:
 1. Add field to `loader.ArticleSelectors` or `loader.ListSelectors`
 2. Add field to `configtypes.ArticleSelectors` or `configtypes.ListSelectors`
-3. Add field to `sourceutils.ArticleSelectors` or `sourceutils.ListSelectors`
-4. Update ALL conversion functions to handle the new field
-5. Update `ConvertToConfigSource()` in `sourceutils.go`
-6. Update `createSelectorConfig()` in `sources.go`
+3. Update ALL conversion functions to handle the new field
+4. Update source processing logic in `internal/sources/`
 
 ## Field Naming Conventions
 
@@ -138,6 +131,5 @@ globs:
   - "**/sources*.yml"
   - "internal/sources/**/*.go"
   - "internal/config/types/selectors.go"
-  - "internal/sourceutils/sourceutils.go"
 alwaysApply: true
 ---

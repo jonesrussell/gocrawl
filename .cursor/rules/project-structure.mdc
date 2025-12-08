@@ -20,7 +20,7 @@ This is a Go web crawler and search engine project with the following architectu
 - Dependencies created via `common.NewCommandDeps()` factory
 - Commands construct dependencies directly (no FX, no context.Value)
 - Storage clients created via `common.CreateStorageClient()`
-- Constants defined in `cmd/common/constants.go`
+- Constants defined in `internal/constants/constants.go`
 - See command-architecture.mdc for detailed patterns
 
 ## Core Components (internal/)
@@ -51,7 +51,7 @@ This is a Go web crawler and search engine project with the following architectu
 - CLI framework: `github.com/spf13/cobra`
 - Configuration: `github.com/spf13/viper`
 - Logging: `go.uber.org/zap`
-- Dependency injection: `go.uber.org/fx` (used in internal packages only, not in commands)
+- Dependency injection: Explicit dependency passing (FX removed from codebase)
 description:
 globs:
 alwaysApply: true

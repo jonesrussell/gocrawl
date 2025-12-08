@@ -129,31 +129,35 @@ RunE: func(cmd *cobra.Command, args []string) error {
 ## Constants
 
 ### Using Constants
-Common constants are defined in `cmd/common/constants.go`:
+All shared constants are defined in `internal/constants/constants.go`:
 
 **Index Names:**
-- `common.DefaultArticleIndex` - default index name for articles ("articles")
-- `common.DefaultPageIndex` - default index name for pages ("pages")
-- `common.DefaultContentIndex` - default index name for content ("content")
+- `constants.DefaultArticleIndex` - default index name for articles ("articles")
+- `constants.DefaultPageIndex` - default index name for pages ("pages")
+- `constants.DefaultContentIndex` - default index name for content ("content")
 
 **Timeouts:**
-- `common.DefaultCrawlerTimeout` - maximum time to wait for crawler (30 minutes)
-- `common.DefaultShutdownTimeout` - maximum time for graceful shutdown (30 seconds)
+- `constants.DefaultCrawlerTimeout` - maximum time to wait for crawler (30 minutes)
+- `constants.DefaultShutdownTimeout` - maximum time for graceful shutdown (30 seconds)
 
 **Capacities:**
-- `common.DefaultIndicesCapacity` - initial capacity for index slices (2)
+- `constants.DefaultIndicesCapacity` - initial capacity for index slices (2)
 
 **Pattern:**
 ```go
+import "github.com/jonesrussell/gocrawl/internal/constants"
+
 // Use constants instead of magic strings/numbers
-articleIndexName := common.DefaultArticleIndex
-processorFactory := crawler.NewProcessorFactory(log, storage, common.DefaultContentIndex)
+articleIndexName := constants.DefaultArticleIndex
+processorFactory := crawler.NewProcessorFactory(log, storage, constants.DefaultContentIndex)
+shutdownCtx, cancel := context.WithTimeout(ctx, constants.DefaultShutdownTimeout)
 ```
 
 **DO NOT:**
 - Use magic strings like `"articles"`, `"pages"`, `"content"` directly
 - Use magic numbers for timeouts or capacities
 - Hardcode index names
+- Import `cmd/common` for constants (use `internal/constants` instead)
 
 ## Atomic Operations
 
@@ -286,7 +290,7 @@ case <-cmd.Context().Done():
 }
 
 // Graceful shutdown
-shutdownCtx, cancel := context.WithTimeout(context.Background(), common.DefaultShutdownTimeout)
+shutdownCtx, cancel := context.WithTimeout(context.Background(), constants.DefaultShutdownTimeout)
 defer cancel()
 
 if err := service.Stop(shutdownCtx); err != nil {
@@ -369,25 +373,27 @@ func UpdateJob(ctx context.Context, jobObj *content.Job) error
 1. Use `context.Value()` for dependency injection - use `CommandDeps` directly
 2. Use `cmdcommon.GetDependencies(cmd.Context())` - use `common.NewCommandDeps()` instead
 3. Create duplicate `createStorageClientFor*` functions - use `common.CreateStorageClient()`
-4. Use FX modules for commands - FX was removed from command layer
+4. Use FX modules - FX has been removed from the codebase
 5. Use `*int32` for atomic operations - use `atomic.Int32` directly
-6. Use magic strings/numbers - use constants from `cmd/common/constants.go`
+6. Use magic strings/numbers - use constants from `internal/constants/constants.go`
 7. Use `localhost` in Elasticsearch addresses - use `127.0.0.1` or service name
 8. Shadow imported package names with parameters
 9. Create FX apps in command RunE functions
 10. Use PersistentPreRunE for dependency injection
+11. Import `cmd/common` for constants - use `internal/constants` instead
 
 ### DO:
 1. Use `Command()` function pattern for all commands
 2. Use `common.NewCommandDeps()` factory to get dependencies
 3. Use `common.CreateStorageClient()` for storage client creation
 4. Construct dependencies directly in `RunE` functions
-5. Use constants from `cmd/common/constants.go`
+5. Use constants from `internal/constants/constants.go`
 6. Use `atomic.Int32` for atomic counters
 7. Implement graceful shutdown for long-running commands
 8. Use shortened parameter names to avoid import shadowing
 9. Wrap errors with context using `fmt.Errorf`
 10. Follow the established patterns consistently
+11. Import `internal/constants` for all shared constants
 
 ## Migration Notes
 
