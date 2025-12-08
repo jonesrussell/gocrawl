@@ -105,3 +105,39 @@ func RetryAssertion(t require.TestingT, timeout, interval time.Duration, fn func
 	}
 	require.Fail(t, fmt.Sprintf("assertion failed after %v: %v", timeout, lastErr))
 }
+
+// WaitForDocumentIndexed polls until document is indexed or times out.
+func WaitForDocumentIndexed(
+	t require.TestingT,
+	storage types.Interface,
+	ctx context.Context,
+	indexName, docID string,
+	timeout time.Duration,
+) {
+	require.Eventually(t, func() bool {
+		var doc map[string]any
+		err := storage.GetDocument(ctx, indexName, docID, &doc)
+		return err == nil
+	}, timeout, DefaultHealthCheckInterval,
+		"document %q not indexed in index %q within %v", docID, indexName, timeout)
+}
+
+// WaitForDocumentCount polls until document count matches or times out.
+func WaitForDocumentCount(
+	t require.TestingT,
+	storage types.Interface,
+	ctx context.Context,
+	indexName string,
+	expectedCount int,
+	timeout time.Duration,
+) {
+	require.Eventually(t, func() bool {
+		count, err := storage.GetIndexDocCount(ctx, indexName)
+		if err != nil {
+			return false
+		}
+		return count == int64(expectedCount)
+	}, timeout, DefaultHealthCheckInterval,
+		"expected %d documents in index %q, timeout after %v",
+		expectedCount, indexName, timeout)
+}

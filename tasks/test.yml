@@ -15,23 +15,13 @@ tasks:
   integration:
     desc: "Run integration tests"
     cmds:
-      - |
-        if [ -d "./tests/integration" ]; then
-          go test -run Integration -v ./tests/integration/... || true
-        else
-          echo "No integration tests directory found, skipping..."
-        fi
+      - go test -run Integration -v ./tests/integration/...
     ignore_error: true
 
   features:
     desc: "Run feature tests"
     cmds:
-      - |
-        if [ -d "./tests/features" ]; then
-          go test -v ./tests/features/... || true
-        else
-          echo "No feature tests directory found, skipping..."
-        fi
+      - go test -v ./tests/features/...
     ignore_error: true
 
   all:
