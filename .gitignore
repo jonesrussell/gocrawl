@@ -196,3 +196,10 @@ site/
 *.db
 *.sqlite
 *.sqlite3
+testutils/mocks/api/api.go
+testutils/mocks/api/indexing.go
+testutils/mocks/config/config.go
+testutils/mocks/crawler/crawler.go
+testutils/mocks/logger/logger.go
+testutils/mocks/sources/sources.go
+testutils/mocks/storage/storage.go
