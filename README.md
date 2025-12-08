@@ -12,7 +12,7 @@ A web crawler and search engine built with Go. It crawls websites, extracts cont
 
 ## Prerequisites
 
-- Go 1.23 or later
+- Go 1.24 or later
 - Elasticsearch 8.x
 - Docker (optional)
 

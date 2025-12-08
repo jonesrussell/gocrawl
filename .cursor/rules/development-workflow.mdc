@@ -1,7 +1,7 @@
 # Development Workflow
 
 ## Getting Started
-1. Ensure Go 1.23+ is installed
+1. Ensure Go 1.24+ is installed
 2. Clone and navigate to project directory
 3. Run `go mod download` to install dependencies
 4. Copy configuration examples and customize
