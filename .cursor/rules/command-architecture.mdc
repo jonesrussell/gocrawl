@@ -280,6 +280,18 @@ func NewService(stor types.Interface) *Service
 - `storage` → `stor`
 - `config` → `cfg` (already common)
 - `logger` → `log` (already common)
+- `job` (when importing `internal/job`) → `jobObj` or `j`
+
+**Example with job package:**
+```go
+import "github.com/jonesrussell/gocrawl/internal/job"
+
+// BAD: shadows job package
+func UpdateJob(ctx context.Context, job *content.Job) error
+
+// GOOD: use different name
+func UpdateJob(ctx context.Context, jobObj *content.Job) error
+```
 
 ## Anti-Patterns to Avoid
 

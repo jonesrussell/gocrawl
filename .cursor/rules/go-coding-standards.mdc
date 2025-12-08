@@ -82,10 +82,11 @@
 - Use shortened names when needed (e.g., `stor` instead of `storage`, `hostname` instead of `domain`)
 - Follow established naming conventions consistently
 - When importing `internal/domain`, avoid using variable name `domain` (use `hostname` for URL hostnames)
+- When importing `internal/job`, avoid using variable name `job` (use `jobObj` or `j` for job parameters)
 
 ## Interface Organization
-- **Interfaces MUST be defined in the same file as their implementation**
-- Do NOT create separate `interface.go` files - consolidate interfaces into implementation files
+- **Interfaces SHOULD be defined in the same file as their implementation**
+- Prefer consolidating interfaces into implementation files when possible
 - Use compile-time interface checks: `var _ InterfaceName = (*Implementation)(nil)`
 - Pattern:
   ```go
@@ -105,19 +106,22 @@
   // Compile-time check
   var _ Interface = (*Sources)(nil)
   ```
-- Exceptions: `internal/storage/types/interface.go` is kept separate to avoid circular dependencies
+- Exceptions:
+  - `internal/storage/types/interface.go` - kept separate to avoid circular dependencies
+  - `internal/job/interface.go` - Service interface defined separately from BaseService implementation to avoid name conflicts
 
 ## Constants Organization
 - **All shared constants MUST be defined in `internal/constants/constants.go`**
 - Constants are organized by domain: HTTP/Server, Crawler, Storage, Logger, General
-- Old constant files (e.g., `internal/common/constants.go`, `internal/crawler/constants.go`) may re-export constants for backward compatibility, but new constants should go in `internal/constants/`
-- Use constants from `internal/constants` package instead of defining duplicates
+- Use constants from `internal/constants` package - DO NOT create duplicate constant files
+- `internal/common/transport/constants.go` re-exports transport constants for backward compatibility only
 - Pattern:
   ```go
   import "github.com/jonesrussell/gocrawl/internal/constants"
   
   // Use constants
   timeout := constants.DefaultRateLimit
+  bufferSize := constants.DefaultBufferSize
   ```
 
 ## Domain Models
@@ -128,9 +132,14 @@
 
 ## Package Structure
 - **Avoid catch-all packages** - each package should have a single, clear responsibility
-- `internal/common/` should only contain truly shared utilities, not domain-specific code
-- Source utilities are in `internal/sources/types/` (consolidated from `internal/sourceutils`)
+- `internal/common/` now only contains `transport/` subpackage (TLS utilities and transport constant re-exports)
+- Domain-specific utilities have been moved to their respective packages:
+  - Job interface: `internal/job/interface.go` (Service interface)
+  - Job implementation: `internal/job/service.go` (BaseService struct)
+  - Source utilities: `internal/sources/utils.go` (ConvertSourceConfig, ExtractDomain)
+- All constants: `internal/constants/constants.go` (no duplicates in common package)
 - Do not create circular dependencies - use type packages when needed (`internal/storage/types/`)
+- When importing `internal/job`, use `job.Service` interface (not `common.JobService`)
 
 description:
 globs:

@@ -26,17 +26,17 @@ This is a Go web crawler and search engine project with the following architectu
 ## Core Components (internal/)
 - `crawler/` - Web crawling engine using Colly (includes events subsystem)
 - `storage/` - Elasticsearch storage layer (includes types and index management)
-- `sources/` - Source configuration and management (includes types package)
+- `sources/` - Source configuration and management (includes types package and utilities: ConvertSourceConfig, ExtractDomain)
 - `processor/` - Content processing and extraction
 - `content/` - Content handling with articles and pages sub-packages
 - `domain/` - Domain models and data structures (Article, Page, Content, Job)
-- `constants/` - Shared constants organized by domain (HTTP, Crawler, Storage, Logger)
-- `api/` - REST API implementation using Gin (includes middleware)
+- `constants/` - Shared constants organized by domain (HTTP, Crawler, Storage, Logger, General)
+- `api/` - REST API implementation using Gin (includes middleware, lifecycle management)
 - `config/` - Configuration management using Viper (includes sub-packages for app, server, crawler, elasticsearch, logging)
 - `logger/` - Logging using Zap
 - `metrics/` - Application metrics and monitoring
-- `job/` - Job management and scheduling
-- `common/` - Common utilities and shared code (events, transport, source utilities)
+- `job/` - Job management and scheduling (includes Service interface and BaseService implementation)
+- `common/` - Common utilities (only transport subpackage: TLS utilities and transport constants re-exports)
 
 ## Configuration
 - [config.example.yaml](mdc:config.example.yaml) - Main configuration template
