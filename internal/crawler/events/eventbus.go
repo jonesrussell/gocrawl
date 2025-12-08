@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 )
 
 // EventBus implements the crawler.EventBus interface for managing event distribution.
@@ -31,7 +31,7 @@ func (b *EventBus) Subscribe(handler EventHandler) {
 }
 
 // PublishArticle publishes an article event to all handlers.
-func (b *EventBus) PublishArticle(ctx context.Context, article *models.Article) error {
+func (b *EventBus) PublishArticle(ctx context.Context, article *domain.Article) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (b *EventBus) PublishStop(ctx context.Context) error {
 }
 
 // HandleError handles an error that occurred during event processing.
-func (b *EventBus) HandleError(err error, article *models.Article) {
+func (b *EventBus) HandleError(err error, article *domain.Article) {
 	b.logger.Error("Error processing article",
 		"error", err,
 		"articleID", article.ID,

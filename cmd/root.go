@@ -10,10 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 
 	"github.com/joho/godotenv"
-	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/cmd/crawl"
 	"github.com/jonesrussell/gocrawl/cmd/httpd"
 	"github.com/jonesrussell/gocrawl/cmd/index"
@@ -22,8 +20,6 @@ import (
 	cmdsources "github.com/jonesrussell/gocrawl/cmd/sources"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
-	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/storage"
 )
 
 var (
@@ -38,130 +34,27 @@ var (
 		Use:   "gocrawl",
 		Short: "A web crawler and search engine",
 		Long:  `A web crawler and search engine built with Go.`,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Config is already initialized in Execute(), but we ensure context propagation
-			// Ensure the CommandContext is propagated from the root command to all subcommands
-			// This is necessary because Cobra may create new contexts for subcommands
-			rootCtx := cmd.Root().Context()
-			if rootCtx != nil {
-				if cmdCtx := rootCtx.Value(common.CommandContextKey); cmdCtx != nil {
-					// If this command's context doesn't have the CommandContext, propagate it
-					if cmd.Context().Value(common.CommandContextKey) == nil {
-						newCtx := context.WithValue(cmd.Context(), common.CommandContextKey, cmdCtx)
-						cmd.SetContext(newCtx)
-					}
-				}
-			}
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
 	}
 )
 
-// Module provides the root command and its dependencies
-var Module = fx.Module("root",
-	common.Module,
-	storage.ClientModule,
-	storage.Module,
-	crawl.Module,
-	index.Module,
-	cmdsources.Module,
-	search.Module,
-	httpd.Module,
-	cmdscheduler.Module,
-	fx.WithLogger(logger.NewFxLogger),
-)
-
 // Execute runs the root command
 func Execute() error {
-	// Load .env file early so environment variables are available when LoadConfig() is called
-	// This must happen before LoadConfig() because LoadFromViper checks os.Getenv() directly
-	// Note: We ignore errors here as .env is optional; initConfig() will handle warnings
+	// Load .env file early so environment variables are available
 	_ = godotenv.Load()
 
 	// Parse flags early to get debug flag before creating logger
-	// This is a minimal parse just to get the debug flag value
-	// Note: We ignore parse errors here as they'll be caught by ExecuteContext
 	_ = rootCmd.ParseFlags(os.Args[1:])
 
-	// Initialize configuration early so logger level is set correctly
-	// This must happen before LoadConfig() creates the logger
+	// Initialize configuration
 	if err := initConfig(); err != nil {
 		return fmt.Errorf("failed to initialize configuration: %w", err)
 	}
 
-	// Load config and create logger
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Get logger configuration from Viper
-	logLevel := viper.GetString("logger.level")
-	if logLevel == "" {
-		logLevel = "info" // Fallback to info if not set
-	}
-	// Ensure lowercase for consistency
-	logLevel = strings.ToLower(logLevel)
-
-	// Debug: Print to stderr to verify what we're getting (before logger is created)
-	if Debug {
-		fmt.Fprintf(os.Stderr,
-			"DEBUG: Debug flag is true, logger.level=%s, viper.app.debug=%v\n",
-			logLevel, viper.GetBool("app.debug"))
-	}
-
-	logCfg := &logger.Config{
-		Level:       logger.Level(logLevel),
-		Development: viper.GetBool("logger.development"),
-		Encoding:    viper.GetString("logger.encoding"),
-		OutputPaths: viper.GetStringSlice("logger.output_paths"),
-		EnableColor: viper.GetBool("logger.enable_color"),
-	}
-
-	log, err := logger.New(logCfg)
-	if err != nil {
-		return fmt.Errorf("failed to create logger: %w", err)
-	}
-
-	// Test debug logging to verify level is set correctly
-	log.Debug("Logger initialized", "level", logLevel, "debug_flag", Debug, "viper_debug", viper.GetBool("app.debug"))
-
-	// Create a context with dependencies using CommandContext
-	cmdCtx := &common.CommandContext{
-		Logger: log,
-		Config: cfg,
-	}
-	ctx := context.WithValue(context.Background(), common.CommandContextKey, cmdCtx)
-
-	// Initialize the application with the root module
-	app := fx.New(
-		Module,
-		fx.Provide(
-			func() config.Interface { return cfg },
-			func() logger.Interface { return log },
-		),
-		fx.WithLogger(logger.NewFxLogger),
-	)
-
-	// Start the application
-	if startErr := app.Start(ctx); startErr != nil {
-		return fmt.Errorf("failed to start application: %w", startErr)
-	}
-	defer func() {
-		if stopErr := app.Stop(ctx); stopErr != nil {
-			log.Error("failed to stop application", "error", stopErr)
-		}
-	}()
-
-	// Set the context on the root command to ensure it's available to all subcommands
-	// This is necessary because ExecuteContext may not propagate the context to all commands
-	rootCmd.SetContext(ctx)
-
-	// Execute the root command with the context
-	return rootCmd.ExecuteContext(ctx)
+	// Execute the root command with a fresh context
+	return rootCmd.ExecuteContext(context.Background())
 }
 
 // init initializes the root command and its subcommands.
@@ -186,7 +79,7 @@ func init() {
 
 	// Add subcommands
 	rootCmd.AddCommand(crawl.Command())
-	rootCmd.AddCommand(index.Command)
+	rootCmd.AddCommand(index.Command())
 	rootCmd.AddCommand(cmdsources.NewSourcesCommand())
 	rootCmd.AddCommand(search.Command())
 	rootCmd.AddCommand(httpd.Command())

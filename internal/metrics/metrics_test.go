@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/constants"
 	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/stretchr/testify/assert"
 )
@@ -61,7 +61,7 @@ func TestUpdateMetricsConcurrently(t *testing.T) {
 	}()
 
 	// Wait for goroutine to complete
-	time.Sleep(common.DefaultTestSleepDuration)
+	time.Sleep(constants.DefaultTestSleepDuration)
 
 	// Verify metrics
 	assert.Equal(t, int64(1), m.GetProcessedCount())
@@ -107,7 +107,7 @@ func TestHTTPRequestMetricsConcurrently(t *testing.T) {
 	}()
 
 	// Wait for goroutines to complete
-	time.Sleep(common.DefaultTestSleepDuration)
+	time.Sleep(constants.DefaultTestSleepDuration)
 
 	// Verify metrics
 	assert.Equal(t, int64(1), m.GetSuccessfulRequests(), "Should have 1 successful request")

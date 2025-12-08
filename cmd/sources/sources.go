@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
+	"github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/spf13/cobra"
@@ -24,21 +24,21 @@ func NewSourcesCommand() *cobra.Command {
 		Short: "Manage content sources",
 		Long:  `Manage content sources for crawling`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get dependencies from context using helper
-			log, cfg, err := cmdcommon.GetDependencies(cmd.Context())
+			// Get dependencies - NEW WAY
+			deps, err := common.NewCommandDeps()
 			if err != nil {
 				return fmt.Errorf("failed to get dependencies: %w", err)
 			}
 
-			// Construct dependencies directly without FX
-			sourceManager, err := sources.LoadSources(cfg, log)
+			// Construct dependencies
+			sourceManager, err := sources.LoadSources(deps.Config, deps.Logger)
 			if err != nil {
 				return fmt.Errorf("failed to load sources: %w", err)
 			}
 
 			sourcesCmd := &SourcesCommand{
 				sourceManager: sourceManager,
-				logger:        log,
+				logger:        deps.Logger,
 			}
 
 			return sourcesCmd.Run(cmd.Context())

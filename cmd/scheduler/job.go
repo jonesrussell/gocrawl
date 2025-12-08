@@ -5,26 +5,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/crawler"
+	"github.com/jonesrussell/gocrawl/internal/job"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
-// SchedulerService implements the common.JobService interface for the scheduler module.
+// SchedulerService implements the job.Service interface for the scheduler module.
 type SchedulerService struct {
 	logger           logger.Interface
 	sources          sources.Interface
 	crawler          crawler.Interface
 	done             chan struct{}
+	doneOnce         sync.Once // Ensures done channel is only closed once
 	config           config.Interface
-	activeJobs       *int32
+	activeJobs       atomic.Int32 // Use atomic.Int32 directly
 	storage          types.Interface
 	processorFactory crawler.ProcessorFactory
 	items            map[string][]*content.Item
@@ -39,15 +41,14 @@ func NewSchedulerService(
 	cfg config.Interface,
 	storage types.Interface,
 	processorFactory crawler.ProcessorFactory,
-) common.JobService {
-	var jobs int32
+) job.Service {
 	return &SchedulerService{
-		logger:           log,
-		sources:          sourcesManager,
-		crawler:          crawlerInstance,
-		done:             done,
-		config:           cfg,
-		activeJobs:       &jobs,
+		logger:  log,
+		sources: sourcesManager,
+		crawler: crawlerInstance,
+		done:    done,
+		config:  cfg,
+		// activeJobs is zero-initialized
 		storage:          storage,
 		processorFactory: processorFactory,
 		items:            make(map[string][]*content.Item),
@@ -58,35 +59,43 @@ func NewSchedulerService(
 func (s *SchedulerService) Start(ctx context.Context) error {
 	s.logger.Info("Starting scheduler service")
 
-	// Check every minute
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
+	// Start the scheduler loop in a goroutine so it doesn't block
+	go func() {
+		// Check every minute
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
 
-	// Do initial check
-	if err := s.checkAndRunJobs(ctx, time.Now()); err != nil {
-		return fmt.Errorf("failed to run initial jobs: %w", err)
-	}
+		// Do initial check
+		if err := s.checkAndRunJobs(ctx, time.Now()); err != nil {
+			s.logger.Error("Failed to run initial jobs", "error", err)
+		}
 
-	for {
-		select {
-		case <-ctx.Done():
-			s.logger.Info("Context cancelled, stopping scheduler service")
-			return nil
-		case <-s.done:
-			s.logger.Info("Done signal received, stopping scheduler service")
-			return nil
-		case t := <-ticker.C:
-			if err := s.checkAndRunJobs(ctx, t); err != nil {
-				s.logger.Error("Failed to run jobs", "error", err)
+		for {
+			select {
+			case <-ctx.Done():
+				s.logger.Info("Context cancelled, stopping scheduler service")
+				return
+			case <-s.done:
+				s.logger.Info("Done signal received, stopping scheduler service")
+				return
+			case t := <-ticker.C:
+				if err := s.checkAndRunJobs(ctx, t); err != nil {
+					s.logger.Error("Failed to run jobs", "error", err)
+				}
 			}
 		}
-	}
+	}()
+
+	return nil
 }
 
 // Stop stops the scheduler service.
 func (s *SchedulerService) Stop(ctx context.Context) error {
 	s.logger.Info("Stopping scheduler service")
-	close(s.done)
+	// Signal completion (safe to call multiple times)
+	s.doneOnce.Do(func() {
+		close(s.done)
+	})
 	return nil
 }
 
@@ -117,15 +126,15 @@ func (s *SchedulerService) UpdateItem(ctx context.Context, item *content.Item) e
 // Status returns the current status of the scheduler service.
 func (s *SchedulerService) Status(ctx context.Context) (content.JobStatus, error) {
 	state := content.JobStatusProcessing
-	if atomic.LoadInt32(s.activeJobs) == 0 {
+	if s.activeJobs.Load() == 0 { // Use .Load() method
 		state = content.JobStatusCompleted
 	}
 	return state, nil
 }
 
 // UpdateJob updates a job in the scheduler service.
-func (s *SchedulerService) UpdateJob(ctx context.Context, job *content.Job) error {
-	s.logger.Info("Updating job", "jobID", job.ID)
+func (s *SchedulerService) UpdateJob(ctx context.Context, jobObj *content.Job) error {
+	s.logger.Info("Updating job", "jobID", jobObj.ID)
 	// TODO: Implement job update in storage
 	return nil
 }
@@ -166,8 +175,8 @@ func (s *SchedulerService) checkAndRunJobs(ctx context.Context, now time.Time) e
 
 // executeCrawl performs the crawl operation for a single source.
 func (s *SchedulerService) executeCrawl(ctx context.Context, source *sources.Config) error {
-	atomic.AddInt32(s.activeJobs, 1)
-	defer atomic.AddInt32(s.activeJobs, -1)
+	s.activeJobs.Add(1)        // Use .Add() method
+	defer s.activeJobs.Add(-1) // Use .Add(-1) instead of atomic.AddInt32
 
 	// Start crawler
 	if err := s.crawler.Start(ctx, source.URL); err != nil {

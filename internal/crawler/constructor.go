@@ -2,78 +2,59 @@
 package crawler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"errors"
-
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/common/transport"
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/config/crawler"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/articles"
 	"github.com/jonesrussell/gocrawl/internal/content/page"
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
-	"go.uber.org/fx"
 )
 
 const (
 	// ArticleChannelBufferSize is the buffer size for the article channel.
 	ArticleChannelBufferSize = 100
+	// DefaultChannelBufferSize is the default buffer size for processor channels.
+	DefaultChannelBufferSize = 100
 	// DefaultMaxIdleConns is the default maximum number of idle connections.
 	DefaultMaxIdleConns = 100
 	// DefaultMaxIdleConnsPerHost is the default maximum number of idle connections per host.
 	DefaultMaxIdleConnsPerHost = 10
 	// DefaultIdleConnTimeout is the default idle connection timeout.
 	DefaultIdleConnTimeout = 90 * time.Second
-	// DefaultTLSHandshakeTimeout is the default TLS handshake timeout.
-	DefaultTLSHandshakeTimeout = 10 * time.Second
 	// DefaultResponseHeaderTimeout is the default response header timeout.
 	DefaultResponseHeaderTimeout = 30 * time.Second
 	// DefaultExpectContinueTimeout is the default expect continue timeout.
 	DefaultExpectContinueTimeout = 1 * time.Second
-	// DefaultMaxRetries is the default maximum number of retries for failed requests.
-	DefaultMaxRetries = 3
-	// DefaultRetryDelay is the default delay between retries.
-	DefaultRetryDelay = 1 * time.Second
-	// DefaultMaxDepth is the default maximum depth for crawling.
-	DefaultMaxDepth = 1
-	// DefaultMaxBodySize is the default maximum body size for responses.
-	DefaultMaxBodySize = 10 * 1024 * 1024 // 10 MB
-	// DefaultMaxConcurrentRequests is the default maximum number of concurrent requests.
-	DefaultMaxConcurrentRequests = 10
-	// DefaultRequestTimeout is the default timeout for requests.
-	DefaultRequestTimeout = 30 * time.Second
-	// DefaultUserAgent is the default user agent string used for HTTP requests.
-	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-		"AppleWebKit/537.36 (KHTML, like Gecko) " +
-		"Chrome/91.0.4472.124 Safari/537.36"
-	// DefaultChannelBufferSize is the default buffer size for processor channels.
-	DefaultChannelBufferSize = 100
 )
 
-// ModuleParams contains dependencies for creating the crawler module.
-type ModuleParams struct {
-	fx.In
-
-	Config  config.Interface
-	Logger  logger.Interface
-	Storage types.Interface
+// CrawlerParams holds parameters for creating a crawler instance
+type CrawlerParams struct {
+	Logger         logger.Interface
+	Bus            *events.EventBus
+	IndexManager   types.IndexManager
+	Sources        sources.Interface
+	Config         *crawler.Config
+	ArticleService articles.Interface
+	PageService    page.Interface
+	Storage        types.Interface
 }
 
-// Module provides the crawler module's dependencies.
-var Module = fx.Module("crawler",
-	fx.Provide(
-		ProvideCrawler,
-		ProvideProcessorFactory,
-	),
-)
+// CrawlerResult holds the crawler instance and its channels
+type CrawlerResult struct {
+	Crawler        Interface
+	ArticleChannel chan *domain.Article
+	PageChannel    chan *domain.Page
+}
 
 // createJobValidator creates a simple job validator
 func createJobValidator() content.JobValidator {
@@ -155,26 +136,14 @@ func createCollector(cfg *crawler.Config, log logger.Interface) (*colly.Collecto
 	return collector, nil
 }
 
-// ProvideCrawler creates a new crawler instance with all its components
-func ProvideCrawler(p struct {
-	fx.In
-
-	Logger         logger.Interface
-	Bus            *events.EventBus
-	IndexManager   types.IndexManager
-	Sources        sources.Interface
-	Config         *crawler.Config
-	ArticleService articles.Interface
-	PageService    page.Interface
-	Storage        types.Interface
-}) (struct {
-	fx.Out
-
-	Crawler        Interface
-	ArticleChannel chan *models.Article
-	PageChannel    chan *models.Page
-}, error) {
+// NewCrawlerWithParams creates a new crawler instance with all its components.
+// This is the non-FX version that replaces ProvideCrawler.
+func NewCrawlerWithParams(p CrawlerParams) (*CrawlerResult, error) {
 	validator := createJobValidator()
+
+	// Create channels
+	articleChannel := make(chan *domain.Article, ArticleChannelBufferSize)
+	pageChannel := make(chan *domain.Page, DefaultChannelBufferSize)
 
 	// Create processors
 	articleProcessor := articles.NewProcessor(
@@ -183,7 +152,7 @@ func ProvideCrawler(p struct {
 		validator,
 		p.Storage,
 		"articles",
-		make(chan *models.Article, ArticleChannelBufferSize),
+		articleChannel,
 		nil,
 		nil,
 	)
@@ -194,23 +163,14 @@ func ProvideCrawler(p struct {
 		validator,
 		p.Storage,
 		"pages",
-		make(chan *models.Page, DefaultChannelBufferSize),
+		pageChannel,
 	)
 
 	// Create collector
 	collector, err := createCollector(p.Config, p.Logger)
 	if err != nil {
-		return struct {
-			fx.Out
-			Crawler        Interface
-			ArticleChannel chan *models.Article
-			PageChannel    chan *models.Page
-		}{}, err
+		return nil, err
 	}
-
-	// Create channels
-	articleChannel := make(chan *models.Article, ArticleChannelBufferSize)
-	pageChannel := make(chan *models.Page, DefaultChannelBufferSize)
 
 	// Create crawler
 	c := &Crawler{
@@ -232,19 +192,9 @@ func ProvideCrawler(p struct {
 
 	c.linkHandler = NewLinkHandler(c)
 
-	return struct {
-		fx.Out
-		Crawler        Interface
-		ArticleChannel chan *models.Article
-		PageChannel    chan *models.Page
-	}{
+	return &CrawlerResult{
 		Crawler:        c,
 		ArticleChannel: articleChannel,
 		PageChannel:    pageChannel,
 	}, nil
-}
-
-// ProvideProcessorFactory creates a new processor factory.
-func ProvideProcessorFactory(p ModuleParams) ProcessorFactory {
-	return NewProcessorFactory(p.Logger, p.Storage, "content")
 }

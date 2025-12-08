@@ -2,26 +2,9 @@
 package scheduler
 
 import (
-	"context"
-
-	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/sources"
-	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
 )
-
-// CommandDeps holds the dependencies for the scheduler command.
-type CommandDeps struct {
-	fx.In
-
-	Context context.Context `name:"schedulerContext"`
-	Config  config.Interface
-	Logger  logger.Interface
-	Storage storagetypes.Interface
-	Sources sources.Interface
-}
 
 // NewSchedulerSubCommands returns the scheduler subcommands.
 func NewSchedulerSubCommands(log logger.Interface) *cobra.Command {

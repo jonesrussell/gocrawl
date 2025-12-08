@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jonesrussell/gocrawl/internal/common"
+	"github.com/jonesrussell/gocrawl/internal/constants"
 )
 
 // CollectorConfig holds configuration for the collector.
@@ -17,9 +17,9 @@ type CollectorConfig struct {
 // NewCollectorConfig creates a new collector configuration.
 func NewCollectorConfig() *CollectorConfig {
 	return &CollectorConfig{
-		RateLimit:      common.DefaultRateLimit,
-		MaxDepth:       common.DefaultMaxDepth,
-		MaxConcurrency: common.DefaultMaxConcurrency,
+		RateLimit:      constants.DefaultRateLimit,
+		MaxDepth:       constants.DefaultMaxDepth,
+		MaxConcurrency: constants.DefaultMaxConcurrency,
 	}
 }
 

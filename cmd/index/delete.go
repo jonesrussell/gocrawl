@@ -11,21 +11,18 @@ import (
 	"os"
 	"strings"
 
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/mattn/go-isatty"
+	"github.com/spf13/cobra"
 )
 
 var (
 	// ErrDeletionCancelled is returned when the user cancels the deletion
 	ErrDeletionCancelled = errors.New("deletion cancelled by user")
-)
-
-const (
-	// defaultIndicesCapacity is the initial capacity for the index slice
-	defaultIndicesCapacity = 2
 )
 
 // DeleteParams holds the parameters for the delete command
@@ -51,14 +48,14 @@ type Deleter struct {
 func NewDeleter(
 	cfg config.Interface,
 	log logger.Interface,
-	storage storagetypes.Interface,
+	stor storagetypes.Interface,
 	sourcesManager sources.Interface,
 	params DeleteParams,
 ) *Deleter {
 	return &Deleter{
 		config:     cfg,
 		logger:     log,
-		storage:    storage,
+		storage:    stor,
 		sources:    sourcesManager,
 		index:      params.Indices,
 		force:      params.Force,
@@ -130,7 +127,7 @@ func (d *Deleter) deleteIndices(ctx context.Context) error {
 			return fmt.Errorf("source %s has no index configured", d.sourceName)
 		}
 		// Add both content and article index if they exist
-		d.index = make([]string, 0, defaultIndicesCapacity)
+		d.index = make([]string, 0, cmdcommon.DefaultIndicesCapacity)
 		if source.Index != "" {
 			d.index = append(d.index, source.Index)
 		}
@@ -233,4 +230,39 @@ func (d *Deleter) reportMissingIndices(missingIndices []string) {
 			fmt.Fprintf(os.Stdout, "  - %s\n", index)
 		}
 	}
+}
+
+// runDeleteCmd executes the delete command
+func runDeleteCmd(cmd *cobra.Command, args []string) error {
+	// Validate that either --source is provided or at least one index name is provided
+	if sourceName == "" && len(args) == 0 {
+		return errors.New("either --source flag or at least one index name must be provided")
+	}
+
+	ctx := cmd.Context()
+
+	// Get dependencies
+	deps, err := cmdcommon.NewCommandDeps()
+	if err != nil {
+		return fmt.Errorf("failed to initialize dependencies: %w", err)
+	}
+
+	// Create storage using common function
+	storageResult, err := cmdcommon.CreateStorage(deps.Config, deps.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	sourcesManager, err := sources.LoadSources(deps.Config, deps.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to load sources: %w", err)
+	}
+
+	deleter := NewDeleter(deps.Config, deps.Logger, storageResult.Storage, sourcesManager, DeleteParams{
+		Force:      forceDelete,
+		SourceName: sourceName,
+		Indices:    args,
+	})
+
+	return deleter.Start(ctx)
 }

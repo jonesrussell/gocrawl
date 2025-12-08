@@ -11,9 +11,11 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/spf13/cobra"
 )
 
 // TableRenderer handles the display of index data in a table format
@@ -42,7 +44,7 @@ func (r *TableRenderer) handleIndexError(operation, index string, err error, act
 }
 
 // RenderTable formats and displays the index in a table format
-func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface, indices []string) error {
+func (r *TableRenderer) RenderTable(ctx context.Context, stor types.Interface, indices []string) error {
 	if len(indices) == 0 {
 		r.logger.Info("No indices found in Elasticsearch")
 		return nil
@@ -89,13 +91,13 @@ func (r *TableRenderer) RenderTable(ctx context.Context, storage types.Interface
 	// Add rows
 	for _, index := range indices {
 		// Get index health
-		health, err := storage.GetIndexHealth(ctx, index)
+		health, err := stor.GetIndexHealth(ctx, index)
 		if err != nil {
 			return r.handleIndexError("get health", index, err, "Skipping index", "Failed to retrieve index health")
 		}
 
 		// Get document count
-		count, err := storage.GetIndexDocCount(ctx, index)
+		count, err := stor.GetIndexDocCount(ctx, index)
 		if err != nil {
 			return r.handleIndexError("get doc count", index, err, "Skipping index", "Failed to retrieve document count")
 		}
@@ -130,13 +132,13 @@ type Lister struct {
 func NewLister(
 	cfg config.Interface,
 	log logger.Interface,
-	storage types.Interface,
+	stor types.Interface,
 	renderer *TableRenderer,
 ) *Lister {
 	return &Lister{
 		config:   cfg,
 		logger:   log,
-		storage:  storage,
+		storage:  stor,
 		renderer: renderer,
 	}
 }
@@ -179,4 +181,26 @@ func getIngestionStatus(health string) string {
 	default:
 		return "Unknown"
 	}
+}
+
+// runListCmd executes the list command
+func runListCmd(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+
+	// Get dependencies
+	deps, err := cmdcommon.NewCommandDeps()
+	if err != nil {
+		return fmt.Errorf("failed to initialize dependencies: %w", err)
+	}
+
+	// Create storage using common function
+	storageResult, err := cmdcommon.CreateStorage(deps.Config, deps.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	renderer := NewTableRenderer(deps.Logger)
+	lister := NewLister(deps.Config, deps.Logger, storageResult.Storage, renderer)
+
+	return lister.Start(ctx)
 }

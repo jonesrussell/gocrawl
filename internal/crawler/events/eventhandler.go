@@ -3,13 +3,13 @@ package events
 import (
 	"context"
 
-	"github.com/jonesrussell/gocrawl/internal/models"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 )
 
 // EventHandler defines the interface for handling events from the EventBus.
 type EventHandler interface {
 	// HandleArticle processes an article event.
-	HandleArticle(ctx context.Context, article *models.Article) error
+	HandleArticle(ctx context.Context, article *domain.Article) error
 
 	// HandleError processes an error event.
 	HandleError(ctx context.Context, err error) error

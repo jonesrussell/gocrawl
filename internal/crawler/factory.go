@@ -8,8 +8,8 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/content/articles"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/content/page"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -100,7 +100,7 @@ func (f *DefaultProcessorFactory) createArticleProcessor() content.Processor {
 		validator,
 		f.storage,
 		"articles",
-		make(chan *models.Article, ArticleChannelBufferSize),
+		make(chan *domain.Article, ArticleChannelBufferSize),
 		nil,
 		nil,
 	)
@@ -132,6 +132,6 @@ func (f *DefaultProcessorFactory) createPageProcessor() content.Processor {
 		validator,
 		f.storage,
 		"pages",
-		make(chan *models.Page, DefaultChannelBufferSize),
+		make(chan *domain.Page, DefaultChannelBufferSize),
 	)
 }

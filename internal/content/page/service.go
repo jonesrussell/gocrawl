@@ -10,11 +10,11 @@ import (
 
 	"github.com/gocolly/colly/v2"
 	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/sources"
-	sourceutils "github.com/jonesrussell/gocrawl/internal/sourceutils"
-	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	sourcestypes "github.com/jonesrussell/gocrawl/internal/sources/types"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
 // Interface defines the contract for page processing services.
@@ -25,7 +25,7 @@ type Interface interface {
 // ContentService implements the Interface for page processing.
 type ContentService struct {
 	logger        logger.Interface
-	storage       types.Interface
+	storage       storagetypes.Interface
 	indexName     string
 	sources       sources.Interface
 	sourceManager SourceManager
@@ -37,7 +37,7 @@ type SourceManager interface {
 }
 
 // NewContentService creates a new page content service.
-func NewContentService(log logger.Interface, storage types.Interface, indexName string) Interface {
+func NewContentService(log logger.Interface, storage storagetypes.Interface, indexName string) Interface {
 	return &ContentService{
 		logger:    log,
 		storage:   storage,
@@ -48,7 +48,7 @@ func NewContentService(log logger.Interface, storage types.Interface, indexName 
 // NewContentServiceWithSources creates a new page content service with sources access.
 func NewContentServiceWithSources(
 	log logger.Interface,
-	storage types.Interface,
+	storage storagetypes.Interface,
 	indexName string,
 	sourcesManager sources.Interface,
 ) Interface {
@@ -79,7 +79,7 @@ func (s *sourceWrapper) FindSourceByURL(rawURL string) *configtypes.Source {
 		source := &allSources[i]
 		// A more robust check might involve parsing domains or using a more sophisticated matching logic
 		if strings.Contains(rawURL, source.URL) {
-			return sourceutils.ConvertToConfigSource(source)
+			return sourcestypes.ConvertToConfigSource(source)
 		}
 	}
 	return nil
@@ -113,8 +113,8 @@ func (s *ContentService) Process(e *colly.HTMLElement) error {
 	// Extract page data using Colly methods with selectors
 	pageData := extractPage(e, selectors, sourceURL)
 
-	// Convert to models.Page
-	page := &models.Page{
+	// Convert to domain.Page
+	page := &domain.Page{
 		ID:            pageData.ID,
 		URL:           pageData.URL,
 		Title:         pageData.Title,
@@ -161,8 +161,8 @@ func (s *ContentService) findSourceByURL(pageURL string) *sources.Config {
 		return nil
 	}
 
-	domain := parsedURL.Hostname()
-	if domain == "" {
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
 		return nil
 	}
 
@@ -176,13 +176,13 @@ func (s *ContentService) findSourceByURL(pageURL string) *sources.Config {
 		source := &sourceConfigs[i]
 		// Check if domain matches any allowed domain
 		for _, allowedDomain := range source.AllowedDomains {
-			if allowedDomain == domain || allowedDomain == "*."+domain {
+			if allowedDomain == hostname || allowedDomain == "*."+hostname {
 				return source
 			}
 		}
 		// Also check source URL
 		if sourceParsedURL, parseErr := url.Parse(source.URL); parseErr == nil {
-			if sourceParsedURL.Hostname() == domain {
+			if sourceParsedURL.Hostname() == hostname {
 				return source
 			}
 		}

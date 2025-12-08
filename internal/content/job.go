@@ -4,6 +4,8 @@ package content
 import (
 	"context"
 	"time"
+
+	"github.com/jonesrussell/gocrawl/internal/domain"
 )
 
 // JobStatus represents the status of a job.
@@ -43,7 +45,7 @@ type Item struct {
 	// URL is the URL of the item.
 	URL string
 	// Type is the type of content.
-	Type Type
+	Type domain.Type
 	// Status is the current status of the item.
 	Status JobStatus
 	// Source is the source of the item.

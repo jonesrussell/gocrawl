@@ -1,23 +1,23 @@
-// Package common provides shared utilities and types used across the application.
-package common
+// Package sources manages the configuration and lifecycle of web content sources for GoCrawl.
+package sources
 
 import (
 	"fmt"
 	"net/url"
 	"strings"
 
-	"github.com/jonesrussell/gocrawl/internal/config/types"
-	"github.com/jonesrussell/gocrawl/internal/sourceutils"
+	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
+	sourcestypes "github.com/jonesrussell/gocrawl/internal/sources/types"
 )
 
-// ConvertSourceConfig converts a sourceutils.SourceConfig to a types.Source.
+// ConvertSourceConfig converts a sourcestypes.SourceConfig to a configtypes.Source.
 // It handles the conversion of fields between the two types.
-func ConvertSourceConfig(source *sourceutils.SourceConfig) *types.Source {
+func ConvertSourceConfig(source *sourcestypes.SourceConfig) *configtypes.Source {
 	if source == nil {
 		return nil
 	}
 
-	return sourceutils.ConvertToConfigSource(source)
+	return sourcestypes.ConvertToConfigSource(source)
 }
 
 // ExtractDomain extracts the domain from a URL string.

@@ -25,10 +25,14 @@
 - Ensure test coverage for critical paths
 
 ## Code Quality
-- Run `go fmt` before committing
+- Run `task lint` before committing (includes `go fmt`, `go vet`, and `golangci-lint`)
 - Use `golangci-lint` for static analysis
-- Follow Go coding standards
+- Follow Go coding standards (see go-coding-standards.mdc)
 - Write clear commit messages
+- Fix lint errors before committing:
+  - Import shadowing: rename variables to avoid shadowing imported package names
+  - Unused nolint directives: remove if not needed (linter may resolve issues automatically)
+  - Empty branches: add TODO comments or use `_ = variable` for placeholders
 
 ## Deployment
 - Build for target platform

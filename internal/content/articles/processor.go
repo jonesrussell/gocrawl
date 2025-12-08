@@ -10,11 +10,15 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/jonesrussell/gocrawl/internal/processor"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 )
+
+// Type conversion helper: domain.Type and contenttype.Type are both string types,
+// but we need to compare Item.Type (domain.Type) with contenttype constants.
+// Since Item.Type is domain.Type, we compare with domain.TypeArticle.
 
 // ArticleProcessor implements the common.Processor interface for articles.
 type ArticleProcessor struct {
@@ -23,7 +27,7 @@ type ArticleProcessor struct {
 	validator      content.JobValidator
 	storage        types.Interface
 	indexName      string
-	articleChannel chan *models.Article
+	articleChannel chan *domain.Article
 	articleIndexer processor.Processor
 	pageIndexer    processor.Processor
 }
@@ -35,7 +39,7 @@ func NewProcessor(
 	validator content.JobValidator,
 	storage types.Interface,
 	indexName string,
-	articleChannel chan *models.Article,
+	articleChannel chan *domain.Article,
 	articleIndexer processor.Processor,
 	pageIndexer processor.Processor,
 ) *ArticleProcessor {
@@ -104,7 +108,7 @@ func (p *ArticleProcessor) ValidateJob(job *content.Job) error {
 		return errors.New("job must have at least one item")
 	}
 	for _, item := range job.Items {
-		if item.Type != content.Article {
+		if item.Type != domain.TypeArticle {
 			return errors.New("invalid item type: expected article")
 		}
 	}
@@ -177,7 +181,7 @@ func (p *ArticleProcessor) ProcessContent(ctx context.Context, ct contenttype.Ty
 }
 
 // Get retrieves an article by its ID
-func (p *ArticleProcessor) Get(ctx context.Context, id string) (*models.Article, error) {
+func (p *ArticleProcessor) Get(ctx context.Context, id string) (*domain.Article, error) {
 	// TODO: Implement article retrieval
 	return nil, errors.New("not implemented")
 }

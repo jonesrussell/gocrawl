@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	es "github.com/elastic/go-elasticsearch/v8"
-	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/storage"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
 	loggermocks "github.com/jonesrussell/gocrawl/testutils/mocks/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 // mockTransport implements http.RoundTripper for mocking Elasticsearch responses

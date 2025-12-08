@@ -56,24 +56,90 @@
 - Refactor when linters detect duplication or excessive function length
 
 ## Context Usage
-- Use `CommandContext` for type-safe dependency passing (see command-architecture.mdc)
-- DO NOT use `context.Value()` with individual keys - use `CommandContext` instead
-- Always check for errors when retrieving dependencies from context
-- Propagate context properly to all subcommands
+- Use `CommandDeps` struct for explicit dependency passing (see command-architecture.mdc)
+- DO NOT use `context.Value()` for dependency injection - use `common.NewCommandDeps()` factory
+- Always check for errors when creating dependencies
+- Use `cmd.Context()` for cancellation and timeouts only
 
-## FX (Uber FX) Usage
-- Use FX modules for internal package dependency injection
-- DO NOT create new `fx.New()` apps in command RunE functions
-- Construct dependencies directly in commands
-- Keep FX modules minimal - only include what's needed
-- Avoid duplicate module inclusions (causes "already provided" errors)
+## Dependency Injection
+- Use `common.NewCommandDeps()` factory to get logger and config
+- Use `common.CreateStorageClient()` for storage client creation
+- Construct dependencies directly in command RunE functions
+- DO NOT use FX modules for commands - FX was removed from command layer
+- Keep dependency construction explicit and clear
 
 ## Command Implementation
 - All commands MUST use `Command()` function pattern for registration
-- Commands MUST construct dependencies directly in RunE functions
-- Use helper functions for common dependency construction patterns
+- Commands MUST use `common.NewCommandDeps()` to get dependencies
+- Commands MUST use `common.CreateStorageClient()` for storage
+- Use constants from `cmd/common/constants.go` instead of magic strings/numbers
+- Use `atomic.Int32` directly for atomic operations (not `*int32`)
 - Implement graceful shutdown for long-running commands
 - See command-architecture.mdc for detailed patterns
+
+## Parameter Naming
+- Avoid shadowing imported package names with parameters
+- Use shortened names when needed (e.g., `stor` instead of `storage`, `hostname` instead of `domain`)
+- Follow established naming conventions consistently
+- When importing `internal/domain`, avoid using variable name `domain` (use `hostname` for URL hostnames)
+- When importing `internal/job`, avoid using variable name `job` (use `jobObj` or `j` for job parameters)
+
+## Interface Organization
+- **Interfaces SHOULD be defined in the same file as their implementation**
+- Prefer consolidating interfaces into implementation files when possible
+- Use compile-time interface checks: `var _ InterfaceName = (*Implementation)(nil)`
+- Pattern:
+  ```go
+  // In implementation file (e.g., internal/sources/sources.go)
+  package sources
+  
+  // Interface defines the contract for source management
+  type Interface interface {
+      // ... methods ...
+  }
+  
+  // Sources implements Interface
+  type Sources struct {
+      // ... fields ...
+  }
+  
+  // Compile-time check
+  var _ Interface = (*Sources)(nil)
+  ```
+- Exceptions:
+  - `internal/storage/types/interface.go` - kept separate to avoid circular dependencies
+  - `internal/job/interface.go` - Service interface defined separately from BaseService implementation to avoid name conflicts
+
+## Constants Organization
+- **All shared constants MUST be defined in `internal/constants/constants.go`**
+- Constants are organized by domain: HTTP/Server, Crawler, Storage, Logger, General
+- Use constants from `internal/constants` package - DO NOT create duplicate constant files
+- `internal/common/transport/constants.go` re-exports transport constants for backward compatibility only
+- Pattern:
+  ```go
+  import "github.com/jonesrussell/gocrawl/internal/constants"
+  
+  // Use constants
+  timeout := constants.DefaultRateLimit
+  bufferSize := constants.DefaultBufferSize
+  ```
+
+## Domain Models
+- **Use `internal/domain` package for all domain models** (not `internal/models`)
+- Domain types: `domain.Article`, `domain.Page`, `domain.Content`, `domain.Job`
+- Import pattern: `import "github.com/jonesrussell/gocrawl/internal/domain"`
+- Type constants are prefixed with `Type` (e.g., `domain.TypeArticle`, `domain.TypePage`) to avoid conflicts with struct types
+
+## Package Structure
+- **Avoid catch-all packages** - each package should have a single, clear responsibility
+- `internal/common/` now only contains `transport/` subpackage (TLS utilities and transport constant re-exports)
+- Domain-specific utilities have been moved to their respective packages:
+  - Job interface: `internal/job/interface.go` (Service interface)
+  - Job implementation: `internal/job/service.go` (BaseService struct)
+  - Source utilities: `internal/sources/utils.go` (ConvertSourceConfig, ExtractDomain)
+- All constants: `internal/constants/constants.go` (no duplicates in common package)
+- Do not create circular dependencies - use type packages when needed (`internal/storage/types/`)
+- When importing `internal/job`, use `job.Service` interface (not `common.JobService`)
 
 description:
 globs:

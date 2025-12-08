@@ -12,15 +12,15 @@ import (
 func TestMetrics(t *testing.T) {
 	t.Parallel()
 
-	metrics := crawler.NewCrawlerMetrics()
-
 	t.Run("NewMetrics", func(t *testing.T) {
 		t.Parallel()
+		metrics := crawler.NewCrawlerMetrics()
 		require.NotNil(t, metrics)
 	})
 
 	t.Run("Update", func(t *testing.T) {
 		t.Parallel()
+		metrics := crawler.NewCrawlerMetrics()
 		startTime := time.Now()
 		metrics.Update(startTime, 10, 2)
 		assert.Equal(t, int64(10), metrics.GetProcessedCount())
@@ -30,6 +30,7 @@ func TestMetrics(t *testing.T) {
 
 	t.Run("Reset", func(t *testing.T) {
 		t.Parallel()
+		metrics := crawler.NewCrawlerMetrics()
 		startTime := time.Now()
 		metrics.Update(startTime, 10, 2)
 		metrics.Reset()
@@ -40,6 +41,7 @@ func TestMetrics(t *testing.T) {
 
 	t.Run("GetProcessingDuration", func(t *testing.T) {
 		t.Parallel()
+		metrics := crawler.NewCrawlerMetrics()
 		startTime := time.Now()
 		metrics.Update(startTime, 10, 2)
 		assert.Positive(t, metrics.GetProcessingDuration())

@@ -10,7 +10,6 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/types"
 )
 
 // SearchManager defines the interface for search operations.
@@ -141,7 +140,7 @@ func handleSearch(searchManager SearchManager) gin.HandlerFunc {
 		}
 
 		// Return response
-		response := types.SearchResponse{
+		response := SearchResponse{
 			Results: results,
 			Total:   int(total),
 		}

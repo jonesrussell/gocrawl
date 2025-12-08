@@ -7,9 +7,11 @@ import (
 	"context"
 	"fmt"
 
+	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/storage/types"
+	"github.com/spf13/cobra"
 )
 
 // DefaultMapping provides a default mapping for new index
@@ -56,13 +58,13 @@ type Creator struct {
 func NewCreator(
 	cfg config.Interface,
 	log logger.Interface,
-	storage types.Interface,
+	stor types.Interface,
 	params CreateParams,
 ) *Creator {
 	return &Creator{
 		config:  cfg,
 		logger:  log,
-		storage: storage,
+		storage: stor,
 		index:   params.IndexName,
 	}
 }
@@ -97,4 +99,26 @@ func (c *Creator) Start(ctx context.Context) error {
 
 	c.logger.Info("Successfully created index", "index", c.index)
 	return nil
+}
+
+// runCreateCmd executes the create command
+func runCreateCmd(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+
+	// Get dependencies
+	deps, err := cmdcommon.NewCommandDeps()
+	if err != nil {
+		return fmt.Errorf("failed to initialize dependencies: %w", err)
+	}
+
+	// Create storage using common function
+	storageResult, err := cmdcommon.CreateStorage(deps.Config, deps.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	creator := NewCreator(deps.Config, deps.Logger, storageResult.Storage, CreateParams{})
+	creator.index = args[0]
+
+	return creator.Start(ctx)
 }

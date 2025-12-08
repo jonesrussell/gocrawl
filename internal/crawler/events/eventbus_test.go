@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/crawler/events"
+	"github.com/jonesrussell/gocrawl/internal/domain"
 	"github.com/jonesrussell/gocrawl/internal/logger"
-	"github.com/jonesrussell/gocrawl/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -121,13 +121,13 @@ func (m *MockLogger) NewFxLogger() fxevent.Logger {
 
 // MockEventHandler is a mock implementation of EventHandler
 type MockEventHandler struct {
-	article *models.Article
+	article *domain.Article
 	err     error
 	started bool
 	stopped bool
 }
 
-func (h *MockEventHandler) HandleArticle(ctx context.Context, article *models.Article) error {
+func (h *MockEventHandler) HandleArticle(ctx context.Context, article *domain.Article) error {
 	h.article = article
 	return nil
 }
@@ -162,7 +162,7 @@ func TestEventBus(t *testing.T) {
 		t.Parallel()
 		handler := &MockEventHandler{}
 		bus.Subscribe(handler)
-		article := &models.Article{Title: "Test Article"}
+		article := &domain.Article{Title: "Test Article"}
 		bus.PublishArticle(context.Background(), article)
 		require.Eventually(t, func() bool {
 			return handler.article != nil
