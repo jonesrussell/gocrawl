@@ -9,10 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/golang/mock/gomock"
 	"github.com/jonesrussell/gocrawl/internal/api/middleware"
 	"github.com/jonesrussell/gocrawl/internal/config/server"
 	loggerMock "github.com/jonesrussell/gocrawl/testutils/mocks/logger"
+	"go.uber.org/mock/gomock"
 )
 
 // mockTimeProvider is a mock implementation of TimeProvider
