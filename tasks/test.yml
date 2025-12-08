@@ -4,11 +4,12 @@ tasks:
   test:
     desc: "Run all tests (unit, integration, and feature tests)"
     cmds:
-      - task: test:all
+      - task: all
 
   unit:
     desc: "Run unit tests only (excludes integration and feature tests)"
     cmds:
+      - mkdir -p coverage
       - go test -short -race -coverprofile=coverage/unit.out ./...
 
   integration:
@@ -36,9 +37,9 @@ tasks:
   all:
     desc: "Run all tests (unit, integration, and feature tests)"
     cmds:
-      - task: test:unit
-      - task: test:integration
-      - task: test:features
+      - task: unit
+      - task: integration
+      - task: features
 
   cover:
     desc: "Run tests with coverage"
