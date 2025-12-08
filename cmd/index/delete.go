@@ -124,16 +124,19 @@ func (d *Deleter) deleteIndices(ctx context.Context) error {
 		if source == nil {
 			return fmt.Errorf("source not found: %s", d.sourceName)
 		}
-		if source.Index == "" && source.ArticleIndex == "" {
+		if source.Index == "" && source.ArticleIndex == "" && source.PageIndex == "" {
 			return fmt.Errorf("source %s has no index configured", d.sourceName)
 		}
-		// Add both content and article index if they exist
+		// Add all indices (content, article, and page) if they exist
 		d.index = make([]string, 0, constants.DefaultIndicesCapacity)
 		if source.Index != "" {
 			d.index = append(d.index, source.Index)
 		}
 		if source.ArticleIndex != "" {
 			d.index = append(d.index, source.ArticleIndex)
+		}
+		if source.PageIndex != "" {
+			d.index = append(d.index, source.PageIndex)
 		}
 		d.logger.Info("Resolved source index", "index", d.index, "source", d.sourceName)
 	}

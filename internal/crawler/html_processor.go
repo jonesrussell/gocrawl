@@ -136,10 +136,23 @@ func (p *HTMLProcessor) selectProcessor(contentType contenttype.Type) content.Pr
 func (p *HTMLProcessor) detectContentType(e *colly.HTMLElement) contenttype.Type {
 	url := e.Request.URL.String()
 
-	// Check for article patterns
-	if strings.Contains(url, "/article/") || strings.Contains(url, "/articles/") ||
-		strings.Contains(url, "/blog/") || strings.Contains(url, "/news/") {
-		return contenttype.Article
+	// Check for article patterns - common news/article URL patterns
+	articlePatterns := []string{
+		"/article/",
+		"/articles/",
+		"/blog/",
+		"/news/",
+		"/local-news/",
+		"/story/",
+		"/stories/",
+		"/post/",
+		"/posts/",
+		"/entry/",
+	}
+	for _, pattern := range articlePatterns {
+		if strings.Contains(url, pattern) {
+			return contenttype.Article
+		}
 	}
 
 	// Check for job listings
