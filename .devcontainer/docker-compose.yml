@@ -7,7 +7,7 @@ services:
       args:
         VARIANT: 1-1.24-bookworm
     volumes:
-      - ..:/workspaces:cached
+      - ../..:/workspaces:cached
     command: sleep infinity
     depends_on:
       elasticsearch:

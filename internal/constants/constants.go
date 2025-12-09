@@ -243,6 +243,10 @@ const (
 
 	// DefaultAppEnv is the default application environment
 	DefaultAppEnv = "development"
+
+	// MinArticleBodyLength is the minimum number of characters required
+	// for a page to be detected as an article based on body content
+	MinArticleBodyLength = 200
 )
 
 // Environment types

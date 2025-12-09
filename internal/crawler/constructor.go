@@ -185,7 +185,7 @@ func NewCrawlerWithParams(p CrawlerParams) (*CrawlerResult, error) {
 		done:             make(chan struct{}),
 		articleChannel:   articleChannel,
 		processors:       []content.Processor{articleProcessor, pageProcessor},
-		htmlProcessor:    NewHTMLProcessor(p.Logger),
+		htmlProcessor:    NewHTMLProcessor(p.Logger, p.Sources),
 		cfg:              p.Config,
 		abortChan:        make(chan struct{}),
 	}

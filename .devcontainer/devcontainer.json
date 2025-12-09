@@ -2,7 +2,7 @@
 	"name": "GoCrawl Dev",
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "app",
-	"workspaceFolder": "/workspaces",
+	"workspaceFolder": "/workspaces/gocrawl",
 	
 	"customizations": {
 		"vscode": {
