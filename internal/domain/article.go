@@ -2,6 +2,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -16,45 +17,142 @@ type Article struct {
 	// Main content of the article
 	Body string `json:"body" mapstructure:"body"`
 	// Author of the article
-	Author string `json:"author" mapstructure:"author"`
+	Author string `json:"author,omitempty" mapstructure:"author"`
 	// Byline name if different from author
-	BylineName string `json:"byline_name" mapstructure:"byline_name"`
+	BylineName string `json:"byline_name,omitempty" mapstructure:"byline_name"`
 	// Date when the article was published
 	PublishedDate time.Time `json:"published_date" mapstructure:"published_date"`
 	// Source of the article (e.g., website URL)
 	Source string `json:"source" mapstructure:"source"`
 	// Tags or categories related to the article
-	Tags []string `json:"tags" mapstructure:"tags"`
+	Tags []string `json:"tags,omitempty" mapstructure:"tags"`
 	// Article introduction or summary
-	Intro string `json:"intro" mapstructure:"intro"`
+	Intro string `json:"intro,omitempty" mapstructure:"intro"`
 	// Article description (often from meta tags)
-	Description string `json:"description" mapstructure:"description"`
+	Description string `json:"description,omitempty" mapstructure:"description"`
 	// Raw HTML content
 	HTML *colly.HTMLElement `json:"-" mapstructure:"-"`
 
 	// Open Graph metadata
 	// Open Graph title
-	OgTitle string `json:"og_title" mapstructure:"og_title"`
+	OgTitle string `json:"og_title,omitempty" mapstructure:"og_title"`
 	// Open Graph description
-	OgDescription string `json:"og_description" mapstructure:"og_description"`
+	OgDescription string `json:"og_description,omitempty" mapstructure:"og_description"`
 	// Open Graph image URL
-	OgImage string `json:"og_image" mapstructure:"og_image"`
+	OgImage string `json:"og_image,omitempty" mapstructure:"og_image"`
 	// Open Graph URL
-	OgURL string `json:"og_url" mapstructure:"og_url"`
+	OgURL string `json:"og_url,omitempty" mapstructure:"og_url"`
 
 	// Additional metadata
 	// Canonical URL if different from source
-	CanonicalURL string `json:"canonical_url" mapstructure:"canonical_url"`
+	CanonicalURL string `json:"canonical_url,omitempty" mapstructure:"canonical_url"`
 	// Article word count
 	WordCount int `json:"word_count" mapstructure:"word_count"`
 	// Primary category
-	Category string `json:"category" mapstructure:"category"`
+	Category string `json:"category,omitempty" mapstructure:"category"`
 	// Article section
-	Section string `json:"section" mapstructure:"section"`
+	Section string `json:"section,omitempty" mapstructure:"section"`
 	// Keywords from meta tags
-	Keywords []string `json:"keywords" mapstructure:"keywords"`
+	Keywords []string `json:"keywords,omitempty" mapstructure:"keywords"`
 	// Record creation timestamp
 	CreatedAt time.Time `json:"created_at" mapstructure:"created_at"`
 	// Record update timestamp
 	UpdatedAt time.Time `json:"updated_at" mapstructure:"updated_at"`
+}
+
+// KeywordsString returns keywords as a comma-separated string for Drupal compatibility.
+// Drupal expects field_keywords as a string (long text) field.
+func (a *Article) KeywordsString() string {
+	if len(a.Keywords) == 0 {
+		return ""
+	}
+	return strings.Join(a.Keywords, ", ")
+}
+
+// TagsString returns tags as a comma-separated string.
+func (a *Article) TagsString() string {
+	if len(a.Tags) == 0 {
+		return ""
+	}
+	return strings.Join(a.Tags, ", ")
+}
+
+// PrepareForIndexing cleans and prepares the article for Elasticsearch indexing.
+// This ensures best practices: removes empty strings, normalizes arrays, and prevents duplication.
+func (a *Article) PrepareForIndexing() {
+	// Clean empty strings - convert to empty string (will be omitted by omitempty)
+	if strings.TrimSpace(a.Author) == "" {
+		a.Author = ""
+	}
+	if strings.TrimSpace(a.BylineName) == "" {
+		a.BylineName = ""
+	}
+	if strings.TrimSpace(a.Intro) == "" {
+		a.Intro = ""
+	}
+	if strings.TrimSpace(a.Description) == "" {
+		a.Description = ""
+	}
+	if strings.TrimSpace(a.OgTitle) == "" {
+		a.OgTitle = ""
+	}
+	if strings.TrimSpace(a.OgDescription) == "" {
+		a.OgDescription = ""
+	}
+	if strings.TrimSpace(a.OgImage) == "" {
+		a.OgImage = ""
+	}
+	if strings.TrimSpace(a.OgURL) == "" {
+		a.OgURL = ""
+	}
+	if strings.TrimSpace(a.CanonicalURL) == "" {
+		a.CanonicalURL = ""
+	}
+	if strings.TrimSpace(a.Category) == "" {
+		a.Category = ""
+	}
+	if strings.TrimSpace(a.Section) == "" {
+		a.Section = ""
+	}
+
+	// Normalize arrays - ensure empty arrays are nil (will be omitted by omitempty)
+	if len(a.Tags) == 0 {
+		a.Tags = nil
+	} else {
+		// Remove empty tags and deduplicate
+		seen := make(map[string]bool)
+		cleaned := []string{}
+		for _, tag := range a.Tags {
+			tag = strings.TrimSpace(tag)
+			if tag != "" && !seen[tag] {
+				seen[tag] = true
+				cleaned = append(cleaned, tag)
+			}
+		}
+		if len(cleaned) == 0 {
+			a.Tags = nil
+		} else {
+			a.Tags = cleaned
+		}
+	}
+
+	if len(a.Keywords) == 0 {
+		a.Keywords = nil
+	} else {
+		// Remove empty keywords and deduplicate
+		seen := make(map[string]bool)
+		cleaned := []string{}
+		for _, keyword := range a.Keywords {
+			keyword = strings.TrimSpace(keyword)
+			if keyword != "" && !seen[keyword] {
+				seen[keyword] = true
+				cleaned = append(cleaned, keyword)
+			}
+		}
+		if len(cleaned) == 0 {
+			a.Keywords = nil
+		} else {
+			a.Keywords = cleaned
+		}
+	}
 }

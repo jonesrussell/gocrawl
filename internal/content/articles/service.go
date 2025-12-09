@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/gocolly/colly/v2"
 	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
@@ -50,6 +51,7 @@ type ContentService struct {
 	storage   types.Interface
 	indexName string
 	sources   sources.Interface
+	validator *ArticleValidator
 }
 
 // NewContentService creates a new article service.
@@ -58,6 +60,7 @@ func NewContentService(log logger.Interface, storage types.Interface, indexName 
 		logger:    log,
 		storage:   storage,
 		indexName: indexName,
+		validator: NewArticleValidator(log),
 	}
 }
 
@@ -73,6 +76,7 @@ func NewContentServiceWithSources(
 		storage:   storage,
 		indexName: indexName,
 		sources:   sourcesManager,
+		validator: NewArticleValidator(log),
 	}
 }
 
@@ -136,6 +140,16 @@ func (s *ContentService) Process(e *colly.HTMLElement) error {
 	// Extract article data using Colly methods
 	articleData := extractArticle(e, selectors, sourceURL)
 
+	// Clean category field
+	categories := CleanCategory(articleData.Category)
+	categoryStr := ""
+	if len(categories) > 0 {
+		categoryStr = categories[0] // Use first category as primary
+	}
+
+	// Calculate word count
+	wordCount := CalculateWordCount(articleData.Body)
+
 	// Convert to domain.Article
 	article := &domain.Article{
 		ID:            articleData.ID,
@@ -147,16 +161,29 @@ func (s *ContentService) Process(e *colly.HTMLElement) error {
 		PublishedDate: articleData.PublishedDate,
 		Source:        articleData.Source,
 		Tags:          articleData.Tags,
+		Keywords:      articleData.Keywords,
 		Description:   articleData.Description,
 		Section:       articleData.Section,
-		Category:      articleData.Category,
+		Category:      categoryStr,
 		OgTitle:       articleData.OgTitle,
 		OgDescription: articleData.OgDescription,
 		OgImage:       articleData.OgImage,
 		OgURL:         articleData.OgURL,
 		CanonicalURL:  articleData.CanonicalURL,
+		WordCount:     wordCount,
 		CreatedAt:     articleData.CreatedAt,
 		UpdatedAt:     articleData.UpdatedAt,
+	}
+
+	// Validate article before indexing
+	validationResult := s.validator.ValidateArticle(article)
+	if !validationResult.IsValid {
+		s.logger.Warn("Article validation failed, skipping index",
+			"url", article.Source,
+			"articleID", article.ID,
+			"reason", validationResult.Reason,
+			"title", article.Title)
+		return fmt.Errorf("article validation failed: %s", validationResult.Reason)
 	}
 
 	// Process the article using the service interface with the determined index name
@@ -224,6 +251,37 @@ func (s *ContentService) ProcessArticleWithIndex(ctx context.Context, article *d
 		return errors.New("article source URL is required")
 	}
 
+	// Ensure word count is calculated if not set
+	if article.WordCount == 0 {
+		article.WordCount = CalculateWordCount(article.Body)
+	}
+
+	// Clean category if needed
+	if article.Category != "" {
+		categories := CleanCategory(article.Category)
+		if len(categories) > 0 {
+			article.Category = categories[0]
+		} else {
+			article.Category = ""
+		}
+	}
+
+	// Validate article before indexing (if validator is set)
+	if s.validator != nil {
+		validationResult := s.validator.ValidateArticle(article)
+		if !validationResult.IsValid {
+			s.logger.Warn("Article validation failed, skipping index",
+				"url", article.Source,
+				"articleID", article.ID,
+				"reason", validationResult.Reason,
+				"title", article.Title)
+			return fmt.Errorf("article validation failed: %s", validationResult.Reason)
+		}
+	}
+
+	// Prepare article for indexing: clean empty fields, normalize arrays, prevent duplication
+	article.PrepareForIndexing()
+
 	// Index the article to Elasticsearch
 	if err := s.storage.IndexDocument(ctx, indexName, article.ID, article); err != nil {
 		s.logger.Error("Failed to index article",
@@ -234,11 +292,14 @@ func (s *ContentService) ProcessArticleWithIndex(ctx context.Context, article *d
 		return fmt.Errorf("failed to index article: %w", err)
 	}
 
-	s.logger.Debug("Article indexed successfully",
+	s.logger.Info("Article indexed successfully",
 		"articleID", article.ID,
 		"url", article.Source,
 		"index", indexName,
-		"title", article.Title)
+		"title", article.Title,
+		"wordCount", article.WordCount,
+		"publishedDate", article.PublishedDate.Format(time.RFC3339),
+		"category", article.Category)
 
 	return nil
 }
