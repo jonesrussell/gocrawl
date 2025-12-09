@@ -454,29 +454,101 @@ func (s *ElasticsearchStorage) EnsureArticleIndex(ctx context.Context, name stri
 	articleMapping := map[string]any{
 		"mappings": map[string]any{
 			"properties": map[string]any{
-				"title": map[string]any{
-					"type": "text",
-				},
-				"content": map[string]any{
-					"type": "text",
-				},
-				"url": map[string]any{
+				"id": map[string]any{
 					"type": "keyword",
 				},
-				"published_at": map[string]any{
+				"title": map[string]any{
+					"type": "text",
+					"fields": map[string]any{
+						"keyword": map[string]any{
+							"type":         "keyword",
+							"ignore_above": 256,
+						},
+					},
+				},
+				"body": map[string]any{
+					"type": "text",
+					// No keyword sub-field for long text content
+				},
+				"author": map[string]any{
+					"type": "keyword",
+				},
+				"byline_name": map[string]any{
+					"type": "keyword",
+				},
+				"published_date": map[string]any{
 					"type": "date",
 				},
 				"source": map[string]any{
 					"type": "keyword",
 				},
-				"author": map[string]any{
-					"type": "keyword",
-				},
 				"tags": map[string]any{
 					"type": "keyword",
 				},
-				"categories": map[string]any{
+				"keywords": map[string]any{
 					"type": "keyword",
+				},
+				"intro": map[string]any{
+					"type": "text",
+					// No keyword sub-field for long text content
+				},
+				"description": map[string]any{
+					"type": "text",
+					"fields": map[string]any{
+						"keyword": map[string]any{
+							"type":         "keyword",
+							"ignore_above": 512,
+						},
+					},
+				},
+				"og_title": map[string]any{
+					"type": "text",
+					"fields": map[string]any{
+						"keyword": map[string]any{
+							"type":         "keyword",
+							"ignore_above": 256,
+						},
+					},
+				},
+				"og_description": map[string]any{
+					"type": "text",
+					// No keyword sub-field for long text content
+				},
+				"og_image": map[string]any{
+					"type": "keyword",
+				},
+				"og_url": map[string]any{
+					"type": "keyword",
+				},
+				"canonical_url": map[string]any{
+					"type": "keyword",
+				},
+				"word_count": map[string]any{
+					"type": "integer",
+				},
+				"category": map[string]any{
+					"type": "text",
+					"fields": map[string]any{
+						"keyword": map[string]any{
+							"type":         "keyword",
+							"ignore_above": 512,
+						},
+					},
+				},
+				"section": map[string]any{
+					"type": "text",
+					"fields": map[string]any{
+						"keyword": map[string]any{
+							"type":         "keyword",
+							"ignore_above": 512,
+						},
+					},
+				},
+				"created_at": map[string]any{
+					"type": "date",
+				},
+				"updated_at": map[string]any{
+					"type": "date",
 				},
 			},
 		},
