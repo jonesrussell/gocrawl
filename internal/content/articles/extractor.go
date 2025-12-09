@@ -219,10 +219,17 @@ func extractArticle(e *colly.HTMLElement, selectors configtypes.ArticleSelectors
 
 // extractBasicFields extracts title and intro fields.
 func extractBasicFields(data *ArticleData, e *colly.HTMLElement, selectors configtypes.ArticleSelectors) {
-	data.Title = extractText(e, selectors.Title)
-	if data.Title == "" {
-		// Fallback to OG title
-		data.Title = extractMeta(e, "og:title")
+	// Extract title from selector
+	extractedTitle := extractText(e, selectors.Title)
+
+	// Extract OG title as fallback/preference
+	ogTitle := extractMeta(e, "og:title")
+
+	// Prefer OG title if available, otherwise use extracted title
+	if ogTitle != "" {
+		data.Title = ogTitle
+	} else {
+		data.Title = extractedTitle
 	}
 
 	data.Intro = extractText(e, selectors.Intro)
@@ -362,10 +369,10 @@ func extractOtherMetadata(
 		data.Section = extractMeta(e, "article:section")
 	}
 
-	// Extract category and clean it
-	categoryStr := extractText(e, selectors.Category)
-	if categoryStr == "" {
-		categoryStr = extractMeta(e, "article:section")
+	// Extract category
+	data.Category = extractText(e, selectors.Category)
+	if data.Category == "" {
+		data.Category = extractMeta(e, "article:section")
 	}
 	// Clean category will be applied when converting to domain.Article
 

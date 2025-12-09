@@ -26,14 +26,14 @@ type ArticleValidator struct {
 
 // ValidationStats tracks validation statistics
 type ValidationStats struct {
-	TotalProcessed    int64
-	ValidArticles     int64
-	InvalidArticles   int64
-	CategoryPageSkips int64
-	InvalidDateSkips  int64
+	TotalProcessed      int64
+	ValidArticles       int64
+	InvalidArticles     int64
+	CategoryPageSkips   int64
+	InvalidDateSkips    int64
 	ContentQualitySkips int64
-	TitleQualitySkips  int64
-	WordCountSkips     int64
+	TitleQualitySkips   int64
+	WordCountSkips      int64
 }
 
 // NewArticleValidator creates a new article validator
@@ -437,4 +437,3 @@ func CleanCategory(category string) []string {
 
 	return result
 }
-
