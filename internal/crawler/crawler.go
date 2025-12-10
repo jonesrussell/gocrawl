@@ -25,6 +25,7 @@ import (
 	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/metrics"
 	"github.com/jonesrussell/gocrawl/internal/sources"
+	sourcestypes "github.com/jonesrussell/gocrawl/internal/sources/types"
 	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 )
 
@@ -161,6 +162,7 @@ type Crawler struct {
 	pageProcessor    content.Processor
 	state            *State
 	done             chan struct{}
+	doneOnce         sync.Once // Ensures done channel is only closed once
 	wg               sync.WaitGroup
 	articleChannel   chan *domain.Article
 	processors       []content.Processor
@@ -471,6 +473,11 @@ func (c *Crawler) Start(ctx context.Context, sourceName string) error {
 	// Stop the crawler state
 	c.state.Stop()
 
+	// Signal completion by closing the done channel
+	c.doneOnce.Do(func() {
+		close(c.done)
+	})
+
 	return nil
 }
 
@@ -542,9 +549,14 @@ func (c *Crawler) Stop(ctx context.Context) error {
 	}
 }
 
-// Wait waits for the crawler to complete
+// Wait waits for the crawler to complete.
+// Since Start() already waits for the collector to finish, this method
+// just ensures the done channel is closed to signal completion.
 func (c *Crawler) Wait() error {
-	c.wg.Wait()
+	// Close the done channel to signal completion (safe to call multiple times)
+	c.doneOnce.Do(func() {
+		close(c.done)
+	})
 	return nil
 }
 
@@ -702,9 +714,24 @@ func (c *Crawler) SetCollector(collector *colly.Collector) {
 // Processor Management
 // ------------------
 
+// getSourceConfig gets the source configuration for the current source
+func (c *Crawler) getSourceConfig() *configtypes.Source {
+	sourceName := c.state.CurrentSource()
+	if sourceName == "" || c.sources == nil {
+		return nil
+	}
+	sourceConfig := c.sources.FindByName(sourceName)
+	if sourceConfig == nil {
+		return nil
+	}
+	// Convert to configtypes.Source
+	return sourcestypes.ConvertToConfigSource(sourceConfig)
+}
+
 // selectProcessor selects the appropriate processor for the given HTML element
 func (c *Crawler) selectProcessor(e *colly.HTMLElement) content.Processor {
-	contentType := c.htmlProcessor.detectContentType(e)
+	source := c.getSourceConfig()
+	contentType := c.htmlProcessor.DetectContentType(e, source)
 
 	// Try to get a processor for the specific content type
 	processor := c.getProcessorForType(contentType)
@@ -882,12 +909,16 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 		// Continue processing
 	}
 
+	// Get source config for content type detection
+	source := c.getSourceConfig()
+
 	// Detect content type and get appropriate processor
 	processor := c.selectProcessor(e)
 	if processor == nil {
+		contentType := c.htmlProcessor.DetectContentType(e, source)
 		c.logger.Debug("No processor found for content",
 			"url", e.Request.URL.String(),
-			"type", c.htmlProcessor.detectContentType(e))
+			"type", contentType)
 		c.state.IncrementProcessed()
 		return
 	}
@@ -895,23 +926,25 @@ func (c *Crawler) ProcessHTML(e *colly.HTMLElement) {
 	// Process the content
 	err := processor.Process(c.state.Context(), e)
 	if err != nil {
+		contentType := c.htmlProcessor.DetectContentType(e, source)
 		// If the error is "not implemented", log at debug level since this is expected
 		// until the feature is implemented
 		if err.Error() == "not implemented" {
 			c.logger.Debug("Content processing not implemented",
 				"url", e.Request.URL.String(),
-				"type", c.htmlProcessor.detectContentType(e))
+				"type", contentType)
 		} else {
 			c.logger.Error("Failed to process content",
 				"error", err,
 				"url", e.Request.URL.String(),
-				"type", c.htmlProcessor.detectContentType(e))
+				"type", contentType)
 			c.state.IncrementError()
 		}
 	} else {
+		contentType := c.htmlProcessor.DetectContentType(e, source)
 		c.logger.Debug("Successfully processed content",
 			"url", e.Request.URL.String(),
-			"type", c.htmlProcessor.detectContentType(e))
+			"type", contentType)
 	}
 
 	c.state.IncrementProcessed()

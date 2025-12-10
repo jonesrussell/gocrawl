@@ -9,9 +9,12 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/jonesrussell/gocrawl/internal/config/types"
+	"github.com/jonesrussell/gocrawl/internal/constants"
 	"github.com/jonesrussell/gocrawl/internal/content"
 	"github.com/jonesrussell/gocrawl/internal/content/contenttype"
 	"github.com/jonesrussell/gocrawl/internal/logger"
+	"github.com/jonesrussell/gocrawl/internal/sources"
 )
 
 // HTMLProcessor processes HTML content and delegates to appropriate content processors.
@@ -19,40 +22,26 @@ type HTMLProcessor struct {
 	logger       logger.Interface
 	processors   []content.Processor
 	unknownTypes map[contenttype.Type]int
+	sources      sources.Interface
 }
 
 // NewHTMLProcessor creates a new HTMLProcessor.
-func NewHTMLProcessor(log logger.Interface) *HTMLProcessor {
+func NewHTMLProcessor(log logger.Interface, sources sources.Interface) *HTMLProcessor {
 	return &HTMLProcessor{
 		logger:       log,
 		processors:   make([]content.Processor, 0, DefaultProcessorsCapacity), // Pre-allocate for article and page processors
 		unknownTypes: make(map[contenttype.Type]int),
+		sources:      sources,
 	}
 }
 
 // Process processes an HTML element.
+// Note: This method is part of the content.Processor interface but content type
+// detection is handled by the crawler via detectContentType, not through this method.
 func (p *HTMLProcessor) Process(ctx context.Context, contentData any) error {
-	e, ok := contentData.(*colly.HTMLElement)
-	if !ok {
-		return fmt.Errorf("invalid content type: expected *colly.HTMLElement, got %T", contentData)
-	}
-
-	// Detect content type
-	contentType := p.detectContentType(e)
-
-	// Select appropriate processor
-	processor := p.selectProcessor(contentType)
-	if processor == nil {
-		p.unknownTypes[contentType]++
-		return fmt.Errorf("no processor found for content type: %s", contentType)
-	}
-
-	// Process the content
-	if err := processor.Process(ctx, e); err != nil {
-		return fmt.Errorf("failed to process content: %w", err)
-	}
-
-	return nil
+	// This method is not used in the current implementation.
+	// Content type detection happens in crawler.selectProcessor via detectContentType.
+	return errors.New("not implemented")
 }
 
 // ParseHTML parses HTML content.
@@ -132,31 +121,61 @@ func (p *HTMLProcessor) selectProcessor(contentType contenttype.Type) content.Pr
 	return nil
 }
 
-// detectContentType detects the content type of the given HTML element.
-func (p *HTMLProcessor) detectContentType(e *colly.HTMLElement) contenttype.Type {
-	url := e.Request.URL.String()
+// DetectContentType detects the content type of the given HTML element using selector-based detection.
+func (p *HTMLProcessor) DetectContentType(e *colly.HTMLElement, source *types.Source) contenttype.Type {
+	// e.DOM is a goquery.Selection, and since OnHTML("html") is used,
+	// e.DOM represents the html element, so Find() searches the entire document
 
-	// Check for article patterns
-	if strings.Contains(url, "/article/") || strings.Contains(url, "/articles/") ||
-		strings.Contains(url, "/blog/") || strings.Contains(url, "/news/") {
+	// Strategy 1: Check Open Graph type metadata
+	ogType := e.DOM.Find("meta[property='og:type']").AttrOr("content", "")
+	if ogType == "article" {
+		p.logger.Debug("Detected article via og:type metadata")
 		return contenttype.Article
 	}
 
-	// Check for job listings
-	if strings.Contains(url, "/job/") || strings.Contains(url, "/jobs/") ||
-		strings.Contains(url, "/career/") || strings.Contains(url, "/careers/") {
-		return contenttype.Job
+	// Strategy 2: Use article selectors to detect content
+	// If the page matches article selectors and has substantial content, it's an article
+	if source == nil || source.Selectors.Article.Body == "" {
+		p.logger.Debug("No source or article body selector defined, defaulting to page")
+		return contenttype.Page
 	}
 
-	// Check for image galleries
-	if strings.Contains(url, "/image/") || strings.Contains(url, "/images/") ||
-		strings.Contains(url, "/photo/") || strings.Contains(url, "/photos/") ||
-		strings.Contains(url, "/gallery/") {
-		return contenttype.Image
+	// Get article body using the source's body selector
+	bodySelector := source.Selectors.Article.Body
+	articleBody := e.DOM.Find(bodySelector)
+	if articleBody.Length() == 0 {
+		p.logger.Debug("No article body found with selector", "selector", bodySelector)
+		return contenttype.Page
 	}
 
-	// Default to page
-	return contenttype.Page
+	// Verify it has substantial content (articles typically have >200 chars)
+	bodyText := strings.TrimSpace(articleBody.Text())
+	if len(bodyText) < constants.MinArticleBodyLength {
+		p.logger.Debug("Body content too short, treating as page",
+			"length", len(bodyText),
+			"min_required", constants.MinArticleBodyLength)
+		return contenttype.Page
+	}
+
+	// Strategy 3: Verify title exists (articles should have titles)
+	titleSelector := source.Selectors.Article.Title
+	if titleSelector != "" {
+		articleTitle := e.DOM.Find(titleSelector)
+		if articleTitle.Length() == 0 {
+			p.logger.Debug("No article title found, treating as page")
+			return contenttype.Page
+		}
+
+		titleText := strings.TrimSpace(articleTitle.Text())
+		if titleText == "" {
+			p.logger.Debug("Empty article title, treating as page")
+			return contenttype.Page
+		}
+	}
+
+	// If we got here, it has body + title with substantial content
+	p.logger.Debug("Detected article via selectors", "body_length", len(bodyText))
+	return contenttype.Article
 }
 
 // GetUnknownTypes returns a map of content types that have no registered processor.

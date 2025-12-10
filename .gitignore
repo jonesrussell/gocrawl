@@ -161,12 +161,15 @@ tmp/
 temp/
 .tmp/
 *.tmp
-*.bak
 *.swp
-*.backup
 
 # PID Files
 *.pid
+
+# Backups
+backups/
+*.bak
+*.backup
 
 # =================================================================
 # DOCKER AND CONTAINERS

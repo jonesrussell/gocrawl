@@ -211,21 +211,24 @@ func setupDevelopmentLogging() {
 	// Check both the flag variable and Viper to ensure we catch the debug flag
 	// Note: Debug variable is set by ParseFlags(), and we bind it to Viper above
 	debugFlag := Debug || viper.GetBool("app.debug")
-	isDev := viper.GetString("app.environment") == "development" || debugFlag
+	isDev := viper.GetString("app.environment") == "development"
 
-	// Force set debug level if debug flag is set
+	// Only set debug level if explicitly requested via flag or APP_DEBUG
+	// Do NOT automatically set debug level just because environment is "development"
 	if debugFlag {
 		viper.Set("logger.level", "debug")
 	}
 
+	// Set development mode features (formatting, colors, etc.) if in development environment
+	// But do NOT change log level unless explicitly requested
 	if isDev {
 		viper.Set("logger.development", true)
 		viper.Set("logger.enable_color", true)
 		viper.Set("logger.caller", true)
 		viper.Set("logger.stacktrace", true)
 		viper.Set("logger.encoding", "console")
-		// Ensure debug level is set for development mode
-		if !debugFlag {
+		// Only set debug level if explicitly requested
+		if debugFlag {
 			viper.Set("logger.level", "debug")
 		}
 	}
