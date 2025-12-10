@@ -153,16 +153,9 @@ func (m *ElasticsearchIndexManager) EnsureArticleIndex(ctx context.Context, name
 				},
 				"title": map[string]any{
 					"type": "text",
-					"fields": map[string]any{
-						"keyword": map[string]any{
-							"type":         "keyword",
-							"ignore_above": 256,
-						},
-					},
 				},
 				"body": map[string]any{
 					"type": "text",
-					// No keyword sub-field for long text content
 				},
 				"author": map[string]any{
 					"type": "keyword",
@@ -184,29 +177,15 @@ func (m *ElasticsearchIndexManager) EnsureArticleIndex(ctx context.Context, name
 				},
 				"intro": map[string]any{
 					"type": "text",
-					// No keyword sub-field for long text content
 				},
 				"description": map[string]any{
 					"type": "text",
-					"fields": map[string]any{
-						"keyword": map[string]any{
-							"type":         "keyword",
-							"ignore_above": 512,
-						},
-					},
 				},
 				"og_title": map[string]any{
 					"type": "text",
-					"fields": map[string]any{
-						"keyword": map[string]any{
-							"type":         "keyword",
-							"ignore_above": 256,
-						},
-					},
 				},
 				"og_description": map[string]any{
 					"type": "text",
-					// No keyword sub-field for long text content
 				},
 				"og_image": map[string]any{
 					"type": "keyword",
@@ -221,22 +200,10 @@ func (m *ElasticsearchIndexManager) EnsureArticleIndex(ctx context.Context, name
 					"type": "integer",
 				},
 				"category": map[string]any{
-					"type": "text",
-					"fields": map[string]any{
-						"keyword": map[string]any{
-							"type":         "keyword",
-							"ignore_above": 512,
-						},
-					},
+					"type": "keyword",
 				},
 				"section": map[string]any{
-					"type": "text",
-					"fields": map[string]any{
-						"keyword": map[string]any{
-							"type":         "keyword",
-							"ignore_above": 512,
-						},
-					},
+					"type": "keyword",
 				},
 				"created_at": map[string]any{
 					"type": "date",

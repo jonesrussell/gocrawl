@@ -40,8 +40,8 @@ func createHTMLElement(htmlContent string) (*colly.HTMLElement, error) {
 	}
 
 	req := &colly.Request{
-		URL:    parsedURL,
-		Method: "GET",
+		URL:     parsedURL,
+		Method:  "GET",
 		Headers: &http.Header{},
 	}
 
