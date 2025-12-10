@@ -18,6 +18,7 @@ import (
 	loggerpkg "github.com/jonesrussell/gocrawl/internal/logger"
 	sourcespkg "github.com/jonesrussell/gocrawl/internal/sources"
 	"github.com/jonesrussell/gocrawl/internal/sources/loader"
+	storagetypes "github.com/jonesrussell/gocrawl/internal/storage/types"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +29,7 @@ type Crawler struct {
 	jobService    job.Service
 	sourceManager sourcespkg.Interface
 	crawler       crawler.Interface
+	storage       storagetypes.Interface
 	done          chan struct{} // Channel to signal crawler completion
 	doneOnce      sync.Once     // Ensures done channel is only closed once
 }
@@ -39,6 +41,7 @@ func NewCrawler(
 	jobService job.Service,
 	sourceManager sourcespkg.Interface,
 	crawlerInstance crawler.Interface,
+	storage storagetypes.Interface,
 	done chan struct{},
 ) *Crawler {
 	return &Crawler{
@@ -47,6 +50,7 @@ func NewCrawler(
 		jobService:    jobService,
 		sourceManager: sourceManager,
 		crawler:       crawlerInstance,
+		storage:       storage,
 		done:          done,
 	}
 }
@@ -55,6 +59,13 @@ func NewCrawler(
 func (c *Crawler) Start(ctx context.Context) error {
 	// Note: The done channel is closed by the JobService, not here.
 	// We don't need to clean it up here to avoid double-close panics.
+
+	// Ensure storage is closed when we're done
+	defer func() {
+		if err := c.storage.Close(); err != nil {
+			c.logger.Error("Failed to close storage", "error", err)
+		}
+	}()
 
 	// Check if sources exist
 	if _, err := sourcespkg.LoadSources(c.config, c.logger); err != nil {
@@ -205,6 +216,9 @@ func constructCrawlerDependencies(
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
 
+	// Note: Storage cleanup is handled by Crawler.cleanup()
+	// which is called when the crawler finishes
+
 	// Get index names for this source
 	articleIndex, pageIndex := getIndexNamesForSource(sourceManager, sourceName)
 
@@ -241,5 +255,5 @@ func constructCrawlerDependencies(
 		SourceName:       sourceName,
 	})
 
-	return NewCrawler(cfg, log, jobService, sourceManager, crawlerInstance, done), nil
+	return NewCrawler(cfg, log, jobService, sourceManager, crawlerInstance, storageResult.Storage, done), nil
 }

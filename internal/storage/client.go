@@ -19,9 +19,10 @@ type ClientParams struct {
 	Logger logger.Interface
 }
 
-// ClientResult contains the Elasticsearch client
+// ClientResult contains the Elasticsearch client and transport
 type ClientResult struct {
-	Client *es.Client
+	Client    *es.Client
+	Transport *http.Transport
 }
 
 // NewClient creates a new Elasticsearch client
@@ -59,7 +60,8 @@ func NewClient(p ClientParams) (ClientResult, error) {
 	}
 
 	return ClientResult{
-		Client: client,
+		Client:    client,
+		Transport: transport,
 	}, nil
 }
 

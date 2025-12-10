@@ -34,16 +34,20 @@ func CreateStorageClient(cfg config.Interface, log logger.Interface) (*es.Client
 // This consolidates the common pattern used across all commands.
 func CreateStorage(cfg config.Interface, log logger.Interface) (*StorageResult, error) {
 	// Create storage client
-	client, err := CreateStorageClient(cfg, log)
+	clientResult, err := storage.NewClient(storage.ClientParams{
+		Config: cfg,
+		Logger: log,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("create storage client: %w", err)
 	}
 
 	// Create storage
 	storageResult, err := storage.NewStorage(storage.StorageParams{
-		Config: cfg,
-		Logger: log,
-		Client: client,
+		Config:    cfg,
+		Logger:    log,
+		Client:    clientResult.Client,
+		Transport: clientResult.Transport,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create storage: %w", err)

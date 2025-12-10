@@ -26,9 +26,10 @@ const (
 
 // StorageParams contains dependencies for creating a storage instance
 type StorageParams struct {
-	Config config.Interface
-	Logger logger.Interface
-	Client *es.Client
+	Config    config.Interface
+	Logger    logger.Interface
+	Client    *es.Client
+	Transport *http.Transport
 }
 
 // StorageResult holds the storage instance and index manager
@@ -42,9 +43,10 @@ func NewStorage(p StorageParams) (StorageResult, error) {
 	// Create storage with default options
 	opts := DefaultOptions()
 	storage := &Storage{
-		client: p.Client,
-		logger: p.Logger,
-		opts:   opts,
+		client:    p.Client,
+		logger:    p.Logger,
+		opts:      opts,
+		transport: p.Transport,
 	}
 
 	// Create index manager
@@ -63,6 +65,7 @@ type Storage struct {
 	logger       logger.Interface
 	opts         Options
 	indexManager types.IndexManager
+	transport    *http.Transport
 }
 
 // Ensure Storage implements types.Interface
@@ -689,8 +692,12 @@ func (s *Storage) TestConnection(ctx context.Context) error {
 	return nil
 }
 
-// Close closes any resources held by the search manager.
+// Close closes any resources held by the storage, including HTTP connections.
 func (s *Storage) Close() error {
-	// No resources to close in this implementation
+	// Close idle HTTP connections to allow the program to exit cleanly
+	if s.transport != nil {
+		s.transport.CloseIdleConnections()
+		s.logger.Debug("Closed idle HTTP connections")
+	}
 	return nil
 }
