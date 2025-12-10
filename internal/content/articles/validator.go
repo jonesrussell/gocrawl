@@ -193,7 +193,7 @@ func (v *ArticleValidator) isCategoryPage(article *domain.Article) ValidationRes
 	}
 
 	// Check for concatenated content (multiple article snippets)
-	// Check body, intro, and og_description as they can all contain concatenated content
+	// Check body, intro, and description as they can all contain concatenated content
 	if v.hasConcatenatedContent(article.Body) {
 		return ValidationResult{
 			IsValid: false,
@@ -206,10 +206,10 @@ func (v *ArticleValidator) isCategoryPage(article *domain.Article) ValidationRes
 			Reason:  "Content appears to be concatenated snippets from multiple articles (intro)",
 		}
 	}
-	if article.OgDescription != "" && v.hasConcatenatedContent(article.OgDescription) {
+	if article.Description != "" && v.hasConcatenatedContent(article.Description) {
 		return ValidationResult{
 			IsValid: false,
-			Reason:  "Content appears to be concatenated snippets from multiple articles (og_description)",
+			Reason:  "Content appears to be concatenated snippets from multiple articles (description)",
 		}
 	}
 

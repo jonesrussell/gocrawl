@@ -34,13 +34,13 @@ type Article struct {
 	HTML *colly.HTMLElement `json:"-" mapstructure:"-"`
 
 	// Open Graph metadata
-	// Open Graph title
+	// Open Graph title (may differ from Title for social sharing)
 	OgTitle string `json:"og_title,omitempty" mapstructure:"og_title"`
-	// Open Graph description
+	// Open Graph description (may differ from Description/Intro for social sharing)
 	OgDescription string `json:"og_description,omitempty" mapstructure:"og_description"`
 	// Open Graph image URL
 	OgImage string `json:"og_image,omitempty" mapstructure:"og_image"`
-	// Open Graph URL
+	// Open Graph URL (may differ from CanonicalURL)
 	OgURL string `json:"og_url,omitempty" mapstructure:"og_url"`
 
 	// Additional metadata
@@ -77,6 +77,36 @@ func (a *Article) TagsString() string {
 	return strings.Join(a.Tags, ", ")
 }
 
+// GetOGTitle returns the Open Graph title, falling back to Title if OG title is not set.
+func (a *Article) GetOGTitle() string {
+	if a.OgTitle != "" {
+		return a.OgTitle
+	}
+	return a.Title
+}
+
+// GetOGDescription returns the Open Graph description, falling back to Description or Intro if OG description is not set.
+func (a *Article) GetOGDescription() string {
+	if a.OgDescription != "" {
+		return a.OgDescription
+	}
+	if a.Description != "" {
+		return a.Description
+	}
+	return a.Intro
+}
+
+// GetOGURL returns the Open Graph URL, falling back to CanonicalURL or Source if OG URL is not set.
+func (a *Article) GetOGURL() string {
+	if a.OgURL != "" {
+		return a.OgURL
+	}
+	if a.CanonicalURL != "" {
+		return a.CanonicalURL
+	}
+	return a.Source
+}
+
 // PrepareForIndexing cleans and prepares the article for Elasticsearch indexing.
 // This ensures best practices: removes empty strings, normalizes arrays, and prevents duplication.
 func (a *Article) PrepareForIndexing() {
@@ -93,20 +123,36 @@ func (a *Article) PrepareForIndexing() {
 	if strings.TrimSpace(a.Description) == "" {
 		a.Description = ""
 	}
+	if strings.TrimSpace(a.OgImage) == "" {
+		a.OgImage = ""
+	}
+	if strings.TrimSpace(a.CanonicalURL) == "" {
+		a.CanonicalURL = ""
+	}
+	
+	// Remove duplicate OG fields - only store if they differ from canonical fields
+	// This prevents storing duplicate data while preserving unique OG metadata
+	if strings.TrimSpace(a.OgTitle) == strings.TrimSpace(a.Title) {
+		a.OgTitle = "" // Will be omitted by omitempty
+	}
+	if strings.TrimSpace(a.OgDescription) == strings.TrimSpace(a.Description) || 
+	   strings.TrimSpace(a.OgDescription) == strings.TrimSpace(a.Intro) {
+		a.OgDescription = "" // Will be omitted by omitempty
+	}
+	if strings.TrimSpace(a.OgURL) == strings.TrimSpace(a.CanonicalURL) || 
+	   strings.TrimSpace(a.OgURL) == strings.TrimSpace(a.Source) {
+		a.OgURL = "" // Will be omitted by omitempty
+	}
+	
+	// Clean OG fields
 	if strings.TrimSpace(a.OgTitle) == "" {
 		a.OgTitle = ""
 	}
 	if strings.TrimSpace(a.OgDescription) == "" {
 		a.OgDescription = ""
 	}
-	if strings.TrimSpace(a.OgImage) == "" {
-		a.OgImage = ""
-	}
 	if strings.TrimSpace(a.OgURL) == "" {
 		a.OgURL = ""
-	}
-	if strings.TrimSpace(a.CanonicalURL) == "" {
-		a.CanonicalURL = ""
 	}
 	if strings.TrimSpace(a.Category) == "" {
 		a.Category = ""
