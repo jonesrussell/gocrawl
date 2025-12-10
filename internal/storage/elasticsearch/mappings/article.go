@@ -18,16 +18,20 @@ type ArticleMappings struct {
 
 // ArticleProperties defines the properties for each field in the article mapping
 type ArticleProperties struct {
-	ID          Field `json:"id"`
-	URL         Field `json:"url"`
-	Title       Field `json:"title"`
-	Content     Field `json:"content"`
-	Author      Field `json:"author"`
-	PublishedAt Field `json:"published_at"`
-	CreatedAt   Field `json:"created_at"`
-	UpdatedAt   Field `json:"updated_at"`
-	Source      Field `json:"source"`
-	Tags        Field `json:"tags"`
+	ID            Field `json:"id"`
+	URL           Field `json:"url"`
+	Title         Field `json:"title"`
+	Content       Field `json:"content"`
+	Author        Field `json:"author"`
+	PublishedAt   Field `json:"published_at"`
+	CreatedAt     Field `json:"created_at"`
+	UpdatedAt     Field `json:"updated_at"`
+	Source        Field `json:"source"`
+	Tags          Field `json:"tags"`
+	OgTitle       Field `json:"og_title,omitempty"`
+	OgDescription Field `json:"og_description,omitempty"`
+	OgImage       Field `json:"og_image,omitempty"`
+	OgURL         Field `json:"og_url,omitempty"`
 }
 
 // Field represents an Elasticsearch field mapping
@@ -78,6 +82,20 @@ func NewArticleMapping() *ArticleMapping {
 					Type: "keyword",
 				},
 				Tags: Field{
+					Type: "keyword",
+				},
+				OgTitle: Field{
+					Type:     "text",
+					Analyzer: "standard",
+				},
+				OgDescription: Field{
+					Type:     "text",
+					Analyzer: "standard",
+				},
+				OgImage: Field{
+					Type: "keyword",
+				},
+				OgURL: Field{
 					Type: "keyword",
 				},
 			},
