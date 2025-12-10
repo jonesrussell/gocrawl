@@ -59,19 +59,23 @@ func (s *JobService) Start(ctx context.Context) error {
 
 	// Start the crawler in a goroutine so it doesn't block
 	go func() {
+		s.logger.Debug("Goroutine: Starting crawler")
 		// Start the crawler with the source name
 		if err := s.crawler.Start(ctx, s.sourceName); err != nil {
 			s.logger.Error("Crawler failed", "error", err)
 		}
+		s.logger.Debug("Goroutine: Crawler.Start() returned, calling Wait()")
 		// Wait for the crawler to complete all async operations
 		// crawler.Start() returns immediately after starting async operations,
 		// so we must wait for them to complete
 		if err := s.crawler.Wait(); err != nil {
 			s.logger.Error("Error waiting for crawler", "error", err)
 		}
+		s.logger.Debug("Goroutine: Crawler.Wait() returned, closing done channel")
 		// Signal completion when crawler finishes
 		s.doneOnce.Do(func() {
 			close(s.done)
+			s.logger.Debug("Goroutine: Done channel closed")
 		})
 	}()
 

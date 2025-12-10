@@ -62,8 +62,11 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 	// Ensure storage is closed when we're done
 	defer func() {
+		c.logger.Debug("Defer: Closing storage")
 		if err := c.storage.Close(); err != nil {
 			c.logger.Error("Failed to close storage", "error", err)
+		} else {
+			c.logger.Debug("Defer: Storage closed successfully")
 		}
 	}()
 
@@ -89,7 +92,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	select {
 	case <-c.done:
 		// Crawler completed successfully
-		c.logger.Info("Crawler completed successfully")
+		c.logger.Info("Crawler completed successfully, exiting Start()")
 		return nil
 	case <-ctx.Done():
 		// Interrupt signal received - graceful shutdown
@@ -131,7 +134,10 @@ The --max-depth flag can be used to override the max_depth setting from the sour
 				return fmt.Errorf("failed to construct crawler dependencies: %w", err)
 			}
 
-			return crawlerInstance.Start(cmd.Context())
+			deps.Logger.Debug("Command: Calling crawlerInstance.Start()")
+			err = crawlerInstance.Start(cmd.Context())
+			deps.Logger.Debug("Command: crawlerInstance.Start() returned", "error", err)
+			return err
 		},
 	}
 
