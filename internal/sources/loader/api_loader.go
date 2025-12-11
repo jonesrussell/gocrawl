@@ -40,8 +40,8 @@ func (l *APILoader) LoadSources() ([]Config, error) {
 	// Convert API sources to Config structs
 	configs := make([]Config, 0, len(apiSources))
 	for i := range apiSources {
-		cfg, err := convertAPISourceToConfig(&apiSources[i])
-		if err != nil {
+		cfg, convertErr := convertAPISourceToConfig(&apiSources[i])
+		if convertErr != nil {
 			// Log the error but continue processing other sources
 			sourceName := "unknown"
 			if apiSources[i].Name != "" {
@@ -52,7 +52,7 @@ func (l *APILoader) LoadSources() ([]Config, error) {
 			if l.logger != nil {
 				l.logger.Warn("Failed to convert source from API, skipping",
 					"source", sourceName,
-					"error", err,
+					"error", convertErr,
 				)
 			}
 			continue
