@@ -3,6 +3,7 @@ package loader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jonesrussell/gocrawl/internal/logger"
@@ -70,7 +71,7 @@ func (l *APILoader) LoadSources() ([]Config, error) {
 // convertAPISourceToConfig converts an apiclient.APISource to a loader.Config.
 func convertAPISourceToConfig(apiSource *apiclient.APISource) (Config, error) {
 	if apiSource == nil {
-		return Config{}, fmt.Errorf("apiSource cannot be nil")
+		return Config{}, errors.New("apiSource cannot be nil")
 	}
 
 	return Config{

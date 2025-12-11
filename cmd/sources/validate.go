@@ -2,6 +2,7 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -34,13 +35,17 @@ Example:
   gocrawl sources validate --source "Mid-North Monitor" --samples 5
 
   # Validate selectors against specific URLs
-  gocrawl sources validate --source "Mid-North Monitor" --urls "https://example.com/article1" "https://example.com/article2"`,
+  gocrawl sources validate --source "Mid-North Monitor" ` +
+			`--urls "https://example.com/article1" "https://example.com/article2"`,
 		RunE: runValidate,
 	}
 
 	cmd.Flags().StringVarP(&validateSourceName, "source", "s", "", "Source name to validate (required)")
-	cmd.Flags().IntVarP(&validateSamples, "samples", "n", 5, "Number of sample articles to test (default: 5)")
-	cmd.Flags().StringSliceVarP(&validateURLs, "urls", "u", []string{}, "Specific article URLs to test (overrides samples)")
+	const defaultSamples = 5
+	cmd.Flags().IntVarP(&validateSamples, "samples", "n", defaultSamples,
+		"Number of sample articles to test (default: 5)")
+	cmd.Flags().StringSliceVarP(&validateURLs, "urls", "u", []string{},
+		"Specific article URLs to test (overrides samples)")
 	if err := cmd.MarkFlagRequired("source"); err != nil {
 		return nil
 	}
@@ -101,12 +106,12 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	articleURLs := validateURLs
 	if len(articleURLs) == 0 {
 		// Try to discover article URLs from the source URL
-		discoveredURLs, err := discoverArticleURLs(sourceConfig.URL, articleSelectors, validateSamples)
-		if err != nil {
-			return fmt.Errorf("failed to discover article URLs: %w\n   Please provide URLs with --urls flag", err)
+		discoveredURLs, discoverErr := discoverArticleURLs(sourceConfig.URL, articleSelectors, validateSamples)
+		if discoverErr != nil {
+			return fmt.Errorf("failed to discover article URLs: %w\n   Please provide URLs with --urls flag", discoverErr)
 		}
 		if len(discoveredURLs) == 0 {
-			return fmt.Errorf("no article URLs found on source page\n   Please provide URLs with --urls flag")
+			return errors.New("no article URLs found on source page\n   Please provide URLs with --urls flag")
 		}
 		articleURLs = discoveredURLs
 		fmt.Fprintf(os.Stderr, "📋 Discovered %d article URL(s) from source page\n", len(articleURLs))
@@ -130,10 +135,11 @@ func runValidate(cmd *cobra.Command, args []string) error {
 // printValidationResults prints validation results in a user-friendly format.
 func printValidationResults(w *os.File, result *generator.ValidationResult) {
 	fmt.Fprintf(w, "📊 Validation Results:\n\n")
+	const percentMultiplier = 100.0
 	fmt.Fprintf(w, "Total articles tested: %d\n", result.TotalArticles)
 	fmt.Fprintf(w, "Articles with all critical fields: %d (%.0f%%)\n\n",
 		result.SuccessfulArticles,
-		float64(result.SuccessfulArticles)/float64(result.TotalArticles)*100)
+		float64(result.SuccessfulArticles)/float64(result.TotalArticles)*percentMultiplier)
 
 	// Print field results
 	fieldOrder := []string{"title", "body", "author", "byline", "published_time", "image", "link", "category", "section"}
@@ -227,10 +233,10 @@ func discoverArticleURLs(sourceURL string, selectors configtypes.ArticleSelector
 				href, exists := s.Attr("href")
 				if exists && href != "" {
 					// Make absolute URL
-					baseURL, err := url.Parse(sourceURL)
-					if err == nil {
-						hrefURL, err := baseURL.Parse(href)
-						if err == nil {
+					baseURL, parseErr := url.Parse(sourceURL)
+					if parseErr == nil {
+						hrefURL, parseHrefErr := baseURL.Parse(href)
+						if parseHrefErr == nil {
 							articleURLs = append(articleURLs, hrefURL.String())
 						}
 					}

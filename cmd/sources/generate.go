@@ -3,6 +3,7 @@ package sources
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -282,11 +283,12 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 // fetchDocument fetches a URL and returns a goquery document.
 func fetchDocument(url string) (*goquery.Document, error) {
+	ctx := context.Background()
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 
-	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

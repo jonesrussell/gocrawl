@@ -10,6 +10,21 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+const (
+	sampleTextLength        = 100
+	longContentThreshold    = 500
+	mediumContentThreshold  = 200
+	highConfidenceThreshold = 0.95
+	mediumHighConfidence    = 0.90
+	mediumConfidence        = 0.85
+	mediumLowConfidence     = 0.75
+	lowConfidence           = 0.70
+	veryLowConfidence       = 0.65
+	minConfidence           = 0.60
+	linkLowConfidence       = 0.70
+	linkMinConfidence       = 0.75
+)
+
 // SelectorDiscovery analyzes HTML documents to discover CSS selectors
 // for extracting article content.
 type SelectorDiscovery struct {
@@ -55,12 +70,14 @@ func (sd *SelectorDiscovery) DiscoverTitle() SelectorCandidate {
 	// Semantic HTML - highest confidence
 	semanticSelectors := []string{"article h1", "main h1", "article h1.article-title", "main h1.page-title"}
 	for _, sel := range semanticSelectors {
-		if text, found := sd.extractText(sel); found && text != "" {
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < 0.95 {
-				candidate.Confidence = 0.95
-				candidate.SampleText = truncateText(text, 100)
-			}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < highConfidenceThreshold {
+			candidate.Confidence = highConfidenceThreshold
+			candidate.SampleText = truncateText(text, sampleTextLength)
 		}
 	}
 
@@ -71,13 +88,15 @@ func (sd *SelectorDiscovery) DiscoverTitle() SelectorCandidate {
 		"meta[name='twitter:title']",
 	}
 	for _, sel := range metaSelectors {
-		if text, found := sd.extractText(sel); found && text != "" {
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < 0.90 {
-				candidate.Confidence = 0.90
-				if candidate.SampleText == "" {
-					candidate.SampleText = truncateText(text, 100)
-				}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < mediumHighConfidence {
+			candidate.Confidence = mediumHighConfidence
+			if candidate.SampleText == "" {
+				candidate.SampleText = truncateText(text, sampleTextLength)
 			}
 		}
 	}
@@ -92,35 +111,38 @@ func (sd *SelectorDiscovery) DiscoverTitle() SelectorCandidate {
 		"h2.title",
 	}
 	for _, sel := range classPatterns {
-		if text, found := sd.extractText(sel); found && text != "" {
-			// Check for uniqueness - penalize if multiple matches
-			count := sd.doc.Find(sel).Length()
-			confidence := 0.75
-			if count > 1 {
-				confidence = 0.65 // Penalize ambiguity
-			}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		// Check for uniqueness - penalize if multiple matches
+		count := sd.doc.Find(sel).Length()
+		confidence := mediumLowConfidence
+		if count > 1 {
+			confidence = veryLowConfidence // Penalize ambiguity
+		}
 
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < confidence {
-				candidate.Confidence = confidence
-				if candidate.SampleText == "" {
-					candidate.SampleText = truncateText(text, 100)
-				}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < confidence {
+			candidate.Confidence = confidence
+			if candidate.SampleText == "" {
+				candidate.SampleText = truncateText(text, sampleTextLength)
 			}
 		}
 	}
 
 	// Fallback to any h1
 	if len(candidate.Selectors) == 0 {
-		if text, found := sd.extractText("h1"); found && text != "" {
+		text, found := sd.extractText("h1")
+		if found && text != "" {
 			count := sd.doc.Find("h1").Length()
-			confidence := 0.70
+			confidence := lowConfidence
 			if count > 1 {
-				confidence = 0.60
+				confidence = minConfidence
 			}
 			candidate.Selectors = append(candidate.Selectors, "h1")
 			candidate.Confidence = confidence
-			candidate.SampleText = truncateText(text, 100)
+			candidate.SampleText = truncateText(text, sampleTextLength)
 		}
 	}
 
@@ -142,22 +164,26 @@ func (sd *SelectorDiscovery) DiscoverBody() SelectorCandidate {
 		"main article",
 		"article .article-content",
 	}
+	const longContentThreshold = 500
+	const mediumContentThreshold = 200
 	for _, sel := range semanticSelectors {
-		if text, found := sd.extractText(sel); found && text != "" {
-			length := len(strings.TrimSpace(text))
-			confidence := 0.90
-			// Bonus for longer content (up to +0.1)
-			if length > 500 {
-				confidence = 0.95
-			} else if length > 200 {
-				confidence = 0.92
-			}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		length := len(strings.TrimSpace(text))
+		confidence := 0.90
+		// Bonus for longer content (up to +0.1)
+		if length > longContentThreshold {
+			confidence = 0.95
+		} else if length > mediumContentThreshold {
+			confidence = 0.92
+		}
 
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < confidence {
-				candidate.Confidence = confidence
-				candidate.SampleText = truncateText(text, 100)
-			}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < confidence {
+			candidate.Confidence = confidence
+			candidate.SampleText = truncateText(text, sampleTextLength)
 		}
 	}
 
@@ -171,22 +197,24 @@ func (sd *SelectorDiscovery) DiscoverBody() SelectorCandidate {
 		"main .content",
 	}
 	for _, sel := range classPatterns {
-		if text, found := sd.extractText(sel); found && text != "" {
-			length := len(strings.TrimSpace(text))
-			confidence := 0.85
-			// Bonus for longer content
-			if length > 500 {
-				confidence = 0.90
-			} else if length > 200 {
-				confidence = 0.87
-			}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		length := len(strings.TrimSpace(text))
+		confidence := 0.85
+		// Bonus for longer content
+		if length > longContentThreshold {
+			confidence = 0.90
+		} else if length > mediumContentThreshold {
+			confidence = 0.87
+		}
 
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < confidence {
-				candidate.Confidence = confidence
-				if candidate.SampleText == "" {
-					candidate.SampleText = truncateText(text, 100)
-				}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < confidence {
+			candidate.Confidence = confidence
+			if candidate.SampleText == "" {
+				candidate.SampleText = truncateText(text, sampleTextLength)
 			}
 		}
 	}
@@ -209,13 +237,16 @@ func (sd *SelectorDiscovery) DiscoverAuthor() SelectorCandidate {
 		"meta[property='article:author']",
 		"meta[name='author']",
 	}
+	const authorMediumConfidence = 0.80
 	for _, sel := range schemaSelectors {
-		if text, found := sd.extractText(sel); found && text != "" {
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < 0.95 {
-				candidate.Confidence = 0.95
-				candidate.SampleText = truncateText(text, 100)
-			}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < highConfidenceThreshold {
+			candidate.Confidence = highConfidenceThreshold
+			candidate.SampleText = truncateText(text, sampleTextLength)
 		}
 	}
 
@@ -228,13 +259,15 @@ func (sd *SelectorDiscovery) DiscoverAuthor() SelectorCandidate {
 		".writer",
 	}
 	for _, sel := range classPatterns {
-		if text, found := sd.extractText(sel); found && text != "" {
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < 0.80 {
-				candidate.Confidence = 0.80
-				if candidate.SampleText == "" {
-					candidate.SampleText = truncateText(text, 100)
-				}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < authorMediumConfidence {
+			candidate.Confidence = authorMediumConfidence
+			if candidate.SampleText == "" {
+				candidate.SampleText = truncateText(text, sampleTextLength)
 			}
 		}
 	}
@@ -258,33 +291,37 @@ func (sd *SelectorDiscovery) DiscoverPublishedTime() SelectorCandidate {
 		"meta[name='date']",
 	}
 	for _, sel := range metaSelectors {
-		if text, found := sd.extractText(sel); found && text != "" {
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < 0.95 {
-				candidate.Confidence = 0.95
-				candidate.SampleText = truncateText(text, 100)
-			}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < highConfidenceThreshold {
+			candidate.Confidence = highConfidenceThreshold
+			candidate.SampleText = truncateText(text, sampleTextLength)
 		}
 	}
 
 	// Time element with datetime attribute
-	if text, found := sd.extractText("time[datetime]"); found && text != "" {
+	text, found := sd.extractText("time[datetime]")
+	if found && text != "" {
 		candidate.Selectors = append(candidate.Selectors, "time[datetime]")
-		if candidate.Confidence < 0.90 {
-			candidate.Confidence = 0.90
+		if candidate.Confidence < mediumHighConfidence {
+			candidate.Confidence = mediumHighConfidence
 			if candidate.SampleText == "" {
-				candidate.SampleText = truncateText(text, 100)
+				candidate.SampleText = truncateText(text, sampleTextLength)
 			}
 		}
 	}
 
 	// Schema.org
-	if text, found := sd.extractText("[itemprop='datePublished']"); found && text != "" {
+	text, found = sd.extractText("[itemprop='datePublished']")
+	if found && text != "" {
 		candidate.Selectors = append(candidate.Selectors, "[itemprop='datePublished']")
-		if candidate.Confidence < 0.95 {
-			candidate.Confidence = 0.95
+		if candidate.Confidence < highConfidenceThreshold {
+			candidate.Confidence = highConfidenceThreshold
 			if candidate.SampleText == "" {
-				candidate.SampleText = truncateText(text, 100)
+				candidate.SampleText = truncateText(text, sampleTextLength)
 			}
 		}
 	}
@@ -299,13 +336,15 @@ func (sd *SelectorDiscovery) DiscoverPublishedTime() SelectorCandidate {
 		".timestamp",
 	}
 	for _, sel := range classPatterns {
-		if text, found := sd.extractText(sel); found && text != "" {
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < 0.75 {
-				candidate.Confidence = 0.75
-				if candidate.SampleText == "" {
-					candidate.SampleText = truncateText(text, 100)
-				}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < mediumLowConfidence {
+			candidate.Confidence = mediumLowConfidence
+			if candidate.SampleText == "" {
+				candidate.SampleText = truncateText(text, sampleTextLength)
 			}
 		}
 	}
@@ -324,17 +363,17 @@ func (sd *SelectorDiscovery) DiscoverImage() SelectorCandidate {
 	// Open Graph - highest confidence
 	if src, found := sd.extractAttr("meta[property='og:image']", "content"); found && src != "" {
 		candidate.Selectors = append(candidate.Selectors, "meta[property='og:image']")
-		candidate.Confidence = 0.95
-		candidate.SampleText = truncateText(src, 100)
+		candidate.Confidence = highConfidenceThreshold
+		candidate.SampleText = truncateText(src, sampleTextLength)
 	}
 
 	// Schema.org
 	if src, found := sd.extractAttr("[itemprop='image']", "src"); found && src != "" {
 		candidate.Selectors = append(candidate.Selectors, "[itemprop='image']")
-		if candidate.Confidence < 0.90 {
-			candidate.Confidence = 0.90
+		if candidate.Confidence < mediumHighConfidence {
+			candidate.Confidence = mediumHighConfidence
 			if candidate.SampleText == "" {
-				candidate.SampleText = truncateText(src, 100)
+				candidate.SampleText = truncateText(src, sampleTextLength)
 			}
 		}
 	}
@@ -348,17 +387,19 @@ func (sd *SelectorDiscovery) DiscoverImage() SelectorCandidate {
 		".post-image img",
 	}
 	for _, sel := range articleImageSelectors {
-		if src, found := sd.extractAttr(sel, "src"); found && src != "" {
-			// Skip placeholder images
-			if strings.Contains(src, "placeholder") || strings.Contains(src, "fallback") {
-				continue
-			}
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < 0.85 {
-				candidate.Confidence = 0.85
-				if candidate.SampleText == "" {
-					candidate.SampleText = truncateText(src, 100)
-				}
+		src, found := sd.extractAttr(sel, "src")
+		if !found || src == "" {
+			continue
+		}
+		// Skip placeholder images
+		if strings.Contains(src, "placeholder") || strings.Contains(src, "fallback") {
+			continue
+		}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < mediumConfidence {
+			candidate.Confidence = mediumConfidence
+			if candidate.SampleText == "" {
+				candidate.SampleText = truncateText(src, sampleTextLength)
 			}
 		}
 	}
@@ -371,7 +412,7 @@ func (sd *SelectorDiscovery) DiscoverLinks() SelectorCandidate {
 	candidate := SelectorCandidate{
 		Field:      "link",
 		Selectors:  []string{},
-		Confidence: 0.70, // Lower confidence - needs manual review
+		Confidence: linkLowConfidence, // Lower confidence - needs manual review
 	}
 
 	// Common article URL patterns
@@ -445,7 +486,7 @@ func (sd *SelectorDiscovery) DiscoverLinks() SelectorCandidate {
 	}
 
 	if sampleHref != "" {
-		candidate.SampleText = truncateText(sampleHref, 100)
+		candidate.SampleText = truncateText(sampleHref, sampleTextLength)
 	}
 
 	return candidate
@@ -460,10 +501,11 @@ func (sd *SelectorDiscovery) DiscoverCategory() SelectorCandidate {
 	}
 
 	// Meta tags - high confidence
-	if text, found := sd.extractText("meta[property='article:section']"); found && text != "" {
+	text, found := sd.extractText("meta[property='article:section']")
+	if found && text != "" {
 		candidate.Selectors = append(candidate.Selectors, "meta[property='article:section']")
-		candidate.Confidence = 0.90
-		candidate.SampleText = truncateText(text, 100)
+		candidate.Confidence = mediumHighConfidence
+		candidate.SampleText = truncateText(text, sampleTextLength)
 	}
 
 	// Class patterns
@@ -475,13 +517,15 @@ func (sd *SelectorDiscovery) DiscoverCategory() SelectorCandidate {
 		"[data-category]",
 	}
 	for _, sel := range classPatterns {
-		if text, found := sd.extractText(sel); found && text != "" {
-			candidate.Selectors = append(candidate.Selectors, sel)
-			if candidate.Confidence < 0.75 {
-				candidate.Confidence = 0.75
-				if candidate.SampleText == "" {
-					candidate.SampleText = truncateText(text, 100)
-				}
+		text, found := sd.extractText(sel)
+		if !found || text == "" {
+			continue
+		}
+		candidate.Selectors = append(candidate.Selectors, sel)
+		if candidate.Confidence < mediumLowConfidence {
+			candidate.Confidence = mediumLowConfidence
+			if candidate.SampleText == "" {
+				candidate.SampleText = truncateText(text, sampleTextLength)
 			}
 		}
 	}
@@ -637,6 +681,7 @@ func extractPattern(href string) string {
 }
 
 // truncateText truncates text to a maximum length.
+// maxLen is always 100, but kept as parameter for API consistency.
 func truncateText(text string, maxLen int) string {
 	if len(text) <= maxLen {
 		return text

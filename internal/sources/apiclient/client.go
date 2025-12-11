@@ -68,14 +68,14 @@ func NewClient(opts ...Option) *Client {
 
 // ListSources retrieves all sources from the API.
 func (c *Client) ListSources(ctx context.Context) ([]APISource, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	var response ListSourcesResponse
-	if err := c.doRequest(req, &response); err != nil {
-		return nil, fmt.Errorf("failed to list sources: %w", err)
+	if doErr := c.doRequest(req, &response); doErr != nil {
+		return nil, fmt.Errorf("failed to list sources: %w", doErr)
 	}
 
 	return response.Sources, nil
@@ -88,14 +88,14 @@ func (c *Client) GetSource(ctx context.Context, id string) (*APISource, error) {
 		return nil, fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	var source APISource
-	if err := c.doRequest(req, &source); err != nil {
-		return nil, fmt.Errorf("failed to get source: %w", err)
+	if doErr := c.doRequest(req, &source); doErr != nil {
+		return nil, fmt.Errorf("failed to get source: %w", doErr)
 	}
 
 	return &source, nil
@@ -115,8 +115,8 @@ func (c *Client) CreateSource(ctx context.Context, source *APISource) (*APISourc
 	req.Header.Set("Content-Type", "application/json")
 
 	var created APISource
-	if err := c.doRequest(req, &created); err != nil {
-		return nil, fmt.Errorf("failed to create source: %w", err)
+	if doErr := c.doRequest(req, &created); doErr != nil {
+		return nil, fmt.Errorf("failed to create source: %w", doErr)
 	}
 
 	return &created, nil
@@ -141,8 +141,8 @@ func (c *Client) UpdateSource(ctx context.Context, id string, source *APISource)
 	req.Header.Set("Content-Type", "application/json")
 
 	var updated APISource
-	if err := c.doRequest(req, &updated); err != nil {
-		return nil, fmt.Errorf("failed to update source: %w", err)
+	if doErr := c.doRequest(req, &updated); doErr != nil {
+		return nil, fmt.Errorf("failed to update source: %w", doErr)
 	}
 
 	return &updated, nil
@@ -155,27 +155,28 @@ func (c *Client) DeleteSource(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, sourceURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, sourceURL, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	if err := c.doRequest(req, nil); err != nil {
-		return fmt.Errorf("failed to delete source: %w", err)
+	if doErr := c.doRequest(req, nil); doErr != nil {
+		return fmt.Errorf("failed to delete source: %w", doErr)
 	}
 
 	return nil
 }
 
 // doRequest executes an HTTP request and decodes the response.
-func (c *Client) doRequest(req *http.Request, result interface{}) error {
+func (c *Client) doRequest(req *http.Request, result any) error {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		// Provide more helpful error message for connection issues
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {
 			if urlErr.Op == "dial" || urlErr.Err != nil {
-				return fmt.Errorf("failed to connect to sources API at %s: %w. Ensure the gosources service is running and accessible", c.baseURL, err)
+				return fmt.Errorf("failed to connect to sources API at %s: %w. "+
+					"Ensure the gosources service is running and accessible", c.baseURL, err)
 			}
 		}
 		return fmt.Errorf("request failed: %w", err)
@@ -183,13 +184,14 @@ func (c *Client) doRequest(req *http.Request, result interface{}) error {
 	defer resp.Body.Close()
 
 	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return fmt.Errorf("failed to read response body: %w", readErr)
 	}
 
 	// Check for error status codes
-	if resp.StatusCode >= 400 {
+	const minErrorStatusCode = 400
+	if resp.StatusCode >= minErrorStatusCode {
 		var errResp ErrorResponse
 		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil && errResp.Error != "" {
 			return fmt.Errorf("API error (status %d): %s - %s", resp.StatusCode, errResp.Error, errResp.Message)
@@ -203,8 +205,8 @@ func (c *Client) doRequest(req *http.Request, result interface{}) error {
 	}
 
 	// Decode the response
-	if err := json.Unmarshal(body, result); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+	if unmarshalErr := json.Unmarshal(body, result); unmarshalErr != nil {
+		return fmt.Errorf("failed to decode response: %w", unmarshalErr)
 	}
 
 	return nil

@@ -1,10 +1,11 @@
-package generator
+package generator_test
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/jonesrussell/gocrawl/internal/generator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +15,7 @@ func TestDiscoverTitle_SemanticHTML(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverTitle()
@@ -28,7 +29,7 @@ func TestDiscoverTitle_MultipleMatches(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverTitle()
@@ -42,7 +43,7 @@ func TestDiscoverTitle_MetaTag(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverTitle()
@@ -57,7 +58,7 @@ func TestDiscoverBody_LongContent(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverBody()
@@ -71,7 +72,7 @@ func TestDiscoverBody_ClassPattern(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverBody()
@@ -84,7 +85,7 @@ func TestDiscoverAuthor_SchemaOrg(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverAuthor()
@@ -97,7 +98,7 @@ func TestDiscoverAuthor_MetaTag(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverAuthor()
@@ -110,7 +111,7 @@ func TestDiscoverPublishedTime_MetaTag(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverPublishedTime()
@@ -123,7 +124,7 @@ func TestDiscoverPublishedTime_TimeElement(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverPublishedTime()
@@ -136,7 +137,7 @@ func TestDiscoverImage_OpenGraph(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverImage()
@@ -149,7 +150,7 @@ func TestDiscoverImage_ArticleImage(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverImage()
@@ -169,12 +170,13 @@ func TestDiscoverLinks_ArticlePatterns(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverLinks()
 	// Should find links with /news/ or /article/ patterns
-	assert.GreaterOrEqual(t, len(result.Selectors), 0) // May find selectors or not depending on implementation
+	// May find selectors or not depending on implementation
+	_ = len(result.Selectors)
 }
 
 func TestDiscoverCategory_MetaTag(t *testing.T) {
@@ -182,7 +184,7 @@ func TestDiscoverCategory_MetaTag(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverCategory()
@@ -200,7 +202,7 @@ func TestDiscoverExclusions_CommonPatterns(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	exclusions := sd.DiscoverExclusions()
@@ -230,7 +232,7 @@ func TestDiscoverAll_CompleteResult(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	require.NoError(t, err)
 
-	sd, err := NewSelectorDiscovery(doc, "https://example.com")
+	sd, err := generator.NewSelectorDiscovery(doc, "https://example.com")
 	require.NoError(t, err)
 
 	result := sd.DiscoverAll()

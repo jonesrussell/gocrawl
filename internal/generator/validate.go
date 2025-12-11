@@ -3,6 +3,7 @@
 package generator
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -45,7 +46,7 @@ func ValidateSelectors(
 	maxSamples int,
 ) (*ValidationResult, error) {
 	if len(articleURLs) == 0 {
-		return nil, fmt.Errorf("no article URLs provided")
+		return nil, errors.New("no article URLs provided")
 	}
 
 	// Limit to maxSamples
@@ -115,10 +116,12 @@ func ValidateSelectors(
 			if found && value != "" {
 				fieldResult.SuccessCount++
 				// Store sample value (limit to 3 samples)
-				if len(fieldResult.SampleValues) < 3 {
+				const maxSamples = 3
+				const maxSampleLength = 100
+				if len(fieldResult.SampleValues) < maxSamples {
 					sample := value
-					if len(sample) > 100 {
-						sample = sample[:100] + "..."
+					if len(sample) > maxSampleLength {
+						sample = sample[:maxSampleLength] + "..."
 					}
 					fieldResult.SampleValues = append(fieldResult.SampleValues, sample)
 				}
@@ -131,7 +134,8 @@ func ValidateSelectors(
 			}
 
 			// Calculate success rate
-			fieldResult.SuccessRate = float64(fieldResult.SuccessCount) / float64(fieldResult.TotalCount) * 100
+			const percentMultiplier = 100.0
+			fieldResult.SuccessRate = float64(fieldResult.SuccessCount) / float64(fieldResult.TotalCount) * percentMultiplier
 			result.FieldResults[fieldName] = fieldResult
 		}
 
@@ -215,16 +219,19 @@ func FetchDocumentForValidation(url string) (*goquery.Document, error) {
 
 // fetchDocumentForValidation fetches a document for validation.
 func fetchDocumentForValidation(url string) (*goquery.Document, error) {
+	const requestTimeout = 30 * time.Second
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: requestTimeout,
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+	userAgent := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+		"(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {

@@ -26,12 +26,12 @@ type HTMLProcessor struct {
 }
 
 // NewHTMLProcessor creates a new HTMLProcessor.
-func NewHTMLProcessor(log logger.Interface, sources sources.Interface) *HTMLProcessor {
+func NewHTMLProcessor(log logger.Interface, sourcesManager sources.Interface) *HTMLProcessor {
 	return &HTMLProcessor{
 		logger:       log,
 		processors:   make([]content.Processor, 0, DefaultProcessorsCapacity), // Pre-allocate for article and page processors
 		unknownTypes: make(map[contenttype.Type]int),
-		sources:      sources,
+		sources:      sourcesManager,
 	}
 }
 
@@ -109,16 +109,6 @@ func (p *HTMLProcessor) ProcessContent(ctx context.Context, ct contenttype.Type,
 		return err
 	}
 	return proc.Process(ctx, contentData)
-}
-
-// selectProcessor selects a processor for the given content type.
-func (p *HTMLProcessor) selectProcessor(contentType contenttype.Type) content.Processor {
-	for _, processor := range p.processors {
-		if processor.CanProcess(contentType) {
-			return processor
-		}
-	}
-	return nil
 }
 
 // DetectContentType detects the content type of the given HTML element using selector-based detection.

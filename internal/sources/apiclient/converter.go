@@ -2,6 +2,7 @@
 package apiclient
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -12,7 +13,7 @@ import (
 // ConvertAPISourceToConfig converts an APISource to a types.SourceConfig.
 func ConvertAPISourceToConfig(apiSource *APISource) (*types.SourceConfig, error) {
 	if apiSource == nil {
-		return nil, fmt.Errorf("apiSource cannot be nil")
+		return nil, errors.New("apiSource cannot be nil")
 	}
 
 	// Parse rate limit

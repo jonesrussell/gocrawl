@@ -184,7 +184,9 @@ func (v *ArticleValidator) isCategoryPage(article *domain.Article) ValidationRes
 	// Check for generic titles
 	titleLower := strings.ToLower(strings.TrimSpace(article.Title))
 	for _, generic := range genericTitles {
-		if titleLower == generic || strings.HasPrefix(titleLower, generic+" |") || strings.HasSuffix(titleLower, "| "+generic) {
+		if titleLower == generic ||
+			strings.HasPrefix(titleLower, generic+" |") ||
+			strings.HasSuffix(titleLower, "| "+generic) {
 			return ValidationResult{
 				IsValid: false,
 				Reason:  fmt.Sprintf("Generic title detected: %s", article.Title),
@@ -216,9 +218,18 @@ func (v *ArticleValidator) isCategoryPage(article *domain.Article) ValidationRes
 	return ValidationResult{IsValid: true}
 }
 
+const (
+	minBodyLengthForConcatenation = 200
+	minSeparatorCount             = 3
+	minHeadlineLikeCount          = 5
+	minContentLength              = 100
+	maxContentLength              = 100000
+	minWordCount                  = 50
+)
+
 // hasConcatenatedContent checks if body contains multiple article snippets
 func (v *ArticleValidator) hasConcatenatedContent(body string) bool {
-	if len(body) < 200 {
+	if len(body) < minBodyLengthForConcatenation {
 		return false // Too short to be concatenated
 	}
 
@@ -242,7 +253,7 @@ func (v *ArticleValidator) hasConcatenatedContent(body string) bool {
 	}
 
 	// If we find 3+ separators, likely multiple articles
-	if separatorCount >= 3 {
+	if separatorCount >= minSeparatorCount {
 		return true
 	}
 
@@ -263,7 +274,7 @@ func (v *ArticleValidator) hasConcatenatedContent(body string) bool {
 	}
 
 	// If we find 5+ headline-like patterns, likely multiple articles
-	if headlineLikeCount >= 5 {
+	if headlineLikeCount >= minHeadlineLikeCount {
 		return true
 	}
 
@@ -307,18 +318,18 @@ func (v *ArticleValidator) validateContent(article *domain.Article) ValidationRe
 	body := strings.TrimSpace(article.Body)
 
 	// Check minimum length
-	if len(body) < 100 {
+	if len(body) < minContentLength {
 		return ValidationResult{
 			IsValid: false,
-			Reason:  fmt.Sprintf("Content too short: %d characters (minimum 100)", len(body)),
+			Reason:  fmt.Sprintf("Content too short: %d characters (minimum %d)", len(body), minContentLength),
 		}
 	}
 
 	// Check maximum length (likely concatenated content)
-	if len(body) > 100000 {
+	if len(body) > maxContentLength {
 		return ValidationResult{
 			IsValid: false,
-			Reason:  fmt.Sprintf("Content too long: %d characters (maximum 100,000)", len(body)),
+			Reason:  fmt.Sprintf("Content too long: %d characters (maximum %d)", len(body), maxContentLength),
 		}
 	}
 
@@ -355,16 +366,16 @@ func (v *ArticleValidator) validateWordCount(article *domain.Article) Validation
 	// Word count should be calculated, but if it's 0, we'll calculate it
 	if article.WordCount == 0 {
 		wordCount := CalculateWordCount(article.Body)
-		if wordCount < 50 {
+		if wordCount < minWordCount {
 			return ValidationResult{
 				IsValid: false,
-				Reason:  fmt.Sprintf("Word count too low: %d words (minimum 50)", wordCount),
+				Reason:  fmt.Sprintf("Word count too low: %d words (minimum %d)", wordCount, minWordCount),
 			}
 		}
-	} else if article.WordCount < 50 {
+	} else if article.WordCount < minWordCount {
 		return ValidationResult{
 			IsValid: false,
-			Reason:  fmt.Sprintf("Word count too low: %d words (minimum 50)", article.WordCount),
+			Reason:  fmt.Sprintf("Word count too low: %d words (minimum %d)", article.WordCount, minWordCount),
 		}
 	}
 

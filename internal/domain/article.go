@@ -85,7 +85,8 @@ func (a *Article) GetOGTitle() string {
 	return a.Title
 }
 
-// GetOGDescription returns the Open Graph description, falling back to Description or Intro if OG description is not set.
+// GetOGDescription returns the Open Graph description, falling back to
+// Description or Intro if OG description is not set.
 func (a *Article) GetOGDescription() string {
 	if a.OgDescription != "" {
 		return a.OgDescription

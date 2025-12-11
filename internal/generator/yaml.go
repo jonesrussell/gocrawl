@@ -155,15 +155,11 @@ func GenerateSourceYAML(
 	// Exclusions
 	if len(result.Exclusions) > 0 {
 		builder.WriteString("        exclude: [\n")
-		for i, excl := range result.Exclusions {
+		for _, excl := range result.Exclusions {
 			builder.WriteString("          \"")
 			builder.WriteString(excl)
 			builder.WriteString("\"")
-			if i < len(result.Exclusions)-1 {
-				builder.WriteString(",\n")
-			} else {
-				builder.WriteString(",\n")
-			}
+			builder.WriteString(",\n")
 		}
 		builder.WriteString("        ]\n")
 	}
@@ -186,7 +182,8 @@ func generateSourceName(hostname string) string {
 
 	// Take the main domain part (usually first or second)
 	var mainPart string
-	if len(parts) >= 2 {
+	const minPartsForDomain = 2
+	if len(parts) >= minPartsForDomain {
 		// Take the second-to-last part (e.g., "example" from "example.com")
 		mainPart = parts[len(parts)-2]
 	} else {
@@ -194,7 +191,7 @@ func generateSourceName(hostname string) string {
 	}
 
 	// Convert to title case
-	if len(mainPart) == 0 {
+	if mainPart == "" {
 		return hostname
 	}
 

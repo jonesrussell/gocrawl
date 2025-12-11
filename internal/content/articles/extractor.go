@@ -465,7 +465,7 @@ func extractDateFromJSONLD(e *colly.HTMLElement, selector string) time.Time {
 
 	// Find all JSON-LD script tags
 	scripts := e.DOM.Find(selector)
-	for i := 0; i < scripts.Length(); i++ {
+	for i := range scripts.Length() {
 		script := scripts.Eq(i)
 		jsonText := script.Text()
 		if jsonText == "" {
@@ -473,25 +473,25 @@ func extractDateFromJSONLD(e *colly.HTMLElement, selector string) time.Time {
 		}
 
 		// Parse JSON-LD
-		var jsonData interface{}
+		var jsonData any
 		if err := json.Unmarshal([]byte(jsonText), &jsonData); err != nil {
 			continue
 		}
 
 		// Handle both single objects and arrays
-		var items []interface{}
+		var items []any
 		switch v := jsonData.(type) {
-		case []interface{}:
+		case []any:
 			items = v
-		case map[string]interface{}:
-			items = []interface{}{v}
+		case map[string]any:
+			items = []any{v}
 		default:
 			continue
 		}
 
 		// Look for datePublished in each item
 		for _, item := range items {
-			obj, ok := item.(map[string]interface{})
+			obj, ok := item.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -500,9 +500,9 @@ func extractDateFromJSONLD(e *colly.HTMLElement, selector string) time.Time {
 			typeVal, hasType := obj["@type"].(string)
 			if !hasType {
 				// Try nested @graph
-				if graph, ok := obj["@graph"].([]interface{}); ok {
+				if graph, ok := obj["@graph"].([]any); ok {
 					for _, graphItem := range graph {
-						if graphObj, ok := graphItem.(map[string]interface{}); ok {
+						if graphObj, ok := graphItem.(map[string]any); ok {
 							if date := extractDateFromJSONLDObject(graphObj); !date.IsZero() {
 								return date
 							}
@@ -534,7 +534,7 @@ func extractDateFromJSONLD(e *colly.HTMLElement, selector string) time.Time {
 }
 
 // extractDateFromJSONLDObject extracts date from a JSON-LD object
-func extractDateFromJSONLDObject(obj map[string]interface{}) time.Time {
+func extractDateFromJSONLDObject(obj map[string]any) time.Time {
 	// Try datePublished first
 	if datePublished, ok := obj["datePublished"].(string); ok {
 		if date := parseDate(datePublished); !date.IsZero() {
