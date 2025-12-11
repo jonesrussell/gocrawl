@@ -111,95 +111,78 @@ func (a *Article) GetOGURL() string {
 // PrepareForIndexing cleans and prepares the article for Elasticsearch indexing.
 // This ensures best practices: removes empty strings, normalizes arrays, and prevents duplication.
 func (a *Article) PrepareForIndexing() {
-	// Clean empty strings - convert to empty string (will be omitted by omitempty)
-	if strings.TrimSpace(a.Author) == "" {
-		a.Author = ""
-	}
-	if strings.TrimSpace(a.BylineName) == "" {
-		a.BylineName = ""
-	}
-	if strings.TrimSpace(a.Intro) == "" {
-		a.Intro = ""
-	}
-	if strings.TrimSpace(a.Description) == "" {
-		a.Description = ""
-	}
-	if strings.TrimSpace(a.OgImage) == "" {
-		a.OgImage = ""
-	}
-	if strings.TrimSpace(a.CanonicalURL) == "" {
-		a.CanonicalURL = ""
-	}
+	a.cleanEmptyStrings()
+	a.removeDuplicateOGFields()
+	a.cleanOGFields()
+	a.normalizeArrays()
+}
 
-	// Remove duplicate OG fields - only store if they differ from canonical fields
-	// This prevents storing duplicate data while preserving unique OG metadata
+// cleanEmptyStrings converts empty strings to empty (will be omitted by omitempty).
+func (a *Article) cleanEmptyStrings() {
+	a.Author = cleanString(a.Author)
+	a.BylineName = cleanString(a.BylineName)
+	a.Intro = cleanString(a.Intro)
+	a.Description = cleanString(a.Description)
+	a.OgImage = cleanString(a.OgImage)
+	a.CanonicalURL = cleanString(a.CanonicalURL)
+}
+
+// cleanString returns empty string if trimmed value is empty.
+func cleanString(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return ""
+	}
+	return s
+}
+
+// removeDuplicateOGFields removes OG fields that duplicate canonical fields.
+func (a *Article) removeDuplicateOGFields() {
 	if strings.TrimSpace(a.OgTitle) == strings.TrimSpace(a.Title) {
-		a.OgTitle = "" // Will be omitted by omitempty
+		a.OgTitle = ""
 	}
 	if strings.TrimSpace(a.OgDescription) == strings.TrimSpace(a.Description) ||
 		strings.TrimSpace(a.OgDescription) == strings.TrimSpace(a.Intro) {
-		a.OgDescription = "" // Will be omitted by omitempty
+		a.OgDescription = ""
 	}
 	if strings.TrimSpace(a.OgURL) == strings.TrimSpace(a.CanonicalURL) ||
 		strings.TrimSpace(a.OgURL) == strings.TrimSpace(a.Source) {
-		a.OgURL = "" // Will be omitted by omitempty
-	}
-
-	// Clean OG fields
-	if strings.TrimSpace(a.OgTitle) == "" {
-		a.OgTitle = ""
-	}
-	if strings.TrimSpace(a.OgDescription) == "" {
-		a.OgDescription = ""
-	}
-	if strings.TrimSpace(a.OgURL) == "" {
 		a.OgURL = ""
 	}
-	if strings.TrimSpace(a.Category) == "" {
-		a.Category = ""
-	}
-	if strings.TrimSpace(a.Section) == "" {
-		a.Section = ""
+}
+
+// cleanOGFields cleans OG and other metadata fields.
+func (a *Article) cleanOGFields() {
+	a.OgTitle = cleanString(a.OgTitle)
+	a.OgDescription = cleanString(a.OgDescription)
+	a.OgURL = cleanString(a.OgURL)
+	a.Category = cleanString(a.Category)
+	a.Section = cleanString(a.Section)
+}
+
+// normalizeArrays ensures empty arrays are nil and deduplicates.
+func (a *Article) normalizeArrays() {
+	a.Tags = normalizeStringArray(a.Tags)
+	a.Keywords = normalizeStringArray(a.Keywords)
+}
+
+// normalizeStringArray removes empty items, deduplicates, and returns nil if empty.
+func normalizeStringArray(arr []string) []string {
+	if len(arr) == 0 {
+		return nil
 	}
 
-	// Normalize arrays - ensure empty arrays are nil (will be omitted by omitempty)
-	if len(a.Tags) == 0 {
-		a.Tags = nil
-	} else {
-		// Remove empty tags and deduplicate
-		seen := make(map[string]bool)
-		cleaned := []string{}
-		for _, tag := range a.Tags {
-			tag = strings.TrimSpace(tag)
-			if tag != "" && !seen[tag] {
-				seen[tag] = true
-				cleaned = append(cleaned, tag)
-			}
-		}
-		if len(cleaned) == 0 {
-			a.Tags = nil
-		} else {
-			a.Tags = cleaned
+	seen := make(map[string]bool)
+	cleaned := make([]string, 0, len(arr))
+	for _, item := range arr {
+		item = strings.TrimSpace(item)
+		if item != "" && !seen[item] {
+			seen[item] = true
+			cleaned = append(cleaned, item)
 		}
 	}
 
-	if len(a.Keywords) == 0 {
-		a.Keywords = nil
-	} else {
-		// Remove empty keywords and deduplicate
-		seen := make(map[string]bool)
-		cleaned := []string{}
-		for _, keyword := range a.Keywords {
-			keyword = strings.TrimSpace(keyword)
-			if keyword != "" && !seen[keyword] {
-				seen[keyword] = true
-				cleaned = append(cleaned, keyword)
-			}
-		}
-		if len(cleaned) == 0 {
-			a.Keywords = nil
-		} else {
-			a.Keywords = cleaned
-		}
+	if len(cleaned) == 0 {
+		return nil
 	}
+	return cleaned
 }

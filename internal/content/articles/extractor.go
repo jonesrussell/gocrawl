@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 	configtypes "github.com/jonesrussell/gocrawl/internal/config/types"
 )
@@ -283,55 +284,68 @@ func extractMetadata(data *ArticleData, e *colly.HTMLElement, selectors configty
 
 // extractTags extracts tags and keywords from the article.
 func extractTags(data *ArticleData, e *colly.HTMLElement, selectors configtypes.ArticleSelectors) {
-	// Extract keywords separately (for Drupal field_keywords)
+	extractKeywords(data, e, selectors)
+	extractTagsFromSelector(data, e, selectors)
+}
+
+// extractKeywords extracts keywords and adds them to data.
+func extractKeywords(data *ArticleData, e *colly.HTMLElement, selectors configtypes.ArticleSelectors) {
 	keywordsStr := extractText(e, selectors.Keywords)
 	if keywordsStr == "" {
 		keywordsStr = extractMetaName(e, "keywords")
 	}
-	if keywordsStr != "" {
-		// Store keywords as array
-		keywords := strings.Split(keywordsStr, ",")
-		for i := range keywords {
-			keywords[i] = strings.TrimSpace(keywords[i])
-			if keywords[i] != "" {
-				data.Keywords = append(data.Keywords, keywords[i])
-			}
-		}
-		// Also add to tags for backward compatibility
-		data.Tags = append(data.Tags, data.Keywords...)
+	if keywordsStr == "" {
+		return
 	}
 
-	// Extract tags from tags selector (separate from keywords)
+	keywords := parseCommaSeparatedList(keywordsStr)
+	data.Keywords = append(data.Keywords, keywords...)
+	// Also add to tags for backward compatibility
+	data.Tags = append(data.Tags, keywords...)
+}
+
+// extractTagsFromSelector extracts tags from the tags selector.
+func extractTagsFromSelector(data *ArticleData, e *colly.HTMLElement, selectors configtypes.ArticleSelectors) {
 	tagsStr := extractText(e, selectors.Tags)
-	if tagsStr != "" {
-		tags := strings.Split(tagsStr, ",")
-		for _, tag := range tags {
-			tag = strings.TrimSpace(tag)
-			if tag == "" {
-				continue
-			}
-			// Avoid duplicates with keywords
-			found := false
-			for _, existing := range data.Keywords {
-				if existing == tag {
-					found = true
-					break
-				}
-			}
-			// Avoid duplicates with existing tags
-			if !found {
-				for _, existing := range data.Tags {
-					if existing == tag {
-						found = true
-						break
-					}
-				}
-			}
-			if !found {
-				data.Tags = append(data.Tags, tag)
-			}
+	if tagsStr == "" {
+		return
+	}
+
+	tags := parseCommaSeparatedList(tagsStr)
+	keywordSet := makeStringSet(data.Keywords)
+	tagSet := makeStringSet(data.Tags)
+
+	for _, tag := range tags {
+		if tag == "" {
+			continue
+		}
+		if !keywordSet[tag] && !tagSet[tag] {
+			data.Tags = append(data.Tags, tag)
+			tagSet[tag] = true
 		}
 	}
+}
+
+// parseCommaSeparatedList parses a comma-separated string into a slice.
+func parseCommaSeparatedList(s string) []string {
+	items := strings.Split(s, ",")
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// makeStringSet creates a map for fast lookup.
+func makeStringSet(items []string) map[string]bool {
+	set := make(map[string]bool, len(items))
+	for _, item := range items {
+		set[item] = true
+	}
+	return set
 }
 
 // extractOpenGraphMetadata extracts Open Graph metadata.
@@ -384,8 +398,6 @@ func extractOtherMetadata(
 
 // extractPublishedDate extracts published date with multiple fallback strategies
 func extractPublishedDate(e *colly.HTMLElement, selectors configtypes.ArticleSelectors) time.Time {
-	var publishedTimeStr string
-
 	// Strategy 1: Try JSON-LD structured data (highest priority)
 	if selectors.JSONLD != "" {
 		if date := extractDateFromJSONLD(e, selectors.JSONLD); !date.IsZero() {
@@ -399,61 +411,78 @@ func extractPublishedDate(e *colly.HTMLElement, selectors configtypes.ArticleSel
 	}
 
 	// Strategy 3: Try published_time selector (datetime attribute)
-	publishedTimeStr = extractAttr(e, selectors.PublishedTime, "datetime")
+	if date := tryPublishedTimeSelector(e, selectors); !date.IsZero() {
+		return date
+	}
+
+	// Strategy 4: Try Open Graph article:published_time
+	if date := tryOpenGraphDate(e); !date.IsZero() {
+		return date
+	}
+
+	// Strategy 5: Try meta name="date" or "publishdate"
+	if date := tryMetaNameDate(e); !date.IsZero() {
+		return date
+	}
+
+	// Strategy 6: Try common HTML date patterns
+	return tryTimeElementDate(e)
+}
+
+// tryPublishedTimeSelector tries to extract date from published_time selector.
+func tryPublishedTimeSelector(e *colly.HTMLElement, selectors configtypes.ArticleSelectors) time.Time {
+	// Try datetime attribute first
+	publishedTimeStr := extractAttr(e, selectors.PublishedTime, "datetime")
 	if publishedTimeStr != "" {
 		if date := parseDate(publishedTimeStr); !date.IsZero() {
 			return date
 		}
 	}
 
-	// Strategy 4: Try published_time selector (text content)
-	if publishedTimeStr == "" {
-		publishedTimeStr = extractText(e, selectors.PublishedTime)
+	// Try text content
+	publishedTimeStr = extractText(e, selectors.PublishedTime)
+	if publishedTimeStr != "" {
+		if date := parseDate(publishedTimeStr); !date.IsZero() {
+			return date
+		}
+	}
+
+	return time.Time{}
+}
+
+// tryOpenGraphDate tries to extract date from Open Graph meta tag.
+func tryOpenGraphDate(e *colly.HTMLElement) time.Time {
+	publishedTimeStr := extractMeta(e, "article:published_time")
+	if publishedTimeStr != "" {
+		if date := parseDate(publishedTimeStr); !date.IsZero() {
+			return date
+		}
+	}
+	return time.Time{}
+}
+
+// tryMetaNameDate tries to extract date from meta name tags.
+func tryMetaNameDate(e *colly.HTMLElement) time.Time {
+	metaNames := []string{"date", "publishdate", "pubdate"}
+	for _, name := range metaNames {
+		publishedTimeStr := extractMetaName(e, name)
 		if publishedTimeStr != "" {
 			if date := parseDate(publishedTimeStr); !date.IsZero() {
 				return date
 			}
 		}
 	}
+	return time.Time{}
+}
 
-	// Strategy 5: Try Open Graph article:published_time
-	if publishedTimeStr == "" {
-		publishedTimeStr = extractMeta(e, "article:published_time")
-		if publishedTimeStr != "" {
-			if date := parseDate(publishedTimeStr); !date.IsZero() {
-				return date
-			}
+// tryTimeElementDate tries to extract date from time element.
+func tryTimeElementDate(e *colly.HTMLElement) time.Time {
+	publishedTimeStr := extractAttr(e, "time", "datetime")
+	if publishedTimeStr != "" {
+		if date := parseDate(publishedTimeStr); !date.IsZero() {
+			return date
 		}
 	}
-
-	// Strategy 6: Try meta name="date" or "publishdate"
-	if publishedTimeStr == "" {
-		publishedTimeStr = extractMetaName(e, "date")
-		if publishedTimeStr == "" {
-			publishedTimeStr = extractMetaName(e, "publishdate")
-		}
-		if publishedTimeStr == "" {
-			publishedTimeStr = extractMetaName(e, "pubdate")
-		}
-		if publishedTimeStr != "" {
-			if date := parseDate(publishedTimeStr); !date.IsZero() {
-				return date
-			}
-		}
-	}
-
-	// Strategy 7: Try common HTML date patterns
-	if publishedTimeStr == "" {
-		// Try time element with datetime
-		publishedTimeStr = extractAttr(e, "time", "datetime")
-		if publishedTimeStr != "" {
-			if date := parseDate(publishedTimeStr); !date.IsZero() {
-				return date
-			}
-		}
-	}
-
-	// If all strategies fail, return zero time
 	return time.Time{}
 }
 
@@ -463,7 +492,6 @@ func extractDateFromJSONLD(e *colly.HTMLElement, selector string) time.Time {
 		return time.Time{}
 	}
 
-	// Find all JSON-LD script tags
 	scripts := e.DOM.Find(selector)
 	for i := range scripts.Length() {
 		script := scripts.Eq(i)
@@ -472,65 +500,102 @@ func extractDateFromJSONLD(e *colly.HTMLElement, selector string) time.Time {
 			continue
 		}
 
-		// Parse JSON-LD
-		var jsonData any
-		if err := json.Unmarshal([]byte(jsonText), &jsonData); err != nil {
+		date := parseJSONLDDate(jsonText)
+		if !date.IsZero() {
+			return date
+		}
+	}
+
+	return time.Time{}
+}
+
+// parseJSONLDDate parses JSON-LD text and extracts date.
+func parseJSONLDDate(jsonText string) time.Time {
+	var jsonData any
+	if err := json.Unmarshal([]byte(jsonText), &jsonData); err != nil {
+		return time.Time{}
+	}
+
+	items := normalizeJSONLDItems(jsonData)
+	return findDateInJSONLDItems(items)
+}
+
+// normalizeJSONLDItems normalizes JSON-LD data to a slice of items.
+func normalizeJSONLDItems(jsonData any) []any {
+	switch v := jsonData.(type) {
+	case []any:
+		return v
+	case map[string]any:
+		return []any{v}
+	default:
+		return nil
+	}
+}
+
+// findDateInJSONLDItems searches for date in JSON-LD items.
+func findDateInJSONLDItems(items []any) time.Time {
+	for _, item := range items {
+		obj, ok := item.(map[string]any)
+		if !ok {
 			continue
 		}
 
-		// Handle both single objects and arrays
-		var items []any
-		switch v := jsonData.(type) {
-		case []any:
-			items = v
-		case map[string]any:
-			items = []any{v}
-		default:
-			continue
+		// Try nested @graph first
+		if date := extractDateFromGraph(obj); !date.IsZero() {
+			return date
 		}
 
-		// Look for datePublished in each item
-		for _, item := range items {
-			obj, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-
-			// Check for @type NewsArticle, Article, BlogPosting, etc.
-			typeVal, hasType := obj["@type"].(string)
-			if !hasType {
-				// Try nested @graph
-				if graph, hasGraph := obj["@graph"].([]any); hasGraph {
-					for _, graphItem := range graph {
-						if graphObj, isGraphObj := graphItem.(map[string]any); isGraphObj {
-							if date := extractDateFromJSONLDObject(graphObj); !date.IsZero() {
-								return date
-							}
-						}
-					}
-				}
-				continue
-			}
-
-			// Check if it's an article type
-			articleTypes := []string{"NewsArticle", "Article", "BlogPosting", "ScholarlyArticle", "Report"}
-			isArticleType := false
-			for _, articleType := range articleTypes {
-				if typeVal == articleType {
-					isArticleType = true
-					break
-				}
-			}
-
-			if isArticleType {
-				if date := extractDateFromJSONLDObject(obj); !date.IsZero() {
-					return date
-				}
+		// Check for article type and extract date
+		if isArticleType(obj) {
+			if date := extractDateFromJSONLDObject(obj); !date.IsZero() {
+				return date
 			}
 		}
 	}
 
 	return time.Time{}
+}
+
+// extractDateFromGraph extracts date from @graph in JSON-LD.
+func extractDateFromGraph(obj map[string]any) time.Time {
+	// Only process if @type is not present (meaning we should check @graph)
+	if _, hasType := obj["@type"].(string); hasType {
+		return time.Time{}
+	}
+
+	graph, hasGraph := obj["@graph"].([]any)
+	if !hasGraph {
+		return time.Time{}
+	}
+
+	for _, graphItem := range graph {
+		graphObj, isGraphObj := graphItem.(map[string]any)
+		if !isGraphObj {
+			continue
+		}
+		if date := extractDateFromJSONLDObject(graphObj); !date.IsZero() {
+			return date
+		}
+	}
+
+	return time.Time{}
+}
+
+// isArticleType checks if JSON-LD object is an article type.
+func isArticleType(obj map[string]any) bool {
+	typeVal, hasType := obj["@type"].(string)
+	if !hasType {
+		return false
+	}
+
+	articleTypes := []string{"NewsArticle", "Article", "BlogPosting", "ScholarlyArticle", "Report"}
+	for _, articleType := range articleTypes {
+		if typeVal == articleType {
+			return true
+		}
+	}
+
+	return false
 }
 
 // extractDateFromJSONLDObject extracts date from a JSON-LD object
@@ -572,21 +637,36 @@ func extractDateFromSchemaOrg(e *colly.HTMLElement) time.Time {
 	for _, articleType := range articleTypes {
 		selector := fmt.Sprintf("[itemtype='%s']", articleType)
 		article := e.DOM.Find(selector).First()
-		if article.Length() > 0 {
-			// Try itemprop="datePublished"
-			datePublished := article.Find("[itemprop='datePublished']").First()
-			if datePublished.Length() > 0 {
-				dateStr := datePublished.AttrOr("content", datePublished.AttrOr("datetime", datePublished.Text()))
-				if dateStr != "" {
-					if date := parseDate(dateStr); !date.IsZero() {
-						return date
-					}
-				}
-			}
+		if article.Length() == 0 {
+			continue
+		}
+
+		if date := extractDateFromSchemaArticle(article); !date.IsZero() {
+			return date
 		}
 	}
 
 	return time.Time{}
+}
+
+// extractDateFromSchemaArticle extracts date from a schema.org article element.
+func extractDateFromSchemaArticle(article *goquery.Selection) time.Time {
+	datePublished := article.Find("[itemprop='datePublished']").First()
+	if datePublished.Length() == 0 {
+		return time.Time{}
+	}
+
+	dateStr := datePublished.AttrOr("content", datePublished.AttrOr("datetime", datePublished.Text()))
+	if dateStr == "" {
+		return time.Time{}
+	}
+
+	date := parseDate(dateStr)
+	if date.IsZero() {
+		return time.Time{}
+	}
+
+	return date
 }
 
 // extractArticleID extracts the article ID from various attributes or generates one from URL.

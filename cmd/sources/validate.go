@@ -135,78 +135,107 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 // printValidationResults prints validation results in a user-friendly format.
 func printValidationResults(w *os.File, result *generator.ValidationResult) {
+	printValidationHeader(w, result)
+	printFieldResults(w, result)
+	printValidationSummary(w, result)
+}
+
+// printValidationHeader prints the header with summary statistics.
+func printValidationHeader(w *os.File, result *generator.ValidationResult) {
 	fmt.Fprintf(w, "📊 Validation Results:\n\n")
 	const percentMultiplier = 100.0
 	fmt.Fprintf(w, "Total articles tested: %d\n", result.TotalArticles)
 	fmt.Fprintf(w, "Articles with all critical fields: %d (%.0f%%)\n\n",
 		result.SuccessfulArticles,
 		float64(result.SuccessfulArticles)/float64(result.TotalArticles)*percentMultiplier)
+}
 
-	// Print field results
+// printFieldResults prints results for each field.
+func printFieldResults(w *os.File, result *generator.ValidationResult) {
 	fieldOrder := []string{"title", "body", "author", "byline", "published_time", "image", "link", "category", "section"}
 
 	for _, fieldName := range fieldOrder {
 		fieldResult, exists := result.FieldResults[fieldName]
-		if !exists {
+		if !exists || fieldResult.TotalCount == 0 {
 			continue
 		}
 
-		// Skip if selector is empty
-		if fieldResult.TotalCount == 0 {
-			continue
-		}
+		printFieldResult(w, fieldName, fieldResult)
+	}
+}
 
-		// Determine status emoji
-		const highSuccessRate = 90.0
-		const mediumSuccessRate = 70.0
-		var status string
-		if fieldResult.SuccessRate >= highSuccessRate {
-			status = "✅"
-		} else if fieldResult.SuccessRate >= mediumSuccessRate {
-			status = "⚠️"
-		} else {
-			status = "❌"
-		}
+// printFieldResult prints a single field's validation result.
+func printFieldResult(w *os.File, fieldName string, fieldResult generator.FieldValidationResult) {
+	status := getStatusEmoji(fieldResult.SuccessRate)
+	fmt.Fprintf(w, "%s %s: %.0f%% (%d/%d)\n",
+		status,
+		fieldName,
+		fieldResult.SuccessRate,
+		fieldResult.SuccessCount,
+		fieldResult.TotalCount,
+	)
 
-		fmt.Fprintf(w, "%s %s: %.0f%% (%d/%d)\n",
-			status,
-			fieldName,
-			fieldResult.SuccessRate,
-			fieldResult.SuccessCount,
-			fieldResult.TotalCount,
-		)
+	printSampleValues(w, fieldResult.SampleValues)
+	printFailedURLs(w, fieldResult.FailedURLs)
+	fmt.Fprintf(w, "\n")
+}
 
-		// Show sample values
-		const maxSamplesToShow = 2
-		const maxSampleDisplayLength = 60
-		if len(fieldResult.SampleValues) > 0 {
-			for i, sample := range fieldResult.SampleValues {
-				if i >= maxSamplesToShow { // Limit to 2 samples
-					break
-				}
-				sampleDisplay := sample
-				if len(sampleDisplay) > maxSampleDisplayLength {
-					sampleDisplay = sampleDisplay[:maxSampleDisplayLength] + "..."
-				}
-				fmt.Fprintf(w, "   Sample %d: \"%s\"\n", i+1, sampleDisplay)
-			}
-		}
+// getStatusEmoji returns the appropriate emoji based on success rate.
+func getStatusEmoji(successRate float64) string {
+	const highSuccessRate = 90.0
+	const mediumSuccessRate = 70.0
 
-		// Show failed URLs if any
-		const maxFailedURLsToShow = 3
-		if len(fieldResult.FailedURLs) > 0 && len(fieldResult.FailedURLs) <= maxFailedURLsToShow {
-			fmt.Fprintf(w, "   Failed on: %s\n", strings.Join(fieldResult.FailedURLs, ", "))
-		} else if len(fieldResult.FailedURLs) > maxFailedURLsToShow {
-			fmt.Fprintf(w, "   Failed on %d URLs (showing first %d): %s\n",
-				len(fieldResult.FailedURLs),
-				maxFailedURLsToShow,
-				strings.Join(fieldResult.FailedURLs[:maxFailedURLsToShow], ", "))
-		}
+	if successRate >= highSuccessRate {
+		return "✅"
+	}
+	if successRate >= mediumSuccessRate {
+		return "⚠️"
+	}
+	return "❌"
+}
 
-		fmt.Fprintf(w, "\n")
+// printSampleValues prints sample extracted values.
+func printSampleValues(w *os.File, sampleValues []string) {
+	const maxSamplesToShow = 2
+	const maxSampleDisplayLength = 60
+
+	if len(sampleValues) == 0 {
+		return
 	}
 
-	// Summary
+	for i, sample := range sampleValues {
+		if i >= maxSamplesToShow {
+			break
+		}
+		sampleDisplay := sample
+		if len(sampleDisplay) > maxSampleDisplayLength {
+			sampleDisplay = sampleDisplay[:maxSampleDisplayLength] + "..."
+		}
+		fmt.Fprintf(w, "   Sample %d: \"%s\"\n", i+1, sampleDisplay)
+	}
+}
+
+// printFailedURLs prints failed URLs if any.
+func printFailedURLs(w *os.File, failedURLs []string) {
+	const maxFailedURLsToShow = 3
+
+	if len(failedURLs) == 0 {
+		return
+	}
+
+	if len(failedURLs) <= maxFailedURLsToShow {
+		fmt.Fprintf(w, "   Failed on: %s\n", strings.Join(failedURLs, ", "))
+		return
+	}
+
+	fmt.Fprintf(w, "   Failed on %d URLs (showing first %d): %s\n",
+		len(failedURLs),
+		maxFailedURLsToShow,
+		strings.Join(failedURLs[:maxFailedURLsToShow], ", "))
+}
+
+// printValidationSummary prints the final summary.
+func printValidationSummary(w *os.File, result *generator.ValidationResult) {
 	fmt.Fprintf(w, "---\n\n")
 	if result.SuccessfulArticles == result.TotalArticles {
 		fmt.Fprintf(w, "✅ All articles have all critical fields!\n")
@@ -223,37 +252,49 @@ func discoverArticleURLs(sourceURL string, selectors configtypes.ArticleSelector
 		return nil, err
 	}
 
-	var articleURLs []string
+	if selectors.Link == "" {
+		return nil, nil
+	}
 
-	// Use link selector to find article URLs
-	if selectors.Link != "" {
-		linkSelectors := strings.Split(selectors.Link, ",")
-		for _, selector := range linkSelectors {
-			selector = strings.TrimSpace(selector)
-			if selector == "" {
-				continue
-			}
-			doc.Find(selector).Each(func(i int, s *goquery.Selection) {
-				if len(articleURLs) >= maxSamples {
-					return
-				}
-				href, exists := s.Attr("href")
-				if exists && href != "" {
-					// Make absolute URL
-					baseURL, parseErr := url.Parse(sourceURL)
-					if parseErr == nil {
-						hrefURL, parseHrefErr := baseURL.Parse(href)
-						if parseHrefErr == nil {
-							articleURLs = append(articleURLs, hrefURL.String())
-						}
-					}
-				}
-			})
+	baseURL, err := url.Parse(sourceURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse source URL: %w", err)
+	}
+
+	return extractURLsFromSelectors(doc, selectors.Link, baseURL, maxSamples), nil
+}
+
+// extractURLsFromSelectors extracts URLs from comma-separated selectors.
+func extractURLsFromSelectors(doc *goquery.Document, linkSelector string, baseURL *url.URL, maxSamples int) []string {
+	var articleURLs []string
+	linkSelectors := strings.Split(linkSelector, ",")
+
+	for _, selector := range linkSelectors {
+		selector = strings.TrimSpace(selector)
+		if selector == "" {
+			continue
+		}
+
+		doc.Find(selector).Each(func(i int, s *goquery.Selection) {
 			if len(articleURLs) >= maxSamples {
-				break
+				return
 			}
+
+			href, exists := s.Attr("href")
+			if !exists || href == "" {
+				return
+			}
+
+			hrefURL, err := baseURL.Parse(href)
+			if err == nil {
+				articleURLs = append(articleURLs, hrefURL.String())
+			}
+		})
+
+		if len(articleURLs) >= maxSamples {
+			break
 		}
 	}
 
-	return articleURLs, nil
+	return articleURLs
 }

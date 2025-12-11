@@ -50,7 +50,6 @@ func ValidateSelectors(
 		return nil, errors.New("no article URLs provided")
 	}
 
-	// Limit to maxSamples
 	if len(articleURLs) > maxSamples {
 		articleURLs = articleURLs[:maxSamples]
 	}
@@ -60,8 +59,19 @@ func ValidateSelectors(
 		TotalArticles: len(articleURLs),
 	}
 
-	// Fields to validate
-	fields := map[string]string{
+	fields := buildFieldMap(selectors)
+	initializeFieldResults(result, fields, len(articleURLs))
+
+	criticalFields := []string{"title", "body"}
+	articlesWithAllCritical := validateArticles(articleURLs, fields, result, criticalFields)
+
+	result.SuccessfulArticles = articlesWithAllCritical
+	return result, nil
+}
+
+// buildFieldMap creates a map of field names to selectors.
+func buildFieldMap(selectors configtypes.ArticleSelectors) map[string]string {
+	return map[string]string{
 		"title":          selectors.Title,
 		"body":           selectors.Body,
 		"author":         selectors.Author,
@@ -72,82 +82,121 @@ func ValidateSelectors(
 		"category":       selectors.Category,
 		"section":        selectors.Section,
 	}
+}
 
-	// Initialize field results
+// initializeFieldResults initializes field results for all fields.
+func initializeFieldResults(result *ValidationResult, fields map[string]string, totalCount int) {
 	for fieldName := range fields {
 		result.FieldResults[fieldName] = FieldValidationResult{
 			FieldName:    fieldName,
 			SuccessCount: 0,
-			TotalCount:   len(articleURLs),
+			TotalCount:   totalCount,
 			FailedURLs:   []string{},
 			SampleValues: []string{},
 		}
 	}
+}
 
-	// Track articles with all critical fields
-	criticalFields := []string{"title", "body"}
+// validateArticles validates selectors against all article URLs.
+func validateArticles(
+	articleURLs []string,
+	fields map[string]string,
+	result *ValidationResult,
+	criticalFields []string,
+) int {
 	articlesWithAllCritical := 0
 
-	// Test each article
 	for _, articleURL := range articleURLs {
 		doc, err := fetchDocumentForValidation(articleURL)
 		if err != nil {
-			// Mark all fields as failed for this URL
-			for fieldName := range fields {
-				fieldResult := result.FieldResults[fieldName]
-				fieldResult.FailedURLs = append(fieldResult.FailedURLs, articleURL)
-				result.FieldResults[fieldName] = fieldResult
-			}
+			markAllFieldsFailed(result, fields, articleURL)
 			continue
 		}
 
-		// Create a mock HTMLElement from goquery document
-		// We'll use goquery directly since we don't have colly.HTMLElement
-		articleHasAllCritical := true
-
-		// Test each field
-		for fieldName, selector := range fields {
-			if selector == "" {
-				continue
-			}
-
-			value, found := extractValueFromDocument(doc, selector)
-			fieldResult := result.FieldResults[fieldName]
-
-			if found && value != "" {
-				fieldResult.SuccessCount++
-				// Store sample value (limit to 3 samples)
-				const maxSamples = 3
-				const maxSampleLength = 100
-				if len(fieldResult.SampleValues) < maxSamples {
-					sample := value
-					if len(sample) > maxSampleLength {
-						sample = sample[:maxSampleLength] + "..."
-					}
-					fieldResult.SampleValues = append(fieldResult.SampleValues, sample)
-				}
-			} else {
-				fieldResult.FailedURLs = append(fieldResult.FailedURLs, articleURL)
-				// If this is a critical field, mark article as incomplete
-				if contains(criticalFields, fieldName) {
-					articleHasAllCritical = false
-				}
-			}
-
-			// Calculate success rate
-			const percentMultiplier = 100.0
-			fieldResult.SuccessRate = float64(fieldResult.SuccessCount) / float64(fieldResult.TotalCount) * percentMultiplier
-			result.FieldResults[fieldName] = fieldResult
-		}
-
-		if articleHasAllCritical {
+		if validateArticleFields(doc, fields, result, articleURL, criticalFields) {
 			articlesWithAllCritical++
 		}
 	}
 
-	result.SuccessfulArticles = articlesWithAllCritical
+	return articlesWithAllCritical
+}
 
-	return result, nil
+// markAllFieldsFailed marks all fields as failed for a URL.
+func markAllFieldsFailed(result *ValidationResult, fields map[string]string, articleURL string) {
+	for fieldName := range fields {
+		fieldResult := result.FieldResults[fieldName]
+		fieldResult.FailedURLs = append(fieldResult.FailedURLs, articleURL)
+		result.FieldResults[fieldName] = fieldResult
+	}
+}
+
+// validateArticleFields validates all fields for a single article.
+// Returns true if article has all critical fields.
+func validateArticleFields(
+	doc *goquery.Document,
+	fields map[string]string,
+	result *ValidationResult,
+	articleURL string,
+	criticalFields []string,
+) bool {
+	articleHasAllCritical := true
+
+	for fieldName, selector := range fields {
+		if selector == "" {
+			continue
+		}
+
+		value, found := extractValueFromDocument(doc, selector)
+		fieldResult := result.FieldResults[fieldName]
+
+		if found && value != "" {
+			updateFieldSuccess(&fieldResult, value)
+		} else {
+			updateFieldFailure(&fieldResult, articleURL, fieldName, criticalFields, &articleHasAllCritical)
+		}
+
+		updateFieldSuccessRate(&fieldResult, result.TotalArticles)
+		result.FieldResults[fieldName] = fieldResult
+	}
+
+	return articleHasAllCritical
+}
+
+// updateFieldSuccess updates field result for successful extraction.
+func updateFieldSuccess(fieldResult *FieldValidationResult, value string) {
+	fieldResult.SuccessCount++
+
+	const maxSamples = 3
+	const maxSampleLength = 100
+	if len(fieldResult.SampleValues) >= maxSamples {
+		return
+	}
+
+	sample := value
+	if len(sample) > maxSampleLength {
+		sample = sample[:maxSampleLength] + "..."
+	}
+	fieldResult.SampleValues = append(fieldResult.SampleValues, sample)
+}
+
+// updateFieldFailure updates field result for failed extraction.
+func updateFieldFailure(
+	fieldResult *FieldValidationResult,
+	articleURL string,
+	fieldName string,
+	criticalFields []string,
+	articleHasAllCritical *bool,
+) {
+	fieldResult.FailedURLs = append(fieldResult.FailedURLs, articleURL)
+	if contains(criticalFields, fieldName) {
+		*articleHasAllCritical = false
+	}
+}
+
+// updateFieldSuccessRate calculates and updates the success rate.
+func updateFieldSuccessRate(fieldResult *FieldValidationResult, totalCount int) {
+	const percentMultiplier = 100.0
+	fieldResult.SuccessRate = float64(fieldResult.SuccessCount) / float64(totalCount) * percentMultiplier
 }
 
 // extractValueFromDocument extracts a value from a goquery document using a selector.
@@ -158,42 +207,65 @@ func extractValueFromDocument(doc *goquery.Document, selector string) (string, b
 
 	// Handle meta tags
 	if strings.HasPrefix(selector, "meta[") {
-		selection := doc.Find(selector).First()
-		if selection.Length() == 0 {
-			return "", false
-		}
-		content, exists := selection.Attr("content")
-		if exists && content != "" {
-			return strings.TrimSpace(content), true
-		}
-		return "", false
+		return extractMetaContent(doc, selector)
 	}
 
 	// Handle attributes (e.g., time[datetime], img[src])
 	if strings.Contains(selector, "[") {
-		// Extract attribute name
-		parts := strings.Split(selector, "[")
-		if len(parts) > 1 {
-			attrPart := strings.TrimSuffix(parts[1], "]")
-			attrParts := strings.Split(attrPart, "=")
-			if len(attrParts) > 0 {
-				attrName := strings.Trim(attrParts[0], "'\"")
-				// Handle datetime, src, href, etc.
-				if attrName == "datetime" || attrName == "src" || attrName == "href" {
-					elementSelector := parts[0]
-					selection := doc.Find(elementSelector).First()
-					if selection.Length() > 0 {
-						value, exists := selection.Attr(attrName)
-						if exists && value != "" {
-							return strings.TrimSpace(value), true
-						}
-					}
-				}
-			}
-		}
+		return extractAttributeValue(doc, selector)
 	}
 
 	// Regular text extraction
+	return extractTextValue(doc, selector)
+}
+
+// extractMetaContent extracts content from meta tags.
+func extractMetaContent(doc *goquery.Document, selector string) (string, bool) {
+	selection := doc.Find(selector).First()
+	if selection.Length() == 0 {
+		return "", false
+	}
+	content, exists := selection.Attr("content")
+	if exists && content != "" {
+		return strings.TrimSpace(content), true
+	}
+	return "", false
+}
+
+// extractAttributeValue extracts value from elements with attributes.
+func extractAttributeValue(doc *goquery.Document, selector string) (string, bool) {
+	parts := strings.Split(selector, "[")
+	if len(parts) <= 1 {
+		return "", false
+	}
+
+	attrPart := strings.TrimSuffix(parts[1], "]")
+	attrParts := strings.Split(attrPart, "=")
+	if len(attrParts) == 0 {
+		return "", false
+	}
+
+	attrName := strings.Trim(attrParts[0], "'\"")
+	if attrName != "datetime" && attrName != "src" && attrName != "href" {
+		return "", false
+	}
+
+	elementSelector := parts[0]
+	selection := doc.Find(elementSelector).First()
+	if selection.Length() == 0 {
+		return "", false
+	}
+
+	value, exists := selection.Attr(attrName)
+	if exists && value != "" {
+		return strings.TrimSpace(value), true
+	}
+
+	return "", false
+}
+
+// extractTextValue extracts text content from selectors.
+func extractTextValue(doc *goquery.Document, selector string) (string, bool) {
 	selectors := strings.Split(selector, ",")
 	for _, sel := range selectors {
 		sel = strings.TrimSpace(sel)
@@ -208,7 +280,6 @@ func extractValueFromDocument(doc *goquery.Document, selector string) (string, b
 			}
 		}
 	}
-
 	return "", false
 }
 

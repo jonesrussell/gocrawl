@@ -2,7 +2,6 @@
 package sources
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -18,10 +17,9 @@ import (
 )
 
 var (
-	generateOutputFile   string
-	generateArticleURL   string
-	generateSamples      int
-	generateShouldAppend bool
+	generateOutputFile string
+	generateArticleURL string
+	generateSamples    int
 )
 
 // NewGenerateCommand creates a new generate subcommand for sources.
@@ -38,12 +36,7 @@ Example:
   # Analyze both listing and article pages for best results
   gocrawl sources generate https://www.example.com/news \
     --article-url https://www.example.com/news/article-123 \
-    -o new_source.yaml
-
-  # Append directly to sources.yml (with confirmation and backup)
-  gocrawl sources generate https://www.example.com/news \
-    --article-url https://www.example.com/news/article-123 \
-    --append`,
+    -o new_source.yaml`,
 		Args: cobra.ExactArgs(1),
 		RunE: runGenerate,
 	}
@@ -53,119 +46,26 @@ Example:
 		"Analyze an article page for better body/metadata selectors")
 	cmd.Flags().IntVarP(&generateSamples, "samples", "n", 1,
 		"Number of sample articles to analyze (default: 1, future use)")
-	cmd.Flags().BoolVar(&generateShouldAppend, "append", false,
-		"Append to sources.yml after confirmation (creates backup)")
 
 	return cmd
 }
 
 func runGenerate(cmd *cobra.Command, args []string) error {
 	sourceURL := args[0]
-	var backupFilePath string // Store backup file path for later reference
 
-	// If output file is specified, ensure directory exists
-	if generateOutputFile != "" && !generateShouldAppend {
-		outputDir := filepath.Dir(generateOutputFile)
-		if outputDir != "." && outputDir != "" {
-			if err := os.MkdirAll(outputDir, 0755); err != nil {
-				return fmt.Errorf("failed to create output directory: %w", err)
-			}
-			fmt.Fprintf(os.Stderr, "📁 Created directory: %s\n", outputDir)
-		}
+	// Prepare output directory if needed
+	if err := prepareOutputDirectory(); err != nil {
+		return err
 	}
 
-	// Handle --append flag
-	if generateShouldAppend {
-		generateOutputFile = "sources.yml"
-
-		// Create backups directory
-		if err := os.MkdirAll("backups", 0755); err != nil {
-			return fmt.Errorf("failed to create backups directory: %w", err)
-		}
-
-		// Create timestamped backup
-		timestamp := time.Now().Format("2006-01-02_15-04-05")
-		backupFilePath = filepath.Join("backups", fmt.Sprintf("sources_%s.yaml", timestamp))
-
-		// Read and backup sources.yml if it exists
-		if _, statErr := os.Stat("sources.yml"); statErr == nil {
-			input, readErr := os.ReadFile("sources.yml")
-			if readErr != nil {
-				return fmt.Errorf("failed to read sources.yml: %w", readErr)
-			}
-
-			if writeErr := os.WriteFile(backupFilePath, input, 0600); writeErr != nil {
-				return fmt.Errorf("failed to create backup: %w", writeErr)
-			}
-
-			fmt.Fprintf(os.Stderr, "💾 Backup created: %s\n", backupFilePath)
-		}
-
-		// Prompt for confirmation
-		fmt.Fprintf(os.Stderr, "\n⚠️  This will append to sources.yml. Continue? [y/N]: ")
-		reader := bufio.NewReader(os.Stdin)
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("failed to read confirmation: %w", err)
-		}
-
-		response = strings.ToLower(strings.TrimSpace(response))
-		if response != "y" && response != "yes" {
-			fmt.Fprintln(os.Stderr, "❌ Cancelled")
-			return nil
-		}
-	}
-
-	// Print to stderr (user feedback)
-	fmt.Fprintf(os.Stderr, "🔍 Analyzing %s...\n", sourceURL)
-
-	// Fetch the main page
-	mainDoc, err := fetchDocument(sourceURL)
+	// Discover selectors
+	finalResult, err := discoverSelectors(sourceURL)
 	if err != nil {
-		return fmt.Errorf("failed to fetch URL: %w", err)
+		return err
 	}
 
-	// Create discovery instance for main page
-	mainDiscovery, err := generator.NewSelectorDiscovery(mainDoc, sourceURL)
-	if err != nil {
-		return fmt.Errorf("failed to create discovery instance: %w", err)
-	}
-
-	// Discover selectors from main page
-	mainResult := mainDiscovery.DiscoverAll()
-
-	var finalResult generator.DiscoveryResult
-
-	// If article URL provided, fetch and merge
-	if generateArticleURL != "" {
-		fmt.Fprintf(os.Stderr, "🔍 Analyzing article page %s...\n", generateArticleURL)
-		articleDoc, fetchErr := fetchDocument(generateArticleURL)
-		if fetchErr != nil {
-			fmt.Fprintf(os.Stderr, "⚠️  Failed to fetch article page: %v\n", fetchErr)
-			fmt.Fprintf(os.Stderr, "   Continuing with main page results only...\n\n")
-			finalResult = mainResult
-		} else {
-			articleDiscovery, discoveryErr := generator.NewSelectorDiscovery(articleDoc, generateArticleURL)
-			if discoveryErr != nil {
-				fmt.Fprintf(os.Stderr, "⚠️  Failed to create article discovery: %v\n", discoveryErr)
-				fmt.Fprintf(os.Stderr, "   Continuing with main page results only...\n\n")
-				finalResult = mainResult
-			} else {
-				articleResult := articleDiscovery.DiscoverAll()
-
-				// Merge results (article page takes precedence for content)
-				finalResult = mergeResults(mainResult, articleResult)
-				fmt.Fprintf(os.Stderr, "✅ Merged results from both pages\n\n")
-			}
-		}
-	} else {
-		finalResult = mainResult
-	}
-
-	// Print summary to stderr
+	// Print summary and check for missing fields
 	printSummary(os.Stderr, finalResult)
-
-	// Check for missing fields and warn
 	checkMissingFields(os.Stderr, finalResult)
 
 	// Generate YAML
@@ -174,111 +74,121 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to generate YAML: %w", err)
 	}
 
-	// Check for duplicate source if appending
-	if generateShouldAppend {
-		// Parse the generated source to get its name
-		var generatedSource struct {
-			Name string `yaml:"name"`
-		}
-		// The YAML content starts with "  - name:", so we need to extract just the source entry
-		// For simplicity, we'll search for the name pattern in the YAML
-		lines := strings.Split(yamlContent, "\n")
-		for _, line := range lines {
-			if strings.HasPrefix(strings.TrimSpace(line), "name:") {
-				// Extract name value
-				parts := strings.Split(line, "name:")
-				if len(parts) > 1 {
-					name := strings.Trim(strings.TrimSpace(parts[1]), "\"")
-					generatedSource.Name = name
-					break
-				}
-			}
-		}
-
-		// Check if source already exists in sources.yml
-		if generatedSource.Name != "" {
-			if _, statErr := os.Stat("sources.yml"); statErr == nil {
-				existingContent, readErr := os.ReadFile("sources.yml")
-				if readErr != nil {
-					return fmt.Errorf("failed to read sources.yml: %w", readErr)
-				}
-
-				// Simple check - look for the source name
-				searchPattern := fmt.Sprintf("name: %q", generatedSource.Name)
-				if strings.Contains(string(existingContent), searchPattern) {
-					fmt.Fprintf(os.Stderr, "\n⚠️  WARNING: Source \"%s\" already exists in sources.yml!\n", generatedSource.Name)
-					fmt.Fprintln(os.Stderr, "   Options:")
-					fmt.Fprintln(os.Stderr, "   1. Cancel and manually merge (recommended)")
-					fmt.Fprintln(os.Stderr, "   2. Append anyway (will create duplicate)")
-					fmt.Fprintf(os.Stderr, "\n   Continue with append? [y/N]: ")
-
-					reader := bufio.NewReader(os.Stdin)
-					response, readResponseErr := reader.ReadString('\n')
-					if readResponseErr != nil {
-						return fmt.Errorf("failed to read confirmation: %w", readResponseErr)
-					}
-
-					response = strings.ToLower(strings.TrimSpace(response))
-					if response != "y" && response != "yes" {
-						fmt.Fprintln(os.Stderr, "\n❌ Cancelled. Please manually merge:")
-						if generateOutputFile != "" && !generateShouldAppend {
-							fmt.Fprintf(os.Stderr, "   code -d sources.yml %s\n", generateOutputFile)
-						} else {
-							fmt.Fprintln(os.Stderr, "   Review the generated YAML above and merge manually")
-						}
-						return nil
-					}
-				}
-			}
-		}
+	// Write output
+	if err := writeOutput(yamlContent); err != nil {
+		return err
 	}
 
-	// Output YAML
+	// Print success message
+	printSuccessMessage()
+
+	return nil
+}
+
+// prepareOutputDirectory ensures the output directory exists if needed.
+func prepareOutputDirectory() error {
+	if generateOutputFile == "" {
+		return nil
+	}
+
+	outputDir := filepath.Dir(generateOutputFile)
+	if outputDir == "." || outputDir == "" {
+		return nil
+	}
+
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "📁 Created directory: %s\n", outputDir)
+	return nil
+}
+
+// discoverSelectors discovers selectors from the source URL and optionally an article URL.
+func discoverSelectors(sourceURL string) (generator.DiscoveryResult, error) {
+	fmt.Fprintf(os.Stderr, "🔍 Analyzing %s...\n", sourceURL)
+
+	// Fetch the main page
+	mainDoc, err := fetchDocument(sourceURL)
+	if err != nil {
+		return generator.DiscoveryResult{}, fmt.Errorf("failed to fetch URL: %w", err)
+	}
+
+	// Create discovery instance for main page
+	mainDiscovery, err := generator.NewSelectorDiscovery(mainDoc, sourceURL)
+	if err != nil {
+		return generator.DiscoveryResult{}, fmt.Errorf("failed to create discovery instance: %w", err)
+	}
+
+	// Discover selectors from main page
+	mainResult := mainDiscovery.DiscoverAll()
+
+	// If article URL provided, fetch and merge
+	if generateArticleURL == "" {
+		return mainResult, nil
+	}
+
+	return discoverAndMergeArticleSelectors(generateArticleURL, mainResult)
+}
+
+// discoverAndMergeArticleSelectors fetches article page and merges results.
+func discoverAndMergeArticleSelectors(articleURL string, mainResult generator.DiscoveryResult) (generator.DiscoveryResult, error) {
+	fmt.Fprintf(os.Stderr, "🔍 Analyzing article page %s...\n", articleURL)
+
+	articleDoc, fetchErr := fetchDocument(articleURL)
+	if fetchErr != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Failed to fetch article page: %v\n", fetchErr)
+		fmt.Fprintf(os.Stderr, "   Continuing with main page results only...\n\n")
+		return mainResult, nil
+	}
+
+	articleDiscovery, discoveryErr := generator.NewSelectorDiscovery(articleDoc, articleURL)
+	if discoveryErr != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Failed to create article discovery: %v\n", discoveryErr)
+		fmt.Fprintf(os.Stderr, "   Continuing with main page results only...\n\n")
+		return mainResult, nil
+	}
+
+	articleResult := articleDiscovery.DiscoverAll()
+	finalResult := mergeResults(mainResult, articleResult)
+	fmt.Fprintf(os.Stderr, "✅ Merged results from both pages\n\n")
+
+	return finalResult, nil
+}
+
+// writeOutput writes YAML content to the appropriate output.
+func writeOutput(yamlContent string) error {
 	var writer io.Writer = os.Stdout
-	if generateOutputFile != "" {
-		var file *os.File
-		var fileErr error
 
-		if generateShouldAppend {
-			// Append mode
-			file, fileErr = os.OpenFile(generateOutputFile, os.O_APPEND|os.O_WRONLY, 0644)
-			if fileErr != nil {
-				return fmt.Errorf("failed to open sources.yml for appending: %w", fileErr)
-			}
-		} else {
-			// Overwrite mode
-			file, fileErr = os.Create(generateOutputFile)
-			if fileErr != nil {
-				return fmt.Errorf("failed to create output file: %w", fileErr)
-			}
-		}
-		defer file.Close()
-		writer = file
+	if generateOutputFile == "" {
+		_, err := fmt.Fprint(writer, yamlContent)
+		return err
 	}
+
+	file, fileErr := os.Create(generateOutputFile)
+	if fileErr != nil {
+		return fmt.Errorf("failed to create output file: %w", fileErr)
+	}
+	defer file.Close()
+	writer = file
 
 	_, writeErr := fmt.Fprint(writer, yamlContent)
 	if writeErr != nil {
 		return fmt.Errorf("failed to write output: %w", writeErr)
 	}
 
-	// Print success message to stderr
-	if generateOutputFile != "" {
-		if generateShouldAppend {
-			fmt.Fprintf(os.Stderr, "\n✅ Appended to %s\n", generateOutputFile)
-			if backupFilePath != "" {
-				fmt.Fprintf(os.Stderr, "   To undo: cp %s %s\n", backupFilePath, generateOutputFile)
-			}
-		} else {
-			fmt.Fprintf(os.Stderr, "\n✅ Selectors written to %s\n\n", generateOutputFile)
-			fmt.Fprintf(os.Stderr, "⚠️  IMPORTANT: Review and refine these selectors manually!\n")
-			fmt.Fprintf(os.Stderr, "   After review, add to sources.yml:\n")
-			fmt.Fprintf(os.Stderr, "   cat %s >> sources.yml\n", generateOutputFile)
-		}
-	} else {
+	return nil
+}
+
+// printSuccessMessage prints success message after writing output.
+func printSuccessMessage() {
+	if generateOutputFile == "" {
 		fmt.Fprintf(os.Stderr, "\n⚠️  IMPORTANT: Review and refine these selectors manually!\n")
+		return
 	}
 
-	return nil
+	fmt.Fprintf(os.Stderr, "\n✅ Selectors written to %s\n\n", generateOutputFile)
+	fmt.Fprintf(os.Stderr, "⚠️  IMPORTANT: Review and refine these selectors manually!\n")
+	fmt.Fprintf(os.Stderr, "   After review, use the sources API to add this source.\n")
 }
 
 // fetchDocument fetches a URL and returns a goquery document.
