@@ -48,9 +48,12 @@ Example:
 	}
 
 	cmd.Flags().StringVarP(&generateOutputFile, "output", "o", "", "Output file path (default: stdout)")
-	cmd.Flags().StringVarP(&generateArticleURL, "article-url", "a", "", "Analyze an article page for better body/metadata selectors")
-	cmd.Flags().IntVarP(&generateSamples, "samples", "n", 1, "Number of sample articles to analyze (default: 1, future use)")
-	cmd.Flags().BoolVar(&generateShouldAppend, "append", false, "Append to sources.yml after confirmation (creates backup)")
+	cmd.Flags().StringVarP(&generateArticleURL, "article-url", "a", "",
+		"Analyze an article page for better body/metadata selectors")
+	cmd.Flags().IntVarP(&generateSamples, "samples", "n", 1,
+		"Number of sample articles to analyze (default: 1, future use)")
+	cmd.Flags().BoolVar(&generateShouldAppend, "append", false,
+		"Append to sources.yml after confirmation (creates backup)")
 
 	return cmd
 }
@@ -84,14 +87,14 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		backupFilePath = filepath.Join("backups", fmt.Sprintf("sources_%s.yaml", timestamp))
 
 		// Read and backup sources.yml if it exists
-		if _, err := os.Stat("sources.yml"); err == nil {
-			input, err := os.ReadFile("sources.yml")
-			if err != nil {
-				return fmt.Errorf("failed to read sources.yml: %w", err)
+		if _, statErr := os.Stat("sources.yml"); statErr == nil {
+			input, readErr := os.ReadFile("sources.yml")
+			if readErr != nil {
+				return fmt.Errorf("failed to read sources.yml: %w", readErr)
 			}
 
-			if err := os.WriteFile(backupFilePath, input, 0644); err != nil {
-				return fmt.Errorf("failed to create backup: %w", err)
+			if writeErr := os.WriteFile(backupFilePath, input, 0600); writeErr != nil {
+				return fmt.Errorf("failed to create backup: %w", writeErr)
 			}
 
 			fmt.Fprintf(os.Stderr, "💾 Backup created: %s\n", backupFilePath)
@@ -135,15 +138,15 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	// If article URL provided, fetch and merge
 	if generateArticleURL != "" {
 		fmt.Fprintf(os.Stderr, "🔍 Analyzing article page %s...\n", generateArticleURL)
-		articleDoc, err := fetchDocument(generateArticleURL)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "⚠️  Failed to fetch article page: %v\n", err)
+		articleDoc, fetchErr := fetchDocument(generateArticleURL)
+		if fetchErr != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Failed to fetch article page: %v\n", fetchErr)
 			fmt.Fprintf(os.Stderr, "   Continuing with main page results only...\n\n")
 			finalResult = mainResult
 		} else {
-			articleDiscovery, err := generator.NewSelectorDiscovery(articleDoc, generateArticleURL)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "⚠️  Failed to create article discovery: %v\n", err)
+			articleDiscovery, discoveryErr := generator.NewSelectorDiscovery(articleDoc, generateArticleURL)
+			if discoveryErr != nil {
+				fmt.Fprintf(os.Stderr, "⚠️  Failed to create article discovery: %v\n", discoveryErr)
 				fmt.Fprintf(os.Stderr, "   Continuing with main page results only...\n\n")
 				finalResult = mainResult
 			} else {
@@ -193,14 +196,14 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 		// Check if source already exists in sources.yml
 		if generatedSource.Name != "" {
-			if _, err := os.Stat("sources.yml"); err == nil {
-				existingContent, err := os.ReadFile("sources.yml")
-				if err != nil {
-					return fmt.Errorf("failed to read sources.yml: %w", err)
+			if _, statErr := os.Stat("sources.yml"); statErr == nil {
+				existingContent, readErr := os.ReadFile("sources.yml")
+				if readErr != nil {
+					return fmt.Errorf("failed to read sources.yml: %w", readErr)
 				}
 
 				// Simple check - look for the source name
-				searchPattern := fmt.Sprintf("name: \"%s\"", generatedSource.Name)
+				searchPattern := fmt.Sprintf("name: %q", generatedSource.Name)
 				if strings.Contains(string(existingContent), searchPattern) {
 					fmt.Fprintf(os.Stderr, "\n⚠️  WARNING: Source \"%s\" already exists in sources.yml!\n", generatedSource.Name)
 					fmt.Fprintln(os.Stderr, "   Options:")
@@ -209,9 +212,9 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 					fmt.Fprintf(os.Stderr, "\n   Continue with append? [y/N]: ")
 
 					reader := bufio.NewReader(os.Stdin)
-					response, err := reader.ReadString('\n')
-					if err != nil {
-						return fmt.Errorf("failed to read confirmation: %w", err)
+					response, readErr := reader.ReadString('\n')
+					if readErr != nil {
+						return fmt.Errorf("failed to read confirmation: %w", readErr)
 					}
 
 					response = strings.ToLower(strings.TrimSpace(response))
@@ -233,28 +236,28 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	var writer io.Writer = os.Stdout
 	if generateOutputFile != "" {
 		var file *os.File
-		var err error
+		var fileErr error
 
 		if generateShouldAppend {
 			// Append mode
-			file, err = os.OpenFile(generateOutputFile, os.O_APPEND|os.O_WRONLY, 0644)
-			if err != nil {
-				return fmt.Errorf("failed to open sources.yml for appending: %w", err)
+			file, fileErr = os.OpenFile(generateOutputFile, os.O_APPEND|os.O_WRONLY, 0644)
+			if fileErr != nil {
+				return fmt.Errorf("failed to open sources.yml for appending: %w", fileErr)
 			}
 		} else {
 			// Overwrite mode
-			file, err = os.Create(generateOutputFile)
-			if err != nil {
-				return fmt.Errorf("failed to create output file: %w", err)
+			file, fileErr = os.Create(generateOutputFile)
+			if fileErr != nil {
+				return fmt.Errorf("failed to create output file: %w", fileErr)
 			}
 		}
 		defer file.Close()
 		writer = file
 	}
 
-	_, err = fmt.Fprint(writer, yamlContent)
-	if err != nil {
-		return fmt.Errorf("failed to write output: %w", err)
+	_, writeErr := fmt.Fprint(writer, yamlContent)
+	if writeErr != nil {
+		return fmt.Errorf("failed to write output: %w", writeErr)
 	}
 
 	// Print success message to stderr
@@ -283,13 +286,15 @@ func fetchDocument(url string) (*goquery.Document, error) {
 		Timeout: 30 * time.Second,
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set a user agent
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+	userAgent := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+		"(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -337,7 +342,8 @@ func printCandidate(w io.Writer, fieldName string, candidate generator.SelectorC
 		return
 	}
 
-	fmt.Fprintf(w, "%s (confidence: %.0f%%):\n", fieldName, candidate.Confidence*100)
+	const confidencePercent = 100.0
+	fmt.Fprintf(w, "%s (confidence: %.0f%%):\n", fieldName, candidate.Confidence*confidencePercent)
 	for _, sel := range candidate.Selectors {
 		fmt.Fprintf(w, "  - %s\n", sel)
 	}
