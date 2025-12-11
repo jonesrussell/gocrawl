@@ -501,11 +501,11 @@ func (sd *SelectorDiscovery) DiscoverCategory() SelectorCandidate {
 	}
 
 	// Meta tags - high confidence
-	text, found := sd.extractText("meta[property='article:section']")
-	if found && text != "" {
+	categoryText, categoryFound := sd.extractText("meta[property='article:section']")
+	if categoryFound && categoryText != "" {
 		candidate.Selectors = append(candidate.Selectors, "meta[property='article:section']")
 		candidate.Confidence = mediumHighConfidence
-		candidate.SampleText = truncateText(text, sampleTextLength)
+		candidate.SampleText = truncateText(categoryText, sampleTextLength)
 	}
 
 	// Class patterns
@@ -517,15 +517,15 @@ func (sd *SelectorDiscovery) DiscoverCategory() SelectorCandidate {
 		"[data-category]",
 	}
 	for _, sel := range classPatterns {
-		text, found := sd.extractText(sel)
-		if !found || text == "" {
+		classText, classFound := sd.extractText(sel)
+		if !classFound || classText == "" {
 			continue
 		}
 		candidate.Selectors = append(candidate.Selectors, sel)
 		if candidate.Confidence < mediumLowConfidence {
 			candidate.Confidence = mediumLowConfidence
 			if candidate.SampleText == "" {
-				candidate.SampleText = truncateText(text, sampleTextLength)
+				candidate.SampleText = truncateText(classText, sampleTextLength)
 			}
 		}
 	}
@@ -681,8 +681,8 @@ func extractPattern(href string) string {
 }
 
 // truncateText truncates text to a maximum length.
-// maxLen is always 100, but kept as parameter for API consistency.
-func truncateText(text string, maxLen int) string {
+// maxLen is always sampleTextLength (100), but kept as parameter for API consistency.
+func truncateText(text string, maxLen int) string { //nolint:unparam // kept for API consistency
 	if len(text) <= maxLen {
 		return text
 	}
