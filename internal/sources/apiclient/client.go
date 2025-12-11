@@ -170,6 +170,12 @@ func (c *Client) DeleteSource(ctx context.Context, id string) error {
 func (c *Client) doRequest(req *http.Request, result interface{}) error {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		// Provide more helpful error message for connection issues
+		if urlErr, ok := err.(*url.Error); ok {
+			if urlErr.Op == "dial" || urlErr.Err != nil {
+				return fmt.Errorf("failed to connect to sources API at %s: %w. Ensure the gosources service is running and accessible", c.baseURL, err)
+			}
+		}
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
