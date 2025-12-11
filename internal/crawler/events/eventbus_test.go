@@ -33,14 +33,14 @@ func TestEventBus(t *testing.T) {
 
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		t.Cleanup(ctrl.Finish)
+		testCtrl := gomock.NewController(t)
+		t.Cleanup(testCtrl.Finish)
 
-		mockLog := loggerMock.NewMockInterface(ctrl)
-		mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+		testMockLog := loggerMock.NewMockInterface(testCtrl)
+		testMockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
-		bus := events.NewEventBus(mockLog)
-		handler := crawlerMock.NewMockEventHandler(ctrl)
+		testBus := events.NewEventBus(testMockLog)
+		handler := crawlerMock.NewMockEventHandler(testCtrl)
 
 		var receivedArticle *domain.Article
 		handler.EXPECT().HandleArticle(gomock.Any(), gomock.Any()).
@@ -50,23 +50,23 @@ func TestEventBus(t *testing.T) {
 			Return(nil).
 			Times(1)
 
-		bus.Subscribe(handler)
+		testBus.Subscribe(handler)
 		article := &domain.Article{Title: "Test Article"}
-		err := bus.PublishArticle(context.Background(), article)
+		err := testBus.PublishArticle(context.Background(), article)
 		require.NoError(t, err)
 		assert.Equal(t, article, receivedArticle)
 	})
 
 	t.Run("PublishError", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		t.Cleanup(ctrl.Finish)
+		testCtrl := gomock.NewController(t)
+		t.Cleanup(testCtrl.Finish)
 
-		mockLog := loggerMock.NewMockInterface(ctrl)
-		mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+		testMockLog := loggerMock.NewMockInterface(testCtrl)
+		testMockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
-		bus := events.NewEventBus(mockLog)
-		handler := crawlerMock.NewMockEventHandler(ctrl)
+		testBus := events.NewEventBus(testMockLog)
+		handler := crawlerMock.NewMockEventHandler(testCtrl)
 
 		var receivedErr error
 		handler.EXPECT().HandleError(gomock.Any(), gomock.Any()).
@@ -76,45 +76,45 @@ func TestEventBus(t *testing.T) {
 			Return(nil).
 			Times(1)
 
-		bus.Subscribe(handler)
+		testBus.Subscribe(handler)
 		testErr := errors.New("test error")
-		bus.PublishError(context.Background(), testErr)
+		testBus.PublishError(context.Background(), testErr)
 		assert.Equal(t, testErr, receivedErr)
 	})
 
 	t.Run("PublishStart", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		t.Cleanup(ctrl.Finish)
+		testCtrl := gomock.NewController(t)
+		t.Cleanup(testCtrl.Finish)
 
-		mockLog := loggerMock.NewMockInterface(ctrl)
-		mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+		testMockLog := loggerMock.NewMockInterface(testCtrl)
+		testMockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
-		bus := events.NewEventBus(mockLog)
-		handler := crawlerMock.NewMockEventHandler(ctrl)
+		testBus := events.NewEventBus(testMockLog)
+		handler := crawlerMock.NewMockEventHandler(testCtrl)
 
 		handler.EXPECT().HandleStart(gomock.Any()).Return(nil).Times(1)
 
-		bus.Subscribe(handler)
-		err := bus.PublishStart(context.Background())
+		testBus.Subscribe(handler)
+		err := testBus.PublishStart(context.Background())
 		require.NoError(t, err)
 	})
 
 	t.Run("PublishStop", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		t.Cleanup(ctrl.Finish)
+		testCtrl := gomock.NewController(t)
+		t.Cleanup(testCtrl.Finish)
 
-		mockLog := loggerMock.NewMockInterface(ctrl)
-		mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+		testMockLog := loggerMock.NewMockInterface(testCtrl)
+		testMockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
-		bus := events.NewEventBus(mockLog)
-		handler := crawlerMock.NewMockEventHandler(ctrl)
+		testBus := events.NewEventBus(testMockLog)
+		handler := crawlerMock.NewMockEventHandler(testCtrl)
 
 		handler.EXPECT().HandleStop(gomock.Any()).Return(nil).Times(1)
 
-		bus.Subscribe(handler)
-		err := bus.PublishStop(context.Background())
+		testBus.Subscribe(handler)
+		err := testBus.PublishStop(context.Background())
 		require.NoError(t, err)
 	})
 }

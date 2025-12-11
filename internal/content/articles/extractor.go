@@ -500,9 +500,9 @@ func extractDateFromJSONLD(e *colly.HTMLElement, selector string) time.Time {
 			typeVal, hasType := obj["@type"].(string)
 			if !hasType {
 				// Try nested @graph
-				if graph, ok := obj["@graph"].([]any); ok {
+				if graph, hasGraph := obj["@graph"].([]any); hasGraph {
 					for _, graphItem := range graph {
-						if graphObj, ok := graphItem.(map[string]any); ok {
+						if graphObj, isGraphObj := graphItem.(map[string]any); isGraphObj {
 							if date := extractDateFromJSONLDObject(graphObj); !date.IsZero() {
 								return date
 							}

@@ -213,9 +213,9 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 					fmt.Fprintf(os.Stderr, "\n   Continue with append? [y/N]: ")
 
 					reader := bufio.NewReader(os.Stdin)
-					response, readErr := reader.ReadString('\n')
-					if readErr != nil {
-						return fmt.Errorf("failed to read confirmation: %w", readErr)
+					response, readResponseErr := reader.ReadString('\n')
+					if readResponseErr != nil {
+						return fmt.Errorf("failed to read confirmation: %w", readResponseErr)
 					}
 
 					response = strings.ToLower(strings.TrimSpace(response))
@@ -284,8 +284,9 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 // fetchDocument fetches a URL and returns a goquery document.
 func fetchDocument(url string) (*goquery.Document, error) {
 	ctx := context.Background()
+	const httpTimeout = 30 * time.Second
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: httpTimeout,
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
@@ -351,8 +352,9 @@ func printCandidate(w io.Writer, fieldName string, candidate generator.SelectorC
 	}
 	if candidate.SampleText != "" {
 		sample := candidate.SampleText
-		if len(sample) > 80 {
-			sample = sample[:80] + "..."
+		const maxSampleDisplayLength = 80
+		if len(sample) > maxSampleDisplayLength {
+			sample = sample[:maxSampleDisplayLength] + "..."
 		}
 		fmt.Fprintf(w, "  Sample: \"%s\"\n", sample)
 	}

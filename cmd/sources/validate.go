@@ -79,7 +79,8 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	var articleSelectors configtypes.ArticleSelectors
-	for _, src := range allSources {
+	for i := range allSources {
+		src := &allSources[i]
 		if src.Name == validateSourceName {
 			// Convert selectors
 			articleSelectors = configtypes.ArticleSelectors{
@@ -156,10 +157,12 @@ func printValidationResults(w *os.File, result *generator.ValidationResult) {
 		}
 
 		// Determine status emoji
+		const highSuccessRate = 90.0
+		const mediumSuccessRate = 70.0
 		var status string
-		if fieldResult.SuccessRate >= 90 {
+		if fieldResult.SuccessRate >= highSuccessRate {
 			status = "✅"
-		} else if fieldResult.SuccessRate >= 70 {
+		} else if fieldResult.SuccessRate >= mediumSuccessRate {
 			status = "⚠️"
 		} else {
 			status = "❌"
@@ -174,26 +177,30 @@ func printValidationResults(w *os.File, result *generator.ValidationResult) {
 		)
 
 		// Show sample values
+		const maxSamplesToShow = 2
+		const maxSampleDisplayLength = 60
 		if len(fieldResult.SampleValues) > 0 {
 			for i, sample := range fieldResult.SampleValues {
-				if i >= 2 { // Limit to 2 samples
+				if i >= maxSamplesToShow { // Limit to 2 samples
 					break
 				}
 				sampleDisplay := sample
-				if len(sampleDisplay) > 60 {
-					sampleDisplay = sampleDisplay[:60] + "..."
+				if len(sampleDisplay) > maxSampleDisplayLength {
+					sampleDisplay = sampleDisplay[:maxSampleDisplayLength] + "..."
 				}
 				fmt.Fprintf(w, "   Sample %d: \"%s\"\n", i+1, sampleDisplay)
 			}
 		}
 
 		// Show failed URLs if any
-		if len(fieldResult.FailedURLs) > 0 && len(fieldResult.FailedURLs) <= 3 {
+		const maxFailedURLsToShow = 3
+		if len(fieldResult.FailedURLs) > 0 && len(fieldResult.FailedURLs) <= maxFailedURLsToShow {
 			fmt.Fprintf(w, "   Failed on: %s\n", strings.Join(fieldResult.FailedURLs, ", "))
-		} else if len(fieldResult.FailedURLs) > 3 {
-			fmt.Fprintf(w, "   Failed on %d URLs (showing first 3): %s\n",
+		} else if len(fieldResult.FailedURLs) > maxFailedURLsToShow {
+			fmt.Fprintf(w, "   Failed on %d URLs (showing first %d): %s\n",
 				len(fieldResult.FailedURLs),
-				strings.Join(fieldResult.FailedURLs[:3], ", "))
+				maxFailedURLsToShow,
+				strings.Join(fieldResult.FailedURLs[:maxFailedURLsToShow], ", "))
 		}
 
 		fmt.Fprintf(w, "\n")

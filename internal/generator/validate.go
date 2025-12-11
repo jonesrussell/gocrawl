@@ -3,6 +3,7 @@
 package generator
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -224,7 +225,8 @@ func fetchDocumentForValidation(url string) (*goquery.Document, error) {
 		Timeout: requestTimeout,
 	}
 
-	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+	ctx := context.Background()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

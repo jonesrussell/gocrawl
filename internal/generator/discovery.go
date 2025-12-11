@@ -303,25 +303,25 @@ func (sd *SelectorDiscovery) DiscoverPublishedTime() SelectorCandidate {
 	}
 
 	// Time element with datetime attribute
-	text, found := sd.extractText("time[datetime]")
-	if found && text != "" {
+	timeText, timeFound := sd.extractText("time[datetime]")
+	if timeFound && timeText != "" {
 		candidate.Selectors = append(candidate.Selectors, "time[datetime]")
 		if candidate.Confidence < mediumHighConfidence {
 			candidate.Confidence = mediumHighConfidence
 			if candidate.SampleText == "" {
-				candidate.SampleText = truncateText(text, sampleTextLength)
+				candidate.SampleText = truncateText(timeText, sampleTextLength)
 			}
 		}
 	}
 
 	// Schema.org
-	text, found = sd.extractText("[itemprop='datePublished']")
-	if found && text != "" {
+	schemaText, schemaFound := sd.extractText("[itemprop='datePublished']")
+	if schemaFound && schemaText != "" {
 		candidate.Selectors = append(candidate.Selectors, "[itemprop='datePublished']")
 		if candidate.Confidence < highConfidenceThreshold {
 			candidate.Confidence = highConfidenceThreshold
 			if candidate.SampleText == "" {
-				candidate.SampleText = truncateText(text, sampleTextLength)
+				candidate.SampleText = truncateText(schemaText, sampleTextLength)
 			}
 		}
 	}
@@ -336,15 +336,15 @@ func (sd *SelectorDiscovery) DiscoverPublishedTime() SelectorCandidate {
 		".timestamp",
 	}
 	for _, sel := range classPatterns {
-		text, found := sd.extractText(sel)
-		if !found || text == "" {
+		classText, classFound := sd.extractText(sel)
+		if !classFound || classText == "" {
 			continue
 		}
 		candidate.Selectors = append(candidate.Selectors, sel)
 		if candidate.Confidence < mediumLowConfidence {
 			candidate.Confidence = mediumLowConfidence
 			if candidate.SampleText == "" {
-				candidate.SampleText = truncateText(text, sampleTextLength)
+				candidate.SampleText = truncateText(classText, sampleTextLength)
 			}
 		}
 	}
