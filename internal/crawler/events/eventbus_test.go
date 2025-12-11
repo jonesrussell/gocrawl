@@ -33,14 +33,14 @@ func TestEventBus(t *testing.T) {
 
 	t.Run("Subscribe", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		t.Cleanup(ctrl.Finish)
+		testCtrl := gomock.NewController(t)
+		t.Cleanup(testCtrl.Finish)
 
-		mockLog := loggerMock.NewMockInterface(ctrl)
-		mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+		testMockLog := loggerMock.NewMockInterface(testCtrl)
+		testMockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
-		bus := events.NewEventBus(mockLog)
-		handler := crawlerMock.NewMockEventHandler(ctrl)
+		testBus := events.NewEventBus(testMockLog)
+		handler := crawlerMock.NewMockEventHandler(testCtrl)
 
 		var receivedArticle *domain.Article
 		handler.EXPECT().HandleArticle(gomock.Any(), gomock.Any()).
@@ -50,23 +50,23 @@ func TestEventBus(t *testing.T) {
 			Return(nil).
 			Times(1)
 
-		bus.Subscribe(handler)
+		testBus.Subscribe(handler)
 		article := &domain.Article{Title: "Test Article"}
-		err := bus.PublishArticle(context.Background(), article)
+		err := testBus.PublishArticle(context.Background(), article)
 		require.NoError(t, err)
 		assert.Equal(t, article, receivedArticle)
 	})
 
 	t.Run("PublishError", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		t.Cleanup(ctrl.Finish)
+		testCtrl := gomock.NewController(t)
+		t.Cleanup(testCtrl.Finish)
 
-		mockLog := loggerMock.NewMockInterface(ctrl)
-		mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+		testMockLog := loggerMock.NewMockInterface(testCtrl)
+		testMockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
-		bus := events.NewEventBus(mockLog)
-		handler := crawlerMock.NewMockEventHandler(ctrl)
+		testBus := events.NewEventBus(testMockLog)
+		handler := crawlerMock.NewMockEventHandler(testCtrl)
 
 		var receivedErr error
 		handler.EXPECT().HandleError(gomock.Any(), gomock.Any()).
@@ -76,45 +76,45 @@ func TestEventBus(t *testing.T) {
 			Return(nil).
 			Times(1)
 
-		bus.Subscribe(handler)
+		testBus.Subscribe(handler)
 		testErr := errors.New("test error")
-		bus.PublishError(context.Background(), testErr)
+		testBus.PublishError(context.Background(), testErr)
 		assert.Equal(t, testErr, receivedErr)
 	})
 
 	t.Run("PublishStart", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		t.Cleanup(ctrl.Finish)
+		testCtrl := gomock.NewController(t)
+		t.Cleanup(testCtrl.Finish)
 
-		mockLog := loggerMock.NewMockInterface(ctrl)
-		mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+		testMockLog := loggerMock.NewMockInterface(testCtrl)
+		testMockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
-		bus := events.NewEventBus(mockLog)
-		handler := crawlerMock.NewMockEventHandler(ctrl)
+		testBus := events.NewEventBus(testMockLog)
+		handler := crawlerMock.NewMockEventHandler(testCtrl)
 
 		handler.EXPECT().HandleStart(gomock.Any()).Return(nil).Times(1)
 
-		bus.Subscribe(handler)
-		err := bus.PublishStart(context.Background())
+		testBus.Subscribe(handler)
+		err := testBus.PublishStart(context.Background())
 		require.NoError(t, err)
 	})
 
 	t.Run("PublishStop", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		t.Cleanup(ctrl.Finish)
+		testCtrl := gomock.NewController(t)
+		t.Cleanup(testCtrl.Finish)
 
-		mockLog := loggerMock.NewMockInterface(ctrl)
-		mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+		testMockLog := loggerMock.NewMockInterface(testCtrl)
+		testMockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 
-		bus := events.NewEventBus(mockLog)
-		handler := crawlerMock.NewMockEventHandler(ctrl)
+		testBus := events.NewEventBus(testMockLog)
+		handler := crawlerMock.NewMockEventHandler(testCtrl)
 
 		handler.EXPECT().HandleStop(gomock.Any()).Return(nil).Times(1)
 
-		bus.Subscribe(handler)
-		err := bus.PublishStop(context.Background())
+		testBus.Subscribe(handler)
+		err := testBus.PublishStop(context.Background())
 		require.NoError(t, err)
 	})
 }
@@ -133,7 +133,7 @@ func TestEventBus_ConcurrentSubscribe(t *testing.T) {
 
 	// Create handlers with expectations before concurrent access
 	handlers := make([]*crawlerMock.MockEventHandler, 100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		handlers[i] = crawlerMock.NewMockEventHandler(ctrl)
 		handlers[i].EXPECT().HandleError(gomock.Any(), gomock.Any()).AnyTimes()
 		handlers[i].EXPECT().HandleArticle(gomock.Any(), gomock.Any()).AnyTimes()
@@ -142,7 +142,7 @@ func TestEventBus_ConcurrentSubscribe(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -170,7 +170,7 @@ func TestEventBus_ConcurrentPublish(t *testing.T) {
 	bus.Subscribe(handler)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -196,7 +196,7 @@ func TestEventBus_ConcurrentSubscribeAndPublish(t *testing.T) {
 
 	// Create handlers with expectations before concurrent access
 	handlers := make([]*crawlerMock.MockEventHandler, 100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		handlers[i] = crawlerMock.NewMockEventHandler(ctrl)
 		handlers[i].EXPECT().HandleError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		handlers[i].EXPECT().HandleArticle(gomock.Any(), gomock.Any()).AnyTimes()
@@ -210,11 +210,11 @@ func TestEventBus_ConcurrentSubscribeAndPublish(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Publishers
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 100; j++ {
+			for range 100 {
 				select {
 				case <-ctx.Done():
 					return
@@ -228,11 +228,13 @@ func TestEventBus_ConcurrentSubscribeAndPublish(t *testing.T) {
 	// Subscribers
 	handlerIdx := 0
 	var mu sync.Mutex
-	for i := 0; i < 10; i++ {
+	const subscriberCount = 10
+	const subscribePerSubscriber = 10
+	for i := range subscriberCount {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 10; j++ {
+			for j := range subscribePerSubscriber {
 				select {
 				case <-ctx.Done():
 					return
@@ -243,8 +245,10 @@ func TestEventBus_ConcurrentSubscribeAndPublish(t *testing.T) {
 					mu.Unlock()
 					bus.Subscribe(handlers[idx])
 				}
+				_ = j
 			}
 		}()
+		_ = i
 	}
 
 	wg.Wait()

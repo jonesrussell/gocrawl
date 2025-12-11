@@ -8,8 +8,7 @@ import (
 	"strings"
 )
 
-// GenerateSourceYAML generates a YAML configuration entry for a source
-// that can be appended to sources.yml.
+// GenerateSourceYAML generates a YAML configuration entry for a source.
 func GenerateSourceYAML(
 	sourceURL string,
 	result DiscoveryResult,
@@ -19,16 +18,20 @@ func GenerateSourceYAML(
 		return "", fmt.Errorf("failed to parse URL: %w", err)
 	}
 
-	// Generate source name from hostname
-	sourceName := generateSourceName(parsedURL.Hostname())
+	var builder strings.Builder
+	writeYAMLHeader(&builder, parsedURL, sourceURL)
+	writeYAMLSelectors(&builder, result)
+	writeYAMLExclusions(&builder, result)
 
-	// Generate index names
+	return builder.String(), nil
+}
+
+// writeYAMLHeader writes the header section of the YAML.
+func writeYAMLHeader(builder *strings.Builder, parsedURL *url.URL, sourceURL string) {
+	sourceName := generateSourceName(parsedURL.Hostname())
 	articleIndex := generateIndexName(parsedURL.Hostname(), "articles")
 	pageIndex := generateIndexName(parsedURL.Hostname(), "pages")
 
-	var builder strings.Builder
-
-	// Start with array item indent (2 spaces)
 	builder.WriteString("  - name: \"")
 	builder.WriteString(sourceName)
 	builder.WriteString("\"\n")
@@ -53,122 +56,53 @@ func GenerateSourceYAML(
 
 	builder.WriteString("    selectors:\n")
 	builder.WriteString("      article:\n")
+}
 
-	// Title
-	if len(result.Title.Selectors) > 0 {
-		builder.WriteString("        title: \"")
-		builder.WriteString(strings.Join(result.Title.Selectors, ", "))
-		builder.WriteString("\"  # Confidence: ")
-		builder.WriteString(fmt.Sprintf("%.2f", result.Title.Confidence))
-		builder.WriteString("\n")
-		if result.Title.SampleText != "" {
-			builder.WriteString("        # Sample: \"")
-			builder.WriteString(escapeYAMLString(result.Title.SampleText))
-			builder.WriteString("\"\n")
-		}
+// writeYAMLSelectors writes all selector fields.
+func writeYAMLSelectors(builder *strings.Builder, result DiscoveryResult) {
+	writeSelectorField(builder, "title", result.Title)
+	writeSelectorField(builder, "body", result.Body)
+	writeSelectorField(builder, "author", result.Author)
+	writeSelectorField(builder, "published_time", result.PublishedTime)
+	writeSelectorField(builder, "image", result.Image)
+	writeSelectorField(builder, "link", result.Link)
+	writeSelectorField(builder, "category", result.Category)
+}
+
+// writeSelectorField writes a single selector field.
+func writeSelectorField(builder *strings.Builder, fieldName string, candidate SelectorCandidate) {
+	if len(candidate.Selectors) == 0 {
+		return
 	}
 
-	// Body
-	if len(result.Body.Selectors) > 0 {
-		builder.WriteString("        body: \"")
-		builder.WriteString(strings.Join(result.Body.Selectors, ", "))
-		builder.WriteString("\"  # Confidence: ")
-		builder.WriteString(fmt.Sprintf("%.2f", result.Body.Confidence))
-		builder.WriteString("\n")
-		if result.Body.SampleText != "" {
-			builder.WriteString("        # Sample: \"")
-			builder.WriteString(escapeYAMLString(result.Body.SampleText))
-			builder.WriteString("\"\n")
-		}
+	builder.WriteString("        ")
+	builder.WriteString(fieldName)
+	builder.WriteString(": \"")
+	builder.WriteString(strings.Join(candidate.Selectors, ", "))
+	builder.WriteString("\"  # Confidence: ")
+	fmt.Fprintf(builder, "%.2f", candidate.Confidence)
+	builder.WriteString("\n")
+
+	if candidate.SampleText != "" {
+		builder.WriteString("        # Sample: \"")
+		builder.WriteString(escapeYAMLString(candidate.SampleText))
+		builder.WriteString("\"\n")
+	}
+}
+
+// writeYAMLExclusions writes the exclusions section.
+func writeYAMLExclusions(builder *strings.Builder, result DiscoveryResult) {
+	if len(result.Exclusions) == 0 {
+		return
 	}
 
-	// Author
-	if len(result.Author.Selectors) > 0 {
-		builder.WriteString("        author: \"")
-		builder.WriteString(strings.Join(result.Author.Selectors, ", "))
-		builder.WriteString("\"  # Confidence: ")
-		builder.WriteString(fmt.Sprintf("%.2f", result.Author.Confidence))
-		builder.WriteString("\n")
-		if result.Author.SampleText != "" {
-			builder.WriteString("        # Sample: \"")
-			builder.WriteString(escapeYAMLString(result.Author.SampleText))
-			builder.WriteString("\"\n")
-		}
+	builder.WriteString("        exclude: [\n")
+	for _, excl := range result.Exclusions {
+		builder.WriteString("          \"")
+		builder.WriteString(excl)
+		builder.WriteString("\",\n")
 	}
-
-	// Published time
-	if len(result.PublishedTime.Selectors) > 0 {
-		builder.WriteString("        published_time: \"")
-		builder.WriteString(strings.Join(result.PublishedTime.Selectors, ", "))
-		builder.WriteString("\"  # Confidence: ")
-		builder.WriteString(fmt.Sprintf("%.2f", result.PublishedTime.Confidence))
-		builder.WriteString("\n")
-		if result.PublishedTime.SampleText != "" {
-			builder.WriteString("        # Sample: \"")
-			builder.WriteString(escapeYAMLString(result.PublishedTime.SampleText))
-			builder.WriteString("\"\n")
-		}
-	}
-
-	// Image
-	if len(result.Image.Selectors) > 0 {
-		builder.WriteString("        image: \"")
-		builder.WriteString(strings.Join(result.Image.Selectors, ", "))
-		builder.WriteString("\"  # Confidence: ")
-		builder.WriteString(fmt.Sprintf("%.2f", result.Image.Confidence))
-		builder.WriteString("\n")
-		if result.Image.SampleText != "" {
-			builder.WriteString("        # Sample: \"")
-			builder.WriteString(escapeYAMLString(result.Image.SampleText))
-			builder.WriteString("\"\n")
-		}
-	}
-
-	// Link
-	if len(result.Link.Selectors) > 0 {
-		builder.WriteString("        link: \"")
-		builder.WriteString(strings.Join(result.Link.Selectors, ", "))
-		builder.WriteString("\"  # Confidence: ")
-		builder.WriteString(fmt.Sprintf("%.2f", result.Link.Confidence))
-		builder.WriteString("\n")
-		if result.Link.SampleText != "" {
-			builder.WriteString("        # Sample: \"")
-			builder.WriteString(escapeYAMLString(result.Link.SampleText))
-			builder.WriteString("\"\n")
-		}
-	}
-
-	// Category
-	if len(result.Category.Selectors) > 0 {
-		builder.WriteString("        category: \"")
-		builder.WriteString(strings.Join(result.Category.Selectors, ", "))
-		builder.WriteString("\"  # Confidence: ")
-		builder.WriteString(fmt.Sprintf("%.2f", result.Category.Confidence))
-		builder.WriteString("\n")
-		if result.Category.SampleText != "" {
-			builder.WriteString("        # Sample: \"")
-			builder.WriteString(escapeYAMLString(result.Category.SampleText))
-			builder.WriteString("\"\n")
-		}
-	}
-
-	// Exclusions
-	if len(result.Exclusions) > 0 {
-		builder.WriteString("        exclude: [\n")
-		for i, excl := range result.Exclusions {
-			builder.WriteString("          \"")
-			builder.WriteString(excl)
-			builder.WriteString("\"")
-			if i < len(result.Exclusions)-1 {
-				builder.WriteString(",\n")
-			} else {
-				builder.WriteString(",\n")
-			}
-		}
-		builder.WriteString("        ]\n")
-	}
-
-	return builder.String(), nil
+	builder.WriteString("        ]\n")
 }
 
 // generateSourceName converts a hostname to a title case source name.
@@ -186,7 +120,8 @@ func generateSourceName(hostname string) string {
 
 	// Take the main domain part (usually first or second)
 	var mainPart string
-	if len(parts) >= 2 {
+	const minPartsForDomain = 2
+	if len(parts) >= minPartsForDomain {
 		// Take the second-to-last part (e.g., "example" from "example.com")
 		mainPart = parts[len(parts)-2]
 	} else {
@@ -194,7 +129,7 @@ func generateSourceName(hostname string) string {
 	}
 
 	// Convert to title case
-	if len(mainPart) == 0 {
+	if mainPart == "" {
 		return hostname
 	}
 

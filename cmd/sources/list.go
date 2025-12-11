@@ -142,17 +142,5 @@ func setupCrawlerConfig(cfg config.Interface) error {
 		concrete.Crawler = crawlercfg.New()
 	}
 
-	// If the configured source file does not exist, fall back to sources.example.yml
-	path := concrete.GetCrawlerConfig().SourceFile
-	if path == "" {
-		path = "sources.yml"
-	}
-	if _, statErr := os.Stat(path); statErr != nil {
-		alt := "./sources.example.yml"
-		if _, altErr := os.Stat(alt); altErr == nil {
-			concrete.Crawler.SourceFile = alt
-		}
-	}
-
 	return nil
 }

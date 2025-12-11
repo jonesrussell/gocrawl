@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
 	cmdcommon "github.com/jonesrussell/gocrawl/cmd/common"
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -29,7 +28,6 @@ type Crawler struct {
 	sourceManager sourcespkg.Interface
 	crawler       crawler.Interface
 	done          chan struct{} // Channel to signal crawler completion
-	doneOnce      sync.Once     // Ensures done channel is only closed once
 }
 
 // NewCrawler creates a new crawler instance

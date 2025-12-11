@@ -451,76 +451,7 @@ func mustJSON(v any) []byte {
 
 // EnsureArticleIndex ensures the article index exists with the correct mapping
 func (s *ElasticsearchStorage) EnsureArticleIndex(ctx context.Context, name string) error {
-	articleMapping := map[string]any{
-		"mappings": map[string]any{
-			"properties": map[string]any{
-				"id": map[string]any{
-					"type": "keyword",
-				},
-				"title": map[string]any{
-					"type": "text",
-				},
-				"body": map[string]any{
-					"type": "text",
-				},
-				"author": map[string]any{
-					"type": "keyword",
-				},
-				"byline_name": map[string]any{
-					"type": "keyword",
-				},
-				"published_date": map[string]any{
-					"type": "date",
-				},
-				"source": map[string]any{
-					"type": "keyword",
-				},
-				"tags": map[string]any{
-					"type": "keyword",
-				},
-				"keywords": map[string]any{
-					"type": "keyword",
-				},
-				"intro": map[string]any{
-					"type": "text",
-				},
-				"description": map[string]any{
-					"type": "text",
-				},
-				"og_title": map[string]any{
-					"type": "text",
-				},
-				"og_description": map[string]any{
-					"type": "text",
-				},
-				"og_image": map[string]any{
-					"type": "keyword",
-				},
-				"og_url": map[string]any{
-					"type": "keyword",
-				},
-				"canonical_url": map[string]any{
-					"type": "keyword",
-				},
-				"word_count": map[string]any{
-					"type": "integer",
-				},
-				"category": map[string]any{
-					"type": "keyword",
-				},
-				"section": map[string]any{
-					"type": "keyword",
-				},
-				"created_at": map[string]any{
-					"type": "date",
-				},
-				"updated_at": map[string]any{
-					"type": "date",
-				},
-			},
-		},
-	}
-	return s.CreateIndex(ctx, name, articleMapping)
+	return s.CreateIndex(ctx, name, getArticleMapping())
 }
 
 // EnsureIndex ensures that an index exists with the specified mapping

@@ -112,52 +112,27 @@ func (d *Deleter) confirmDeletion() error {
 func (d *Deleter) deleteIndices(ctx context.Context) error {
 	d.logger.Info("Starting index deletion", "index", d.index, "source", d.sourceName)
 
-	// Test storage connection
 	if err := d.storage.TestConnection(ctx); err != nil {
 		d.logger.Error("Failed to connect to storage", "error", err)
 		return fmt.Errorf("failed to connect to storage: %w", err)
 	}
 
-	// Resolve index to delete
-	if d.sourceName != "" {
-		source := d.sources.FindByName(d.sourceName)
-		if source == nil {
-			return fmt.Errorf("source not found: %s", d.sourceName)
-		}
-		if source.Index == "" && source.ArticleIndex == "" && source.PageIndex == "" {
-			return fmt.Errorf("source %s has no index configured", d.sourceName)
-		}
-		// Add all indices (content, article, and page) if they exist
-		d.index = make([]string, 0, constants.DefaultIndicesCapacity)
-		if source.Index != "" {
-			d.index = append(d.index, source.Index)
-		}
-		if source.ArticleIndex != "" {
-			d.index = append(d.index, source.ArticleIndex)
-		}
-		if source.PageIndex != "" {
-			d.index = append(d.index, source.PageIndex)
-		}
-		d.logger.Info("Resolved source index", "index", d.index, "source", d.sourceName)
+	if err := d.resolveIndicesFromSource(); err != nil {
+		return err
 	}
 
-	// Get existing index
-	existingIndices, listErr := d.storage.ListIndices(ctx)
-	if listErr != nil {
-		d.logger.Error("Failed to list index", "error", listErr)
-		return listErr
-	}
-	d.logger.Debug("Found existing index", "index", existingIndices)
-
-	// Check for empty index
 	if len(d.index) == 0 {
 		return errors.New("no index specified")
 	}
 
-	// Filter index
-	filtered := d.filterIndices(existingIndices)
+	existingIndices, err := d.storage.ListIndices(ctx)
+	if err != nil {
+		d.logger.Error("Failed to list index", "error", err)
+		return err
+	}
+	d.logger.Debug("Found existing index", "index", existingIndices)
 
-	// Report missing index
+	filtered := d.filterIndices(existingIndices)
 	d.reportMissingIndices(filtered.missing)
 
 	if len(filtered.toDelete) == 0 {
@@ -165,20 +140,50 @@ func (d *Deleter) deleteIndices(ctx context.Context) error {
 		return nil
 	}
 
-	d.logger.Info("Indices to delete", "index", filtered.toDelete)
+	return d.deleteFilteredIndices(ctx, filtered.toDelete)
+}
 
-	// Delete index
+// resolveIndicesFromSource resolves indices from source name if provided.
+func (d *Deleter) resolveIndicesFromSource() error {
+	if d.sourceName == "" {
+		return nil
+	}
+
+	source := d.sources.FindByName(d.sourceName)
+	if source == nil {
+		return fmt.Errorf("source not found: %s", d.sourceName)
+	}
+
+	if source.Index == "" && source.ArticleIndex == "" && source.PageIndex == "" {
+		return fmt.Errorf("source %s has no index configured", d.sourceName)
+	}
+
+	d.index = make([]string, 0, constants.DefaultIndicesCapacity)
+	if source.Index != "" {
+		d.index = append(d.index, source.Index)
+	}
+	if source.ArticleIndex != "" {
+		d.index = append(d.index, source.ArticleIndex)
+	}
+	if source.PageIndex != "" {
+		d.index = append(d.index, source.PageIndex)
+	}
+
+	d.logger.Info("Resolved source index", "index", d.index, "source", d.sourceName)
+	return nil
+}
+
+// deleteFilteredIndices deletes the filtered indices.
+func (d *Deleter) deleteFilteredIndices(ctx context.Context, indicesToDelete []string) error {
+	d.logger.Info("Indices to delete", "index", indicesToDelete)
+
 	var deleteErr error
-	for _, index := range filtered.toDelete {
+	for _, index := range indicesToDelete {
 		if err := d.storage.DeleteIndex(ctx, index); err != nil {
-			d.logger.Error("Failed to delete index",
-				"index", index,
-				"error", err,
-			)
+			d.logger.Error("Failed to delete index", "index", index, "error", err)
 			deleteErr = fmt.Errorf("failed to delete index %s: %w", index, err)
 			continue
 		}
-
 		d.logger.Info("Successfully deleted index", "index", index)
 	}
 
@@ -186,12 +191,7 @@ func (d *Deleter) deleteIndices(ctx context.Context) error {
 		return deleteErr
 	}
 
-	if len(filtered.toDelete) == 0 {
-		d.logger.Info("No index to delete")
-		return nil
-	}
-
-	d.logger.Info("Successfully deleted index", "count", len(filtered.toDelete))
+	d.logger.Info("Successfully deleted index", "count", len(indicesToDelete))
 	return nil
 }
 

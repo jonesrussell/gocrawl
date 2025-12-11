@@ -83,10 +83,10 @@ func TestDetectContentType_Article_ViaMetadata(t *testing.T) {
 		},
 	}
 
-	logger := logger.NewNoOp()
+	log := logger.NewNoOp()
 	// Create a minimal Sources instance - we can pass nil since we're passing source directly
 	sourcesInstance := &sources.Sources{}
-	proc := crawler.NewHTMLProcessor(logger, sourcesInstance)
+	proc := crawler.NewHTMLProcessor(log, sourcesInstance)
 
 	contentType := proc.DetectContentType(e, source)
 	assert.Equal(t, contenttype.Article, contentType)
@@ -120,9 +120,9 @@ func TestDetectContentType_Article_ViaSelectors(t *testing.T) {
 		},
 	}
 
-	logger := logger.NewNoOp()
+	log := logger.NewNoOp()
 	sourcesInstance := &sources.Sources{}
-	proc := crawler.NewHTMLProcessor(logger, sourcesInstance)
+	proc := crawler.NewHTMLProcessor(log, sourcesInstance)
 
 	contentType := proc.DetectContentType(e, source)
 	assert.Equal(t, contenttype.Article, contentType)
@@ -153,9 +153,9 @@ func TestDetectContentType_Page_ShortContent(t *testing.T) {
 		},
 	}
 
-	logger := logger.NewNoOp()
+	log := logger.NewNoOp()
 	sourcesInstance := &sources.Sources{}
-	proc := crawler.NewHTMLProcessor(logger, sourcesInstance)
+	proc := crawler.NewHTMLProcessor(log, sourcesInstance)
 
 	contentType := proc.DetectContentType(e, source)
 	assert.Equal(t, contenttype.Page, contentType, "Short content should be detected as page")
@@ -183,9 +183,9 @@ func TestDetectContentType_Page_NoBodySelector(t *testing.T) {
 		},
 	}
 
-	logger := logger.NewNoOp()
+	log := logger.NewNoOp()
 	sourcesInstance := &sources.Sources{}
-	proc := crawler.NewHTMLProcessor(logger, sourcesInstance)
+	proc := crawler.NewHTMLProcessor(log, sourcesInstance)
 
 	contentType := proc.DetectContentType(e, source)
 	assert.Equal(t, contenttype.Page, contentType, "No body match should be detected as page")
@@ -217,9 +217,9 @@ func TestDetectContentType_Page_NoTitle(t *testing.T) {
 		},
 	}
 
-	logger := logger.NewNoOp()
+	log := logger.NewNoOp()
 	sourcesInstance := &sources.Sources{}
-	proc := crawler.NewHTMLProcessor(logger, sourcesInstance)
+	proc := crawler.NewHTMLProcessor(log, sourcesInstance)
 
 	contentType := proc.DetectContentType(e, source)
 	assert.Equal(t, contenttype.Page, contentType, "No title should be detected as page")
@@ -238,9 +238,9 @@ func TestDetectContentType_Page_NoSource(t *testing.T) {
 	e, err := createHTMLElement(html)
 	require.NoError(t, err)
 
-	logger := logger.NewNoOp()
+	log := logger.NewNoOp()
 	sourcesInstance := &sources.Sources{}
-	proc := crawler.NewHTMLProcessor(logger, sourcesInstance)
+	proc := crawler.NewHTMLProcessor(log, sourcesInstance)
 
 	contentType := proc.DetectContentType(e, nil)
 	assert.Equal(t, contenttype.Page, contentType, "No source should default to page")
@@ -267,9 +267,9 @@ func TestDetectContentType_Page_EmptyBodySelector(t *testing.T) {
 		},
 	}
 
-	logger := logger.NewNoOp()
+	log := logger.NewNoOp()
 	sourcesInstance := &sources.Sources{}
-	proc := crawler.NewHTMLProcessor(logger, sourcesInstance)
+	proc := crawler.NewHTMLProcessor(log, sourcesInstance)
 
 	contentType := proc.DetectContentType(e, source)
 	assert.Equal(t, contenttype.Page, contentType, "Empty body selector should default to page")
@@ -303,9 +303,9 @@ func TestDetectContentType_Article_ExactMinLength(t *testing.T) {
 		},
 	}
 
-	logger := logger.NewNoOp()
+	log := logger.NewNoOp()
 	sourcesInstance := &sources.Sources{}
-	proc := crawler.NewHTMLProcessor(logger, sourcesInstance)
+	proc := crawler.NewHTMLProcessor(log, sourcesInstance)
 
 	contentType := proc.DetectContentType(e, source)
 	assert.Equal(t, contenttype.Article, contentType, "Content at minimum length should be detected as article")
@@ -339,9 +339,9 @@ func TestDetectContentType_Page_JustBelowMinLength(t *testing.T) {
 		},
 	}
 
-	logger := logger.NewNoOp()
+	log := logger.NewNoOp()
 	sourcesInstance := &sources.Sources{}
-	proc := crawler.NewHTMLProcessor(logger, sourcesInstance)
+	proc := crawler.NewHTMLProcessor(log, sourcesInstance)
 
 	contentType := proc.DetectContentType(e, source)
 	assert.Equal(t, contenttype.Page, contentType, "Content just below minimum length should be detected as page")

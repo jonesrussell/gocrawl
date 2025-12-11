@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/jonesrussell/gocrawl/internal/config"
@@ -245,27 +246,31 @@ func createSelectorConfig(selectors any) types.SelectorConfig {
 	}
 }
 
-// LoadSources creates a new Sources instance by loading sources from a YAML file
-// specified in the crawler config. Returns an error if no sources are found.
+// LoadSources creates a new Sources instance by loading sources from either the
+// gosources API or a YAML file specified in the crawler config. Returns an error if no sources are found.
 // The logger parameter is optional and can be nil.
 func LoadSources(cfg config.Interface, log logger.Interface) (*Sources, error) {
-	// Determine source file path, handling nil crawler config
-	sourceFile := "sources.yml" // Default source file
-	if crawlerCfg := cfg.GetCrawlerConfig(); crawlerCfg != nil {
-		if crawlerCfg.SourceFile != "" {
-			sourceFile = crawlerCfg.SourceFile
-		}
+	var sources []Config
+	var err error
+
+	crawlerCfg := cfg.GetCrawlerConfig()
+
+	// API loader is required - no file-based fallback
+	if crawlerCfg == nil || crawlerCfg.SourcesAPIURL == "" {
+		return nil, errors.New("sources_api_url is required in crawler configuration. API-only mode is enabled")
 	}
 
-	// Load sources from config file
-	sources, err := loadSourcesFromFile(sourceFile)
+	if log != nil {
+		log.Info("Loading sources from API", "url", crawlerCfg.SourcesAPIURL)
+	}
+	sources, err = loadSourcesFromAPI(crawlerCfg.SourcesAPIURL, log)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load sources from file: %w", err)
+		return nil, fmt.Errorf("failed to load sources from API: %w", err)
 	}
 
 	// If no sources found, return an error
 	if len(sources) == 0 {
-		return nil, errors.New("no sources found in file")
+		return nil, errors.New("no sources found")
 	}
 
 	return &Sources{
@@ -275,20 +280,17 @@ func LoadSources(cfg config.Interface, log logger.Interface) (*Sources, error) {
 	}, nil
 }
 
-// loadSourcesFromFile attempts to load sources from a file
-func loadSourcesFromFile(path string) ([]Config, error) {
-	sourceLoader, err := loader.NewLoader(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create source loader: %w", err)
-	}
+// loadSourcesFromAPI attempts to load sources from the gosources API
+func loadSourcesFromAPI(apiURL string, log logger.Interface) ([]Config, error) {
+	apiLoader := loader.NewAPILoader(apiURL, log)
 
-	configs, err := sourceLoader.LoadSources()
+	configs, err := apiLoader.LoadSources()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load sources: %w", err)
+		return nil, fmt.Errorf("failed to load sources from API: %w", err)
 	}
 
 	if len(configs) == 0 {
-		return nil, errors.New("no sources found in file")
+		return nil, errors.New("no sources found from API")
 	}
 
 	// Convert loaded configs to our source type
@@ -456,18 +458,31 @@ func (s *Sources) ValidateSource(
 		return nil, errors.New("no sources configured")
 	}
 
-	// Find the requested source
+	// Find the requested source (case-insensitive match)
 	var selectedSource *Config
+	var availableNames []string
 	for i := range sourceConfigs {
+		availableNames = append(availableNames, sourceConfigs[i].Name)
+		// Try exact match first
 		if sourceConfigs[i].Name == sourceName {
 			selectedSource = &sourceConfigs[i]
 			break
 		}
 	}
 
-	// If source not found, return an error
+	// If exact match not found, try case-insensitive match
 	if selectedSource == nil {
-		return nil, fmt.Errorf("source not found: %s", sourceName)
+		for i := range sourceConfigs {
+			if strings.EqualFold(sourceConfigs[i].Name, sourceName) {
+				selectedSource = &sourceConfigs[i]
+				break
+			}
+		}
+	}
+
+	// If source not found, return an error with available sources
+	if selectedSource == nil {
+		return nil, fmt.Errorf("source not found: %s. Available sources: %v", sourceName, availableNames)
 	}
 
 	// Convert to configtypes.Source

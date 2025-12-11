@@ -143,9 +143,9 @@ func (m *ElasticsearchIndexManager) GetMapping(ctx context.Context, name string)
 	return result, nil
 }
 
-// EnsureArticleIndex ensures the article index exists.
-func (m *ElasticsearchIndexManager) EnsureArticleIndex(ctx context.Context, name string) error {
-	articleMapping := map[string]any{
+// getArticleMapping returns the Elasticsearch mapping configuration for articles.
+func getArticleMapping() map[string]any {
+	return map[string]any{
 		"mappings": map[string]any{
 			"properties": map[string]any{
 				"id": map[string]any{
@@ -214,7 +214,11 @@ func (m *ElasticsearchIndexManager) EnsureArticleIndex(ctx context.Context, name
 			},
 		},
 	}
-	return m.EnsureIndex(ctx, name, articleMapping)
+}
+
+// EnsureArticleIndex ensures the article index exists.
+func (m *ElasticsearchIndexManager) EnsureArticleIndex(ctx context.Context, name string) error {
+	return m.EnsureIndex(ctx, name, getArticleMapping())
 }
 
 // EnsurePageIndex ensures the page index exists.
