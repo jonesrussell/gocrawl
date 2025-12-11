@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -171,7 +172,8 @@ func (c *Client) doRequest(req *http.Request, result interface{}) error {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		// Provide more helpful error message for connection issues
-		if urlErr, ok := err.(*url.Error); ok {
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
 			if urlErr.Op == "dial" || urlErr.Err != nil {
 				return fmt.Errorf("failed to connect to sources API at %s: %w. Ensure the gosources service is running and accessible", c.baseURL, err)
 			}

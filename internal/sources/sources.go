@@ -263,7 +263,7 @@ func LoadSources(cfg config.Interface, log logger.Interface) (*Sources, error) {
 	if log != nil {
 		log.Info("Loading sources from API", "url", crawlerCfg.SourcesAPIURL)
 	}
-	sources, err = loadSourcesFromAPI(crawlerCfg.SourcesAPIURL)
+	sources, err = loadSourcesFromAPI(crawlerCfg.SourcesAPIURL, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sources from API: %w", err)
 	}
@@ -281,8 +281,8 @@ func LoadSources(cfg config.Interface, log logger.Interface) (*Sources, error) {
 }
 
 // loadSourcesFromAPI attempts to load sources from the gosources API
-func loadSourcesFromAPI(apiURL string) ([]Config, error) {
-	apiLoader := loader.NewAPILoader(apiURL)
+func loadSourcesFromAPI(apiURL string, log logger.Interface) ([]Config, error) {
+	apiLoader := loader.NewAPILoader(apiURL, log)
 
 	configs, err := apiLoader.LoadSources()
 	if err != nil {
@@ -472,9 +472,8 @@ func (s *Sources) ValidateSource(
 
 	// If exact match not found, try case-insensitive match
 	if selectedSource == nil {
-		sourceNameLower := strings.ToLower(sourceName)
 		for i := range sourceConfigs {
-			if strings.ToLower(sourceConfigs[i].Name) == sourceNameLower {
+			if strings.EqualFold(sourceConfigs[i].Name, sourceName) {
 				selectedSource = &sourceConfigs[i]
 				break
 			}

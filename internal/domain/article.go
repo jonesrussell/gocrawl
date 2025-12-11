@@ -129,21 +129,21 @@ func (a *Article) PrepareForIndexing() {
 	if strings.TrimSpace(a.CanonicalURL) == "" {
 		a.CanonicalURL = ""
 	}
-	
+
 	// Remove duplicate OG fields - only store if they differ from canonical fields
 	// This prevents storing duplicate data while preserving unique OG metadata
 	if strings.TrimSpace(a.OgTitle) == strings.TrimSpace(a.Title) {
 		a.OgTitle = "" // Will be omitted by omitempty
 	}
-	if strings.TrimSpace(a.OgDescription) == strings.TrimSpace(a.Description) || 
-	   strings.TrimSpace(a.OgDescription) == strings.TrimSpace(a.Intro) {
+	if strings.TrimSpace(a.OgDescription) == strings.TrimSpace(a.Description) ||
+		strings.TrimSpace(a.OgDescription) == strings.TrimSpace(a.Intro) {
 		a.OgDescription = "" // Will be omitted by omitempty
 	}
-	if strings.TrimSpace(a.OgURL) == strings.TrimSpace(a.CanonicalURL) || 
-	   strings.TrimSpace(a.OgURL) == strings.TrimSpace(a.Source) {
+	if strings.TrimSpace(a.OgURL) == strings.TrimSpace(a.CanonicalURL) ||
+		strings.TrimSpace(a.OgURL) == strings.TrimSpace(a.Source) {
 		a.OgURL = "" // Will be omitted by omitempty
 	}
-	
+
 	// Clean OG fields
 	if strings.TrimSpace(a.OgTitle) == "" {
 		a.OgTitle = ""

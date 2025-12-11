@@ -41,7 +41,9 @@ Example:
 	cmd.Flags().StringVarP(&validateSourceName, "source", "s", "", "Source name to validate (required)")
 	cmd.Flags().IntVarP(&validateSamples, "samples", "n", 5, "Number of sample articles to test (default: 5)")
 	cmd.Flags().StringSliceVarP(&validateURLs, "urls", "u", []string{}, "Specific article URLs to test (overrides samples)")
-	cmd.MarkFlagRequired("source")
+	if err := cmd.MarkFlagRequired("source"); err != nil {
+		return nil
+	}
 
 	return cmd
 }

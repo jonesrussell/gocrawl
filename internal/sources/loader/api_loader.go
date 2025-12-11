@@ -5,19 +5,22 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jonesrussell/gocrawl/internal/logger"
 	"github.com/jonesrussell/gocrawl/internal/sources/apiclient"
 )
 
 // APILoader handles loading source configurations from the gosources API.
 type APILoader struct {
 	client *apiclient.Client
+	logger logger.Interface
 }
 
 // NewAPILoader creates a new APILoader instance.
-func NewAPILoader(apiURL string) *APILoader {
+func NewAPILoader(apiURL string, log logger.Interface) *APILoader {
 	client := apiclient.NewClient(apiclient.WithBaseURL(apiURL))
 	return &APILoader{
 		client: client,
+		logger: log,
 	}
 }
 
@@ -40,6 +43,18 @@ func (l *APILoader) LoadSources() ([]Config, error) {
 		cfg, err := convertAPISourceToConfig(&apiSources[i])
 		if err != nil {
 			// Log the error but continue processing other sources
+			sourceName := "unknown"
+			if apiSources[i].Name != "" {
+				sourceName = apiSources[i].Name
+			} else if apiSources[i].URL != "" {
+				sourceName = apiSources[i].URL
+			}
+			if l.logger != nil {
+				l.logger.Warn("Failed to convert source from API, skipping",
+					"source", sourceName,
+					"error", err,
+				)
+			}
 			continue
 		}
 		configs = append(configs, cfg)
