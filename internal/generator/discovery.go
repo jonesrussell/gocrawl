@@ -23,6 +23,12 @@ const (
 	minConfidence           = 0.60
 	linkLowConfidence       = 0.70
 	linkMinConfidence       = 0.75
+	// Body selector confidence values
+	semanticBodyConfidence = 0.90
+	classBodyConfidence    = 0.85
+	// Confidence bonuses for body content length
+	longContentBonus   = 0.05
+	mediumContentBonus = 0.02
 )
 
 // SelectorDiscovery analyzes HTML documents to discover CSS selectors
@@ -186,7 +192,7 @@ func (sd *SelectorDiscovery) DiscoverBody() SelectorCandidate {
 		"main article",
 		"article .article-content",
 	}
-	sd.processBodySelectors(&candidate, semanticSelectors, 0.90)
+	sd.processBodySelectors(&candidate, semanticSelectors, semanticBodyConfidence)
 
 	classPatterns := []string{
 		".article-body",
@@ -196,13 +202,17 @@ func (sd *SelectorDiscovery) DiscoverBody() SelectorCandidate {
 		".content",
 		"main .content",
 	}
-	sd.processBodySelectors(&candidate, classPatterns, 0.85)
+	sd.processBodySelectors(&candidate, classPatterns, classBodyConfidence)
 
 	return candidate
 }
 
 // processBodySelectors processes body selectors with confidence calculation.
-func (sd *SelectorDiscovery) processBodySelectors(candidate *SelectorCandidate, selectors []string, baseConfidence float64) {
+func (sd *SelectorDiscovery) processBodySelectors(
+	candidate *SelectorCandidate,
+	selectors []string,
+	baseConfidence float64,
+) {
 	const longContentThreshold = 500
 	const mediumContentThreshold = 200
 
@@ -228,10 +238,10 @@ func (sd *SelectorDiscovery) processBodySelectors(candidate *SelectorCandidate, 
 // calculateBodyConfidence calculates confidence based on content length.
 func calculateBodyConfidence(length int, baseConfidence, longThreshold, mediumThreshold float64) float64 {
 	if length > int(longThreshold) {
-		return baseConfidence + 0.05
+		return baseConfidence + longContentBonus
 	}
 	if length > int(mediumThreshold) {
-		return baseConfidence + 0.02
+		return baseConfidence + mediumContentBonus
 	}
 	return baseConfidence
 }
@@ -485,9 +495,8 @@ func (sd *SelectorDiscovery) DiscoverLinks() SelectorCandidate {
 }
 
 // collectLinkSelectors collects link selectors from the document.
-func (sd *SelectorDiscovery) collectLinkSelectors(patterns []string) (map[string]int, string) {
-	linkSelectors := make(map[string]int)
-	var sampleHref string
+func (sd *SelectorDiscovery) collectLinkSelectors(patterns []string) (linkSelectors map[string]int, sampleHref string) {
+	linkSelectors = make(map[string]int)
 
 	sd.doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
 		href, exists := s.Attr("href")

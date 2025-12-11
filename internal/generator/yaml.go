@@ -80,7 +80,7 @@ func writeSelectorField(builder *strings.Builder, fieldName string, candidate Se
 	builder.WriteString(": \"")
 	builder.WriteString(strings.Join(candidate.Selectors, ", "))
 	builder.WriteString("\"  # Confidence: ")
-	builder.WriteString(fmt.Sprintf("%.2f", candidate.Confidence))
+	fmt.Fprintf(builder, "%.2f", candidate.Confidence)
 	builder.WriteString("\n")
 
 	if candidate.SampleText != "" {

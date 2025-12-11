@@ -75,8 +75,8 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Write output
-	if err := writeOutput(yamlContent); err != nil {
-		return err
+	if writeErr := writeOutput(yamlContent); writeErr != nil {
+		return writeErr
 	}
 
 	// Print success message
@@ -131,7 +131,10 @@ func discoverSelectors(sourceURL string) (generator.DiscoveryResult, error) {
 }
 
 // discoverAndMergeArticleSelectors fetches article page and merges results.
-func discoverAndMergeArticleSelectors(articleURL string, mainResult generator.DiscoveryResult) (generator.DiscoveryResult, error) {
+func discoverAndMergeArticleSelectors(
+	articleURL string,
+	mainResult generator.DiscoveryResult,
+) (generator.DiscoveryResult, error) {
 	fmt.Fprintf(os.Stderr, "🔍 Analyzing article page %s...\n", articleURL)
 
 	articleDoc, fetchErr := fetchDocument(articleURL)
