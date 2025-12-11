@@ -49,8 +49,10 @@ type Config struct {
 	Delay time.Duration `yaml:"delay"`
 	// RandomDelay is the random delay to add to the base delay
 	RandomDelay time.Duration `yaml:"random_delay"`
-	// SourceFile is the path to the sources configuration file
+	// SourceFile is the path to the sources configuration file (deprecated, use SourcesAPIURL)
 	SourceFile string `yaml:"source_file"`
+	// SourcesAPIURL is the URL of the gosources API service
+	SourcesAPIURL string `yaml:"sources_api_url"`
 	// Debug enables debug logging
 	Debug bool `yaml:"debug"`
 	// TLS contains TLS configuration
@@ -102,6 +104,7 @@ func New(opts ...Option) *Config {
 		AllowedDomains:    []string{"*"},
 		DisallowedDomains: []string{},
 		SourceFile:        "sources.yml",
+		SourcesAPIURL:     "http://localhost:8050/api/v1/sources",
 		Debug:             false,
 		TLS: TLSConfig{
 			InsecureSkipVerify:       false, // Default to secure TLS verification
@@ -277,6 +280,7 @@ func LoadFromViper(v *viper.Viper) *Config {
 	cfg.Delay = v.GetDuration("crawler.delay")
 	cfg.RandomDelay = v.GetDuration("crawler.random_delay")
 	cfg.SourceFile = v.GetString("crawler.source_file")
+	cfg.SourcesAPIURL = v.GetString("crawler.sources_api_url")
 	cfg.Debug = v.GetBool("crawler.debug")
 	// Only set MaxRetries if it's actually set and > 0 in Viper
 	// This prevents overwriting the default with 0 when defaults haven't been loaded yet
